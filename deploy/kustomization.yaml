@@ -1,0 +1,18 @@
+images:
+- name: controller
+  newName: quay.io/periklis/multi-cluster-observability-addon
+  newTag: 0.0.1
+
+namespace: open-cluster-management
+
+resources:
+- resources/cluster_role_binding.yaml
+- resources/cluster_role.yaml
+- resources/manager_deployment.yaml
+- resources/service_account.yaml
+- resources/cluster-management-addon.yaml
+- resources/addondeploymentconfig.yaml
+- crds/logging.openshift.io_clusterlogforwarders.yaml
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization

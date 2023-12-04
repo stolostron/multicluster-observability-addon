@@ -1,0 +1,13 @@
+apiVersion: logging.openshift.io/v1
+kind: ClusterLogging
+metadata:
+  name: instance
+  namespace: openshift-logging
+  labels:
+    app: {{ template "lokihelm.name" . }}
+    chart: {{ template "lokihelm.chart" . }}
+    release: {{ .Release.Name }}
+spec:
+  collection:
+    type: vector
+  managementState: Managed

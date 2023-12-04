@@ -1,0 +1,11 @@
+apiVersion: logging.openshift.io/v1
+kind: ClusterLogForwarder
+metadata:
+  name: instance
+  namespace: openshift-logging
+  labels:
+    app: {{ template "lokihelm.name" . }}
+    chart: {{ template "lokihelm.chart" . }}
+    release: {{ .Release.Name }}
+spec:
+{{- fromJson .Values.clfSpec | toYaml | nindent 2 }}

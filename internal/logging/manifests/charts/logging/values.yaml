@@ -1,0 +1,5 @@
+nameOverride: null
+
+clfSpec: ""
+
+loggingSubscriptionChannel: channelName

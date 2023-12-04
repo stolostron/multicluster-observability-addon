@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: openshift-logging
+  labels:
+    app: {{ template "lokihelm.name" . }}
+    chart: {{ template "lokihelm.chart" . }}
+    release: {{ .Release.Name }}

@@ -1,0 +1,9 @@
+apiVersion: addon.open-cluster-management.io/v1alpha1
+kind: AddOnDeploymentConfig
+metadata:
+  name: multicluster-observability-addon
+  namespace: open-cluster-management
+spec:
+  customizedVariables:
+    - name: loggingSubscriptionChannel
+      value: stable-5.8
