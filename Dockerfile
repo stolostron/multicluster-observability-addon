@@ -14,13 +14,13 @@ COPY main.go main.go
 COPY internal/ internal/
 
 # Build
-RUN CGO_ENABLED=0 GOOS=linux GO111MODULE=on go build -mod=readonly -a -o multi-cluster-observability-addon main.go
+RUN CGO_ENABLED=0 GOOS=linux GO111MODULE=on go build -mod=readonly -a -o multicluster-observability-addon main.go
 
 # Use distroless as minimal base image to package the manager binary
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
 FROM gcr.io/distroless/static:nonroot
 WORKDIR /
-COPY --from=builder /workspace/multi-cluster-observability-addon .
+COPY --from=builder /workspace/multicluster-observability-addon .
 USER 65532:65532
 
-ENTRYPOINT ["/multi-cluster-observability-addon"]
+ENTRYPOINT ["/multicluster-observability-addon"]

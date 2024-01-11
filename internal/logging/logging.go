@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 
 	loggingv1 "github.com/openshift/cluster-logging-operator/apis/logging/v1"
-	"github.com/stolostron/multi-cluster-observability-addon/internal/addon"
+	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"

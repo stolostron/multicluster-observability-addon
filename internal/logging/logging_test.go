@@ -23,7 +23,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	"github.com/stolostron/multi-cluster-observability-addon/internal/addon"
+	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 )
 
 var (
@@ -50,14 +50,14 @@ func TestNewLoggingAgentAddon_WithFleetWideSubscriptionChannel(t *testing.T) {
 			},
 			ConfigReferent: addonapiv1alpha1.ConfigReferent{
 				Namespace: "open-cluster-management",
-				Name:      "multi-cluster-observability-addon",
+				Name:      "multicluster-observability-addon",
 			},
 		},
 	}
 
 	addOnDeploymentConfig = &addonapiv1alpha1.AddOnDeploymentConfig{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "multi-cluster-observability-addon",
+			Name:      "multicluster-observability-addon",
 			Namespace: "open-cluster-management",
 		},
 		Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
@@ -128,7 +128,7 @@ func TestNewLoggingAgentAddon_WithFleetWideClusterLogForwarder_AndAllConfigsToge
 			},
 			ConfigReferent: addonapiv1alpha1.ConfigReferent{
 				Namespace: "open-cluster-management",
-				Name:      "multi-cluster-observability-addon",
+				Name:      "multicluster-observability-addon",
 			},
 		},
 		{
@@ -272,7 +272,7 @@ func TestNewLoggingAgentAddon_WithFleetWideClusterLogForwarder_AndAllConfigsToge
 
 	addOnDeploymentConfig = &addonapiv1alpha1.AddOnDeploymentConfig{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "multi-cluster-observability-addon",
+			Name:      "multicluster-observability-addon",
 			Namespace: "open-cluster-management",
 		},
 		Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{

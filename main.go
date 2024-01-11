@@ -13,8 +13,8 @@ import (
 	operatorsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	"github.com/stolostron/multi-cluster-observability-addon/internal/addon"
-	"github.com/stolostron/multi-cluster-observability-addon/internal/logging"
+	"github.com/stolostron/multicluster-observability-addon/internal/addon"
+	"github.com/stolostron/multicluster-observability-addon/internal/logging"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -49,8 +49,8 @@ func main() {
 
 func newCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "multi-cluster-observability-addon",
-		Short: "multi-cluster-observability-addon",
+		Use:   "multicluster-observability-addon",
+		Short: "multicluster-observability-addon",
 		Run: func(cmd *cobra.Command, _ []string) {
 			if err := cmd.Help(); err != nil {
 				fmt.Fprintf(os.Stderr, "%v\n", err)
@@ -72,7 +72,7 @@ func newCommand() *cobra.Command {
 
 func newControllerCommand() *cobra.Command {
 	cmd := cmdfactory.
-		NewControllerCommandConfig("multi-cluster-observability-addon-controller", version.Get(), runController).
+		NewControllerCommandConfig("multicluster-observability-addon-controller", version.Get(), runController).
 		NewCommand()
 	cmd.Use = "controller"
 	cmd.Short = "Start the addon controller"
