@@ -5,8 +5,8 @@ metadata:
   namespace: openshift-logging
   labels:
     operators.coreos.com/cluster-logging.openshift-logging: ''
-    app: {{ template "lokihelm.name" . }}
-    chart: {{ template "lokihelm.chart" . }}
+    app: {{ template "logginghelm.name" . }}
+    chart: {{ template "logginghelm.chart" . }}
     release: {{ .Release.Name }}
 spec:
   channel: {{ .Values.loggingSubscriptionChannel }}
