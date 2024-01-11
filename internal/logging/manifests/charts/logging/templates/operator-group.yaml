@@ -6,8 +6,8 @@ metadata:
   annotations:
     olm.providedAPIs: ClusterLogForwarder.v1.logging.openshift.io,ClusterLogging.v1.logging.openshift.io
   labels:
-    app: {{ template "lokihelm.name" . }}
-    chart: {{ template "lokihelm.chart" . }}
+    app: {{ template "logginghelm.name" . }}
+    chart: {{ template "logginghelm.chart" . }}
     release: {{ .Release.Name }}
 spec:
   targetNamespaces:

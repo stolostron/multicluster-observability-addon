@@ -4,8 +4,8 @@ metadata:
   name: instance
   namespace: openshift-logging
   labels:
-    app: {{ template "lokihelm.name" . }}
-    chart: {{ template "lokihelm.chart" . }}
+    app: {{ template "logginghelm.name" . }}
+    chart: {{ template "logginghelm.chart" . }}
     release: {{ .Release.Name }}
 spec:
   collection:

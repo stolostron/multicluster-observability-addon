@@ -6,6 +6,10 @@ kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: open-cluster-management:logging-addon:klusterlet-work:agent
+  labels:
+    app: {{ template "logginghelm.name" . }}
+    chart: {{ template "logginghelm.chart" . }}
+    release: {{ .Release.Name }}
 rules:
   - apiGroups: ["operators.coreos.com"]
     resources: ["operatorgroups"]
