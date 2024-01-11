@@ -17,7 +17,7 @@ REGISTRY_BASE_OPENSHIFT = quay.io/openshift-logging
 REGISTRY_BASE ?= $(REGISTRY_BASE_OPENSHIFT)
 
 # Image URL to use all building/pushing image targets
-IMG ?= $(REGISTRY_BASE)/multi-cluster-observability-addon:$(VERSION)
+IMG ?= $(REGISTRY_BASE)/multicluster-observability-addon:$(VERSION)
 
 .PHONY: deps
 deps: go.mod go.sum
@@ -50,7 +50,7 @@ test:
 
 .PHONY: addon
 addon: deps ## Build addon binary
-	go build -o bin/multi-cluster-observability-addon main.go
+	go build -o bin/multicluster-observability-addon main.go
 
 .PHONY: oci-build
 oci-build: ## Build the image
