@@ -1,0 +1,51 @@
+name: addon images
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  IMAGE_REGISTRY: quay.io
+  IMAGE_ORGANIZATION: rhobs
+  IMAGE_ADDON_NAME: multicluster-observability-addon
+  IMAGE_VERSION: v0.0.1
+
+jobs:
+ publish-image:
+   runs-on: ubuntu-latest
+   steps:
+     - uses: actions/checkout@v3
+
+     - name: Set up QEMU
+       uses: docker/setup-qemu-action@v3
+
+     - name: Set up Docker Buildx
+       uses: docker/setup-buildx-action@v3
+
+     - name: Login to Quay.io
+       uses: docker/login-action@v3
+       with:
+         registry: quay.io
+         logout: true
+         username: ${{ secrets.RHOBS_USER }}
+         password: ${{ secrets.RHOBS_PASS }}
+
+     - name: Get image tags
+       id: image_tags
+       run: |
+         PULLSPEC="$IMAGE_REGISTRY/$IMAGE_ORGANIZATION/$IMAGE_ADDON_NAME"
+         TAGS=("$PULLSPEC:latest", "$PULLSPEC:$IMAGE_VERSION")
+         BUILD_DATE="$(date -u +'%Y-%m-%d')"
+         VCS_BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+         VCS_REF="$(git rev-parse --short HEAD)"
+         TAGS+=("$PULLSPEC:$VCS_BRANCH-$BUILD_DATE-$VCS_REF")
+         IMAGE_TAGS=$(IFS=$','; echo "${TAGS[*]}")
+         echo "IMAGE_TAGS=$IMAGE_TAGS" >> $GITHUB_OUTPUT
+
+     - name: Build and publish image on quay.io
+       uses: docker/build-push-action@v5
+       with:
+         push: true
+         tags: "${{ steps.image_tags.outputs.IMAGE_TAGS }}"
