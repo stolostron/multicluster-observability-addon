@@ -14,7 +14,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
-	"github.com/stolostron/multicluster-observability-addon/internal/logging"
+	addonhelm "github.com/stolostron/multicluster-observability-addon/internal/addon/helm"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -27,6 +27,7 @@ import (
 	cmdfactory "open-cluster-management.io/addon-framework/pkg/cmd/factory"
 	"open-cluster-management.io/addon-framework/pkg/utils"
 	"open-cluster-management.io/addon-framework/pkg/version"
+	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
@@ -92,7 +93,7 @@ func runController(ctx context.Context, kubeConfig *rest.Config) error {
 		return err
 	}
 
-	registrationOption := logging.NewRegistrationOption(utilrand.String(5))
+	registrationOption := addon.NewRegistrationOption(utilrand.String(5))
 
 	// Necessary to reconcile ClusterLogging and ClusterLogForwarder
 	err = loggingapis.AddToScheme(scheme.Scheme)
@@ -106,6 +107,12 @@ func runController(ctx context.Context, kubeConfig *rest.Config) error {
 	}
 	// Necessary to reconcile Subscriptions
 	err = operatorsv1alpha1.AddToScheme(scheme.Scheme)
+	if err != nil {
+		return err
+	}
+
+	// Reconcile AddOnDeploymentConfig
+	err = addonapiv1alpha1.AddToScheme(scheme.Scheme)
 	if err != nil {
 		return err
 	}
@@ -136,14 +143,14 @@ func runController(ctx context.Context, kubeConfig *rest.Config) error {
 		addonfactory.ToAddOnCustomizedVariableValues,
 	)
 
-	loggingAgentAddon, err := addonfactory.NewAgentAddonFactory(addon.Name, logging.FS, "manifests/charts/logging").
+	loggingAgentAddon, err := addonfactory.NewAgentAddonFactory(addon.Name, addon.FS, "manifests/charts/mcoa").
 		WithConfigGVRs(
 			schema.GroupVersionResource{Version: "v1", Resource: "secrets"},
 			schema.GroupVersionResource{Version: "v1", Resource: "configmaps"},
 			schema.GroupVersionResource{Version: "v1", Group: "logging.openshift.io", Resource: "clusterlogforwarders"},
 			utils.AddOnDeploymentConfigGVR,
 		).
-		WithGetValuesFuncs(addonConfigValuesFn, logging.GetValuesFunc(k8sClient)).
+		WithGetValuesFuncs(addonConfigValuesFn, addonhelm.GetValuesFunc(k8sClient)).
 		WithAgentRegistrationOption(registrationOption).
 		WithScheme(scheme.Scheme).
 		BuildHelmAgentAddon()

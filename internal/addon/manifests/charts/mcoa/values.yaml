@@ -1,0 +1,10 @@
+nameOverride: null
+
+metrics:
+  enabled: true
+
+logging:
+  enabled: true
+
+tracing:
+  enabled: true

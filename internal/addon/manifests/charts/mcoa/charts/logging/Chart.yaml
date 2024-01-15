@@ -1,4 +1,4 @@
-apiVersion: v1
+apiVersion: v2
 description: A Helm chart for installing log collection and forwarding
 name: logging
 version: 1.0.0
