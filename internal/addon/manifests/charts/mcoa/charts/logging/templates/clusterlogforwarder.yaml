@@ -1,3 +1,4 @@
+{{- if .Values.enabled }}
 apiVersion: logging.openshift.io/v1
 kind: ClusterLogForwarder
 metadata:
@@ -9,3 +10,4 @@ metadata:
     release: {{ .Release.Name }}
 spec:
 {{- fromJson .Values.clfSpec | toYaml | nindent 2 }}
+{{- end }}

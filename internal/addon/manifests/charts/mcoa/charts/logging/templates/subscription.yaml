@@ -1,3 +1,4 @@
+{{- if .Values.enabled }}
 apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
 metadata:
@@ -14,3 +15,4 @@ spec:
   name: cluster-logging
   source: redhat-operators
   sourceNamespace: openshift-marketplace
+{{- end }}

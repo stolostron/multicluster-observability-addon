@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"testing"
 
-	loggingapis "github.com/openshift/cluster-logging-operator/apis"
 	loggingv1 "github.com/openshift/cluster-logging-operator/apis/logging/v1"
+	"github.com/stolostron/multicluster-observability-addon/internal/addon"
+
+	loggingapis "github.com/openshift/cluster-logging-operator/apis"
 	operatorsv1 "github.com/operator-framework/api/pkg/operators/v1"
 	operatorsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	"github.com/stretchr/testify/require"
@@ -22,8 +24,6 @@ import (
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-
-	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 )
 
 var (
@@ -31,6 +31,20 @@ var (
 	_ = operatorsv1.AddToScheme(scheme.Scheme)
 	_ = operatorsv1alpha1.AddToScheme(scheme.Scheme)
 )
+
+func testingGetValues(k8s client.Client) addonfactory.GetValuesFunc {
+	return func(
+		cluster *clusterv1.ManagedCluster,
+		addon *addonapiv1alpha1.ManagedClusterAddOn,
+	) (addonfactory.Values, error) {
+		logging, err := GetValuesFunc(k8s, cluster, addon, nil)
+		if err != nil {
+			return nil, err
+		}
+
+		return addonfactory.JsonStructToValues(logging)
+	}
+}
 
 func TestNewLoggingAgentAddon_WithFleetWideSubscriptionChannel(t *testing.T) {
 	var (
@@ -76,7 +90,7 @@ func TestNewLoggingAgentAddon_WithFleetWideSubscriptionChannel(t *testing.T) {
 		addonfactory.ToAddOnCustomizedVariableValues,
 	)
 
-	loggingAgentAddon, err := addonfactory.NewAgentAddonFactory(addon.Name, FS, "manifests/charts/logging").
+	loggingAgentAddon, err := addonfactory.NewAgentAddonFactory(addon.Name, addon.FS, "manifests/charts/mcoa/charts/logging").
 		WithGetValuesFuncs(addonConfigValuesFn).
 		WithAgentRegistrationOption(&agent.RegistrationOption{}).
 		WithScheme(scheme.Scheme).
@@ -87,7 +101,7 @@ func TestNewLoggingAgentAddon_WithFleetWideSubscriptionChannel(t *testing.T) {
 
 	objects, err := loggingAgentAddon.Manifests(managedCluster, managedClusterAddOn)
 	require.NoError(t, err)
-	require.Equal(t, 8, len(objects))
+	require.Equal(t, 6, len(objects))
 
 	for _, obj := range objects {
 		switch obj := obj.(type) {
@@ -299,8 +313,8 @@ func TestNewLoggingAgentAddon_WithFleetWideClusterLogForwarder_AndAllConfigsToge
 	)
 
 	// Wire everything together to a fake addon instance
-	loggingAgentAddon, err := addonfactory.NewAgentAddonFactory(addon.Name, FS, "manifests/charts/logging").
-		WithGetValuesFuncs(addonConfigValuesFn, GetValuesFunc(fakeKubeClient)).
+	loggingAgentAddon, err := addonfactory.NewAgentAddonFactory(addon.Name, addon.FS, "manifests/charts/mcoa/charts/logging").
+		WithGetValuesFuncs(addonConfigValuesFn, testingGetValues(fakeKubeClient)).
 		WithAgentRegistrationOption(&agent.RegistrationOption{}).
 		WithScheme(scheme.Scheme).
 		BuildHelmAgentAddon()
@@ -311,7 +325,7 @@ func TestNewLoggingAgentAddon_WithFleetWideClusterLogForwarder_AndAllConfigsToge
 	// Render manifests and return them as k8s runtime objects
 	objects, err := loggingAgentAddon.Manifests(managedCluster, managedClusterAddOn)
 	require.NoError(t, err)
-	require.Equal(t, 8, len(objects))
+	require.Equal(t, 6, len(objects))
 
 	for _, obj := range objects {
 		switch obj := obj.(type) {
