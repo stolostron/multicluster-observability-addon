@@ -32,7 +32,7 @@ var (
 	_ = operatorsv1alpha1.AddToScheme(scheme.Scheme)
 )
 
-func testingGetValues(k8s client.Client) addonfactory.GetValuesFunc {
+func fakeGetValues(k8s client.Client) addonfactory.GetValuesFunc {
 	return func(
 		cluster *clusterv1.ManagedCluster,
 		addon *addonapiv1alpha1.ManagedClusterAddOn,
@@ -53,8 +53,8 @@ func TestNewLoggingAgentAddon_WithFleetWideSubscriptionChannel(t *testing.T) {
 		addOnDeploymentConfig *addonapiv1alpha1.AddOnDeploymentConfig
 	)
 
-	managedCluster = addontesting.NewManagedCluster("cluster1")
-	managedClusterAddOn = addontesting.NewAddon("test", "cluster1")
+	managedCluster = addontesting.NewManagedCluster("cluster-1")
+	managedClusterAddOn = addontesting.NewAddon("test", "cluster-1")
 
 	managedClusterAddOn.Status.ConfigReferences = []addonapiv1alpha1.ConfigReference{
 		{
@@ -129,11 +129,10 @@ func TestNewLoggingAgentAddon_WithFleetWideClusterLogForwarder_AndAllConfigsToge
 	)
 
 	// Setup a managed cluster
-	managedCluster = addontesting.NewManagedCluster("cluster1")
-	managedCluster.SetNamespace("cluster-1")
+	managedCluster = addontesting.NewManagedCluster("cluster-1")
 
 	// Register the addon for the managed cluster
-	managedClusterAddOn = addontesting.NewAddon("test", "cluster1")
+	managedClusterAddOn = addontesting.NewAddon("test", "cluster-1")
 	managedClusterAddOn.Status.ConfigReferences = []addonapiv1alpha1.ConfigReference{
 		{
 			ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
@@ -161,7 +160,7 @@ func TestNewLoggingAgentAddon_WithFleetWideClusterLogForwarder_AndAllConfigsToge
 				Resource: "secrets",
 			},
 			ConfigReferent: addonapiv1alpha1.ConfigReferent{
-				Namespace: managedCluster.Namespace,
+				Namespace: managedCluster.Name,
 				Name:      fmt.Sprintf("%s-app-logs", managedCluster.Name),
 			},
 		},
@@ -171,7 +170,7 @@ func TestNewLoggingAgentAddon_WithFleetWideClusterLogForwarder_AndAllConfigsToge
 				Resource: "secrets",
 			},
 			ConfigReferent: addonapiv1alpha1.ConfigReferent{
-				Namespace: managedCluster.Namespace,
+				Namespace: managedCluster.Name,
 				Name:      fmt.Sprintf("%s-cluster-logs", managedCluster.Name),
 			},
 		},
@@ -181,7 +180,7 @@ func TestNewLoggingAgentAddon_WithFleetWideClusterLogForwarder_AndAllConfigsToge
 				Resource: "configmaps",
 			},
 			ConfigReferent: addonapiv1alpha1.ConfigReferent{
-				Namespace: managedCluster.Namespace,
+				Namespace: managedCluster.Name,
 				Name:      fmt.Sprintf("%s-app-logs", managedCluster.Name),
 			},
 		},
@@ -246,9 +245,9 @@ func TestNewLoggingAgentAddon_WithFleetWideClusterLogForwarder_AndAllConfigsToge
 	appLogsSecret = &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-app-logs", managedCluster.Name),
-			Namespace: managedCluster.Namespace,
+			Namespace: managedCluster.Name,
 			Annotations: map[string]string{
-				AnnotationTargetOutputName: "app-logs",
+				annotationTargetOutputName: "app-logs",
 			},
 		},
 		Data: map[string][]byte{
@@ -260,9 +259,9 @@ func TestNewLoggingAgentAddon_WithFleetWideClusterLogForwarder_AndAllConfigsToge
 	clusterLogsSecret = &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-cluster-logs", managedCluster.Name),
-			Namespace: managedCluster.Namespace,
+			Namespace: managedCluster.Name,
 			Annotations: map[string]string{
-				AnnotationTargetOutputName: "cluster-logs",
+				annotationTargetOutputName: "cluster-logs",
 			},
 		},
 		Data: map[string][]byte{
@@ -274,9 +273,9 @@ func TestNewLoggingAgentAddon_WithFleetWideClusterLogForwarder_AndAllConfigsToge
 	appLogsCm = &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-app-logs", managedCluster.Name),
-			Namespace: managedCluster.Namespace,
+			Namespace: managedCluster.Name,
 			Annotations: map[string]string{
-				AnnotationTargetOutputName: "app-logs",
+				annotationTargetOutputName: "app-logs",
 			},
 		},
 		Data: map[string]string{
@@ -313,8 +312,8 @@ func TestNewLoggingAgentAddon_WithFleetWideClusterLogForwarder_AndAllConfigsToge
 	)
 
 	// Wire everything together to a fake addon instance
-	loggingAgentAddon, err := addonfactory.NewAgentAddonFactory(addon.Name, addon.FS, "manifests/charts/mcoa/charts/logging").
-		WithGetValuesFuncs(addonConfigValuesFn, testingGetValues(fakeKubeClient)).
+	loggingAgentAddon, err := addonfactory.NewAgentAddonFactory(addon.Name, addon.FS, addon.LoggingChartDir).
+		WithGetValuesFuncs(addonConfigValuesFn, fakeGetValues(fakeKubeClient)).
 		WithAgentRegistrationOption(&agent.RegistrationOption{}).
 		WithScheme(scheme.Scheme).
 		BuildHelmAgentAddon()
