@@ -5,6 +5,10 @@ import "embed"
 const (
 	Name             = "multicluster-observability-addon"
 	InstallNamespace = "open-cluster-management"
+
+	MetricsChartDir = "manifests/charts/mcoa/charts/metrics"
+	LoggingChartDir = "manifests/charts/mcoa/charts/logging"
+	TracingChartDir = "manifests/charts/mcoa/charts/tracing"
 )
 
 //go:embed manifests
