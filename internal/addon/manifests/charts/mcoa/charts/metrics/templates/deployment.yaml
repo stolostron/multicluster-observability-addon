@@ -1,0 +1,86 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: metrics-addon-agent
+  namespace: {{ .AddonInstallNamespace }}
+  labels:
+    app.kubernetes.io/part-of: multicluster-observability-addon
+    app.kubernetes.io/component: metrics-agent
+    app.kubernetes.io/instance: metrics-agent
+    app.kubernetes.io/name: metrics-addon-agent
+    app.kubernetes.io/version: 2.48.1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/part-of: multicluster-observability-addon
+      app.kubernetes.io/component: metrics-agent
+      app.kubernetes.io/instance: metrics-agent
+      app.kubernetes.io/name: metrics-addon-agent
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/part-of: multicluster-observability-addon
+        app.kubernetes.io/component: metrics-agent
+        app.kubernetes.io/instance: metrics-agent
+        app.kubernetes.io/name: metrics-addon-agent
+    spec:
+      serviceAccountName: metrics-addon-sa
+      volumes:
+        - name: prometheus-config-volume
+          configMap:
+            name: prometheus-agent-conf
+            defaultMode: 420
+        - name: prometheus-storage-volume
+          emptyDir: {}
+        - name: serving-certs-ca-bundle
+          configMap:
+            name: client-serving-certs-ca-bundle
+        - name: observability-managed-cluster-certs
+          secret:
+            secretName: observability-managed-cluster-certs
+      containers:
+        - name: prometheus-agent
+          ports:
+            - containerPort: 9090
+              protocol: TCP
+          resources:
+            requests:
+              cpu: 500m
+              memory: 500M
+            limits:
+              cpu: 1
+              memory: 1Gi
+          imagePullPolicy: IfNotPresent
+          restartPolicy: Always
+          terminationGracePeriodSeconds: 30
+          dnsPolicy: ClusterFirst
+          securityContext: {}
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+            - name: prometheus-config-volume
+              mountPath: /etc/prometheus/
+            - name: prometheus-storage-volume
+              mountPath: /prometheus/
+            - name: observability-managed-cluster-certs
+              readOnly: true
+              mountPath: /tlscerts/certs
+            - name: observability-managed-cluster-certs
+              readOnly: true
+              mountPath: /tlscerts/ca
+            - name: serving-certs-ca-bundle
+              mountPath: /etc/serving-certs-ca-bundle
+              readOnly: false
+          image: "quay.io/prometheus/prometheus:v2.48.1"
+          args:
+            - "--log.level=debug"
+            - "--config.file=/etc/prometheus/prometheus.yml"
+            - "--storage.tsdb.path=/prometheus/"
+            - "--web.enable-lifecycle"
+            - "--enable-feature=agent"
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 25%
+      maxSurge: 25%

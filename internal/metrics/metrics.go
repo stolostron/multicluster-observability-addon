@@ -10,12 +10,10 @@ type MetricsValues struct {
 	Enabled bool `json:"enabled"`
 }
 
-func GetValuesFunc(k8s client.Client, cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) (MetricsValues, error) {
+func GetValuesFunc(_ client.Client, _ *clusterv1.ManagedCluster, _ *addonapiv1alpha1.ManagedClusterAddOn) (MetricsValues, error) {
 	values := MetricsValues{
 		Enabled: false,
 	}
-
-	// Get necessary values
 
 	values.Enabled = true
 	return values, nil
