@@ -1,7 +1,7 @@
 package logging
 
 const (
-	annotationTargetOutputName = "logging.openshift.io/target-output-name"
+	annotationTargetOutputName = "logging.mcoa.openshift.io/target-output-name"
 
 	subscriptionChannelValueKey = "loggingSubscriptionChannel"
 	defaultLoggingVersion       = "stable-5.8"
