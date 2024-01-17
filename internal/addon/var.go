@@ -18,6 +18,11 @@ const (
 	AdcMetricsDisabledKey = "metricsDisabled"
 	AdcLoggingDisabledKey = "loggingDisabled"
 	AdcTracingisabledKey  = "tracingDisabled"
+
+	SignalLabelKey = "mcoa.openshift.io/signal"
+	SignalMetrics  = "metrics"
+	SignalLogging  = "logging"
+	SignalTracing  = "tracing"
 )
 
 //go:embed manifests

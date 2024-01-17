@@ -246,6 +246,9 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-app-logs", managedCluster.Name),
 			Namespace: managedCluster.Name,
+			Labels: map[string]string{
+				"mcoa.openshift.io/signal": "logging",
+			},
 			Annotations: map[string]string{
 				annotationTargetOutputName: "app-logs",
 			},
@@ -260,6 +263,9 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-cluster-logs", managedCluster.Name),
 			Namespace: managedCluster.Name,
+			Labels: map[string]string{
+				"mcoa.openshift.io/signal": "logging",
+			},
 			Annotations: map[string]string{
 				annotationTargetOutputName: "cluster-logs",
 			},
@@ -274,6 +280,9 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-app-logs", managedCluster.Name),
 			Namespace: managedCluster.Name,
+			Labels: map[string]string{
+				"mcoa.openshift.io/signal": "logging",
+			},
 			Annotations: map[string]string{
 				annotationTargetOutputName: "app-logs",
 			},

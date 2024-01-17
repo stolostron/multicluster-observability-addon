@@ -175,6 +175,9 @@ func Test_BuildCLFSpec(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-app-logs", clusterName),
 			Namespace: clusterName,
+			Labels: map[string]string{
+				"mcoa.openshift.io/signal": "logging",
+			},
 			Annotations: map[string]string{
 				annotationTargetOutputName: "app-logs",
 			},
@@ -189,6 +192,9 @@ func Test_BuildCLFSpec(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-cluster-logs", clusterName),
 			Namespace: clusterName,
+			Labels: map[string]string{
+				"mcoa.openshift.io/signal": "logging",
+			},
 			Annotations: map[string]string{
 				annotationTargetOutputName: "cluster-logs",
 			},
@@ -203,6 +209,9 @@ func Test_BuildCLFSpec(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-app-logs", clusterName),
 			Namespace: clusterName,
+			Labels: map[string]string{
+				"mcoa.openshift.io/signal": "logging",
+			},
 			Annotations: map[string]string{
 				annotationTargetOutputName: "app-logs",
 			},
@@ -229,81 +238,139 @@ func Test_BuildCLFSpec(t *testing.T) {
 }
 
 func Test_TemplateWithConfigMap(t *testing.T) {
-	configReference := addonapiv1alpha1.ConfigReference{
-		ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
-			Group:    "",
-			Resource: "configmap",
+	for _, tc := range []struct {
+		name           string
+		signalLabel    bool
+		configMapUrl   string
+		expectedCLFUrl string
+	}{
+		{
+			name:           "SignalAnnotationSet",
+			signalLabel:    true,
+			configMapUrl:   "http://foo.bar",
+			expectedCLFUrl: "http://foo.bar",
 		},
-		ConfigReferent: addonapiv1alpha1.ConfigReferent{
-			Namespace: "cluster-1",
-			Name:      "cluster-1",
+		{
+			name:           "SignalAnnotationNotSet",
+			signalLabel:    false,
+			configMapUrl:   "http://foo.bar",
+			expectedCLFUrl: "",
 		},
-	}
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			configReference := addonapiv1alpha1.ConfigReference{
+				ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+					Group:    "",
+					Resource: "configmap",
+				},
+				ConfigReferent: addonapiv1alpha1.ConfigReferent{
+					Namespace: "cluster-1",
+					Name:      "cluster-1",
+				},
+			}
 
-	cm := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "cluster-1",
-			Namespace: "cluster-1",
-			Annotations: map[string]string{
-				"logging.mcoa.openshift.io/target-output-name": "foo",
-			},
-		},
-		Data: map[string]string{
-			"url": "http://foo.bar",
-		},
-	}
-	client := fake.NewClientBuilder().
-		WithObjects(cm).
-		Build()
+			cm := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "cluster-1",
+					Namespace: "cluster-1",
+					Annotations: map[string]string{
+						"logging.mcoa.openshift.io/target-output-name": "foo",
+					},
+				},
+				Data: map[string]string{
+					"url": "http://foo.bar",
+				},
+			}
 
-	spec := &loggingv1.ClusterLogForwarderSpec{
-		Outputs: []loggingv1.OutputSpec{
-			{
-				Name: "foo",
-			},
-		},
-	}
+			if tc.signalLabel {
+				cm.Labels = map[string]string{
+					"mcoa.openshift.io/signal": "logging",
+				}
+			}
 
-	err := templateWithConfigMap(client, spec, configReference)
-	assert.NoError(t, err, "Expected no error")
-	assert.Equal(t, "http://foo.bar", spec.Outputs[0].URL)
+			client := fake.NewClientBuilder().
+				WithObjects(cm).
+				Build()
+
+			spec := &loggingv1.ClusterLogForwarderSpec{
+				Outputs: []loggingv1.OutputSpec{
+					{
+						Name: "foo",
+					},
+				},
+			}
+
+			err := templateWithConfigMap(client, spec, configReference)
+			assert.NoError(t, err, "Expected no error")
+			assert.Equal(t, tc.expectedCLFUrl, spec.Outputs[0].URL)
+		})
+	}
 }
 
 func Test_TemplateWithSecret(t *testing.T) {
-	configReference := addonapiv1alpha1.ConfigReference{
-		ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
-			Group:    "",
-			Resource: "secret",
+	for _, tc := range []struct {
+		name               string
+		signalLabel        bool
+		secretName         string
+		expectedSecretName string
+	}{
+		{
+			name:               "SignalAnnotationSet",
+			signalLabel:        true,
+			secretName:         "my-secret",
+			expectedSecretName: "my-secret",
 		},
-		ConfigReferent: addonapiv1alpha1.ConfigReferent{
-			Namespace: "cluster-1",
-			Name:      "cluster-1",
+		{
+			name:               "SignalAnnotationNotSet",
+			signalLabel:        false,
+			secretName:         "my-secret",
+			expectedSecretName: "",
 		},
-	}
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			configReference := addonapiv1alpha1.ConfigReference{
+				ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+					Group:    "",
+					Resource: "secret",
+				},
+				ConfigReferent: addonapiv1alpha1.ConfigReferent{
+					Namespace: "cluster-1",
+					Name:      tc.secretName,
+				},
+			}
 
-	secret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "cluster-1",
-			Namespace: "cluster-1",
-			Annotations: map[string]string{
-				"logging.mcoa.openshift.io/target-output-name": "foo",
-			},
-		},
-	}
-	client := fake.NewClientBuilder().
-		WithObjects(secret).
-		Build()
+			secret := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      tc.secretName,
+					Namespace: "cluster-1",
+					Labels: map[string]string{
+						"mcoa.openshift.io/signal": "logging",
+					},
+					Annotations: map[string]string{
+						"logging.mcoa.openshift.io/target-output-name": "foo",
+					},
+				},
+			}
+			client := fake.NewClientBuilder().
+				WithObjects(secret).
+				Build()
 
-	spec := &loggingv1.ClusterLogForwarderSpec{
-		Outputs: []loggingv1.OutputSpec{
-			{
-				Name: "foo",
-			},
-		},
-	}
+			spec := &loggingv1.ClusterLogForwarderSpec{
+				Outputs: []loggingv1.OutputSpec{
+					{
+						Name: "foo",
+					},
+				},
+			}
 
-	err := templateWithSecret(client, spec, configReference)
-	assert.NoError(t, err)
-	assert.NotNil(t, spec.Outputs[0].Secret)
-	assert.Equal(t, "cluster-1", spec.Outputs[0].Secret.Name)
+			err := templateWithSecret(client, spec, configReference)
+			assert.NoError(t, err)
+			if tc.secretName == "" {
+				assert.Nil(t, spec.Outputs[0].Secret)
+			} else {
+				assert.NotNil(t, spec.Outputs[0].Secret)
+				assert.Equal(t, tc.secretName, spec.Outputs[0].Secret.Name)
+			}
+		})
+	}
 }

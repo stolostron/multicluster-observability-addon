@@ -61,6 +61,10 @@ func templateWithConfigMap(k8s client.Client, spec *loggingv1.ClusterLogForwarde
 		return err
 	}
 
+	if signal, ok := cm.Labels[addon.SignalLabelKey]; !ok || signal != addon.SignalLogging {
+		return nil
+	}
+
 	clfOutputName, ok := cm.Annotations[annotationTargetOutputName]
 	if !ok {
 		return nil
@@ -87,6 +91,10 @@ func templateWithSecret(k8s client.Client, spec *loggingv1.ClusterLogForwarderSp
 			return nil
 		}
 		return err
+	}
+
+	if signal, ok := secret.Labels[addon.SignalLabelKey]; !ok || signal != addon.SignalLogging {
+		return nil
 	}
 
 	clfOutputName, ok := secret.Annotations[annotationTargetOutputName]
