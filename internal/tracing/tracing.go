@@ -10,7 +10,7 @@ type TracingValues struct {
 	Enabled bool `json:"enabled"`
 }
 
-func GetValuesFunc(k8s client.Client, cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) (TracingValues, error) {
+func GetValuesFunc(_ client.Client, _ *clusterv1.ManagedCluster, _ *addonapiv1alpha1.ManagedClusterAddOn) (TracingValues, error) {
 	values := TracingValues{
 		Enabled: false,
 	}

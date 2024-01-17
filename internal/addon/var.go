@@ -9,6 +9,9 @@ const (
 	MetricsChartDir = "manifests/charts/mcoa/charts/metrics"
 	LoggingChartDir = "manifests/charts/mcoa/charts/logging"
 	TracingChartDir = "manifests/charts/mcoa/charts/tracing"
+
+	ConfigMapResource = "configmaps"
+	SecretResource    = "secrets"
 )
 
 //go:embed manifests
