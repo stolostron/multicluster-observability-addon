@@ -4,10 +4,10 @@ import (
 	"context"
 	"strconv"
 
-	"github.com/stolostron/multicluster-observability-addon/internal/logging"
-	"github.com/stolostron/multicluster-observability-addon/internal/metrics"
-	"github.com/stolostron/multicluster-observability-addon/internal/tracing"
-	"github.com/stolostron/multicluster-observability-addon/internal/util"
+	"github.com/rhobs/multicluster-observability-addon/internal/addon"
+	"github.com/rhobs/multicluster-observability-addon/internal/logging"
+	"github.com/rhobs/multicluster-observability-addon/internal/metrics"
+	"github.com/rhobs/multicluster-observability-addon/internal/tracing"
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 	addonutils "open-cluster-management.io/addon-framework/pkg/utils"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
@@ -71,8 +71,8 @@ func GetValuesFunc(k8s client.Client) addonfactory.GetValuesFunc {
 	}
 }
 
-func getAddOnDeploymentConfig(k8s client.Client, addon *addonapiv1alpha1.ManagedClusterAddOn) (*addonapiv1alpha1.AddOnDeploymentConfig, error) {
-	key := util.GetObjectKey(addon.Status.ConfigReferences, addonutils.AddOnDeploymentConfigGVR.Group, "addondeploymentconfigs")
+func getAddOnDeploymentConfig(k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAddOn) (*addonapiv1alpha1.AddOnDeploymentConfig, error) {
+	key := addon.GetObjectKey(mcAddon.Status.ConfigReferences, addonutils.AddOnDeploymentConfigGVR.Group, "addondeploymentconfigs")
 	addOnDeployment := &addonapiv1alpha1.AddOnDeploymentConfig{}
 	if err := k8s.Get(context.TODO(), key, addOnDeployment, &client.GetOptions{}); err != nil {
 		// TODO(JoaoBraveCoding) Add proper error handling

@@ -1,4 +1,4 @@
-module github.com/stolostron/multicluster-observability-addon
+module github.com/rhobs/multicluster-observability-addon
 
 go 1.20
 

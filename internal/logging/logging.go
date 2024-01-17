@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 
 	loggingv1 "github.com/openshift/cluster-logging-operator/apis/logging/v1"
-	"github.com/stolostron/multicluster-observability-addon/internal/util"
+	"github.com/rhobs/multicluster-observability-addon/internal/addon"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
@@ -13,7 +13,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func GetValuesFunc(k8s client.Client, cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn, adoc *addonapiv1alpha1.AddOnDeploymentConfig) (LoggingValues, error) {
+func GetValuesFunc(k8s client.Client, cluster *clusterv1.ManagedCluster, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, adoc *addonapiv1alpha1.AddOnDeploymentConfig) (LoggingValues, error) {
 	values := LoggingValues{
 		Enabled: true,
 	}
@@ -24,7 +24,7 @@ func GetValuesFunc(k8s client.Client, cluster *clusterv1.ManagedCluster, addon *
 	}
 	values.LoggingSubscriptionChannel = channel
 
-	clfSpec, err := getClusterLogForwarderSpec(k8s, cluster, addon)
+	clfSpec, err := getClusterLogForwarderSpec(k8s, cluster, mcAddon)
 	if err != nil {
 		return values, err
 	}
@@ -52,24 +52,24 @@ func getSubscriptionChannel(adoc *addonapiv1alpha1.AddOnDeploymentConfig) (strin
 	return defaultLoggingVersion, nil
 }
 
-func getClusterLogForwarderSpec(k8s client.Client, cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) (*loggingv1.ClusterLogForwarderSpec, error) {
-	key := util.GetObjectKey(addon.Status.ConfigReferences, loggingv1.GroupVersion.Group, clusterLogForwarderResource)
+func getClusterLogForwarderSpec(k8s client.Client, cluster *clusterv1.ManagedCluster, mcAddon *addonapiv1alpha1.ManagedClusterAddOn) (*loggingv1.ClusterLogForwarderSpec, error) {
+	key := addon.GetObjectKey(mcAddon.Status.ConfigReferences, loggingv1.GroupVersion.Group, clusterLogForwarderResource)
 	clf := &loggingv1.ClusterLogForwarder{}
 	if err := k8s.Get(context.Background(), key, clf, &client.GetOptions{}); err != nil {
 		return nil, err
 	}
 
-	for _, config := range addon.Status.ConfigReferences {
+	for _, config := range mcAddon.Status.ConfigReferences {
 		if config.ConfigGroupResource.Group != "" {
 			continue
 		}
 
 		switch config.ConfigGroupResource.Resource {
-		case util.ConfigMapResource:
+		case addon.ConfigMapResource:
 			if err := getManagedClusterConfigMaps(k8s, &clf.Spec, config, cluster.Name); err != nil {
 				return nil, err
 			}
-		case util.SecretResource:
+		case addon.SecretResource:
 			if err := getManagedClusterSecrets(k8s, &clf.Spec, config, cluster.Name); err != nil {
 				return nil, err
 			}

@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	loggingv1 "github.com/openshift/cluster-logging-operator/apis/logging/v1"
-	"github.com/stolostron/multicluster-observability-addon/internal/addon"
+	"github.com/rhobs/multicluster-observability-addon/internal/addon"
 
 	loggingapis "github.com/openshift/cluster-logging-operator/apis"
 	operatorsv1 "github.com/operator-framework/api/pkg/operators/v1"
