@@ -46,71 +46,6 @@ func fakeGetValues(k8s client.Client) addonfactory.GetValuesFunc {
 	}
 }
 
-func Test_Logging_SubscriptionChannel(t *testing.T) {
-	var (
-		managedCluster        *clusterv1.ManagedCluster
-		managedClusterAddOn   *addonapiv1alpha1.ManagedClusterAddOn
-		addOnDeploymentConfig *addonapiv1alpha1.AddOnDeploymentConfig
-	)
-
-	managedCluster = addontesting.NewManagedCluster("cluster-1")
-	managedClusterAddOn = addontesting.NewAddon("test", "cluster-1")
-
-	managedClusterAddOn.Status.ConfigReferences = []addonapiv1alpha1.ConfigReference{
-		{
-			ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
-				Group:    "addon.open-cluster-management.io",
-				Resource: "addondeploymentconfigs",
-			},
-			ConfigReferent: addonapiv1alpha1.ConfigReferent{
-				Namespace: "open-cluster-management",
-				Name:      "multicluster-observability-addon",
-			},
-		},
-	}
-
-	addOnDeploymentConfig = &addonapiv1alpha1.AddOnDeploymentConfig{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "multicluster-observability-addon",
-			Namespace: "open-cluster-management",
-		},
-		Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
-			CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
-				{
-					Name:  "loggingSubscriptionChannel",
-					Value: "stable-5.8",
-				},
-			},
-		},
-	}
-
-	fakeAddonClient := fakeaddon.NewSimpleClientset(addOnDeploymentConfig)
-	addonConfigValuesFn := addonfactory.GetAddOnDeploymentConfigValues(
-		addonfactory.NewAddOnDeploymentConfigGetter(fakeAddonClient),
-		addonfactory.ToAddOnCustomizedVariableValues,
-	)
-
-	loggingAgentAddon, err := addonfactory.NewAgentAddonFactory(addon.Name, addon.FS, addon.LoggingChartDir).
-		WithGetValuesFuncs(addonConfigValuesFn).
-		WithAgentRegistrationOption(&agent.RegistrationOption{}).
-		WithScheme(scheme.Scheme).
-		BuildHelmAgentAddon()
-	if err != nil {
-		klog.Fatalf("failed to build agent %v", err)
-	}
-
-	objects, err := loggingAgentAddon.Manifests(managedCluster, managedClusterAddOn)
-	require.NoError(t, err)
-	require.Equal(t, 6, len(objects))
-
-	for _, obj := range objects {
-		switch obj := obj.(type) {
-		case *operatorsv1alpha1.Subscription:
-			require.Equal(t, obj.Spec.Channel, "stable-5.8")
-		}
-	}
-}
-
 func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 	var (
 		// Addon envinronment and registration
@@ -121,7 +56,6 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 		addOnDeploymentConfig            *addonapiv1alpha1.AddOnDeploymentConfig
 		clf                              *loggingv1.ClusterLogForwarder
 		appLogsSecret, clusterLogsSecret *corev1.Secret
-		appLogsCm                        *corev1.ConfigMap
 
 		// Test clients
 		fakeKubeClient  client.Client
@@ -172,16 +106,6 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 			ConfigReferent: addonapiv1alpha1.ConfigReferent{
 				Namespace: managedCluster.Name,
 				Name:      fmt.Sprintf("%s-cluster-logs", managedCluster.Name),
-			},
-		},
-		{
-			ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
-				Group:    "",
-				Resource: "configmaps",
-			},
-			ConfigReferent: addonapiv1alpha1.ConfigReferent{
-				Namespace: managedCluster.Name,
-				Name:      fmt.Sprintf("%s-app-logs", managedCluster.Name),
 			},
 		},
 	}
@@ -276,22 +200,6 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 		},
 	}
 
-	appLogsCm = &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-app-logs", managedCluster.Name),
-			Namespace: managedCluster.Name,
-			Labels: map[string]string{
-				"mcoa.openshift.io/signal": "logging",
-			},
-			Annotations: map[string]string{
-				annotationTargetOutputName: "app-logs",
-			},
-		},
-		Data: map[string]string{
-			"url": "https://example.com",
-		},
-	}
-
 	addOnDeploymentConfig = &addonapiv1alpha1.AddOnDeploymentConfig{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "multicluster-observability-addon",
@@ -310,7 +218,7 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 	// Setup the fake k8s client
 	fakeKubeClient = fake.NewClientBuilder().
 		WithScheme(scheme.Scheme).
-		WithObjects(clf, appLogsCm, appLogsSecret, clusterLogsSecret).
+		WithObjects(clf, appLogsSecret, clusterLogsSecret).
 		Build()
 
 	// Setup the fake addon client
@@ -344,7 +252,15 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 			require.NotNil(t, obj.Spec.Outputs[1].Secret)
 			require.Equal(t, appLogsSecret.Name, obj.Spec.Outputs[0].Secret.Name)
 			require.Equal(t, clusterLogsSecret.Name, obj.Spec.Outputs[1].Secret.Name)
-			require.Equal(t, appLogsCm.Data["url"], obj.Spec.Outputs[0].URL)
+		case *corev1.Secret:
+			if obj.Name == fmt.Sprintf("%s-app-logs", managedCluster.Name) {
+				require.Equal(t, appLogsSecret.Data, obj.Data)
+			}
+
+			if obj.Name == fmt.Sprintf("%s-cluster-logs", managedCluster.Name) {
+				require.Equal(t, clusterLogsSecret.Data, obj.Data)
+			}
+
 		}
 	}
 }

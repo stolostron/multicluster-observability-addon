@@ -8,9 +8,3 @@ const (
 
 	clusterLogForwarderResource = "clusterlogforwarders"
 )
-
-type LoggingValues struct {
-	Enabled                    bool   `json:"enabled"`
-	CLFSpec                    string `json:"clfSpec"`
-	LoggingSubscriptionChannel string `json:"loggingSubscriptionChannel"`
-}

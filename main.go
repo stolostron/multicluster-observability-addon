@@ -155,7 +155,7 @@ func runController(ctx context.Context, kubeConfig *rest.Config) error {
 		addonfactory.ToAddOnCustomizedVariableValues,
 	)
 
-	loggingAgentAddon, err := addonfactory.NewAgentAddonFactory(addon.Name, addon.FS, "manifests/charts/mcoa").
+	mcoaAgentAddon, err := addonfactory.NewAgentAddonFactory(addon.Name, addon.FS, "manifests/charts/mcoa").
 		WithConfigGVRs(
 			schema.GroupVersionResource{Version: "v1", Resource: "secrets"},
 			schema.GroupVersionResource{Version: "v1", Resource: "configmaps"},
@@ -171,7 +171,7 @@ func runController(ctx context.Context, kubeConfig *rest.Config) error {
 		return err
 	}
 
-	err = mgr.AddAgent(loggingAgentAddon)
+	err = mgr.AddAgent(mcoaAgentAddon)
 	if err != nil {
 		klog.Fatal(err)
 	}

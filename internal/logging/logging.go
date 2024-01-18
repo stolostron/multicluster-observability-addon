@@ -1,17 +1,14 @@
 package logging
 
 import (
-	"context"
+	"encoding/json"
 
 	loggingv1 "github.com/openshift/cluster-logging-operator/apis/logging/v1"
-	"github.com/rhobs/multicluster-observability-addon/internal/addon"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func buildSubscriptionChannel(adoc *addonapiv1alpha1.AddOnDeploymentConfig) string {
+func buildSubscriptionChannel(resources Resources) string {
+	adoc := resources.AddOnDeploymentConfig
 	if adoc == nil || len(adoc.Spec.CustomizedVariables) == 0 {
 		return defaultLoggingVersion
 	}
@@ -24,79 +21,34 @@ func buildSubscriptionChannel(adoc *addonapiv1alpha1.AddOnDeploymentConfig) stri
 	return defaultLoggingVersion
 }
 
-func buildClusterLogForwarderSpec(k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAddOn) (*loggingv1.ClusterLogForwarderSpec, error) {
-	key := addon.GetObjectKey(mcAddon.Status.ConfigReferences, loggingv1.GroupVersion.Group, clusterLogForwarderResource)
-	clf := &loggingv1.ClusterLogForwarder{}
-	if err := k8s.Get(context.Background(), key, clf, &client.GetOptions{}); err != nil {
-		return nil, err
-	}
-
-	for _, config := range mcAddon.Status.ConfigReferences {
-		if config.ConfigGroupResource.Group != "" {
-			continue
+func buildSecrets(resources Resources) ([]SecretValue, error) {
+	secretsValue := []SecretValue{}
+	for _, secret := range resources.Secrets {
+		dataJSON, err := json.Marshal(secret.Data)
+		if err != nil {
+			return secretsValue, err
 		}
+		secretValue := SecretValue{
+			Name: secret.Name,
+			Data: string(dataJSON),
+		}
+		secretsValue = append(secretsValue, secretValue)
+	}
+	return secretsValue, nil
+}
 
-		switch config.ConfigGroupResource.Resource {
-		case addon.ConfigMapResource:
-			if err := templateWithConfigMap(k8s, &clf.Spec, config); err != nil {
-				return nil, err
-			}
-		case addon.SecretResource:
-			if err := templateWithSecret(k8s, &clf.Spec, config); err != nil {
-				return nil, err
-			}
+func buildClusterLogForwarderSpec(resources Resources) (*loggingv1.ClusterLogForwarderSpec, error) {
+	clf := resources.ClusterLogForwarder
+	for _, secret := range resources.Secrets {
+		if err := templateWithSecret(&clf.Spec, secret); err != nil {
+			return nil, err
 		}
 	}
 
 	return &clf.Spec, nil
 }
 
-func templateWithConfigMap(k8s client.Client, spec *loggingv1.ClusterLogForwarderSpec, config addonapiv1alpha1.ConfigReference) error {
-	key := client.ObjectKey{Name: config.Name, Namespace: config.Namespace}
-	cm := &corev1.ConfigMap{}
-	if err := k8s.Get(context.Background(), key, cm, &client.GetOptions{}); err != nil {
-		if errors.IsNotFound(err) {
-			return nil
-		}
-		return err
-	}
-
-	if signal, ok := cm.Labels[addon.SignalLabelKey]; !ok || signal != addon.Logging.String() {
-		return nil
-	}
-
-	clfOutputName, ok := cm.Annotations[annotationTargetOutputName]
-	if !ok {
-		return nil
-	}
-	// TODO(JoaoBraveCoding) Validate that clfOutputName actually exists
-
-	outputURL := cm.Data["url"]
-	// TODO(JoaoBraveCoding) Validate that is a valid URL
-
-	for k, output := range spec.Outputs {
-		if output.Name == clfOutputName {
-			spec.Outputs[k].URL = outputURL
-		}
-	}
-
-	return nil
-}
-
-func templateWithSecret(k8s client.Client, spec *loggingv1.ClusterLogForwarderSpec, config addonapiv1alpha1.ConfigReference) error {
-	key := client.ObjectKey{Name: config.Name, Namespace: config.Namespace}
-	secret := &corev1.Secret{}
-	if err := k8s.Get(context.Background(), key, secret, &client.GetOptions{}); err != nil {
-		if errors.IsNotFound(err) {
-			return nil
-		}
-		return err
-	}
-
-	if signal, ok := secret.Labels[addon.SignalLabelKey]; !ok || signal != addon.Logging.String() {
-		return nil
-	}
-
+func templateWithSecret(spec *loggingv1.ClusterLogForwarderSpec, secret corev1.Secret) error {
 	clfOutputName, ok := secret.Annotations[annotationTargetOutputName]
 	if !ok {
 		return nil
