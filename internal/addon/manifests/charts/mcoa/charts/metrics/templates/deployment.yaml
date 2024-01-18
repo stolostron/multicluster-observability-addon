@@ -1,8 +1,9 @@
+{{- if .Values.enabled }}
 kind: Deployment
 apiVersion: apps/v1
 metadata:
   name: metrics-addon-agent
-  namespace: {{ .AddonInstallNamespace }}
+  namespace: {{ .Value.addonInstallNamespace }}
   labels:
     app.kubernetes.io/part-of: multicluster-observability-addon
     app.kubernetes.io/component: metrics-agent
@@ -84,3 +85,4 @@ spec:
     rollingUpdate:
       maxUnavailable: 25%
       maxSurge: 25%
+{{- end }}

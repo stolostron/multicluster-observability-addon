@@ -1,8 +1,9 @@
+{{- if .Values.enabled }}
 kind: ConfigMap
 apiVersion: v1
 metadata:
   name: prometheus-agent-conf
-  namespace: {{ .AddonInstallNamespace }}
+  namespace: {{ .Value.addonInstallNamespace }}
   labels:
     app.kubernetes.io/part-of: multicluster-observability-addon
     app.kubernetes.io/component: metrics-agent
@@ -101,3 +102,4 @@ data:
         ca_file: /tlscerts/ca/ca.crt
         cert_file: /tlscerts/certs/tls.crt
         key_file: /tlscerts/certs/tls.key
+{{- end }}
