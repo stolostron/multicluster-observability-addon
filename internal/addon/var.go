@@ -6,12 +6,23 @@ const (
 	Name             = "multicluster-observability-addon"
 	InstallNamespace = "open-cluster-management"
 
+	McoaChartDir    = "manifests/charts/mcoa"
 	MetricsChartDir = "manifests/charts/mcoa/charts/metrics"
 	LoggingChartDir = "manifests/charts/mcoa/charts/logging"
 	TracingChartDir = "manifests/charts/mcoa/charts/tracing"
 
-	ConfigMapResource = "configmaps"
-	SecretResource    = "secrets"
+	ConfigMapResource             = "configmaps"
+	SecretResource                = "secrets"
+	AddonDeploymentConfigResource = "addondeploymentconfigs"
+
+	AdcMetricsDisabledKey = "metricsDisabled"
+	AdcLoggingDisabledKey = "loggingDisabled"
+	AdcTracingisabledKey  = "tracingDisabled"
+
+	SignalLabelKey = "mcoa.openshift.io/signal"
+	SignalMetrics  = "metrics"
+	SignalLogging  = "logging"
+	SignalTracing  = "tracing"
 )
 
 //go:embed manifests

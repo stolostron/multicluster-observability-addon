@@ -72,7 +72,7 @@ func GetValuesFunc(k8s client.Client) addonfactory.GetValuesFunc {
 }
 
 func getAddOnDeploymentConfig(k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAddOn) (*addonapiv1alpha1.AddOnDeploymentConfig, error) {
-	key := addon.GetObjectKey(mcAddon.Status.ConfigReferences, addonutils.AddOnDeploymentConfigGVR.Group, "addondeploymentconfigs")
+	key := addon.GetObjectKey(mcAddon.Status.ConfigReferences, addonutils.AddOnDeploymentConfigGVR.Group, addon.AddonDeploymentConfigResource)
 	addOnDeployment := &addonapiv1alpha1.AddOnDeploymentConfig{}
 	if err := k8s.Get(context.TODO(), key, addOnDeployment, &client.GetOptions{}); err != nil {
 		// TODO(JoaoBraveCoding) Add proper error handling
@@ -92,21 +92,21 @@ func buildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Opti
 	}
 
 	for _, keyvalue := range addOnDeployment.Spec.CustomizedVariables {
-		if keyvalue.Name == "metricsDisabled" {
+		if keyvalue.Name == addon.AdcMetricsDisabledKey {
 			value, err := strconv.ParseBool(keyvalue.Value)
 			if err != nil {
 				return opts, err
 			}
 			opts.MetricsDisabled = value
 		}
-		if keyvalue.Name == "loggingDisabled" {
+		if keyvalue.Name == addon.AdcLoggingDisabledKey {
 			value, err := strconv.ParseBool(keyvalue.Value)
 			if err != nil {
 				return opts, err
 			}
 			opts.LoggingDisabled = value
 		}
-		if keyvalue.Name == "tracingDisabled" {
+		if keyvalue.Name == addon.AdcTracingisabledKey {
 			value, err := strconv.ParseBool(keyvalue.Value)
 			if err != nil {
 				return opts, err
