@@ -234,7 +234,6 @@ func Test_BuildCLFSpec(t *testing.T) {
 	require.Equal(t, appLogsSecret.Name, clfSpec.Outputs[0].Secret.Name)
 	require.Equal(t, clusterLogsSecret.Name, clfSpec.Outputs[1].Secret.Name)
 	require.Equal(t, appLogsCm.Data["url"], clfSpec.Outputs[0].URL)
-
 }
 
 func Test_TemplateWithConfigMap(t *testing.T) {
