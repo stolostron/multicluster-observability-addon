@@ -40,6 +40,8 @@ spec:
         - name: observability-managed-cluster-certs
           secret:
             secretName: observability-managed-cluster-certs
+      dnsPolicy: ClusterFirst
+      terminationGracePeriodSeconds: 30
       containers:
         - name: prometheus-agent
           ports:
@@ -54,8 +56,6 @@ spec:
               memory: 1Gi
           imagePullPolicy: IfNotPresent
           restartPolicy: Always
-          terminationGracePeriodSeconds: 30
-          dnsPolicy: ClusterFirst
           securityContext: {}
           terminationMessagePath: /dev/termination-log
           terminationMessagePolicy: File
