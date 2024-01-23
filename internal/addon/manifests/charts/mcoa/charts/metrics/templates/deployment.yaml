@@ -3,7 +3,7 @@ kind: Deployment
 apiVersion: apps/v1
 metadata:
   name: metrics-addon-agent
-  namespace: {{ .Value.addonInstallNamespace }}
+  namespace: {{ .Values.addonInstallNamespace }}
   labels:
     app.kubernetes.io/part-of: multicluster-observability-addon
     app.kubernetes.io/component: metrics-agent

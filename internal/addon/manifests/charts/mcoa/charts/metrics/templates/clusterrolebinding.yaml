@@ -26,5 +26,5 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: metrics-addon-sa
-    namespace: { { Value.addonInstallNamespace } }
+    namespace: { { .Values.addonInstallNamespace } }
 {{- end }}
