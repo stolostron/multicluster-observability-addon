@@ -7,14 +7,14 @@ import (
 )
 
 type MetricsValues struct {
-	Enabled bool `json:"enabled"`
+	Enabled               bool   `json:"enabled"`
+	AddonInstallNamespace string `json:"addonInstallNamespace"`
 }
 
-func GetValuesFunc(_ client.Client, _ *clusterv1.ManagedCluster, _ *addonapiv1alpha1.ManagedClusterAddOn) (MetricsValues, error) {
+func GetValuesFunc(_ client.Client, _ *clusterv1.ManagedCluster, mca *addonapiv1alpha1.ManagedClusterAddOn) (MetricsValues, error) {
 	values := MetricsValues{
-		Enabled: false,
+		Enabled:               true,
+		AddonInstallNamespace: mca.Spec.InstallNamespace,
 	}
-
-	values.Enabled = true
 	return values, nil
 }
