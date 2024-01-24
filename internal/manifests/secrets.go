@@ -25,7 +25,7 @@ type MTLSConfig struct {
 // BuildStaticSecret creates a Kubernetes secret for static authentication
 // TODO (JoaoBraveCoding) In the future we will want to deprecate this
 // authentication method as it's not ideal for multicluster authentication
-func BuildStaticSecret(ctx context.Context, k client.Client, key client.ObjectKey, saConfig StaticAuthenticationConfig) (client.Object, error) {
+func BuildStaticSecret(ctx context.Context, k client.Client, key client.ObjectKey, saConfig StaticAuthenticationConfig) (*corev1.Secret, error) {
 	staticAuth := &corev1.Secret{}
 	err := k.Get(ctx, saConfig.ExistingSecret, staticAuth, &client.GetOptions{})
 	if err != nil {
@@ -43,9 +43,9 @@ func BuildStaticSecret(ctx context.Context, k client.Client, key client.ObjectKe
 	return secret, nil
 }
 
-// BuildMTLSSecret generates a Kubernetes secret for mTLS authentication. This is
+// BuildCertificate generates a Kubernetes secret for mTLS authentication. This is
 // done using Cert-Manager CR.
-func BuildMTLSSecret(ctx context.Context, key client.ObjectKey, mTLSConfig MTLSConfig) (client.Object, error) {
+func BuildCertificate(key client.ObjectKey, mTLSConfig MTLSConfig) (*certmanagerv1.Certificate, error) {
 	certKey := client.ObjectKey{Name: fmt.Sprintf("%s-cert", key.Name), Namespace: key.Namespace}
 	certManagerCert := &certmanagerv1.Certificate{
 		ObjectMeta: metav1.ObjectMeta{
@@ -77,7 +77,7 @@ func BuildMTLSSecret(ctx context.Context, key client.ObjectKey, mTLSConfig MTLSC
 // createMCOSecret creates a Kubernetes secret for authentication using the
 // credentials provided by MCO
 // TODO (JoaoBraveCoding) Not implemented
-func BuildMCOSecret(ctx context.Context, key client.ObjectKey) (client.Object, error) {
+func BuildMCOSecret(key client.ObjectKey) (*corev1.Secret, error) {
 	return nil, nil
 }
 
@@ -85,7 +85,7 @@ func BuildMCOSecret(ctx context.Context, key client.ObjectKey) (client.Object, e
 // such as workload identity federation.
 // TODO (JoaoBraveCoding) Currently not implemented, this should only work on
 // STS/WIF enabeld clusters
-func BuildManagedSecret(_ context.Context, key client.ObjectKey) (client.Object, error) {
+func BuildManagedSecret(key client.ObjectKey) (*corev1.Secret, error) {
 	// Set additional keys for managed secret
 	data := map[string][]byte{
 		"roleARN":          []byte("foo"),
@@ -102,4 +102,56 @@ func BuildManagedSecret(_ context.Context, key client.ObjectKey) (client.Object,
 	}
 
 	return secret, nil
+}
+
+func BuildAllRootCertificate() []client.Object {
+	issuerName := "mcoa-bootstrap-issuer"
+	issuer := certmanagerv1.Issuer{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      issuerName,
+			Namespace: "cert-manager",
+		},
+		Spec: certmanagerv1.IssuerSpec{
+			IssuerConfig: certmanagerv1.IssuerConfig{
+				SelfSigned: &certmanagerv1.SelfSignedIssuer{},
+			},
+		},
+	}
+
+	certSecretName := "mcoa-root-certificate"
+	cert := certmanagerv1.Certificate{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "mcoa-root-certificate",
+			Namespace: "cert-manager",
+		},
+		Spec: certmanagerv1.CertificateSpec{
+			IsCA:       true,
+			SecretName: certSecretName,
+			CommonName: "MCOA Root Certificate",
+			PrivateKey: &certmanagerv1.CertificatePrivateKey{
+				Algorithm: certmanagerv1.RSAKeyAlgorithm,
+				Size:      4096,
+				Encoding:  certmanagerv1.PKCS8,
+			},
+			IssuerRef: cmmetav1.ObjectReference{
+				Kind: "Issuer",
+				Name: issuerName,
+			},
+		},
+	}
+
+	cIssuer := certmanagerv1.ClusterIssuer{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "mcoa-root-issuer",
+			Namespace: "cert-manager",
+		},
+		Spec: certmanagerv1.IssuerSpec{
+			IssuerConfig: certmanagerv1.IssuerConfig{
+				CA: &certmanagerv1.CAIssuer{
+					SecretName: certSecretName,
+				},
+			},
+		},
+	}
+	return []client.Object{&issuer, &cert, &cIssuer}
 }

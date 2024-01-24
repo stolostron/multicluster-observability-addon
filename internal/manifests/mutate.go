@@ -44,10 +44,10 @@ func MutateFuncFor(existing, desired client.Object, depAnnotations map[string]st
 			}
 			s.SetAnnotations(existingAnnotations)
 
-		case *certmanagerv1.CertificateRequest:
-			cr := existing.(*certmanagerv1.CertificateRequest)
-			wantCr := desired.(*certmanagerv1.CertificateRequest)
-			mutateCertificateRequest(cr, wantCr)
+		case *certmanagerv1.Certificate:
+			cr := existing.(*certmanagerv1.Certificate)
+			wantCr := desired.(*certmanagerv1.Certificate)
+			mutateCertificate(cr, wantCr)
 
 		default:
 			t := reflect.TypeOf(existing).String()
@@ -71,7 +71,7 @@ func mutateSecret(existing, desired *corev1.Secret) {
 	existing.Data = desired.Data
 }
 
-func mutateCertificateRequest(existing, desired *certmanagerv1.CertificateRequest) {
+func mutateCertificate(existing, desired *certmanagerv1.Certificate) {
 	existing.Annotations = desired.Annotations
 	existing.Labels = desired.Labels
 	existing.Spec = desired.Spec
