@@ -36,10 +36,13 @@ spec:
           emptyDir: {}
         - name: serving-certs-ca-bundle
           configMap:
-            name: client-serving-certs-ca-bundle
-        - name: observability-managed-cluster-certs
+            name: metrics-collector-serving-certs-ca-bundle
+        - name: mtlsca
           secret:
             secretName: observability-managed-cluster-certs
+        - name: mtlscerts
+          secret:
+              secretName: observability-controller-open-cluster-management.io-observability-signer-client-cert
       dnsPolicy: ClusterFirst
       terminationGracePeriodSeconds: 30
       containers:
@@ -64,15 +67,15 @@ spec:
               mountPath: /etc/prometheus/
             - name: prometheus-storage-volume
               mountPath: /prometheus/
-            - name: observability-managed-cluster-certs
+            - name: mtlscerts
               readOnly: true
               mountPath: /tlscerts/certs
-            - name: observability-managed-cluster-certs
+            - name: mtlsca
               readOnly: true
               mountPath: /tlscerts/ca
             - name: serving-certs-ca-bundle
               mountPath: /etc/serving-certs-ca-bundle
-              readOnly: false
+              readOnly: true
           image: "quay.io/prometheus/prometheus:v2.48.1"
           args:
             - "--log.level=debug"
