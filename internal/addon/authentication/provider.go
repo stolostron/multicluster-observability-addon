@@ -4,8 +4,11 @@ import (
 	"context"
 	"fmt"
 
-	"k8s.io/apimachinery/pkg/api/errors"
+	"github.com/rhobs/multicluster-observability-addon/internal/manifests"
+	"k8s.io/klog/v2"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	ctrlutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 // AuthenticationType defines the type of authentication that will be used for a target.
@@ -15,8 +18,8 @@ type AuthenticationType string
 type Signal string
 
 type ProviderConfig struct {
-	StaticAuthConfig StaticAuthenticationConfig
-	MTLSConfig       MTLSConfig
+	StaticAuthConfig manifests.StaticAuthenticationConfig
+	MTLSConfig       manifests.MTLSConfig
 }
 
 // secretsProvider is a struct that holds the Kubernetes client and configuration.
@@ -59,52 +62,50 @@ func NewSecretsProvider(client client.Client, clusterName string, signal Signal,
 func (k *secretsProvider) GenerateSecrets(targetAuthType map[string]AuthenticationType) (map[string]client.ObjectKey, error) {
 	ctx := context.Background()
 	secretKeys := make(map[string]client.ObjectKey, len(targetAuthType))
+	objs := make([]client.Object, len(targetAuthType))
 	for targetName, authType := range targetAuthType {
 		secretKey := client.ObjectKey{Name: fmt.Sprintf("%s-%s-auth", k.signal, targetName), Namespace: k.clusterName}
+		var (
+			obj client.Object
+			err error
+		)
 		switch authType {
 		case Static:
-			err := k.createStaticSecret(ctx, secretKey)
-			if err != nil {
-				return nil, err
-			}
-
+			obj, err = manifests.BuildStaticSecret(ctx, k.client, secretKey, k.StaticAuthConfig)
 		case Managed:
-			err := k.createManagedSecret(ctx, secretKey)
-			if err != nil {
-				return nil, err
-			}
-
+			obj, err = manifests.BuildManagedSecret(ctx, secretKey)
 		case MTLS:
-			err := k.createMTLSSecret(ctx, secretKey)
-			if err != nil {
-				return nil, err
-			}
-
+			obj, err = manifests.BuildMTLSSecret(ctx, secretKey, k.MTLSConfig)
 		case MCO:
-			err := k.createMCOSecret(ctx, secretKey)
-			if err != nil {
-				return nil, err
-			}
+			obj, err = manifests.BuildMCOSecret(ctx, secretKey)
+		default:
+			return nil, fmt.Errorf("unknown authentication type")
 		}
+		if err != nil {
+			return nil, err
+		}
+		objs = append(objs, obj)
 		secretKeys[targetName] = secretKey
 	}
 
-	return secretKeys, nil
-}
+	for _, obj := range objs {
+		desired := obj.DeepCopyObject().(client.Object)
+		mutateFn := manifests.MutateFuncFor(obj, desired, nil)
 
-// createOrUpdateSecret creates or updates a Kubernetes resource. If the resource
-// already exists, it will be updated with the new data; otherwise, it will be created.
-func (k *secretsProvider) createOrUpdate(ctx context.Context, obj client.Object) error {
-	err := k.client.Create(ctx, obj, &client.CreateOptions{})
-	if err != nil {
-		if errors.IsAlreadyExists(err) {
-			err = k.client.Update(ctx, obj, &client.UpdateOptions{})
-			if err != nil {
-				return fmt.Errorf("failed to update resource %s: %w", obj.GetName(), err)
-			}
-			return nil
+		op, err := ctrl.CreateOrUpdate(ctx, k.client, obj, mutateFn)
+		if err != nil {
+			klog.Error(err, "failed to configure resource")
+			continue
 		}
-		return fmt.Errorf("failed to create resource %s: %w", obj.GetName(), err)
+
+		msg := fmt.Sprintf("Resource has been %s", op)
+		switch op {
+		case ctrlutil.OperationResultNone:
+			klog.Info(msg)
+		default:
+			klog.Info(msg)
+		}
 	}
-	return nil
+
+	return secretKeys, nil
 }

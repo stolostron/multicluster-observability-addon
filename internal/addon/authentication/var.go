@@ -3,6 +3,7 @@ package authentication
 import (
 	v1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	cmmetav1 "github.com/cert-manager/cert-manager/pkg/apis/meta/v1"
+	"github.com/rhobs/multicluster-observability-addon/internal/manifests"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -25,14 +26,14 @@ var (
 	metricsDefaults = ProviderConfig{}
 
 	loggingDefaults = ProviderConfig{
-		StaticAuthConfig: StaticAuthenticationConfig{
-			existingSecret: client.ObjectKey{
+		StaticAuthConfig: manifests.StaticAuthenticationConfig{
+			ExistingSecret: client.ObjectKey{
 				Name:      "static-authentication",
 				Namespace: "open-cluster-management",
 			},
 		},
 		// TODO(JoaoBraveCoding) Implement when support for LokiStack is added
-		MTLSConfig: MTLSConfig{
+		MTLSConfig: manifests.MTLSConfig{
 			CommonName: "",
 			Subject:    &v1.X509Subject{},
 			DNSNames:   []string{},
