@@ -7,7 +7,9 @@ import (
 )
 
 type MetricsValues struct {
-	Enabled               bool   `json:"enabled"`
+	Enabled bool `json:"enabled"`
+	// TODO: revert this hack to the official way as recommended by the docs.
+	// See https://open-cluster-management.io/developer-guides/addon/#values-definition.
 	AddonInstallNamespace string `json:"addonInstallNamespace"`
 	DestinationEndpoint   string `json:"destinationEndpoint"`
 }
