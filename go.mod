@@ -3,6 +3,7 @@ module github.com/rhobs/multicluster-observability-addon
 go 1.20
 
 require (
+	github.com/ViaQ/logerr/v2 v2.1.0
 	github.com/cert-manager/cert-manager v1.13.3
 	github.com/imdario/mergo v0.3.12
 	github.com/openshift/cluster-logging-operator v0.0.0-20231130135759-9270994dc4bc

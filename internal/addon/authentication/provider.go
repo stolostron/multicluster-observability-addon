@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/ViaQ/logerr/v2/kverrors"
 	"github.com/rhobs/multicluster-observability-addon/internal/manifests"
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -79,7 +80,7 @@ func (k *secretsProvider) GenerateSecrets(targetAuthType map[string]Authenticati
 		case MCO:
 			obj, err = manifests.BuildMCOSecret(ctx, secretKey)
 		default:
-			return nil, fmt.Errorf("unknown authentication type")
+			return nil, kverrors.New("missing mutate implementation for authentication type", "type", authType)
 		}
 		if err != nil {
 			return nil, err

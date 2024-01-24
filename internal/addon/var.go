@@ -1,6 +1,8 @@
 package addon
 
-import "embed"
+import (
+	"embed"
+)
 
 const (
 	Name             = "multicluster-observability-addon"

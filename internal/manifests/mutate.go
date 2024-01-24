@@ -1,9 +1,10 @@
 package manifests
 
 import (
-	"fmt"
 	"reflect"
 
+	"github.com/ViaQ/logerr/v2/kverrors"
+	certmanagerv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	"github.com/imdario/mergo"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -43,9 +44,14 @@ func MutateFuncFor(existing, desired client.Object, depAnnotations map[string]st
 			}
 			s.SetAnnotations(existingAnnotations)
 
+		case *certmanagerv1.CertificateRequest:
+			cr := existing.(*certmanagerv1.CertificateRequest)
+			wantCr := desired.(*certmanagerv1.CertificateRequest)
+			mutateCertificateRequest(cr, wantCr)
+
 		default:
 			t := reflect.TypeOf(existing).String()
-			return fmt.Errorf("missing mutate implementation for resource type %s", t)
+			return kverrors.New("missing mutate implementation for resource type", "type", t)
 		}
 		return nil
 	}
@@ -54,7 +60,7 @@ func MutateFuncFor(existing, desired client.Object, depAnnotations map[string]st
 func mergeWithOverride(dst, src interface{}) error {
 	err := mergo.Merge(dst, src, mergo.WithOverride)
 	if err != nil {
-		return fmt.Errorf("unable to mergeWithOverride dst %s src %s error: %w", dst, src, err)
+		return kverrors.Wrap(err, "unable to mergeWithOverride", "dst", dst, "src", src)
 	}
 	return nil
 }
@@ -63,4 +69,10 @@ func mutateSecret(existing, desired *corev1.Secret) {
 	existing.Annotations = desired.Annotations
 	existing.Labels = desired.Labels
 	existing.Data = desired.Data
+}
+
+func mutateCertificateRequest(existing, desired *certmanagerv1.CertificateRequest) {
+	existing.Annotations = desired.Annotations
+	existing.Labels = desired.Labels
+	existing.Spec = desired.Spec
 }
