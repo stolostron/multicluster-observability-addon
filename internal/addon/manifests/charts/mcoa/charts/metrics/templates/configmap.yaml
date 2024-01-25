@@ -23,6 +23,7 @@ data:
         honor_labels: true
         metrics_path: '/federate'
 
+        scheme: https
         tls_config:
           ca_file: /etc/serving-certs-ca-bundle/service-ca.crt
         bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
