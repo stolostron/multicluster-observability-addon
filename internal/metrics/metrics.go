@@ -32,8 +32,7 @@ func GetValuesFunc(
 	values := MetricsValues{
 		Enabled:               true,
 		AddonInstallNamespace: mca.Spec.InstallNamespace,
-		// TODO: grab Location from the `open-cluster-management-observability/observatorium-api` Route in the Hub
-		DestinationEndpoint: endpoint,
+		DestinationEndpoint:   endpoint,
 	}
 	return values, nil
 }
