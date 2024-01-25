@@ -41,7 +41,7 @@ func testingGetValues(k8s client.Client) addonfactory.GetValuesFunc {
 	}
 }
 
-func TestMetricsAddon(t *testing.T) {
+func Test_GenerateManagedClusterResources(t *testing.T) {
 	var (
 		managedCluster        *clusterv1.ManagedCluster
 		managedClusterAddOn   *addonapiv1alpha1.ManagedClusterAddOn
