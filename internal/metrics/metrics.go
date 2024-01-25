@@ -19,7 +19,12 @@ type MetricsValues struct {
 	DestinationEndpoint   string `json:"destinationEndpoint"`
 }
 
-func GetValuesFunc(k8sClient client.Client, _ *clusterv1.ManagedCluster, mca *addonapiv1alpha1.ManagedClusterAddOn, adoc *addonapiv1alpha1.AddOnDeploymentConfig) (MetricsValues, error) {
+func GetValuesFunc(
+	k8sClient client.Client,
+	_ *clusterv1.ManagedCluster,
+	mca *addonapiv1alpha1.ManagedClusterAddOn,
+	adoc *addonapiv1alpha1.AddOnDeploymentConfig,
+) (MetricsValues, error) {
 	endpoint, err := getDestinationEndpoint(k8sClient, adoc)
 	if err != nil {
 		return MetricsValues{}, fmt.Errorf("failed to get metrics destination endpoint: %w", err)
