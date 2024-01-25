@@ -5,7 +5,7 @@ import (
 
 	v1 "k8s.io/api/apps/v1"
 
-	"github.com/stolostron/multicluster-observability-addon/internal/addon"
+	"github.com/rhobs/multicluster-observability-addon/internal/addon"
 
 	operatorsv1 "github.com/operator-framework/api/pkg/operators/v1"
 	operatorsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
