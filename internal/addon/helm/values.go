@@ -4,8 +4,12 @@ import (
 	"context"
 	"strconv"
 
+	"github.com/rhobs/multicluster-observability-addon/internal/addon"
+	"github.com/rhobs/multicluster-observability-addon/internal/logging"
+	"github.com/rhobs/multicluster-observability-addon/internal/metrics"
+	"github.com/rhobs/multicluster-observability-addon/internal/tracing"
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
-	"open-cluster-management.io/addon-framework/pkg/utils"
+	addonutils "open-cluster-management.io/addon-framework/pkg/utils"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -71,20 +75,8 @@ func GetValuesFunc(k8s client.Client) addonfactory.GetValuesFunc {
 	}
 }
 
-func getAddOnDeploymentConfig(k8s client.Client, addon *addonapiv1alpha1.ManagedClusterAddOn) (*addonapiv1alpha1.AddOnDeploymentConfig, error) {
-	var key client.ObjectKey
-	for _, config := range addon.Status.ConfigReferences {
-		if config.ConfigGroupResource.Group != utils.AddOnDeploymentConfigGVR.Group {
-			continue
-		}
-		if config.ConfigGroupResource.Resource != "addondeploymentconfigs" {
-			continue
-		}
-
-		key.Name = "multicluster-observability-addon"
-		key.Namespace = "open-cluster-management"
-	}
-
+func getAddOnDeploymentConfig(k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAddOn) (*addonapiv1alpha1.AddOnDeploymentConfig, error) {
+	key := addon.GetObjectKey(mcAddon.Status.ConfigReferences, addonutils.AddOnDeploymentConfigGVR.Group, addon.AddonDeploymentConfigResource)
 	addOnDeployment := &addonapiv1alpha1.AddOnDeploymentConfig{}
 	if err := k8s.Get(context.TODO(), key, addOnDeployment, &client.GetOptions{}); err != nil {
 		// TODO(JoaoBraveCoding) Add proper error handling
@@ -104,21 +96,21 @@ func buildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Opti
 	}
 
 	for _, keyvalue := range addOnDeployment.Spec.CustomizedVariables {
-		if keyvalue.Name == "metricsDisabled" {
+		if keyvalue.Name == addon.AdcMetricsDisabledKey {
 			value, err := strconv.ParseBool(keyvalue.Value)
 			if err != nil {
 				return opts, err
 			}
 			opts.MetricsDisabled = value
 		}
-		if keyvalue.Name == "loggingDisabled" {
+		if keyvalue.Name == addon.AdcLoggingDisabledKey {
 			value, err := strconv.ParseBool(keyvalue.Value)
 			if err != nil {
 				return opts, err
 			}
 			opts.LoggingDisabled = value
 		}
-		if keyvalue.Name == "tracingDisabled" {
+		if keyvalue.Name == addon.AdcTracingisabledKey {
 			value, err := strconv.ParseBool(keyvalue.Value)
 			if err != nil {
 				return opts, err
