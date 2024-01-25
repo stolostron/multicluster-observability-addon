@@ -8,13 +8,12 @@ import (
 	"os"
 	"time"
 
+	routev1 "github.com/openshift/api/route/v1"
 	loggingapis "github.com/openshift/cluster-logging-operator/apis"
 	operatorsv1 "github.com/operator-framework/api/pkg/operators/v1"
 	operatorsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	"github.com/stolostron/multicluster-observability-addon/internal/addon"
-	addonhelm "github.com/stolostron/multicluster-observability-addon/internal/addon/helm"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -31,6 +30,9 @@ import (
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
+
+	"github.com/stolostron/multicluster-observability-addon/internal/addon"
+	addonhelm "github.com/stolostron/multicluster-observability-addon/internal/addon/helm"
 )
 
 func main() {
@@ -108,6 +110,10 @@ func runController(ctx context.Context, kubeConfig *rest.Config) error {
 	// Necessary to reconcile Subscriptions
 	err = operatorsv1alpha1.AddToScheme(scheme.Scheme)
 	if err != nil {
+		return err
+	}
+	// Necessary for metrics to get Routes hosts
+	if err := routev1.Install(scheme.Scheme); err != nil {
 		return err
 	}
 
