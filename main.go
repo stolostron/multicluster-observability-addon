@@ -113,7 +113,7 @@ func runController(ctx context.Context, kubeConfig *rest.Config) error {
 		return err
 	}
 	// Necessary for metrics to get Routes hosts
-	if err := routev1.Install(scheme.Scheme); err != nil {
+	if err = routev1.Install(scheme.Scheme); err != nil {
 		return err
 	}
 

@@ -4,16 +4,15 @@ import (
 	"context"
 	"strconv"
 
+	"github.com/rhobs/multicluster-observability-addon/internal/addon"
+	"github.com/rhobs/multicluster-observability-addon/internal/logging"
+	"github.com/rhobs/multicluster-observability-addon/internal/metrics"
+	"github.com/rhobs/multicluster-observability-addon/internal/tracing"
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 	addonutils "open-cluster-management.io/addon-framework/pkg/utils"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	"github.com/rhobs/multicluster-observability-addon/internal/addon"
-	"github.com/rhobs/multicluster-observability-addon/internal/logging"
-	"github.com/rhobs/multicluster-observability-addon/internal/metrics"
-	"github.com/rhobs/multicluster-observability-addon/internal/tracing"
 )
 
 type HelmChartValues struct {
