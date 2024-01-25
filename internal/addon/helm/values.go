@@ -4,14 +4,15 @@ import (
 	"context"
 	"strconv"
 
-	"github.com/stolostron/multicluster-observability-addon/internal/logging"
-	"github.com/stolostron/multicluster-observability-addon/internal/metrics"
-	"github.com/stolostron/multicluster-observability-addon/internal/tracing"
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 	"open-cluster-management.io/addon-framework/pkg/utils"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/stolostron/multicluster-observability-addon/internal/logging"
+	"github.com/stolostron/multicluster-observability-addon/internal/metrics"
+	"github.com/stolostron/multicluster-observability-addon/internal/tracing"
 )
 
 type HelmChartValues struct {
@@ -43,7 +44,7 @@ func GetValuesFunc(k8s client.Client) addonfactory.GetValuesFunc {
 		var userValues HelmChartValues
 
 		if !opts.MetricsDisabled {
-			metrics, err := metrics.GetValuesFunc(k8s, cluster, addon)
+			metrics, err := metrics.GetValuesFunc(k8s, cluster, addon, aodc)
 			if err != nil {
 				return nil, err
 			}

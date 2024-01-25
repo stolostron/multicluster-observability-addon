@@ -91,10 +91,10 @@ data:
 
         static_configs:
           - targets:
-            - 'prometheus-k8s.openshift-monitoring.svc.cluster.local:9092'
+            - 'prometheus-k8s.openshift-monitoring.svc:9092'
 
     remote_write:
-    - url: 'https://observability-observatorium-observatorium-api.open-cluster-management-observability.svc.cluster.local:8443/api/metrics/v1/test-mtls/api/v1/receive'
+    - url: {{ .Values.destinationEndpoint }}
       metadata_config:
         send: false
       tls_config:

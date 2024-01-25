@@ -32,7 +32,7 @@ func testingGetValues(k8s client.Client) addonfactory.GetValuesFunc {
 		cluster *clusterv1.ManagedCluster,
 		addon *addonapiv1alpha1.ManagedClusterAddOn,
 	) (addonfactory.Values, error) {
-		logging, err := GetValuesFunc(k8s, cluster, addon)
+		logging, err := GetValuesFunc(k8s, cluster, addon, nil)
 		if err != nil {
 			return nil, err
 		}
