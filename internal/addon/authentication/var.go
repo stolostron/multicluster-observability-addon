@@ -2,7 +2,6 @@ package authentication
 
 import (
 	v1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
-	cmmetav1 "github.com/cert-manager/cert-manager/pkg/apis/meta/v1"
 	"github.com/rhobs/multicluster-observability-addon/internal/manifests"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -37,7 +36,6 @@ var (
 			CommonName: "",
 			Subject:    &v1.X509Subject{},
 			DNSNames:   []string{},
-			IssuerRef:  cmmetav1.ObjectReference{},
 		},
 	}
 

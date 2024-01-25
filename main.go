@@ -8,6 +8,7 @@ import (
 	"os"
 	"time"
 
+	certmanagerv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	loggingapis "github.com/openshift/cluster-logging-operator/apis"
 	operatorsv1 "github.com/operator-framework/api/pkg/operators/v1"
 	operatorsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
@@ -107,6 +108,12 @@ func runController(ctx context.Context, kubeConfig *rest.Config) error {
 	}
 	// Necessary to reconcile Subscriptions
 	err = operatorsv1alpha1.AddToScheme(scheme.Scheme)
+	if err != nil {
+		return err
+	}
+
+	// Necessary to reconcile cert-manager resources
+	err = certmanagerv1.AddToScheme(scheme.Scheme)
 	if err != nil {
 		return err
 	}

@@ -110,28 +110,3 @@ func (sp *secretsProvider) GenerateSecrets(targetAuthType map[string]Authenticat
 
 	return secretKeys, nil
 }
-
-func CreateOrUpdateRootCertificate(k client.Client, clusterName string) error {
-	objects := manifests.BuildAllRootCertificate()
-
-	for _, obj := range objects {
-		desired := obj.DeepCopyObject().(client.Object)
-		mutateFn := manifests.MutateFuncFor(obj, desired, nil)
-
-		op, err := ctrl.CreateOrUpdate(context.Background(), k, obj, mutateFn)
-		if err != nil {
-			klog.Error(err, "failed to configure resource")
-			continue
-		}
-
-		msg := fmt.Sprintf("Resource has been %s", op)
-		switch op {
-		case ctrlutil.OperationResultNone:
-			klog.Info(msg)
-		default:
-			klog.Info(msg)
-		}
-	}
-
-	return nil
-}

@@ -8,7 +8,30 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestGetMudateFunc_MutateCertificate(t *testing.T) {
+func TestGetMutateFunc_MutateIssuer(t *testing.T) {
+	got := &certmanagerv1.Issuer{
+		Spec: certmanagerv1.IssuerSpec{
+			IssuerConfig: certmanagerv1.IssuerConfig{
+				SelfSigned: &certmanagerv1.SelfSignedIssuer{},
+			},
+		},
+	}
+
+	want := &certmanagerv1.Issuer{
+		Spec: certmanagerv1.IssuerSpec{
+			IssuerConfig: certmanagerv1.IssuerConfig{
+				SelfSigned: &certmanagerv1.SelfSignedIssuer{},
+			},
+		},
+	}
+
+	f := MutateFuncFor(got, want, nil)
+	err := f()
+	require.NoError(t, err)
+	require.Equal(t, want.Spec.IssuerConfig, got.Spec.IssuerConfig)
+}
+
+func TestGetMutateFunc_MutateCertificate(t *testing.T) {
 	got := &certmanagerv1.Certificate{
 		Spec: certmanagerv1.CertificateSpec{
 			SecretName: "foo",
@@ -72,8 +95,34 @@ func TestGetMudateFunc_MutateCertificate(t *testing.T) {
 	require.NoError(t, err)
 
 	// Ensure partial mutation applied
-	require.Equal(t, got.Spec.SecretName, want.Spec.SecretName)
-	require.Equal(t, got.Spec.CommonName, want.Spec.CommonName)
-	require.Equal(t, got.Spec.IssuerRef, want.Spec.IssuerRef)
-	require.ElementsMatch(t, got.Spec.DNSNames, want.Spec.DNSNames)
+	require.Equal(t, want.Spec.SecretName, got.Spec.SecretName)
+	require.Equal(t, want.Spec.CommonName, got.Spec.CommonName)
+	require.Equal(t, want.Spec.IssuerRef, got.Spec.IssuerRef)
+	require.ElementsMatch(t, want.Spec.DNSNames, got.Spec.DNSNames)
+}
+
+func TestGetMutateFunc_MutateClusterIssuer(t *testing.T) {
+	got := &certmanagerv1.ClusterIssuer{
+		Spec: certmanagerv1.IssuerSpec{
+			IssuerConfig: certmanagerv1.IssuerConfig{
+				CA: &certmanagerv1.CAIssuer{
+					SecretName: "foo",
+				},
+			},
+		},
+	}
+	want := &certmanagerv1.ClusterIssuer{
+		Spec: certmanagerv1.IssuerSpec{
+			IssuerConfig: certmanagerv1.IssuerConfig{
+				CA: &certmanagerv1.CAIssuer{
+					SecretName: "bar",
+				},
+			},
+		},
+	}
+
+	f := MutateFuncFor(got, want, nil)
+	err := f()
+	require.NoError(t, err)
+	require.Equal(t, want.Spec.IssuerConfig, got.Spec.IssuerConfig)
 }

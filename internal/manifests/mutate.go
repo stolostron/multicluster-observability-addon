@@ -15,6 +15,9 @@ import (
 // It currently supports the following types and will return an error for other types:
 //
 //   - Secret
+//   - Issuer
+//   - Certificate
+//   - ClusterIssuer
 func MutateFuncFor(existing, desired client.Object, depAnnotations map[string]string) controllerutil.MutateFn {
 	return func() error {
 		existingAnnotations := existing.GetAnnotations()
@@ -44,10 +47,20 @@ func MutateFuncFor(existing, desired client.Object, depAnnotations map[string]st
 			}
 			s.SetAnnotations(existingAnnotations)
 
+		case *certmanagerv1.Issuer:
+			i := existing.(*certmanagerv1.Issuer)
+			wantI := desired.(*certmanagerv1.Issuer)
+			mutateIssuer(i, wantI)
+
 		case *certmanagerv1.Certificate:
 			cr := existing.(*certmanagerv1.Certificate)
 			wantCr := desired.(*certmanagerv1.Certificate)
 			mutateCertificate(cr, wantCr)
+
+		case *certmanagerv1.ClusterIssuer:
+			cr := existing.(*certmanagerv1.ClusterIssuer)
+			wantCr := desired.(*certmanagerv1.ClusterIssuer)
+			mutateClusterIssuer(cr, wantCr)
 
 		default:
 			t := reflect.TypeOf(existing).String()
@@ -71,7 +84,19 @@ func mutateSecret(existing, desired *corev1.Secret) {
 	existing.Data = desired.Data
 }
 
+func mutateIssuer(existing, desired *certmanagerv1.Issuer) {
+	existing.Annotations = desired.Annotations
+	existing.Labels = desired.Labels
+	existing.Spec = desired.Spec
+}
+
 func mutateCertificate(existing, desired *certmanagerv1.Certificate) {
+	existing.Annotations = desired.Annotations
+	existing.Labels = desired.Labels
+	existing.Spec = desired.Spec
+}
+
+func mutateClusterIssuer(existing, desired *certmanagerv1.ClusterIssuer) {
 	existing.Annotations = desired.Annotations
 	existing.Labels = desired.Labels
 	existing.Spec = desired.Spec

@@ -11,6 +11,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+const (
+	rootIssuerName       = "mcoa-bootstrap-issuer"
+	rootCertName         = "mcoa-root-certificate"
+	clusterIssuerName    = "mcoa-cluster-issuer"
+	certManagerNamespace = "cert-manager"
+)
+
 type StaticAuthenticationConfig struct {
 	ExistingSecret client.ObjectKey
 }
@@ -19,7 +26,6 @@ type MTLSConfig struct {
 	CommonName string
 	Subject    *certmanagerv1.X509Subject
 	DNSNames   []string
-	IssuerRef  cmmetav1.ObjectReference
 }
 
 // BuildStaticSecret creates a Kubernetes secret for static authentication
@@ -57,7 +63,6 @@ func BuildCertificate(key client.ObjectKey, mTLSConfig MTLSConfig) (*certmanager
 			CommonName: mTLSConfig.CommonName, // Signal specific
 			Subject:    mTLSConfig.Subject,    // Signal specific
 			DNSNames:   mTLSConfig.DNSNames,   // Signal specific
-			IssuerRef:  mTLSConfig.IssuerRef,  // Signal specific (possibly)
 			PrivateKey: &certmanagerv1.CertificatePrivateKey{
 				Algorithm: certmanagerv1.RSAKeyAlgorithm,
 				Encoding:  certmanagerv1.PKCS8,
@@ -67,6 +72,10 @@ func BuildCertificate(key client.ObjectKey, mTLSConfig MTLSConfig) (*certmanager
 				certmanagerv1.UsageClientAuth,
 				certmanagerv1.UsageKeyEncipherment,
 				certmanagerv1.UsageDigitalSignature,
+			},
+			IssuerRef: cmmetav1.ObjectReference{
+				Kind: "ClusterIssuer",
+				Name: clusterIssuerName,
 			},
 		},
 	}
@@ -105,11 +114,10 @@ func BuildManagedSecret(key client.ObjectKey) (*corev1.Secret, error) {
 }
 
 func BuildAllRootCertificate() []client.Object {
-	issuerName := "mcoa-bootstrap-issuer"
-	issuer := certmanagerv1.Issuer{
+	issuer := &certmanagerv1.Issuer{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      issuerName,
-			Namespace: "cert-manager",
+			Name:      rootIssuerName,
+			Namespace: certManagerNamespace,
 		},
 		Spec: certmanagerv1.IssuerSpec{
 			IssuerConfig: certmanagerv1.IssuerConfig{
@@ -118,15 +126,14 @@ func BuildAllRootCertificate() []client.Object {
 		},
 	}
 
-	certSecretName := "mcoa-root-certificate"
-	cert := certmanagerv1.Certificate{
+	cert := &certmanagerv1.Certificate{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "mcoa-root-certificate",
-			Namespace: "cert-manager",
+			Name:      rootCertName,
+			Namespace: certManagerNamespace,
 		},
 		Spec: certmanagerv1.CertificateSpec{
 			IsCA:       true,
-			SecretName: certSecretName,
+			SecretName: rootCertName,
 			CommonName: "MCOA Root Certificate",
 			PrivateKey: &certmanagerv1.CertificatePrivateKey{
 				Algorithm: certmanagerv1.RSAKeyAlgorithm,
@@ -135,23 +142,23 @@ func BuildAllRootCertificate() []client.Object {
 			},
 			IssuerRef: cmmetav1.ObjectReference{
 				Kind: "Issuer",
-				Name: issuerName,
+				Name: rootIssuerName,
 			},
 		},
 	}
 
-	cIssuer := certmanagerv1.ClusterIssuer{
+	cIssuer := &certmanagerv1.ClusterIssuer{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "mcoa-root-issuer",
-			Namespace: "cert-manager",
+			Name:      clusterIssuerName,
+			Namespace: certManagerNamespace,
 		},
 		Spec: certmanagerv1.IssuerSpec{
 			IssuerConfig: certmanagerv1.IssuerConfig{
 				CA: &certmanagerv1.CAIssuer{
-					SecretName: certSecretName,
+					SecretName: rootCertName,
 				},
 			},
 		},
 	}
-	return []client.Object{&issuer, &cert, &cIssuer}
+	return []client.Object{issuer, cert, cIssuer}
 }

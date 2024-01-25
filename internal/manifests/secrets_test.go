@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	certmanagerv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
-	cmmetav1 "github.com/cert-manager/cert-manager/pkg/apis/meta/v1"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -54,10 +53,6 @@ func Test_BuildMTLSSecret(t *testing.T) {
 		DNSNames: []string{
 			"foo",
 		},
-		IssuerRef: cmmetav1.ObjectReference{
-			Kind: "ClusterIssuer",
-			Name: "foo",
-		},
 	}
 
 	c, err := BuildCertificate(key, mTLSConfig)
@@ -65,6 +60,6 @@ func Test_BuildMTLSSecret(t *testing.T) {
 	require.Equal(t, "foo", c.Spec.SecretName)
 	require.Equal(t, mTLSConfig.CommonName, c.Spec.CommonName)
 	require.Equal(t, mTLSConfig.Subject, c.Spec.Subject)
-	require.Equal(t, mTLSConfig.IssuerRef, c.Spec.IssuerRef)
+	require.Equal(t, "mcoa-cluster-issuer", c.Spec.IssuerRef.Name)
 	require.ElementsMatch(t, mTLSConfig.DNSNames, c.Spec.DNSNames)
 }

@@ -55,6 +55,14 @@
     - apiGroups: [""]
       resources: ["secrets"]
       verbs: ["get", "list", "watch"]
+    # Roles for addon to manage it's own certificates
+    - apiGroups: ["cert-manager.io"]
+      resources: ["issuers", "certificates", "clusterissuers"]
+      verbs: ["create", "get", "list", "watch"]
+    # Roles for addon to manage it's own certificates
+    - apiGroups: ["cert-manager.io"]
+      resources: ["issuers/status", "certificates/status", "clusterissuers/status"]
+      verbs: ["get", "update"]
     # Roles for addon to preform logging specific actions
     - apiGroups: ["logging.openshift.io"]
       resources: ["clusterlogforwarders"]
