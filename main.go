@@ -12,6 +12,8 @@ import (
 	loggingapis "github.com/openshift/cluster-logging-operator/apis"
 	operatorsv1 "github.com/operator-framework/api/pkg/operators/v1"
 	operatorsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
+	"github.com/rhobs/multicluster-observability-addon/internal/addon"
+	addonhelm "github.com/rhobs/multicluster-observability-addon/internal/addon/helm"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -30,9 +32,6 @@ import (
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
-
-	"github.com/rhobs/multicluster-observability-addon/internal/addon"
-	addonhelm "github.com/rhobs/multicluster-observability-addon/internal/addon/helm"
 )
 
 func main() {
