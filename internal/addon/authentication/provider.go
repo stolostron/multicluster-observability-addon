@@ -5,7 +5,9 @@ import (
 	"fmt"
 
 	"github.com/ViaQ/logerr/v2/kverrors"
+	"github.com/rhobs/multicluster-observability-addon/internal/addon"
 	"github.com/rhobs/multicluster-observability-addon/internal/manifests"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -15,9 +17,6 @@ import (
 // AuthenticationType defines the type of authentication that will be used for a target.
 type AuthenticationType string
 
-// Signal defines the signal type that will be using an instance of the provisioner
-type Signal string
-
 type ProviderConfig struct {
 	StaticAuthConfig manifests.StaticAuthenticationConfig
 	MTLSConfig       manifests.MTLSConfig
@@ -25,16 +24,16 @@ type ProviderConfig struct {
 
 // secretsProvider is a struct that holds the Kubernetes client and configuration.
 type secretsProvider struct {
-	k           client.Client
+	k8s           client.Client
 	clusterName string
-	signal      Signal
+	signal      addon.Signal
 	ProviderConfig
 }
 
 // NewSecretsProvider creates a new instance of K8sSecretGenerator.
-func NewSecretsProvider(k client.Client, clusterName string, signal Signal, providerConfig *ProviderConfig) *secretsProvider {
+func NewSecretsProvider(k8s client.Client, clusterName string, signal addon.Signal, providerConfig *ProviderConfig) *secretsProvider {
 	secretsProvider := &secretsProvider{
-		k:           k,
+		k8s:           k8s,
 		clusterName: clusterName,
 		signal:      signal,
 	}
@@ -45,11 +44,11 @@ func NewSecretsProvider(k client.Client, clusterName string, signal Signal, prov
 	}
 
 	switch signal {
-	case Metrics:
+	case addon.Metrics:
 		secretsProvider.ProviderConfig = metricsDefaults
-	case Logging:
+	case addon.Logging:
 		secretsProvider.ProviderConfig = loggingDefaults
-	case Tracing:
+	case addon.Tracing:
 		secretsProvider.ProviderConfig = tracingDefaults
 	}
 
@@ -60,7 +59,7 @@ func NewSecretsProvider(k client.Client, clusterName string, signal Signal, prov
 // The provided targetAuthType map represents a set of targets, where each key corresponds to a target that
 // will receive signal data using a specific authentication type. This function returns a map with the same target
 // keys, where the values are `client.ObjectKey` representing the Kubernetes secret created for each target.
-func (sp *secretsProvider) GenerateSecrets(targetAuthType map[string]AuthenticationType) (map[string]client.ObjectKey, error) {
+func (sp *secretsProvider) GenerateSecrets(targetAuthType map[string]string) (map[string]client.ObjectKey, error) {
 	ctx := context.Background()
 	secretKeys := make(map[string]client.ObjectKey, len(targetAuthType))
 	objects := make([]client.Object, len(targetAuthType))
@@ -70,9 +69,9 @@ func (sp *secretsProvider) GenerateSecrets(targetAuthType map[string]Authenticat
 			obj client.Object
 			err error
 		)
-		switch authType {
+		switch AuthenticationType(authType) {
 		case Static:
-			obj, err = manifests.BuildStaticSecret(ctx, sp.k, secretKey, sp.StaticAuthConfig)
+			obj, err = manifests.BuildStaticSecret(ctx, sp.k8s, secretKey, sp.StaticAuthConfig)
 		case Managed:
 			obj, err = manifests.BuildManagedSecret(secretKey)
 		case MTLS:
@@ -93,7 +92,7 @@ func (sp *secretsProvider) GenerateSecrets(targetAuthType map[string]Authenticat
 		desired := obj.DeepCopyObject().(client.Object)
 		mutateFn := manifests.MutateFuncFor(obj, desired, nil)
 
-		op, err := ctrl.CreateOrUpdate(ctx, sp.k, obj, mutateFn)
+		op, err := ctrl.CreateOrUpdate(ctx, sp.k8s, obj, mutateFn)
 		if err != nil {
 			klog.Error(err, "failed to configure resource")
 			continue
@@ -109,4 +108,20 @@ func (sp *secretsProvider) GenerateSecrets(targetAuthType map[string]Authenticat
 	}
 
 	return secretKeys, nil
+}
+
+func (sp *secretsProvider) FetchSecrets(targetsSecret map[string]client.ObjectKey, targetAnnotation string) ([]corev1.Secret, error) {
+	secrets := make([]corev1.Secret, 0, len(targetsSecret))
+	for target, key := range targetsSecret {
+		secret := &corev1.Secret{}
+		if err := sp.k8s.Get(context.Background(), key, secret, &client.GetOptions{}); err != nil {
+			return secrets, err
+		}
+		if secret.Annotations == nil {
+			secret.Annotations = make(map[string]string)
+		}
+		secret.Annotations[targetAnnotation] = target
+		secrets = append(secrets, *secret)
+	}
+	return secrets, nil
 }

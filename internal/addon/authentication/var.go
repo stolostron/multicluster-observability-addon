@@ -15,10 +15,6 @@ const (
 	MTLS AuthenticationType = "mTLS"
 	// MCO represents an authentication type that will re-use the MCO provided credentials
 	MCO AuthenticationType = "MCO"
-
-	Metrics Signal = "Metrics"
-	Logging Signal = "Logging"
-	Tracing Signal = "Tracing"
 )
 
 var (
@@ -40,4 +36,6 @@ var (
 	}
 
 	tracingDefaults = ProviderConfig{}
+
+	certManagerCRDs = []string{"certificates.cert-manager.io", "issuers.cert-manager.io", "clusterissuers.cert-manager.io"}
 )

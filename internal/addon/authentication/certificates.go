@@ -19,7 +19,7 @@ func CreateOrUpdateRootCertificate(k8s client.Client) error {
 
 	err := checkCertManagerCRDs(ctx, k8s)
 	if err != nil {
-		return nil
+		return err
 	}
 
 	objects := manifests.BuildAllRootCertificate()
@@ -47,9 +47,7 @@ func CreateOrUpdateRootCertificate(k8s client.Client) error {
 }
 
 func checkCertManagerCRDs(ctx context.Context, k8s client.Client) error {
-	crds := []string{"certificates.cert-manager.io", "issuers.cert-manager.io", "clusterissuers.cert-manager.io"}
-
-	for _, crdName := range crds {
+	for _, crdName := range certManagerCRDs {
 		key := client.ObjectKey{Name: crdName}
 		crd := &apiextensions.CustomResourceDefinition{}
 		err := k8s.Get(ctx, key, crd, &client.GetOptions{})
