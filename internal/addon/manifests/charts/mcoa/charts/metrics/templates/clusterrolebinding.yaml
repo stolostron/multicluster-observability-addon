@@ -3,6 +3,8 @@ kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: multicluster-observability-addon:metrics:agent
+  labels:
+    {{- include "metricshelm.labels" . | indent 4 }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
