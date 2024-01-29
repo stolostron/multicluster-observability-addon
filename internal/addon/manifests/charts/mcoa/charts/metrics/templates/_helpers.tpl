@@ -11,7 +11,7 @@
 {{/* Generate basic labels */}}
 {{- define "metricshelm.labels" }}
 app: {{ template "metricshelm.name" . }}
-chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
+chart: {{ template "metricshelm.chart" . }}
 release: {{ .Release.Name }}
 app.kubernetes.io/part-of: multicluster-observability-addon
 {{- end }}
