@@ -38,13 +38,11 @@ func GetValuesFunc(
 }
 
 func getDestinationEndpoint(k8sClient client.Client, adoc *addonapiv1alpha1.AddOnDeploymentConfig) (string, error) {
-	if adoc == nil {
-		return "", nil
-	}
-
-	for _, customVar := range adoc.Spec.CustomizedVariables {
-		if customVar.Name == "metricsDestinationEndpoint" {
-			return customVar.Value, nil
+	if adoc != nil {
+		for _, customVar := range adoc.Spec.CustomizedVariables {
+			if customVar.Name == "metricsDestinationEndpoint" {
+				return customVar.Value, nil
+			}
 		}
 	}
 
