@@ -5,7 +5,6 @@ metadata:
   name: multicluster-observability-addon:metrics:agent
   labels:
     {{- include "metricshelm.labels" . | indent 4 }}
-    app.kubernetes.io/component: metrics-agent
 rules:
   - apiGroups: [""]
     resources:
