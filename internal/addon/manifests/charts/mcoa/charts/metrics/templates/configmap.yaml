@@ -93,6 +93,8 @@ data:
         static_configs:
           - targets:
             - 'prometheus-k8s.openshift-monitoring.svc:9092'
+            labels:
+              prometheus_agent: "true"
 
     remote_write:
     - url: {{ .Values.destinationEndpoint }}
