@@ -7,7 +7,7 @@ const (
 )
 
 type TracingValues struct {
-	Enabled bool `json:"enabled"`
+	Enabled                 bool   `json:"enabled"`
 	OtelSubscriptionChannel string `json:"otelSubscriptionChannel"`
-	OTELColSpec string `json:"otelColSpec"`
+	OTELColSpec             string `json:"otelColSpec"`
 }

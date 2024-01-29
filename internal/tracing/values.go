@@ -10,7 +10,7 @@ import (
 
 func GetValuesFunc(k8s client.Client, _ *clusterv1.ManagedCluster, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, adoc *addonapiv1alpha1.AddOnDeploymentConfig) (TracingValues, error) {
 	values := TracingValues{
-		Enabled: true,
+		Enabled:                 true,
 		OtelSubscriptionChannel: subscriptionChannel,
 	}
 
