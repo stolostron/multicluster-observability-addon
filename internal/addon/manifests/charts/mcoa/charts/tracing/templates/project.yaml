@@ -1,0 +1,10 @@
+{{- if .Values.enabled }}
+apiVersion: project.openshift.io/v1
+kind: Project
+metadata:
+  name: openshift-opentelemetry-operator
+  labels:
+    app: {{ template "logginghelm.name" . }}
+    chart: {{ template "logginghelm.chart" . }}
+    release: {{ .Release.Name }}
+{{- end }}

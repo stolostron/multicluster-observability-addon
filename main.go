@@ -8,6 +8,8 @@ import (
 	"os"
 	"time"
 
+	otelv1alpha1 "github.com/open-telemetry/opentelemetry-operator/apis/v1alpha1"
+	projectsv1 "github.com/openshift/api/project/v1"
 	loggingapis "github.com/openshift/cluster-logging-operator/apis"
 	operatorsv1 "github.com/operator-framework/api/pkg/operators/v1"
 	operatorsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
@@ -100,6 +102,17 @@ func runController(ctx context.Context, kubeConfig *rest.Config) error {
 	if err != nil {
 		return err
 	}
+	// Necessary to reconcile OpenTelemetryCollectors
+	err = otelv1alpha1.AddToScheme(scheme.Scheme)
+	if err != nil {
+		return err
+	}
+	// Necessary to reconcile Projects
+	err = projectsv1.AddToScheme(scheme.Scheme)
+	if err != nil {
+		klog.Errorf("error while adding the project types to the schema: %v", err)
+		os.Exit(1)
+	}
 	// Necessary to reconcile OperatorGroups
 	err = operatorsv1.AddToScheme(scheme.Scheme)
 	if err != nil {
@@ -148,6 +161,7 @@ func runController(ctx context.Context, kubeConfig *rest.Config) error {
 			schema.GroupVersionResource{Version: "v1", Resource: "secrets"},
 			schema.GroupVersionResource{Version: "v1", Resource: "configmaps"},
 			schema.GroupVersionResource{Version: "v1", Group: "logging.openshift.io", Resource: "clusterlogforwarders"},
+			schema.GroupVersionResource{Version: "v1alpha1", Group: "opentelemetry.io", Resource: "opentelemetrycollectors"},
 			utils.AddOnDeploymentConfigGVR,
 		).
 		WithGetValuesFuncs(addonConfigValuesFn, addonhelm.GetValuesFunc(k8sClient)).

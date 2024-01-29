@@ -60,7 +60,7 @@ func GetValuesFunc(k8s client.Client) addonfactory.GetValuesFunc {
 		}
 
 		if !opts.TracingDisabled {
-			tracing, err := tracing.GetValuesFunc(k8s, cluster, addon)
+			tracing, err := tracing.GetValuesFunc(k8s, cluster, addon, aodc)
 			if err != nil {
 				return nil, err
 			}
