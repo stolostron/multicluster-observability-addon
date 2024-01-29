@@ -11,6 +11,6 @@ roleRef:
   name: multicluster-observability-addon:metrics:agent
 subjects:
   - kind: ServiceAccount
-    name: multicluster-observability-addon:metrics:agent
+    name: multicluster-observability-metrics
     namespace: {{ .Values.addonInstallNamespace }}
 {{- end }}
