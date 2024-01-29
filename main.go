@@ -8,6 +8,7 @@ import (
 	"os"
 	"time"
 
+	routev1 "github.com/openshift/api/route/v1"
 	loggingapis "github.com/openshift/cluster-logging-operator/apis"
 	operatorsv1 "github.com/operator-framework/api/pkg/operators/v1"
 	operatorsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
@@ -108,6 +109,10 @@ func runController(ctx context.Context, kubeConfig *rest.Config) error {
 	// Necessary to reconcile Subscriptions
 	err = operatorsv1alpha1.AddToScheme(scheme.Scheme)
 	if err != nil {
+		return err
+	}
+	// Necessary for metrics to get Routes hosts
+	if err = routev1.Install(scheme.Scheme); err != nil {
 		return err
 	}
 

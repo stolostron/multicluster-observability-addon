@@ -1,0 +1,107 @@
+{{- if .Values.enabled }}
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: prometheus-agent-conf
+  namespace: {{ .Values.addonInstallNamespace }}
+  labels:
+    app.kubernetes.io/part-of: multicluster-observability-addon
+    app.kubernetes.io/component: metrics-agent
+    app.kubernetes.io/instance: metrics-agent
+    app.kubernetes.io/name: prometheus-agent-conf
+    app.kubernetes.io/version: 2.48.1
+data:
+  prometheus.yml: |-
+    global:
+      scrape_interval: 5s
+      evaluation_interval: 5s
+
+    scrape_configs:
+      - job_name: 'federate'
+        scrape_interval: 4m
+
+        honor_labels: true
+        metrics_path: '/federate'
+
+        scheme: https
+        tls_config:
+          ca_file: /etc/serving-certs-ca-bundle/service-ca.crt
+        bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+
+        params:
+          'match[]':
+            - '{__name__="up"}'
+            - '{__name__=":node_memory_MemAvailable_bytes:sum"}'
+            - '{__name__="cluster:capacity_cpu_cores:sum"}'
+            - '{__name__="cluster:capacity_memory_bytes:sum"}'
+            - '{__name__="cluster:container_cpu_usage:ratio"}'
+            - '{__name__="cluster:container_spec_cpu_shares:ratio"}'
+            - '{__name__="cluster:cpu_usage_cores:sum"}'
+            - '{__name__="cluster:memory_usage:ratio"}'
+            - '{__name__="cluster:memory_usage_bytes:sum"}'
+            - '{__name__="cluster:usage:resources:sum"}'
+            - '{__name__="cluster_infrastructure_provider"}'
+            - '{__name__="cluster_version"}'
+            - '{__name__="cluster_version_payload"}'
+            - '{__name__="container_cpu_cfs_throttled_periods_total"}'
+            - '{__name__="container_memory_cache"}'
+            - '{__name__="container_memory_rss"}'
+            - '{__name__="container_memory_swap"}'
+            - '{__name__="container_memory_working_set_bytes"}'
+            - '{__name__="container_network_receive_bytes_total"}'
+            - '{__name__="container_network_receive_packets_dropped_total"}'
+            - '{__name__="container_network_receive_packets_total"}'
+            - '{__name__="container_network_transmit_bytes_total"}'
+            - '{__name__="container_network_transmit_packets_dropped_total"}'
+            - '{__name__="container_network_transmit_packets_total"}'
+            - '{__name__="haproxy_backend_connections_total"}'
+            - '{__name__="instance:node_cpu_utilisation:rate1m"}'
+            - '{__name__="instance:node_load1_per_cpu:ratio"}'
+            - '{__name__="instance:node_memory_utilisation:ratio"}'
+            - '{__name__="instance:node_network_receive_bytes_excluding_lo:rate1m"}'
+            - '{__name__="instance:node_network_receive_drop_excluding_lo:rate1m",}'
+            - '{__name__="instance:node_network_transmit_bytes_excluding_lo:rate1m"}'
+            - '{__name__="instance:node_network_transmit_drop_excluding_lo:rate1m"}'
+            - '{__name__="instance:node_num_cpu:sum"}'
+            - '{__name__="instance:node_vmstat_pgmajfault:rate1m"}'
+            - '{__name__="instance_device:node_disk_io_time_seconds:rate1m"}'
+            - '{__name__="instance_device:node_disk_io_time_weighted_seconds:rate1m"}'
+            - '{__name__="kube_node_status_allocatable_cpu_cores"}'
+            - '{__name__="kube_node_status_allocatable_memory_bytes"}'
+            - '{__name__="kube_pod_container_resource_limits_cpu_cores"}'
+            - '{__name__="kube_pod_container_resource_limits_memory_bytes"}'
+            - '{__name__="kube_pod_container_resource_requests_cpu_cores"}'
+            - '{__name__="kube_pod_container_resource_requests_memory_bytes"}'
+            - '{__name__="kube_pod_info"}'
+            - '{__name__="kube_resourcequota"}'
+            - '{__name__="machine_cpu_cores"}'
+            - '{__name__="machine_memory_bytes"}'
+            - '{__name__="mixin_pod_workload"}'
+            - '{__name__="node_cpu_seconds_total"}'
+            - '{__name__="node_filesystem_avail_bytes"}'
+            - '{__name__="node_filesystem_size_bytes"}'
+            - '{__name__="node.oc_memory_MemAvailable_bytes"}'
+            - '{__name__="node_namespace_pod_container:container_cpu_usage_seconds_total:sum_rate"}'
+            - '{__name__="node_namespace_pod_container:container_memory_cache"}'
+            - '{__name__="node_namespace_pod_container:container_memory_rss"}'
+            - '{__name__="node_namespace_pod_container:container_memory_swap"}'
+            - '{__name__="node_namespace_pod_container:container_memory_working_set_bytes"}'
+            - '{__name__="node_netstat_Tcp_OutSegs"}'
+            - '{__name__="node_netstat_Tcp_RetransSegs"}'
+            - '{__name__="node_netstat_TcpExt_TCPSynRetrans"}'
+
+        static_configs:
+          - targets:
+            - 'prometheus-k8s.openshift-monitoring.svc:9092'
+            labels:
+              prometheus_agent: "true"
+
+    remote_write:
+    - url: {{ .Values.destinationEndpoint }}
+      metadata_config:
+        send: false
+      tls_config:
+        ca_file: /tlscerts/ca/ca.crt
+        cert_file: /tlscerts/certs/tls.crt
+        key_file: /tlscerts/certs/tls.key
+{{- end }}

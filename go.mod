@@ -3,7 +3,6 @@ module github.com/rhobs/multicluster-observability-addon
 go 1.20
 
 require (
-	github.com/imdario/mergo v0.3.12
 	github.com/openshift/cluster-logging-operator v0.0.0-20231130135759-9270994dc4bc
 	github.com/operator-framework/api v0.17.7
 	github.com/spf13/cobra v1.8.0
@@ -60,6 +59,7 @@ require (
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.7.0 // indirect
 	github.com/huandu/xstrings v1.3.3 // indirect
+	github.com/imdario/mergo v0.3.12 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
