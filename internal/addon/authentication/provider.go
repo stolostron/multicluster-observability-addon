@@ -24,7 +24,7 @@ type ProviderConfig struct {
 
 // secretsProvider is a struct that holds the Kubernetes client and configuration.
 type secretsProvider struct {
-	k8s           client.Client
+	k8s         client.Client
 	clusterName string
 	signal      addon.Signal
 	ProviderConfig
@@ -33,7 +33,7 @@ type secretsProvider struct {
 // NewSecretsProvider creates a new instance of K8sSecretGenerator.
 func NewSecretsProvider(k8s client.Client, clusterName string, signal addon.Signal, providerConfig *ProviderConfig) *secretsProvider {
 	secretsProvider := &secretsProvider{
-		k8s:           k8s,
+		k8s:         k8s,
 		clusterName: clusterName,
 		signal:      signal,
 	}

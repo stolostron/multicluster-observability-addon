@@ -68,3 +68,7 @@
     - apiGroups: ["logging.openshift.io"]
       resources: ["clusterlogforwarders"]
       verbs: ["get", "list", "watch"]
+    # Roles for addon to preform metrics specific actions
+    - apiGroups: ["route.openshift.io"]
+      resources: ["routes"]
+      verbs: ["get"]

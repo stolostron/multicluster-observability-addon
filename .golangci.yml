@@ -11,7 +11,7 @@ linters-settings:
     sections:
     - standard
     - default
-    - prefix(github.com/stolostron/multi-cluster-obsevability-addon)
+    - prefix(github.com/rhobs/multi-cluster-obsevability-addon)
     - blank
     - dot
   govet:

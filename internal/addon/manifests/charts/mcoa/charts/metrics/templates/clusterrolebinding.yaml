@@ -1,0 +1,14 @@
+{{- if .Values.enabled }}
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: multicluster-observability-addon:metrics:agent
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: multicluster-observability-addon:metrics:agent
+subjects:
+  - kind: ServiceAccount
+    name: multicluster-observability-addon:metrics:agent
+    namespace: {{ .Values.addonInstallNamespace }}
+{{- end }}

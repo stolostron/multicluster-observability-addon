@@ -53,7 +53,7 @@ func checkCertManagerCRDs(ctx context.Context, k8s client.Client) error {
 		err := k8s.Get(ctx, key, crd, &client.GetOptions{})
 		if err != nil {
 			if errors.IsNotFound(err) {
-				return kverrors.New("cert-manager CRD is missing %s", crdName)
+				return kverrors.New(fmt.Sprintf("cert-manager CRD is missing %s", crdName))
 			}
 			return err
 		}

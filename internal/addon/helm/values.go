@@ -50,7 +50,7 @@ func GetValuesFunc(k8s client.Client) addonfactory.GetValuesFunc {
 		var userValues HelmChartValues
 
 		if !opts.MetricsDisabled {
-			metrics, err := metrics.GetValuesFunc(k8s, cluster, addon)
+			metrics, err := metrics.GetValuesFunc(k8s, cluster, addon, aodc)
 			if err != nil {
 				return nil, err
 			}
