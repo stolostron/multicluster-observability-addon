@@ -2,7 +2,7 @@
 kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: open-cluster-management:metrics-addon:agent
+  name: multicluster-observability-addon:metrics:agent
 rules:
   - apiGroups: [""]
     resources:
