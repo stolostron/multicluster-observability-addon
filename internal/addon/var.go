@@ -1,6 +1,8 @@
 package addon
 
-import "embed"
+import (
+	"embed"
+)
 
 const (
 	Name             = "multicluster-observability-addon"
@@ -19,10 +21,10 @@ const (
 	AdcLoggingDisabledKey = "loggingDisabled"
 	AdcTracingisabledKey  = "tracingDisabled"
 
-	SignalLabelKey = "mcoa.openshift.io/signal"
-	SignalMetrics  = "metrics"
-	SignalLogging  = "logging"
-	SignalTracing  = "tracing"
+	SignalLabelKey        = "mcoa.openshift.io/signal"
+	Metrics        Signal = "metrics"
+	Logging        Signal = "logging"
+	Tracing        Signal = "tracing"
 )
 
 //go:embed manifests

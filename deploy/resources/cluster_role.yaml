@@ -52,9 +52,18 @@
     - apiGroups: ["rbac.authorization.k8s.io"]
       resources: ["rolebindings"]
       verbs: ["get", "list", "watch", "create", "delete"]
+    # The addon will need to create secrets to ensure secure communication
     - apiGroups: [""]
       resources: ["secrets"]
-      verbs: ["get", "list", "watch"]
+      verbs: ["get", "list", "watch", "create", "update", "delete", "patch"]
+    # Roles for addon to manage it's own certificates
+    - apiGroups: ["cert-manager.io"]
+      resources: ["issuers", "certificates", "clusterissuers"]
+      verbs: ["create", "get", "list", "watch"]
+    # Roles for addon to manage it's own certificates
+    - apiGroups: ["cert-manager.io"]
+      resources: ["issuers/status", "certificates/status", "clusterissuers/status"]
+      verbs: ["get", "update"]
     # Roles for addon to preform logging specific actions
     - apiGroups: ["logging.openshift.io"]
       resources: ["clusterlogforwarders"]

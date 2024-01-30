@@ -8,6 +8,7 @@ import (
 	"os"
 	"time"
 
+	certmanagerv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	routev1 "github.com/openshift/api/route/v1"
 	loggingapis "github.com/openshift/cluster-logging-operator/apis"
 	operatorsv1 "github.com/operator-framework/api/pkg/operators/v1"
@@ -113,6 +114,12 @@ func runController(ctx context.Context, kubeConfig *rest.Config) error {
 	}
 	// Necessary for metrics to get Routes hosts
 	if err = routev1.Install(scheme.Scheme); err != nil {
+		return err
+	}
+
+	// Necessary to reconcile cert-manager resources
+	err = certmanagerv1.AddToScheme(scheme.Scheme)
+	if err != nil {
 		return err
 	}
 
