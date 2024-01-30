@@ -5,28 +5,21 @@ metadata:
   name: metrics-addon-agent
   namespace: {{ .Values.addonInstallNamespace }}
   labels:
-    app.kubernetes.io/part-of: multicluster-observability-addon
+    {{- include "metricshelm.labels" . | indent 4 }}
     app.kubernetes.io/component: metrics-agent
-    app.kubernetes.io/instance: metrics-agent
-    app.kubernetes.io/name: metrics-addon-agent
-    app.kubernetes.io/version: 2.48.1
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app.kubernetes.io/part-of: multicluster-observability-addon
+      {{- include "metricshelm.labels" . | indent 6 }}
       app.kubernetes.io/component: metrics-agent
-      app.kubernetes.io/instance: metrics-agent
-      app.kubernetes.io/name: metrics-addon-agent
   template:
     metadata:
       labels:
-        app.kubernetes.io/part-of: multicluster-observability-addon
+        {{- include "metricshelm.labels" . | indent 8 }}
         app.kubernetes.io/component: metrics-agent
-        app.kubernetes.io/instance: metrics-agent
-        app.kubernetes.io/name: metrics-addon-agent
     spec:
-      serviceAccountName: multicluster-observability-addon:metrics:agent
+      serviceAccountName: multicluster-observability-metrics
       volumes:
         - name: prometheus-config-volume
           configMap:

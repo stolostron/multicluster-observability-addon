@@ -5,11 +5,7 @@ metadata:
   name: prometheus-agent-conf
   namespace: {{ .Values.addonInstallNamespace }}
   labels:
-    app.kubernetes.io/part-of: multicluster-observability-addon
-    app.kubernetes.io/component: metrics-agent
-    app.kubernetes.io/instance: metrics-agent
-    app.kubernetes.io/name: prometheus-agent-conf
-    app.kubernetes.io/version: 2.48.1
+    {{- include "metricshelm.labels" . | indent 4 }}
 data:
   prometheus.yml: |-
     global:
