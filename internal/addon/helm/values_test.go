@@ -9,7 +9,7 @@ import (
 
 	"github.com/rhobs/multicluster-observability-addon/internal/addon"
 	"github.com/stretchr/testify/require"
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog/v2"
@@ -26,7 +26,7 @@ var (
 	_ = operatorsv1.AddToScheme(scheme.Scheme)
 	_ = operatorsv1alpha1.AddToScheme(scheme.Scheme)
 	_ = addonapiv1alpha1.AddToScheme(scheme.Scheme)
-	_ = apiextensions.AddToScheme(scheme.Scheme)
+	_ = apiextensionsv1.AddToScheme(scheme.Scheme)
 )
 
 func Test_Mcoa_Disable_Charts(t *testing.T) {
@@ -75,17 +75,17 @@ func Test_Mcoa_Disable_Charts(t *testing.T) {
 		},
 	}
 
-	certManagerCertificateCRD := &apiextensions.CustomResourceDefinition{
+	certManagerCertificateCRD := &apiextensionsv1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "certificates.cert-manager.io",
 		},
 	}
-	certManagerIssuerCRD := &apiextensions.CustomResourceDefinition{
+	certManagerIssuerCRD := &apiextensionsv1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "issuers.cert-manager.io",
 		},
 	}
-	certManagerClusterIssuerCRD := &apiextensions.CustomResourceDefinition{
+	certManagerClusterIssuerCRD := &apiextensionsv1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "clusterissuers.cert-manager.io",
 		},

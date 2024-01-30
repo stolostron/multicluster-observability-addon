@@ -87,17 +87,23 @@ func mutateSecret(existing, desired *corev1.Secret) {
 func mutateIssuer(existing, desired *certmanagerv1.Issuer) {
 	existing.Annotations = desired.Annotations
 	existing.Labels = desired.Labels
+	// TODO(JoaoBraveCoding) Validate that all the spec fields are mutable after
+	// creation
 	existing.Spec = desired.Spec
 }
 
 func mutateCertificate(existing, desired *certmanagerv1.Certificate) {
 	existing.Annotations = desired.Annotations
 	existing.Labels = desired.Labels
+	// TODO(JoaoBraveCoding) Validate that all the spec fields are mutable after
+	// creation
 	existing.Spec = desired.Spec
 }
 
 func mutateClusterIssuer(existing, desired *certmanagerv1.ClusterIssuer) {
 	existing.Annotations = desired.Annotations
 	existing.Labels = desired.Labels
+	// TODO(JoaoBraveCoding) Validate that all the spec fields are mutable after
+	// creation
 	existing.Spec = desired.Spec
 }

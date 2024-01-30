@@ -6,7 +6,7 @@ import (
 
 	"github.com/ViaQ/logerr/v2/kverrors"
 	"github.com/rhobs/multicluster-observability-addon/internal/manifests"
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -49,11 +49,11 @@ func CreateOrUpdateRootCertificate(k8s client.Client) error {
 func checkCertManagerCRDs(ctx context.Context, k8s client.Client) error {
 	for _, crdName := range certManagerCRDs {
 		key := client.ObjectKey{Name: crdName}
-		crd := &apiextensions.CustomResourceDefinition{}
+		crd := &apiextensionsv1.CustomResourceDefinition{}
 		err := k8s.Get(ctx, key, crd, &client.GetOptions{})
 		if err != nil {
 			if errors.IsNotFound(err) {
-				return kverrors.New(fmt.Sprintf("cert-manager CRD is missing %s", crdName))
+				return kverrors.New("cert-manager CRD is missing", "name", crdName)
 			}
 			return err
 		}
