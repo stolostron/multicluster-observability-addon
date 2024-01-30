@@ -1,4 +1,4 @@
-package logging
+package manifests
 
 import (
 	"encoding/json"
@@ -15,7 +15,7 @@ import (
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 )
 
-func Test_Logging_BuildSubscriptionChannel(t *testing.T) {
+func Test_BuildSubscriptionChannel(t *testing.T) {
 	for _, tc := range []struct {
 		name       string
 		key        string
@@ -46,7 +46,7 @@ func Test_Logging_BuildSubscriptionChannel(t *testing.T) {
 					},
 				},
 			}
-			resources := Resources{
+			resources := Options{
 				AddOnDeploymentConfig: adoc,
 			}
 			subChannel := buildSubscriptionChannel(resources)
@@ -56,7 +56,7 @@ func Test_Logging_BuildSubscriptionChannel(t *testing.T) {
 }
 
 func Test_BuildSecrets(t *testing.T) {
-	resources := Resources{
+	resources := Options{
 		Secrets: []corev1.Secret{
 			{
 				ObjectMeta: metav1.ObjectMeta{
@@ -207,7 +207,7 @@ func Test_BuildCLFSpec(t *testing.T) {
 				"mcoa.openshift.io/signal": "logging",
 			},
 			Annotations: map[string]string{
-				annotationTargetOutputName: "app-logs",
+				AnnotationTargetOutputName: "app-logs",
 			},
 		},
 		Data: map[string][]byte{
@@ -224,7 +224,7 @@ func Test_BuildCLFSpec(t *testing.T) {
 				"mcoa.openshift.io/signal": "logging",
 			},
 			Annotations: map[string]string{
-				annotationTargetOutputName: "cluster-logs",
+				AnnotationTargetOutputName: "cluster-logs",
 			},
 		},
 		Data: map[string][]byte{
@@ -234,7 +234,7 @@ func Test_BuildCLFSpec(t *testing.T) {
 	}
 
 	// Setup the fake k8s client
-	resources := Resources{
+	resources := Options{
 		ClusterLogForwarder: clf,
 		Secrets: []corev1.Secret{
 			*appLogsSecret,

@@ -1,4 +1,4 @@
-package logging
+package manifests
 
 import (
 	"encoding/json"
@@ -7,7 +7,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-func buildSubscriptionChannel(resources Resources) string {
+func buildSubscriptionChannel(resources Options) string {
 	adoc := resources.AddOnDeploymentConfig
 	if adoc == nil || len(adoc.Spec.CustomizedVariables) == 0 {
 		return defaultLoggingVersion
@@ -21,7 +21,7 @@ func buildSubscriptionChannel(resources Resources) string {
 	return defaultLoggingVersion
 }
 
-func buildSecrets(resources Resources) ([]SecretValue, error) {
+func buildSecrets(resources Options) ([]SecretValue, error) {
 	secretsValue := []SecretValue{}
 	for _, secret := range resources.Secrets {
 		dataJSON, err := json.Marshal(secret.Data)
@@ -37,7 +37,7 @@ func buildSecrets(resources Resources) ([]SecretValue, error) {
 	return secretsValue, nil
 }
 
-func buildClusterLogForwarderSpec(resources Resources) (*loggingv1.ClusterLogForwarderSpec, error) {
+func buildClusterLogForwarderSpec(resources Options) (*loggingv1.ClusterLogForwarderSpec, error) {
 	clf := resources.ClusterLogForwarder
 	for _, secret := range resources.Secrets {
 		if err := templateWithSecret(&clf.Spec, secret); err != nil {
@@ -49,7 +49,7 @@ func buildClusterLogForwarderSpec(resources Resources) (*loggingv1.ClusterLogFor
 }
 
 func templateWithSecret(spec *loggingv1.ClusterLogForwarderSpec, secret corev1.Secret) error {
-	clfOutputName, ok := secret.Annotations[annotationTargetOutputName]
+	clfOutputName, ok := secret.Annotations[AnnotationTargetOutputName]
 	if !ok {
 		return nil
 	}
