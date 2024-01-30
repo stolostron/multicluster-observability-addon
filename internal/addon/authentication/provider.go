@@ -62,7 +62,7 @@ func NewSecretsProvider(k8s client.Client, clusterName string, signal addon.Sign
 func (sp *secretsProvider) GenerateSecrets(targetAuthType map[string]string) (map[string]client.ObjectKey, error) {
 	ctx := context.Background()
 	secretKeys := make(map[string]client.ObjectKey, len(targetAuthType))
-	objects := make([]client.Object, len(targetAuthType))
+	objects := make([]client.Object, 0, len(targetAuthType))
 	for targetName, authType := range targetAuthType {
 		secretKey := client.ObjectKey{Name: fmt.Sprintf("%s-%s-auth", sp.signal, targetName), Namespace: sp.clusterName}
 		var (
