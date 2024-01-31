@@ -150,7 +150,6 @@ func BuildAllRootCertificate() []client.Object {
 	cIssuer := &certmanagerv1.ClusterIssuer{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      clusterIssuerName,
-			Namespace: certManagerNamespace,
 		},
 		Spec: certmanagerv1.IssuerSpec{
 			IssuerConfig: certmanagerv1.IssuerConfig{
