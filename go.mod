@@ -5,6 +5,7 @@ go 1.20
 require (
 	github.com/ViaQ/logerr/v2 v2.1.0
 	github.com/cert-manager/cert-manager v1.13.3
+	github.com/go-logr/logr v1.4.1
 	github.com/imdario/mergo v0.3.16
 	github.com/open-telemetry/opentelemetry-operator v0.93.0
 	github.com/openshift/api v0.0.0-20240124164020-e2ce40831f2e // release-4.15
@@ -49,7 +50,6 @@ require (
 	github.com/fatih/structs v1.1.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
-	github.com/go-logr/logr v1.4.1 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-openapi/jsonpointer v0.20.0 // indirect
 	github.com/go-openapi/jsonreference v0.20.2 // indirect

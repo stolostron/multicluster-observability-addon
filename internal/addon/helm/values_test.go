@@ -3,6 +3,8 @@ package helm
 import (
 	"testing"
 
+	certmanagerv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
+	logrtesting "github.com/go-logr/logr/testing"
 	loggingapis "github.com/openshift/cluster-logging-operator/apis"
 	operatorsv1 "github.com/operator-framework/api/pkg/operators/v1"
 	operatorsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
@@ -99,7 +101,7 @@ func Test_Mcoa_Disable_Charts(t *testing.T) {
 		Build()
 
 	loggingAgentAddon, err := addonfactory.NewAgentAddonFactory(addon.Name, addon.FS, addon.McoaChartDir).
-		WithGetValuesFuncs(GetValuesFunc(fakeKubeClient)).
+		WithGetValuesFuncs(GetValuesFunc(fakeKubeClient, logrtesting.NewTestLogger(t))).
 		WithAgentRegistrationOption(&agent.RegistrationOption{}).
 		WithScheme(scheme.Scheme).
 		BuildHelmAgentAddon()

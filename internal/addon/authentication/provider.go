@@ -5,10 +5,10 @@ import (
 	"fmt"
 
 	"github.com/ViaQ/logerr/v2/kverrors"
+	"github.com/go-logr/logr"
 	"github.com/rhobs/multicluster-observability-addon/internal/addon"
 	"github.com/rhobs/multicluster-observability-addon/internal/manifests"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	ctrlutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -35,15 +35,17 @@ type Config struct {
 // secretsProvider an implementaton of the authentication package API
 type secretsProvider struct {
 	k8s         client.Client
+	log         logr.Logger
 	clusterName string
 	signal      addon.Signal
 	Config
 }
 
 // NewSecretsProvider creates a new instance of *secretsProvider.
-func NewSecretsProvider(k8s client.Client, clusterName string, signal addon.Signal, config *Config) (*secretsProvider, error) {
+func NewSecretsProvider(k8s client.Client, log logr.Logger, clusterName string, signal addon.Signal, config *Config) (*secretsProvider, error) {
 	secretsProvider := &secretsProvider{
 		k8s:         k8s,
+		log:         log,
 		clusterName: clusterName,
 		signal:      signal,
 	}
@@ -90,23 +92,33 @@ func (sp *secretsProvider) GenerateSecrets(ctx context.Context, targetAuthType m
 		secretKeys[targetName] = SecretKey(secretKey)
 	}
 
+	var errCount int32
 	for _, obj := range objects {
+		l := sp.log.WithValues(
+			"object_name", obj.GetName(),
+			"object_kind", obj.GetObjectKind(),
+		)
+
 		desired := obj.DeepCopyObject().(client.Object)
 		mutateFn := manifests.MutateFuncFor(obj, desired, nil)
 
 		op, err := ctrl.CreateOrUpdate(ctx, sp.k8s, obj, mutateFn)
 		if err != nil {
-			klog.Error(err, "failed to configure resource")
+			l.Error(err, "failed to configure resource")
+			errCount++
 			continue
 		}
 
-		msg := fmt.Sprintf("Resource has been %s", op)
+		msg := fmt.Sprintf("resource has been %s", op)
 		switch op {
 		case ctrlutil.OperationResultNone:
-			klog.Info(msg)
+			l.Info(msg)
 		default:
-			klog.Info(msg)
+			l.Info(msg)
 		}
+	}
+	if errCount > 0 {
+		return nil, kverrors.New("failed to request secrets")
 	}
 
 	err := sp.injectCA(ctx, targetAuthType, secretKeys)

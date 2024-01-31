@@ -8,6 +8,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/ViaQ/logerr/v2/log"
 	certmanagerv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	otelv1alpha1 "github.com/open-telemetry/opentelemetry-operator/apis/v1alpha1"
 	routev1 "github.com/openshift/api/route/v1"
@@ -32,6 +33,7 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/version"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 )
@@ -85,6 +87,9 @@ func newControllerCommand() *cobra.Command {
 }
 
 func runController(ctx context.Context, kubeConfig *rest.Config) error {
+	logger := log.NewLogger("multicluster-observability-addon")
+	ctrl.SetLogger(logger)
+
 	addonClient, err := addonv1alpha1client.NewForConfig(kubeConfig)
 	if err != nil {
 		return err
@@ -169,7 +174,7 @@ func runController(ctx context.Context, kubeConfig *rest.Config) error {
 			schema.GroupVersionResource{Version: "v1alpha1", Group: "opentelemetry.io", Resource: "opentelemetrycollectors"},
 			utils.AddOnDeploymentConfigGVR,
 		).
-		WithGetValuesFuncs(addonConfigValuesFn, addonhelm.GetValuesFunc(k8sClient)).
+		WithGetValuesFuncs(addonConfigValuesFn, addonhelm.GetValuesFunc(k8sClient, logger)).
 		WithAgentRegistrationOption(registrationOption).
 		WithScheme(scheme.Scheme).
 		BuildHelmAgentAddon()

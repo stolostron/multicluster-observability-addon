@@ -5,16 +5,16 @@ import (
 	"fmt"
 
 	"github.com/ViaQ/logerr/v2/kverrors"
+	"github.com/go-logr/logr"
 	"github.com/rhobs/multicluster-observability-addon/internal/manifests"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	ctrlutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-func CreateOrUpdateRootCertificate(k8s client.Client) error {
+func CreateOrUpdateRootCertificate(k8s client.Client, log logr.Logger) error {
 	ctx := context.Background()
 
 	err := checkCertManagerCRDs(ctx, k8s)
@@ -24,23 +24,33 @@ func CreateOrUpdateRootCertificate(k8s client.Client) error {
 
 	objects := manifests.BuildAllRootCertificate()
 
+	var errCount int32
 	for _, obj := range objects {
+		l := log.WithValues(
+			"object_name", obj.GetName(),
+			"object_kind", obj.GetObjectKind(),
+		)
+
 		desired := obj.DeepCopyObject().(client.Object)
 		mutateFn := manifests.MutateFuncFor(obj, desired, nil)
 
 		op, err := ctrl.CreateOrUpdate(ctx, k8s, obj, mutateFn)
 		if err != nil {
-			klog.Error(err, "failed to configure resource")
+			l.Error(err, "failed to configure resource")
+			errCount++
 			continue
 		}
 
-		msg := fmt.Sprintf("Resource has been %s", op)
+		msg := fmt.Sprintf("resource has been %s", op)
 		switch op {
 		case ctrlutil.OperationResultNone:
-			klog.Info(msg)
+			l.Info(msg)
 		default:
-			klog.Info(msg)
+			l.Info(msg)
 		}
+	}
+	if errCount > 0 {
+		return kverrors.New("failed to configure root certificate resources")
 	}
 
 	return nil

@@ -3,6 +3,7 @@ package logging
 import (
 	"testing"
 
+	logrtesting "github.com/go-logr/logr/testing"
 	loggingv1 "github.com/openshift/cluster-logging-operator/apis/logging/v1"
 	"github.com/rhobs/multicluster-observability-addon/internal/addon"
 	"github.com/rhobs/multicluster-observability-addon/internal/logging/handlers"
@@ -33,7 +34,7 @@ var (
 	_ = operatorsv1alpha1.AddToScheme(scheme.Scheme)
 )
 
-func fakeGetValues(k8s client.Client) addonfactory.GetValuesFunc {
+func fakeGetValues(t *testing.T, k8s client.Client) addonfactory.GetValuesFunc {
 	return func(
 		cluster *clusterv1.ManagedCluster,
 		addon *addonapiv1alpha1.ManagedClusterAddOn,
@@ -220,7 +221,7 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 
 	// Wire everything together to a fake addon instance
 	loggingAgentAddon, err := addonfactory.NewAgentAddonFactory(addon.Name, addon.FS, addon.LoggingChartDir).
-		WithGetValuesFuncs(addonConfigValuesFn, fakeGetValues(fakeKubeClient)).
+		WithGetValuesFuncs(addonConfigValuesFn, fakeGetValues(t, fakeKubeClient)).
 		WithAgentRegistrationOption(&agent.RegistrationOption{}).
 		WithScheme(scheme.Scheme).
 		BuildHelmAgentAddon()

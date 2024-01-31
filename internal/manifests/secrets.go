@@ -116,6 +116,10 @@ func BuildManagedSecret(key client.ObjectKey) (*corev1.Secret, error) {
 
 func BuildAllRootCertificate() []client.Object {
 	issuer := &certmanagerv1.Issuer{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: certmanagerv1.SchemeGroupVersion.String(),
+			Kind:       certmanagerv1.IssuerKind,
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      rootIssuerName,
 			Namespace: certManagerNamespace,
@@ -128,6 +132,10 @@ func BuildAllRootCertificate() []client.Object {
 	}
 
 	cert := &certmanagerv1.Certificate{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: certmanagerv1.SchemeGroupVersion.String(),
+			Kind:       certmanagerv1.CertificateKind,
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      rootCertName,
 			Namespace: certManagerNamespace,
@@ -149,6 +157,10 @@ func BuildAllRootCertificate() []client.Object {
 	}
 
 	cIssuer := &certmanagerv1.ClusterIssuer{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: certmanagerv1.SchemeGroupVersion.String(),
+			Kind:       certmanagerv1.ClusterIssuerKind,
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: clusterIssuerName,
 		},
