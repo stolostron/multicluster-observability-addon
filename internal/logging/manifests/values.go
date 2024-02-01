@@ -2,6 +2,8 @@ package manifests
 
 import (
 	"encoding/json"
+
+	"github.com/go-logr/logr"
 )
 
 type LoggingValues struct {
@@ -15,7 +17,7 @@ type SecretValue struct {
 	Data string `json:"data"`
 }
 
-func BuildValues(opts Options) (*LoggingValues, error) {
+func BuildValues(log logr.Logger, opts Options) (*LoggingValues, error) {
 	values := &LoggingValues{
 		Enabled: true,
 	}
@@ -38,6 +40,8 @@ func BuildValues(opts Options) (*LoggingValues, error) {
 		return nil, err
 	}
 	values.CLFSpec = string(b)
+
+	log.Info("values built successfully")
 
 	return values, nil
 }

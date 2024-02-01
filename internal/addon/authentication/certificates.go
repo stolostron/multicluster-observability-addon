@@ -28,7 +28,7 @@ func CreateOrUpdateRootCertificate(k8s client.Client, log logr.Logger) error {
 	for _, obj := range objects {
 		l := log.WithValues(
 			"object_name", obj.GetName(),
-			"object_kind", obj.GetObjectKind(),
+			"object_kind", obj.GetObjectKind().GroupVersionKind().Kind,
 		)
 
 		desired := obj.DeepCopyObject().(client.Object)

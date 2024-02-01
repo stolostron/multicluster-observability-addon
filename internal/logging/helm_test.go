@@ -39,12 +39,12 @@ func fakeGetValues(t *testing.T, k8s client.Client) addonfactory.GetValuesFunc {
 		cluster *clusterv1.ManagedCluster,
 		addon *addonapiv1alpha1.ManagedClusterAddOn,
 	) (addonfactory.Values, error) {
-		opts, err := handlers.BuildOptions(k8s, addon, nil)
+		opts, err := handlers.BuildOptions(k8s, logrtesting.NewTestLogger(t), addon, nil)
 		if err != nil {
 			return nil, err
 		}
 
-		logging, err := manifests.BuildValues(opts)
+		logging, err := manifests.BuildValues(logrtesting.NewTestLogger(t), opts)
 		if err != nil {
 			return nil, err
 		}

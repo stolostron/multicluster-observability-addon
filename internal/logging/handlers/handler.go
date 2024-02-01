@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/ViaQ/logerr/v2/kverrors"
+	"github.com/go-logr/logr"
 	loggingv1 "github.com/openshift/cluster-logging-operator/apis/logging/v1"
 	"github.com/rhobs/multicluster-observability-addon/internal/addon"
 	"github.com/rhobs/multicluster-observability-addon/internal/addon/authentication"
@@ -17,7 +18,7 @@ const (
 	clusterLogForwarderResource = "clusterlogforwarders"
 )
 
-func BuildOptions(k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, adoc *addonapiv1alpha1.AddOnDeploymentConfig) (manifests.Options, error) {
+func BuildOptions(k8s client.Client, log logr.Logger, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, adoc *addonapiv1alpha1.AddOnDeploymentConfig) (manifests.Options, error) {
 	resources := manifests.Options{
 		AddOnDeploymentConfig: adoc,
 	}
@@ -72,7 +73,7 @@ func BuildOptions(k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAdd
 		}
 	}
 
-	secretsProvider, err := authentication.NewSecretsProvider(k8s, mcAddon.Namespace, addon.Logging, authConfig)
+	secretsProvider, err := authentication.NewSecretsProvider(k8s, log, mcAddon.Namespace, addon.Logging, authConfig)
 	if err != nil {
 		return resources, err
 	}
