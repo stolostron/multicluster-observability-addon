@@ -43,7 +43,11 @@ func BuildOptions(k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAdd
 		}
 	}
 
-	secretsProvider := authentication.NewSecretsProvider(k8s, mcAddon.Namespace, addon.Logging, nil)
+	secretsProvider, err := authentication.NewSecretsProvider(k8s, mcAddon.Namespace, addon.Logging, manifests.AuthDefaultConfig)
+	if err != nil {
+		return resources, err
+	}
+
 	targetsSecret, err := secretsProvider.GenerateSecrets(authCM.Data)
 	if err != nil {
 		return resources, err

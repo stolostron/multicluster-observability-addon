@@ -16,6 +16,7 @@ const (
 	rootCertName         = "mcoa-root-certificate"
 	clusterIssuerName    = "mcoa-cluster-issuer"
 	certManagerNamespace = "cert-manager"
+	caKey                = "ca-bundle.crt"
 )
 
 type StaticAuthenticationConfig struct {
@@ -23,6 +24,7 @@ type StaticAuthenticationConfig struct {
 }
 
 type MTLSConfig struct {
+	CAToInject string
 	CommonName string
 	Subject    *certmanagerv1.X509Subject
 	DNSNames   []string
@@ -160,4 +162,8 @@ func BuildAllRootCertificate() []client.Object {
 		},
 	}
 	return []client.Object{issuer, cert, cIssuer}
+}
+
+func InjectCA(secret *corev1.Secret, ca string) {
+	secret.Data[caKey] = []byte(ca)
 }

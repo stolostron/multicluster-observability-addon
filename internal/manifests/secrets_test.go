@@ -63,3 +63,15 @@ func Test_BuildMTLSSecret(t *testing.T) {
 	require.Equal(t, "mcoa-cluster-issuer", c.Spec.IssuerRef.Name)
 	require.ElementsMatch(t, mTLSConfig.DNSNames, c.Spec.DNSNames)
 }
+
+func Test_InjectCA(t *testing.T) {
+	secret := &corev1.Secret{
+		Data: map[string][]byte{
+			"foo": []byte("bar"),
+		},
+	}
+	ca := "test"
+	InjectCA(secret, ca)
+	require.Equal(t, []byte("bar"), secret.Data["foo"])
+	require.Equal(t, []byte("test"), secret.Data["ca-bundle.crt"])
+}
