@@ -32,14 +32,24 @@ func BuildOptions(k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAdd
 	for _, config := range mcAddon.Spec.Configs {
 		switch config.ConfigGroupResource.Resource {
 		case addon.ConfigMapResource:
+			cm := &corev1.ConfigMap{}
 			key := client.ObjectKey{Name: config.Name, Namespace: config.Namespace}
-			if err := k8s.Get(context.Background(), key, authCM, &client.GetOptions{}); err != nil {
+			if err := k8s.Get(context.Background(), key, cm, &client.GetOptions{}); err != nil {
 				return resources, err
 			}
 
-			if signal, ok := authCM.Labels[addon.SignalLabelKey]; !ok || signal != addon.Logging.String() {
+			// Only care about cm's that configure logging
+			if signal, ok := cm.Labels[addon.SignalLabelKey]; !ok || signal != addon.Logging.String() {
 				continue
 			}
+
+			// If a cm doesn't have a target label then it's configuring authentication
+			if _, ok := cm.Labels[manifests.AnnotationTargetOutputName]; !ok {
+				authCM = cm
+				continue
+			}
+
+			resources.ConfigMaps = append(resources.ConfigMaps, *cm)
 		}
 	}
 
