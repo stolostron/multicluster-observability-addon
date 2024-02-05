@@ -12,6 +12,7 @@ func GetValuesFunc(k8s client.Client, _ *clusterv1.ManagedCluster, mcAddon *addo
 	values := TracingValues{
 		Enabled:                 true,
 		OtelSubscriptionChannel: subscriptionChannel,
+		AddonInstallNamespace: mcAddon.Spec.InstallNamespace,
 	}
 
 	otelColSpec, err := buildOtelColSpec(k8s, mcAddon)
