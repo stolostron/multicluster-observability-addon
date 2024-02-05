@@ -3,7 +3,7 @@ kind: Deployment
 apiVersion: apps/v1
 metadata:
   name: metrics-addon-agent
-  namespace: {{ .Values.addonInstallNamespace }}
+  namespace: open-cluster-management-addon-observability
   labels:
     {{- include "metricshelm.labels" . | indent 4 }}
     app.kubernetes.io/component: metrics-agent
