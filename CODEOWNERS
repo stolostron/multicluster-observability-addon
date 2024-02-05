@@ -1,0 +1,12 @@
+# All signal teams own everything by default. Exceptions will be listed below this generic rule.
+* @multicluster-observability @team-logging @team-tracing
+
+# Signal specific implementation folders.
+/internal/logging @team-logging
+/internal/tracing @team-tracing
+/internal/metrics @multicluster-observability
+
+# Signal specific charts.
+/internal/addon/manifests/charts/mcoa/charts/logging @team-logging
+/internal/addon/manifests/charts/mcoa/charts/tracing @team-tracing
+/internal/addon/manifests/charts/mcoa/charts/metrics @multicluster-observability
