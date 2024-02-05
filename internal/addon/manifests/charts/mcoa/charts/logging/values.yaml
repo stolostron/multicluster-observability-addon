@@ -2,6 +2,12 @@ nameOverride: null
 
 enabled: true
 
-clfSpec: ""
+# Expects json format
+clfSpec: {}
+
+secrets:
+  - name: "secret-1"
+    # Expects json format
+    data: {}
 
 loggingSubscriptionChannel: channelName

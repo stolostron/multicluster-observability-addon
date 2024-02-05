@@ -5,7 +5,9 @@ import (
 	"strconv"
 
 	"github.com/rhobs/multicluster-observability-addon/internal/addon"
-	"github.com/rhobs/multicluster-observability-addon/internal/logging"
+	"github.com/rhobs/multicluster-observability-addon/internal/addon/authentication"
+	lhandlers "github.com/rhobs/multicluster-observability-addon/internal/logging/handlers"
+	lmanifests "github.com/rhobs/multicluster-observability-addon/internal/logging/manifests"
 	"github.com/rhobs/multicluster-observability-addon/internal/metrics"
 	"github.com/rhobs/multicluster-observability-addon/internal/tracing"
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
@@ -16,9 +18,9 @@ import (
 )
 
 type HelmChartValues struct {
-	Metrics metrics.MetricsValues `json:"metrics"`
-	Logging logging.LoggingValues `json:"logging"`
-	Tracing tracing.TracingValues `json:"tracing"`
+	Metrics metrics.MetricsValues    `json:"metrics"`
+	Logging lmanifests.LoggingValues `json:"logging"`
+	Tracing tracing.TracingValues    `json:"tracing"`
 }
 
 type Options struct {
@@ -32,6 +34,11 @@ func GetValuesFunc(k8s client.Client) addonfactory.GetValuesFunc {
 		cluster *clusterv1.ManagedCluster,
 		addon *addonapiv1alpha1.ManagedClusterAddOn,
 	) (addonfactory.Values, error) {
+		err := authentication.CreateOrUpdateRootCertificate(k8s)
+		if err != nil {
+			return nil, err
+		}
+
 		aodc, err := getAddOnDeploymentConfig(k8s, addon)
 		if err != nil {
 			return nil, err
@@ -44,7 +51,7 @@ func GetValuesFunc(k8s client.Client) addonfactory.GetValuesFunc {
 		var userValues HelmChartValues
 
 		if !opts.MetricsDisabled {
-			metrics, err := metrics.GetValuesFunc(k8s, cluster, addon)
+			metrics, err := metrics.GetValuesFunc(k8s, cluster, addon, aodc)
 			if err != nil {
 				return nil, err
 			}
@@ -52,7 +59,12 @@ func GetValuesFunc(k8s client.Client) addonfactory.GetValuesFunc {
 		}
 
 		if !opts.LoggingDisabled {
-			logging, err := logging.GetValuesFunc(k8s, cluster, addon, aodc)
+			loggingOpts, err := lhandlers.BuildOptions(k8s, addon, aodc)
+			if err != nil {
+				return nil, err
+			}
+
+			logging, err := lmanifests.BuildValues(loggingOpts)
 			if err != nil {
 				return nil, err
 			}

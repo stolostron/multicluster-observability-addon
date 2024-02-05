@@ -1,0 +1,83 @@
+{{- if .Values.enabled }}
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: metrics-addon-agent
+  namespace: {{ .Values.addonInstallNamespace }}
+  labels:
+    {{- include "metricshelm.labels" . | indent 4 }}
+    app.kubernetes.io/component: metrics-agent
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "metricshelm.labels" . | indent 6 }}
+      app.kubernetes.io/component: metrics-agent
+  template:
+    metadata:
+      labels:
+        {{- include "metricshelm.labels" . | indent 8 }}
+        app.kubernetes.io/component: metrics-agent
+    spec:
+      serviceAccountName: multicluster-observability-metrics
+      volumes:
+        - name: prometheus-config-volume
+          configMap:
+            name: prometheus-agent-conf
+            defaultMode: 420
+        - name: prometheus-storage-volume
+          emptyDir: {}
+        - name: serving-certs-ca-bundle
+          configMap:
+            name: metrics-collector-serving-certs-ca-bundle
+        - name: mtlsca
+          secret:
+            secretName: observability-managed-cluster-certs
+        - name: mtlscerts
+          secret:
+              secretName: observability-controller-open-cluster-management.io-observability-signer-client-cert
+      dnsPolicy: ClusterFirst
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: prometheus-agent
+          ports:
+            - containerPort: 9090
+              protocol: TCP
+          resources:
+            requests:
+              cpu: 500m
+              memory: 500M
+            limits:
+              cpu: 1
+              memory: 1Gi
+          imagePullPolicy: IfNotPresent
+          restartPolicy: Always
+          securityContext: {}
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+            - name: prometheus-config-volume
+              mountPath: /etc/prometheus/
+            - name: prometheus-storage-volume
+              mountPath: /prometheus/
+            - name: mtlscerts
+              readOnly: true
+              mountPath: /tlscerts/certs
+            - name: mtlsca
+              readOnly: true
+              mountPath: /tlscerts/ca
+            - name: serving-certs-ca-bundle
+              mountPath: /etc/serving-certs-ca-bundle
+              readOnly: true
+          image: "quay.io/prometheus/prometheus:v2.48.1"
+          args:
+            - "--log.level=debug"
+            - "--config.file=/etc/prometheus/prometheus.yml"
+            - "--web.enable-lifecycle"
+            - "--enable-feature=agent"
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 25%
+      maxSurge: 25%
+{{- end }}

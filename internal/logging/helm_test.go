@@ -1,11 +1,12 @@
 package logging
 
 import (
-	"fmt"
 	"testing"
 
 	loggingv1 "github.com/openshift/cluster-logging-operator/apis/logging/v1"
 	"github.com/rhobs/multicluster-observability-addon/internal/addon"
+	"github.com/rhobs/multicluster-observability-addon/internal/logging/handlers"
+	"github.com/rhobs/multicluster-observability-addon/internal/logging/manifests"
 
 	loggingapis "github.com/openshift/cluster-logging-operator/apis"
 	operatorsv1 "github.com/operator-framework/api/pkg/operators/v1"
@@ -15,7 +16,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog/v2"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
 	"open-cluster-management.io/addon-framework/pkg/agent"
@@ -37,77 +38,17 @@ func fakeGetValues(k8s client.Client) addonfactory.GetValuesFunc {
 		cluster *clusterv1.ManagedCluster,
 		addon *addonapiv1alpha1.ManagedClusterAddOn,
 	) (addonfactory.Values, error) {
-		logging, err := GetValuesFunc(k8s, cluster, addon, nil)
+		opts, err := handlers.BuildOptions(k8s, addon, nil)
+		if err != nil {
+			return nil, err
+		}
+
+		logging, err := manifests.BuildValues(opts)
 		if err != nil {
 			return nil, err
 		}
 
 		return addonfactory.JsonStructToValues(logging)
-	}
-}
-
-func Test_Logging_SubscriptionChannel(t *testing.T) {
-	var (
-		managedCluster        *clusterv1.ManagedCluster
-		managedClusterAddOn   *addonapiv1alpha1.ManagedClusterAddOn
-		addOnDeploymentConfig *addonapiv1alpha1.AddOnDeploymentConfig
-	)
-
-	managedCluster = addontesting.NewManagedCluster("cluster-1")
-	managedClusterAddOn = addontesting.NewAddon("test", "cluster-1")
-
-	managedClusterAddOn.Status.ConfigReferences = []addonapiv1alpha1.ConfigReference{
-		{
-			ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
-				Group:    "addon.open-cluster-management.io",
-				Resource: "addondeploymentconfigs",
-			},
-			ConfigReferent: addonapiv1alpha1.ConfigReferent{
-				Namespace: "open-cluster-management",
-				Name:      "multicluster-observability-addon",
-			},
-		},
-	}
-
-	addOnDeploymentConfig = &addonapiv1alpha1.AddOnDeploymentConfig{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "multicluster-observability-addon",
-			Namespace: "open-cluster-management",
-		},
-		Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
-			CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
-				{
-					Name:  "loggingSubscriptionChannel",
-					Value: "stable-5.8",
-				},
-			},
-		},
-	}
-
-	fakeAddonClient := fakeaddon.NewSimpleClientset(addOnDeploymentConfig)
-	addonConfigValuesFn := addonfactory.GetAddOnDeploymentConfigValues(
-		addonfactory.NewAddOnDeploymentConfigGetter(fakeAddonClient),
-		addonfactory.ToAddOnCustomizedVariableValues,
-	)
-
-	loggingAgentAddon, err := addonfactory.NewAgentAddonFactory(addon.Name, addon.FS, addon.LoggingChartDir).
-		WithGetValuesFuncs(addonConfigValuesFn).
-		WithAgentRegistrationOption(&agent.RegistrationOption{}).
-		WithScheme(scheme.Scheme).
-		BuildHelmAgentAddon()
-	if err != nil {
-		klog.Fatalf("failed to build agent %v", err)
-	}
-
-	objects, err := loggingAgentAddon.Manifests(managedCluster, managedClusterAddOn)
-	require.NoError(t, err)
-	require.Equal(t, 6, len(objects))
-
-	for _, obj := range objects {
-		switch obj := obj.(type) {
-		case *operatorsv1alpha1.Subscription:
-			require.Equal(t, obj.Spec.Channel, "stable-5.8")
-		}
 	}
 }
 
@@ -118,10 +59,10 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 		managedClusterAddOn *addonapiv1alpha1.ManagedClusterAddOn
 
 		// Addon configuration
-		addOnDeploymentConfig            *addonapiv1alpha1.AddOnDeploymentConfig
-		clf                              *loggingv1.ClusterLogForwarder
-		appLogsSecret, clusterLogsSecret *corev1.Secret
-		appLogsCm                        *corev1.ConfigMap
+		addOnDeploymentConfig *addonapiv1alpha1.AddOnDeploymentConfig
+		clf                   *loggingv1.ClusterLogForwarder
+		authCM                *corev1.ConfigMap
+		staticCred            *corev1.Secret
 
 		// Test clients
 		fakeKubeClient  client.Client
@@ -157,31 +98,11 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 		{
 			ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
 				Group:    "",
-				Resource: "secrets",
-			},
-			ConfigReferent: addonapiv1alpha1.ConfigReferent{
-				Namespace: managedCluster.Name,
-				Name:      fmt.Sprintf("%s-app-logs", managedCluster.Name),
-			},
-		},
-		{
-			ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
-				Group:    "",
-				Resource: "secrets",
-			},
-			ConfigReferent: addonapiv1alpha1.ConfigReferent{
-				Namespace: managedCluster.Name,
-				Name:      fmt.Sprintf("%s-cluster-logs", managedCluster.Name),
-			},
-		},
-		{
-			ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
-				Group:    "",
 				Resource: "configmaps",
 			},
 			ConfigReferent: addonapiv1alpha1.ConfigReferent{
-				Namespace: managedCluster.Name,
-				Name:      fmt.Sprintf("%s-app-logs", managedCluster.Name),
+				Namespace: "open-cluster-management",
+				Name:      "logging-auth",
 			},
 		},
 	}
@@ -222,7 +143,7 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 					OutputTypeSpec: loggingv1.OutputTypeSpec{
 						Cloudwatch: &loggingv1.Cloudwatch{
 							GroupBy:     loggingv1.LogGroupByLogType,
-							GroupPrefix: pointer.String("test-prefix"),
+							GroupPrefix: ptr.To("test-prefix"),
 						},
 					},
 				},
@@ -242,53 +163,28 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 		},
 	}
 
-	appLogsSecret = &corev1.Secret{
+	staticCred = &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-app-logs", managedCluster.Name),
-			Namespace: managedCluster.Name,
-			Labels: map[string]string{
-				"mcoa.openshift.io/signal": "logging",
-			},
-			Annotations: map[string]string{
-				annotationTargetOutputName: "app-logs",
-			},
+			Name:      "static-authentication",
+			Namespace: "open-cluster-management",
 		},
 		Data: map[string][]byte{
-			"tls.crt": []byte("cert"),
-			"tls.key": []byte("key"),
+			"key":  []byte("data"),
+			"pass": []byte("data"),
 		},
 	}
 
-	clusterLogsSecret = &corev1.Secret{
+	authCM = &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-cluster-logs", managedCluster.Name),
-			Namespace: managedCluster.Name,
+			Name:      "logging-auth",
+			Namespace: "open-cluster-management",
 			Labels: map[string]string{
 				"mcoa.openshift.io/signal": "logging",
-			},
-			Annotations: map[string]string{
-				annotationTargetOutputName: "cluster-logs",
-			},
-		},
-		Data: map[string][]byte{
-			"tls.crt": []byte("cert"),
-			"tls.key": []byte("key"),
-		},
-	}
-
-	appLogsCm = &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-app-logs", managedCluster.Name),
-			Namespace: managedCluster.Name,
-			Labels: map[string]string{
-				"mcoa.openshift.io/signal": "logging",
-			},
-			Annotations: map[string]string{
-				annotationTargetOutputName: "app-logs",
 			},
 		},
 		Data: map[string]string{
-			"url": "https://example.com",
+			"app-logs":     "StaticAuthentication",
+			"cluster-logs": "StaticAuthentication",
 		},
 	}
 
@@ -310,7 +206,7 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 	// Setup the fake k8s client
 	fakeKubeClient = fake.NewClientBuilder().
 		WithScheme(scheme.Scheme).
-		WithObjects(clf, appLogsCm, appLogsSecret, clusterLogsSecret).
+		WithObjects(clf, staticCred, authCM).
 		Build()
 
 	// Setup the fake addon client
@@ -342,9 +238,17 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 		case *loggingv1.ClusterLogForwarder:
 			require.NotNil(t, obj.Spec.Outputs[0].Secret)
 			require.NotNil(t, obj.Spec.Outputs[1].Secret)
-			require.Equal(t, appLogsSecret.Name, obj.Spec.Outputs[0].Secret.Name)
-			require.Equal(t, clusterLogsSecret.Name, obj.Spec.Outputs[1].Secret.Name)
-			require.Equal(t, appLogsCm.Data["url"], obj.Spec.Outputs[0].URL)
+			require.Equal(t, "logging-app-logs-auth", obj.Spec.Outputs[0].Secret.Name)
+			require.Equal(t, "logging-cluster-logs-auth", obj.Spec.Outputs[1].Secret.Name)
+		case *corev1.Secret:
+			if obj.Name == "logging-app-logs-auth" {
+				require.Equal(t, staticCred.Data, obj.Data)
+			}
+
+			if obj.Name == "logging-cluster-logs-auth" {
+				require.Equal(t, staticCred.Data, obj.Data)
+			}
+
 		}
 	}
 }

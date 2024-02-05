@@ -8,8 +8,10 @@ import (
 	"os"
 	"time"
 
+	certmanagerv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	otelv1alpha1 "github.com/open-telemetry/opentelemetry-operator/apis/v1alpha1"
 	projectsv1 "github.com/openshift/api/project/v1"
+	routev1 "github.com/openshift/api/route/v1"
 	loggingapis "github.com/openshift/cluster-logging-operator/apis"
 	operatorsv1 "github.com/operator-framework/api/pkg/operators/v1"
 	operatorsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
@@ -123,6 +125,16 @@ func runController(ctx context.Context, kubeConfig *rest.Config) error {
 	if err != nil {
 		return err
 	}
+	// Necessary for metrics to get Routes hosts
+	if err = routev1.Install(scheme.Scheme); err != nil {
+		return err
+	}
+
+	// Necessary to reconcile cert-manager resources
+	err = certmanagerv1.AddToScheme(scheme.Scheme)
+	if err != nil {
+		return err
+	}
 
 	// Reconcile AddOnDeploymentConfig
 	err = addonapiv1alpha1.AddToScheme(scheme.Scheme)
@@ -156,7 +168,7 @@ func runController(ctx context.Context, kubeConfig *rest.Config) error {
 		addonfactory.ToAddOnCustomizedVariableValues,
 	)
 
-	loggingAgentAddon, err := addonfactory.NewAgentAddonFactory(addon.Name, addon.FS, "manifests/charts/mcoa").
+	mcoaAgentAddon, err := addonfactory.NewAgentAddonFactory(addon.Name, addon.FS, "manifests/charts/mcoa").
 		WithConfigGVRs(
 			schema.GroupVersionResource{Version: "v1", Resource: "secrets"},
 			schema.GroupVersionResource{Version: "v1", Resource: "configmaps"},
@@ -173,7 +185,7 @@ func runController(ctx context.Context, kubeConfig *rest.Config) error {
 		return err
 	}
 
-	err = mgr.AddAgent(loggingAgentAddon)
+	err = mgr.AddAgent(mcoaAgentAddon)
 	if err != nil {
 		klog.Fatal(err)
 	}
