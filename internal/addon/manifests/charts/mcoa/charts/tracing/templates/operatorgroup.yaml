@@ -5,8 +5,8 @@ metadata:
   name: openshift-opentelemetry-operator-ghl6v
   namespace: openshift-opentelemetry-operator
   labels:
-    app: {{ template "logginghelm.name" . }}
-    chart: {{ template "logginghelm.chart" . }}
+    app: {{ template "tracinghelm.name" . }}
+    chart: {{ template "tracinghelm.chart" . }}
     release: {{ .Release.Name }}
 spec:
   upgradeStrategy: Default
