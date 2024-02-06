@@ -34,7 +34,7 @@ func CreateOrUpdateRootCertificate(k8s client.Client) error {
 			continue
 		}
 
-		klog.Infof("Resource %s has been %s",obj.GetName(), op)
+		klog.Infof("Resource %s has been %s", obj.GetName(), op)
 	}
 
 	return nil

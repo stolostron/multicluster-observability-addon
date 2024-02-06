@@ -59,7 +59,7 @@ func Test_Tracing_AllConfigsTogether_AllResources(t *testing.T) {
 
 		// Addon configuration
 		addOnDeploymentConfig *addonapiv1alpha1.AddOnDeploymentConfig
-		otelCol                   *otelv1alpha1.OpenTelemetryCollector
+		otelCol               *otelv1alpha1.OpenTelemetryCollector
 
 		// Test clients
 		fakeKubeClient  client.Client
@@ -97,18 +97,17 @@ func Test_Tracing_AllConfigsTogether_AllResources(t *testing.T) {
 	// Setup configuration resources: OpenTelemetryCollector, AddOnDeploymentConfig
 	b, err := os.ReadFile("./test_data/simplest.yaml")
 	require.NoError(t, err)
-	otelColConfig := string(b) 
+	otelColConfig := string(b)
 
 	otelCol = &otelv1alpha1.OpenTelemetryCollector{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "spoke-otelcol",
+			Name:      "spoke-otelcol",
 			Namespace: "open-cluster-management",
 		},
 		Spec: otelv1alpha1.OpenTelemetryCollectorSpec{
 			Config: otelColConfig,
 		},
 	}
-
 
 	addOnDeploymentConfig = &addonapiv1alpha1.AddOnDeploymentConfig{
 		ObjectMeta: metav1.ObjectMeta{

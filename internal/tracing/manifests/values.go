@@ -16,7 +16,6 @@ type TracingValues struct {
 	OTELColSpec             string `json:"otelColSpec"`
 }
 
-
 func BuildValues(opts Options) (TracingValues, error) {
 	values := TracingValues{
 		Enabled:                 true,

@@ -22,7 +22,7 @@ import (
 type HelmChartValues struct {
 	Metrics metrics.MetricsValues    `json:"metrics"`
 	Logging lmanifests.LoggingValues `json:"logging"`
-	Tracing tmanifests.TracingValues    `json:"tracing"`
+	Tracing tmanifests.TracingValues `json:"tracing"`
 }
 
 type Options struct {
