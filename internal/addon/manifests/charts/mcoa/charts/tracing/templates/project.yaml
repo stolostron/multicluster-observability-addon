@@ -4,7 +4,16 @@ kind: Project
 metadata:
   name: openshift-opentelemetry-operator
   labels:
-    app: {{ template "logginghelm.name" . }}
-    chart: {{ template "logginghelm.chart" . }}
+    app: {{ template "tracinghelm.name" . }}
+    chart: {{ template "tracinghelm.chart" . }}
+    release: {{ .Release.Name }}
+---
+apiVersion: project.openshift.io/v1
+kind: Project
+metadata:
+  name: spoke-otelcol
+  labels:
+    app: {{ template "tracinghelm.name" . }}
+    chart: {{ template "tracinghelm.chart" . }}
     release: {{ .Release.Name }}
 {{- end }}

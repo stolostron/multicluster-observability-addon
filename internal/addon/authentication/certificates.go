@@ -2,7 +2,6 @@ package authentication
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/ViaQ/logerr/v2/kverrors"
 	"github.com/rhobs/multicluster-observability-addon/internal/manifests"
@@ -11,7 +10,6 @@ import (
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	ctrlutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 func CreateOrUpdateRootCertificate(k8s client.Client) error {
@@ -28,19 +26,15 @@ func CreateOrUpdateRootCertificate(k8s client.Client) error {
 		desired := obj.DeepCopyObject().(client.Object)
 		mutateFn := manifests.MutateFuncFor(obj, desired, nil)
 
+		klog.Infof("Trying to create/update the %s resource", obj.GetName())
+
 		op, err := ctrl.CreateOrUpdate(ctx, k8s, obj, mutateFn)
 		if err != nil {
 			klog.Error(err, "failed to configure resource")
 			continue
 		}
 
-		msg := fmt.Sprintf("Resource has been %s", op)
-		switch op {
-		case ctrlutil.OperationResultNone:
-			klog.Info(msg)
-		default:
-			klog.Info(msg)
-		}
+		klog.Infof("Resource %s has been %s",obj.GetName(), op)
 	}
 
 	return nil

@@ -3,7 +3,7 @@ apiVersion: opentelemetry.io/v1alpha1
 kind: OpenTelemetryCollector
 metadata:
   name: spoke-otelcol
-  namespace: {{ .Values.addonInstallNamespace }}
+  namespace: spoke-otelcol
   labels:
     app: {{ template "tracinghelm.name" . }}
     chart: {{ template "tracinghelm.chart" . }}

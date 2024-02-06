@@ -9,7 +9,9 @@ import (
 	lhandlers "github.com/rhobs/multicluster-observability-addon/internal/logging/handlers"
 	lmanifests "github.com/rhobs/multicluster-observability-addon/internal/logging/manifests"
 	"github.com/rhobs/multicluster-observability-addon/internal/metrics"
-	"github.com/rhobs/multicluster-observability-addon/internal/tracing"
+	thandlers "github.com/rhobs/multicluster-observability-addon/internal/tracing/handlers"
+	tmanifests "github.com/rhobs/multicluster-observability-addon/internal/tracing/manifests"
+	"k8s.io/klog/v2"
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 	addonutils "open-cluster-management.io/addon-framework/pkg/utils"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
@@ -20,7 +22,7 @@ import (
 type HelmChartValues struct {
 	Metrics metrics.MetricsValues    `json:"metrics"`
 	Logging lmanifests.LoggingValues `json:"logging"`
-	Tracing tracing.TracingValues    `json:"tracing"`
+	Tracing tmanifests.TracingValues    `json:"tracing"`
 }
 
 type Options struct {
@@ -72,7 +74,13 @@ func GetValuesFunc(k8s client.Client) addonfactory.GetValuesFunc {
 		}
 
 		if !opts.TracingDisabled {
-			tracing, err := tracing.GetValuesFunc(k8s, cluster, addon, aodc)
+			klog.Info("Tracing enabled")
+			tracingOpts, err := thandlers.BuildOptions(k8s, addon, aodc)
+			if err != nil {
+				return nil, err
+			}
+
+			tracing, err := tmanifests.BuildValues(tracingOpts)
 			if err != nil {
 				return nil, err
 			}
