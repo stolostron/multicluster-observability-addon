@@ -14,7 +14,7 @@ import (
 	ctrlutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-// AuthenticationType defines a authentication method between two endpoints
+// AuthenticationType defines an authentication method between two endpoints
 type AuthenticationType string
 
 // Target defines the name of an endpoint that will be available to store
