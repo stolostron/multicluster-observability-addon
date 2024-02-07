@@ -47,10 +47,10 @@ func Test_FetchSecrets(t *testing.T) {
 	spConfig := &Config{}
 	sp, err := NewSecretsProvider(fakeKubeClient, "test", "logging", spConfig)
 	require.NoError(t, err)
-	keys := map[string]client.ObjectKey{
+	keys := map[Target]SecretKey{
 		"target-1": {Name: "foo", Namespace: "bar"},
 	}
-	secrets, err := sp.FetchSecrets(keys, "foo-annotation")
+	secrets, err := sp.FetchSecrets(context.TODO(), keys, "foo-annotation")
 	require.NoError(t, err)
 	require.Len(t, secrets, 1)
 	require.Equal(t, sFoo.Name, secrets[0].Name)
@@ -84,13 +84,13 @@ func Test_InjectCA(t *testing.T) {
 	}}
 	sp, err := NewSecretsProvider(fakeKubeClient, "test", "logging", spConfig)
 	require.NoError(t, err)
-	targetAuth := map[string]string{
+	targetAuth := map[Target]AuthenticationType{
 		"target-1": "mTLS",
 	}
-	targetKeys := map[string]client.ObjectKey{
-		"target-1": key,
+	targetKeys := map[Target]SecretKey{
+		"target-1": SecretKey(key),
 	}
-	err = sp.injectCA(targetAuth, targetKeys)
+	err = sp.injectCA(context.TODO(), targetAuth, targetKeys)
 	require.NoError(t, err)
 	secret := &corev1.Secret{}
 	err = fakeKubeClient.Get(context.TODO(), key, secret, &client.GetOptions{})
