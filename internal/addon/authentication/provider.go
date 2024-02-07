@@ -96,6 +96,7 @@ func (sp *secretsProvider) GenerateSecrets(ctx context.Context, targetAuthType m
 	for _, obj := range objects {
 		l := sp.log.WithValues(
 			"object_name", obj.GetName(),
+			"object_namespace", obj.GetNamespace(),
 			"object_kind", obj.GetObjectKind(),
 		)
 
@@ -112,13 +113,13 @@ func (sp *secretsProvider) GenerateSecrets(ctx context.Context, targetAuthType m
 		msg := fmt.Sprintf("resource has been %s", op)
 		switch op {
 		case ctrlutil.OperationResultNone:
-			l.Info(msg)
+			l.V(1).Info(msg)
 		default:
 			l.Info(msg)
 		}
 	}
 	if errCount > 0 {
-		return nil, kverrors.New("failed to request secrets")
+		return nil, kverrors.New("failed to request secrets", "failedResources", errCount)
 	}
 
 	err := sp.injectCA(ctx, targetAuthType, secretKeys)

@@ -44,13 +44,13 @@ func CreateOrUpdateRootCertificate(k8s client.Client, log logr.Logger) error {
 		msg := fmt.Sprintf("resource has been %s", op)
 		switch op {
 		case ctrlutil.OperationResultNone:
-			l.Info(msg)
+			l.V(1).Info(msg)
 		default:
 			l.Info(msg)
 		}
 	}
 	if errCount > 0 {
-		return kverrors.New("failed to configure root certificate resources")
+		return kverrors.New("failed to configure root certificate resources", "failedResources", errCount)
 	}
 
 	return nil
