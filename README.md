@@ -10,6 +10,8 @@ central stores.
 
 This is acheived through the installation on the spoke clusters of dedicated operators for each observability signal: 
 
+- For Metrics the addon will deploy an instance of Prometheus running in agent mode, that will forward metrics to the hub.
+
 - For Logs the operator installed will be [cluster-logging-operator](https://github.com/openshift/cluster-logging-operator). And the AddOn will configure a [ClusterLogForwarder](https://github.com/openshift/cluster-logging-operator) resource to forward logs to AWS CloudWatch.
 
 The logging-ocm-addon consists of one component:
@@ -25,6 +27,8 @@ TBD
 ### Prerequisite
 
 - OCM registration (>= 0.5.0)
+- cert-manager operator
+- multicluster-observability-operator (for metrics)
 
 ### Steps
 

@@ -47,6 +47,9 @@ All steps are meant to be run on the hub cluster except when explicitly stated.
 
 ## Development Cycle for Smoke Testing
 
+Note: the addon has a dependency on cert-manager operator, which should be
+installed on the hub cluster
+
 When working on the addon, it's nice to be able to test things quickly; to do
 this, you can:
 
@@ -65,6 +68,24 @@ make oci
 # Delete the mcoa pod which will make the Deployment pull the new image
 oc -n open-cluster-management delete pod -l app=multicluster-observability-addon-manager
 ```
+
+### Disabeling specific signals 
+
+The addon supports disabling signals using the resource `AddOnDeploymentConfig`. For instance, to disable the logging signal create the following resource on the hub cluster:
+
+```yaml
+apiVersion: addon.open-cluster-management.io/v1alpha1
+kind: AddOnDeploymentConfig
+metadata:
+  name: multicluster-observability-addon
+  namespace: open-cluster-management
+spec:
+  customizedVariables:
+    - name: loggingDisabled
+      value: "true"
+``` 
+
+Supported keys are `metricsDisabled`, `loggingDisabled` and `tracingDisabled`
 
 ## Install the addon on a Spoke Cluster
 
