@@ -1,6 +1,6 @@
 {{- if .Values.enabled }}
-apiVersion: project.openshift.io/v1
-kind: Project
+apiVersion: v1
+kind: Namespace
 metadata:
   name: openshift-opentelemetry-operator
   labels:
@@ -8,8 +8,8 @@ metadata:
     chart: {{ template "tracinghelm.chart" . }}
     release: {{ .Release.Name }}
 ---
-apiVersion: project.openshift.io/v1
-kind: Project
+apiVersion: v1
+kind: Namespace
 metadata:
   name: spoke-otelcol
   labels:

@@ -1,6 +1,7 @@
 images:
 - name: controller
-  newName: ttl.sh/acmiblancasa
+  newName: quay.io/periklis/multicluster-observability-addon
+  newTag: 0.0.1
 
 namespace: open-cluster-management
 

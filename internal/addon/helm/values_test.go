@@ -107,5 +107,5 @@ func Test_Mcoa_Disable_Charts(t *testing.T) {
 
 	objects, err := loggingAgentAddon.Manifests(managedCluster, managedClusterAddOn)
 	require.NoError(t, err)
-	require.Equal(t, 3, len(objects))
+	require.Equal(t, 2, len(objects))
 }

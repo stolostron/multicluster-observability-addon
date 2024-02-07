@@ -72,7 +72,7 @@
     - apiGroups: ["logging.openshift.io"]
       resources: ["clusterlogforwarders"]
       verbs: ["get", "list", "watch"]
-    # Role for addon to perform OpenTelemetry specific actions
+    # Role for addon to perform tracing specific actions
     - apiGroups: ["opentelemetry.io"]
       resources: ["opentelemetrycollectors"]
       verbs: ["get", "list", "watch"]
