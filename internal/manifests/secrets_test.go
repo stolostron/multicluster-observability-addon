@@ -42,7 +42,7 @@ func Test_BuildStaticSecret(t *testing.T) {
 }
 
 func Test_BuildMTLSSecret(t *testing.T) {
-	key := client.ObjectKey{Name: "foo", Namespace: "foo"}
+	key := client.ObjectKey{Name: "foo", Namespace: "bar"}
 	mTLSConfig := MTLSConfig{
 		CommonName: "foo",
 		Subject: &certmanagerv1.X509Subject{
