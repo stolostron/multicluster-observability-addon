@@ -59,7 +59,7 @@ func BuildCertificate(key client.ObjectKey, mTLSConfig MTLSConfig) (*certmanager
 			Namespace: certKey.Namespace,
 		},
 		Spec: certmanagerv1.CertificateSpec{
-			SecretName: key.Namespace,
+			SecretName: key.Name,
 			CommonName: mTLSConfig.CommonName, // Signal specific
 			Subject:    mTLSConfig.Subject,    // Signal specific
 			DNSNames:   mTLSConfig.DNSNames,   // Signal specific
