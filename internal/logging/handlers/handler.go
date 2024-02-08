@@ -29,7 +29,7 @@ func BuildOptions(k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAdd
 	resources.ClusterLogForwarder = clf
 
 	authCM := &corev1.ConfigMap{}
-	for _, config := range mcAddon.Status.ConfigReferences {
+	for _, config := range mcAddon.Spec.Configs {
 		switch config.ConfigGroupResource.Resource {
 		case addon.ConfigMapResource:
 			key := client.ObjectKey{Name: config.Name, Namespace: config.Namespace}
