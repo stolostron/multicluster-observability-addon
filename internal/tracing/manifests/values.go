@@ -7,13 +7,13 @@ import (
 )
 
 type TracingValues struct {
-	Enabled                 bool   `json:"enabled"`
-	OTELColSpec             string `json:"otelColSpec"`
+	Enabled     bool   `json:"enabled"`
+	OTELColSpec string `json:"otelColSpec"`
 }
 
 func BuildValues(opts Options) (TracingValues, error) {
 	values := TracingValues{
-		Enabled:                 true,
+		Enabled: true,
 	}
 
 	klog.Info("Building OTEL Collector instance")
