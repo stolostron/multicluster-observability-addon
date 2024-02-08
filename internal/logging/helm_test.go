@@ -74,6 +74,18 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 
 	// Register the addon for the managed cluster
 	managedClusterAddOn = addontesting.NewAddon("test", "cluster-1")
+	managedClusterAddOn.Spec.Configs = []addonapiv1alpha1.AddOnConfig{
+		{
+			ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+				Group:    "",
+				Resource: "configmaps",
+			},
+			ConfigReferent: addonapiv1alpha1.ConfigReferent{
+				Namespace: "open-cluster-management",
+				Name:      "logging-auth",
+			},
+		},
+	}
 	managedClusterAddOn.Status.ConfigReferences = []addonapiv1alpha1.ConfigReference{
 		{
 			ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
@@ -93,16 +105,6 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 			ConfigReferent: addonapiv1alpha1.ConfigReferent{
 				Namespace: "open-cluster-management",
 				Name:      "instance",
-			},
-		},
-		{
-			ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
-				Group:    "",
-				Resource: "configmaps",
-			},
-			ConfigReferent: addonapiv1alpha1.ConfigReferent{
-				Namespace: "open-cluster-management",
-				Name:      "logging-auth",
 			},
 		},
 	}
@@ -229,7 +231,7 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 	// Render manifests and return them as k8s runtime objects
 	objects, err := loggingAgentAddon.Manifests(managedCluster, managedClusterAddOn)
 	require.NoError(t, err)
-	require.Equal(t, 6, len(objects))
+	require.Equal(t, 7, len(objects))
 
 	for _, obj := range objects {
 		switch obj := obj.(type) {
