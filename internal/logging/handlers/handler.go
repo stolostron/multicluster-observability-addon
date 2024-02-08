@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 
+	"github.com/ViaQ/logerr/v2/kverrors"
 	loggingv1 "github.com/openshift/cluster-logging-operator/apis/logging/v1"
 	"github.com/rhobs/multicluster-observability-addon/internal/addon"
 	"github.com/rhobs/multicluster-observability-addon/internal/addon/authentication"
@@ -29,6 +30,7 @@ func BuildOptions(k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAdd
 	resources.ClusterLogForwarder = clf
 
 	authCM := &corev1.ConfigMap{}
+	caCM := &corev1.ConfigMap{}
 	for _, config := range mcAddon.Spec.Configs {
 		switch config.ConfigGroupResource.Resource {
 		case addon.ConfigMapResource:
@@ -43,8 +45,14 @@ func BuildOptions(k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAdd
 				continue
 			}
 
+			// If a cm has the ca annotation then it's the configmap containing the ca
+			if _, ok := cm.Annotations[manifests.AnnotationCAToInject]; ok {
+				caCM = cm
+				continue
+			}
+
 			// If a cm doesn't have a target label then it's configuring authentication
-			if _, ok := cm.Labels[manifests.AnnotationTargetOutputName]; !ok {
+			if _, ok := cm.Annotations[manifests.AnnotationTargetOutputName]; !ok {
 				authCM = cm
 				continue
 			}
@@ -53,12 +61,22 @@ func BuildOptions(k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAdd
 		}
 	}
 
-	secretsProvider, err := authentication.NewSecretsProvider(k8s, mcAddon.Namespace, addon.Logging, manifests.AuthDefaultConfig)
+	ctx := context.Background()
+	authConfig := manifests.AuthDefaultConfig
+	authConfig.MTLSConfig.CommonName = mcAddon.Namespace
+	if len(caCM.Data) > 0 {
+		if ca, ok := caCM.Data["service-ca.crt"]; ok {
+			authConfig.MTLSConfig.CAToInject = ca
+		} else {
+			return resources, kverrors.New("missing ca bundle in configmap", "key", "service-ca.crt")
+		}
+	}
+
+	secretsProvider, err := authentication.NewSecretsProvider(k8s, mcAddon.Namespace, addon.Logging, authConfig)
 	if err != nil {
 		return resources, err
 	}
 
-	ctx := context.Background()
 	targetsSecret, err := secretsProvider.GenerateSecrets(ctx, authentication.BuildAuthenticationMap(authCM.Data))
 	if err != nil {
 		return resources, err
