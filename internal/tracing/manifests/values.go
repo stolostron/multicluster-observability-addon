@@ -6,20 +6,14 @@ import (
 	"k8s.io/klog"
 )
 
-const (
-	subscriptionChannel = "stable"
-)
-
 type TracingValues struct {
 	Enabled                 bool   `json:"enabled"`
-	OTELSubscriptionChannel string `json:"otelSubscriptionChannel"`
 	OTELColSpec             string `json:"otelColSpec"`
 }
 
 func BuildValues(opts Options) (TracingValues, error) {
 	values := TracingValues{
 		Enabled:                 true,
-		OTELSubscriptionChannel: subscriptionChannel,
 	}
 
 	klog.Info("Building OTEL Collector instance")
