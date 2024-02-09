@@ -1,6 +1,6 @@
 module github.com/rhobs/multicluster-observability-addon
 
-go 1.20
+go 1.21
 
 require (
 	github.com/ViaQ/logerr/v2 v2.1.0
