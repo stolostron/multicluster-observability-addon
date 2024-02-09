@@ -32,3 +32,12 @@ spec:
      defaultConfig:
        name: instance
        namespace: open-cluster-management
+
+   # Describes the default OpenTelemetryCollector type applied to all managed clusters.
+   - group: opentelemetry.io
+     resource: opentelemetrycollectors
+     # The default config is the main stanza of an OpenTelemetryCollector resource
+     # that describes where traces should be forwarded for all managed cluster.
+     defaultConfig:
+       name: spoke-otelcol
+       namespace: open-cluster-management

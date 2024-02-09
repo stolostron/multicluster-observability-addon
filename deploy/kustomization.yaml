@@ -13,6 +13,7 @@ resources:
 - resources/cluster-management-addon.yaml
 - resources/addondeploymentconfig.yaml
 - crds/logging.openshift.io_clusterlogforwarders.yaml
+- crds/opentelemetry.io_opentelemetrycollectors.yaml
 
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	certmanagerv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
+	otelv1alpha1 "github.com/open-telemetry/opentelemetry-operator/apis/v1alpha1"
 	routev1 "github.com/openshift/api/route/v1"
 	loggingapis "github.com/openshift/cluster-logging-operator/apis"
 	operatorsv1 "github.com/operator-framework/api/pkg/operators/v1"
@@ -102,6 +103,11 @@ func runController(ctx context.Context, kubeConfig *rest.Config) error {
 	if err != nil {
 		return err
 	}
+	// Necessary to reconcile OpenTelemetryCollectors
+	err = otelv1alpha1.AddToScheme(scheme.Scheme)
+	if err != nil {
+		return err
+	}
 	// Necessary to reconcile OperatorGroups
 	err = operatorsv1.AddToScheme(scheme.Scheme)
 	if err != nil {
@@ -160,6 +166,7 @@ func runController(ctx context.Context, kubeConfig *rest.Config) error {
 			schema.GroupVersionResource{Version: "v1", Resource: "secrets"},
 			schema.GroupVersionResource{Version: "v1", Resource: "configmaps"},
 			schema.GroupVersionResource{Version: "v1", Group: "logging.openshift.io", Resource: "clusterlogforwarders"},
+			schema.GroupVersionResource{Version: "v1alpha1", Group: "opentelemetry.io", Resource: "opentelemetrycollectors"},
 			utils.AddOnDeploymentConfigGVR,
 		).
 		WithGetValuesFuncs(addonConfigValuesFn, addonhelm.GetValuesFunc(k8sClient)).

@@ -1,0 +1,13 @@
+{{- if .Values.enabled }}
+apiVersion: opentelemetry.io/v1alpha1
+kind: OpenTelemetryCollector
+metadata:
+  name: spoke-otelcol
+  namespace: spoke-otelcol
+  labels:
+    app: {{ template "tracinghelm.name" . }}
+    chart: {{ template "tracinghelm.chart" . }}
+    release: {{ .Release.Name }}
+spec:
+{{- fromJson .Values.otelColSpec | toYaml | nindent 2 }}
+{{- end }}
