@@ -8,6 +8,7 @@ import (
 
 type Options struct {
 	Secrets                []corev1.Secret
+	ConfigMaps             []corev1.ConfigMap
 	OpenTelemetryCollector *otelv1alpha1.OpenTelemetryCollector
 	AddOnDeploymentConfig  *addonapiv1alpha1.AddOnDeploymentConfig
 }
