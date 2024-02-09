@@ -83,7 +83,6 @@ func templateWithConfigMap(spec *otelv1alpha1.OpenTelemetryCollectorSpec, config
 		return kverrors.New(fmt.Sprint("error while marshaling OTEL Configuration: %w", err))
 	}
 	spec.Config = string(yamlConfig)
-	fmt.Println(string(yamlConfig))
 	return nil
 }
 
