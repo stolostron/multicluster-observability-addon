@@ -25,8 +25,6 @@ require (
 	sigs.k8s.io/controller-runtime v0.17.0
 )
 
-require k8s.io/klog v0.2.0
-
 require (
 	github.com/BurntSushi/toml v1.2.1 // indirect
 	github.com/Masterminds/goutils v1.1.1 // indirect
