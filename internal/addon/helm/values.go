@@ -70,7 +70,7 @@ func GetValuesFunc(k8s client.Client) addonfactory.GetValuesFunc {
 			if err != nil {
 				return nil, err
 			}
-			userValues.Logging = logging
+			userValues.Logging = *logging
 		}
 
 		if !opts.TracingDisabled {

@@ -15,8 +15,8 @@ type SecretValue struct {
 	Data string `json:"data"`
 }
 
-func BuildValues(opts Options) (LoggingValues, error) {
-	values := LoggingValues{
+func BuildValues(opts Options) (*LoggingValues, error) {
+	values := &LoggingValues{
 		Enabled: true,
 	}
 
@@ -24,18 +24,18 @@ func BuildValues(opts Options) (LoggingValues, error) {
 
 	secrets, err := buildSecrets(opts)
 	if err != nil {
-		return values, err
+		return nil, err
 	}
 	values.Secrets = secrets
 
 	clfSpec, err := buildClusterLogForwarderSpec(opts)
 	if err != nil {
-		return values, err
+		return nil, err
 	}
 
 	b, err := json.Marshal(clfSpec)
 	if err != nil {
-		return values, err
+		return nil, err
 	}
 	values.CLFSpec = string(b)
 
