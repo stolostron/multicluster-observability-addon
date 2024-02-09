@@ -44,7 +44,7 @@ func buildOtelColSpec(resources Options) (*otelv1alpha1.OpenTelemetryCollectorSp
 }
 
 func templateWithSecret(spec *otelv1alpha1.OpenTelemetryCollectorSpec, secret corev1.Secret) error {
-	cfg, err := configFromString(spec.Config)
+	cfg, err := otelcol.ConfigFromString(spec.Config)
 	if err != nil {
 		return nil
 	}
@@ -69,7 +69,7 @@ func templateWithSecret(spec *otelv1alpha1.OpenTelemetryCollectorSpec, secret co
 }
 
 func templateWithConfigMap(spec *otelv1alpha1.OpenTelemetryCollectorSpec, configmap corev1.ConfigMap) error {
-	cfg, err := configFromString(spec.Config)
+	cfg, err := otelcol.ConfigFromString(spec.Config)
 	if err != nil {
 		return nil
 	}
@@ -84,13 +84,4 @@ func templateWithConfigMap(spec *otelv1alpha1.OpenTelemetryCollectorSpec, config
 	}
 	spec.Config = string(yamlConfig)
 	return nil
-}
-
-func configFromString(configStr string) (map[interface{}]interface{}, error) {
-	config := make(map[interface{}]interface{})
-	if err := yaml.Unmarshal([]byte(configStr), &config); err != nil {
-		return nil, kverrors.New("couldn't parse the opentelemetry-collector configuration")
-	}
-
-	return config, nil
 }
