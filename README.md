@@ -14,6 +14,8 @@ This is acheived through the installation on the spoke clusters of dedicated ope
 
 - For Logs the operator installed will be [cluster-logging-operator](https://github.com/openshift/cluster-logging-operator). And the AddOn will configure a [ClusterLogForwarder](https://github.com/openshift/cluster-logging-operator) resource to forward logs to AWS CloudWatch.
 
+- For Taces the addon installs the [Red Hat build of OpenTelemetry](https://docs.openshift.com/container-platform/4.14/otel/otel-release-notes.html). Later, it will configure an [OpenTelemetry Collector](https://docs.openshift.com/container-platform/4.14/otel/otel-configuring.html) instance in the spoke clusters to forward traces. [Read more](./docs/tracing/).
+
 The logging-ocm-addon consists of one component:
 
 - **Addon-Manager**: Not only manages the installation of the AddOn on spoke clusters. But also builds the manifests that will be deployed to the spoke clusters.
