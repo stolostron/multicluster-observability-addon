@@ -1,0 +1,21 @@
+# list of spoke clusters
+spokeClusters:
+  - spoke-1
+
+metrics:
+  enabled: true
+
+logging:
+  enabled: false
+
+  aws:
+    keyID: ID
+    keySecret: Secret
+
+  loki:
+    enabled: true
+    # Loki S3 bucket configuration
+    s3Bucket:
+      endpoint: https://s3.us-east-1.amazonaws.com
+      region: us-east-1
+      bucketnames: jmarcal-bucket

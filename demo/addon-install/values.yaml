@@ -1,0 +1,15 @@
+spokeClusters:
+- spoke-1
+
+addonInstallNamespace: open-cluster-management-agent-addon
+
+logging:
+  enabled: true
+  
+  outputs:
+    - name: cw-infra
+      type: cloudwatch
+    - name: loki-infra
+      type: loki
+      url: https://my-loki.app
+

@@ -1,0 +1,19 @@
+{{- if .Values.logging.enabled }}
+{{- range $_, $cluster_name := .Values.spokeClusters }}
+{{- range $_, $dic := $.Values.logging.outputs }}
+{{- if eq $dic.type "loki" }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: logging-{{ $cluster_name }}-{{ $dic.name }}
+  namespace: {{ $cluster_name }}
+  labels:
+    mcoa.openshift.io/signal: logging
+  annotations:
+    logging.mcoa.openshift.io/target-output-name: {{ $dic.name }}
+data:
+  url: {{ $dic.url }}/api/logs/v1/{{ $cluster_name }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}

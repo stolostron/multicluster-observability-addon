@@ -1,0 +1,33 @@
+{{- range $_, $cluster_name := .Values.spokeClusters }}
+apiVersion: addon.open-cluster-management.io/v1alpha1
+kind: ManagedClusterAddOn
+metadata:
+  name: multicluster-observability-addon
+  namespace: {{ $cluster_name }}
+spec:
+  installNamespace: {{ $.Values.addonInstallNamespace }}
+  configs:
+# Logging Auth ConfigMap
+{{- if $.Values.loggging.enabled }}
+  - resource: configmaps
+    name: logging-{{ $cluster_name }}
+    namespace: {{ $cluster_name }}
+{{- end }}
+# Logging URLs for Loki ConfigMap
+{{- range $_, $dic := $.Values.logging.outputs }}
+{{- if eq $dic.type "loki" }}
+  - resource: configmaps
+    name: logging-{{ $cluster_name }}-{{ $dic.name }}
+    namespace: {{ $cluster_name }}
+{{- end }}
+{{- end }}
+# Logging ca-bundle ConfigMap
+{{- range $_, $dic := $.Values.logging.outputs }}
+{{- if eq $dic.type "loki" }}
+  - resource: configmaps
+    name: lokistack-hub-gateway-ca-bundle
+    namespace: openshift-logging
+{{- break }}
+{{- end }}
+{{- end }}
+{{- end }}
