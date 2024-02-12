@@ -131,7 +131,7 @@ oc get manifestworks -n spoke-1
 The addon supports the collection of metrics from the spoke clusters. These metrics are sent to an MCO instance running 
 in the Hub. Follow the steps below to install and configure the MCO:
 
-1. Install the MCO operator on the Hub cluster through the OperatorHub.
+1. Install "Advanced Cluster Management for Kubernetes" on the Hub cluster through the OperatorHub.
 2. Create the `open-cluster-management-observability` namespace on the Hub cluster: `oc create ns open-cluster-management-observability`
 3. Install a MinIO instance to act as object storage for the MCO: `oc apply -f ./deploy/metrics/minio`
 4. Create a `MultiClusterObservability` resource on the Hub cluster: `oc apply -f ./deploy/metrics/mco`
