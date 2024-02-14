@@ -11,16 +11,15 @@ const (
 )
 
 var AuthDefaultConfig = &authentication.Config{
-	// TODO(iblancasa)
 	MTLSConfig: manifests.MTLSConfig{
 		CommonName: "",
 		Subject: &v1.X509Subject{
 			OrganizationalUnits: []string{
-				"tracing-ocm-addon",
+				"multicluster-observability-addon",
 			},
 		},
 		DNSNames: []string{
-			"otelcol.observability.svc",
+			"otelcol.spoke-otelcol.svc",
 		},
 	},
 }

@@ -1,6 +1,8 @@
 package otelcol
 
 import (
+	"fmt"
+
 	"github.com/ViaQ/logerr/v2/kverrors"
 	corev1 "k8s.io/api/core/v1"
 )
@@ -82,10 +84,11 @@ func getExporters(cfg *map[interface{}]interface{}) (*map[interface{}]interface{
 
 func configureExporterSecrets(exporter *map[interface{}]interface{}, secret corev1.Secret) {
 	certConfig := make(map[string]interface{})
+	folder := fmt.Sprintf("/%s", secret.Name)
 	certConfig["insecure"] = false
-	certConfig["cert_file"] = "/certs/tls.crt"
-	certConfig["key_file"] = "/certs/tls.key"
-	certConfig["ca_file"] = "/certs/ca.crt"
+	certConfig["cert_file"] = fmt.Sprintf("%s/tls.crt", folder)
+	certConfig["key_file"] = fmt.Sprintf("%s/tls.key", folder)
+	certConfig["ca_file"] = fmt.Sprintf("%s/ca.crt", folder)
 
 	(*exporter)["tls"] = certConfig
 }
@@ -93,7 +96,7 @@ func configureExporterSecrets(exporter *map[interface{}]interface{}, secret core
 func configureExporterEndpoint(exporter *map[interface{}]interface{}, cm corev1.ConfigMap) error {
 	url := cm.Data["endpoint"]
 	if url == "" {
-		return kverrors.New("no value for 'url' in configmap", "name", cm.Name)
+		return kverrors.New("no value for 'endpoint' in configmap", "name", cm.Name)
 	}
 	(*exporter)["endpoint"] = url
 	return nil
