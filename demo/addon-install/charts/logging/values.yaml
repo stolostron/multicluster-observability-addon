@@ -1,7 +1,0 @@
-enabled: true
-
-type: cloudwatch
-
-staticAuth:
-  id: ID
-  key: KEY

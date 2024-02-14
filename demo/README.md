@@ -29,7 +29,17 @@ _Hint:_ `cert-manager` operator is also installed in this step on the hub cluste
 
 ## 4. Manage observability signals across spoke clusters
 
-The following chart will deploy the `ManagedClusterAddOn` resource that installs the AddOn on each spoke cluster.
+### 4.1 Signal configuration
+
+Before enabling the AddOn on spoke clustes we first have define the configuration of each signal:
+
+1. Set the values in `demo/addon-config/values.yaml`
+1. Deploy the signal configuration with `helm upgrade --install addon-install demo/addon-config/`
+1. Annotate necessary resources
+
+### 4.2 Enable the addon for spoke clusters
+
+The following chart will deploy the `ManagedClusterAddOn` resource that enables the AddOn on each spoke cluster.
 
 1. Set the values in `demo/addon-install/values.yaml`.
 1. Deploy it with `helm upgrade --install addon-install demo/addon-install/`. 

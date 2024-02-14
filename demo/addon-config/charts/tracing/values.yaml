@@ -1,0 +1,4 @@
+enabled: true
+
+outputs:
+  - name: otlphttp

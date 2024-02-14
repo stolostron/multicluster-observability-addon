@@ -1,0 +1,18 @@
+metrics:
+  enabled: true
+
+logging:
+  enabled: true
+  
+  outputs:
+    - name: cw-infra
+      type: cloudwatch
+    # - name: loki-infra
+    #   type: loki
+    #   url: https://my-loki.app
+
+tracing:
+  enabled: false
+  
+  outputs:
+    - name: otlphttp

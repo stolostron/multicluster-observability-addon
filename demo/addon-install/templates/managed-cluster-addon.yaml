@@ -7,13 +7,12 @@ metadata:
 spec:
   installNamespace: {{ $.Values.addonInstallNamespace }}
   configs:
-# Logging Auth ConfigMap
-{{- if $.Values.loggging.enabled }}
+{{- if $.Values.logging.enabled }}
+  # Logging Auth ConfigMap
   - resource: configmaps
-    name: logging-{{ $cluster_name }}
-    namespace: {{ $cluster_name }}
-{{- end }}
-# Logging URLs for Loki ConfigMap
+    name: logging-auth
+    namespace: open-cluster-management
+  # Logging URLs for Loki ConfigMap
 {{- range $_, $dic := $.Values.logging.outputs }}
 {{- if eq $dic.type "loki" }}
   - resource: configmaps
@@ -21,13 +20,14 @@ spec:
     namespace: {{ $cluster_name }}
 {{- end }}
 {{- end }}
-# Logging ca-bundle ConfigMap
 {{- range $_, $dic := $.Values.logging.outputs }}
 {{- if eq $dic.type "loki" }}
+  # Logging ca-bundle ConfigMap
   - resource: configmaps
     name: lokistack-hub-gateway-ca-bundle
     namespace: openshift-logging
 {{- break }}
+{{- end }}
 {{- end }}
 {{- end }}
 {{- end }}

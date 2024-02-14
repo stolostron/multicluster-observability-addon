@@ -3,8 +3,3 @@ description: A Helm chart to help install the mcoa addon
 name: addon-install
 version: 1.0.0
 appVersion: "1.0.0"
-
-dependencies:
-- name: logging
-  repository: 'file://./charts/logging'
-  condition: logging.enabled

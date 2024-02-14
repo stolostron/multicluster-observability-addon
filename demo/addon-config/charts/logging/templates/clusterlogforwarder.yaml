@@ -11,8 +11,7 @@ spec:
        region: eu-central-1
        groupBy: logType
      type: cloudwatch
-{{- end }}
-{{- if eq $dic.type "loki" }}
+{{- else if eq $dic.type "loki" }}
    - loki:
        labelKeys:
        - log_type

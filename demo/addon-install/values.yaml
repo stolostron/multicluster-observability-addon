@@ -3,6 +3,9 @@ spokeClusters:
 
 addonInstallNamespace: open-cluster-management-agent-addon
 
+metrics:
+  enabled: true
+
 logging:
   enabled: true
   
@@ -13,3 +16,10 @@ logging:
       type: loki
       url: https://my-loki.app
 
+tracing:
+  enabled: false
+  
+  outputs:
+    - type: jaeger
+    - type: otlp
+      url: https://otlp.app 
