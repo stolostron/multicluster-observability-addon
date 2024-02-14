@@ -113,7 +113,7 @@ func Test_getExporters(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, *exporters, 1)
 
-	cfg = make(map[interface{}]interface{})
+	cfg = make(map[string]interface{})
 	_, err = getExporters(&cfg)
 	require.Error(t, err)
 }

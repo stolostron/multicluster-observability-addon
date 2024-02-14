@@ -5,8 +5,8 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-func ConfigFromString(configStr string) (map[interface{}]interface{}, error) {
-	config := make(map[interface{}]interface{})
+func ConfigFromString(configStr string) (map[string]interface{}, error) {
+	config := make(map[string]interface{})
 	if err := yaml.Unmarshal([]byte(configStr), &config); err != nil {
 		return nil, kverrors.New("couldn't parse the opentelemetry-collector configuration")
 	}

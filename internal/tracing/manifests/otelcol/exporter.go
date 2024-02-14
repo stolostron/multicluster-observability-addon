@@ -7,7 +7,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-func ConfigureExportersSecrets(cfg *map[interface{}]interface{}, secret corev1.Secret, annotation string) error {
+func ConfigureExportersSecrets(cfg *map[string]interface{}, secret corev1.Secret, annotation string) error {
 	otelExporterName, ok := secret.Annotations[annotation]
 	if !ok {
 		return nil
@@ -37,7 +37,7 @@ func ConfigureExportersSecrets(cfg *map[interface{}]interface{}, secret corev1.S
 	return nil
 }
 
-func ConfigureExportersEndpoints(cfg *map[interface{}]interface{}, cm corev1.ConfigMap, annotation string) error {
+func ConfigureExportersEndpoints(cfg *map[string]interface{}, cm corev1.ConfigMap, annotation string) error {
 	otelExporterName, ok := cm.Annotations[annotation]
 	if !ok {
 		return nil
@@ -69,7 +69,7 @@ func ConfigureExportersEndpoints(cfg *map[interface{}]interface{}, cm corev1.Con
 	return nil
 }
 
-func getExporters(cfg *map[interface{}]interface{}) (*map[interface{}]interface{}, error) {
+func getExporters(cfg *map[string]interface{}) (*map[interface{}]interface{}, error) {
 	exportersField, ok := (*cfg)["exporters"]
 	if !ok {
 		return nil, kverrors.New("no exporters available as part of the configuration")
