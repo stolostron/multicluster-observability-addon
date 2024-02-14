@@ -45,6 +45,12 @@ func buildClusterLogForwarderSpec(resources Options) (*loggingv1.ClusterLogForwa
 		}
 	}
 
+	for _, configmap := range resources.ConfigMaps {
+		if err := templateWithConfigMap(&clf.Spec, configmap); err != nil {
+			return nil, err
+		}
+	}
+
 	return &clf.Spec, nil
 }
 
@@ -61,6 +67,22 @@ func templateWithSecret(spec *loggingv1.ClusterLogForwarderSpec, secret corev1.S
 			output.Secret = &loggingv1.OutputSecretSpec{
 				Name: secret.Name,
 			}
+			spec.Outputs[k] = output
+		}
+	}
+
+	return nil
+}
+
+func templateWithConfigMap(spec *loggingv1.ClusterLogForwarderSpec, configmap corev1.ConfigMap) error {
+	clfOutputName, ok := configmap.Annotations[AnnotationTargetOutputName]
+	if !ok {
+		return nil
+	}
+
+	for k, output := range spec.Outputs {
+		if output.Name == clfOutputName && output.Type == "loki" {
+			output.URL = configmap.Data["url"]
 			spec.Outputs[k] = output
 		}
 	}

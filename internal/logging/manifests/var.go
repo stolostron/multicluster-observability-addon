@@ -9,22 +9,34 @@ import (
 
 const (
 	AnnotationTargetOutputName = "logging.mcoa.openshift.io/target-output-name"
+	AnnotationCAToInject       = "logging.mcoa.openshift.io/ca"
 
 	subscriptionChannelValueKey = "loggingSubscriptionChannel"
 	defaultLoggingVersion       = "stable-5.8"
+
+	certOrganizatonalUnit = "multicluster-observability-addon"
+	certDNSNameCollector  = "collector.openshift-logging.svc"
+
+	staticSecretName      = "static-authentication"
+	staticSecretNamespace = "open-cluster-management"
 )
 
 var AuthDefaultConfig = &authentication.Config{
 	StaticAuthConfig: manifests.StaticAuthenticationConfig{
 		ExistingSecret: client.ObjectKey{
-			Name:      "static-authentication",
-			Namespace: "open-cluster-management",
+			Name:      staticSecretName,
+			Namespace: staticSecretNamespace,
 		},
 	},
-	// TODO(JoaoBraveCoding) Implement when support for LokiStack is added
 	MTLSConfig: manifests.MTLSConfig{
-		CommonName: "",
-		Subject:    &v1.X509Subject{},
-		DNSNames:   []string{},
+		CommonName: "", // Should be set when using these defaults
+		Subject: &v1.X509Subject{
+			OrganizationalUnits: []string{
+				certOrganizatonalUnit,
+			},
+		},
+		DNSNames: []string{
+			certDNSNameCollector,
+		},
 	},
 }
