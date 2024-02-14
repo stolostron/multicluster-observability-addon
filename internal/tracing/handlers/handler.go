@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/ViaQ/logerr/v2/kverrors"
 	otelv1alpha1 "github.com/open-telemetry/opentelemetry-operator/apis/v1alpha1"
 	"github.com/rhobs/multicluster-observability-addon/internal/addon"
 	"github.com/rhobs/multicluster-observability-addon/internal/addon/authentication"
@@ -15,6 +16,7 @@ import (
 )
 
 const (
+	AnnotationCAToInject           = "tracing.mcoa.openshift.io/ca"
 	opentelemetryCollectorResource = "opentelemetrycollectors"
 )
 
@@ -33,6 +35,7 @@ func BuildOptions(k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAdd
 	klog.Info("OpenTelemetry Collector template found")
 
 	var authCM *corev1.ConfigMap = nil
+	caCM := &corev1.ConfigMap{}
 
 	for _, config := range mcAddon.Spec.Configs {
 		switch config.ConfigGroupResource.Resource {
@@ -47,6 +50,12 @@ func BuildOptions(k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAdd
 			// Only care about cm's that configure tracing
 			if signal, ok := cm.Labels[addon.SignalLabelKey]; !ok || signal != addon.Tracing.String() {
 				klog.Info("skipped configmap")
+				continue
+			}
+
+			// If a cm has the ca annotation then it's the configmap containing the ca
+			if _, ok := cm.Annotations[AnnotationCAToInject]; ok {
+				caCM = cm
 				continue
 			}
 
@@ -67,6 +76,13 @@ func BuildOptions(k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAdd
 	ctx := context.Background()
 	authConfig := manifests.AuthDefaultConfig
 	authConfig.MTLSConfig.CommonName = mcAddon.Namespace
+	if len(caCM.Data) > 0 {
+		if ca, ok := caCM.Data["service-ca.crt"]; ok {
+			authConfig.MTLSConfig.CAToInject = ca
+		} else {
+			return resources, kverrors.New("missing ca bundle in configmap", "key", "service-ca.crt")
+		}
+	}
 
 	secretsProvider, err := authentication.NewSecretsProvider(k8s, mcAddon.Namespace, addon.Tracing, authConfig)
 	if err != nil {
