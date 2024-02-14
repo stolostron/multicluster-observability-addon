@@ -6,7 +6,7 @@ metrics:
   enabled: true
 
 logging:
-  enabled: false
+  enabled: true
 
   aws:
     keyID: ID

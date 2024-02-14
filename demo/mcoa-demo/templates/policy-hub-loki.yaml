@@ -2,7 +2,7 @@
 apiVersion: policy.open-cluster-management.io/v1
 kind: Policy
 metadata:
-  name: policy-hub-logging
+  name: policy-hub-loki
 spec:
   disabled: false
   policy-templates:
@@ -47,71 +47,71 @@ spec:
       compliance: Compliant
       kind: ConfigurationPolicy
       name: redhat-loki-operator
-      objectDefinition:
-        apiVersion: policy.open-cluster-management.io/v1
-        kind: ConfigurationPolicy
-        metadata:
-          name: lokistack-hub
-        spec:
-          remediationAction: enforce
-          severity: high
-          pruneObjectBehavior: DeleteAll
-          object-templates:
-          - complianceType: musthave
-            objectDefinition:
-              apiVersion: loki.grafana.com/v1
-              kind: LokiStack
-              metadata:
-                name: lokistack-hub
-                namespace: openshift-logging
-              spec:
-                size: 1x.extra-small
-                storage:
-                  secret:
-                    name: hub-lokistack-s3-credentials
-                    type: s3
-                storageClassName: gp3-csi
-                tenants:
-                  authentication:
+    objectDefinition:
+      apiVersion: policy.open-cluster-management.io/v1
+      kind: ConfigurationPolicy
+      metadata:
+        name: lokistack-hub
+      spec:
+        remediationAction: enforce
+        severity: high
+        pruneObjectBehavior: DeleteAll
+        object-templates:
+        - complianceType: musthave
+          objectDefinition:
+            apiVersion: loki.grafana.com/v1
+            kind: LokiStack
+            metadata:
+              name: lokistack-hub
+              namespace: openshift-logging
+            spec:
+              size: 1x.extra-small
+              storage:
+                secret:
+                  name: hub-lokistack-s3-credentials
+                  type: s3
+              storageClassName: gp3-csi
+              tenants:
+                authentication:
 {{- range $_, $cluster_name := .Values.spokeClusters }}
-                  - mTLS:
-                      ca:
-                        caName: {{ $cluster_name }}
-                    tenantId: {{ $cluster_name }}
-                    tenantName: {{ $cluster_name }}
+                - mTLS:
+                    ca:
+                      caName: {{ $cluster_name }}
+                  tenantId: {{ $cluster_name }}
+                  tenantName: {{ $cluster_name }}
 {{- end }}
-                  authorization:
-                    roleBindings:
-                    - name: write-logs
-                      roles:
-                      - write-logs
-                      subjects:
-                      - kind: group
-                        name: multicluster-observability-addon
-                    - name: read-logs
-                      roles:
-                      - read-logs
-                      subjects:
-                      - kind: group
-                        name: multicluster-observability-addon
+                authorization:
+                  roleBindings:
+                  - name: write-logs
                     roles:
-                    - name: read-logs
-                      permissions:
-                      - read
-                      resources:
-                      - logs
-                      tenants:
+                    - write-logs
+                    subjects:
+                    - kind: group
+                      name: multicluster-observability-addon
+                  - name: read-logs
+                    roles:
+                    - read-logs
+                    subjects:
+                    - kind: group
+                      name: multicluster-observability-addon
+                  roles:
+                  - name: read-logs
+                    permissions:
+                    - read
+                    resources:
+                    - logs
+                    tenants:
 {{- range $_, $cluster_name := .Values.spokeClusters }}
-                      - {{ $cluster_name }}
+                    - {{ $cluster_name }}
 {{- end }}
-                    - name: write-logs
-                      permissions:
-                      - write
-                      resources:
-                      - logs
-                      tenants:
+                  - name: write-logs
+                    permissions:
+                    - write
+                    resources:
+                    - logs
+                    tenants:
 {{- range $_, $cluster_name := .Values.spokeClusters }}
-                      - {{ $cluster_name }}
+                    - {{ $cluster_name }}
 {{- end }}
-                  mode: static
+                mode: static
 {{- end }}

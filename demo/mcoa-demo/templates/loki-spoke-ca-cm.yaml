@@ -1,0 +1,15 @@
+{{- range $_, $cluster_name := .Values.spokeClusters }}
+{{ $cert_secret := (lookup "v1" "Secret" $cluster_name  "logging-loki-infra-auth")}}
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: {{ $cluster_name }}
+  namespace: openshift-logging
+data:
+{{- if $cert_secret }}
+  service-ca.crt: {{ index $cert_secret.data "ca.crt" | b64dec | quote }}
+{{- else }}
+  service-ca.crt: {{ "PLACEHOLDER" | b64dec | quote }}
+{{- end }}
+---
+{{- end }}

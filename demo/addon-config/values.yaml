@@ -7,9 +7,9 @@ logging:
   outputs:
     - name: cw-infra
       type: cloudwatch
-    # - name: loki-infra
-    #   type: loki
-    #   url: https://my-loki.app
+    - name: loki-infra
+      type: loki
+      url: https://my-loki.app
 
 tracing:
   enabled: false
