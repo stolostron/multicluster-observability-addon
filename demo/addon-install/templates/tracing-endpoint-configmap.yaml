@@ -4,14 +4,14 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: tracing-{{ $cluster_name }}-{{ $dic.name }}
+  name: tracing-{{ $cluster_name }}-{{ $dic.type }}
   namespace: {{ $cluster_name }}
   labels:
     mcoa.openshift.io/signal: tracing
   annotations:
-    tracing.mcoa.openshift.io/target-output-name: {{ $dic.name }}
+    tracing.mcoa.openshift.io/target-output-name: {{ $dic.type }}
 data:
-  endpoint: # Add route here
+  endpoint: {{ $dic.endpoint }}
 {{- end }}
 {{- end }}
 {{- end }}

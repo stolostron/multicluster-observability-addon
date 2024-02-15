@@ -17,9 +17,8 @@ logging:
       url: https://my-loki.app
 
 tracing:
-  enabled: false
+  enabled: true
   
   outputs:
-    - type: jaeger
     - type: otlp
-      url: https://otlp.app 
+      endpoint: otlp-http-otel-gateway-route-observability.apps.my-cluster.app

@@ -18,6 +18,12 @@ spec:
         object-templates:
         - complianceType: musthave
           objectDefinition:
+            apiVersion: v1
+            kind: Namespace
+            metadata:
+              name: open-cluster-management-observability
+        - complianceType: musthave
+          objectDefinition:
             apiVersion: apps/v1
             kind: Deployment
             metadata:

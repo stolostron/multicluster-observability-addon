@@ -3,7 +3,7 @@ spokeClusters:
   - spoke-1
 
 metrics:
-  enabled: false
+  enabled: true
 
 logging:
   enabled: true
@@ -22,3 +22,5 @@ logging:
 
 tracing:
   enabled: true
+
+  clusterName: my-cluster.app
