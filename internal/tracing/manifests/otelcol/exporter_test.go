@@ -33,11 +33,11 @@ func Test_ConfigureExportersSecrets(t *testing.T) {
 		},
 	}
 
-	err = ConfigureExportersSecrets(&cfg, secret, annotation)
+	err = ConfigureExportersSecrets(cfg, secret, annotation)
 	require.NoError(t, err)
 
 	exportersField := cfg["exporters"]
-	exporters := exportersField.(map[interface{}]interface{})
+	exporters := exportersField.(map[string]interface{})
 	require.Nil(t, exporters["debug"])
 
 	b, err = os.ReadFile("./test_data/basic_otelhttp.yaml")
@@ -46,11 +46,11 @@ func Test_ConfigureExportersSecrets(t *testing.T) {
 	cfg, err = ConfigFromString(otelColConfig)
 	require.NoError(t, err)
 
-	err = ConfigureExportersSecrets(&cfg, secret, annotation)
+	err = ConfigureExportersSecrets(cfg, secret, annotation)
 	require.NoError(t, err)
 
 	exportersField = cfg["exporters"]
-	exporters = exportersField.(map[interface{}]interface{})
+	exporters = exportersField.(map[string]interface{})
 	otlphttpField := exporters["otlphttp"]
 	otlphttp := otlphttpField.(map[interface{}]interface{})
 	require.NotNil(t, otlphttp["tls"])
@@ -79,11 +79,11 @@ func Test_ConfigureExportersEndpoints(t *testing.T) {
 		},
 	}
 
-	err = ConfigureExportersEndpoints(&cfg, cm, annotation)
+	err = ConfigureExportersEndpoints(cfg, cm, annotation)
 	require.NoError(t, err)
 
 	exportersField := cfg["exporters"]
-	exporters := exportersField.(map[interface{}]interface{})
+	exporters := exportersField.(map[string]interface{})
 	require.Nil(t, exporters["debug"])
 
 	b, err = os.ReadFile("./test_data/basic_otelhttp.yaml")
@@ -92,11 +92,11 @@ func Test_ConfigureExportersEndpoints(t *testing.T) {
 	cfg, err = ConfigFromString(otelColConfig)
 	require.NoError(t, err)
 
-	err = ConfigureExportersEndpoints(&cfg, cm, annotation)
+	err = ConfigureExportersEndpoints(cfg, cm, annotation)
 	require.NoError(t, err)
 
 	exportersField = cfg["exporters"]
-	exporters = exportersField.(map[interface{}]interface{})
+	exporters = exportersField.(map[string]interface{})
 	otlphttpField := exporters["otlphttp"]
 	otlphttp := otlphttpField.(map[interface{}]interface{})
 	require.NotNil(t, otlphttp["endpoint"])
@@ -109,12 +109,12 @@ func Test_getExporters(t *testing.T) {
 	cfg, err := ConfigFromString(otelColConfig)
 	require.NoError(t, err)
 
-	exporters, err := getExporters(&cfg)
+	exporters, err := getExporters(cfg)
 	require.NoError(t, err)
-	require.Len(t, *exporters, 1)
+	require.Len(t, exporters, 1)
 
 	cfg = make(map[string]interface{})
-	_, err = getExporters(&cfg)
+	_, err = getExporters(cfg)
 	require.Error(t, err)
 }
 

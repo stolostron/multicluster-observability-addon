@@ -18,15 +18,14 @@ func ConfigureExportersSecrets(cfg map[string]interface{}, secret corev1.Secret,
 		return err
 	}
 
-	for name, config := range *exporters {
-		exporterName := name.(string)
+	for exporterName, config := range exporters {
 		if otelExporterName != exporterName {
 			continue
 		}
 		var configMap map[interface{}]interface{}
 		if config == nil {
 			configMap = make(map[interface{}]interface{})
-			(*exporters)[otelExporterName] = configMap
+			exporters[otelExporterName] = configMap
 		} else {
 			configMap = config.(map[interface{}]interface{})
 		}
@@ -48,15 +47,14 @@ func ConfigureExportersEndpoints(cfg map[string]interface{}, cm corev1.ConfigMap
 		return err
 	}
 
-	for name, config := range *exporters {
-		exporterName := name.(string)
+	for exporterName, config := range exporters {
 		if otelExporterName != exporterName {
 			continue
 		}
 		var configMap map[interface{}]interface{}
 		if config == nil {
 			configMap = make(map[interface{}]interface{})
-			(*exporters)[otelExporterName] = configMap
+			exporters[otelExporterName] = configMap
 		} else {
 			configMap = config.(map[interface{}]interface{})
 		}
@@ -69,17 +67,14 @@ func ConfigureExportersEndpoints(cfg map[string]interface{}, cm corev1.ConfigMap
 	return nil
 }
 
-func getExporters(cfg map[string]interface{}) (*map[interface{}]interface{}, error) {
+func getExporters(cfg map[string]interface{}) (map[string]interface{}, error) {
 	exportersField, ok := cfg["exporters"]
 	if !ok {
 		return nil, kverrors.New("no exporters available as part of the configuration")
 	}
 
-	exporters, ok := exportersField.(map[interface{}]interface{})
-	if !ok {
-		return nil, kverrors.New("exporters field doesn't contain valid components")
-	}
-	return &exporters, nil
+	exporters := exportersField.(map[string]interface{})
+	return exporters, nil
 }
 
 func configureExporterSecrets(exporter *map[interface{}]interface{}, secret corev1.Secret) {
