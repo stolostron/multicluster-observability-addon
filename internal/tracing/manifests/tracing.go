@@ -7,7 +7,7 @@ import (
 	"github.com/ViaQ/logerr/v2/kverrors"
 	otelv1alpha1 "github.com/open-telemetry/opentelemetry-operator/apis/v1alpha1"
 	"github.com/rhobs/multicluster-observability-addon/internal/tracing/manifests/otelcol"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -51,7 +51,7 @@ func templateWithSecret(spec *otelv1alpha1.OpenTelemetryCollectorSpec, secret co
 
 	// iblancasa: add verifications for the exporters
 
-	err = otelcol.ConfigureExportersSecrets(&cfg, secret, AnnotationTargetOutputName)
+	err = otelcol.ConfigureExportersSecrets(cfg, secret, AnnotationTargetOutputName)
 	if err != nil {
 		return err
 	}
@@ -73,7 +73,7 @@ func templateWithConfigMap(spec *otelv1alpha1.OpenTelemetryCollectorSpec, config
 	if err != nil {
 		return nil
 	}
-	err = otelcol.ConfigureExportersEndpoints(&cfg, configmap, AnnotationTargetOutputName)
+	err = otelcol.ConfigureExportersEndpoints(cfg, configmap, AnnotationTargetOutputName)
 	if err != nil {
 		return nil
 	}

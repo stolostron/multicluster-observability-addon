@@ -2,7 +2,7 @@ package otelcol
 
 import (
 	"github.com/ViaQ/logerr/v2/kverrors"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 )
 
 func ConfigFromString(configStr string) (map[string]interface{}, error) {
