@@ -1,0 +1,17 @@
+{{- if .Values.tracing.enabled }}
+{{- range $_, $cluster_name := .Values.spokeClusters }}
+{{- range $_, $dic := $.Values.tracing.outputs }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tracing-{{ $cluster_name }}-{{ $dic.name }}
+  namespace: {{ $cluster_name }}
+  labels:
+    mcoa.openshift.io/signal: tracing
+  annotations:
+    tracing.mcoa.openshift.io/target-output-name: {{ $dic.name }}
+data:
+  endpoint: # Add route here
+{{- end }}
+{{- end }}
+{{- end }}

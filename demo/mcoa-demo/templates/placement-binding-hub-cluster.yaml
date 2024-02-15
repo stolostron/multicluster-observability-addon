@@ -16,3 +16,9 @@ subjects:
   - name: policy-hub-metrics
     kind: Policy
     apiGroup: policy.open-cluster-management.io
+  - name: policy-hub-otel-operator
+    kind: Policy
+    apiGroup: policy.open-cluster-management.io
+  - name: policy-hub-otel-collector
+    kind: Policy
+    apiGroup: policy.open-cluster-management.io

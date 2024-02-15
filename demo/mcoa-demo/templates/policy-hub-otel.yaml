@@ -1,0 +1,131 @@
+{{- if and .Values.tracing.enabled }}
+apiVersion: policy.open-cluster-management.io/v1
+kind: Policy
+metadata:
+  name: policy-hub-otel-collector
+spec:
+  disabled: false
+  policy-templates:
+  - objectDefinition:
+      apiVersion: policy.open-cluster-management.io/v1
+      kind: ConfigurationPolicy
+      metadata:
+        name: policy-hub-otel-collector
+      spec:
+        remediationAction: enforce
+        severity: high
+        pruneObjectBehavior: DeleteAll
+        object-templates:
+          - complianceType: musthave
+            objectDefinition:
+              apiVersion: v1
+              kind: Namespace
+              metadata:
+                name: observability
+          - complianceType: musthave
+            objectDefinition:
+              apiVersion: cert-manager.io/v1
+              kind: Issuer
+              metadata:
+                name: selfsigned-issuer
+                namespace: cert-manager
+              spec:
+                selfSigned: {}
+          - complianceType: musthave
+            objectDefinition:
+              apiVersion: cert-manager.io/v1
+              kind: Certificate
+              metadata:
+                name: otel-ca
+                namespace: cert-manager
+              spec:
+                isCA: true
+                commonName: otel-ca
+                secretName: otel-ca-secret
+                privateKey:
+                  algorithm: RSA
+                  size: 4096
+                  encoding: PKCS8
+                issuerRef:
+                  name: selfsigned-issuer
+                  kind: Issuer
+                  group: cert-manager.io
+          - complianceType: musthave
+            objectDefinition:
+              apiVersion: cert-manager.io/v1
+              kind: ClusterIssuer
+              metadata:
+                name: otel-ca-issuer
+                namespace: observability
+              spec:
+                ca:
+                  secretName: otel-ca-secret
+          - complianceType: musthave
+            objectDefinition:
+              apiVersion: cert-manager.io/v1
+              kind: Certificate
+              metadata:
+                name: otel-gateway
+                namespace: observability
+              spec:
+                secretName: otel-gateway
+                commonName: otel-gateway
+                subject:
+                  organizationalUnits:
+                    - otel-ocm-addon
+                privateKey:
+                  algorithm: RSA
+                  encoding: PKCS8
+                  size: 4096
+                dnsNames:
+                  - otlp-http-otel-gateway-route-observability.apps.iba412ipi01.maistra.upshift.redhat.com
+                usages:
+                  - server auth
+                  - key encipherment
+                  - digital signature
+                issuerRef:
+                  name: otel-ca-issuer
+                  kind: ClusterIssuer
+          - complianceType: musthave
+            objectDefinition:
+              apiVersion: opentelemetry.io/v1alpha1
+              kind: OpenTelemetryCollector
+              metadata:
+                name: otel-gateway
+                namespace: observability
+              spec:
+                mode: "deployment"
+                ingress:
+                  type: route
+                  route:
+                    termination: "passthrough"
+                volumes:
+                  - name: otel-gateway
+                    secret: 
+                      secretName: otel-gateway
+                volumeMounts:
+                  - name: otel-gateway
+                    mountPath: /certs
+                config: |
+                  receivers:
+                    otlp:
+                      protocols:
+                        http:
+                          tls:
+                            cert_file: /certs/tls.crt
+                            key_file: /certs/tls.key
+                            client_ca_file: /certs/ca.crt
+                        grpc:
+                          tls:
+                            cert_file: /certs/tls.crt
+                            key_file: /certs/tls.key
+                            client_ca_file: /certs/ca.crt
+                  exporters:
+                    logging:
+                  service:
+                    pipelines:
+                      traces:
+                        receivers: [otlp]
+                        processors: []
+                        exporters: [logging]
+{{- end }}

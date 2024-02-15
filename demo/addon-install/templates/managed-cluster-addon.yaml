@@ -29,5 +29,18 @@ spec:
 {{- break }}
 {{- end }}
 {{- end }}
+# Tracing Auth ConfigMap
+{{- if $.Values.tracing.enabled }}
+  - resource: configmaps
+    name: tracing-{{ $cluster_name }}
+    namespace: {{ $cluster_name }}
+{{- end }}
+# Endpoints for Tracing
+{{- range $_, $dic := $.Values.tracing.outputs }}
+{{- if $.Values.tracing.enabled }}
+  - resource: configmaps
+    name: tracing-{{ $cluster_name }}-{{ $dic.name }}
+    namespace: {{ $cluster_name }}
+{{- end }}
 {{- end }}
 {{- end }}

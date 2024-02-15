@@ -3,7 +3,7 @@ spokeClusters:
   - spoke-1
 
 metrics:
-  enabled: true
+  enabled: false
 
 logging:
   enabled: true
@@ -19,3 +19,6 @@ logging:
       endpoint: https://s3.us-east-1.amazonaws.com
       region: us-east-1
       bucketnames: jmarcal-bucket
+
+tracing:
+  enabled: true

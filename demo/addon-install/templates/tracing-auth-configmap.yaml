@@ -1,0 +1,16 @@
+{{- if .Values.tracing.enabled }}
+{{- range $_, $cluster_name := .Values.spokeClusters }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tracing-{{ $cluster_name }}
+  namespace: {{ $cluster_name }}
+  labels:
+    mcoa.openshift.io/signal: tracing
+data:
+{{- range $_, $dic := $.Values.tracing.outputs }}
+  {{ $dic.name }}: mTLS
+{{- end }}
+---
+{{- end }}
+{{- end }}
