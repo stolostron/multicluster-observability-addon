@@ -12,7 +12,7 @@ logging:
       url: https://my-loki.app
 
 tracing:
-  enabled: false
+  enabled: true
   
   outputs:
     - name: otlphttp

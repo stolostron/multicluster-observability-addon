@@ -20,7 +20,7 @@ The following steps use Helm to install a set of RHACM `ConfigurationPolicies` t
 _Hint:_ `cert-manager` operator is also installed in this step on the hub cluster. It will be used to demonstrate the ability to delegate PKI management for all tenants to a third-party tool.
 
 1. Set the values in `demo/mcoa-demo/values.yaml`
-1. Deploy the chart `helm upgrade --install mcoa-demos demo/mcoa-demo/`. This Helm chart will bootstrap configuration on the hub cluster to enabled it to receive signals from the spoke clustes.
+1. Deploy the chart `helm upgrade --install mcoa-demo demo/mcoa-demo/`. This Helm chart will bootstrap configuration on the hub cluster to enabled it to receive signals from the spoke clustes.
 1. Run `oc label --overwrite managedcluster/local-cluster cluster.open-cluster-management.io/clusterset=hub-mcoa-clusters` to label the `local-cluster` a.k.a. hub so that the policy applies to it.
 
 ## 3. Install multicluster-observability-addon
@@ -34,8 +34,7 @@ _Hint:_ `cert-manager` operator is also installed in this step on the hub cluste
 Before enabling the AddOn on spoke clustes we first have define the configuration of each signal:
 
 1. Set the values in `demo/addon-config/values.yaml`
-1. Deploy the signal configuration with `helm upgrade --install addon-install demo/addon-config/`
-1. Annotate necessary resources
+1. Deploy the signal configuration with `helm upgrade --install addon-config demo/addon-config/`
 
 ### 4.2 Enable the addon for spoke clusters
 

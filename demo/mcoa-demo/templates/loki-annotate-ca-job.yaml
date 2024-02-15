@@ -1,0 +1,57 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: configure-logging
+  namespace: openshift-logging
+spec:
+  template:
+    spec:
+      serviceAccountName: annotate-ca-sa
+      containers:
+      - name: configure-container
+        image: bitnami/kubectl
+        command:
+          - "/bin/sh"
+          - "-c"
+          - |
+            while true; do
+              if kubectl get cm/lokistack-hub-gateway-ca-bundle -n openshift-logging >/dev/null 2>&1; then
+                kubectl -n openshift-logging label --overwrite cm/lokistack-hub-gateway-ca-bundle mcoa.openshift.io/signal=logging
+                kubectl -n openshift-logging annotate --overwrite cm/lokistack-hub-gateway-ca-bundle logging.mcoa.openshift.io/ca=true
+                return 0
+              else
+                echo "Waiting for ConfigMap..."
+                sleep 10
+              fi
+            done
+      restartPolicy: Never
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: annotate-ca-sa
+  namespace: openshift-logging
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: annotate-ca-role
+  namespace: openshift-logging
+rules:
+- apiGroups: [""]
+  resources: ["configmaps"]
+  verbs: ["get", "patch", "update"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: annotate-ca-role-binding
+  namespace: openshift-logging
+subjects:
+- kind: ServiceAccount
+  name: annotate-ca-sa
+  namespace: openshift-logging
+roleRef:
+  kind: Role
+  name: annotate-ca-role
+  apiGroup: rbac.authorization.k8s.io
