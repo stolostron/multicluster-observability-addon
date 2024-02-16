@@ -8,3 +8,6 @@ logging:
 
 tracing:
   enabled: true
+
+netflow:
+  enabled: true

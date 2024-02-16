@@ -1,0 +1,13 @@
+{{- if .Values.enabled }}
+apiVersion: operators.coreos.com/v1
+kind: OperatorGroup
+metadata:
+  name: openshift-netobserv-operator
+  namespace: openshift-netobserv-operator
+  labels:
+    app: {{ template "netflowhelm.name" . }}
+    chart: {{ template "netflowhelm.chart" . }}
+    release: {{ .Release.Name }}
+spec:
+  upgradeStrategy: Default
+{{- end }}

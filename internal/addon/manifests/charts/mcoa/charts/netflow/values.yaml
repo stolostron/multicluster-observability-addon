@@ -1,0 +1,11 @@
+nameOverride: null
+
+enabled: true
+
+# Expects json format
+flowCollectorSpec: {}
+
+secrets:
+  - name: "secret-1"
+    # Expects json format
+    data: {}

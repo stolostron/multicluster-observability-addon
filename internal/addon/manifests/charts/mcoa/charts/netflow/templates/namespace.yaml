@@ -1,0 +1,11 @@
+{{- if .Values.enabled }}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: openshift-netobserv-operator
+  labels:
+    app: {{ template "netflowhelm.name" . }}
+    chart: {{ template "netflowhelm.chart" . }}
+    release: {{ .Release.Name }}
+spec: {}
+{{- end }}

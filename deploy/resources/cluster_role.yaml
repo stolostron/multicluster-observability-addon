@@ -76,6 +76,10 @@
     - apiGroups: ["opentelemetry.io"]
       resources: ["opentelemetrycollectors"]
       verbs: ["get", "list", "watch"]
+    # Roles for addon to collert flow logs
+    - apiGroups: ["flows.netobserv.io"]
+      resources: ["flowcollectors"]
+      verbs: ["get", "list", "watch"]
     # Roles for addon to perform metrics specific actions
     - apiGroups: ["route.openshift.io"]
       resources: ["routes"]

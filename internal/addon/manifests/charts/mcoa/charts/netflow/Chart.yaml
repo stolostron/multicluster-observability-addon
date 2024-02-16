@@ -1,0 +1,5 @@
+apiVersion: v2
+description: A Helm chart for installing NetObserv netflow collection pipeline
+name: netflow
+version: 1.0.0
+appVersion: "1.0.0"

@@ -85,7 +85,7 @@ spec:
       value: "true"
 ``` 
 
-Supported keys are `metricsDisabled`, `loggingDisabled` and `tracingDisabled`
+Supported keys are `metricsDisabled`, `loggingDisabled`, `tracingDisabled` and `netflowDisabled`.
 
 ## Install the addon on a Spoke Cluster
 

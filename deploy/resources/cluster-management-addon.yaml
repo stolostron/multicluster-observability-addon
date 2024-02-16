@@ -41,3 +41,9 @@ spec:
      defaultConfig:
        name: spoke-otelcol
        namespace: open-cluster-management
+
+   # Describes the default NetObserv FlowCollector instance applied to all managed clusters. This is a cluster-scope resource.
+   - group: flows.netobserv.io
+     resource: flowcollectors
+     defaultConfig:
+       name: cluster

@@ -9,6 +9,8 @@ import (
 	lhandlers "github.com/rhobs/multicluster-observability-addon/internal/logging/handlers"
 	lmanifests "github.com/rhobs/multicluster-observability-addon/internal/logging/manifests"
 	"github.com/rhobs/multicluster-observability-addon/internal/metrics"
+	nfhandlers "github.com/rhobs/multicluster-observability-addon/internal/netflows/handlers"
+	nfmanifests "github.com/rhobs/multicluster-observability-addon/internal/netflows/manifests"
 	thandlers "github.com/rhobs/multicluster-observability-addon/internal/tracing/handlers"
 	tmanifests "github.com/rhobs/multicluster-observability-addon/internal/tracing/manifests"
 	"k8s.io/klog/v2"
@@ -20,15 +22,17 @@ import (
 )
 
 type HelmChartValues struct {
-	Metrics metrics.MetricsValues    `json:"metrics"`
-	Logging lmanifests.LoggingValues `json:"logging"`
-	Tracing tmanifests.TracingValues `json:"tracing"`
+	Metrics metrics.MetricsValues     `json:"metrics"`
+	Logging lmanifests.LoggingValues  `json:"logging"`
+	Tracing tmanifests.TracingValues  `json:"tracing"`
+	Netflow nfmanifests.NetflowValues `json:"netflow"`
 }
 
 type Options struct {
 	MetricsDisabled bool
 	LoggingDisabled bool
 	TracingDisabled bool
+	NetflowDisabled bool
 }
 
 func GetValuesFunc(k8s client.Client) addonfactory.GetValuesFunc {
@@ -87,6 +91,20 @@ func GetValuesFunc(k8s client.Client) addonfactory.GetValuesFunc {
 			userValues.Tracing = tracing
 		}
 
+		if !opts.NetflowDisabled {
+			klog.Info("Netflow enabled")
+			nfOpts, err := nfhandlers.BuildOptions(k8s, addon, aodc)
+			if err != nil {
+				return nil, err
+			}
+
+			nf, err := nfmanifests.BuildValues(nfOpts)
+			if err != nil {
+				return nil, err
+			}
+			userValues.Netflow = *nf
+		}
+
 		return addonfactory.JsonStructToValues(userValues)
 	}
 }
@@ -133,7 +151,13 @@ func buildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Opti
 			}
 			opts.TracingDisabled = value
 		}
-
+		if keyvalue.Name == addon.AdcNetflowDisabledKey {
+			value, err := strconv.ParseBool(keyvalue.Value)
+			if err != nil {
+				return opts, err
+			}
+			opts.NetflowDisabled = value
+		}
 	}
 	return opts, nil
 }

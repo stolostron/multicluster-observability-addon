@@ -14,3 +14,6 @@ dependencies:
 - name: tracing
   repository: 'file://./charts/tracing'
   condition: tracing.enabled
+- name: netflow
+  repository: 'file://./charts/netflow'
+  condition: netflow.enabled

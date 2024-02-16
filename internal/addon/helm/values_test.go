@@ -73,6 +73,10 @@ func Test_Mcoa_Disable_Charts(t *testing.T) {
 					Name:  "tracingDisabled",
 					Value: "true",
 				},
+				{
+					Name:  "netflowDisabled",
+					Value: "true",
+				},
 			},
 		},
 	}
