@@ -51,15 +51,15 @@ func ConfigureExportersEndpoints(cfg map[string]interface{}, cm corev1.ConfigMap
 		if otelExporterName != exporterName {
 			continue
 		}
-		var configMap map[interface{}]interface{}
+		var configMap map[string]interface{}
 		if config == nil {
-			configMap = make(map[interface{}]interface{})
+			configMap = make(map[string]interface{})
 			exporters[otelExporterName] = configMap
 		} else {
-			configMap = config.(map[interface{}]interface{})
+			configMap = config.(map[string]interface{})
 		}
 
-		err := configureExporterEndpoint(&configMap, cm)
+		err := configureExporterEndpoint(configMap, cm)
 		if err != nil {
 			return err
 		}
@@ -83,16 +83,16 @@ func configureExporterSecrets(exporter *map[interface{}]interface{}, secret core
 	certConfig["insecure"] = false
 	certConfig["cert_file"] = fmt.Sprintf("%s/tls.crt", folder)
 	certConfig["key_file"] = fmt.Sprintf("%s/tls.key", folder)
-	certConfig["ca_file"] = fmt.Sprintf("%s/ca.crt", folder)
+	certConfig["ca_file"] = fmt.Sprintf("%s/ca-bundle.crt", folder)
 
 	(*exporter)["tls"] = certConfig
 }
 
-func configureExporterEndpoint(exporter *map[interface{}]interface{}, cm corev1.ConfigMap) error {
+func configureExporterEndpoint(exporter map[string]interface{}, cm corev1.ConfigMap) error {
 	url := cm.Data["endpoint"]
 	if url == "" {
 		return kverrors.New("no value for 'endpoint' in configmap", "name", cm.Name)
 	}
-	(*exporter)["endpoint"] = url
+	exporter["endpoint"] = url
 	return nil
 }

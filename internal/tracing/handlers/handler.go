@@ -35,13 +35,13 @@ func BuildOptions(k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAdd
 	klog.Info("OpenTelemetry Collector template found")
 
 	var authCM *corev1.ConfigMap = nil
-	caCM := &corev1.ConfigMap{}
+	var caSecret *corev1.Secret = nil
 
 	for _, config := range mcAddon.Spec.Configs {
+		key := client.ObjectKey{Name: config.Name, Namespace: config.Namespace}
 		switch config.ConfigGroupResource.Resource {
 		case addon.ConfigMapResource:
 			cm := &corev1.ConfigMap{}
-			key := client.ObjectKey{Name: config.Name, Namespace: config.Namespace}
 			klog.Infof("processing cm %s/%s", config.Namespace, config.Name)
 			if err := k8s.Get(context.Background(), key, cm, &client.GetOptions{}); err != nil {
 				return resources, err
@@ -50,12 +50,6 @@ func BuildOptions(k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAdd
 			// Only care about cm's that configure tracing
 			if signal, ok := cm.Labels[addon.SignalLabelKey]; !ok || signal != addon.Tracing.String() {
 				klog.Info("skipped configmap")
-				continue
-			}
-
-			// If a cm has the ca annotation then it's the configmap containing the ca
-			if _, ok := cm.Annotations[AnnotationCAToInject]; ok {
-				caCM = cm
 				continue
 			}
 
@@ -70,17 +64,37 @@ func BuildOptions(k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAdd
 			}
 
 			resources.ConfigMaps = append(resources.ConfigMaps, *cm)
+		case addon.SecretResource:
+			secret := &corev1.Secret{}
+			klog.Infof("processing secret %s/%s", config.Namespace, config.Name)
+			if err := k8s.Get(context.Background(), key, secret, &client.GetOptions{}); err != nil {
+				return resources, err
+			}
+
+			// Only care about cm's that configure tracing
+			if signal, ok := secret.Labels[addon.SignalLabelKey]; !ok || signal != addon.Tracing.String() {
+				klog.Info("skipped secret")
+				continue
+			}
+
+			// If the secret has the ca annotation then it's the secret containing the ca
+			if _, ok := secret.Annotations[AnnotationCAToInject]; ok {
+				caSecret = secret
+				continue
+			}
 		}
 	}
 
 	ctx := context.Background()
 	authConfig := manifests.AuthDefaultConfig
 	authConfig.MTLSConfig.CommonName = mcAddon.Namespace
-	if len(caCM.Data) > 0 {
-		if ca, ok := caCM.Data["service-ca.crt"]; ok {
-			authConfig.MTLSConfig.CAToInject = ca
+	if caSecret == nil {
+		klog.Warning("no CA was found")
+	} else if len(caSecret.Data) > 0 {
+		if ca, ok := caSecret.Data["ca.crt"]; ok {
+			authConfig.MTLSConfig.CAToInject = string(ca)
 		} else {
-			return resources, kverrors.New("missing ca bundle in configmap", "key", "service-ca.crt")
+			return resources, kverrors.New("missing ca bundle in secret", "key", "ca.crt")
 		}
 	}
 
