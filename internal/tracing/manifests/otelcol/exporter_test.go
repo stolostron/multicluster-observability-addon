@@ -98,7 +98,7 @@ func Test_ConfigureExportersEndpoints(t *testing.T) {
 	exportersField = cfg["exporters"]
 	exporters = exportersField.(map[string]interface{})
 	otlphttpField := exporters["otlphttp"]
-	otlphttp := otlphttpField.(map[interface{}]interface{})
+	otlphttp := otlphttpField.(map[string]interface{})
 	require.NotNil(t, otlphttp["endpoint"])
 }
 
@@ -136,7 +136,7 @@ func Test_configureExporterSecrets(t *testing.T) {
 }
 
 func Test_configureExporterEndpoint(t *testing.T) {
-	exporter := make(map[interface{}]interface{})
+	exporter := make(map[string]interface{})
 	cm := corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "tracing-auth",
@@ -150,7 +150,7 @@ func Test_configureExporterEndpoint(t *testing.T) {
 		},
 	}
 
-	err := configureExporterEndpoint(&exporter, cm)
+	err := configureExporterEndpoint(exporter, cm)
 	require.NoError(t, err)
 
 	require.NotNil(t, exporter["endpoint"])
@@ -168,6 +168,6 @@ func Test_configureExporterEndpoint(t *testing.T) {
 		},
 	}
 
-	err = configureExporterEndpoint(&exporter, cm)
+	err = configureExporterEndpoint(exporter, cm)
 	require.Error(t, err)
 }
