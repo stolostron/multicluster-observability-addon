@@ -7,13 +7,13 @@ include .bingo/Variables.mk
 .DEFAULT_GOAL := default
 default: all
 
-VERSION ?= 0.0.1
+VERSION ?= v0.0.1
 
 CRD_DIR := $(shell pwd)/deploy/crds
 
 # REGISTRY_BASE
 # defines the container registry and organization for the bundle and operator container images.
-REGISTRY_BASE_OPENSHIFT = quay.io/openshift-logging
+REGISTRY_BASE_OPENSHIFT = quay.io/rhobs
 REGISTRY_BASE ?= $(REGISTRY_BASE_OPENSHIFT)
 
 # Image URL to use all building/pushing image targets

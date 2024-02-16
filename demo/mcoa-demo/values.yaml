@@ -23,4 +23,4 @@ logging:
 tracing:
   enabled: true
 
-  clusterName: my-cluster.app
+  clusterName: otlp-http-otel-gateway-route-observability.apps.my-cluster.app

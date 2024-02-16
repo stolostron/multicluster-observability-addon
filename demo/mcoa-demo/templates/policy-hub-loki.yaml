@@ -63,6 +63,43 @@ spec:
       apiVersion: policy.open-cluster-management.io/v1
       kind: ConfigurationPolicy
       metadata:
+        name: lokistack-s3-secret
+      spec:
+        remediationAction: enforce
+        severity: high
+        pruneObjectBehavior: DeleteAll
+        object-templates:
+        - complianceType: musthave
+          objectDefinition:
+            apiVersion: v1
+            kind: Secret
+            metadata:
+              name: hub-lokistack-s3-credentials
+              namespace: openshift-logging
+            type: Opaque
+            data:
+              endpoint: {{ .Values.logging.loki.s3Bucket.endpoint | b64enc }}
+              region: {{ .Values.logging.loki.s3Bucket.region | b64enc }}
+              access_key_id: {{ .Values.logging.aws.keyID | b64enc }}
+              access_key_secret: {{ .Values.logging.aws.keySecret | b64enc }}
+              bucketnames: {{ .Values.logging.loki.s3Bucket.bucketnames | b64enc }}
+  - extraDependencies:
+    - apiVersion: policy.open-cluster-management.io/v1
+      compliance: Compliant
+      kind: ConfigurationPolicy
+      name: redhat-loki-operator
+    - apiVersion: policy.open-cluster-management.io/v1
+      compliance: Compliant
+      kind: ConfigurationPolicy
+      name: lokistack-s3-secret
+    - apiVersion: policy.open-cluster-management.io/v1
+      compliance: Compliant
+      kind: ConfigurationPolicy
+      name: tenant-create-ca
+    objectDefinition:
+      apiVersion: policy.open-cluster-management.io/v1
+      kind: ConfigurationPolicy
+      metadata:
         name: lokistack-hub
       spec:
         remediationAction: enforce

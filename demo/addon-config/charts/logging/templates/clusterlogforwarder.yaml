@@ -32,6 +32,10 @@ spec:
    - name: infra-{{ $dic.name }}
      inputRefs:
      - infrastructure
+{{- if eq $dic.type "cloudwatch" }}
+     - application
+     - audit
+{{- end }}
      outputRefs:
      - {{ $dic.name }}
 {{- end }}

@@ -9,7 +9,7 @@ logging:
       type: cloudwatch
     - name: loki-infra
       type: loki
-      url: https://my-loki.app
+      url: https://lokistack-hub-openshift-logging.apps.my-cluster.com
 
 tracing:
   enabled: true

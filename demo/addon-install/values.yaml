@@ -14,11 +14,11 @@ logging:
       type: cloudwatch
     - name: loki-infra
       type: loki
-      url: https://my-loki.app
+      url: https://lokistack-hub-openshift-logging.apps.my-cluster.com
 
 tracing:
   enabled: true
   
   outputs:
     - type: otlp
-      endpoint: otlp-http-otel-gateway-route-observability.apps.my-cluster.app
+      endpoint: otlp-http-otel-gateway-route-observability.apps.my-cluster.com
