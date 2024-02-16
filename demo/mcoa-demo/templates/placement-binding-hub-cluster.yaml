@@ -22,3 +22,6 @@ subjects:
   - name: policy-loki-jobs
     kind: Policy
     apiGroup: policy.open-cluster-management.io
+  - name: policy-otel-jobs
+    kind: Policy
+    apiGroup: policy.open-cluster-management.io

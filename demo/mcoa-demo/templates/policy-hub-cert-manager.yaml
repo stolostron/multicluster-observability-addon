@@ -49,3 +49,56 @@ spec:
               name: openshift-cert-manager-operator
               source: redhat-operators
               sourceNamespace: openshift-marketplace
+  - extraDependencies:
+    - apiVersion: policy.open-cluster-management.io/v1
+      compliance: Compliant
+      kind: ConfigurationPolicy
+      name: redhat-openshift-cert-manager
+    objectDefinition:
+      apiVersion: policy.open-cluster-management.io/v1
+      kind: ConfigurationPolicy
+      metadata:
+        name: policy-hub-root-certs
+      spec:
+        remediationAction: enforce
+        severity: high
+        pruneObjectBehavior: DeleteAll
+        object-templates:
+          - complianceType: musthave
+            objectDefinition:
+              apiVersion: cert-manager.io/v1
+              kind: Issuer
+              metadata:
+                name: selfsigned-issuer
+                namespace: cert-manager
+              spec:
+                selfSigned: {}
+          - complianceType: musthave
+            objectDefinition:
+              apiVersion: cert-manager.io/v1
+              kind: Certificate
+              metadata:
+                name: mcoa-demo-ca
+                namespace: cert-manager
+              spec:
+                isCA: true
+                commonName: mcoa-demo-ca
+                secretName: mcoa-demo-ca-secret
+                privateKey:
+                  algorithm: RSA
+                  size: 4096
+                  encoding: PKCS8
+                issuerRef:
+                  name: selfsigned-issuer
+                  kind: Issuer
+                  group: cert-manager.io
+          - complianceType: musthave
+            objectDefinition:
+              apiVersion: cert-manager.io/v1
+              kind: ClusterIssuer
+              metadata:
+                name: mcoa-demo-ca-issuer
+                namespace: observability
+              spec:
+                ca:
+                  secretName: mcoa-demo-ca-secret

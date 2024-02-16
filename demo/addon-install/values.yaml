@@ -20,5 +20,5 @@ tracing:
   enabled: true
   
   outputs:
-    - type: otlp
+    - type: otlphttp
       endpoint: otlp-http-otel-gateway-route-observability.apps.my-cluster.com
