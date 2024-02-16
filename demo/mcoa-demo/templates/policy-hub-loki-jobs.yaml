@@ -123,14 +123,7 @@ spec:
                         target_namespace="openshift-logging"
                         configmap_created=false
 
-                        while true; do
-                          secret_exists=$(kubectl get secret loki-admin -n "$namespace" --ignore-not-found)
-                          if [ -n "$secret_exists" ]; then
-                            ca_crt=$(kubectl get secret loki-admin -n "$namespace" -o jsonpath="{.data.ca\.crt}" | base64 --decode)
-                            kubectl create configmap loki-admin-ca -n "${target_namespace}" --from-literal=service-ca.crt="${ca_crt}" --dry-run=client -o yaml | kubectl apply -f -
-                            break
-                          fi
-                        done
+                        kubectl create configmap loki-admin-ca -n "${target_namespace}" --from-literal=service-ca.crt="placeholder" --dry-run=client -o yaml | kubectl apply -f -
 
                         while true; do
                           for namespace in "${namespaces[@]}"; do
@@ -145,6 +138,15 @@ spec:
                             fi
                           done
                           if [ "$configmap_created" = true ]; then
+                            break
+                          fi
+                        done
+
+                        while true; do
+                          secret_exists=$(kubectl get secret loki-admin -n "${target_namespace}" --ignore-not-found)
+                          if [ -n "$secret_exists" ]; then
+                            ca_crt=$(kubectl get secret loki-admin -n "${target_namespace}" -o jsonpath="{.data.ca\.crt}" | base64 --decode)
+                            kubectl create configmap loki-admin-ca -n "${target_namespace}" --from-literal=service-ca.crt="${ca_crt}" --dry-run=client -o yaml | kubectl apply -f -
                             break
                           fi
                         done

@@ -83,32 +83,6 @@ spec:
               access_key_id: {{ .Values.logging.aws.keyID | b64enc }}
               access_key_secret: {{ .Values.logging.aws.keySecret | b64enc }}
               bucketnames: {{ .Values.logging.loki.s3Bucket.bucketnames | b64enc }}
-        - complianceType: musthave
-          objectDefinition:
-            apiVersion: cert-manager.io/v1
-            kind: Certificate
-            metadata:
-              name: loki-admin-cert
-              namespace: openshift-logging
-            spec:
-              secretName: loki-admin
-              commonName: loki-admin
-              subject:
-                organizationalUnits:
-                  - multicluster-observability-addon
-              privateKey:
-                algorithm: RSA
-                encoding: PKCS8
-                size: 4096
-              dnsNames:
-                - collector.openshift-logging.svc
-              usages:
-                - server auth
-                - key encipherment
-                - digital signature
-              issuerRef:
-                name: mcoa-demo-ca-issuer
-                kind: ClusterIssuer 
   - extraDependencies:
     - apiVersion: policy.open-cluster-management.io/v1
       compliance: Compliant
@@ -196,3 +170,29 @@ spec:
 {{- end }}
                 mode: static
 {{- end }}
+        - complianceType: musthave
+          objectDefinition:
+            apiVersion: cert-manager.io/v1
+            kind: Certificate
+            metadata:
+              name: loki-admin-cert
+              namespace: openshift-logging
+            spec:
+              secretName: loki-admin
+              commonName: loki-admin
+              subject:
+                organizationalUnits:
+                  - multicluster-observability-addon
+              privateKey:
+                algorithm: RSA
+                encoding: PKCS8
+                size: 4096
+              dnsNames:
+                - collector.openshift-logging.svc
+              usages:
+                - client auth
+                - key encipherment
+                - digital signature
+              issuerRef:
+                name: mcoa-cluster-issuer
+                kind: ClusterIssuer 
