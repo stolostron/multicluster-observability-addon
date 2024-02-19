@@ -174,6 +174,260 @@ spec:
                         secretKeyRef:
                           name: observability-grafana-certs
                           key: tls.key
-          pruneObjectBehavior: DeleteAll
-          remediationAction: enforce
-          severity: high
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: grafana.integreatly.org/v1beta1
+                kind: GrafanaDashboard
+                metadata:
+                  name: mcoa-dashboard
+                  namespace: grafana-operator
+                spec:
+                  instanceSelector:
+                    matchLabels:
+                      dashboards: "grafana"
+                  configMapRef:
+                    name: mcoa-dashboard
+                    key: json
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: v1
+                kind: ConfigMap
+                metadata:
+                  name: mcoa-dashboard
+                  namespace: grafana-operator
+                data:
+                  json: >
+                    {
+                      "annotations": {
+                        "list": [
+                          {
+                            "builtIn": 1,
+                            "datasource": {
+                              "type": "grafana",
+                              "uid": "-- Grafana --"
+                            },
+                            "enable": true,
+                            "hide": true,
+                            "iconColor": "rgba(0, 211, 255, 1)",
+                            "name": "Annotations & Alerts",
+                            "target": {
+                              "limit": 100,
+                              "matchAny": false,
+                              "tags": [],
+                              "type": "dashboard"
+                            },
+                            "type": "dashboard"
+                          }
+                        ]
+                      },
+                      "editable": true,
+                      "fiscalYearStartMonth": 0,
+                      "graphTooltip": 0,
+                      "id": 5,
+                      "links": [],
+                      "liveNow": false,
+                      "panels": [
+                        {
+                          "datasource": {
+                            "type": "prometheus",
+                            "uid": "abdc028b-0c2c-4416-a2d2-d8ea61dcd4bc"
+                          },
+                          "fieldConfig": {
+                            "defaults": {
+                              "color": {
+                                "mode": "palette-classic"
+                              },
+                              "custom": {
+                                "axisCenteredZero": false,
+                                "axisColorMode": "text",
+                                "axisLabel": "",
+                                "axisPlacement": "auto",
+                                "barAlignment": 0,
+                                "drawStyle": "line",
+                                "fillOpacity": 0,
+                                "gradientMode": "none",
+                                "hideFrom": {
+                                  "legend": false,
+                                  "tooltip": false,
+                                  "viz": false
+                                },
+                                "lineInterpolation": "linear",
+                                "lineWidth": 1,
+                                "pointSize": 5,
+                                "scaleDistribution": {
+                                  "type": "linear"
+                                },
+                                "showPoints": "auto",
+                                "spanNulls": false,
+                                "stacking": {
+                                  "group": "A",
+                                  "mode": "none"
+                                },
+                                "thresholdsStyle": {
+                                  "mode": "off"
+                                }
+                              },
+                              "mappings": [],
+                              "thresholds": {
+                                "mode": "absolute",
+                                "steps": [
+                                  {
+                                    "color": "green",
+                                    "value": null
+                                  },
+                                  {
+                                    "color": "red",
+                                    "value": 80
+                                  }
+                                ]
+                              }
+                            },
+                            "overrides": []
+                          },
+                          "gridPos": {
+                            "h": 8,
+                            "w": 12,
+                            "x": 0,
+                            "y": 0
+                          },
+                          "id": 2,
+                          "options": {
+                            "legend": {
+                              "calcs": [],
+                              "displayMode": "list",
+                              "placement": "bottom",
+                              "showLegend": true
+                            },
+                            "tooltip": {
+                              "mode": "single",
+                              "sort": "none"
+                            }
+                          },
+                          "targets": [
+                            {
+                              "datasource": {
+                                "type": "prometheus",
+                                "uid": "c48de94c-4781-454e-9afa-bc98bc055fca"
+                              },
+                              "editorMode": "builder",
+                              "expr": "sum by(clusterID, namespace) (namespace:container_memory_usage_bytes:sum{namespace=\"openshift-console-operator\"})",
+                              "key": "Q-bc53f8ac-3df1-476e-83f3-c1bed492a796-0",
+                              "range": true,
+                              "refId": "Console Memory"
+                            }
+                          ],
+                          "title": "Sum container memory usage",
+                          "type": "timeseries"
+                        },
+                        {
+                          "datasource": {
+                            "type": "loki",
+                            "uid": "9a70b20e-8abe-4394-b428-636ce3c078e7"
+                          },
+                          "fieldConfig": {
+                            "defaults": {
+                              "color": {
+                                "mode": "palette-classic"
+                              },
+                              "custom": {
+                                "axisCenteredZero": false,
+                                "axisColorMode": "text",
+                                "axisLabel": "",
+                                "axisPlacement": "auto",
+                                "barAlignment": 0,
+                                "drawStyle": "bars",
+                                "fillOpacity": 100,
+                                "gradientMode": "hue",
+                                "hideFrom": {
+                                  "legend": false,
+                                  "tooltip": false,
+                                  "viz": false
+                                },
+                                "lineInterpolation": "linear",
+                                "lineWidth": 8,
+                                "pointSize": 5,
+                                "scaleDistribution": {
+                                  "type": "linear"
+                                },
+                                "showPoints": "auto",
+                                "spanNulls": false,
+                                "stacking": {
+                                  "group": "A",
+                                  "mode": "none"
+                                },
+                                "thresholdsStyle": {
+                                  "mode": "off"
+                                }
+                              },
+                              "mappings": [],
+                              "thresholds": {
+                                "mode": "absolute",
+                                "steps": [
+                                  {
+                                    "color": "green",
+                                    "value": null
+                                  },
+                                  {
+                                    "color": "red",
+                                    "value": 80
+                                  }
+                                ]
+                              }
+                            },
+                            "overrides": []
+                          },
+                          "gridPos": {
+                            "h": 8,
+                            "w": 12,
+                            "x": 0,
+                            "y": 8
+                          },
+                          "id": 3,
+                          "options": {
+                            "legend": {
+                              "calcs": [],
+                              "displayMode": "list",
+                              "placement": "bottom",
+                              "showLegend": true
+                            },
+                            "tooltip": {
+                              "mode": "single",
+                              "sort": "none"
+                            }
+                          },
+                          "pluginVersion": "9.1.6",
+                          "targets": [
+                            {
+                              "datasource": {
+                                "type": "loki",
+                                "uid": "9a70b20e-8abe-4394-b428-636ce3c078e7"
+                              },
+                              "editorMode": "builder",
+                              "expr": "sum by(namespace, clusterID) (rate({kubernetes_namespace_name=\"openshift-console-operator\"} |= `` | label_format namespace=kubernetes_namespace_name | label_format clusterID=openshift_cluster_id [$__interval]))",
+                              "key": "Q-e99c1178-1445-48a9-b847-9e87abedded1-0",
+                              "queryType": "range",
+                              "refId": "Console Logs Sum"
+                            }
+                          ],
+                          "title": "Console Logs",
+                          "type": "timeseries"
+                        }
+                      ],
+                      "refresh": false,
+                      "schemaVersion": 37,
+                      "style": "dark",
+                      "tags": [],
+                      "templating": {
+                        "list": []
+                      },
+                      "time": {
+                        "from": "now-5m",
+                        "to": "now"
+                      },
+                      "timepicker": {},
+                      "timezone": "",
+                      "title": "MCOA",
+                      "uid": "CuUyrZTSz",
+                      "version": 4,
+                      "weekStart": ""
+                    }
