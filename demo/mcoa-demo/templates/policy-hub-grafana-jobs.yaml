@@ -1,0 +1,113 @@
+apiVersion: policy.open-cluster-management.io/v1
+kind: Policy
+metadata:
+  name: policy-grafana-jobs
+spec:
+  disabled: false
+  policy-templates:
+  - extraDependencies:
+    - apiVersion: policy.open-cluster-management.io/v1
+      compliance: Compliant
+      kind: ConfigurationPolicy
+      name: redhat-loki-operator
+    objectDefinition:
+      apiVersion: policy.open-cluster-management.io/v1
+      kind: ConfigurationPolicy
+      metadata:
+        name: signals-auth-copy
+      spec:
+        remediationAction: enforce
+        severity: high
+        pruneObjectBehavior: DeleteAll
+        object-templates:
+        - complianceType: musthave
+          objectDefinition:
+            apiVersion: batch/v1
+            kind: Job
+            metadata:
+              name: signals-auth-copy
+              namespace: grafana-operator
+            spec:
+              template:
+                spec:
+                  serviceAccountName: signals-auth-copy-job-sa
+                  containers:
+                  - name: signals-auth-copy
+                    image: bitnami/kubectl
+                    command:
+                      - "/bin/bash"
+                      - "-c"
+                      - |
+                        secrets=("openshift-logging/loki-admin" "open-cluster-management-observability/observability-grafana-certs" "open-cluster-management-observability/observability-server-certs")
+                        configmaps=("openshift-logging/lokistack-hub-gateway-ca-bundle")
+                        target_namespace="grafana-operator"
+
+                        while true; do
+                          for secret in "${secrets[@]}"; do
+                            source_namespace=$(echo "${secret}" | cut -d'/' -f1)
+                            secret_name=$(echo "${secret}" | cut -d'/' -f2)
+
+                            # Check if the source secret exists
+                            if ! kubectl get secret "${secret_name}" -n "${source_namespace}" >/dev/null 2>&1; then
+                              echo "Source secret '${secret_name}' not found in namespace '${source_namespace}'"
+                              continue
+                            fi
+
+                            # Get the secret data
+                            secret_data=$(kubectl get secret "${secret_name}" -n "${source_namespace}" -o json | jq 'del(.metadata.creationTimestamp, .metadata.uid, .metadata.resourceVersion, .metadata.namespace, .metadata.annotations, .metadata.labels)')
+
+                            # Create or update the target secret in the target namespace
+                            echo "${secret_data}" | kubectl apply -n "${target_namespace}" -f -
+                          done
+
+                          for configmap in "${configmaps[@]}"; do
+                            source_namespace=$(echo "${configmap}" | cut -d'/' -f1)
+                            configmap_name=$(echo "${configmap}" | cut -d'/' -f2)
+
+                            # Check if the source configmap exists
+                            if ! kubectl get configmap "${configmap_name}" -n "${source_namespace}" >/dev/null 2>&1; then
+                              echo "Source configmap '${configmap_name}' not found in namespace '${source_namespace}'"
+                              continue
+                            fi
+
+                            # Get the configmap data
+                            configmap_data=$(kubectl get configmap "${configmap_name}" -n "${source_namespace}" -o json | jq 'del(.metadata.creationTimestamp, .metadata.uid, .metadata.resourceVersion, .metadata.namespace, .metadata.annotations, .metadata.labels)')
+
+                            # Create or update the target configmap in the target namespace
+                            echo "${configmap_data}" | kubectl apply -n "${target_namespace}" -f -
+                          done
+
+                          sleep 10
+                        done
+                  restartPolicy: Never
+        - complianceType: musthave
+          objectDefinition:
+            apiVersion: v1
+            kind: ServiceAccount
+            metadata:
+              name: signals-auth-copy-job-sa
+              namespace: grafana-operator
+        - complianceType: musthave
+          objectDefinition:
+            apiVersion: rbac.authorization.k8s.io/v1
+            kind: ClusterRole
+            metadata:
+              name: signals-auth-copy-job-role
+            rules:
+            - apiGroups: [""]
+              resources: ["secrets", "configmaps"]
+              verbs: ["*"]
+        - complianceType: musthave
+          objectDefinition:
+            apiVersion: rbac.authorization.k8s.io/v1
+            kind: ClusterRoleBinding
+            metadata:
+              name: signals-auth-copy-job-role-binding
+            subjects:
+            - kind: ServiceAccount
+              name: signals-auth-copy-job-sa
+              namespace: grafana-operator
+            roleRef:
+              kind: ClusterRole
+              name: signals-auth-copy-job-role
+              apiGroup: rbac.authorization.k8s.io
