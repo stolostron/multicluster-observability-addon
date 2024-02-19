@@ -6,46 +6,68 @@ metadata:
 spec:
   disabled: false
   policy-templates:
-    - objectDefinition:
+  - objectDefinition:
+      apiVersion: policy.open-cluster-management.io/v1
+      kind: ConfigurationPolicy
+      metadata:
+        name: community-grafana
+      spec:
+        remediationAction: enforce
+        severity: high
+        pruneObjectBehavior: DeleteAll
+        object-templates:
+          - complianceType: musthave
+            objectDefinition:
+              apiVersion: v1
+              kind: Namespace
+              metadata:
+                name: grafana-operator
+          - complianceType: musthave
+            objectDefinition:
+              apiVersion: operators.coreos.com/v1
+              kind: OperatorGroup
+              metadata:
+                name: grafana-operator-kz2v9
+                namespace: grafana-operator
+                annotations:
+                  olm.providedAPIs: Grafana.v1beta1.grafana.integreatly.org,GrafanaDashboard.v1beta1.grafana.integreatly.org,GrafanaDatasource.v1beta1.grafana.integreatly.org,GrafanaFolder.v1beta1.grafana.integreatly.org
+              spec:
+                upgradeStrategy: Default
+          - complianceType: musthave
+            objectDefinition:
+              apiVersion: operators.coreos.com/v1alpha1
+              kind: Subscription
+              metadata:
+                name: grafana-operator
+                namespace: grafana-operator
+                labels:
+                  operators.coreos.com/grafana-operator.grafana-operator: ""
+              spec:
+                name: grafana-operator
+                channel: v5
+                installPlanApproval: Automatic
+                source: community-operators
+                sourceNamespace: openshift-marketplace
+                startingCSV: grafana-operator.v5.6.3
+  - extraDependencies:
+    - apiVersion: policy.open-cluster-management.io/v1
+      compliance: Compliant
+      kind: ConfigurationPolicy
+      name: community-grafana
+    - apiVersion: policy.open-cluster-management.io/v1
+      compliance: Compliant
+      kind: ConfigurationPolicy
+      name: signals-auth-copy
+    objectDefinition:
         apiVersion: policy.open-cluster-management.io/v1
         kind: ConfigurationPolicy
         metadata:
-          name: community-grafana
+          name: grafana-instance
         spec:
+          remediationAction: enforce
+          severity: high
+          pruneObjectBehavior: DeleteAll
           object-templates:
-            - complianceType: musthave
-              objectDefinition:
-                apiVersion: v1
-                kind: Namespace
-                metadata:
-                  name: grafana-operator
-            - complianceType: musthave
-              objectDefinition:
-                apiVersion: operators.coreos.com/v1
-                kind: OperatorGroup
-                metadata:
-                  name: grafana-operator-kz2v9
-                  namespace: grafana-operator
-                  annotations:
-                    olm.providedAPIs: Grafana.v1beta1.grafana.integreatly.org,GrafanaDashboard.v1beta1.grafana.integreatly.org,GrafanaDatasource.v1beta1.grafana.integreatly.org,GrafanaFolder.v1beta1.grafana.integreatly.org
-                spec:
-                  upgradeStrategy: Default
-            - complianceType: musthave
-              objectDefinition:
-                apiVersion: operators.coreos.com/v1alpha1
-                kind: Subscription
-                metadata:
-                  name: grafana-operator
-                  namespace: grafana-operator
-                  labels:
-                    operators.coreos.com/grafana-operator.grafana-operator: ""
-                spec:
-                  name: grafana-operator
-                  channel: v5
-                  installPlanApproval: Automatic
-                  source: community-operators
-                  sourceNamespace: openshift-marketplace
-                  startingCSV: grafana-operator.v5.6.3
             - complianceType: musthave
               objectDefinition:
                 apiVersion: grafana.integreatly.org/v1beta1

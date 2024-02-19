@@ -9,7 +9,15 @@ spec:
     - apiVersion: policy.open-cluster-management.io/v1
       compliance: Compliant
       kind: ConfigurationPolicy
-      name: redhat-loki-operator
+      name: lokistack-hub
+    - apiVersion: policy.open-cluster-management.io/v1
+      compliance: Compliant
+      kind: ConfigurationPolicy
+      name: mco-config
+    - apiVersion: policy.open-cluster-management.io/v1
+      compliance: Compliant
+      kind: ConfigurationPolicy
+      name: community-grafana
     objectDefinition:
       apiVersion: policy.open-cluster-management.io/v1
       kind: ConfigurationPolicy
@@ -54,7 +62,7 @@ spec:
                             fi
 
                             # Get the secret data
-                            secret_data=$(kubectl get secret "${secret_name}" -n "${source_namespace}" -o json | jq 'del(.metadata.creationTimestamp, .metadata.uid, .metadata.resourceVersion, .metadata.namespace, .metadata.annotations, .metadata.labels)')
+                            secret_data=$(kubectl get secret "${secret_name}" -n "${source_namespace}" -o json | jq 'del(.metadata.creationTimestamp, .metadata.uid, .metadata.resourceVersion, .metadata.namespace, .metadata.annotations, .metadata.labels, .metadata.ownerReferences)')
 
                             # Create or update the target secret in the target namespace
                             echo "${secret_data}" | kubectl apply -n "${target_namespace}" -f -
@@ -71,7 +79,7 @@ spec:
                             fi
 
                             # Get the configmap data
-                            configmap_data=$(kubectl get configmap "${configmap_name}" -n "${source_namespace}" -o json | jq 'del(.metadata.creationTimestamp, .metadata.uid, .metadata.resourceVersion, .metadata.namespace, .metadata.annotations, .metadata.labels)')
+                            configmap_data=$(kubectl get configmap "${configmap_name}" -n "${source_namespace}" -o json | jq 'del(.metadata.creationTimestamp, .metadata.uid, .metadata.resourceVersion, .metadata.namespace, .metadata.annotations, .metadata.labels, .metadata.ownerReferences)')
 
                             # Create or update the target configmap in the target namespace
                             echo "${configmap_data}" | kubectl apply -n "${target_namespace}" -f -
