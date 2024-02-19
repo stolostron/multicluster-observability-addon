@@ -1,0 +1,157 @@
+apiVersion: policy.open-cluster-management.io/v1
+kind: Policy
+metadata:
+  name: policy-hub-grafana
+  namespace: default
+spec:
+  disabled: false
+  policy-templates:
+    - objectDefinition:
+        apiVersion: policy.open-cluster-management.io/v1
+        kind: ConfigurationPolicy
+        metadata:
+          name: community-grafana
+        spec:
+          object-templates:
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: v1
+                kind: Namespace
+                metadata:
+                  name: grafana-operator
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: operators.coreos.com/v1
+                kind: OperatorGroup
+                metadata:
+                  name: grafana-operator-kz2v9
+                  namespace: grafana-operator
+                  annotations:
+                    olm.providedAPIs: Grafana.v1beta1.grafana.integreatly.org,GrafanaDashboard.v1beta1.grafana.integreatly.org,GrafanaDatasource.v1beta1.grafana.integreatly.org,GrafanaFolder.v1beta1.grafana.integreatly.org
+                spec:
+                  upgradeStrategy: Default
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: operators.coreos.com/v1alpha1
+                kind: Subscription
+                metadata:
+                  name: grafana-operator
+                  namespace: grafana-operator
+                  labels:
+                    operators.coreos.com/grafana-operator.grafana-operator: ""
+                spec:
+                  name: grafana-operator
+                  channel: v5
+                  installPlanApproval: Automatic
+                  source: community-operators
+                  sourceNamespace: openshift-marketplace
+                  startingCSV: grafana-operator.v5.6.3
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: grafana.integreatly.org/v1beta1
+                kind: Grafana
+                metadata:
+                  name: grafana
+                  namespace: grafana-operator
+                  labels:
+                    dashboards: grafana
+                spec:
+                  config:
+                    auth:
+                      disable_login_form: "false"
+                    log:
+                      mode: console
+                    security:
+                      admin_password: secret
+                      admin_user: root
+                  route:
+                    spec: {}
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: grafana.integreatly.org/v1beta1
+                kind: GrafanaDatasource
+                metadata:
+                  name: grafana-loki-datasource
+                  namespace: grafana-operator
+                spec:
+                  datasource:
+                    name: loki
+                    access: proxy
+                    editable: true
+                    isDefault: true
+                    jsonData:
+                      timeInterval: 5s
+                      tlsAuth: true
+                      tlsAuthWithCACert: true
+                      tlsSkipVerify: false
+                    secureJsonData:
+                      tlsCACert: ${service-ca.crt}
+                      tlsClientCert: ${tls.crt}
+                      tlsClientKey: ${tls.key}
+                    type: loki
+                    url: https://lokistack-hub-gateway-http.openshift-logging.svc:8080/api/logs/v1/spoke-1/
+                  instanceSelector:
+                    matchLabels:
+                      dashboards: grafana
+                  valuesFrom:
+                    - targetPath: secureJsonData.tlsCACert
+                      valueFrom:
+                        configMapKeyRef:
+                          name: lokistack-hub-gateway-ca-bundle
+                          key: service-ca.crt
+                    - targetPath: secureJsonData.tlsClientCert
+                      valueFrom:
+                        secretKeyRef:
+                          name: loki-admin
+                          key: tls.crt
+                    - targetPath: secureJsonData.tlsClientKey
+                      valueFrom:
+                        secretKeyRef:
+                          name: loki-admin
+                          key: tls.key
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: grafana.integreatly.org/v1beta1
+                kind: GrafanaDatasource
+                metadata:
+                  name: grafana-thanos-datasource
+                  namespace: grafana-operator
+                spec:
+                  datasource:
+                    name: thanos
+                    access: proxy
+                    editable: true
+                    isDefault: true
+                    jsonData:
+                      timeInterval: 5s
+                      tlsAuth: true
+                      tlsAuthWithCACert: false
+                      tlsSkipVerify: true
+                    secureJsonData:
+                      tlsCACert: ${ca.crt}
+                      tlsClientCert: ${tls.crt}
+                      tlsClientKey: ${tls.key}
+                    type: prometheus
+                    url: https://observability-observatorium-api.open-cluster-management-observability.svc.cluster.local:8080/api/metrics/v1/default
+                  instanceSelector:
+                    matchLabels:
+                      dashboards: grafana
+                  valuesFrom:
+                    - targetPath: secureJsonData.tlsCACert
+                      valueFrom:
+                        secretKeyRef:
+                          name: observability-server-certs
+                          key: ca.crt
+                    - targetPath: secureJsonData.tlsClientCert
+                      valueFrom:
+                        secretKeyRef:
+                          name: observability-grafana-certs
+                          key: tls.crt
+                    - targetPath: secureJsonData.tlsClientKey
+                      valueFrom:
+                        secretKeyRef:
+                          name: observability-grafana-certs
+                          key: tls.key
+          pruneObjectBehavior: DeleteAll
+          remediationAction: enforce
+          severity: high

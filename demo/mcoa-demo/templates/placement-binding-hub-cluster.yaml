@@ -19,6 +19,9 @@ subjects:
   - name: policy-hub-otel
     kind: Policy
     apiGroup: policy.open-cluster-management.io
+  - name: policy-hub-grafana
+    kind: Policy
+    apiGroup: policy.open-cluster-management.io
   - name: policy-loki-jobs
     kind: Policy
     apiGroup: policy.open-cluster-management.io
