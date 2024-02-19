@@ -8,11 +8,11 @@ spec:
     receivers:
       jaeger:
         protocols:
-        grpc:
+          grpc:
       otlp:
         protocols:
-        grpc:
-        http:
+          grpc:
+          http:
     processors:
     exporters:
       otlphttp:
