@@ -81,7 +81,6 @@ func BuildCertificate(key client.ObjectKey, mTLSConfig MTLSConfig) (*certmanager
 			},
 		},
 	}
-
 	return certManagerCert, nil
 }
 

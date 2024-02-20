@@ -25,6 +25,8 @@ require (
 	sigs.k8s.io/controller-runtime v0.17.0
 )
 
+require gopkg.in/yaml.v3 v3.0.1
+
 require (
 	github.com/BurntSushi/toml v1.2.1 // indirect
 	github.com/Masterminds/goutils v1.1.1 // indirect
@@ -123,7 +125,6 @@ require (
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 	helm.sh/helm/v3 v3.11.1 // indirect
 	k8s.io/apiserver v0.29.1 // indirect
 	k8s.io/kms v0.29.1 // indirect
