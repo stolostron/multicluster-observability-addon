@@ -59,7 +59,7 @@ MCOA will consume these configmaps and it will generate the necessary secrets fo
 
 For this demo we will deploy these configurations using a helm chart. We've pre-defined the values in `demo/addon-config/values.yaml`
 
-If I run the deployment command with `--dry-run` we will be able to see the resources that are created 
+If I run the deployment command with `--dry-run` we will be able to see the resources that will be created 
 
 RUN `helm upgrade --install addon-config demo/addon-config/ --dry-run`
 
@@ -79,24 +79,79 @@ RUN `helm upgrade --install addon-config demo/addon-config/`
 
 ### 2.2 Enable the addon for spoke clusters
 
-Now that we have deployed the configuration for the addon its time to finally install the addon on the spoke `luster.
-The process of installing an addon on a cluster is simple, we only need to create a resource called `ManagedClusterAddOn` in the namespace of the spoke cluster. This resource contains a list of resources that will be used to configure the addon deployment on the spoke cluster. 
+Now that we have deployed the configuration for the addon its time to finally install the addon on the spoke clusters.
+The process of installing an addon on a cluster is simple, we only need to create a resource called `ManagedClusterAddOn` named `multicluster-observability-addon` in the namespace of the spoke cluster that we want to install the addon on. This resource contains a list of resources that will be used by the manager to configure the addon deployment on the spoke cluster.
 
 For this demo we will install the addon using a helm chart. We've pre-defined the values in `demo/addon-install/values.yaml`
 
-So now if I run the deployment command with `--dry-run` we will be able to see the resources that are created.
+So now if I run the deployment command with `--dry-run` we will be able to see the resources that will be created.
 
 RUN `helm upgrade --install addon-install demo/addon-install/ --dry-run`
 
-@Joao go through logging resources
+@Joao go through the logging resources
 
-On the Logging side we can se that `ManagedClusterAddOn` is configured to 
+For the logging configuration we will use:
+- The `ClusterLogForwarder` created in the last step, it's not on the list because if you remember it was a default on the `ClusterManagementAddOn` resource.
+- The authentication configmap `logging-auth` this is a configmap that has a mapping between the log stores on CLF and their authentication methods
+- A configmap with the URL of the loki store, specific to the spoke cluster
+- A configmap that will contain the CA, of the loki store, that will be injected in the mTLS secret used by CLF
 
 @Israel go through tracing resources
 
 TO BE DONE
 
+Finally we can now install the addon. 
+
+RUN `helm upgrade --install addon-install demo/addon-install/`
+
+Once this finishes running the manager will reconcile the resources we just created and it will create a resource called `ManifestsWorks`, in the namespace of the cluster. This resource will contain a list of Kubernetes resources in YAML format that will be deployed to the spoke cluster by an agent running on the spoke cluster (the agent is installed on the spoke cluster when we import the spoke cluster to the hub cluster).
+
+We can look at the `ManifestsWorks` created by running:
+
+RUN `oc -n spoke-1 get manifestworks addon-multicluster-observability-addon-deploy-0 -o yaml`
+
+Now we can see what is being installed on the spoke cluster.
+
+- Metrics 
+
+@Douglas describe what's being installed
+
+- Logs
+
+@Joao describe what's being installed
+
+- Traces
+
+@Israel describe what's being installed
+
+Now let's jump into the spoke cluster and we see is the different signal collectors are all running correctly:
+
+First, Prometheus Agent
+
+RUN `oc -n open-cluster-management-addon-observability get pods -l app.kubernetes.io/component=metrics-agent`
+
+Second, Vector
+
+RUN `oc -n openshift-logging get pods -l `
+
+Third, OTEL Collector
+
+RUN `oc -n spoke-otel get pods -l `
 
 ## 3. Validate with Grafana
 
-https://grafana-route-grafana-operator.apps.jmarcalaws24021929.devcluster.openshift.com/d/eH_o-ZoSz/mcoa?orgId=1&from=now-5m&to=now
+Great! Now let's jump into a grafana instance running on the hub cluster to see a dashboard where we can see all the 3 signals
+
+RUN `oc -n grafana-operator get route grafana-route`
+
+**Note: user: `root` password: `secret`**
+
+- First we have the total amount of container memory being used on the `kube-system` namespace.
+- Second we have the logs being produced by all the containers on the `kube-system` namespace, and the actuall logs.
+- Third we have a set of traces from the `kube-system` namespace. 
+
+## 4. Takeaways
+
+- All the heavy lifting we just saw in this demo was done by the operators we already know & love today, cluster-logging-operator, opentelemetry-operator. 
+- Configuration will be uniform across the fleet as the main configuration is only defined once and then will be templated to fit each spoke cluster.
+- Configured signal stores can then be queried from a single grafana instance.
