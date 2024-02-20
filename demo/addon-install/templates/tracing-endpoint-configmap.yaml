@@ -1,17 +1,15 @@
 {{- if .Values.tracing.enabled }}
 {{- range $_, $cluster_name := .Values.spokeClusters }}
-{{- range $_, $dic := $.Values.tracing.outputs }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: tracing-{{ $cluster_name }}-{{ $dic.type }}
+  name: tracing-{{ $cluster_name }}-otlphttp
   namespace: {{ $cluster_name }}
   labels:
     mcoa.openshift.io/signal: tracing
   annotations:
-    tracing.mcoa.openshift.io/target-output-name: {{ $dic.type }}
+    tracing.mcoa.openshift.io/target-output-name: otlphttp
 data:
-  endpoint: {{ $dic.endpoint }}
-{{- end }}
+  endpoint: otlp-http-otel-gateway-route-observability.apps.{{ $.Values.hubClusterName }}
 {{- end }}
 {{- end }}

@@ -89,7 +89,7 @@ spec:
                   encoding: PKCS8
                   size: 4096
                 dnsNames:
-                  - otlp-http-otel-gateway-route-observability.apps.{{ .Values.tracing.clusterName }}
+                  - otlp-http-otel-gateway-route-observability.apps.{{ .Values.hubClusterName }}
                 usages:
                   - server auth
                   - key encipherment

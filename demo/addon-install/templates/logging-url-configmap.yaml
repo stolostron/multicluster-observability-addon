@@ -12,7 +12,7 @@ metadata:
   annotations:
     logging.mcoa.openshift.io/target-output-name: {{ $dic.name }}
 data:
-  url: {{ $dic.url }}/api/logs/v1/{{ $cluster_name }}
+  url: https://lokistack-hub-openshift-logging.apps.{{ $.Values.hubClusterName }}/api/logs/v1/{{ $cluster_name }}
 {{- end }}
 {{- end }}
 {{- end }}

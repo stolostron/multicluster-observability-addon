@@ -29,7 +29,7 @@ spec:
 {{- end }}
   pipelines:
 {{- range $_, $dic := .Values.outputs }}
-   - name: infra-{{ $dic.name }}
+   - name: {{ $dic.name }}
      inputRefs:
      - infrastructure
 {{- if eq $dic.type "cloudwatch" }}

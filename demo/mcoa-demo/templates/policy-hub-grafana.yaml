@@ -98,6 +98,7 @@ spec:
                 spec:
                   datasource:
                     name: loki
+                    uid: "29562244-dbcf-41bd-97de-e7961864e9dc"
                     access: proxy
                     editable: true
                     isDefault: true
@@ -141,6 +142,7 @@ spec:
                 spec:
                   datasource:
                     name: thanos
+                    uid: "49a9de7b-4740-4ccc-877b-73011f5e276d"
                     access: proxy
                     editable: true
                     isDefault: true
@@ -223,14 +225,27 @@ spec:
                       "editable": true,
                       "fiscalYearStartMonth": 0,
                       "graphTooltip": 0,
-                      "id": 5,
+                      "id": 2,
                       "links": [],
                       "liveNow": false,
                       "panels": [
                         {
+                          "collapsed": false,
+                          "gridPos": {
+                            "h": 1,
+                            "w": 24,
+                            "x": 0,
+                            "y": 0
+                          },
+                          "id": 9,
+                          "panels": [],
+                          "title": "Metrics",
+                          "type": "row"
+                        },
+                        {
                           "datasource": {
                             "type": "prometheus",
-                            "uid": "abdc028b-0c2c-4416-a2d2-d8ea61dcd4bc"
+                            "uid": "49a9de7b-4740-4ccc-877b-73011f5e276d"
                           },
                           "fieldConfig": {
                             "defaults": {
@@ -285,10 +300,10 @@ spec:
                             "overrides": []
                           },
                           "gridPos": {
-                            "h": 8,
-                            "w": 12,
+                            "h": 9,
+                            "w": 24,
                             "x": 0,
-                            "y": 0
+                            "y": 1
                           },
                           "id": 2,
                           "options": {
@@ -307,22 +322,34 @@ spec:
                             {
                               "datasource": {
                                 "type": "prometheus",
-                                "uid": "c48de94c-4781-454e-9afa-bc98bc055fca"
+                                "uid": "49a9de7b-4740-4ccc-877b-73011f5e276d"
                               },
                               "editorMode": "builder",
-                              "expr": "sum by(clusterID, namespace) (namespace:container_memory_usage_bytes:sum{namespace=\"openshift-console-operator\"})",
-                              "key": "Q-bc53f8ac-3df1-476e-83f3-c1bed492a796-0",
+                              "expr": "sum by(namespace, clusterID) (namespace:container_memory_usage_bytes:sum{namespace=\"kube-system\"})",
                               "range": true,
-                              "refId": "Console Memory"
+                              "refId": "Kube System Memory"
                             }
                           ],
-                          "title": "Sum container memory usage",
+                          "title": "Kube System Namespace Memory Usage",
                           "type": "timeseries"
+                        },
+                        {
+                          "collapsed": false,
+                          "gridPos": {
+                            "h": 1,
+                            "w": 24,
+                            "x": 0,
+                            "y": 10
+                          },
+                          "id": 7,
+                          "panels": [],
+                          "title": "Logs",
+                          "type": "row"
                         },
                         {
                           "datasource": {
                             "type": "loki",
-                            "uid": "9a70b20e-8abe-4394-b428-636ce3c078e7"
+                            "uid": "29562244-dbcf-41bd-97de-e7961864e9dc"
                           },
                           "fieldConfig": {
                             "defaults": {
@@ -377,10 +404,10 @@ spec:
                             "overrides": []
                           },
                           "gridPos": {
-                            "h": 8,
-                            "w": 12,
+                            "h": 9,
+                            "w": 24,
                             "x": 0,
-                            "y": 8
+                            "y": 11
                           },
                           "id": 3,
                           "options": {
@@ -400,17 +427,54 @@ spec:
                             {
                               "datasource": {
                                 "type": "loki",
-                                "uid": "9a70b20e-8abe-4394-b428-636ce3c078e7"
+                                "uid": "29562244-dbcf-41bd-97de-e7961864e9dc"
                               },
                               "editorMode": "builder",
-                              "expr": "sum by(namespace, clusterID) (rate({kubernetes_namespace_name=\"openshift-console-operator\"} |= `` | label_format namespace=kubernetes_namespace_name | label_format clusterID=openshift_cluster_id [$__interval]))",
+                              "expr": "sum by(namespace, clusterID) (rate({kubernetes_namespace_name=\"kube-system\"} |= `` | label_format namespace=kubernetes_namespace_name | label_format clusterID=openshift_cluster_id [$__interval]))",
                               "key": "Q-e99c1178-1445-48a9-b847-9e87abedded1-0",
                               "queryType": "range",
-                              "refId": "Console Logs Sum"
+                              "refId": "Kube System Logs Sum"
                             }
                           ],
-                          "title": "Console Logs",
+                          "title": "Kube System Logs",
                           "type": "timeseries"
+                        },
+                        {
+                          "datasource": {
+                            "type": "loki",
+                            "uid": "29562244-dbcf-41bd-97de-e7961864e9dc"
+                          },
+                          "gridPos": {
+                            "h": 7,
+                            "w": 24,
+                            "x": 0,
+                            "y": 20
+                          },
+                          "id": 5,
+                          "options": {
+                            "dedupStrategy": "none",
+                            "enableLogDetails": false,
+                            "prettifyLogMessage": false,
+                            "showCommonLabels": false,
+                            "showLabels": false,
+                            "showTime": true,
+                            "sortOrder": "Descending",
+                            "wrapLogMessage": false
+                          },
+                          "targets": [
+                            {
+                              "datasource": {
+                                "type": "loki",
+                                "uid": "29562244-dbcf-41bd-97de-e7961864e9dc"
+                              },
+                              "editorMode": "code",
+                              "expr": "{kubernetes_namespace_name=\"kube-system\"} |= ``",
+                              "queryType": "range",
+                              "refId": "Kube System Logs"
+                            }
+                          ],
+                          "title": "Kube System Logs",
+                          "type": "logs"
                         }
                       ],
                       "refresh": false,
@@ -427,7 +491,7 @@ spec:
                       "timepicker": {},
                       "timezone": "",
                       "title": "MCOA",
-                      "uid": "CuUyrZTSz",
-                      "version": 4,
+                      "uid": "rs2y87TIzf",
+                      "version": 2,
                       "weekStart": ""
                     }

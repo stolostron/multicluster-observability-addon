@@ -7,8 +7,5 @@ metadata:
   labels:
     mcoa.openshift.io/signal: tracing
 data:
-{{- range $_, $dic := $.Values.outputs }}
-  {{ $dic.name }}: mTLS
-{{- end }}
----
+  otlphttp: mTLS
 {{- end }}

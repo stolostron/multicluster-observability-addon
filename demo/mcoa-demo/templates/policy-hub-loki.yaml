@@ -169,7 +169,6 @@ spec:
                     - {{ $cluster_name }}
 {{- end }}
                 mode: static
-{{- end }}
         - complianceType: musthave
           objectDefinition:
             apiVersion: cert-manager.io/v1
@@ -196,3 +195,4 @@ spec:
               issuerRef:
                 name: mcoa-cluster-issuer
                 kind: ClusterIssuer 
+{{- end }}

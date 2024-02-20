@@ -1,13 +1,24 @@
-# list of spoke clusters
+# Hub Cluster Hostname will be used to template resources that make use of the
+# cluster hostname, like routes
+hubClusterName: my-cluster.com
+
+# List with the name of the spoke clusters as they were imported into the hub
+# cluster.
+# WARNING: after instalation if this list has to be updated, then uninstall the
+# chart and install it again as this chat templates jobs that cannot be modified
+# after being created
 spokeClusters:
   - spoke-1
 
+# Metrics specific resources
 metrics:
   enabled: true
 
+# Logs specific resources
 logging:
   enabled: true
 
+  # AWS credentials to send logs to cloudwatch and to access S3 buckets
   aws:
     keyID: ID
     keySecret: Secret
@@ -20,7 +31,6 @@ logging:
       region: us-east-1
       bucketnames: jmarcal-bucket
 
+# Tracing specific resources
 tracing:
   enabled: true
-
-  clusterName: otlp-http-otel-gateway-route-observability.apps.my-cluster.app

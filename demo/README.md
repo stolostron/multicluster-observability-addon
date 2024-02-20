@@ -45,4 +45,11 @@ The following chart will deploy the `ManagedClusterAddOn` resource that enables 
 
 ## 5. Validate with Grafana
 
-https://grafana-route-grafana-operator.apps.MY_CLUSTER/d/eH_o-ZoSz/mcoa?orgId=1&from=now-5m&to=now
+Once the addon is installed on the spoke clusters and the respective forwarders have started to send their signal data you can
+access this grafana instance to see the 3 signals in a single dashboard (roughly 2 minutes after installing the addon).
+
+`oc -n grafana-operator get route grafana-route`
+
+**Note: user: `root` password: `secret`**
+
+There will be a pre-loaded dashboard called "MCOA" that will contain a view of the 3 signals regarding pods in the `openshift-console-operator` namespace.

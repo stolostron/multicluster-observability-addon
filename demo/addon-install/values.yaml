@@ -1,24 +1,28 @@
+# Hub Cluster Hostname will be used to template resources that make use of the
+# cluster hostname, like routes
+# WARNING: should match the list in the mcoa-demo chart values.yaml
+hubClusterName: my-cluster.com
+
+# List with the name of the spoke clusters as they were imported into the hub
+# cluster.
+# WARNING: should match the list in the mcoa-demo chart values.yaml
 spokeClusters:
 - spoke-1
 
-addonInstallNamespace: open-cluster-management-agent-addon
-
-metrics:
-  enabled: true
-
+# Logs specific configuration
 logging:
   enabled: true
   
+  # Outputs list of stores where ClusterLogForwarder will send the logs to
+  # supported types are "cloudwatch" and "loki".
+  # WARNING: Setting type to "loki" assumes you have deployed the mcoa-demo chart
+  # with Loki enabled
   outputs:
-    - name: cw-infra
+    - name: cw-all
       type: cloudwatch
     - name: loki-infra
       type: loki
-      url: https://lokistack-hub-openshift-logging.apps.my-cluster.com
 
+# Tracing specific configuration
 tracing:
   enabled: true
-  
-  outputs:
-    - type: otlphttp
-      endpoint: otlp-http-otel-gateway-route-observability.apps.my-cluster.com
