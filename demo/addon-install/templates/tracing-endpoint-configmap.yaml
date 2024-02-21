@@ -3,13 +3,13 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: tracing-{{ $cluster_name }}-otlphttp
+  name: tracing-{{ $cluster_name }}-otlp
   namespace: {{ $cluster_name }}
   labels:
     mcoa.openshift.io/signal: tracing
   annotations:
-    tracing.mcoa.openshift.io/target-output-name: otlphttp
+    tracing.mcoa.openshift.io/target-output-name: otlp
 data:
-  endpoint: otlp-http-otel-gateway-route-observability.apps.{{ $.Values.hubClusterName }}
+  endpoint: test-collector-observability.apps.{{ $.Values.hubClusterName }}:80
 {{- end }}
 {{- end }}

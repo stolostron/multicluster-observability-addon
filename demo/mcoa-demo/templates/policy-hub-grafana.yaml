@@ -179,6 +179,32 @@ spec:
             - complianceType: musthave
               objectDefinition:
                 apiVersion: grafana.integreatly.org/v1beta1
+                kind: GrafanaDatasource
+                metadata:
+                  name: grafana-jaeger-datasource
+                  namespace: grafana-operator
+                spec:
+                  datasource:
+                    name: jaeger
+                    uid: "dQvjcHoSz"
+                    access: proxy
+                    editable: true
+                    isDefault: true
+                    jsonData:
+                      timeInterval: 5s
+                      tlsAuth: false
+                      tlsSkipVerify: true
+                      httpHeaderName1: 'Authorization'
+                    secureJsonData:
+                      httpHeaderValue1: 'Bearer {{ .Values.token }}'
+                    type: jaeger
+                    url: https://tempo-hub-gateway.observability.svc.cluster.local:8080/api/traces/v1/spoke-1
+                  instanceSelector:
+                    matchLabels:
+                      dashboards: grafana
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: grafana.integreatly.org/v1beta1
                 kind: GrafanaDashboard
                 metadata:
                   name: mcoa-dashboard
@@ -300,7 +326,7 @@ spec:
                             "overrides": []
                           },
                           "gridPos": {
-                            "h": 9,
+                            "h": 8,
                             "w": 24,
                             "x": 0,
                             "y": 1
@@ -339,7 +365,7 @@ spec:
                             "h": 1,
                             "w": 24,
                             "x": 0,
-                            "y": 10
+                            "y": 9
                           },
                           "id": 7,
                           "panels": [],
@@ -404,10 +430,10 @@ spec:
                             "overrides": []
                           },
                           "gridPos": {
-                            "h": 9,
+                            "h": 8,
                             "w": 24,
                             "x": 0,
-                            "y": 11
+                            "y": 10
                           },
                           "id": 3,
                           "options": {
@@ -448,7 +474,7 @@ spec:
                             "h": 7,
                             "w": 24,
                             "x": 0,
-                            "y": 20
+                            "y": 18
                           },
                           "id": 5,
                           "options": {
@@ -475,6 +501,68 @@ spec:
                           ],
                           "title": "Kube System Logs",
                           "type": "logs"
+                        },
+                        {
+                          "datasource": {
+                            "type": "jaeger",
+                            "uid": "dQvjcHoSz"
+                          },
+                          "fieldConfig": {
+                            "defaults": {
+                              "custom": {
+                                "align": "auto",
+                                "displayMode": "auto",
+                                "inspect": false
+                              },
+                              "mappings": [],
+                              "thresholds": {
+                                "mode": "absolute",
+                                "steps": [
+                                  {
+                                    "color": "green",
+                                    "value": null
+                                  },
+                                  {
+                                    "color": "red",
+                                    "value": 80
+                                  }
+                                ]
+                              }
+                            },
+                            "overrides": []
+                          },
+                          "gridPos": {
+                            "h": 7,
+                            "w": 24,
+                            "x": 0,
+                            "y": 25
+                          },
+                          "id": 10,
+                          "options": {
+                            "footer": {
+                              "fields": "",
+                              "reducer": [
+                                "sum"
+                              ],
+                              "show": false
+                            },
+                            "showHeader": true
+                          },
+                          "pluginVersion": "9.1.6",
+                          "targets": [
+                            {
+                              "datasource": {
+                                "type": "jaeger",
+                                "uid": "dQvjcHoSz"
+                              },
+                              "key": "Q-8d31440d-9371-42fb-9326-c604ec0e99a2-0",
+                              "queryType": "search",
+                              "refId": "Traces mcoa-demo service",
+                              "service": "mcoa-demo"
+                            }
+                          ],
+                          "title": "Traces",
+                          "type": "table"
                         }
                       ],
                       "refresh": false,

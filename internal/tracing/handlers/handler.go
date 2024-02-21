@@ -23,6 +23,7 @@ const (
 func BuildOptions(k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, adoc *addonapiv1alpha1.AddOnDeploymentConfig) (manifests.Options, error) {
 	resources := manifests.Options{
 		AddOnDeploymentConfig: adoc,
+		ClusterName:           mcAddon.Namespace,
 	}
 
 	klog.Info("Retrieving OpenTelemetry Collector template")
@@ -98,19 +99,21 @@ func BuildOptions(k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAdd
 		}
 	}
 
-	secretsProvider, err := authentication.NewSecretsProvider(k8s, mcAddon.Namespace, addon.Tracing, authConfig)
-	if err != nil {
-		return resources, err
-	}
+	if authCM != nil {
+		secretsProvider, err := authentication.NewSecretsProvider(k8s, mcAddon.Namespace, addon.Tracing, authConfig)
+		if err != nil {
+			return resources, err
+		}
 
-	targetsSecret, err := secretsProvider.GenerateSecrets(ctx, authentication.BuildAuthenticationMap(authCM.Data))
-	if err != nil {
-		return resources, err
-	}
+		targetsSecret, err := secretsProvider.GenerateSecrets(ctx, authentication.BuildAuthenticationMap(authCM.Data))
+		if err != nil {
+			return resources, err
+		}
 
-	resources.Secrets, err = secretsProvider.FetchSecrets(ctx, targetsSecret, manifests.AnnotationTargetOutputName)
-	if err != nil {
-		return resources, err
+		resources.Secrets, err = secretsProvider.FetchSecrets(ctx, targetsSecret, manifests.AnnotationTargetOutputName)
+		if err != nil {
+			return resources, err
+		}
 	}
 
 	return resources, nil

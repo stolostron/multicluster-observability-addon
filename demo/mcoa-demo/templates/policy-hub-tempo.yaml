@@ -1,0 +1,219 @@
+
+apiVersion: policy.open-cluster-management.io/v1
+kind: Policy
+metadata:
+  name: policy-hub-tempo
+spec:
+  disabled: false
+  policy-templates:
+  - objectDefinition:
+      apiVersion: policy.open-cluster-management.io/v1
+      kind: ConfigurationPolicy
+      metadata:
+        name: redhat-tempo-operator
+      spec:
+        remediationAction: enforce
+        severity: high
+        pruneObjectBehavior: DeleteAll
+        object-templates:
+        # Operator installation
+        - complianceType: musthave
+          objectDefinition:
+            apiVersion: v1
+            kind: Namespace
+            metadata:
+              name: openshift-tempo-operator
+        - complianceType: musthave
+          objectDefinition:
+            apiVersion: operators.coreos.com/v1
+            kind: OperatorGroup
+            metadata:
+              name: openshift-tempo-operator
+              namespace: openshift-tempo-operator
+            spec:
+              upgradeStrategy: Default
+        - complianceType: musthave
+          objectDefinition:
+            apiVersion: operators.coreos.com/v1alpha1
+            kind: Subscription
+            metadata:
+              name: tempo-product
+              namespace: openshift-tempo-operator
+            spec:
+              channel: stable
+              installPlanApproval: Automatic
+              name: tempo-product
+              source: redhat-operators
+              sourceNamespace: openshift-marketplace
+  - extraDependencies:
+    - apiVersion: policy.open-cluster-management.io/v1
+      compliance: Compliant
+      kind: ConfigurationPolicy
+      name: redhat-tempo-operator
+    - apiVersion: policy.open-cluster-management.io/v1
+      compliance: Compliant
+      kind: Policy
+      name: policy-hub-cert-manager
+    objectDefinition:
+      apiVersion: policy.open-cluster-management.io/v1
+      kind: ConfigurationPolicy
+      metadata:
+        name: policy-hub-tempo-collector
+      spec:
+        remediationAction: enforce
+        severity: high
+        pruneObjectBehavior: DeleteAll
+        object-templates:
+          - complianceType: musthave
+            objectDefinition:
+              apiVersion: v1
+              kind: Namespace
+              metadata:
+                name: observability
+          - complianceType: musthave
+            objectDefinition:
+              apiVersion: v1
+              kind: Namespace
+              metadata:
+                name: minio
+          - complianceType: musthave
+            objectDefinition:
+              apiVersion: v1
+              kind: PersistentVolumeClaim
+              metadata:
+                labels:
+                  app.kubernetes.io/name: minio
+                name: minio
+                namespace: minio
+              spec:
+                accessModes:
+                  - ReadWriteOnce
+                resources:
+                  requests:
+                    storage: 2Gi
+          - complianceType: musthave
+            objectDefinition:
+              apiVersion: apps/v1
+              kind: Deployment
+              metadata:
+                name: minio
+                namespace: minio
+              spec:
+                selector:
+                  matchLabels:
+                    app.kubernetes.io/name: minio
+                strategy:
+                  type: Recreate
+                template:
+                  metadata:
+                    labels:
+                      app.kubernetes.io/name: minio
+                  spec:
+                    containers:
+                      - command:
+                          - /bin/sh
+                          - -c
+                          - |
+                            mkdir -p /storage/tempo && \
+                            minio server /storage
+                        env:
+                          - name: MINIO_ACCESS_KEY
+                            value: tempo
+                          - name: MINIO_SECRET_KEY
+                            value: supersecret
+                        image: minio/minio
+                        name: minio
+                        ports:
+                          - containerPort: 9000
+                        volumeMounts:
+                          - mountPath: /storage
+                            name: storage
+                    volumes:
+                      - name: storage
+                        persistentVolumeClaim:
+                          claimName: minio
+          - complianceType: musthave
+            objectDefinition:
+              apiVersion: v1
+              kind: Service
+              metadata:
+                name: minio
+                namespace: minio
+              spec:
+                ports:
+                  - port: 9000
+                    protocol: TCP
+                    targetPort: 9000
+                selector:
+                  app.kubernetes.io/name: minio
+                type: ClusterIP
+          - complianceType: musthave
+            objectDefinition:
+              apiVersion: rbac.authorization.k8s.io/v1
+              kind: ClusterRole
+              metadata:
+                name: tempostack-traces-reader
+              rules:
+                - apiGroups:
+                    - 'tempo.grafana.com'
+                  resources:
+{{- range $_, $cluster_name := .Values.spokeClusters }}
+                    - {{ $cluster_name }}
+{{- end }}
+                  resourceNames:
+                    - traces
+                  verbs:
+                    - 'get'
+          - complianceType: musthave
+            objectDefinition:
+              apiVersion: rbac.authorization.k8s.io/v1
+              kind: ClusterRoleBinding
+              metadata:
+                name: tempostack-traces-reader
+              roleRef:
+                apiGroup: rbac.authorization.k8s.io
+                kind: ClusterRole
+                name: tempostack-traces-reader
+              subjects:
+                - kind: Group
+                  apiGroup: rbac.authorization.k8s.io
+                  name: system:authenticated
+          - complianceType: musthave
+            objectDefinition:
+              apiVersion: v1
+              kind: Secret
+              metadata:
+                name: object-storage
+                namespace: observability
+              stringData:
+                endpoint: http://minio.minio.svc:9000
+                bucket: tempo
+                access_key_id: tempo
+                access_key_secret: supersecret
+              type: Opaque
+          - complianceType: musthave
+            objectDefinition:
+              apiVersion: tempo.grafana.com/v1alpha1
+              kind:  TempoStack
+              metadata:
+                name: hub
+                namespace: observability
+              spec:
+                storage:
+                  secret:
+                    name: object-storage
+                    type: s3
+                storageSize: 1Gi
+                tenants:
+                  mode: openshift
+                  authentication:
+{{- range $_, $cluster_name := .Values.spokeClusters }}
+                    - tenantName: {{ $cluster_name }}
+                      tenantId: "{{ $cluster_name }}"
+{{- end }}
+                template:
+                  gateway:
+                    enabled: true
+                  queryFrontend:
+                    jaegerQuery:
+                      enabled: true

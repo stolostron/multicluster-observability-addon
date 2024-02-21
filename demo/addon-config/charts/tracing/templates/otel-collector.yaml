@@ -15,10 +15,13 @@ spec:
           http:
     processors:
     exporters:
-      otlphttp:
+      debug:
+      otlp:
+        tls:
+          insecure: true
     service:
       pipelines:
         traces:
           receivers: [jaeger,otlp]
           processors: []
-          exporters: [otlphttp]
+          exporters: [otlp, debug]

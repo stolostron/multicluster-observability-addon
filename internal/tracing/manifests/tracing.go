@@ -35,7 +35,7 @@ func buildOtelColSpec(resources Options) (*otelv1alpha1.OpenTelemetryCollectorSp
 	}
 
 	for _, configmap := range resources.ConfigMaps {
-		if err := templateWithConfigMap(&resources.OpenTelemetryCollector.Spec, configmap); err != nil {
+		if err := templateWithConfigMap(&resources, configmap); err != nil {
 			return nil, err
 		}
 	}
@@ -68,20 +68,20 @@ func templateWithSecret(spec *otelv1alpha1.OpenTelemetryCollectorSpec, secret co
 	return nil
 }
 
-func templateWithConfigMap(spec *otelv1alpha1.OpenTelemetryCollectorSpec, configmap corev1.ConfigMap) error {
-	cfg, err := otelcol.ConfigFromString(spec.Config)
+func templateWithConfigMap(resource *Options, configmap corev1.ConfigMap) error {
+	cfg, err := otelcol.ConfigFromString(resource.OpenTelemetryCollector.Spec.Config)
 	if err != nil {
-		return nil
+		return err
 	}
-	err = otelcol.ConfigureExportersEndpoints(cfg, configmap, AnnotationTargetOutputName)
+	err = otelcol.ConfigureExporters(cfg, configmap, resource.ClusterName, AnnotationTargetOutputName)
 	if err != nil {
-		return nil
+		return err
 	}
 
 	yamlConfig, err := yaml.Marshal(&cfg)
 	if err != nil {
 		return kverrors.New(fmt.Sprint("error while marshaling OTEL Configuration: %w", err))
 	}
-	spec.Config = string(yamlConfig)
+	resource.OpenTelemetryCollector.Spec.Config = string(yamlConfig)
 	return nil
 }

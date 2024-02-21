@@ -31,17 +31,13 @@ spec:
 {{- end }}
 {{- end }}
 {{- if $.Values.tracing.enabled }}
-  # Tracing Auth ConfigMap
-  - resource: configmaps
-    name: tracing-auth
-    namespace: open-cluster-management
-  # Tracing ca-bundle configmap
-  - resource: secrets
-    name: otel-gateway
-    namespace: observability
   # Endpoints for Tracing
   - resource: configmaps
-    name: tracing-{{ $cluster_name }}-otlphttp
+    name: tracing-{{ $cluster_name }}-otlp
     namespace: {{ $cluster_name }}
+  # Tracing template
+  - resource: opentelemetrycollectors
+    name: spoke-otelcol
+    namespace: multicluster-observability-addon
 {{- end }}
 {{- end }}

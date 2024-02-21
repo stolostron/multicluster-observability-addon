@@ -73,6 +73,45 @@ spec:
                 name: observability
           - complianceType: musthave
             objectDefinition:
+              apiVersion: v1
+              kind: ServiceAccount
+              metadata:
+                name: otel-collector
+                namespace: observability
+          - complianceType: musthave
+            objectDefinition:
+              apiVersion: rbac.authorization.k8s.io/v1
+              kind: ClusterRole
+              metadata:
+                name: tempostack-traces-write
+              rules:
+                - apiGroups:
+                    - 'tempo.grafana.com'
+                  # Tenant name set in X-Scope-OrgID
+                  resources:
+{{- range $_, $cluster_name := .Values.spokeClusters }}
+                    - {{ $cluster_name }}
+{{- end }}
+                  resourceNames:
+                    - traces
+                  verbs:
+                    - 'create'
+          - complianceType: musthave
+            objectDefinition:
+              apiVersion: rbac.authorization.k8s.io/v1
+              kind: ClusterRoleBinding
+              metadata:
+                name: tempostack-traces
+              roleRef:
+                apiGroup: rbac.authorization.k8s.io
+                kind: ClusterRole
+                name: tempostack-traces-write
+              subjects:
+                - kind: ServiceAccount
+                  name: otel-collector
+                  namespace: observability
+          - complianceType: musthave
+            objectDefinition:
               apiVersion: cert-manager.io/v1
               kind: Certificate
               metadata:
@@ -89,7 +128,7 @@ spec:
                   encoding: PKCS8
                   size: 4096
                 dnsNames:
-                  - otlp-http-otel-gateway-route-observability.apps.{{ .Values.hubClusterName }}
+                  - otlp-grpc-otel-gateway-route-observability.apps.{{ .Values.hubClusterName }}
                 usages:
                   - server auth
                   - key encipherment
@@ -105,6 +144,7 @@ spec:
                 name: otel-gateway
                 namespace: observability
               spec:
+                serviceAccount: otel-collector
                 mode: "deployment"
                 ingress:
                   type: route
@@ -118,25 +158,66 @@ spec:
                   - name: otel-gateway
                     mountPath: /certs
                 config: |
+                  extensions:
+                    bearertokenauth:
+                      filename: "/var/run/secrets/kubernetes.io/serviceaccount/token"
                   receivers:
                     otlp:
                       protocols:
                         http:
-                          tls:
-                            cert_file: /certs/tls.crt
-                            key_file: /certs/tls.key
-                            ca_file: /certs/ca.crt
                         grpc:
-                          tls:
-                            cert_file: /certs/tls.crt
-                            key_file: /certs/tls.key
-                            ca_file: /certs/ca.crt
                   exporters:
-                    logging:
+                    debug/default:
+                    debug/cluster1:
+{{- range $_, $cluster_name := .Values.spokeClusters }}
+                    otlp/{{ $cluster_name }}:
+                      endpoint: tempo-hub-gateway.observability.svc.cluster.local:8090
+                      tls:
+                        insecure: false
+                        ca_file: "/var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt"
+                      auth:
+                        authenticator: bearertokenauth
+                      headers:
+                        x-scope-orgid: "{{ $cluster_name }}"
+{{- end }}
+                  processors:
+                    routing:
+                      default_exporters:
+                        - debug/default
+                      from_attribute: x-scope-orgid
+                      table:
+{{- range $_, $cluster_name := .Values.spokeClusters }}
+                      - value: {{ $cluster_name }}
+                        exporters:
+                        - otlp/{{ $cluster_name }}
+                        - debug/cluster1
+{{- end }}
                   service:
+                    extensions: [bearertokenauth]
                     pipelines:
                       traces:
                         receivers: [otlp]
-                        processors: []
-                        exporters: [logging]
+                        processors: [routing]
+                        exporters:
+                          - debug/default
+                          - debug/cluster1
+{{- range $_, $cluster_name := .Values.spokeClusters }}
+                          - otlp/{{ $cluster_name }}
+{{- end }}
+          - complianceType: musthave
+            objectDefinition:
+              apiVersion: route.openshift.io/v1
+              kind: Route
+              metadata:
+                name: test-collector
+                namespace: observability
+              spec:
+                host: test-collector-observability.apps.{{ .Values.hubClusterName }}
+                port:
+                  targetPort: otlp-grpc
+                to:
+                  kind: Service
+                  name: otel-gateway-collector
+                  weight: 100
+                wildcardPolicy: None
 {{- end }}

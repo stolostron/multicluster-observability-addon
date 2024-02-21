@@ -7,5 +7,5 @@ metadata:
   labels:
     mcoa.openshift.io/signal: tracing
 data:
-  otlphttp: mTLS
+  nothing: mTLS
 {{- end }}
