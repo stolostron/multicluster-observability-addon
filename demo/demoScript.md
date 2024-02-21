@@ -146,6 +146,8 @@ For the log collection we are installing:
 
 @Israel describe what's being installed
 
+In the case of the OTEL Collector we can see it was deployed in the spoke cluster. If we check the OTEL Collector configuration (`oc -n spoke-otel get pods -o yaml`) we will see the endpoint and the certificates populated in the exporter.
+
 Now let's jump into the spoke cluster and we see the different signal collectors running correctly:
 
 First, Prometheus Agent
@@ -159,8 +161,6 @@ RUN `oc -n openshift-logging get pods -l app.kubernetes.io/component=collector`
 Third, OTEL Collector
 
 RUN `oc -n spoke-otelcol get pods -l app.kubernetes.io/component=opentelemetry-collector`
-
-In the case of the OTEL Collector we can see it was deployed in the spoke cluster. If we check the OTEL Collector configuration (`oc -n spoke-otel get pods -o yaml`) we will see the endpoint and the certificates populated in the exporter.
 
 ## 3. Validate with Grafana
 
