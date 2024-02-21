@@ -1,0 +1,22 @@
+# Hub Cluster Hostname will be used to template resources that make use of the
+# cluster hostname, like routes
+# WARNING: should match the list in the mcoa-demo chart values.yaml
+hubClusterName: my-cluster.com
+
+# Logs specific resources
+logging:
+  enabled: true
+  
+  # Outputs list of stores where ClusterLogForwarder will send the logs to
+  # supported types are "cloudwatch" and "loki".
+  # WARNING: Setting type to "loki" assumes you have deployed the mcoa-demo chart
+  # with Loki enabled
+  outputs:
+    - name: cw-all
+      type: cloudwatch
+    - name: loki-infra
+      type: loki
+
+# Tracing specific resources
+tracing:
+  enabled: true

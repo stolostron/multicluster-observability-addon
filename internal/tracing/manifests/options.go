@@ -7,6 +7,7 @@ import (
 )
 
 type Options struct {
+	ClusterName            string
 	Secrets                []corev1.Secret
 	ConfigMaps             []corev1.ConfigMap
 	OpenTelemetryCollector *otelv1alpha1.OpenTelemetryCollector

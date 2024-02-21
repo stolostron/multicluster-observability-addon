@@ -1,0 +1,217 @@
+{{- if and .Values.logging.enabled .Values.logging.loki.enabled }}
+apiVersion: policy.open-cluster-management.io/v1
+kind: Policy
+metadata:
+  name: policy-loki-jobs
+spec:
+  disabled: false
+  policy-templates:
+  - extraDependencies:
+    - apiVersion: policy.open-cluster-management.io/v1
+      compliance: Compliant
+      kind: ConfigurationPolicy
+      name: redhat-loki-operator
+    objectDefinition:
+      apiVersion: policy.open-cluster-management.io/v1
+      kind: ConfigurationPolicy
+      metadata:
+        name: annotate-ca
+      spec:
+        remediationAction: enforce
+        severity: high
+        pruneObjectBehavior: DeleteAll
+        object-templates:
+        - complianceType: musthave
+          objectDefinition:
+            apiVersion: batch/v1
+            kind: Job
+            metadata:
+              name: annotate-ca
+              namespace: openshift-logging
+            spec:
+              template:
+                spec:
+                  serviceAccountName: annotate-ca-job-sa
+                  containers:
+                  - name: annotate-ca
+                    image: bitnami/kubectl
+                    command:
+                      - "/bin/sh"
+                      - "-c"
+                      - |
+                        while true; do
+                          while true; do
+                            if kubectl get cm/lokistack-hub-gateway-ca-bundle -n openshift-logging >/dev/null 2>&1; then
+                              kubectl -n openshift-logging label --overwrite cm/lokistack-hub-gateway-ca-bundle mcoa.openshift.io/signal=logging
+                              kubectl -n openshift-logging annotate --overwrite cm/lokistack-hub-gateway-ca-bundle logging.mcoa.openshift.io/ca=true
+                              break
+                            else
+                              echo "Waiting for ConfigMap..."
+                              sleep 10
+                            fi
+                          done
+                          sleep 10
+                        done
+                  restartPolicy: Never
+        - complianceType: musthave
+          objectDefinition:
+            apiVersion: v1
+            kind: ServiceAccount
+            metadata:
+              name: annotate-ca-job-sa
+              namespace: openshift-logging
+        - complianceType: musthave
+          objectDefinition:
+            apiVersion: rbac.authorization.k8s.io/v1
+            kind: Role
+            metadata:
+              name: annotate-ca-job-role
+              namespace: openshift-logging
+            rules:
+            - apiGroups: [""]
+              resources: ["configmaps"]
+              verbs: ["get", "patch", "update"]
+        - complianceType: musthave
+          objectDefinition:
+            apiVersion: rbac.authorization.k8s.io/v1
+            kind: RoleBinding
+            metadata:
+              name: annotate-ca-job-role-binding
+              namespace: openshift-logging
+            subjects:
+            - kind: ServiceAccount
+              name: annotate-ca-job-sa
+              namespace: openshift-logging
+            roleRef:
+              kind: Role
+              name: annotate-ca-job-role
+              apiGroup: rbac.authorization.k8s.io
+  - extraDependencies:
+    - apiVersion: policy.open-cluster-management.io/v1
+      compliance: Compliant
+      kind: ConfigurationPolicy
+      name: redhat-loki-operator
+    objectDefinition:
+      apiVersion: policy.open-cluster-management.io/v1
+      kind: ConfigurationPolicy
+      metadata:
+        name: tenant-create-ca
+      spec:
+        remediationAction: enforce
+        severity: high
+        pruneObjectBehavior: DeleteAll
+        object-templates:
+        - complianceType: musthave
+          objectDefinition:
+            apiVersion: batch/v1
+            kind: Job
+            metadata:
+              name: tenant-create-ca
+              namespace: openshift-logging
+            spec:
+              template:
+                spec:
+                  serviceAccountName: tenant-create-ca-job-sa
+                  containers:
+                  - name: tenant-create-ca
+                    image: bitnami/kubectl
+                    command:
+                      - "/bin/bash"
+                      - "-c"
+                      - |
+                        namespaces=({{- range $_, $cluster_name := .Values.spokeClusters -}} {{ $cluster_name | quote }} {{ end -}})
+                        target_namespace="openshift-logging"
+                        configmap_created=false
+
+                        kubectl create configmap loki-admin-ca -n "${target_namespace}" --from-literal=service-ca.crt="placeholder" --dry-run=client -o yaml | kubectl apply -f -
+
+                        while true; do
+                          for namespace in "${namespaces[@]}"; do
+                            secret_exists=$(kubectl get secret logging-loki-infra-auth -n "$namespace" --ignore-not-found)
+                            if [ -n "$secret_exists" ]; then
+                              ca_crt=$(kubectl get secret logging-loki-infra-auth -n "$namespace" -o jsonpath="{.data.ca\.crt}" | base64 --decode)
+                              kubectl create configmap "${namespace}" -n "${target_namespace}" --from-literal=service-ca.crt="${ca_crt}" --dry-run=client -o yaml | kubectl apply -f -
+                              configmap_created=true
+                            else
+                              kubectl create configmap "${namespace}" -n "${target_namespace}" --from-literal=service-ca.crt="placeholder" --dry-run=client -o yaml | kubectl apply -f -
+                              sleep 5
+                            fi
+                          done
+                          if [ "$configmap_created" = true ]; then
+                            break
+                          fi
+                        done
+
+                        while true; do
+                          secret_exists=$(kubectl get secret loki-admin -n "${target_namespace}" --ignore-not-found)
+                          if [ -n "$secret_exists" ]; then
+                            ca_crt=$(kubectl get secret loki-admin -n "${target_namespace}" -o jsonpath="{.data.ca\.crt}" | base64 --decode)
+                            kubectl create configmap loki-admin-ca -n "${target_namespace}" --from-literal=service-ca.crt="${ca_crt}" --dry-run=client -o yaml | kubectl apply -f -
+                            break
+                          fi
+                        done
+
+                        echo "Restarting Lokistack Gateway Pods..."
+                        kubectl -n "${target_namespace}" delete pod -l app.kubernetes.io/component=lokistack-gateway
+                  restartPolicy: Never
+        - complianceType: musthave
+          objectDefinition:
+            apiVersion: v1
+            kind: ServiceAccount
+            metadata:
+              name: tenant-create-ca-job-sa
+              namespace: openshift-logging
+        - complianceType: musthave
+          objectDefinition:
+            apiVersion: rbac.authorization.k8s.io/v1
+            kind: Role
+            metadata:
+              name: tenant-create-ca-job-role
+              namespace: openshift-logging
+            rules:
+            - apiGroups: [""]
+              resources: ["configmaps"]
+              verbs: ["get", "patch", "update", "create"]
+            - apiGroups: [""]
+              resources: ["pods"]
+              verbs: ["get", "list", "watch", "delete"]
+        - complianceType: musthave
+          objectDefinition:
+            apiVersion: rbac.authorization.k8s.io/v1
+            kind: RoleBinding
+            metadata:
+              name: tenant-create-ca-job-role-binding
+              namespace: openshift-logging
+            subjects:
+            - kind: ServiceAccount
+              name: tenant-create-ca-job-sa
+              namespace: openshift-logging
+            roleRef:
+              kind: Role
+              name: tenant-create-ca-job-role
+              apiGroup: rbac.authorization.k8s.io
+        - complianceType: musthave
+          objectDefinition:
+            apiVersion: rbac.authorization.k8s.io/v1
+            kind: ClusterRole
+            metadata:
+              name: tenant-create-ca-job-role
+            rules:
+            - apiGroups: [""]
+              resources: ["secrets"]
+              verbs: ["get"]
+        - complianceType: musthave
+          objectDefinition:
+            apiVersion: rbac.authorization.k8s.io/v1
+            kind: ClusterRoleBinding
+            metadata:
+              name: tenant-create-ca-job-role-binding
+            subjects:
+            - kind: ServiceAccount
+              name: tenant-create-ca-job-sa
+              namespace: openshift-logging
+            roleRef:
+              kind: ClusterRole
+              name: tenant-create-ca-job-role
+              apiGroup: rbac.authorization.k8s.io
+{{- end }}

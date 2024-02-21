@@ -1,0 +1,223 @@
+{{- if and .Values.tracing.enabled }}
+apiVersion: policy.open-cluster-management.io/v1
+kind: Policy
+metadata:
+  name: policy-hub-otel
+spec:
+  disabled: false
+  policy-templates:
+  - objectDefinition:
+      apiVersion: policy.open-cluster-management.io/v1
+      kind: ConfigurationPolicy
+      metadata:
+        name: redhat-otel-operator
+      spec:
+        remediationAction: enforce
+        severity: high
+        pruneObjectBehavior: DeleteAll
+        object-templates:
+        - complianceType: musthave
+          objectDefinition:
+            apiVersion: v1
+            kind: Namespace
+            metadata:
+              name: openshift-opentelemetry-operator
+        - complianceType: musthave
+          objectDefinition:
+            apiVersion: operators.coreos.com/v1
+            kind: OperatorGroup
+            metadata:
+              name: openshift-opentelemetry-operator
+              namespace: openshift-opentelemetry-operator
+            spec:
+              targetNamespaces:
+              - openshift-opentelemetry-operator
+              upgradeStrategy: Default
+        - complianceType: musthave
+          objectDefinition:
+            apiVersion: operators.coreos.com/v1alpha1
+            kind: Subscription
+            metadata:
+              name: opentelemetry-product
+              namespace: openshift-opentelemetry-operator
+            spec:
+              channel: stable
+              installPlanApproval: Automatic
+              name: opentelemetry-product
+              source: redhat-operators
+              sourceNamespace: openshift-marketplace
+  - extraDependencies:
+    - apiVersion: policy.open-cluster-management.io/v1
+      compliance: Compliant
+      kind: ConfigurationPolicy
+      name: redhat-otel-operator
+    - apiVersion: policy.open-cluster-management.io/v1
+      compliance: Compliant
+      kind: Policy
+      name: policy-hub-cert-manager
+    objectDefinition:
+      apiVersion: policy.open-cluster-management.io/v1
+      kind: ConfigurationPolicy
+      metadata:
+        name: policy-hub-otel-collector
+      spec:
+        remediationAction: enforce
+        severity: high
+        pruneObjectBehavior: DeleteAll
+        object-templates:
+          - complianceType: musthave
+            objectDefinition:
+              apiVersion: v1
+              kind: Namespace
+              metadata:
+                name: observability
+          - complianceType: musthave
+            objectDefinition:
+              apiVersion: v1
+              kind: ServiceAccount
+              metadata:
+                name: otel-collector
+                namespace: observability
+          - complianceType: musthave
+            objectDefinition:
+              apiVersion: rbac.authorization.k8s.io/v1
+              kind: ClusterRole
+              metadata:
+                name: tempostack-traces-write
+              rules:
+                - apiGroups:
+                    - 'tempo.grafana.com'
+                  # Tenant name set in X-Scope-OrgID
+                  resources:
+{{- range $_, $cluster_name := .Values.spokeClusters }}
+                    - {{ $cluster_name }}
+{{- end }}
+                  resourceNames:
+                    - traces
+                  verbs:
+                    - 'create'
+          - complianceType: musthave
+            objectDefinition:
+              apiVersion: rbac.authorization.k8s.io/v1
+              kind: ClusterRoleBinding
+              metadata:
+                name: tempostack-traces
+              roleRef:
+                apiGroup: rbac.authorization.k8s.io
+                kind: ClusterRole
+                name: tempostack-traces-write
+              subjects:
+                - kind: ServiceAccount
+                  name: otel-collector
+                  namespace: observability
+          - complianceType: musthave
+            objectDefinition:
+              apiVersion: cert-manager.io/v1
+              kind: Certificate
+              metadata:
+                name: otel-gateway
+                namespace: observability
+              spec:
+                secretName: otel-gateway
+                commonName: otel-gateway
+                subject:
+                  organizationalUnits:
+                    - otel-ocm-addon
+                privateKey:
+                  algorithm: RSA
+                  encoding: PKCS8
+                  size: 4096
+                dnsNames:
+                  - otlp-grpc-otel-gateway-route-observability.apps.{{ .Values.hubClusterName }}
+                usages:
+                  - server auth
+                  - key encipherment
+                  - digital signature
+                issuerRef:
+                  name: mcoa-demo-ca-issuer
+                  kind: ClusterIssuer
+          - complianceType: musthave
+            objectDefinition:
+              apiVersion: opentelemetry.io/v1alpha1
+              kind: OpenTelemetryCollector
+              metadata:
+                name: otel-gateway
+                namespace: observability
+              spec:
+                serviceAccount: otel-collector
+                mode: "deployment"
+                ingress:
+                  type: route
+                  route:
+                    termination: "passthrough"
+                volumes:
+                  - name: otel-gateway
+                    secret:
+                      secretName: otel-gateway
+                volumeMounts:
+                  - name: otel-gateway
+                    mountPath: /certs
+                config: |
+                  extensions:
+                    bearertokenauth:
+                      filename: "/var/run/secrets/kubernetes.io/serviceaccount/token"
+                  receivers:
+                    otlp:
+                      protocols:
+                        http:
+                        grpc:
+                  exporters:
+                    debug/default:
+                    debug/cluster1:
+{{- range $_, $cluster_name := .Values.spokeClusters }}
+                    otlp/{{ $cluster_name }}:
+                      endpoint: tempo-hub-gateway.observability.svc.cluster.local:8090
+                      tls:
+                        insecure: false
+                        ca_file: "/var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt"
+                      auth:
+                        authenticator: bearertokenauth
+                      headers:
+                        x-scope-orgid: "{{ $cluster_name }}"
+{{- end }}
+                  processors:
+                    routing:
+                      default_exporters:
+                        - debug/default
+                      from_attribute: x-scope-orgid
+                      table:
+{{- range $_, $cluster_name := .Values.spokeClusters }}
+                      - value: {{ $cluster_name }}
+                        exporters:
+                        - otlp/{{ $cluster_name }}
+                        - debug/cluster1
+{{- end }}
+                  service:
+                    extensions: [bearertokenauth]
+                    pipelines:
+                      traces:
+                        receivers: [otlp]
+                        processors: [routing]
+                        exporters:
+                          - debug/default
+                          - debug/cluster1
+{{- range $_, $cluster_name := .Values.spokeClusters }}
+                          - otlp/{{ $cluster_name }}
+{{- end }}
+          - complianceType: musthave
+            objectDefinition:
+              apiVersion: route.openshift.io/v1
+              kind: Route
+              metadata:
+                name: test-collector
+                namespace: observability
+              spec:
+                host: test-collector-observability.apps.{{ .Values.hubClusterName }}
+                port:
+                  targetPort: otlp-grpc
+                to:
+                  kind: Service
+                  name: otel-gateway-collector
+                  weight: 100
+                wildcardPolicy: None
+{{- end }}

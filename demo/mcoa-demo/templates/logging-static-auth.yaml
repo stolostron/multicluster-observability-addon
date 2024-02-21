@@ -1,0 +1,10 @@
+{{- if .Values.logging.enabled }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: static-authentication
+  namespace: open-cluster-management
+data:
+  aws_access_key_id: {{ .Values.logging.aws.keyID | b64enc }}
+  aws_secret_access_key: {{ .Values.logging.aws.keySecret | b64enc }} 
+{{- end }}

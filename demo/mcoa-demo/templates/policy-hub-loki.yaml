@@ -1,0 +1,198 @@
+{{- if and .Values.logging.enabled .Values.logging.loki.enabled }}
+apiVersion: policy.open-cluster-management.io/v1
+kind: Policy
+metadata:
+  name: policy-hub-loki
+spec:
+  disabled: false
+  policy-templates:
+  - objectDefinition:
+      apiVersion: policy.open-cluster-management.io/v1
+      kind: ConfigurationPolicy
+      metadata:
+        name: redhat-loki-operator
+      spec:
+        remediationAction: enforce
+        severity: high
+        pruneObjectBehavior: DeleteAll
+        object-templates:
+        - complianceType: musthave
+          objectDefinition:
+            apiVersion: v1
+            kind: Namespace
+            metadata:
+              name: openshift-operators-redhat
+        - complianceType: musthave
+          objectDefinition:
+            apiVersion: v1
+            kind: Namespace
+            metadata:
+              name: openshift-logging
+        - complianceType: musthave
+          objectDefinition:
+            apiVersion: operators.coreos.com/v1
+            kind: OperatorGroup
+            metadata:
+              annotations:
+                olm.providedAPIs: AlertingRule.v1.loki.grafana.com,LokiStack.v1.loki.grafana.com,RecordingRule.v1.loki.grafana.com,RulerConfig.v1.loki.grafana.com
+              name: openshift-operators-redhat
+              namespace: openshift-operators-redhat
+            spec:
+              upgradeStrategy: Default
+        - complianceType: musthave
+          objectDefinition:
+            apiVersion: operators.coreos.com/v1alpha1
+            kind: Subscription
+            metadata:
+              labels:
+                operators.coreos.com/loki-operator.openshift-operators-redhat: ''
+              name: loki-operator
+              namespace: openshift-operators-redhat
+            spec:
+              channel: stable
+              installPlanApproval: Automatic
+              name: loki-operator
+              source: redhat-operators
+              sourceNamespace: openshift-marketplace
+  - extraDependencies:
+    - apiVersion: policy.open-cluster-management.io/v1
+      compliance: Compliant
+      kind: ConfigurationPolicy
+      name: redhat-loki-operator
+    objectDefinition:
+      apiVersion: policy.open-cluster-management.io/v1
+      kind: ConfigurationPolicy
+      metadata:
+        name: lokistack-s3-secret
+      spec:
+        remediationAction: enforce
+        severity: high
+        pruneObjectBehavior: DeleteAll
+        object-templates:
+        - complianceType: musthave
+          objectDefinition:
+            apiVersion: v1
+            kind: Secret
+            metadata:
+              name: hub-lokistack-s3-credentials
+              namespace: openshift-logging
+            type: Opaque
+            data:
+              endpoint: {{ .Values.logging.loki.s3Bucket.endpoint | b64enc }}
+              region: {{ .Values.logging.loki.s3Bucket.region | b64enc }}
+              access_key_id: {{ .Values.logging.aws.keyID | b64enc }}
+              access_key_secret: {{ .Values.logging.aws.keySecret | b64enc }}
+              bucketnames: {{ .Values.logging.loki.s3Bucket.bucketnames | b64enc }}
+  - extraDependencies:
+    - apiVersion: policy.open-cluster-management.io/v1
+      compliance: Compliant
+      kind: ConfigurationPolicy
+      name: redhat-loki-operator
+    - apiVersion: policy.open-cluster-management.io/v1
+      compliance: Compliant
+      kind: ConfigurationPolicy
+      name: lokistack-s3-secret
+    - apiVersion: policy.open-cluster-management.io/v1
+      compliance: Compliant
+      kind: ConfigurationPolicy
+      name: tenant-create-ca
+    objectDefinition:
+      apiVersion: policy.open-cluster-management.io/v1
+      kind: ConfigurationPolicy
+      metadata:
+        name: lokistack-hub
+      spec:
+        remediationAction: enforce
+        severity: high
+        pruneObjectBehavior: DeleteAll
+        object-templates:
+        - complianceType: musthave
+          objectDefinition:
+            apiVersion: loki.grafana.com/v1
+            kind: LokiStack
+            metadata:
+              name: lokistack-hub
+              namespace: openshift-logging
+            spec:
+              size: 1x.extra-small
+              storage:
+                secret:
+                  name: hub-lokistack-s3-credentials
+                  type: s3
+              storageClassName: gp3-csi
+              tenants:
+                authentication:
+                - mTLS:
+                    ca:
+                      caName: loki-admin-ca
+                  tenantId: loki-admin
+                  tenantName: loki-admin
+{{- range $_, $cluster_name := .Values.spokeClusters }}
+                - mTLS:
+                    ca:
+                      caName: {{ $cluster_name }}
+                  tenantId: {{ $cluster_name }}
+                  tenantName: {{ $cluster_name }}
+{{- end }}
+                authorization:
+                  roleBindings:
+                  - name: write-logs
+                    roles:
+                    - write-logs
+                    subjects:
+                    - kind: group
+                      name: multicluster-observability-addon
+                  - name: read-logs
+                    roles:
+                    - read-logs
+                    subjects:
+                    - kind: group
+                      name: multicluster-observability-addon
+                  roles:
+                  - name: read-logs
+                    permissions:
+                    - read
+                    resources:
+                    - logs
+                    tenants:
+                    - loki-admin
+{{- range $_, $cluster_name := .Values.spokeClusters }}
+                    - {{ $cluster_name }}
+{{- end }}
+                  - name: write-logs
+                    permissions:
+                    - write
+                    resources:
+                    - logs
+                    tenants:
+{{- range $_, $cluster_name := .Values.spokeClusters }}
+                    - {{ $cluster_name }}
+{{- end }}
+                mode: static
+        - complianceType: musthave
+          objectDefinition:
+            apiVersion: cert-manager.io/v1
+            kind: Certificate
+            metadata:
+              name: loki-admin-cert
+              namespace: openshift-logging
+            spec:
+              secretName: loki-admin
+              commonName: loki-admin
+              subject:
+                organizationalUnits:
+                  - multicluster-observability-addon
+              privateKey:
+                algorithm: RSA
+                encoding: PKCS8
+                size: 4096
+              dnsNames:
+                - collector.openshift-logging.svc
+              usages:
+                - client auth
+                - key encipherment
+                - digital signature
+              issuerRef:
+                name: mcoa-cluster-issuer
+                kind: ClusterIssuer 
+{{- end }}

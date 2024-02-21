@@ -1,7 +1,7 @@
 images:
 - name: controller
-  newName: quay.io/periklis/multicluster-observability-addon
-  newTag: 0.0.1
+  newName: quay.io/rhobs/multicluster-observability-addon
+  newTag: v0.0.1
 
 namespace: open-cluster-management
 
