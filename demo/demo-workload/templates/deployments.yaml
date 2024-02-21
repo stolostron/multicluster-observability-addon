@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata: 
+  name: mcoa-demo-workload
+  namespace: openshift-mcoa-demo-workload
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app:  mcoa-demo-workload
+  template:
+    metadata:
+      annotations:
+        workload: deployment
+      labels:
+        app:  mcoa-demo-workload
+    spec:
+      serviceAccountName: mcoa-demo-workload
+      containers:
+      - command:
+        - /telemetrygen
+        - traces
+        - --otlp-insecure
+        - --otlp-endpoint=spoke-otelcol-collector.spoke-otelcol.svc.cluster.local:4317
+        - --duration=36000s
+        - --rate=1
+        - --otlp-attributes=service.name="mcoa-demo-workload"
+        - --otlp-attributes=k8s.container.name="mcoa-demo-workload"
+        - --otlp-header=x-scope-orgid="{{ .Values.clusterName }}"
+        - --status-code=2
+        image: ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen:latest
+        imagePullPolicy: IfNotPresent
+        name: mcoa-demo-workload
+      restartPolicy: Always
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: logger
+  namespace: openshift-mcoa-demo-workload
+spec:
+  selector:
+    matchLabels:
+      app: logger
+  template:
+    metadata:
+      labels:
+        app: logger
+    spec:
+      containers:
+      - name: logger
+        args:
+        - --log-format=csv
+        image: quay.io/openshift-logging/cluster-logging-load-client:latest
+        imagePullPolicy: Always
+        resources:
+          limits:
+            cpu: 1000m
+            memory: 32M
+          requests:
+            cpu: 100m
+            memory: 32M
+---
