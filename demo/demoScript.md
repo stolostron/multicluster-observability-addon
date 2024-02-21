@@ -1,17 +1,20 @@
 # Demo: Multicluster Observability AddOn
+@Douglas: run the introduction 
 
-Welcome to the demo of multicluster-observability-addon (MCOA)! MCOA is an addon for the Open Cluster Management ecosystem which RedHat has a distribution of known as RedHat Advanced Cluster Management (a.k.a ACM) which supports architectures where a fleet of clusters are controlled by a single hub cluster.
+Welcome to the demo of multicluster-observability-addon (aka MCOA). The MCOA is an addon for the Open Cluster Management project. Red Hat has its own distribution of this project, called Red Hat Advanced Cluster Management (aka ACM), which supports architectures where a fleet of clusters is controlled by a single hub cluster.
 
-The goal of MCOA is to configure a fleet of spoke clusters to collect and forward observability signals to a configurable set of stores. MCOA achieves this by leveraging APIs and Operators already present in the single OCP cluster user-story.
+The goal of the MCOA is to configure a fleet of spoke clusters to collect and forward observability signals to a configurable set of stores. It achieves this by leveraging APIs and Operators already present in the OpenShift Platform clusters.
 
-In this demo, we will leverage MCOA to collect and send:
-- Metrics to the hub cluster using Prometheus Agent;
-- Logs to cloudwatch and to an instance of Loki running on the hub cluster using the `ClusterLogForwarder`;
-- Traces to an instance of OTEL Collector running on the hub cluster using the `OpenTelemetryCollector`;
+In this demo, we will leverage the MCOA to collect and send:
 
-**Disclaimer**: for this demo we have already pre-provisioned both the hub and spoke clusters, we have already connected the two and we have already deployed some configuration for the stores. However, all the steps we just mentioned are also described in the README that exists on the demo fodler on the project repo.
+- Metrics to the hub cluster using Prometheus Agent.
+- Logs to cloudwatch and to an instance of Loki running on the hub cluster using the `ClusterLogForwarder`.
+- Traces to an instance of OTEL Collector running on the hub cluster using the `OpenTelemetryCollector`.
+
+**Disclaimer**: for this demo we have already pre-provisioned both the hub and spoke clusters, connected them, and deployed some configuration for the stores. However, all the steps we just mentioned are also described in the README that exists on the demo folder of this project.
 
 ## 1. Install multicluster-observability-addon
+@Douglas: explain the installation of the addon.
 
 First, we are going to install the addon-manager on the hub cluster. The process of installing the manager on the hub cluster is quite simple. We just have to run:
 
@@ -29,7 +32,7 @@ This command will:
 -- More detail beginning --
 ** SHOW `ClusterManagementAddOn` with `oc get ClusterManagementAddOn multicluster-observability-addon -o yaml` **
 
-The `ClusterManagementAddOn` contains a list of resources that the cluster-admin can use to configure the addon deployment on each spoke cluster. In our case, we can see that our addon supports `addondeploymentconfigs, configmaps, secrets, clusterlogforwarders and opentelemetrycollectors`. And we set defaults for `addondeploymentconfigs, clusterlogforwarders, opentelemetrycollectors`.
+The `ClusterManagementAddOn` contains a list of resources that can be used to configure the addon deployment in each spoke cluster. The addon supports:  `addondeploymentconfigs`, `configmaps`, `secrets`, `clusterlogforwarders`, and `opentelemetrycollectors`..
 -- More detail end --
 
 Now that we have deployed the manager it's time to configure our signals collectors.
@@ -114,7 +117,16 @@ Now we can see what is being installed on the spoke cluster.
 
 - Metrics 
 
-@Douglas describe what's being installed
+@Douglas: go through the resources being installed.
+
+For the metrics collection we are installing:
+
+- A `Deployment` with Prometheus in agent mode.
+- A `ConfigMap` to instruct this Prometheus Agent to federate metrics from the Cluster Monitoring Operator's Prometheus, apply an allowlist, and remote write them to Observatorium in the Hub.
+- A `Secret` with the TLS certificates needed to authenticate with Observatorium in the Hub.
+- A `Secret` with the CA certificate to verify the identity of the Observatorium instance.
+
+- Logs
 
 - Logs
 
