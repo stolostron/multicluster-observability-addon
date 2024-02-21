@@ -1,0 +1,596 @@
+apiVersion: policy.open-cluster-management.io/v1
+kind: Policy
+metadata:
+  name: policy-hub-grafana
+  namespace: default
+spec:
+  disabled: false
+  policy-templates:
+  - objectDefinition:
+      apiVersion: policy.open-cluster-management.io/v1
+      kind: ConfigurationPolicy
+      metadata:
+        name: community-grafana
+      spec:
+        remediationAction: enforce
+        severity: high
+        pruneObjectBehavior: DeleteAll
+        object-templates:
+          - complianceType: musthave
+            objectDefinition:
+              apiVersion: v1
+              kind: Namespace
+              metadata:
+                name: grafana-operator
+          - complianceType: musthave
+            objectDefinition:
+              apiVersion: operators.coreos.com/v1
+              kind: OperatorGroup
+              metadata:
+                name: grafana-operator-kz2v9
+                namespace: grafana-operator
+                annotations:
+                  olm.providedAPIs: Grafana.v1beta1.grafana.integreatly.org,GrafanaDashboard.v1beta1.grafana.integreatly.org,GrafanaDatasource.v1beta1.grafana.integreatly.org,GrafanaFolder.v1beta1.grafana.integreatly.org
+              spec:
+                upgradeStrategy: Default
+          - complianceType: musthave
+            objectDefinition:
+              apiVersion: operators.coreos.com/v1alpha1
+              kind: Subscription
+              metadata:
+                name: grafana-operator
+                namespace: grafana-operator
+                labels:
+                  operators.coreos.com/grafana-operator.grafana-operator: ""
+              spec:
+                name: grafana-operator
+                channel: v5
+                installPlanApproval: Automatic
+                source: community-operators
+                sourceNamespace: openshift-marketplace
+                startingCSV: grafana-operator.v5.6.3
+  - extraDependencies:
+    - apiVersion: policy.open-cluster-management.io/v1
+      compliance: Compliant
+      kind: ConfigurationPolicy
+      name: community-grafana
+    - apiVersion: policy.open-cluster-management.io/v1
+      compliance: Compliant
+      kind: ConfigurationPolicy
+      name: signals-auth-copy
+    objectDefinition:
+        apiVersion: policy.open-cluster-management.io/v1
+        kind: ConfigurationPolicy
+        metadata:
+          name: grafana-instance
+        spec:
+          remediationAction: enforce
+          severity: high
+          pruneObjectBehavior: DeleteAll
+          object-templates:
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: grafana.integreatly.org/v1beta1
+                kind: Grafana
+                metadata:
+                  name: grafana
+                  namespace: grafana-operator
+                  labels:
+                    dashboards: grafana
+                spec:
+                  config:
+                    auth:
+                      disable_login_form: "false"
+                    log:
+                      mode: console
+                    security:
+                      admin_password: secret
+                      admin_user: root
+                  route:
+                    spec: {}
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: grafana.integreatly.org/v1beta1
+                kind: GrafanaDatasource
+                metadata:
+                  name: grafana-loki-datasource
+                  namespace: grafana-operator
+                spec:
+                  datasource:
+                    name: loki
+                    uid: "29562244-dbcf-41bd-97de-e7961864e9dc"
+                    access: proxy
+                    editable: true
+                    isDefault: true
+                    jsonData:
+                      timeInterval: 5s
+                      tlsAuth: true
+                      tlsAuthWithCACert: true
+                      tlsSkipVerify: false
+                    secureJsonData:
+                      tlsCACert: ${service-ca.crt}
+                      tlsClientCert: ${tls.crt}
+                      tlsClientKey: ${tls.key}
+                    type: loki
+                    url: https://lokistack-hub-gateway-http.openshift-logging.svc:8080/api/logs/v1/spoke-1/
+                  instanceSelector:
+                    matchLabels:
+                      dashboards: grafana
+                  valuesFrom:
+                    - targetPath: secureJsonData.tlsCACert
+                      valueFrom:
+                        configMapKeyRef:
+                          name: lokistack-hub-gateway-ca-bundle
+                          key: service-ca.crt
+                    - targetPath: secureJsonData.tlsClientCert
+                      valueFrom:
+                        secretKeyRef:
+                          name: loki-admin
+                          key: tls.crt
+                    - targetPath: secureJsonData.tlsClientKey
+                      valueFrom:
+                        secretKeyRef:
+                          name: loki-admin
+                          key: tls.key
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: grafana.integreatly.org/v1beta1
+                kind: GrafanaDatasource
+                metadata:
+                  name: grafana-thanos-datasource
+                  namespace: grafana-operator
+                spec:
+                  datasource:
+                    name: thanos
+                    uid: "49a9de7b-4740-4ccc-877b-73011f5e276d"
+                    access: proxy
+                    editable: true
+                    isDefault: true
+                    jsonData:
+                      timeInterval: 5s
+                      tlsAuth: true
+                      tlsAuthWithCACert: false
+                      tlsSkipVerify: true
+                    secureJsonData:
+                      tlsCACert: ${ca.crt}
+                      tlsClientCert: ${tls.crt}
+                      tlsClientKey: ${tls.key}
+                    type: prometheus
+                    url: https://observability-observatorium-api.open-cluster-management-observability.svc.cluster.local:8080/api/metrics/v1/default
+                  instanceSelector:
+                    matchLabels:
+                      dashboards: grafana
+                  valuesFrom:
+                    - targetPath: secureJsonData.tlsCACert
+                      valueFrom:
+                        secretKeyRef:
+                          name: observability-server-certs
+                          key: ca.crt
+                    - targetPath: secureJsonData.tlsClientCert
+                      valueFrom:
+                        secretKeyRef:
+                          name: observability-grafana-certs
+                          key: tls.crt
+                    - targetPath: secureJsonData.tlsClientKey
+                      valueFrom:
+                        secretKeyRef:
+                          name: observability-grafana-certs
+                          key: tls.key
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: grafana.integreatly.org/v1beta1
+                kind: GrafanaDatasource
+                metadata:
+                  name: grafana-jaeger-datasource
+                  namespace: grafana-operator
+                spec:
+                  datasource:
+                    name: jaeger
+                    uid: "dQvjcHoSz"
+                    access: proxy
+                    editable: true
+                    isDefault: true
+                    jsonData:
+                      timeInterval: 5s
+                      tlsAuth: false
+                      tlsSkipVerify: true
+                      httpHeaderName1: 'Authorization'
+                    secureJsonData:
+                      httpHeaderValue1: 'Bearer {{ .Values.token }}'
+                    type: jaeger
+                    url: https://tempo-hub-gateway.observability.svc.cluster.local:8080/api/traces/v1/spoke-1
+                  instanceSelector:
+                    matchLabels:
+                      dashboards: grafana
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: grafana.integreatly.org/v1beta1
+                kind: GrafanaDashboard
+                metadata:
+                  name: mcoa-dashboard
+                  namespace: grafana-operator
+                spec:
+                  instanceSelector:
+                    matchLabels:
+                      dashboards: "grafana"
+                  configMapRef:
+                    name: mcoa-dashboard
+                    key: json
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: v1
+                kind: ConfigMap
+                metadata:
+                  name: mcoa-dashboard
+                  namespace: grafana-operator
+                data:
+                  json: >
+                    {
+                      "annotations": {
+                        "list": [
+                          {
+                            "builtIn": 1,
+                            "datasource": {
+                              "type": "grafana",
+                              "uid": "-- Grafana --"
+                            },
+                            "enable": true,
+                            "hide": true,
+                            "iconColor": "rgba(0, 211, 255, 1)",
+                            "name": "Annotations & Alerts",
+                            "target": {
+                              "limit": 100,
+                              "matchAny": false,
+                              "tags": [],
+                              "type": "dashboard"
+                            },
+                            "type": "dashboard"
+                          }
+                        ]
+                      },
+                      "editable": true,
+                      "fiscalYearStartMonth": 0,
+                      "graphTooltip": 0,
+                      "id": 2,
+                      "links": [],
+                      "liveNow": false,
+                      "panels": [
+                        {
+                          "gridPos": {
+                            "h": 1,
+                            "w": 24,
+                            "x": 0,
+                            "y": 0
+                          },
+                          "id": 12,
+                          "title": "Metrics",
+                          "type": "row"
+                        },
+                        {
+                          "datasource": {
+                            "type": "prometheus",
+                            "uid": "49a9de7b-4740-4ccc-877b-73011f5e276d"
+                          },
+                          "fieldConfig": {
+                            "defaults": {
+                              "color": {
+                                "mode": "palette-classic"
+                              },
+                              "custom": {
+                                "axisCenteredZero": false,
+                                "axisColorMode": "text",
+                                "axisLabel": "",
+                                "axisPlacement": "auto",
+                                "barAlignment": 0,
+                                "drawStyle": "line",
+                                "fillOpacity": 0,
+                                "gradientMode": "none",
+                                "hideFrom": {
+                                  "legend": false,
+                                  "tooltip": false,
+                                  "viz": false
+                                },
+                                "lineInterpolation": "linear",
+                                "lineWidth": 1,
+                                "pointSize": 5,
+                                "scaleDistribution": {
+                                  "type": "linear"
+                                },
+                                "showPoints": "auto",
+                                "spanNulls": false,
+                                "stacking": {
+                                  "group": "A",
+                                  "mode": "none"
+                                },
+                                "thresholdsStyle": {
+                                  "mode": "off"
+                                }
+                              },
+                              "mappings": [],
+                              "thresholds": {
+                                "mode": "absolute",
+                                "steps": [
+                                  {
+                                    "color": "green",
+                                    "value": null
+                                  },
+                                  {
+                                    "color": "red",
+                                    "value": 80
+                                  }
+                                ]
+                              }
+                            },
+                            "overrides": []
+                          },
+                          "gridPos": {
+                            "h": 8,
+                            "w": 24,
+                            "x": 0,
+                            "y": 1
+                          },
+                          "id": 2,
+                          "options": {
+                            "legend": {
+                              "calcs": [],
+                              "displayMode": "list",
+                              "placement": "bottom",
+                              "showLegend": true
+                            },
+                            "tooltip": {
+                              "mode": "single",
+                              "sort": "none"
+                            }
+                          },
+                          "targets": [
+                            {
+                              "datasource": {
+                                "type": "prometheus",
+                                "uid": "49a9de7b-4740-4ccc-877b-73011f5e276d"
+                              },
+                              "editorMode": "code",
+                              "expr": "sum by(clusterID, namespace) (namespace:container_memory_usage_bytes:sum{namespace=\"openshift-mcoa-demo-workload\"})",
+                              "range": true,
+                              "refId": "MCOA Memory"
+                            }
+                          ],
+                          "title": "MCOA Workload Namespace Memory Usage",
+                          "type": "timeseries"
+                        },
+                        {
+                          "collapsed": false,
+                          "gridPos": {
+                            "h": 1,
+                            "w": 24,
+                            "x": 0,
+                            "y": 9
+                          },
+                          "id": 9,
+                          "panels": [],
+                          "title": "Logs",
+                          "type": "row"
+                        },
+                        {
+                          "datasource": {
+                            "type": "loki",
+                            "uid": "29562244-dbcf-41bd-97de-e7961864e9dc"
+                          },
+                          "fieldConfig": {
+                            "defaults": {
+                              "color": {
+                                "mode": "palette-classic"
+                              },
+                              "custom": {
+                                "axisCenteredZero": false,
+                                "axisColorMode": "text",
+                                "axisLabel": "",
+                                "axisPlacement": "auto",
+                                "barAlignment": 0,
+                                "drawStyle": "bars",
+                                "fillOpacity": 100,
+                                "gradientMode": "hue",
+                                "hideFrom": {
+                                  "legend": false,
+                                  "tooltip": false,
+                                  "viz": false
+                                },
+                                "lineInterpolation": "linear",
+                                "lineWidth": 8,
+                                "pointSize": 5,
+                                "scaleDistribution": {
+                                  "type": "linear"
+                                },
+                                "showPoints": "auto",
+                                "spanNulls": false,
+                                "stacking": {
+                                  "group": "A",
+                                  "mode": "none"
+                                },
+                                "thresholdsStyle": {
+                                  "mode": "off"
+                                }
+                              },
+                              "mappings": [],
+                              "thresholds": {
+                                "mode": "absolute",
+                                "steps": [
+                                  {
+                                    "color": "green",
+                                    "value": null
+                                  },
+                                  {
+                                    "color": "red",
+                                    "value": 80
+                                  }
+                                ]
+                              }
+                            },
+                            "overrides": []
+                          },
+                          "gridPos": {
+                            "h": 8,
+                            "w": 24,
+                            "x": 0,
+                            "y": 10
+                          },
+                          "id": 3,
+                          "options": {
+                            "legend": {
+                              "calcs": [],
+                              "displayMode": "list",
+                              "placement": "bottom",
+                              "showLegend": true
+                            },
+                            "tooltip": {
+                              "mode": "single",
+                              "sort": "none"
+                            }
+                          },
+                          "pluginVersion": "9.1.6",
+                          "targets": [
+                            {
+                              "datasource": {
+                                "type": "loki",
+                                "uid": "29562244-dbcf-41bd-97de-e7961864e9dc"
+                              },
+                              "editorMode": "builder",
+                              "expr": "sum by(namespace, clusterID) (rate({kubernetes_namespace_name=\"openshift-mcoa-demo-workload\"} |= `` | label_format namespace=kubernetes_namespace_name | label_format clusterID=openshift_cluster_id [$__interval]))",
+                              "key": "Q-e99c1178-1445-48a9-b847-9e87abedded1-0",
+                              "queryType": "range",
+                              "refId": "Kube System Logs Sum"
+                            }
+                          ],
+                          "title": "MCOA Workload Logs Sum",
+                          "type": "timeseries"
+                        },
+                        {
+                          "datasource": {
+                            "type": "loki",
+                            "uid": "29562244-dbcf-41bd-97de-e7961864e9dc"
+                          },
+                          "gridPos": {
+                            "h": 7,
+                            "w": 24,
+                            "x": 0,
+                            "y": 18
+                          },
+                          "id": 5,
+                          "options": {
+                            "dedupStrategy": "none",
+                            "enableLogDetails": false,
+                            "prettifyLogMessage": false,
+                            "showCommonLabels": false,
+                            "showLabels": false,
+                            "showTime": true,
+                            "sortOrder": "Descending",
+                            "wrapLogMessage": false
+                          },
+                          "targets": [
+                            {
+                              "datasource": {
+                                "type": "loki",
+                                "uid": "29562244-dbcf-41bd-97de-e7961864e9dc"
+                              },
+                              "editorMode": "code",
+                              "expr": "{kubernetes_namespace_name=\"openshift-mcoa-demo-workload\"} |= ``",
+                              "queryType": "range",
+                              "refId": "Kube System Logs"
+                            }
+                          ],
+                          "title": "MCOA Workload Logs",
+                          "type": "logs"
+                        },
+                        {
+                          "collapsed": false,
+                          "gridPos": {
+                            "h": 1,
+                            "w": 24,
+                            "x": 0,
+                            "y": 25
+                          },
+                          "id": 7,
+                          "panels": [],
+                          "title": "Traces",
+                          "type": "row"
+                        },
+                        {
+                          "datasource": {
+                            "type": "jaeger",
+                            "uid": "dQvjcHoSz"
+                          },
+                          "fieldConfig": {
+                            "defaults": {
+                              "custom": {
+                                "align": "auto",
+                                "displayMode": "auto",
+                                "inspect": false
+                              },
+                              "mappings": [],
+                              "thresholds": {
+                                "mode": "absolute",
+                                "steps": [
+                                  {
+                                    "color": "green",
+                                    "value": null
+                                  },
+                                  {
+                                    "color": "red",
+                                    "value": 80
+                                  }
+                                ]
+                              }
+                            },
+                            "overrides": []
+                          },
+                          "gridPos": {
+                            "h": 7,
+                            "w": 24,
+                            "x": 0,
+                            "y": 26
+                          },
+                          "id": 10,
+                          "options": {
+                            "footer": {
+                              "fields": "",
+                              "reducer": [
+                                "sum"
+                              ],
+                              "show": false
+                            },
+                            "showHeader": true
+                          },
+                          "pluginVersion": "9.1.6",
+                          "targets": [
+                            {
+                              "datasource": {
+                                "type": "jaeger",
+                                "uid": "dQvjcHoSz"
+                              },
+                              "key": "Q-8d31440d-9371-42fb-9326-c604ec0e99a2-0",
+                              "queryType": "search",
+                              "refId": "Traces mcoa-demo service",
+                              "service": "mcoa-demo-workload"
+                            }
+                          ],
+                          "title": "MCOA Workload Traces",
+                          "type": "table"
+                        }
+                      ],
+                      "refresh": false,
+                      "schemaVersion": 37,
+                      "style": "dark",
+                      "tags": [],
+                      "templating": {
+                        "list": []
+                      },
+                      "time": {
+                        "from": "now-5m",
+                        "to": "now"
+                      },
+                      "timepicker": {},
+                      "timezone": "",
+                      "title": "MCOA",
+                      "uid": "rs2y87TIzf",
+                      "version": 2,
+                      "weekStart": ""
+                    }

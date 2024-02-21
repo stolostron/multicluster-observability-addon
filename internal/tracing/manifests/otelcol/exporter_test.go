@@ -79,7 +79,7 @@ func Test_ConfigureExportersEndpoints(t *testing.T) {
 		},
 	}
 
-	err = ConfigureExportersEndpoints(cfg, cm, annotation)
+	err = ConfigureExporters(cfg, cm, "cluster", annotation)
 	require.NoError(t, err)
 
 	exportersField := cfg["exporters"]
@@ -92,7 +92,7 @@ func Test_ConfigureExportersEndpoints(t *testing.T) {
 	cfg, err = ConfigFromString(otelColConfig)
 	require.NoError(t, err)
 
-	err = ConfigureExportersEndpoints(cfg, cm, annotation)
+	err = ConfigureExporters(cfg, cm, "cluster", annotation)
 	require.NoError(t, err)
 
 	exportersField = cfg["exporters"]

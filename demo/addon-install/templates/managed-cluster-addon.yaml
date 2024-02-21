@@ -1,0 +1,43 @@
+{{- range $_, $cluster_name := .Values.spokeClusters }}
+apiVersion: addon.open-cluster-management.io/v1alpha1
+kind: ManagedClusterAddOn
+metadata:
+  name: multicluster-observability-addon
+  namespace: {{ $cluster_name }}
+spec:
+  installNamespace: open-cluster-management-agent-addon
+  configs:
+{{- if $.Values.logging.enabled }}
+  # Logging Auth ConfigMap
+  - resource: configmaps
+    name: logging-auth
+    namespace: open-cluster-management
+  # Logging URLs for Loki ConfigMap
+{{- range $_, $dic := $.Values.logging.outputs }}
+{{- if eq $dic.type "loki" }}
+  - resource: configmaps
+    name: logging-{{ $cluster_name }}-{{ $dic.name }}
+    namespace: {{ $cluster_name }}
+{{- end }}
+{{- end }}
+{{- range $_, $dic := $.Values.logging.outputs }}
+{{- if eq $dic.type "loki" }}
+  # Logging ca-bundle ConfigMap
+  - resource: configmaps
+    name: lokistack-hub-gateway-ca-bundle
+    namespace: openshift-logging
+{{- break }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- if $.Values.tracing.enabled }}
+  # Endpoints for Tracing
+  - resource: configmaps
+    name: tracing-{{ $cluster_name }}-otlp
+    namespace: {{ $cluster_name }}
+  # Tracing template
+  - resource: opentelemetrycollectors
+    name: spoke-otelcol
+    namespace: multicluster-observability-addon
+{{- end }}
+{{- end }}

@@ -36,7 +36,7 @@ func ConfigureExportersSecrets(cfg map[string]interface{}, secret corev1.Secret,
 	return nil
 }
 
-func ConfigureExportersEndpoints(cfg map[string]interface{}, cm corev1.ConfigMap, annotation string) error {
+func ConfigureExporters(cfg map[string]interface{}, cm corev1.ConfigMap, clusterName string, annotation string) error {
 	otelExporterName, ok := cm.Annotations[annotation]
 	if !ok {
 		return nil
@@ -51,18 +51,20 @@ func ConfigureExportersEndpoints(cfg map[string]interface{}, cm corev1.ConfigMap
 		if otelExporterName != exporterName {
 			continue
 		}
-		var configMap map[string]interface{}
+		var exporterConfig map[string]interface{}
 		if config == nil {
-			configMap = make(map[string]interface{})
-			exporters[otelExporterName] = configMap
+			exporterConfig = make(map[string]interface{})
+			exporters[otelExporterName] = exporterConfig
 		} else {
-			configMap = config.(map[string]interface{})
+			exporterConfig = config.(map[string]interface{})
 		}
 
-		err := configureExporterEndpoint(configMap, cm)
+		err := configureExporterEndpoint(exporterConfig, cm)
 		if err != nil {
 			return err
 		}
+
+		configureTenant(exporterConfig, clusterName)
 	}
 	return nil
 }
@@ -95,4 +97,10 @@ func configureExporterEndpoint(exporter map[string]interface{}, cm corev1.Config
 	}
 	exporter["endpoint"] = url
 	return nil
+}
+
+func configureTenant(exporter map[string]interface{}, clusterName string) {
+	headers := make(map[string]string)
+	headers["x-scope-orgid"] = clusterName
+	exporter["headers"] = headers
 }

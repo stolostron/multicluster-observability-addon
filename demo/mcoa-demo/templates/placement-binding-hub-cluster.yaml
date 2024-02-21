@@ -1,0 +1,33 @@
+apiVersion: policy.open-cluster-management.io/v1
+kind: PlacementBinding
+metadata:
+  name: binding-policy-hub-mcoa
+placementRef:
+  name: placement-policy-hub-mcoa
+  kind: Placement
+  apiGroup: cluster.open-cluster-management.io
+subjects:
+  - name: policy-hub-cert-manager
+    kind: Policy
+    apiGroup: policy.open-cluster-management.io
+  - name: policy-hub-loki
+    kind: Policy
+    apiGroup: policy.open-cluster-management.io
+  - name: policy-hub-metrics
+    kind: Policy
+    apiGroup: policy.open-cluster-management.io
+  - name: policy-hub-otel
+    kind: Policy
+    apiGroup: policy.open-cluster-management.io
+  - name: policy-hub-tempo
+    kind: Policy
+    apiGroup: policy.open-cluster-management.io
+  - name: policy-hub-grafana
+    kind: Policy
+    apiGroup: policy.open-cluster-management.io
+  - name: policy-loki-jobs
+    kind: Policy
+    apiGroup: policy.open-cluster-management.io
+  - name: policy-grafana-jobs
+    kind: Policy
+    apiGroup: policy.open-cluster-management.io
