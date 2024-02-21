@@ -2,6 +2,9 @@
 # cluster hostname, like routes
 hubClusterName: my-cluster.com
 
+# Token of the OpenShift user, this is needed for Grafana to query tempo
+token: sha256~XXXXXXXXXXXXXXXXXXXXX
+
 # List with the name of the spoke clusters as they were imported into the hub
 # cluster.
 # WARNING: after instalation if this list has to be updated, then uninstall the

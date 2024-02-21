@@ -23,6 +23,12 @@ _Hint:_ `cert-manager` operator is also installed in this step on the hub cluste
 1. Deploy the chart `helm upgrade --install mcoa-demo demo/mcoa-demo/`. This Helm chart will bootstrap configuration on the hub cluster to enabled it to receive signals from the spoke clustes.
 1. Run `oc label --overwrite managedcluster/local-cluster cluster.open-cluster-management.io/clusterset=hub-mcoa-clusters` to label the `local-cluster` a.k.a. hub so that the policy applies to it.
 
+### 2.1 Deploying a workload on the spoke cluster
+
+Since we will want to observe all the 3 observability signals (metrics, logs and traces) in the end we will deploy a workload on the spoke clusters to generate these signals
+
+1. On the spoke cluster run `helm upgrade --install demo-workload demo/demo-workload/` 
+
 ## 3. Install multicluster-observability-addon
 
 1. Deploy the addon controller by running `make addon-deploy`.
