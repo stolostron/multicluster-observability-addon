@@ -63,13 +63,13 @@ MCOA is able to consume these configmaps and generate the necessary secrets for 
 
 For this demo we will deploy these configurations using a helm chart. To make the demo swift, we've pre-defined the values in the values.yaml file `demo/addon-config/values.yaml`
 
-Now if we run the deployment command with `--dry-run` we will be able to see the resources that will be created
+So now if we enable the `--dry-run` flag we can see the resources that will be created.
 
 RUN `helm upgrade --install addon-config demo/addon-config/ --dry-run`
 
 @Joao go through logging resources
 
-As previously mentioned our ClusterLogForwarder is configured to forward logs to both CloudWatch and the Loki instance we have running on the hub cluster. Notice that we have set to `PLACEHOLDER` all the fields that will be overwriten with cluster specific information by MCOA when installing the addon on a spoke cluster. In this case, the `url` of the Loki instance, and the secret name that will be used for the communication.
+As previously mentioned our `ClusterLogForwarder` is configured to forward logs to both CloudWatch and the Loki instance we have running on the hub cluster. Notice that we have set to `PLACEHOLDER` all the fields that will be overwriten with cluster specific information by MCOA when installing the addon on a spoke cluster. In this case, the `url` of the Loki instance, and the secret name that will be used for the communication.
 
 We also create a configmap with the mapping between the signal store and the authentication method. This will signal MCOA that it needs to provision secrets for these communications.
 
@@ -85,21 +85,21 @@ RUN `helm upgrade --install addon-config demo/addon-config/`
 @Joao Run through the instalation
 
 Now that we have deployed the configuration for the addon its time to finally install the addon on the spoke clusters.
-The process of installing an addon on a cluster is quite trivial, we only need to create, in the namespace of the spoke cluster, a resource called `ManagedClusterAddOn` and give it the name `multicluster-observability-addon`. The `ManagedClusterAddOn` contains a list of resources that will be used by the manager to configure the addon deployment on the spoke cluster.
+The process of installing an addon on a cluster is quite trivial, we only need to create, in the namespace of the spoke cluster, a resource called `ManagedClusterAddOn` and give it the name `multicluster-observability-addon`. `ManagedClusterAddOn` contains a list of resources that will be used by the manager to configure the addon deployment on the spoke cluster.
 
-For this demo we will install the addon using a helm chart. As before we've pre-defined the values in the values.yaml file `demo/addon-install/values.yaml`
+For this demo we will install the addon using a helm chart. As before we've pre-defined the values in the values.yaml file to facilitate the demo `demo/addon-install/values.yaml`
 
-So now if I run the deployment command with `--dry-run` we will be able to see the resources that will be created.
+So now if we enable the `--dry-run` flag we can see the resources that will be created.
 
 RUN `helm upgrade --install addon-install demo/addon-install/ --dry-run`
 
-Looking at the `ManagedClusterAddOn` resouce
+Looking at the `ManagedClusterAddOn` resouce;
 
 @Joao go through the logging resources
 
 For the logging configuration we will use:
 - The authentication configmap called `logging-auth` which has the mapping between the log stores on `ClusterLogForwarder` and their authentication methods;
-- A configmap with the URL of the loki store, specific to the spoke cluster;
+- A configmap with the loki store URL, specific to the spoke cluster;
 - A configmap that will contain the CA, of the loki store;
 - And finally it's not on the list because if you remember it was a default on the `ClusterManagementAddOn` resource, but the `ClusterLogForwarder` template instance created before will also be used for configuration.
 
@@ -136,11 +136,11 @@ For the metrics collection we are installing:
 
 @Joao describe what's being installed
 
-For the log collection we are installing:
+For the logs we are installing:
 
-- Creating a `Subscription` and `OperatorGroup` to install the cluster-logging-operator
-- Then we are creating two secrets, one for Cloudwatch and one for Loki
-- Finally we are creating the ClusterLogging and ClusterLogForwarder resources to enable the forwarding of logs
+- A `Subscription` and `OperatorGroup` to install the cluster-logging-operator;
+- Two secrets for secure communication, one for Cloudwatch and one for Loki;
+- Finally, `ClusterLogging` and `ClusterLogForwarder` to enable the collection and forwarding of logs to the stores mentioned;
 
 - Traces
 
@@ -148,7 +148,7 @@ For the log collection we are installing:
 
 In the case of the OTEL Collector we can see it was deployed in the spoke cluster. If we check the OTEL Collector configuration (`oc -n spoke-otel get pods -o yaml`) we will see the endpoint and the certificates populated in the exporter.
 
-Now let's jump into the spoke cluster and we see the different signal collectors running correctly:
+Now let's jump into the spoke cluster to see if the different signal collectors are running correctly:
 
 First, Prometheus Agent
 
@@ -173,7 +173,7 @@ RUN `oc -n grafana-operator get route grafana-route`
 For this demo we deployed a workload that would generate all the 3 signals. This workload is running on a namespace called `openshift-mcoa-demo-workload`
 
 - First we have the total amount of container memory being used on the namespace.
-- Second we have the logs being produced by all the containers on the namespace, and the actuall logs.
+- Second we have a visual representation of the logs being produced by the containers on the namespace, and the actuall logs.
 - Third we have a set of traces produced by a pod running on the namespace.
 
 ## 4. Takeaways
