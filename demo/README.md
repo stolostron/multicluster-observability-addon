@@ -58,4 +58,4 @@ access this grafana instance to see the 3 signals in a single dashboard (roughly
 
 **Note: user: `root` password: `secret`**
 
-There will be a pre-loaded dashboard called "MCOA" that will contain a view of the 3 signals regarding pods in the `openshift-console-operator` namespace.
+There will be a pre-loaded dashboard called "MCOA" that will contain a view of the 3 signals regarding pods in the `openshift-mcoa-demo-workload` namespace.
