@@ -10,6 +10,6 @@ metadata:
   annotations:
     tracing.mcoa.openshift.io/target-output-name: otlp
 data:
-  endpoint: test-collector-observability.apps.{{ $.Values.hubClusterName }}:80
+  endpoint: otlp-grpc-otel-gateway-route-observability.apps.{{ $.Values.hubClusterName }}:443
 {{- end }}
 {{- end }}

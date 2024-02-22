@@ -1,0 +1,89 @@
+{{- if and .Values.tracing.enabled }}
+apiVersion: policy.open-cluster-management.io/v1
+kind: Policy
+metadata:
+  name: policy-otel-jobs
+spec:
+  disabled: false
+  policy-templates:
+  - extraDependencies:
+    - apiVersion: policy.open-cluster-management.io/v1
+      compliance: Compliant
+      kind: ConfigurationPolicy
+      name: redhat-otel-operator
+    objectDefinition:
+      apiVersion: policy.open-cluster-management.io/v1
+      kind: ConfigurationPolicy
+      metadata:
+        name: annotate-otel-ca
+      spec:
+        remediationAction: enforce
+        severity: high
+        pruneObjectBehavior: DeleteAll
+        object-templates:
+        - complianceType: musthave
+          objectDefinition:
+            apiVersion: batch/v1
+            kind: Job
+            metadata:
+              name: annotate-ca
+              namespace: observability
+            spec:
+              template:
+                spec:
+                  serviceAccountName: annotate-ca-job-sa
+                  containers:
+                  - name: annotate-ca
+                    image: bitnami/kubectl
+                    command:
+                      - "/bin/sh"
+                      - "-c"
+                      - |
+                        while true; do
+                          while true; do
+                            if kubectl get secret/otel-gateway -n observability >/dev/null 2>&1; then
+                              kubectl -n observability label --overwrite secret/otel-gateway mcoa.openshift.io/signal=tracing
+                              kubectl -n observability annotate --overwrite secret/otel-gateway tracing.mcoa.openshift.io/ca=true
+                              break
+                            else
+                              echo "Waiting for Secret..."
+                              sleep 10
+                            fi
+                          done
+                          sleep 10
+                        done
+                  restartPolicy: Never
+        - complianceType: musthave
+          objectDefinition:
+            apiVersion: v1
+            kind: ServiceAccount
+            metadata:
+              name: annotate-ca-job-sa
+              namespace: observability
+        - complianceType: musthave
+          objectDefinition:
+            apiVersion: rbac.authorization.k8s.io/v1
+            kind: Role
+            metadata:
+              name: annotate-ca-job-role
+              namespace: observability
+            rules:
+            - apiGroups: [""]
+              resources: ["secrets"]
+              verbs: ["get", "patch", "update"]
+        - complianceType: musthave
+          objectDefinition:
+            apiVersion: rbac.authorization.k8s.io/v1
+            kind: RoleBinding
+            metadata:
+              name: annotate-ca-job-role-binding
+              namespace: observability
+            subjects:
+            - kind: ServiceAccount
+              name: annotate-ca-job-sa
+              namespace: observability
+            roleRef:
+              kind: Role
+              name: annotate-ca-job-role
+              apiGroup: rbac.authorization.k8s.io
+{{- end }}

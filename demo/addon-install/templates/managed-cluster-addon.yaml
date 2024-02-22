@@ -39,5 +39,13 @@ spec:
   - resource: opentelemetrycollectors
     name: spoke-otelcol
     namespace: multicluster-observability-addon
+  # Tracing Auth ConfigMap
+  - resource: configmaps
+    name: tracing-auth
+    namespace: open-cluster-management
+  # Tracing ca-bundle configmap
+  - resource: secrets
+    name: otel-gateway
+    namespace: observability
 {{- end }}
 {{- end }}
