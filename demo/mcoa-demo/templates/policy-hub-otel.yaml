@@ -212,20 +212,4 @@ spec:
 {{- range $_, $cluster_name := .Values.spokeClusters }}
                           - otlp/{{ $cluster_name }}
 {{- end }}
-          - complianceType: musthave
-            objectDefinition:
-              apiVersion: route.openshift.io/v1
-              kind: Route
-              metadata:
-                name: test-collector
-                namespace: observability
-              spec:
-                host: test-collector-observability.apps.{{ .Values.hubClusterName }}
-                port:
-                  targetPort: otlp-grpc
-                to:
-                  kind: Service
-                  name: otel-gateway-collector
-                  weight: 100
-                wildcardPolicy: None
 {{- end }}
