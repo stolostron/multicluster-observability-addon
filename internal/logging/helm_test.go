@@ -16,7 +16,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
@@ -39,12 +38,13 @@ func fakeGetValues(t *testing.T, k8s client.Client) addonfactory.GetValuesFunc {
 		cluster *clusterv1.ManagedCluster,
 		addon *addonapiv1alpha1.ManagedClusterAddOn,
 	) (addonfactory.Values, error) {
-		opts, err := handlers.BuildOptions(k8s, logrtesting.NewTestLogger(t), addon, nil)
+		logger := logrtesting.NewTestLogger(t)
+		opts, err := handlers.BuildOptions(k8s, logger, addon, nil)
 		if err != nil {
 			return nil, err
 		}
 
-		logging, err := manifests.BuildValues(logrtesting.NewTestLogger(t), opts)
+		logging, err := manifests.BuildValues(logger, opts)
 		if err != nil {
 			return nil, err
 		}
@@ -225,9 +225,7 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 		WithAgentRegistrationOption(&agent.RegistrationOption{}).
 		WithScheme(scheme.Scheme).
 		BuildHelmAgentAddon()
-	if err != nil {
-		klog.Fatalf("failed to build agent %v", err)
-	}
+	require.NoError(t, err)
 
 	// Render manifests and return them as k8s runtime objects
 	objects, err := loggingAgentAddon.Manifests(managedCluster, managedClusterAddOn)

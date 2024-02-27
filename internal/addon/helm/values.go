@@ -12,7 +12,6 @@ import (
 	"github.com/rhobs/multicluster-observability-addon/internal/metrics"
 	thandlers "github.com/rhobs/multicluster-observability-addon/internal/tracing/handlers"
 	tmanifests "github.com/rhobs/multicluster-observability-addon/internal/tracing/manifests"
-	"k8s.io/klog/v2"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 	addonutils "open-cluster-management.io/addon-framework/pkg/utils"
@@ -77,13 +76,14 @@ func GetValuesFunc(k8s client.Client, log logr.Logger) addonfactory.GetValuesFun
 		}
 
 		if !opts.TracingDisabled {
-			klog.Info("Tracing enabled")
-			tracingOpts, err := thandlers.BuildOptions(k8s, mcAddon, aodc)
+			tLog := clusterLog.WithValues("signal", addon.Tracing)
+			tLog.V(1).Info("Tracing enabled")
+			tracingOpts, err := thandlers.BuildOptions(k8s, tLog, mcAddon, aodc)
 			if err != nil {
 				return nil, err
 			}
 
-			tracing, err := tmanifests.BuildValues(tracingOpts)
+			tracing, err := tmanifests.BuildValues(tLog, tracingOpts)
 			if err != nil {
 				return nil, err
 			}

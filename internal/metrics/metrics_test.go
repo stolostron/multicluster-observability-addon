@@ -12,7 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/klog/v2"
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
 	"open-cluster-management.io/addon-framework/pkg/agent"
@@ -85,9 +84,7 @@ func Test_GenerateManagedClusterResources(t *testing.T) {
 		WithAgentRegistrationOption(&agent.RegistrationOption{}).
 		WithScheme(scheme.Scheme).
 		BuildHelmAgentAddon()
-	if err != nil {
-		klog.Fatalf("failed to build agent %v", err)
-	}
+	require.NoError(t, err)
 
 	objects, err := metricsAgentAddon.Manifests(managedCluster, managedClusterAddOn)
 	require.NoError(t, err)

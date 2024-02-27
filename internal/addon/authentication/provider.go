@@ -171,24 +171,36 @@ func (sp *secretsProvider) injectCA(ctx context.Context, targetAuthType map[Targ
 		}
 	}
 
+	var errCount int32
 	for _, obj := range objects {
+		l := sp.log.WithValues(
+			"object_name", obj.GetName(),
+			"object_namespace", obj.GetNamespace(),
+			"object_kind", obj.GetObjectKind(),
+		)
+
 		desired := obj.DeepCopyObject().(client.Object)
 		mutateFn := manifests.MutateFuncFor(obj, desired, nil)
 
 		op, err := ctrl.CreateOrUpdate(ctx, sp.k8s, obj, mutateFn)
 		if err != nil {
-			klog.Error(err, "failed to configure resource")
+			l.Error(err, "failed to configure resource")
+			errCount++
 			continue
 		}
 
-		msg := fmt.Sprintf("Resource has been %s", op)
+		msg := fmt.Sprintf("resource has been %s", op)
 		switch op {
 		case ctrlutil.OperationResultNone:
-			klog.Info(msg)
+			l.V(1).Info(msg)
 		default:
-			klog.Info(msg)
+			l.Info(msg)
 		}
 	}
+	if errCount > 0 {
+		return kverrors.New("failed to inject ca", "failedResources", errCount)
+	}
+
 	return nil
 }
 

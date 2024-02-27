@@ -3,7 +3,7 @@ package manifests
 import (
 	"encoding/json"
 
-	"k8s.io/klog/v2"
+	"github.com/go-logr/logr"
 )
 
 type TracingValues struct {
@@ -17,7 +17,7 @@ type SecretValue struct {
 	Data string `json:"data"`
 }
 
-func BuildValues(opts Options) (TracingValues, error) {
+func BuildValues(log logr.Logger, opts Options) (TracingValues, error) {
 	values := TracingValues{
 		Enabled: true,
 	}
@@ -28,7 +28,7 @@ func BuildValues(opts Options) (TracingValues, error) {
 	}
 	values.Secrets = secrets
 
-	klog.Info("Building OTEL Collector instance")
+	log.V(1).Info("Building OTEL Collector instance")
 	otelColSpec, err := buildOtelColSpec(opts)
 	if err != nil {
 		return values, err

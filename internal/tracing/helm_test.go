@@ -4,6 +4,7 @@ import (
 	"os"
 	"testing"
 
+	logrtesting "github.com/go-logr/logr/testing"
 	corev1 "k8s.io/api/core/v1"
 
 	certmanagerv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
@@ -16,7 +17,6 @@ import (
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/klog/v2"
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
 	"open-cluster-management.io/addon-framework/pkg/agent"
@@ -34,17 +34,18 @@ var (
 	_ = certmanagerv1.AddToScheme(scheme.Scheme)
 )
 
-func fakeGetValues(k8s client.Client) addonfactory.GetValuesFunc {
+func fakeGetValues(t *testing.T, k8s client.Client) addonfactory.GetValuesFunc {
 	return func(
 		cluster *clusterv1.ManagedCluster,
 		addon *addonapiv1alpha1.ManagedClusterAddOn,
 	) (addonfactory.Values, error) {
-		opts, err := handlers.BuildOptions(k8s, addon, nil)
+		logger := logrtesting.NewTestLogger(t) 
+		opts, err := handlers.BuildOptions(k8s, logger, addon, nil)
 		if err != nil {
 			return nil, err
 		}
 
-		tracing, err := manifests.BuildValues(opts)
+		tracing, err := manifests.BuildValues(logger, opts)
 		if err != nil {
 			return nil, err
 		}
@@ -174,13 +175,11 @@ func Test_Tracing_AllConfigsTogether_AllResources(t *testing.T) {
 
 	// Wire everything together to a fake addon instance
 	tracingAgentAddon, err := addonfactory.NewAgentAddonFactory(addon.Name, addon.FS, addon.TracingChartDir).
-		WithGetValuesFuncs(addonConfigValuesFn, fakeGetValues(fakeKubeClient)).
+		WithGetValuesFuncs(addonConfigValuesFn, fakeGetValues(t, fakeKubeClient)).
 		WithAgentRegistrationOption(&agent.RegistrationOption{}).
 		WithScheme(scheme.Scheme).
 		BuildHelmAgentAddon()
-	if err != nil {
-		klog.Fatalf("failed to build agent %v", err)
-	}
+	require.NoError(t, err)
 
 	// Render manifests and return them as k8s runtime objects
 	objects, err := tracingAgentAddon.Manifests(managedCluster, managedClusterAddOn)

@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 
+	logrtesting "github.com/go-logr/logr/testing"
+
 	"github.com/rhobs/multicluster-observability-addon/internal/manifests"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -45,7 +47,7 @@ func Test_FetchSecrets(t *testing.T) {
 		Build()
 
 	spConfig := &Config{}
-	sp, err := NewSecretsProvider(fakeKubeClient, "test", "logging", spConfig)
+	sp, err := NewSecretsProvider(fakeKubeClient, logrtesting.NewTestLogger(t), "test", "logging", spConfig)
 	require.NoError(t, err)
 	keys := map[Target]SecretKey{
 		"target-1": {Name: "foo", Namespace: "bar"},
@@ -82,7 +84,7 @@ func Test_InjectCA(t *testing.T) {
 	spConfig := &Config{MTLSConfig: manifests.MTLSConfig{
 		CAToInject: ca,
 	}}
-	sp, err := NewSecretsProvider(fakeKubeClient, "test", "logging", spConfig)
+	sp, err := NewSecretsProvider(fakeKubeClient, logrtesting.NewTestLogger(t), "test", "logging", spConfig)
 	require.NoError(t, err)
 	targetAuth := map[Target]AuthenticationType{
 		"target-1": "mTLS",
