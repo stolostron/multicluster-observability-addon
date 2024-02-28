@@ -35,10 +35,6 @@ spec:
   - resource: configmaps
     name: tracing-{{ $cluster_name }}-otlp
     namespace: {{ $cluster_name }}
-  # Tracing template
-  - resource: opentelemetrycollectors
-    name: spoke-otelcol
-    namespace: multicluster-observability-addon
   # Tracing Auth ConfigMap
   - resource: configmaps
     name: tracing-auth
