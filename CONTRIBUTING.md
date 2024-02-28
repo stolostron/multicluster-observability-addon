@@ -107,13 +107,9 @@ metadata:
 spec:
   installNamespace: open-cluster-management-agent-addon
   configs:
-  # This ConfigMap will contain the CloudWatch url where we want to forward our
-  # logs to
   - resource: configmaps
     name: spoke-1
     namespace: spoke-1
-  # This Secret will contain the mTLS contents that will be used to communicate
-  # with CloudWatch
   - resource: secrets
     name: spoke-1
     namespace: spoke-1
@@ -123,5 +119,23 @@ spec:
    look for the `ManifestWorks`
 
 ```shell
-oc get manifestworks -n spoke-1
+oc -n spoke-1 get manifestworks addon-multicluster-observability-addon-deploy-0
 ```
+
+### Configuring Metrics
+
+Currently the addon doesn't support any configuration, so no configuration is needed at the `ManagedClusterAddOn` level. However, the addon has a dependency with MCO. 
+Nowadays the addon supports the collection of metrics from the spoke clusters. These metrics are sent to an MCO instance running in the Hub.
+
+### Configuring Logs
+
+Currently the addon supports configuration to send logs either to:
+
+- CloudWatch: requires the auth configmap to be specified
+- Loki: requires the auth configmap, the url configmap and optionally the inject ca configmap
+
+### Configuring Traces
+
+Currently the addon supports configuration to send traces to:
+
+- OpenTelemetryCollector: requires the auth configmap, the url configmap and optionally the inject ca configmap
