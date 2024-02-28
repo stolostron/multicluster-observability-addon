@@ -35,5 +35,13 @@ spec:
   - resource: configmaps
     name: tracing-{{ $cluster_name }}-otlp
     namespace: {{ $cluster_name }}
+  # Tracing Auth ConfigMap
+  - resource: configmaps
+    name: tracing-auth
+    namespace: open-cluster-management
+  # Tracing ca-bundle configmap
+  - resource: secrets
+    name: otel-gateway
+    namespace: observability
 {{- end }}
 {{- end }}

@@ -52,7 +52,7 @@ func Test_ConfigureExportersSecrets(t *testing.T) {
 	exportersField = cfg["exporters"]
 	exporters = exportersField.(map[string]interface{})
 	otlphttpField := exporters["otlphttp"]
-	otlphttp := otlphttpField.(map[interface{}]interface{})
+	otlphttp := otlphttpField.(map[string]interface{})
 	require.NotNil(t, otlphttp["tls"])
 }
 
@@ -119,7 +119,7 @@ func Test_getExporters(t *testing.T) {
 }
 
 func Test_configureExporterSecrets(t *testing.T) {
-	exporter := make(map[interface{}]interface{})
+	exporter := make(map[string]interface{})
 	secret := corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "tracing-otlphttp-auth",
@@ -131,7 +131,7 @@ func Test_configureExporterSecrets(t *testing.T) {
 			"tls.key": []byte("data"),
 		},
 	}
-	configureExporterSecrets(&exporter, secret)
+	configureExporterSecrets(exporter, secret)
 	require.NotNil(t, exporter["tls"])
 }
 

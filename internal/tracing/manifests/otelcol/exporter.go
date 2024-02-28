@@ -22,15 +22,15 @@ func ConfigureExportersSecrets(cfg map[string]interface{}, secret corev1.Secret,
 		if otelExporterName != exporterName {
 			continue
 		}
-		var configMap map[interface{}]interface{}
+		var configMap map[string]interface{}
 		if config == nil {
-			configMap = make(map[interface{}]interface{})
+			configMap = make(map[string]interface{})
 			exporters[otelExporterName] = configMap
 		} else {
-			configMap = config.(map[interface{}]interface{})
+			configMap = config.(map[string]interface{})
 		}
 
-		configureExporterSecrets(&configMap, secret)
+		configureExporterSecrets(configMap, secret)
 
 	}
 	return nil
@@ -79,7 +79,7 @@ func getExporters(cfg map[string]interface{}) (map[string]interface{}, error) {
 	return exporters, nil
 }
 
-func configureExporterSecrets(exporter *map[interface{}]interface{}, secret corev1.Secret) {
+func configureExporterSecrets(exporter map[string]interface{}, secret corev1.Secret) {
 	certConfig := make(map[string]interface{})
 	folder := fmt.Sprintf("/%s", secret.Name)
 	certConfig["insecure"] = false
@@ -87,7 +87,7 @@ func configureExporterSecrets(exporter *map[interface{}]interface{}, secret core
 	certConfig["key_file"] = fmt.Sprintf("%s/tls.key", folder)
 	certConfig["ca_file"] = fmt.Sprintf("%s/ca-bundle.crt", folder)
 
-	(*exporter)["tls"] = certConfig
+	exporter["tls"] = certConfig
 }
 
 func configureExporterEndpoint(exporter map[string]interface{}, cm corev1.ConfigMap) error {
