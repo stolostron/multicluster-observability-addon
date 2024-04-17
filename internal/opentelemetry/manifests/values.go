@@ -6,7 +6,7 @@ import (
 	"k8s.io/klog/v2"
 )
 
-type TracingValues struct {
+type OpenTelemetryValues struct {
 	Enabled     bool          `json:"enabled"`
 	OTELColSpec string        `json:"otelColSpec"`
 	Secrets     []SecretValue `json:"secrets"`
@@ -17,8 +17,8 @@ type SecretValue struct {
 	Data string `json:"data"`
 }
 
-func BuildValues(opts Options) (TracingValues, error) {
-	values := TracingValues{
+func BuildValues(opts Options) (OpenTelemetryValues, error) {
+	values := OpenTelemetryValues{
 		Enabled: true,
 	}
 

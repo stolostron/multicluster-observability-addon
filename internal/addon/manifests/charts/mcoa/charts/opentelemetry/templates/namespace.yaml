@@ -4,8 +4,8 @@ kind: Namespace
 metadata:
   name: openshift-opentelemetry-operator
   labels:
-    app: {{ template "tracinghelm.name" . }}
-    chart: {{ template "tracinghelm.chart" . }}
+    app: {{ template "opentelemetryhelm.name" . }}
+    chart: {{ template "opentelemetryhelm.chart" . }}
     release: {{ .Release.Name }}
 ---
 apiVersion: v1
@@ -13,7 +13,7 @@ kind: Namespace
 metadata:
   name: spoke-otelcol
   labels:
-    app: {{ template "tracinghelm.name" . }}
-    chart: {{ template "tracinghelm.chart" . }}
+    app: {{ template "opentelemetryhelm.name" . }}
+    chart: {{ template "opentelemetryhelm.chart" . }}
     release: {{ .Release.Name }}
 {{- end }}

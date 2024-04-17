@@ -8,23 +8,23 @@ const (
 	Name             = "multicluster-observability-addon"
 	InstallNamespace = "open-cluster-management"
 
-	McoaChartDir    = "manifests/charts/mcoa"
-	MetricsChartDir = "manifests/charts/mcoa/charts/metrics"
-	LoggingChartDir = "manifests/charts/mcoa/charts/logging"
-	TracingChartDir = "manifests/charts/mcoa/charts/tracing"
+	McoaChartDir          = "manifests/charts/mcoa"
+	MetricsChartDir       = "manifests/charts/mcoa/charts/metrics"
+	LoggingChartDir       = "manifests/charts/mcoa/charts/logging"
+	OpenTelemetryChartDir = "manifests/charts/mcoa/charts/opentelemetry"
 
 	ConfigMapResource             = "configmaps"
 	SecretResource                = "secrets"
 	AddonDeploymentConfigResource = "addondeploymentconfigs"
 
-	AdcMetricsDisabledKey = "metricsDisabled"
-	AdcLoggingDisabledKey = "loggingDisabled"
-	AdcTracingisabledKey  = "tracingDisabled"
+	AdcMetricsDisabledKey       = "metricsDisabled"
+	AdcLoggingDisabledKey       = "loggingDisabled"
+	AdcOpenTelemetryDisabledKey = "opentelemetryDisabled"
 
 	SignalLabelKey        = "mcoa.openshift.io/signal"
 	Metrics        Signal = "metrics"
 	Logging        Signal = "logging"
-	Tracing        Signal = "tracing"
+	OpenTelemetry  Signal = "opentelemetry"
 )
 
 //go:embed manifests
@@ -32,5 +32,5 @@ const (
 //go:embed manifests/charts/mcoa/templates/_helpers.tpl
 //go:embed manifests/charts/mcoa/charts/logging/templates/_helpers.tpl
 //go:embed manifests/charts/mcoa/charts/metrics/templates/_helpers.tpl
-//go:embed manifests/charts/mcoa/charts/tracing/templates/_helpers.tpl
+//go:embed manifests/charts/mcoa/charts/opentelemetry/templates/_helpers.tpl
 var FS embed.FS

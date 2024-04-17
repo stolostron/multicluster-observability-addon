@@ -1,4 +1,4 @@
-package tracing
+package opentelemetry
 
 import (
 	"os"
@@ -11,8 +11,8 @@ import (
 	operatorsv1 "github.com/operator-framework/api/pkg/operators/v1"
 	operatorsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	"github.com/rhobs/multicluster-observability-addon/internal/addon"
-	"github.com/rhobs/multicluster-observability-addon/internal/tracing/handlers"
-	"github.com/rhobs/multicluster-observability-addon/internal/tracing/manifests"
+	"github.com/rhobs/multicluster-observability-addon/internal/opentelemetry/handlers"
+	"github.com/rhobs/multicluster-observability-addon/internal/opentelemetry/manifests"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -44,16 +44,16 @@ func fakeGetValues(k8s client.Client) addonfactory.GetValuesFunc {
 			return nil, err
 		}
 
-		tracing, err := manifests.BuildValues(opts)
+		opentelemetry, err := manifests.BuildValues(opts)
 		if err != nil {
 			return nil, err
 		}
 
-		return addonfactory.JsonStructToValues(tracing)
+		return addonfactory.JsonStructToValues(opentelemetry)
 	}
 }
 
-func Test_Tracing_AllConfigsTogether_AllResources(t *testing.T) {
+func Test_OpenTelemetry_AllConfigsTogether_AllResources(t *testing.T) {
 	var (
 		// Addon envinronment and registration
 		managedCluster      *clusterv1.ManagedCluster
@@ -82,7 +82,7 @@ func Test_Tracing_AllConfigsTogether_AllResources(t *testing.T) {
 			},
 			ConfigReferent: addonapiv1alpha1.ConfigReferent{
 				Namespace: "open-cluster-management",
-				Name:      "tracing-auth",
+				Name:      "opentelemetry-auth",
 			},
 		},
 	}
@@ -134,10 +134,10 @@ func Test_Tracing_AllConfigsTogether_AllResources(t *testing.T) {
 
 	authCM = &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "tracing-auth",
+			Name:      "opentelemetry-auth",
 			Namespace: "open-cluster-management",
 			Labels: map[string]string{
-				"mcoa.openshift.io/signal": "tracing",
+				"mcoa.openshift.io/signal": "opentelemetry",
 			},
 		},
 		Data: map[string]string{
@@ -149,7 +149,7 @@ func Test_Tracing_AllConfigsTogether_AllResources(t *testing.T) {
 	// to mock the behaviour from cert-manager
 	generatedSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "tracing-otlphttp-auth",
+			Name:      "opentelemetry-otlphttp-auth",
 			Namespace: "cluster-1",
 		},
 		Data: map[string][]byte{
@@ -173,7 +173,7 @@ func Test_Tracing_AllConfigsTogether_AllResources(t *testing.T) {
 	)
 
 	// Wire everything together to a fake addon instance
-	tracingAgentAddon, err := addonfactory.NewAgentAddonFactory(addon.Name, addon.FS, addon.TracingChartDir).
+	otelAgentAddon, err := addonfactory.NewAgentAddonFactory(addon.Name, addon.FS, addon.OpenTelemetryChartDir).
 		WithGetValuesFuncs(addonConfigValuesFn, fakeGetValues(fakeKubeClient)).
 		WithAgentRegistrationOption(&agent.RegistrationOption{}).
 		WithScheme(scheme.Scheme).
@@ -183,7 +183,7 @@ func Test_Tracing_AllConfigsTogether_AllResources(t *testing.T) {
 	}
 
 	// Render manifests and return them as k8s runtime objects
-	objects, err := tracingAgentAddon.Manifests(managedCluster, managedClusterAddOn)
+	objects, err := otelAgentAddon.Manifests(managedCluster, managedClusterAddOn)
 	require.NoError(t, err)
 	require.Equal(t, 6, len(objects))
 
@@ -194,7 +194,7 @@ func Test_Tracing_AllConfigsTogether_AllResources(t *testing.T) {
 			require.Equal(t, "spoke-otelcol", obj.ObjectMeta.Namespace)
 			require.NotEmpty(t, obj.Spec.Config)
 		case *corev1.Secret:
-			if obj.Name == "tracing-otlphttp-auth" {
+			if obj.Name == "opentelemetry-otlphttp-auth" {
 				require.Equal(t, generatedSecret.Data, obj.Data)
 			}
 		}

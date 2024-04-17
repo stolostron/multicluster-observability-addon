@@ -8,7 +8,7 @@ import (
 	otelv1alpha1 "github.com/open-telemetry/opentelemetry-operator/apis/v1alpha1"
 	"github.com/rhobs/multicluster-observability-addon/internal/addon"
 	"github.com/rhobs/multicluster-observability-addon/internal/addon/authentication"
-	"github.com/rhobs/multicluster-observability-addon/internal/tracing/manifests"
+	"github.com/rhobs/multicluster-observability-addon/internal/opentelemetry/manifests"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	AnnotationCAToInject           = "tracing.mcoa.openshift.io/ca"
+	AnnotationCAToInject           = "opentelemetry.mcoa.openshift.io/ca"
 	opentelemetryCollectorResource = "opentelemetrycollectors"
 )
 
@@ -48,8 +48,8 @@ func BuildOptions(k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAdd
 				return resources, err
 			}
 
-			// Only care about cm's that configure tracing
-			if signal, ok := cm.Labels[addon.SignalLabelKey]; !ok || signal != addon.Tracing.String() {
+			// Only care about cm's that configure opentelemetry
+			if signal, ok := cm.Labels[addon.SignalLabelKey]; !ok || signal != addon.OpenTelemetry.String() {
 				klog.Info("skipped configmap")
 				continue
 			}
@@ -72,8 +72,8 @@ func BuildOptions(k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAdd
 				return resources, err
 			}
 
-			// Only care about cm's that configure tracing
-			if signal, ok := secret.Labels[addon.SignalLabelKey]; !ok || signal != addon.Tracing.String() {
+			// Only care about cm's that configure opentelemetry
+			if signal, ok := secret.Labels[addon.SignalLabelKey]; !ok || signal != addon.OpenTelemetry.String() {
 				klog.Info("skipped secret")
 				continue
 			}
@@ -100,7 +100,7 @@ func BuildOptions(k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAdd
 	}
 
 	if authCM != nil {
-		secretsProvider, err := authentication.NewSecretsProvider(k8s, mcAddon.Namespace, addon.Tracing, authConfig)
+		secretsProvider, err := authentication.NewSecretsProvider(k8s, mcAddon.Namespace, addon.OpenTelemetry, authConfig)
 		if err != nil {
 			return resources, err
 		}

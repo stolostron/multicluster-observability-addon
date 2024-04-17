@@ -12,7 +12,7 @@ import (
 func Test_ConfigureVolumes(t *testing.T) {
 	secret := corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "tracing-otlphttp-auth",
+			Name:      "opentelemetry-otlphttp-auth",
 			Namespace: "cluster-1",
 			Annotations: map[string]string{
 				annotation: "otlphttp",

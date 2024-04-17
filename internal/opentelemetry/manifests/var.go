@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	AnnotationTargetOutputName = "tracing.mcoa.openshift.io/target-output-name"
+	AnnotationTargetOutputName = "opentelemetry.mcoa.openshift.io/target-output-name"
 )
 
 var AuthDefaultConfig = &authentication.Config{

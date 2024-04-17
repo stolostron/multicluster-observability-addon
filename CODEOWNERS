@@ -3,10 +3,10 @@
 
 # Signal specific implementation folders.
 /internal/logging @rhobs/team-logging
-/internal/tracing @rhobs/team-tracing
+/internal/opentelemetry @rhobs/team-tracing
 /internal/metrics @rhobs/multicluster-observability
 
 # Signal specific charts.
 /internal/addon/manifests/charts/mcoa/charts/logging @rhobs/team-logging
-/internal/addon/manifests/charts/mcoa/charts/tracing @rhobs/team-tracing
+/internal/addon/manifests/charts/mcoa/charts/opentelemetry @rhobs/team-tracing
 /internal/addon/manifests/charts/mcoa/charts/metrics @rhobs/multicluster-observability

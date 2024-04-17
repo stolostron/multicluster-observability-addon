@@ -1,5 +1,0 @@
-apiVersion: v2
-description: A Helm chart for installing tracing collection and forwarding
-name: tracing
-version: 1.0.0
-appVersion: "1.0.0"

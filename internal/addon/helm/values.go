@@ -9,8 +9,8 @@ import (
 	lhandlers "github.com/rhobs/multicluster-observability-addon/internal/logging/handlers"
 	lmanifests "github.com/rhobs/multicluster-observability-addon/internal/logging/manifests"
 	"github.com/rhobs/multicluster-observability-addon/internal/metrics"
-	thandlers "github.com/rhobs/multicluster-observability-addon/internal/tracing/handlers"
-	tmanifests "github.com/rhobs/multicluster-observability-addon/internal/tracing/manifests"
+	ohandlers "github.com/rhobs/multicluster-observability-addon/internal/opentelemetry/handlers"
+	omanifests "github.com/rhobs/multicluster-observability-addon/internal/opentelemetry/manifests"
 	"k8s.io/klog/v2"
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 	addonutils "open-cluster-management.io/addon-framework/pkg/utils"
@@ -20,15 +20,15 @@ import (
 )
 
 type HelmChartValues struct {
-	Metrics metrics.MetricsValues    `json:"metrics"`
-	Logging lmanifests.LoggingValues `json:"logging"`
-	Tracing tmanifests.TracingValues `json:"tracing"`
+	Metrics       metrics.MetricsValues          `json:"metrics"`
+	Logging       lmanifests.LoggingValues       `json:"logging"`
+	OpenTelemetry omanifests.OpenTelemetryValues `json:"opentelemetry"`
 }
 
 type Options struct {
-	MetricsDisabled bool
-	LoggingDisabled bool
-	TracingDisabled bool
+	MetricsDisabled       bool
+	LoggingDisabled       bool
+	OpenTelemetryDisabled bool
 }
 
 func GetValuesFunc(k8s client.Client) addonfactory.GetValuesFunc {
@@ -73,18 +73,18 @@ func GetValuesFunc(k8s client.Client) addonfactory.GetValuesFunc {
 			userValues.Logging = *logging
 		}
 
-		if !opts.TracingDisabled {
-			klog.Info("Tracing enabled")
-			tracingOpts, err := thandlers.BuildOptions(k8s, addon, aodc)
+		if !opts.OpenTelemetryDisabled {
+			klog.Info("OpenTelemetry enabled")
+			otelOps, err := ohandlers.BuildOptions(k8s, addon, aodc)
 			if err != nil {
 				return nil, err
 			}
 
-			tracing, err := tmanifests.BuildValues(tracingOpts)
+			otel, err := omanifests.BuildValues(otelOps)
 			if err != nil {
 				return nil, err
 			}
-			userValues.Tracing = tracing
+			userValues.OpenTelemetry = otel
 		}
 
 		return addonfactory.JsonStructToValues(userValues)
@@ -126,12 +126,12 @@ func buildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Opti
 			}
 			opts.LoggingDisabled = value
 		}
-		if keyvalue.Name == addon.AdcTracingisabledKey {
+		if keyvalue.Name == addon.AdcOpenTelemetryDisabledKey {
 			value, err := strconv.ParseBool(keyvalue.Value)
 			if err != nil {
 				return opts, err
 			}
-			opts.TracingDisabled = value
+			opts.OpenTelemetryDisabled = value
 		}
 
 	}

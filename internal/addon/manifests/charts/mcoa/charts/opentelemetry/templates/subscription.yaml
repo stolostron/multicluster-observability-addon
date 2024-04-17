@@ -5,8 +5,8 @@ metadata:
   name: opentelemetry-product
   namespace: openshift-opentelemetry-operator
   labels:
-    app: {{ template "tracinghelm.name" . }}
-    chart: {{ template "tracinghelm.chart" . }}
+    app: {{ template "opentelemetryhelm.name" . }}
+    chart: {{ template "opentelemetryhelm.chart" . }}
     release: {{ .Release.Name }}
 spec:
   channel: stable

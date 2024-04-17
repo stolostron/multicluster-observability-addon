@@ -6,7 +6,7 @@ import (
 
 	"github.com/ViaQ/logerr/v2/kverrors"
 	otelv1alpha1 "github.com/open-telemetry/opentelemetry-operator/apis/v1alpha1"
-	"github.com/rhobs/multicluster-observability-addon/internal/tracing/manifests/otelcol"
+	"github.com/rhobs/multicluster-observability-addon/internal/opentelemetry/manifests/otelcol"
 	"gopkg.in/yaml.v3"
 	corev1 "k8s.io/api/core/v1"
 )

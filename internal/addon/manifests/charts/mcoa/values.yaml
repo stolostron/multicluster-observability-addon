@@ -6,5 +6,5 @@ metrics:
 logging:
   enabled: true
 
-tracing:
+opentelemetry:
   enabled: true

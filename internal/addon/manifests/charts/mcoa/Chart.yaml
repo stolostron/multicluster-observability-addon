@@ -11,6 +11,6 @@ dependencies:
 - name: logging
   repository: 'file://./charts/logging'
   condition: logging.enabled
-- name: tracing
-  repository: 'file://./charts/tracing'
-  condition: tracing.enabled
+- name: opentelemetry
+  repository: 'file://./charts/opentelemetry'
+  condition: opentelemetry.enabled

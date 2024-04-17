@@ -5,8 +5,8 @@ metadata:
   name: spoke-otelcol
   namespace: spoke-otelcol
   labels:
-    app: {{ template "tracinghelm.name" . }}
-    chart: {{ template "tracinghelm.chart" . }}
+    app: {{ template "opentelemetryhelm.name" . }}
+    chart: {{ template "opentelemetryhelm.chart" . }}
     release: {{ .Release.Name }}
 spec:
 {{- fromJson .Values.otelColSpec | toYaml | nindent 2 }}

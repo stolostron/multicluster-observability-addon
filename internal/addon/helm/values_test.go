@@ -70,7 +70,7 @@ func Test_Mcoa_Disable_Charts(t *testing.T) {
 					Value: "true",
 				},
 				{
-					Name:  "tracingDisabled",
+					Name:  "opentelemetryDisabled",
 					Value: "true",
 				},
 			},

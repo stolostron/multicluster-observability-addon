@@ -9,7 +9,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-var annotation = "tracing.mcoa.openshift.io/target-output-name"
+var annotation = "opentelemetry.mcoa.openshift.io/target-output-name"
 
 func Test_ConfigureExportersSecrets(t *testing.T) {
 	b, err := os.ReadFile("./test_data/simplest.yaml")
@@ -20,7 +20,7 @@ func Test_ConfigureExportersSecrets(t *testing.T) {
 
 	secret := corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "tracing-otlphttp-auth",
+			Name:      "opentelemetry-otlphttp-auth",
 			Namespace: "cluster-1",
 			Annotations: map[string]string{
 				annotation: "otlphttp",
@@ -65,10 +65,10 @@ func Test_ConfigureExportersEndpoints(t *testing.T) {
 
 	cm := corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "tracing-auth",
+			Name:      "opentelemetry-auth",
 			Namespace: "open-cluster-management",
 			Labels: map[string]string{
-				"mcoa.openshift.io/signal": "tracing",
+				"mcoa.openshift.io/signal": "opentelemetry",
 			},
 			Annotations: map[string]string{
 				annotation: "otlphttp",
@@ -122,7 +122,7 @@ func Test_configureExporterSecrets(t *testing.T) {
 	exporter := make(map[string]interface{})
 	secret := corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "tracing-otlphttp-auth",
+			Name:      "opentelemetry-otlphttp-auth",
 			Namespace: "cluster-1",
 		},
 		Data: map[string][]byte{
@@ -139,10 +139,10 @@ func Test_configureExporterEndpoint(t *testing.T) {
 	exporter := make(map[string]interface{})
 	cm := corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "tracing-auth",
+			Name:      "opentelemetry-auth",
 			Namespace: "open-cluster-management",
 			Labels: map[string]string{
-				"mcoa.openshift.io/signal": "tracing",
+				"mcoa.openshift.io/signal": "opentelemetry",
 			},
 		},
 		Data: map[string]string{
@@ -157,10 +157,10 @@ func Test_configureExporterEndpoint(t *testing.T) {
 
 	cm = corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "tracing-auth",
+			Name:      "opentelemetry-auth",
 			Namespace: "open-cluster-management",
 			Labels: map[string]string{
-				"mcoa.openshift.io/signal": "tracing",
+				"mcoa.openshift.io/signal": "opentelemetry",
 			},
 		},
 		Data: map[string]string{
