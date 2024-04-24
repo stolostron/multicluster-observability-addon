@@ -39,8 +39,6 @@ func GetObjectKey(configRef []addonapiv1alpha1.ConfigReference, group, resource 
 	return key
 }
 
-// agentHealthProber returns an instance of the agent's health prober. It is used for
-// probing and checking the health status of the agent.
 func AgentHealthProber() *agent.HealthProber {
 	return &agent.HealthProber{
 		Type: agent.HealthProberTypeDeploymentAvailability,
