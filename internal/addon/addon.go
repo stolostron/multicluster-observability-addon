@@ -1,10 +1,18 @@
 package addon
 
 import (
+	"fmt"
+
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	"open-cluster-management.io/addon-framework/pkg/utils"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	workapiv1 "open-cluster-management.io/api/work/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+)
+
+const (
+	clusterLoggingNS = "openshift-logging"
+	collectorNS      = "spoke-otelcol"
 )
 
 func NewRegistrationOption(agentName string) *agent.RegistrationOption {
@@ -29,4 +37,59 @@ func GetObjectKey(configRef []addonapiv1alpha1.ConfigReference, group, resource 
 		break
 	}
 	return key
+}
+
+// agentHealthProber returns an instance of the agent's health prober. It is used for
+// probing and checking the health status of the agent.
+func AgentHealthProber() *agent.HealthProber {
+	return &agent.HealthProber{
+		Type: agent.HealthProberTypeDeploymentAvailability,
+		WorkProber: &agent.WorkHealthProber{
+			ProbeFields: []agent.ProbeField{
+				{
+					ResourceIdentifier: workapiv1.ResourceIdentifier{
+						Group:     "apps",
+						Resource:  "deployments",
+						Name:      "cluster-logging-operator",
+						Namespace: clusterLoggingNS,
+					},
+					ProbeRules: []workapiv1.FeedbackRule{
+						{
+							Type: workapiv1.WellKnownStatusType,
+						},
+					},
+				},
+				{
+					ResourceIdentifier: workapiv1.ResourceIdentifier{
+						Group:     "apps",
+						Resource:  "deployments",
+						Name:      "spoke-otelcol-collector",
+						Namespace: collectorNS,
+					},
+					ProbeRules: []workapiv1.FeedbackRule{
+						{
+							Type: workapiv1.WellKnownStatusType,
+						},
+					},
+				},
+			},
+			HealthCheck: func(identifier workapiv1.ResourceIdentifier, result workapiv1.StatusFeedbackResult) error {
+				if len(result.Values) == 0 {
+					return fmt.Errorf("no values are probed for deployment %s/%s", identifier.Namespace, identifier.Name)
+				}
+				for _, value := range result.Values {
+					if value.Name != "readyReplicas" {
+						continue
+					}
+
+					if *value.Value.Integer >= 1 {
+						return nil
+					}
+
+					return fmt.Errorf("readyReplica is %d for deployement %s/%s", *value.Value.Integer, identifier.Namespace, identifier.Name)
+				}
+				return fmt.Errorf("readyReplica is not probed")
+			},
+		},
+	}
 }
