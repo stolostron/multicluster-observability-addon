@@ -10,11 +10,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-const (
-	clusterLoggingNS = "openshift-logging"
-	collectorNS      = "spoke-otelcol"
-)
-
 func NewRegistrationOption(agentName string) *agent.RegistrationOption {
 	return &agent.RegistrationOption{
 		CSRConfigurations: agent.KubeClientSignerConfigurations(Name, agentName),
@@ -49,7 +44,7 @@ func AgentHealthProber() *agent.HealthProber {
 						Group:     "apps",
 						Resource:  "deployments",
 						Name:      "cluster-logging-operator",
-						Namespace: clusterLoggingNS,
+						Namespace: ClusterLoggingNS,
 					},
 					ProbeRules: []workapiv1.FeedbackRule{
 						{
@@ -62,7 +57,7 @@ func AgentHealthProber() *agent.HealthProber {
 						Group:     "apps",
 						Resource:  "deployments",
 						Name:      "spoke-otelcol-collector",
-						Namespace: collectorNS,
+						Namespace: CollectorNS,
 					},
 					ProbeRules: []workapiv1.FeedbackRule{
 						{
@@ -72,21 +67,27 @@ func AgentHealthProber() *agent.HealthProber {
 				},
 			},
 			HealthCheck: func(identifier workapiv1.ResourceIdentifier, result workapiv1.StatusFeedbackResult) error {
+				if identifier.Resource != "deployments" {
+					return fmt.Errorf("unsupported resource type %s", identifier.Resource)
+				}
+				if identifier.Group != "apps" {
+					return fmt.Errorf("unsupported resource group %s", identifier.Group)
+				}
 				if len(result.Values) == 0 {
 					return fmt.Errorf("no values are probed for deployment %s/%s", identifier.Namespace, identifier.Name)
 				}
 				for _, value := range result.Values {
-					if value.Name != "readyReplicas" {
+					if value.Name != "ReadyReplicas" {
 						continue
 					}
 
-					if *value.Value.Integer >= 1 {
+					if *value.Value.Integer >= 0 {
 						return nil
 					}
 
-					return fmt.Errorf("readyReplica is %d for deployement %s/%s", *value.Value.Integer, identifier.Namespace, identifier.Name)
+					return fmt.Errorf("readyReplicas is %d for deployement %s/%s", *value.Value.Integer, identifier.Namespace, identifier.Name)
 				}
-				return fmt.Errorf("readyReplica is not probed")
+				return fmt.Errorf("readyReplicas is not probed")
 			},
 		},
 	}

@@ -16,6 +16,9 @@ const (
 
 	AdcLoggingDisabledKey = "loggingDisabled"
 	AdcTracingisabledKey  = "tracingDisabled"
+
+	ClusterLoggingNS        = "openshift-logging"
+	CollectorNS             = "spoke-otelcol"
 )
 
 //go:embed manifests
