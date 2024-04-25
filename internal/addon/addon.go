@@ -81,7 +81,7 @@ func AgentHealthProber() *agent.HealthProber {
 						continue
 					}
 
-					if *value.Value.Integer >= 0 {
+					if *value.Value.Integer >= 1 {
 						return nil
 					}
 

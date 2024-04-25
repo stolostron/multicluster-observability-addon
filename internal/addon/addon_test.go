@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog/v2"
 	v1 "open-cluster-management.io/api/work/v1"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -17,6 +18,10 @@ import (
 func Test_AgentHealthProber_Healthy(t *testing.T) {
 	fakeKubeClient := fake.NewClientBuilder().Build()
 	colDeployment := &appsv1.Deployment{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "apps",
+			Kind:       "deployments",
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "spoke-otelcol-collector",
 			Namespace: "spoke-otelcol",
@@ -41,7 +46,7 @@ func Test_AgentHealthProber_Healthy(t *testing.T) {
 	}, v1.StatusFeedbackResult{
 		Values: []v1.FeedbackValue{
 			{
-				Name: "readyReplicas",
+				Name: "ReadyReplicas",
 				Value: v1.FieldValue{
 					Type:    v1.Integer,
 					Integer: &readyReplicas,
@@ -54,11 +59,12 @@ func Test_AgentHealthProber_Healthy(t *testing.T) {
 
 }
 
-func Test_AgentHealthProber(t *testing.T) {
-
-	fakeKubeClient := fake.NewClientBuilder().Build()
-
+func Test_AgentHealthProber_Unhealthy(t *testing.T) {
 	cloDeployment := &appsv1.Deployment{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "apps",
+			Kind:       "deployments",
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "cluster-logging-operator",
 			Namespace: "openshift-logging",
@@ -67,15 +73,11 @@ func Test_AgentHealthProber(t *testing.T) {
 			ReadyReplicas: 0,
 		},
 	}
-
-	err := fakeKubeClient.Create(context.TODO(), cloDeployment, &client.CreateOptions{})
-	require.NoError(t, err)
-
 	readyReplicas := int64(cloDeployment.Status.ReadyReplicas)
 
 	healthProber := AgentHealthProber()
 
-	err = healthProber.WorkProber.HealthCheck(v1.ResourceIdentifier{
+	err := healthProber.WorkProber.HealthCheck(v1.ResourceIdentifier{
 		Group:     cloDeployment.APIVersion,
 		Resource:  cloDeployment.Kind,
 		Name:      cloDeployment.Name,
@@ -83,7 +85,7 @@ func Test_AgentHealthProber(t *testing.T) {
 	}, v1.StatusFeedbackResult{
 		Values: []v1.FeedbackValue{
 			{
-				Name: "readyReplicas",
+				Name: "ReadyReplicas",
 				Value: v1.FieldValue{
 					Type:    v1.Integer,
 					Integer: &readyReplicas,
@@ -92,7 +94,9 @@ func Test_AgentHealthProber(t *testing.T) {
 		},
 	})
 
-	expectedErr := fmt.Errorf("readyReplica is %d for deployement %s/%s", readyReplicas, cloDeployment.Namespace, cloDeployment.Name)
+	klog.Info(err)
+
+	expectedErr := fmt.Errorf("readyReplicas is %d for deployement %s/%s", readyReplicas, cloDeployment.Namespace, cloDeployment.Name)
 	require.EqualError(t, err, expectedErr.Error())
 
 }
