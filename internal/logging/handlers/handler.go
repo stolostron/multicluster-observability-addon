@@ -46,7 +46,7 @@ func BuildOptions(k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAdd
 			}
 
 			// If a cm has the ca annotation then it's the configmap containing the ca
-			if _, ok := cm.Annotations[manifests.AnnotationCAToInject]; ok {
+			if _, ok := cm.Annotations[authentication.AnnotationCAToInject]; ok {
 				caCM = cm
 				continue
 			}

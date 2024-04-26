@@ -9,6 +9,8 @@ const (
 	MTLS AuthenticationType = "mTLS"
 	// MCO represents an authentication type that will re-use the MCO provided credentials
 	MCO AuthenticationType = "MCO"
+
+	AnnotationCAToInject = "authentication.mcoa.openshift.io/ca"
 )
 
 var certManagerCRDs = []string{"certificates.cert-manager.io", "issuers.cert-manager.io", "clusterissuers.cert-manager.io"}

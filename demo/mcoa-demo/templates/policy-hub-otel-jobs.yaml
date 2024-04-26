@@ -43,7 +43,7 @@ spec:
                           while true; do
                             if kubectl get secret/otel-gateway -n observability >/dev/null 2>&1; then
                               kubectl -n observability label --overwrite secret/otel-gateway mcoa.openshift.io/signal=tracing
-                              kubectl -n observability annotate --overwrite secret/otel-gateway tracing.mcoa.openshift.io/ca=true
+                              kubectl -n observability annotate --overwrite secret/otel-gateway authentication.mcoa.openshift.io/ca=true
                               break
                             else
                               echo "Waiting for Secret..."

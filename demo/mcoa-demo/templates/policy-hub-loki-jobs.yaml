@@ -43,7 +43,7 @@ spec:
                           while true; do
                             if kubectl get cm/lokistack-hub-gateway-ca-bundle -n openshift-logging >/dev/null 2>&1; then
                               kubectl -n openshift-logging label --overwrite cm/lokistack-hub-gateway-ca-bundle mcoa.openshift.io/signal=logging
-                              kubectl -n openshift-logging annotate --overwrite cm/lokistack-hub-gateway-ca-bundle logging.mcoa.openshift.io/ca=true
+                              kubectl -n openshift-logging annotate --overwrite cm/lokistack-hub-gateway-ca-bundle authentication.mcoa.openshift.io/ca=true
                               break
                             else
                               echo "Waiting for ConfigMap..."
