@@ -12,7 +12,7 @@ const (
 	AnnotationCAToInject       = "logging.mcoa.openshift.io/ca"
 
 	subscriptionChannelValueKey = "loggingSubscriptionChannel"
-	defaultLoggingVersion       = "stable-5.8"
+	defaultLoggingVersion       = "stable-5.9"
 
 	certOrganizatonalUnit = "multicluster-observability-addon"
 	certDNSNameCollector  = "collector.openshift-logging.svc"
