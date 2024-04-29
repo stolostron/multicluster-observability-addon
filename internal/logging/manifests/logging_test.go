@@ -26,7 +26,7 @@ func Test_BuildSubscriptionChannel(t *testing.T) {
 			name:       "unknown key",
 			key:        "test",
 			value:      "stable-1.0",
-			subChannel: "stable-5.8",
+			subChannel: "stable-5.9",
 		},
 		{
 			name:       "known key",
