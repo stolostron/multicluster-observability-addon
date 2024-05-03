@@ -6,4 +6,4 @@ metadata:
 spec:
   customizedVariables:
     - name: loggingSubscriptionChannel
-      value: stable-5.8
+      value: stable-5.9

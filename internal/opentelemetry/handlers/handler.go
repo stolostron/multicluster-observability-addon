@@ -79,7 +79,7 @@ func BuildOptions(k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAdd
 			}
 
 			// If the secret has the ca annotation then it's the secret containing the ca
-			if _, ok := secret.Annotations[AnnotationCAToInject]; ok {
+			if _, ok := secret.Annotations[authentication.AnnotationCAToInject]; ok {
 				caSecret = secret
 				continue
 			}

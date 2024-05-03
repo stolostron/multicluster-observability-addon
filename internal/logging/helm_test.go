@@ -199,7 +199,7 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 			CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
 				{
 					Name:  "loggingSubscriptionChannel",
-					Value: "stable-5.8",
+					Value: "stable-5.9",
 				},
 			},
 		},
@@ -236,7 +236,7 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 	for _, obj := range objects {
 		switch obj := obj.(type) {
 		case *operatorsv1alpha1.Subscription:
-			require.Equal(t, obj.Spec.Channel, "stable-5.8")
+			require.Equal(t, obj.Spec.Channel, "stable-5.9")
 		case *loggingv1.ClusterLogForwarder:
 			require.NotNil(t, obj.Spec.Outputs[0].Secret)
 			require.NotNil(t, obj.Spec.Outputs[1].Secret)
