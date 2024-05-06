@@ -46,7 +46,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&clfctrl.ClusterLogForwarderReconciler{
+	if err = (&clfctrl.WatcherReconciler{
 		Client: mgr.GetClient(),
 		Log:    logger.WithName("controllers").WithName("mcoa-clf-watcher"),
 		Scheme: mgr.GetScheme(),

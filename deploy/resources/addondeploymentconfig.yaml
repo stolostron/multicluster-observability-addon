@@ -7,3 +7,7 @@ spec:
   customizedVariables:
     - name: loggingSubscriptionChannel
       value: stable-5.9
+    - name: metricsDisabled
+      value: "true"
+    - name: tracingDisabled
+      value: "true"

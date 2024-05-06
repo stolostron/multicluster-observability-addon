@@ -28,3 +28,13 @@ spec:
                 - ALL
             privileged: false
             runAsNonRoot: true
+        - name: watcher
+          image: watcher:latest
+          imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            privileged: false
+            runAsNonRoot: true
