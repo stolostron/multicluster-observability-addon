@@ -50,6 +50,7 @@ func UpdateAnnotationOnManifestWorks(ctx context.Context, log logr.Logger, req c
 
 	opts, err := BuildOptions(k, &addon, nil)
 	if err != nil {
+		ll.Error(err, "failed to buildOptions managedclusteraddon")
 		return kverrors.Wrap(err, "failed to buildOptions managedclusteraddon", "name", req.NamespacedName)
 	}
 

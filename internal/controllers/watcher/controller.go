@@ -16,6 +16,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 )
 
 var (
@@ -57,7 +58,7 @@ func (r *WatcherReconciler) enqueueForClusterSpecificResource() handler.EventHan
 	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
 		key := client.ObjectKey{Name: "multicluster-observability-addon", Namespace: obj.GetNamespace()}
 		addon := &addonapiv1alpha1.ManagedClusterAddOn{}
-		if err := r.Client.Get(ctx, key, addon); err != nil {
+		if err := r.Client.Get(ctx, key, addon); err != nil && !apierrors.IsNotFound(err){
 			r.Log.Error(err, "Error getting ManagedClusterAddon resources in event handler")
 			return nil
 		}

@@ -5,13 +5,16 @@ import (
 	"os"
 
 	"github.com/ViaQ/logerr/v2/log"
+	clfctrl "github.com/rhobs/multicluster-observability-addon/internal/controllers/watcher"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	loggingapis "github.com/openshift/cluster-logging-operator/apis"
+	workv1 "open-cluster-management.io/api/work/v1"
+	certmanagerv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
-
-	clfctrl "github.com/rhobs/multicluster-observability-addon/internal/controllers/watcher"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -22,6 +25,10 @@ var scheme = runtime.NewScheme()
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+	utilruntime.Must(addonapiv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(workv1.AddToScheme(scheme))
+	utilruntime.Must(loggingapis.AddToScheme(scheme))
+	utilruntime.Must(certmanagerv1.AddToScheme(scheme))
 
 	// +kubebuilder:scaffold:scheme
 }
