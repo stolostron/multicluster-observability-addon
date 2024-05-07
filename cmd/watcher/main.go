@@ -5,14 +5,14 @@ import (
 	"os"
 
 	"github.com/ViaQ/logerr/v2/log"
+	certmanagerv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
+	loggingapis "github.com/openshift/cluster-logging-operator/apis"
 	clfctrl "github.com/rhobs/multicluster-observability-addon/internal/controllers/watcher"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
-	loggingapis "github.com/openshift/cluster-logging-operator/apis"
 	workv1 "open-cluster-management.io/api/work/v1"
-	certmanagerv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 
@@ -55,10 +55,10 @@ func main() {
 
 	if err = (&clfctrl.WatcherReconciler{
 		Client: mgr.GetClient(),
-		Log:    logger.WithName("controllers").WithName("mcoa-clf-watcher"),
+		Log:    logger.WithName("controllers").WithName("mcoa-watcher"),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
-		logger.Error(err, "unable to create controller", "controller", "mcoa-clf-watcher")
+		logger.Error(err, "unable to create controller", "controller", "mcoa-watcher")
 		os.Exit(1)
 	}
 

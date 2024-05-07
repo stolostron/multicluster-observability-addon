@@ -7,6 +7,7 @@ import (
 	"github.com/ViaQ/logerr/v2/kverrors"
 	"github.com/go-logr/logr"
 	"github.com/mitchellh/hashstructure"
+	lhandlers "github.com/rhobs/multicluster-observability-addon/internal/logging/handlers"
 	"github.com/rhobs/multicluster-observability-addon/internal/manifests"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
@@ -48,7 +49,7 @@ func UpdateAnnotationOnManifestWorks(ctx context.Context, log logr.Logger, req c
 		return nil
 	}
 
-	opts, err := BuildOptions(k, &addon, nil)
+	opts, err := lhandlers.BuildOptions(k, &addon, nil)
 	if err != nil {
 		ll.Error(err, "failed to buildOptions managedclusteraddon")
 		return kverrors.Wrap(err, "failed to buildOptions managedclusteraddon", "name", req.NamespacedName)
@@ -71,7 +72,7 @@ func UpdateAnnotationOnManifestWorks(ctx context.Context, log logr.Logger, req c
 
 		op, err := ctrl.CreateOrUpdate(ctx, k, obj, mutateFn)
 		if err != nil {
-			kverrors.Wrap(err, "failed to configure resource")
+			klog.Error(err, "failed to configure resource")
 			continue
 		}
 

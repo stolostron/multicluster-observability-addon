@@ -4,8 +4,11 @@ import (
 	"context"
 
 	"github.com/go-logr/logr"
-	"github.com/rhobs/multicluster-observability-addon/internal/logging/handlers"
+	loggingv1 "github.com/openshift/cluster-logging-operator/apis/logging/v1"
+	"github.com/rhobs/multicluster-observability-addon/internal/handlers"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
@@ -16,17 +19,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 )
 
-var (
-	noReconcilePred = builder.WithPredicates(predicate.Funcs{
-		UpdateFunc:  func(ue event.UpdateEvent) bool { return false },
-		CreateFunc:  func(e event.CreateEvent) bool { return false },
-		DeleteFunc:  func(e event.DeleteEvent) bool { return false },
-		GenericFunc: func(e event.GenericEvent) bool { return false },
-	})
-)
+var noReconcilePred = builder.WithPredicates(predicate.Funcs{
+	UpdateFunc:  func(ue event.UpdateEvent) bool { return false },
+	CreateFunc:  func(e event.CreateEvent) bool { return false },
+	DeleteFunc:  func(e event.DeleteEvent) bool { return false },
+	GenericFunc: func(e event.GenericEvent) bool { return false },
+})
 
 // WatcherReconciler reconciles the ManagedClusterAddon to annotate the ManiestWorks resource
 type WatcherReconciler struct {
@@ -51,6 +51,7 @@ func (r *WatcherReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&addonapiv1alpha1.ManagedClusterAddOn{}, noReconcilePred).
 		Watches(&corev1.ConfigMap{}, r.enqueueForClusterSpecificResource(), builder.OnlyMetadata).
 		Watches(&corev1.Secret{}, r.enqueueForClusterSpecificResource(), builder.OnlyMetadata).
+		Watches(&loggingv1.ClusterLogForwarder{}, r.enqueueForClusterWideResource(), builder.OnlyMetadata).
 		Complete(r)
 }
 
@@ -58,8 +59,8 @@ func (r *WatcherReconciler) enqueueForClusterSpecificResource() handler.EventHan
 	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
 		key := client.ObjectKey{Name: "multicluster-observability-addon", Namespace: obj.GetNamespace()}
 		addon := &addonapiv1alpha1.ManagedClusterAddOn{}
-		if err := r.Client.Get(ctx, key, addon); err != nil && !apierrors.IsNotFound(err){
-			r.Log.Error(err, "Error getting ManagedClusterAddon resources in event handler")
+		if err := r.Client.Get(ctx, key, addon); err != nil && !apierrors.IsNotFound(err) {
+			r.Log.Error(err, "Error getting managedclusteraddon resources in event handler")
 			return nil
 		}
 		return []reconcile.Request{
@@ -68,6 +69,30 @@ func (r *WatcherReconciler) enqueueForClusterSpecificResource() handler.EventHan
 					Name:      addon.Name,
 					Namespace: addon.Namespace,
 				},
-			}}
+			},
+		}
+	})
+}
+
+func (r *WatcherReconciler) enqueueForClusterWideResource() handler.EventHandler {
+	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
+		addonList := &addonapiv1alpha1.ManagedClusterAddOnList{}
+		if err := r.Client.List(ctx, addonList, &client.ListOptions{
+			LabelSelector: labels.SelectorFromSet(labels.Set{
+				"open-cluster-management.io/addon-name": "multicluster-observability-addon",
+			})}); err != nil {
+			r.Log.Error(err, "Error listing managedclusteraddon resources in event handler")
+			return nil
+		}
+		var requests []reconcile.Request
+		for _, addon := range addonList.Items {
+			requests = append(requests, reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Namespace: addon.Namespace,
+					Name:      addon.Name,
+				},
+			})
+		}
+		return requests
 	})
 }
