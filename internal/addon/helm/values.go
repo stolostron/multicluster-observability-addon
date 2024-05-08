@@ -42,11 +42,11 @@ func GetValuesFunc(k8s client.Client) addonfactory.GetValuesFunc {
 			return nil, err
 		}
 
-		aodc, err := getAddOnDeploymentConfig(k8s, addon)
+		aodc, err := GetAddOnDeploymentConfig(k8s, addon)
 		if err != nil {
 			return nil, err
 		}
-		opts, err := buildOptions(aodc)
+		opts, err := BuildOptions(aodc)
 		if err != nil {
 			return nil, err
 		}
@@ -92,7 +92,7 @@ func GetValuesFunc(k8s client.Client) addonfactory.GetValuesFunc {
 	}
 }
 
-func getAddOnDeploymentConfig(k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAddOn) (*addonapiv1alpha1.AddOnDeploymentConfig, error) {
+func GetAddOnDeploymentConfig(k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAddOn) (*addonapiv1alpha1.AddOnDeploymentConfig, error) {
 	key := addon.GetObjectKey(mcAddon.Status.ConfigReferences, addonutils.AddOnDeploymentConfigGVR.Group, addon.AddonDeploymentConfigResource)
 	addOnDeployment := &addonapiv1alpha1.AddOnDeploymentConfig{}
 	if err := k8s.Get(context.TODO(), key, addOnDeployment, &client.GetOptions{}); err != nil {
@@ -102,7 +102,7 @@ func getAddOnDeploymentConfig(k8s client.Client, mcAddon *addonapiv1alpha1.Manag
 	return addOnDeployment, nil
 }
 
-func buildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Options, error) {
+func BuildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Options, error) {
 	var opts Options
 	if addOnDeployment == nil {
 		return opts, nil

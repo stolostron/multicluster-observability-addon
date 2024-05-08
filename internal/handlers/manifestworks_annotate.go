@@ -7,8 +7,12 @@ import (
 	"github.com/ViaQ/logerr/v2/kverrors"
 	"github.com/go-logr/logr"
 	"github.com/mitchellh/hashstructure"
+	addonhelm "github.com/rhobs/multicluster-observability-addon/internal/addon/helm"
 	lhandlers "github.com/rhobs/multicluster-observability-addon/internal/logging/handlers"
+	loggingmanifests "github.com/rhobs/multicluster-observability-addon/internal/logging/manifests"
 	"github.com/rhobs/multicluster-observability-addon/internal/manifests"
+	thandlers "github.com/rhobs/multicluster-observability-addon/internal/tracing/handlers"
+	tracingmanifests "github.com/rhobs/multicluster-observability-addon/internal/tracing/manifests"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/klog/v2"
@@ -23,16 +27,6 @@ const manifestworkConfigHash = "mcoa.openshift.io/config-hash"
 
 func UpdateAnnotationOnManifestWorks(ctx context.Context, log logr.Logger, req ctrl.Request, k client.Client) error {
 	ll := log.WithValues("managedclusteraddon", req.NamespacedName, "event", "updateAnnotation")
-
-	var addon addonapiv1alpha1.ManagedClusterAddOn
-	if err := k.Get(ctx, req.NamespacedName, &addon); err != nil {
-		if apierrors.IsNotFound(err) {
-			// maybe the user deleted it before we could react? Either way this isn't an issue
-			ll.Error(err, "could not find the requested managedclusteraddon", "name", req.NamespacedName)
-			return nil
-		}
-		return kverrors.Wrap(err, "failed to lookup managedclusteraddon", "name", req.NamespacedName)
-	}
 
 	var manifestworkList workv1.ManifestWorkList
 	if err := k.List(ctx, &manifestworkList, &client.ListOptions{
@@ -49,20 +43,14 @@ func UpdateAnnotationOnManifestWorks(ctx context.Context, log logr.Logger, req c
 		return nil
 	}
 
-	opts, err := lhandlers.BuildOptions(k, &addon, nil)
+	hash, err := getHash(ctx, ll, req, k)
 	if err != nil {
-		ll.Error(err, "failed to buildOptions managedclusteraddon")
-		return kverrors.Wrap(err, "failed to buildOptions managedclusteraddon", "name", req.NamespacedName)
-	}
-
-	hash, err := hashstructure.Hash(opts, &hashstructure.HashOptions{})
-	if err != nil {
-		return kverrors.Wrap(err, "failed to compute options hash", "name", req.NamespacedName)
+		return err
 	}
 
 	var objects []client.Object
 	for _, manifestwork := range manifestworkList.Items {
-		manifestwork.Annotations[manifestworkConfigHash] = fmt.Sprint(hash)
+		manifestwork.Annotations[manifestworkConfigHash] = hash
 		objects = append(objects, &manifestwork)
 	}
 
@@ -86,4 +74,57 @@ func UpdateAnnotationOnManifestWorks(ctx context.Context, log logr.Logger, req c
 	}
 
 	return nil
+}
+
+// getHash computes the hash based on the enabled signals and the objects to reconcile
+func getHash(ctx context.Context, log logr.Logger, req ctrl.Request, k client.Client) (string, error) {
+	var addon addonapiv1alpha1.ManagedClusterAddOn
+	if err := k.Get(ctx, req.NamespacedName, &addon); err != nil {
+		if apierrors.IsNotFound(err) {
+			// maybe the user deleted it before we could react? Either way this isn't an issue
+			log.Error(err, "could not find the requested managedclusteraddon", "name", req.NamespacedName)
+			return "", nil
+		}
+		return "", kverrors.Wrap(err, "failed to lookup managedclusteraddon", "name", req.NamespacedName)
+	}
+
+	aodc, err := addonhelm.GetAddOnDeploymentConfig(k, &addon)
+	if err != nil {
+		return "", kverrors.Wrap(err, " error getting the addon addondeploymentconfig")
+	}
+	opts, err := addonhelm.BuildOptions(aodc)
+	if err != nil {
+		return "", kverrors.Wrap(err, " error getting the building options")
+	}
+
+	lOpts := loggingmanifests.Options{}
+	if !opts.LoggingDisabled {
+		lOpts, err = lhandlers.BuildOptions(k, &addon, nil)
+		if err != nil {
+			return "", kverrors.Wrap(err, "failed to buildOptions managedclusteraddon", "name", req.NamespacedName, "signal", "logging")
+		}
+	}
+
+	tOpts := tracingmanifests.Options{}
+	if !opts.TracingDisabled {
+		tOpts, err = thandlers.BuildOptions(k, &addon, nil)
+		if err != nil {
+			return "", kverrors.Wrap(err, "failed to buildOptions managedclusteraddon", "name", req.NamespacedName, "signal", "tracing")
+		}
+	}
+
+	addonParameters := struct {
+		loggingOps  loggingmanifests.Options
+		tracingOpts tracingmanifests.Options
+	}{
+		loggingOps:  lOpts,
+		tracingOpts: tOpts,
+	}
+
+	hash, err := hashstructure.Hash(addonParameters, &hashstructure.HashOptions{})
+	if err != nil {
+		return "", kverrors.Wrap(err, "failed to compute options hash", "name", req.NamespacedName)
+	}
+
+	return fmt.Sprint(hash), nil
 }
