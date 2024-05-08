@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/go-logr/logr"
-	otelv1alpha1 "github.com/open-telemetry/opentelemetry-operator/apis/v1alpha1"
 	loggingv1 "github.com/openshift/cluster-logging-operator/apis/logging/v1"
 	"github.com/rhobs/multicluster-observability-addon/internal/handlers"
 	corev1 "k8s.io/api/core/v1"
@@ -54,7 +53,6 @@ func (r *WatcherReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(&corev1.ConfigMap{}, r.enqueueForClusterSpecificResource(), builder.OnlyMetadata).
 		Watches(&corev1.Secret{}, r.enqueueForClusterSpecificResource(), builder.OnlyMetadata).
 		Watches(&loggingv1.ClusterLogForwarder{}, r.enqueueForClusterWideResource(), builder.OnlyMetadata).
-		Watches(&otelv1alpha1.OpenTelemetryCollector{}, r.enqueueForClusterWideResource(), builder.OnlyMetadata).
 		Complete(r)
 }
 
