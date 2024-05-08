@@ -77,50 +77,41 @@ func (r *WatcherReconciler) enqueueForClusterSpecificResource() handler.EventHan
 
 func (r *WatcherReconciler) enqueueForClusterWideResource() handler.EventHandler {
 	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
-		clusterset, ok := obj.GetAnnotations()["cluster.open-cluster-management.io/clusterset"]
-		if ok {
-			selector := labels.SelectorFromSet(labels.Set{
-				"cluster.open-cluster-management.io/clusterset": clusterset,
-			})
-			clusterList := &clusterv1.ManagedClusterList{}
-			if err := r.Client.List(ctx, clusterList, &client.ListOptions{
-				LabelSelector: selector,
-			}); err != nil {
-				r.Log.Error(err, "Error listing managedcluster resources in event handler")
-				return nil
-			}
-			var requests []reconcile.Request
-			for _, cluster := range clusterList.Items {
-				key := client.ObjectKey{Name: "multicluster-observability-addon", Namespace: cluster.GetName()}
-				addon := &addonapiv1alpha1.ManagedClusterAddOn{}
-				if err := r.Client.Get(ctx, key, addon); err != nil {
-					if apierrors.IsNotFound(err) {
-						continue
-					}
-					r.Log.Error(err, "Error getting matching mcoa managedclusteraddon resource in event handler")
-					return nil
-				}
-				requests = append(requests, reconcile.Request{
-					NamespacedName: types.NamespacedName{
-						Namespace: addon.Namespace,
-						Name:      addon.Name,
-					},
-				})
-			}
-			return requests
-
-		}
-		// No clusterset label we will simply re-trigger a reconciliation on all mcoa installations
 		addonList := &addonapiv1alpha1.ManagedClusterAddOnList{}
 		if err := r.Client.List(ctx, addonList, &client.ListOptions{
 			LabelSelector: labels.SelectorFromSet(labels.Set{
 				"open-cluster-management.io/addon-name": "multicluster-observability-addon",
-			})}); err != nil {
+			}),
+		}); err != nil {
 			r.Log.Error(err, "Error listing managedclusteraddon resources in event handler")
 			return nil
 		}
+
+		clustersetValue, clustersetExists := obj.GetAnnotations()["cluster.open-cluster-management.io/clusterset"]
+		var clustersInClusterSet map[string]struct{}
+		if clustersetExists {
+			clusterList := &clusterv1.ManagedClusterList{}
+			if err := r.Client.List(ctx, clusterList, &client.ListOptions{
+				LabelSelector: labels.SelectorFromSet(labels.Set{
+					"cluster.open-cluster-management.io/clusterset": clustersetValue,
+				}),
+			}); err != nil {
+				r.Log.Error(err, "Error listing managedcluster resources in event handler")
+				return nil
+			}
+			clustersInClusterSet = make(map[string]struct{}, len(clusterList.Items))
+			for _, cluster := range clusterList.Items {
+				clustersInClusterSet[cluster.Name] = struct{}{}
+			}
+		}
+
 		var requests []reconcile.Request
 		for _, addon := range addonList.Items {
+			_, installed := clustersInClusterSet[addon.Namespace]
+			if clustersetExists && !installed {
+				continue
+			}
+
 			requests = append(requests, reconcile.Request{
 				NamespacedName: types.NamespacedName{
 					Namespace: addon.Namespace,
