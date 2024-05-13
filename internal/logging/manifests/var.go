@@ -8,6 +8,7 @@ import (
 )
 
 const (
+	LabelCLFRef                = "mcoa.openshift.io/clf-ref"
 	AnnotationTargetOutputName = "logging.mcoa.openshift.io/target-output-name"
 
 	subscriptionChannelValueKey = "loggingSubscriptionChannel"

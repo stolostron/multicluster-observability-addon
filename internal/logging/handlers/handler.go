@@ -9,6 +9,8 @@ import (
 	"github.com/rhobs/multicluster-observability-addon/internal/addon/authentication"
 	"github.com/rhobs/multicluster-observability-addon/internal/logging/manifests"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/klog/v2"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -29,36 +31,39 @@ func BuildOptions(k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAdd
 	}
 	resources.ClusterLogForwarder = clf
 
+	clfRef := client.ObjectKey{Name: clf.Name, Namespace: clf.Namespace}.String()
+
+	klog.Info("looking for configmaps with ref to clusterlogforwarder", "ref", clfRef)
+	configmapList := &corev1.ConfigMapList{}
+	if err := k8s.List(context.Background(), configmapList, &client.ListOptions{
+		LabelSelector: labels.SelectorFromSet(labels.Set{
+			manifests.LabelCLFRef: clfRef,
+		}),
+	}); err != nil {
+		return resources, err
+	}
+
 	authCM := &corev1.ConfigMap{}
 	caCM := &corev1.ConfigMap{}
-	for _, config := range mcAddon.Spec.Configs {
-		switch config.ConfigGroupResource.Resource {
-		case addon.ConfigMapResource:
-			cm := &corev1.ConfigMap{}
-			key := client.ObjectKey{Name: config.Name, Namespace: config.Namespace}
-			if err := k8s.Get(context.Background(), key, cm, &client.GetOptions{}); err != nil {
-				return resources, err
-			}
-
-			// Only care about cm's that configure logging
-			if signal, ok := cm.Labels[addon.SignalLabelKey]; !ok || signal != addon.Logging.String() {
-				continue
-			}
-
-			// If a cm has the ca annotation then it's the configmap containing the ca
-			if _, ok := cm.Annotations[authentication.AnnotationCAToInject]; ok {
-				caCM = cm
-				continue
-			}
-
-			// If a cm doesn't have a target label then it's configuring authentication
-			if _, ok := cm.Annotations[manifests.AnnotationTargetOutputName]; !ok {
-				authCM = cm
-				continue
-			}
-
-			resources.ConfigMaps = append(resources.ConfigMaps, *cm)
+	for _, cm := range configmapList.Items {
+		// If a cm has the ca annotation then it's the configmap containing the ca
+		if _, ok := cm.Annotations[authentication.AnnotationCAToInject]; ok {
+			caCM = &cm
+			continue
 		}
+
+		// If a cm doesn't have a target label then it's configuring authentication
+		if _, ok := cm.Annotations[manifests.AnnotationTargetOutputName]; !ok {
+			authCM = &cm
+			continue
+		}
+
+		// Discard cm's that belong to other clusters
+		if mcAddon.Namespace != cm.Namespace {
+			continue
+		}
+
+		resources.ConfigMaps = append(resources.ConfigMaps, cm)
 	}
 
 	ctx := context.Background()

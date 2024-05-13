@@ -74,18 +74,6 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 
 	// Register the addon for the managed cluster
 	managedClusterAddOn = addontesting.NewAddon("test", "cluster-1")
-	managedClusterAddOn.Spec.Configs = []addonapiv1alpha1.AddOnConfig{
-		{
-			ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
-				Group:    "",
-				Resource: "configmaps",
-			},
-			ConfigReferent: addonapiv1alpha1.ConfigReferent{
-				Namespace: "open-cluster-management",
-				Name:      "logging-auth",
-			},
-		},
-	}
 	managedClusterAddOn.Status.ConfigReferences = []addonapiv1alpha1.ConfigReference{
 		{
 			ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
@@ -181,7 +169,7 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 			Name:      "logging-auth",
 			Namespace: "open-cluster-management",
 			Labels: map[string]string{
-				"mcoa.openshift.io/signal": "logging",
+				"mcoa.openshift.io/clf-ref": "open-cluster-management/instance",
 			},
 		},
 		Data: map[string]string{
