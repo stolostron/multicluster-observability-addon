@@ -1,7 +1,6 @@
 package manifests
 
 import (
-	"context"
 	"fmt"
 
 	certmanagerv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
@@ -33,29 +32,21 @@ type MTLSConfig struct {
 // BuildStaticSecret creates a Kubernetes secret for static authentication
 // TODO (JoaoBraveCoding) In the future we will want to deprecate this
 // authentication method as it's not ideal for multicluster authentication
-func BuildStaticSecret(ctx context.Context, k client.Client, key client.ObjectKey, saConfig StaticAuthenticationConfig) (*corev1.Secret, error) {
-	staticAuth := &corev1.Secret{}
-	err := k.Get(ctx, saConfig.ExistingSecret, staticAuth, &client.GetOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("failed to get existing secret: %w", err)
-	}
-
-	secret := &corev1.Secret{
+func BuildStaticSecret(key client.ObjectKey, secret *corev1.Secret) *corev1.Secret {
+	return &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      key.Name,
 			Namespace: key.Namespace,
 		},
-		Data: staticAuth.Data, // Signal specific
+		Data: secret.Data, // Signal specific
 	}
-
-	return secret, nil
 }
 
 // BuildCertificate generates a Kubernetes secret for mTLS authentication. This is
 // done using Cert-Manager CR.
-func BuildCertificate(key client.ObjectKey, mTLSConfig MTLSConfig) (*certmanagerv1.Certificate, error) {
+func BuildCertificate(key client.ObjectKey, mTLSConfig MTLSConfig) *certmanagerv1.Certificate {
 	certKey := client.ObjectKey{Name: fmt.Sprintf("%s-cert", key.Name), Namespace: key.Namespace}
-	certManagerCert := &certmanagerv1.Certificate{
+	return &certmanagerv1.Certificate{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      certKey.Name,
 			Namespace: certKey.Namespace,
@@ -81,28 +72,28 @@ func BuildCertificate(key client.ObjectKey, mTLSConfig MTLSConfig) (*certmanager
 			},
 		},
 	}
-	return certManagerCert, nil
+
 }
 
 // createMCOSecret creates a Kubernetes secret for authentication using the
 // credentials provided by MCO
 // TODO (JoaoBraveCoding) Not implemented
-func BuildMCOSecret(key client.ObjectKey) (*corev1.Secret, error) {
-	return nil, nil
+func BuildMCOSecret(key client.ObjectKey) *corev1.Secret {
+	return nil
 }
 
 // createManagedSecret generates a Kubernetes secret for managed authentication
 // such as workload identity federation.
 // TODO (JoaoBraveCoding) Currently not implemented, this should only work on
 // STS/WIF enabeld clusters
-func BuildManagedSecret(key client.ObjectKey) (*corev1.Secret, error) {
+func BuildManagedSecret(key client.ObjectKey) *corev1.Secret {
 	// Set additional keys for managed secret
 	data := map[string][]byte{
 		"roleARN":          []byte("foo"),
 		"webIdentityToken": []byte("foo"),
 	}
 
-	secret := &corev1.Secret{
+	return &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      key.Name,
 			Namespace: key.Namespace,
@@ -110,8 +101,6 @@ func BuildManagedSecret(key client.ObjectKey) (*corev1.Secret, error) {
 		Data: data,
 		Type: corev1.SecretTypeOpaque,
 	}
-
-	return secret, nil
 }
 
 func BuildAllRootCertificate() []client.Object {

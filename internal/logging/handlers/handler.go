@@ -68,6 +68,9 @@ func BuildOptions(k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAdd
 			return resources, kverrors.New("missing ca bundle in configmap", "key", "service-ca.crt")
 		}
 	}
+	authConfig.OwnerLabels = map[string]string{
+		manifests.LabelCLFRef: clfRef,
+	}
 
 	secretsProvider, err := authentication.NewSecretsProvider(k8s, mcAddon.Namespace, addon.Logging, authConfig)
 	if err != nil {

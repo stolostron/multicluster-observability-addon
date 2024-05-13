@@ -9,6 +9,7 @@ import (
 	"github.com/rhobs/multicluster-observability-addon/internal/addon"
 	"github.com/rhobs/multicluster-observability-addon/internal/manifests"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -29,8 +30,8 @@ type SecretKey client.ObjectKey
 // Config defines the configuration supported by the authentication package
 // to adapt the secret generation to the needs of each signal
 type Config struct {
-	StaticAuthConfig manifests.StaticAuthenticationConfig
-	MTLSConfig       manifests.MTLSConfig
+	OwnerLabels map[string]string
+	MTLSConfig  manifests.MTLSConfig
 }
 
 // secretsProvider an implementaton of the authentication package API
@@ -68,24 +69,23 @@ func (sp *secretsProvider) GenerateSecrets(ctx context.Context, targetAuthType m
 	objects := make([]client.Object, 0, len(targetAuthType))
 	for targetName, authType := range targetAuthType {
 		secretKey := client.ObjectKey{Name: fmt.Sprintf("%s-%s-auth", sp.signal, targetName), Namespace: sp.clusterName}
-		var (
-			obj client.Object
-			err error
-		)
+		var obj client.Object
 		switch authType {
 		case Static:
-			obj, err = manifests.BuildStaticSecret(ctx, sp.k8s, secretKey, sp.StaticAuthConfig)
+			secret, err := sp.getStaticSecret(ctx, sp.k8s, targetName)
+			if err != nil {
+				return nil, err
+			}
+
+			obj = manifests.BuildStaticSecret(secretKey, secret)
 		case Managed:
-			obj, err = manifests.BuildManagedSecret(secretKey)
+			obj = manifests.BuildManagedSecret(secretKey)
 		case MTLS:
-			obj, err = manifests.BuildCertificate(secretKey, sp.MTLSConfig)
+			obj = manifests.BuildCertificate(secretKey, sp.MTLSConfig)
 		case MCO:
-			obj, err = manifests.BuildMCOSecret(secretKey)
+			obj = manifests.BuildMCOSecret(secretKey)
 		default:
 			return nil, kverrors.New("missing mutate implementation for authentication type", "type", authType)
-		}
-		if err != nil {
-			return nil, err
 		}
 		objects = append(objects, obj)
 		secretKeys[targetName] = SecretKey(secretKey)
@@ -178,6 +178,24 @@ func (sp *secretsProvider) injectCA(ctx context.Context, targetAuthType map[Targ
 		}
 	}
 	return nil
+}
+
+func (sp *secretsProvider) getStaticSecret(ctx context.Context, k client.Client, target Target) (*corev1.Secret, error) {
+	labelSet := sp.OwnerLabels
+	labelSet[labelDiscoverStaticAuthSecrets] = string(target)
+
+	secretList := &corev1.SecretList{}
+	err := k.List(ctx, secretList, &client.ListOptions{
+		Namespace:     sp.clusterName,
+		LabelSelector: labels.SelectorFromSet(labelSet),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to list secrets: %w", err)
+	}
+	if len(secretList.Items) == 0 {
+		return nil, fmt.Errorf("no secret returned in the list")
+	}
+	return &secretList.Items[0], nil
 }
 
 func BuildAuthenticationMap(inputMap map[string]string) map[Target]AuthenticationType {

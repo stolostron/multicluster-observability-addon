@@ -59,9 +59,9 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 		managedClusterAddOn *addonapiv1alpha1.ManagedClusterAddOn
 
 		// Addon configuration
-		addOnDeploymentConfig *addonapiv1alpha1.AddOnDeploymentConfig
-		clf                   *loggingv1.ClusterLogForwarder
-		staticCred            *corev1.Secret
+		addOnDeploymentConfig            *addonapiv1alpha1.AddOnDeploymentConfig
+		clf                              *loggingv1.ClusterLogForwarder
+		clusterStaticCred, appStaticCred *corev1.Secret
 
 		// Test clients
 		fakeKubeClient  client.Client
@@ -156,10 +156,29 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 		},
 	}
 
-	staticCred = &corev1.Secret{
+	clusterStaticCred = &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "static-authentication",
-			Namespace: "open-cluster-management",
+			Name:      "cluster-logs",
+			Namespace: "cluster-1",
+			Labels: map[string]string{
+				"mcoa.openshift.io/clf-ref":                              "open-cluster-management/instance",
+				"authentication.mcoa.openshift.io/static-authentication": "cluster-logs",
+			},
+		},
+		Data: map[string][]byte{
+			"key":  []byte("data"),
+			"pass": []byte("data"),
+		},
+	}
+
+	appStaticCred = &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "app-logs",
+			Namespace: "cluster-1",
+			Labels: map[string]string{
+				"mcoa.openshift.io/clf-ref":                              "open-cluster-management/instance",
+				"authentication.mcoa.openshift.io/static-authentication": "app-logs",
+			},
 		},
 		Data: map[string][]byte{
 			"key":  []byte("data"),
@@ -185,7 +204,7 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 	// Setup the fake k8s client
 	fakeKubeClient = fake.NewClientBuilder().
 		WithScheme(scheme.Scheme).
-		WithObjects(clf, staticCred).
+		WithObjects(clf, clusterStaticCred, appStaticCred).
 		Build()
 
 	// Setup the fake addon client
@@ -221,11 +240,11 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 			require.Equal(t, "logging-cluster-logs-auth", obj.Spec.Outputs[1].Secret.Name)
 		case *corev1.Secret:
 			if obj.Name == "logging-app-logs-auth" {
-				require.Equal(t, staticCred.Data, obj.Data)
+				require.Equal(t, appStaticCred.Data, obj.Data)
 			}
 
 			if obj.Name == "logging-cluster-logs-auth" {
-				require.Equal(t, staticCred.Data, obj.Data)
+				require.Equal(t, clusterStaticCred.Data, obj.Data)
 			}
 
 		}
