@@ -11,6 +11,7 @@ const (
 	MCO AuthenticationType = "MCO"
 
 	AnnotationCAToInject = "authentication.mcoa.openshift.io/ca"
+	AnnotationAuthOutput = "authentication.mcoa.openshift.io/"
 )
 
 var certManagerCRDs = []string{"certificates.cert-manager.io", "issuers.cert-manager.io", "clusterissuers.cert-manager.io"}

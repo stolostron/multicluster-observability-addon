@@ -3,6 +3,7 @@ package authentication
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/ViaQ/logerr/v2/kverrors"
 	"github.com/rhobs/multicluster-observability-addon/internal/addon"
@@ -189,4 +190,22 @@ func BuildAuthenticationMap(inputMap map[string]string) map[Target]Authenticatio
 	}
 
 	return result
+}
+
+func BuildAuthenticationFromAnnotations(annotations map[string]string) (map[Target]AuthenticationType, error) {
+	result := make(map[Target]AuthenticationType)
+	for annotation, annValue := range annotations {
+		if !strings.HasPrefix(annotation, AnnotationAuthOutput) {
+			continue
+		}
+		split := strings.Split(annotation, "/")
+		if len(split) < 2 {
+			return result, kverrors.New("unable to extract output name from annotation", "annotation", annotation)
+		}
+		target := Target(split[1])
+		authType := AuthenticationType(annValue)
+		result[target] = authType
+	}
+
+	return result, nil
 }

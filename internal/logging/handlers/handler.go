@@ -30,7 +30,6 @@ func BuildOptions(k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAdd
 		return resources, err
 	}
 	resources.ClusterLogForwarder = clf
-
 	clfRef := client.ObjectKey{Name: clf.Name, Namespace: clf.Namespace}.String()
 
 	klog.Info("looking for configmaps with ref to clusterlogforwarder", "ref", clfRef)
@@ -43,18 +42,11 @@ func BuildOptions(k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAdd
 		return resources, err
 	}
 
-	authCM := &corev1.ConfigMap{}
 	caCM := &corev1.ConfigMap{}
 	for _, cm := range configmapList.Items {
 		// If a cm has the ca annotation then it's the configmap containing the ca
 		if _, ok := cm.Annotations[authentication.AnnotationCAToInject]; ok {
 			caCM = &cm
-			continue
-		}
-
-		// If a cm doesn't have a target label then it's configuring authentication
-		if _, ok := cm.Annotations[manifests.AnnotationTargetOutputName]; !ok {
-			authCM = &cm
 			continue
 		}
 
@@ -82,7 +74,12 @@ func BuildOptions(k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAdd
 		return resources, err
 	}
 
-	targetsSecret, err := secretsProvider.GenerateSecrets(ctx, authentication.BuildAuthenticationMap(authCM.Data))
+	authMap, err := authentication.BuildAuthenticationFromAnnotations(clf.Annotations)
+	if err != nil {
+		return resources, err
+	}
+
+	targetsSecret, err := secretsProvider.GenerateSecrets(ctx, authMap)
 	if err != nil {
 		return resources, err
 	}
