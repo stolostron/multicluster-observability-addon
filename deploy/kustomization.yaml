@@ -2,9 +2,6 @@ images:
 - name: controller
   newName: quay.io/jmarcal/multicluster-observability-addon
   newTag: v0.0.1
-- name: watcher
-  newName: quay.io/jmarcal/mcoa-watcher
-  newTag: v0.0.1
 
 namespace: open-cluster-management
 

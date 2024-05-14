@@ -18,7 +18,6 @@ REGISTRY_BASE ?= $(REGISTRY_BASE_OPENSHIFT)
 
 # Image URL to use all building/pushing image targets
 IMG ?= $(REGISTRY_BASE)/multicluster-observability-addon:$(VERSION)
-WATCHER_IMG ?= $(REGISTRY_BASE)/mcoa-watcher:$(VERSION)
 
 .PHONY: deps
 deps: go.mod go.sum
@@ -60,19 +59,17 @@ addon: deps ## Build addon binary
 .PHONY: oci-build
 oci-build: ## Build the image
 	podman build -t ${IMG} .
-	podman build -t ${WATCHER_IMG} . -f watcher.Dockerfile
 
 .PHONY: oci-push
 oci-push: ## Push the image
 	podman push ${IMG}
-	podman push ${WATCHER_IMG}
 
 .PHONY: oci
 oci: oci-build oci-push
 
 .PHONY: addon-deploy
 addon-deploy: $(KUSTOMIZE) install-crds
-	cd deploy && $(KUSTOMIZE) edit set image controller=${IMG} && $(KUSTOMIZE) edit set image watcher=${WATCHER_IMG} 
+	cd deploy && $(KUSTOMIZE) edit set image controller=${IMG}
 	$(KUSTOMIZE) build ./deploy | kubectl apply -f -
 
 .PHONY: addon-undeploy

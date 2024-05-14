@@ -1,7 +1,8 @@
-package controllers
+package watcher
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/go-logr/logr"
 	loggingv1 "github.com/openshift/cluster-logging-operator/apis/logging/v1"
@@ -18,6 +19,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
@@ -28,6 +30,54 @@ var noReconcilePred = builder.WithPredicates(predicate.Funcs{
 	DeleteFunc:  func(e event.DeleteEvent) bool { return false },
 	GenericFunc: func(e event.GenericEvent) bool { return false },
 })
+
+type WatcherManager struct {
+	mgr    *ctrl.Manager
+	logger logr.Logger
+}
+
+func NewWatcherManager(logger logr.Logger, scheme *runtime.Scheme) (*WatcherManager, error) {
+	l := logger.WithName("mcoa-watcher")
+
+	ctrl.SetLogger(l)
+
+	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{Scheme: scheme})
+	if err != nil {
+		return nil, fmt.Errorf("unable to start manager: %w", err)
+	}
+
+	if err = (&WatcherReconciler{
+		Client: mgr.GetClient(),
+		Log:    l.WithName("controllers").WithName("mcoa-watcher"),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		return nil, fmt.Errorf("unable to create mcoa-watcher controller: %w", err)
+	}
+
+	if err = mgr.AddHealthzCheck("health", healthz.Ping); err != nil {
+		return nil, fmt.Errorf("unable to set up health check: %w", err)
+	}
+	if err = mgr.AddReadyzCheck("check", healthz.Ping); err != nil {
+		return nil, fmt.Errorf("unable to set up ready check: %w", err)
+	}
+
+	wm := WatcherManager{
+		mgr:    &mgr,
+		logger: l,
+	}
+
+	return &wm, nil
+}
+
+func (wm *WatcherManager) Start(ctx context.Context) {
+	wm.logger.Info("Starting watcher manager")
+	go func() {
+		err := (*wm.mgr).Start(ctx)
+		if err != nil {
+			wm.logger.Error(err, "there was an error while running the reconciliation watcher")
+		}
+	}()
+}
 
 // WatcherReconciler reconciles the ManagedClusterAddon to annotate the ManiestWorks resource
 type WatcherReconciler struct {

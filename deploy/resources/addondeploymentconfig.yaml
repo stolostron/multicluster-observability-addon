@@ -9,5 +9,5 @@ spec:
       value: stable-5.9
     - name: metricsDisabled
       value: "true"
-    - name: tracingDisabled
+    - name: loggingDisabled
       value: "true"

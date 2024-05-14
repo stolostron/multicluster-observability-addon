@@ -8,6 +8,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/ViaQ/logerr/v2/log"
 	certmanagerv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	otelv1alpha1 "github.com/open-telemetry/opentelemetry-operator/apis/v1alpha1"
 	routev1 "github.com/openshift/api/route/v1"
@@ -16,11 +17,14 @@ import (
 	operatorsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	"github.com/rhobs/multicluster-observability-addon/internal/addon"
 	addonhelm "github.com/rhobs/multicluster-observability-addon/internal/addon/helm"
+	"github.com/rhobs/multicluster-observability-addon/internal/controllers/watcher"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
-	"k8s.io/client-go/kubernetes/scheme"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	utilflag "k8s.io/component-base/cli/flag"
 	logs "k8s.io/component-base/logs/api/v1"
@@ -32,9 +36,26 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/version"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
+	workv1 "open-cluster-management.io/api/work/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 )
+
+var scheme = runtime.NewScheme()
+
+func init() {
+	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+	utilruntime.Must(addonapiv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(workv1.AddToScheme(scheme))
+	utilruntime.Must(loggingapis.AddToScheme(scheme))
+	utilruntime.Must(otelv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(operatorsv1.AddToScheme(scheme))
+	utilruntime.Must(operatorsv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(routev1.Install(scheme))
+	utilruntime.Must(certmanagerv1.AddToScheme(scheme))
+
+	// +kubebuilder:scaffold:scheme
+}
 
 func main() {
 	rand.Seed(time.Now().UTC().UnixNano()) // nolint:staticcheck
@@ -85,6 +106,8 @@ func newControllerCommand() *cobra.Command {
 }
 
 func runController(ctx context.Context, kubeConfig *rest.Config) error {
+	logger := log.NewLogger("mcoa")
+
 	addonClient, err := addonv1alpha1client.NewForConfig(kubeConfig)
 	if err != nil {
 		return err
@@ -98,43 +121,6 @@ func runController(ctx context.Context, kubeConfig *rest.Config) error {
 
 	registrationOption := addon.NewRegistrationOption(utilrand.String(5))
 
-	// Necessary to reconcile ClusterLogging and ClusterLogForwarder
-	err = loggingapis.AddToScheme(scheme.Scheme)
-	if err != nil {
-		return err
-	}
-	// Necessary to reconcile OpenTelemetryCollectors
-	err = otelv1alpha1.AddToScheme(scheme.Scheme)
-	if err != nil {
-		return err
-	}
-	// Necessary to reconcile OperatorGroups
-	err = operatorsv1.AddToScheme(scheme.Scheme)
-	if err != nil {
-		return err
-	}
-	// Necessary to reconcile Subscriptions
-	err = operatorsv1alpha1.AddToScheme(scheme.Scheme)
-	if err != nil {
-		return err
-	}
-	// Necessary for metrics to get Routes hosts
-	if err = routev1.Install(scheme.Scheme); err != nil {
-		return err
-	}
-
-	// Necessary to reconcile cert-manager resources
-	err = certmanagerv1.AddToScheme(scheme.Scheme)
-	if err != nil {
-		return err
-	}
-
-	// Reconcile AddOnDeploymentConfig
-	err = addonapiv1alpha1.AddToScheme(scheme.Scheme)
-	if err != nil {
-		return err
-	}
-
 	httpClient, err := rest.HTTPClientFor(kubeConfig)
 	if err != nil {
 		return err
@@ -146,7 +132,7 @@ func runController(ctx context.Context, kubeConfig *rest.Config) error {
 	}
 
 	opts := client.Options{
-		Scheme:     scheme.Scheme,
+		Scheme:     scheme,
 		Mapper:     mapper,
 		HTTPClient: httpClient,
 	}
@@ -171,16 +157,29 @@ func runController(ctx context.Context, kubeConfig *rest.Config) error {
 		).
 		WithGetValuesFuncs(addonConfigValuesFn, addonhelm.GetValuesFunc(k8sClient)).
 		WithAgentRegistrationOption(registrationOption).
-		WithScheme(scheme.Scheme).
+		WithScheme(scheme).
 		BuildHelmAgentAddon()
 	if err != nil {
-		klog.Errorf("failed to build agent %v", err)
+		logger.Error(err, "failed to build agent")
 		return err
 	}
 
 	err = mgr.AddAgent(mcoaAgentAddon)
 	if err != nil {
-		klog.Fatal(err)
+		logger.Error(err, "unable to add mcoa agent addon")
+		return err
+	}
+
+	disableReconciliation := os.Getenv("DISABLE_WATCHER_CONTROLLER")
+	if disableReconciliation == "" {
+		var wm *watcher.WatcherManager
+		wm, err = watcher.NewWatcherManager(logger, scheme)
+		if err != nil {
+			logger.Error(err, "unable to create watcher manager")
+			return err
+		}
+
+		wm.Start(ctx)
 	}
 
 	err = mgr.Start(ctx)
