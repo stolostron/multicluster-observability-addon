@@ -61,7 +61,6 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 		// Addon configuration
 		addOnDeploymentConfig *addonapiv1alpha1.AddOnDeploymentConfig
 		clf                   *loggingv1.ClusterLogForwarder
-		authCM                *corev1.ConfigMap
 		staticCred            *corev1.Secret
 
 		// Test clients
@@ -114,6 +113,10 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "instance",
 			Namespace: "open-cluster-management",
+			Annotations: map[string]string{
+				"authentication.mcoa.openshift.io/app-logs":     "StaticAuthentication",
+				"authentication.mcoa.openshift.io/cluster-logs": "StaticAuthentication",
+			},
 		},
 		Spec: loggingv1.ClusterLogForwarderSpec{
 			Inputs: []loggingv1.InputSpec{
@@ -176,20 +179,6 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 		},
 	}
 
-	authCM = &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "logging-auth",
-			Namespace: "open-cluster-management",
-			Labels: map[string]string{
-				"mcoa.openshift.io/signal": "logging",
-			},
-		},
-		Data: map[string]string{
-			"app-logs":     "StaticAuthentication",
-			"cluster-logs": "StaticAuthentication",
-		},
-	}
-
 	addOnDeploymentConfig = &addonapiv1alpha1.AddOnDeploymentConfig{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "multicluster-observability-addon",
@@ -208,7 +197,7 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 	// Setup the fake k8s client
 	fakeKubeClient = fake.NewClientBuilder().
 		WithScheme(scheme.Scheme).
-		WithObjects(clf, staticCred, authCM).
+		WithObjects(clf, staticCred).
 		Build()
 
 	// Setup the fake addon client

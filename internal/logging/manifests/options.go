@@ -8,7 +8,6 @@ import (
 
 type Options struct {
 	Secrets               []corev1.Secret
-	ConfigMaps            []corev1.ConfigMap
 	ClusterLogForwarder   *loggingv1.ClusterLogForwarder
 	AddOnDeploymentConfig *addonapiv1alpha1.AddOnDeploymentConfig
 }

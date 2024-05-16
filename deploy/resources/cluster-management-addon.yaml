@@ -2,6 +2,8 @@ apiVersion: addon.open-cluster-management.io/v1alpha1
 kind: ClusterManagementAddOn
 metadata:
  name: multicluster-observability-addon
+ annotations:
+  addon.open-cluster-management.io/lifecycle: addon-manager
 spec:
  addOnMeta:
    displayName: Multi Cluster Observability Addon
@@ -27,11 +29,6 @@ spec:
    # Describes the default log forwarding outputs for each log type applied to all managed clusters.
    - group: logging.openshift.io
      resource: clusterlogforwarders
-     # The default config is the main stanza of a ClusterLogForwarder resource
-     # that describes where logs should be forwarded for all managed cluster.
-     defaultConfig:
-       name: instance
-       namespace: open-cluster-management
 
    # Describes the default OpenTelemetryCollector type applied to all managed clusters.
    - group: opentelemetry.io

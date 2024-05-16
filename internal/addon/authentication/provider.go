@@ -3,6 +3,7 @@ package authentication
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/ViaQ/logerr/v2/kverrors"
 	"github.com/rhobs/multicluster-observability-addon/internal/addon"
