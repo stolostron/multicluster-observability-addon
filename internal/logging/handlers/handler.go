@@ -30,23 +30,23 @@ func BuildOptions(k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAdd
 		return resources, err
 	}
 	resources.ClusterLogForwarder = clf
-	clfRef := client.ObjectKey{Name: clf.Name, Namespace: clf.Namespace}.String()
 
-	klog.Info("looking for configmaps with ref to clusterlogforwarder", "ref", clfRef)
+	klog.Info("looking for configmaps with key to clusterlogforwarder", "key", client.ObjectKey{Name: clf.Name, Namespace: clf.Namespace})
 	configmapList := &corev1.ConfigMapList{}
 	if err := k8s.List(context.Background(), configmapList, &client.ListOptions{
 		LabelSelector: labels.SelectorFromSet(labels.Set{
-			manifests.LabelCLFRef: clfRef,
+			manifests.LabelCLFNamespace: clf.Namespace,
+			manifests.LabelCLFName:      clf.Name,
 		}),
 	}); err != nil {
 		return resources, err
 	}
 
-	caCM := &corev1.ConfigMap{}
+	caCM := corev1.ConfigMap{}
 	for _, cm := range configmapList.Items {
 		// If a cm has the ca annotation then it's the configmap containing the ca
 		if _, ok := cm.Annotations[authentication.AnnotationCAToInject]; ok {
-			caCM = &cm
+			caCM = cm
 			continue
 		}
 
@@ -69,7 +69,8 @@ func BuildOptions(k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAdd
 		}
 	}
 	authConfig.OwnerLabels = map[string]string{
-		manifests.LabelCLFRef: clfRef,
+		manifests.LabelCLFNamespace: clf.Namespace,
+		manifests.LabelCLFName:      clf.Name,
 	}
 
 	secretsProvider, err := authentication.NewSecretsProvider(k8s, mcAddon.Namespace, addon.Logging, authConfig)

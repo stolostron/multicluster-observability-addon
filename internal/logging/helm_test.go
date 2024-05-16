@@ -161,7 +161,8 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 			Name:      "cluster-logs",
 			Namespace: "cluster-1",
 			Labels: map[string]string{
-				"mcoa.openshift.io/clf-ref":                              "open-cluster-management/instance",
+				"mcoa.openshift.io/clf-namespace":                        "open-cluster-management",
+				"mcoa.openshift.io/clf-name":                             "instance",
 				"authentication.mcoa.openshift.io/static-authentication": "cluster-logs",
 			},
 		},
@@ -176,7 +177,8 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 			Name:      "app-logs",
 			Namespace: "cluster-1",
 			Labels: map[string]string{
-				"mcoa.openshift.io/clf-ref":                              "open-cluster-management/instance",
+				"mcoa.openshift.io/clf-namespace":                        "open-cluster-management",
+				"mcoa.openshift.io/clf-name":                             "instance",
 				"authentication.mcoa.openshift.io/static-authentication": "app-logs",
 			},
 		},
