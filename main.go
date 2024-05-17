@@ -173,7 +173,7 @@ func runController(ctx context.Context, kubeConfig *rest.Config) error {
 	disableReconciliation := os.Getenv("DISABLE_WATCHER_CONTROLLER")
 	if disableReconciliation == "" {
 		var wm *watcher.WatcherManager
-		wm, err = watcher.NewWatcherManager(logger, scheme)
+		wm, err = watcher.NewWatcherManager(logger, scheme, &mgr)
 		if err != nil {
 			logger.Error(err, "unable to create watcher manager")
 			return err
@@ -184,7 +184,7 @@ func runController(ctx context.Context, kubeConfig *rest.Config) error {
 
 	err = mgr.Start(ctx)
 	if err != nil {
-		klog.Fatal(err)
+		return err
 	}
 	<-ctx.Done()
 

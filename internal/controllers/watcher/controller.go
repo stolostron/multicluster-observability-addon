@@ -2,16 +2,18 @@ package watcher
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/go-logr/logr"
+	otelv1alpha1 "github.com/open-telemetry/opentelemetry-operator/apis/v1alpha1"
 	loggingv1 "github.com/openshift/cluster-logging-operator/apis/logging/v1"
-	"github.com/rhobs/multicluster-observability-addon/internal/handlers"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"open-cluster-management.io/addon-framework/pkg/addonmanager"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -36,7 +38,7 @@ type WatcherManager struct {
 	logger logr.Logger
 }
 
-func NewWatcherManager(logger logr.Logger, scheme *runtime.Scheme) (*WatcherManager, error) {
+func NewWatcherManager(logger logr.Logger, scheme *runtime.Scheme, addonManager *addonmanager.AddonManager) (*WatcherManager, error) {
 	l := logger.WithName("mcoa-watcher")
 
 	ctrl.SetLogger(l)
@@ -47,9 +49,10 @@ func NewWatcherManager(logger logr.Logger, scheme *runtime.Scheme) (*WatcherMana
 	}
 
 	if err = (&WatcherReconciler{
-		Client: mgr.GetClient(),
-		Log:    l.WithName("controllers").WithName("mcoa-watcher"),
-		Scheme: mgr.GetScheme(),
+		Client:        mgr.GetClient(),
+		Log:           l.WithName("controllers").WithName("mcoa-watcher"),
+		Scheme:        mgr.GetScheme(),
+		addonnManager: addonManager,
 	}).SetupWithManager(mgr); err != nil {
 		return nil, fmt.Errorf("unable to create mcoa-watcher controller: %w", err)
 	}
@@ -82,16 +85,28 @@ func (wm *WatcherManager) Start(ctx context.Context) {
 // WatcherReconciler reconciles the ManagedClusterAddon to annotate the ManiestWorks resource
 type WatcherReconciler struct {
 	client.Client
-	Log    logr.Logger
-	Scheme *runtime.Scheme
+	Log           logr.Logger
+	Scheme        *runtime.Scheme
+	addonnManager *addonmanager.AddonManager
 }
+
+var (
+	noNameErr      = errors.New("no name for reconciliation request")
+	noNamespaceErr = errors.New("no namespace for reconciliation request")
+)
 
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.11.0/pkg/reconcile
 func (r *WatcherReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	if err := handlers.UpdateAnnotationOnManifestWorks(ctx, r.Log, req, r.Client); err != nil {
-		return ctrl.Result{}, err
+	if req.Name == "" {
+		return ctrl.Result{}, noNameErr
 	}
+	if req.Namespace == "" {
+		return ctrl.Result{}, noNamespaceErr
+	}
+	(*r.addonnManager).Trigger(req.Namespace, req.Name)
+
+	r.Log.V(2).Info("reconciliation triggered", "cluster", req.Namespace)
 
 	return ctrl.Result{}, nil
 }
@@ -103,6 +118,7 @@ func (r *WatcherReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(&corev1.ConfigMap{}, r.enqueueForClusterSpecificResource(), builder.OnlyMetadata).
 		Watches(&corev1.Secret{}, r.enqueueForClusterSpecificResource(), builder.OnlyMetadata).
 		Watches(&loggingv1.ClusterLogForwarder{}, r.enqueueForClusterWideResource(), builder.OnlyMetadata).
+		Watches(&otelv1alpha1.OpenTelemetryCollector{}, r.enqueueForClusterWideResource(), builder.OnlyMetadata).
 		Complete(r)
 }
 
@@ -110,7 +126,10 @@ func (r *WatcherReconciler) enqueueForClusterSpecificResource() handler.EventHan
 	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
 		key := client.ObjectKey{Name: "multicluster-observability-addon", Namespace: obj.GetNamespace()}
 		addon := &addonapiv1alpha1.ManagedClusterAddOn{}
-		if err := r.Client.Get(ctx, key, addon); err != nil && !apierrors.IsNotFound(err) {
+		if err := r.Client.Get(ctx, key, addon); err != nil {
+			if apierrors.IsNotFound(err) {
+				return nil
+			}
 			r.Log.Error(err, "Error getting managedclusteraddon resources in event handler")
 			return nil
 		}
@@ -134,6 +153,11 @@ func (r *WatcherReconciler) enqueueForClusterWideResource() handler.EventHandler
 			}),
 		}); err != nil {
 			r.Log.Error(err, "Error listing managedclusteraddon resources in event handler")
+			return nil
+		}
+
+		if len(addonList.Items) == 0 {
+			r.Log.V(2).Info("no managedclusteraddon found")
 			return nil
 		}
 

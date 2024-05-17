@@ -29,7 +29,6 @@ require (
 
 require (
 	github.com/go-logr/logr v1.4.1
-	github.com/mitchellh/hashstructure v1.1.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 

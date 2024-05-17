@@ -36,7 +36,8 @@ func GetValuesFunc(k8s client.Client) addonfactory.GetValuesFunc {
 		cluster *clusterv1.ManagedCluster,
 		addon *addonapiv1alpha1.ManagedClusterAddOn,
 	) (addonfactory.Values, error) {
-		klog.Info("Heyyyyyyyyyyy we are reconciling")
+		klog.Info("Getting values for the templates")
+
 		err := authentication.CreateOrUpdateRootCertificate(k8s)
 		if err != nil {
 			return nil, err
