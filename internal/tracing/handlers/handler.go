@@ -109,7 +109,7 @@ func BuildOptions(k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAdd
 			return resources, err
 		}
 
-		resources.Secrets, err = secretsProvider.FetchSecrets(ctx, targetsSecret, manifests.AnnotationTargetOutputName)
+		resources.Secrets, err = secretsProvider.FetchSecretsAndAnnotate(ctx, targetsSecret, manifests.AnnotationTargetOutputName)
 		if err != nil {
 			return resources, err
 		}
