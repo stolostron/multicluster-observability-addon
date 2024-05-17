@@ -9,6 +9,7 @@ import (
 	"github.com/rhobs/multicluster-observability-addon/internal/addon"
 	"github.com/rhobs/multicluster-observability-addon/internal/manifests"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -29,6 +30,8 @@ type SecretKey client.ObjectKey
 // Config defines the configuration supported by the authentication package
 // to adapt the secret generation to the needs of each signal
 type Config struct {
+	DefaultNamespace string
+	TargetSecret     map[Target]SecretKey
 	StaticAuthConfig manifests.StaticAuthenticationConfig
 	MTLSConfig       manifests.MTLSConfig
 }
@@ -81,6 +84,14 @@ func (sp *secretsProvider) GenerateSecrets(ctx context.Context, targetAuthType m
 			obj, err = manifests.BuildCertificate(secretKey, sp.MTLSConfig)
 		case MCO:
 			obj, err = manifests.BuildMCOSecret(secretKey)
+		case ExistingSecret:
+			obj, err = sp.getExistingSecret(ctx, sp.k8s, sp.TargetSecret[targetName].Name)
+			if err != nil {
+				return nil, err
+			}
+			secretKey = client.ObjectKeyFromObject(obj)
+			secretKeys[targetName] = SecretKey(secretKey)
+			continue
 		default:
 			return nil, kverrors.New("missing mutate implementation for authentication type", "type", authType)
 		}
@@ -118,11 +129,24 @@ func (sp *secretsProvider) GenerateSecrets(ctx context.Context, targetAuthType m
 	return secretKeys, nil
 }
 
-// FetchSecrets given a map of Target and SecretKey it will get the Secret from
+// FetchSecrets transforms a map of Target/SecretKey to a map of Target/Secret
+func (sp *secretsProvider) FetchSecrets(ctx context.Context, targetsSecret map[Target]SecretKey) (map[Target]*corev1.Secret, error) {
+	secrets := make(map[Target]*corev1.Secret, len(targetsSecret))
+	for target, key := range targetsSecret {
+		secret := &corev1.Secret{}
+		if err := sp.k8s.Get(ctx, client.ObjectKey(key), secret, &client.GetOptions{}); err != nil {
+			return secrets, err
+		}
+		secrets[target] = secret
+	}
+	return secrets, nil
+}
+
+// FetchSecretsAndAnnotate given a map of Target and SecretKey it will get the Secret from
 // the hub cluster and add an annotation to it with Target. The goal of the
 // annotation is to preseve the link betweeen Target and Secret.
 // Note: the secret is not updated on the cluster with the annotation
-func (sp *secretsProvider) FetchSecrets(ctx context.Context, targetsSecret map[Target]SecretKey, targetAnnotation string) ([]corev1.Secret, error) {
+func (sp *secretsProvider) FetchSecretsAndAnnotate(ctx context.Context, targetsSecret map[Target]SecretKey, targetAnnotation string) ([]corev1.Secret, error) {
 	secrets := make([]corev1.Secret, 0, len(targetsSecret))
 	for target, key := range targetsSecret {
 		secret := &corev1.Secret{}
@@ -180,6 +204,23 @@ func (sp *secretsProvider) injectCA(ctx context.Context, targetAuthType map[Targ
 	return nil
 }
 
+func (sp *secretsProvider) getExistingSecret(ctx context.Context, k client.Client, secretName string) (*corev1.Secret, error) {
+	if sp.DefaultNamespace == "" {
+		return nil, kverrors.New("default namespace not defined in secrets provider config")
+	}
+	existingSecret := &corev1.Secret{}
+	key := client.ObjectKey{Name: secretName, Namespace: sp.clusterName}
+	err := k.Get(ctx, key, existingSecret, &client.GetOptions{})
+	if apierrors.IsNotFound(err) {
+		key = client.ObjectKey{Name: secretName, Namespace: sp.DefaultNamespace}
+		err = k.Get(ctx, key, existingSecret, &client.GetOptions{})
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get existing secret: %w", err)
+	}
+	return existingSecret, nil
+}
+
 func BuildAuthenticationMap(inputMap map[string]string) map[Target]AuthenticationType {
 	result := make(map[Target]AuthenticationType, len(inputMap))
 
@@ -190,4 +231,25 @@ func BuildAuthenticationMap(inputMap map[string]string) map[Target]Authenticatio
 	}
 
 	return result
+}
+
+func BuildAuthenticationFromAnnotations(annotations map[string]string) (map[Target]AuthenticationType, error) {
+	result := make(map[Target]AuthenticationType)
+	for annotation, annValue := range annotations {
+		if !strings.HasPrefix(annotation, AnnotationAuthOutput) {
+			continue
+		}
+		split := strings.Split(annotation, "/")
+		if len(split) != 2 {
+			return result, kverrors.New("unable to extract output name from annotation", "annotation", annotation)
+		}
+		if split[1] == "" {
+			return result, kverrors.New("output name not specified", "annotation", annotation)
+		}
+		target := Target(split[1])
+		authType := AuthenticationType(annValue)
+		result[target] = authType
+	}
+
+	return result, nil
 }
