@@ -41,18 +41,24 @@ func AgentHealthProber() *agent.HealthProber {
 			ProbeFields: []agent.ProbeField{
 				{
 					ResourceIdentifier: workapiv1.ResourceIdentifier{
-						Group:     "apps",
-						Resource:  "deployments",
-						Name:      "cluster-logging-operator",
-						Namespace: ClusterLoggingNS,
+						Group:     "opentelemetry.io",
+						Resource:  "opentelemetrycollectors",
+						Name:      "spoke-otelcol",
+						Namespace: CollectorNS,
 					},
 					ProbeRules: []workapiv1.FeedbackRule{
 						{
-							Type: workapiv1.WellKnownStatusType,
+							Type: workapiv1.JSONPathsType,
+							JsonPaths: []workapiv1.JsonPath{
+								{
+									Name: "replicas",
+									Path: ".spec.replicas",
+								},
+							},
 						},
 					},
 				},
-				{
+				/* {
 					ResourceIdentifier: workapiv1.ResourceIdentifier{
 						Group:     "apps",
 						Resource:  "deployments",
@@ -64,20 +70,14 @@ func AgentHealthProber() *agent.HealthProber {
 							Type: workapiv1.WellKnownStatusType,
 						},
 					},
-				},
+				}, */
 			},
 			HealthCheck: func(identifier workapiv1.ResourceIdentifier, result workapiv1.StatusFeedbackResult) error {
-				if identifier.Resource != "deployments" {
-					return fmt.Errorf("unsupported resource type %s", identifier.Resource)
-				}
-				if identifier.Group != "apps" {
-					return fmt.Errorf("unsupported resource group %s", identifier.Group)
-				}
 				if len(result.Values) == 0 {
-					return fmt.Errorf("no values are probed for deployment %s/%s", identifier.Namespace, identifier.Name)
+					return fmt.Errorf("no values are probed for %s/%s", identifier.Namespace, identifier.Name)
 				}
 				for _, value := range result.Values {
-					if value.Name != "ReadyReplicas" {
+					if value.Name != "replicas" {
 						continue
 					}
 
@@ -85,9 +85,9 @@ func AgentHealthProber() *agent.HealthProber {
 						return nil
 					}
 
-					return fmt.Errorf("readyReplicas is %d for deployement %s/%s", *value.Value.Integer, identifier.Namespace, identifier.Name)
+					return fmt.Errorf("replicas is %d for %s/%s", *value.Value.Integer, identifier.Namespace, identifier.Name)
 				}
-				return fmt.Errorf("readyReplicas is not probed")
+				return fmt.Errorf("replicas is not probed")
 			},
 		},
 	}
