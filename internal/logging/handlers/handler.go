@@ -27,8 +27,17 @@ func BuildOptions(k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAdd
 	}
 	resources.ClusterLogForwarder = clf
 
+	targetSecret := make(map[authentication.Target]authentication.SecretKey)
+	for _, output := range clf.Spec.Outputs {
+		targetSecret[authentication.Target(output.Name)] = authentication.SecretKey{
+			Name: output.Secret.Name,
+		}
+	}
+
 	ctx := context.Background()
 	authConfig := manifests.AuthDefaultConfig
+	authConfig.TargetSecret = targetSecret
+	authConfig.DefaultNamespace = clf.Namespace
 	secretsProvider, err := authentication.NewSecretsProvider(k8s, mcAddon.Namespace, addon.Logging, authConfig)
 	if err != nil {
 		return resources, err
@@ -44,7 +53,7 @@ func BuildOptions(k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAdd
 		return resources, err
 	}
 
-	resources.Secrets, err = secretsProvider.FetchSecrets(ctx, targetsSecret, manifests.AnnotationTargetOutputName)
+	resources.Secrets, err = secretsProvider.FetchSecrets(ctx, targetsSecret)
 	if err != nil {
 		return resources, err
 	}

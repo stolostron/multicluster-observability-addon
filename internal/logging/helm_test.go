@@ -114,8 +114,8 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 			Name:      "instance",
 			Namespace: "open-cluster-management",
 			Annotations: map[string]string{
-				"authentication.mcoa.openshift.io/app-logs":     "StaticAuthentication",
-				"authentication.mcoa.openshift.io/cluster-logs": "StaticAuthentication",
+				"authentication.mcoa.openshift.io/app-logs":     "ExistingSecret",
+				"authentication.mcoa.openshift.io/cluster-logs": "ExistingSecret",
 			},
 		},
 		Spec: loggingv1.ClusterLogForwarderSpec{
@@ -141,6 +141,9 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 							TenantKey: "tenant-x",
 						},
 					},
+					Secret: &loggingv1.OutputSecretSpec{
+						Name: "static-authentication",
+					},
 				},
 				{
 					Name: "cluster-logs",
@@ -150,6 +153,9 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 							GroupBy:     loggingv1.LogGroupByLogType,
 							GroupPrefix: ptr.To("test-prefix"),
 						},
+					},
+					Secret: &loggingv1.OutputSecretSpec{
+						Name: "static-authentication",
 					},
 				},
 			},
@@ -229,17 +235,12 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 		case *loggingv1.ClusterLogForwarder:
 			require.NotNil(t, obj.Spec.Outputs[0].Secret)
 			require.NotNil(t, obj.Spec.Outputs[1].Secret)
-			require.Equal(t, "logging-app-logs-auth", obj.Spec.Outputs[0].Secret.Name)
-			require.Equal(t, "logging-cluster-logs-auth", obj.Spec.Outputs[1].Secret.Name)
+			require.Equal(t, "static-authentication", obj.Spec.Outputs[0].Secret.Name)
+			require.Equal(t, "static-authentication", obj.Spec.Outputs[1].Secret.Name)
 		case *corev1.Secret:
-			if obj.Name == "logging-app-logs-auth" {
+			if obj.Name == "static-authentication" {
 				require.Equal(t, staticCred.Data, obj.Data)
 			}
-
-			if obj.Name == "logging-cluster-logs-auth" {
-				require.Equal(t, staticCred.Data, obj.Data)
-			}
-
 		}
 	}
 }
