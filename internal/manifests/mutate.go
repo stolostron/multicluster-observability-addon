@@ -7,7 +7,6 @@ import (
 	certmanagerv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	"github.com/imdario/mergo"
 	corev1 "k8s.io/api/core/v1"
-	workv1 "open-cluster-management.io/api/work/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
@@ -63,11 +62,6 @@ func MutateFuncFor(existing, desired client.Object, depAnnotations map[string]st
 			wantCr := desired.(*certmanagerv1.ClusterIssuer)
 			mutateClusterIssuer(cr, wantCr)
 
-		case *workv1.ManifestWork:
-			cr := existing.(*workv1.ManifestWork)
-			wantCr := desired.(*workv1.ManifestWork)
-			mutateManifestWork(cr, wantCr)
-
 		default:
 			t := reflect.TypeOf(existing).String()
 			return kverrors.New("missing mutate implementation for resource type", "type", t)
@@ -107,14 +101,6 @@ func mutateCertificate(existing, desired *certmanagerv1.Certificate) {
 }
 
 func mutateClusterIssuer(existing, desired *certmanagerv1.ClusterIssuer) {
-	existing.Annotations = desired.Annotations
-	existing.Labels = desired.Labels
-	// TODO(JoaoBraveCoding) Validate that all the spec fields are mutable after
-	// creation
-	existing.Spec = desired.Spec
-}
-
-func mutateManifestWork(existing, desired *workv1.ManifestWork) {
 	existing.Annotations = desired.Annotations
 	existing.Labels = desired.Labels
 	// TODO(JoaoBraveCoding) Validate that all the spec fields are mutable after
