@@ -33,7 +33,7 @@ func Test_ConfigureExportersSecrets(t *testing.T) {
 		},
 	}
 
-	err = ConfigureExportersSecrets(cfg, secret, annotation)
+	err = ConfigureExportersSecrets(cfg, "otlp", secret)
 	require.NoError(t, err)
 
 	exportersField := cfg["exporters"]
@@ -46,7 +46,7 @@ func Test_ConfigureExportersSecrets(t *testing.T) {
 	cfg, err = ConfigFromString(otelColConfig)
 	require.NoError(t, err)
 
-	err = ConfigureExportersSecrets(cfg, secret, annotation)
+	err = ConfigureExportersSecrets(cfg, "otlphttp", secret)
 	require.NoError(t, err)
 
 	exportersField = cfg["exporters"]
@@ -56,52 +56,6 @@ func Test_ConfigureExportersSecrets(t *testing.T) {
 	require.NotNil(t, otlphttp["tls"])
 }
 
-func Test_ConfigureExportersEndpoints(t *testing.T) {
-	b, err := os.ReadFile("./test_data/simplest.yaml")
-	require.NoError(t, err)
-	otelColConfig := string(b)
-	cfg, err := ConfigFromString(otelColConfig)
-	require.NoError(t, err)
-
-	cm := corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "tracing-auth",
-			Namespace: "open-cluster-management",
-			Labels: map[string]string{
-				"mcoa.openshift.io/signal": "tracing",
-			},
-			Annotations: map[string]string{
-				annotation: "otlphttp",
-			},
-		},
-		Data: map[string]string{
-			"endpoint": "http://example.namespace.svc",
-		},
-	}
-
-	err = ConfigureExporters(cfg, cm, "cluster", annotation)
-	require.NoError(t, err)
-
-	exportersField := cfg["exporters"]
-	exporters := exportersField.(map[string]interface{})
-	require.Nil(t, exporters["debug"])
-
-	b, err = os.ReadFile("./test_data/basic_otelhttp.yaml")
-	require.NoError(t, err)
-	otelColConfig = string(b)
-	cfg, err = ConfigFromString(otelColConfig)
-	require.NoError(t, err)
-
-	err = ConfigureExporters(cfg, cm, "cluster", annotation)
-	require.NoError(t, err)
-
-	exportersField = cfg["exporters"]
-	exporters = exportersField.(map[string]interface{})
-	otlphttpField := exporters["otlphttp"]
-	otlphttp := otlphttpField.(map[string]interface{})
-	require.NotNil(t, otlphttp["endpoint"])
-}
-
 func Test_getExporters(t *testing.T) {
 	b, err := os.ReadFile("./test_data/simplest.yaml")
 	require.NoError(t, err)
@@ -109,12 +63,12 @@ func Test_getExporters(t *testing.T) {
 	cfg, err := ConfigFromString(otelColConfig)
 	require.NoError(t, err)
 
-	exporters, err := getExporters(cfg)
+	exporters, err := GetExporters(cfg)
 	require.NoError(t, err)
 	require.Len(t, exporters, 1)
 
 	cfg = make(map[string]interface{})
-	_, err = getExporters(cfg)
+	_, err = GetExporters(cfg)
 	require.Error(t, err)
 }
 
@@ -133,41 +87,4 @@ func Test_configureExporterSecrets(t *testing.T) {
 	}
 	configureExporterSecrets(exporter, secret)
 	require.NotNil(t, exporter["tls"])
-}
-
-func Test_configureExporterEndpoint(t *testing.T) {
-	exporter := make(map[string]interface{})
-	cm := corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "tracing-auth",
-			Namespace: "open-cluster-management",
-			Labels: map[string]string{
-				"mcoa.openshift.io/signal": "tracing",
-			},
-		},
-		Data: map[string]string{
-			"endpoint": "http://example.namespace.svc",
-		},
-	}
-
-	err := configureExporterEndpoint(exporter, cm)
-	require.NoError(t, err)
-
-	require.NotNil(t, exporter["endpoint"])
-
-	cm = corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "tracing-auth",
-			Namespace: "open-cluster-management",
-			Labels: map[string]string{
-				"mcoa.openshift.io/signal": "tracing",
-			},
-		},
-		Data: map[string]string{
-			"someting": "http://example.namespace.svc",
-		},
-	}
-
-	err = configureExporterEndpoint(exporter, cm)
-	require.Error(t, err)
 }
