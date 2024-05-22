@@ -1,0 +1,5 @@
+spokeClusterName: spoke
+
+awsCredentials:
+  accessKeyID: XXXXXXX
+  accessKeySecret: XXXXXX
