@@ -1,6 +1,7 @@
 package addon
 
 import (
+	"errors"
 	"fmt"
 
 	"open-cluster-management.io/addon-framework/pkg/agent"
@@ -8,6 +9,11 @@ import (
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+)
+
+var (
+	ErrWrongType      = errors.New("probe condition is not satisfied")
+	ErrValueNotProbed = errors.New("value not probed")
 )
 
 func NewRegistrationOption(agentName string) *agent.RegistrationOption {
@@ -41,10 +47,10 @@ func AgentHealthProber() *agent.HealthProber {
 			ProbeFields: []agent.ProbeField{
 				{
 					ResourceIdentifier: workapiv1.ResourceIdentifier{
-						Group:     "opentelemetry.io",
-						Resource:  "opentelemetrycollectors",
-						Name:      "spoke-otelcol",
-						Namespace: CollectorNS,
+						Group:     OtelcolGroup,
+						Resource:  OtelcolResource,
+						Name:      OtelcolName,
+						Namespace: OtelcolNS,
 					},
 					ProbeRules: []workapiv1.FeedbackRule{
 						{
@@ -58,36 +64,57 @@ func AgentHealthProber() *agent.HealthProber {
 						},
 					},
 				},
-				/* {
+				{
 					ResourceIdentifier: workapiv1.ResourceIdentifier{
-						Group:     "apps",
-						Resource:  "deployments",
-						Name:      "spoke-otelcol-collector",
-						Namespace: CollectorNS,
+						Group:     ClfGroup,
+						Resource:  ClfResource,
+						Name:      ClfName,
+						Namespace: ClusterLoggingNS,
 					},
 					ProbeRules: []workapiv1.FeedbackRule{
 						{
-							Type: workapiv1.WellKnownStatusType,
+							Type: workapiv1.JSONPathsType,
+							JsonPaths: []workapiv1.JsonPath{
+								{
+									Name: "type",
+									Path: ".status.conditions[0].type",
+								},
+							},
 						},
 					},
-				}, */
+				},
 			},
 			HealthCheck: func(identifier workapiv1.ResourceIdentifier, result workapiv1.StatusFeedbackResult) error {
-				if len(result.Values) == 0 {
-					return fmt.Errorf("no values are probed for %s/%s", identifier.Namespace, identifier.Name)
-				}
 				for _, value := range result.Values {
-					if value.Name != "replicas" {
+					if identifier.Resource == ClfResource {
+						if value.Name != "type" {
+							continue
+						}
+
+						if *value.Value.String == "Ready" {
+							return nil
+						}
+
+						return fmt.Errorf("%w: status condition type is %s for %s/%s", ErrWrongType, *value.Value.String, identifier.Namespace, identifier.Name)
+					} else if identifier.Resource == OtelcolResource {
+						if value.Name != "replicas" {
+							continue
+						}
+
+						if *value.Value.Integer >= 1 {
+							return nil
+						}
+
+						return fmt.Errorf("%w: replicas is %d for %s/%s", ErrWrongType, *value.Value.Integer, identifier.Namespace, identifier.Name)
+					} else {
 						continue
 					}
-
-					if *value.Value.Integer >= 1 {
-						return nil
-					}
-
-					return fmt.Errorf("replicas is %d for %s/%s", *value.Value.Integer, identifier.Namespace, identifier.Name)
 				}
-				return fmt.Errorf("replicas is not probed")
+				if identifier.Resource == ClfResource || identifier.Resource == OtelcolResource {
+					return fmt.Errorf("%w: for %s/%s", ErrValueNotProbed, identifier.Namespace, identifier.Name)
+				} else {
+					return nil
+				}
 			},
 		},
 	}

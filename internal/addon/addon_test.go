@@ -1,55 +1,55 @@
 package addon
 
 import (
-	"context"
 	"fmt"
 	"testing"
 
+	//"github.com/openshift/cluster-logging-operator/internal/status"
 	"github.com/stretchr/testify/require"
-	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/klog/v2"
+	"k8s.io/client-go/kubernetes/scheme"
 	v1 "open-cluster-management.io/api/work/v1"
 
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	otelv1alpha1 "github.com/open-telemetry/opentelemetry-operator/apis/v1alpha1"
+	loggingapis "github.com/openshift/cluster-logging-operator/apis"
+	operatorsv1 "github.com/operator-framework/api/pkg/operators/v1"
+	operatorsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
+)
+
+var (
+	_ = loggingapis.AddToScheme(scheme.Scheme)
+	_ = operatorsv1.AddToScheme(scheme.Scheme)
+	_ = operatorsv1alpha1.AddToScheme(scheme.Scheme)
 )
 
 func Test_AgentHealthProber_Healthy(t *testing.T) {
-	fakeKubeClient := fake.NewClientBuilder().Build()
-	colDeployment := &appsv1.Deployment{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "apps",
-			Kind:       "deployments",
-		},
+	replicas := int32(1)
+	otelcol := &otelv1alpha1.OpenTelemetryCollector{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "spoke-otelcol-collector",
-			Namespace: "spoke-otelcol",
+			Name:      OtelcolName,
+			Namespace: OtelcolNS,
 		},
-		Status: appsv1.DeploymentStatus{
-			ReadyReplicas: 1,
+		Spec: otelv1alpha1.OpenTelemetryCollectorSpec{
+			Replicas: &replicas,
 		},
 	}
 
-	err := fakeKubeClient.Create(context.TODO(), colDeployment, &client.CreateOptions{})
-	require.NoError(t, err)
-
-	readyReplicas := int64(colDeployment.Status.ReadyReplicas)
-
 	healthProber := AgentHealthProber()
 
-	err = healthProber.WorkProber.HealthCheck(v1.ResourceIdentifier{
-		Group:     colDeployment.APIVersion,
-		Resource:  colDeployment.Kind,
-		Name:      colDeployment.Name,
-		Namespace: colDeployment.Namespace,
+	replicas64 := int64(replicas)
+
+	err := healthProber.WorkProber.HealthCheck(v1.ResourceIdentifier{
+		Group:     otelcol.APIVersion,
+		Resource:  OtelcolResource,
+		Name:      otelcol.Name,
+		Namespace: otelcol.Namespace,
 	}, v1.StatusFeedbackResult{
 		Values: []v1.FeedbackValue{
 			{
-				Name: "ReadyReplicas",
+				Name: "replicas",
 				Value: v1.FieldValue{
 					Type:    v1.Integer,
-					Integer: &readyReplicas,
+					Integer: &replicas64,
 				},
 			},
 		},
@@ -60,43 +60,37 @@ func Test_AgentHealthProber_Healthy(t *testing.T) {
 }
 
 func Test_AgentHealthProber_Unhealthy(t *testing.T) {
-	cloDeployment := &appsv1.Deployment{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "apps",
-			Kind:       "deployments",
-		},
+	replicas := int32(0)
+	otelcol := &otelv1alpha1.OpenTelemetryCollector{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "cluster-logging-operator",
-			Namespace: "openshift-logging",
+			Name:      OtelcolName,
+			Namespace: OtelcolNS,
 		},
-		Status: appsv1.DeploymentStatus{
-			ReadyReplicas: 0,
+		Spec: otelv1alpha1.OpenTelemetryCollectorSpec{
+			Replicas: &replicas,
 		},
 	}
-	readyReplicas := int64(cloDeployment.Status.ReadyReplicas)
-
 	healthProber := AgentHealthProber()
 
+	replicas64 := int64(replicas)
 	err := healthProber.WorkProber.HealthCheck(v1.ResourceIdentifier{
-		Group:     cloDeployment.APIVersion,
-		Resource:  cloDeployment.Kind,
-		Name:      cloDeployment.Name,
-		Namespace: cloDeployment.Namespace,
+		Group:     otelcol.APIVersion,
+		Resource:  OtelcolResource,
+		Name:      otelcol.Name,
+		Namespace: otelcol.Namespace,
 	}, v1.StatusFeedbackResult{
 		Values: []v1.FeedbackValue{
 			{
-				Name: "ReadyReplicas",
+				Name: "replicas",
 				Value: v1.FieldValue{
 					Type:    v1.Integer,
-					Integer: &readyReplicas,
+					Integer: &replicas64,
 				},
 			},
 		},
 	})
 
-	klog.Info(err)
-
-	expectedErr := fmt.Errorf("readyReplicas is %d for deployement %s/%s", readyReplicas, cloDeployment.Namespace, cloDeployment.Name)
+	expectedErr := fmt.Errorf("%w: replicas is %d for %s/%s", ErrWrongType, replicas, otelcol.Namespace, otelcol.Name)
 	require.EqualError(t, err, expectedErr.Error())
 
 }
