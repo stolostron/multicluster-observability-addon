@@ -58,7 +58,7 @@ func buildClusterLogForwarderSpec(resources Options) (*loggingv1.ClusterLogForwa
 	return &clf.Spec, nil
 }
 
-func templateWithSecret(spec *loggingv1.ClusterLogForwarderSpec, target authentication.Target, secret *corev1.Secret) error {
+func templateWithSecret(spec *loggingv1.ClusterLogForwarderSpec, target authentication.Target, secret corev1.Secret) error {
 	// TODO(JoaoBraveCoding) Validate that clfOutputName actually exists
 	// TODO(JoaoBraveCoding) Validate secret
 

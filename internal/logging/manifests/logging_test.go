@@ -58,7 +58,7 @@ func Test_BuildSubscriptionChannel(t *testing.T) {
 
 func Test_BuildSecrets(t *testing.T) {
 	resources := Options{
-		Secrets: map[authentication.Target]*corev1.Secret{
+		Secrets: map[authentication.Target]corev1.Secret{
 			"foo": {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
@@ -104,7 +104,7 @@ func Test_BuildCLFSpec(t *testing.T) {
 
 		// Addon configuration
 		clf                              *loggingv1.ClusterLogForwarder
-		appLogsSecret, clusterLogsSecret *corev1.Secret
+		appLogsSecret, clusterLogsSecret corev1.Secret
 
 		clusterName = "cluster-1"
 	)
@@ -200,7 +200,7 @@ func Test_BuildCLFSpec(t *testing.T) {
 		},
 	}
 
-	appLogsSecret = &corev1.Secret{
+	appLogsSecret = corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-app-logs", clusterName),
 			Namespace: clusterName,
@@ -211,7 +211,7 @@ func Test_BuildCLFSpec(t *testing.T) {
 		},
 	}
 
-	clusterLogsSecret = &corev1.Secret{
+	clusterLogsSecret = corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-cluster-logs", clusterName),
 			Namespace: clusterName,
@@ -225,7 +225,7 @@ func Test_BuildCLFSpec(t *testing.T) {
 	// Setup the fake k8s client
 	resources := Options{
 		ClusterLogForwarder: clf,
-		Secrets: map[authentication.Target]*corev1.Secret{
+		Secrets: map[authentication.Target]corev1.Secret{
 			"app-logs":     appLogsSecret,
 			"cluster-logs": clusterLogsSecret,
 		},
@@ -259,7 +259,7 @@ func Test_TemplateWithSecret(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			secret := &corev1.Secret{
+			secret := corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      tc.secretName,
 					Namespace: "cluster-1",
