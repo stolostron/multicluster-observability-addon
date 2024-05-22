@@ -5,7 +5,6 @@ import (
 	"strconv"
 
 	"github.com/rhobs/multicluster-observability-addon/internal/addon"
-	"github.com/rhobs/multicluster-observability-addon/internal/addon/authentication"
 	lhandlers "github.com/rhobs/multicluster-observability-addon/internal/logging/handlers"
 	lmanifests "github.com/rhobs/multicluster-observability-addon/internal/logging/manifests"
 	"github.com/rhobs/multicluster-observability-addon/internal/metrics"
@@ -36,11 +35,6 @@ func GetValuesFunc(k8s client.Client) addonfactory.GetValuesFunc {
 		cluster *clusterv1.ManagedCluster,
 		addon *addonapiv1alpha1.ManagedClusterAddOn,
 	) (addonfactory.Values, error) {
-		err := authentication.CreateOrUpdateRootCertificate(k8s)
-		if err != nil {
-			return nil, err
-		}
-
 		aodc, err := getAddOnDeploymentConfig(k8s, addon)
 		if err != nil {
 			return nil, err
