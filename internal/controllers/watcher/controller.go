@@ -9,13 +9,13 @@ import (
 	otelv1alpha1 "github.com/open-telemetry/opentelemetry-operator/apis/v1alpha1"
 	loggingv1 "github.com/openshift/cluster-logging-operator/apis/logging/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
-	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	workapiv1 "open-cluster-management.io/api/work/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -82,7 +82,7 @@ func (wm *WatcherManager) Start(ctx context.Context) {
 	}()
 }
 
-// WatcherReconciler reconciles the ManagedClusterAddon to annotate the ManiestWorks resource
+// WatcherReconciler triggers reconciliation in the AddonManager when something changes in an upstream resource
 type WatcherReconciler struct {
 	client.Client
 	Log           logr.Logger
@@ -115,10 +115,9 @@ func (r *WatcherReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 func (r *WatcherReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&addonapiv1alpha1.ManagedClusterAddOn{}, noReconcilePred).
-		Watches(&corev1.ConfigMap{}, r.enqueueForClusterSpecificResource(), builder.OnlyMetadata).
 		Watches(&corev1.Secret{}, r.enqueueForClusterSpecificResource(), builder.OnlyMetadata).
-		Watches(&loggingv1.ClusterLogForwarder{}, r.enqueueForClusterWideResource(), builder.OnlyMetadata).
-		Watches(&otelv1alpha1.OpenTelemetryCollector{}, r.enqueueForClusterWideResource(), builder.OnlyMetadata).
+		Watches(&loggingv1.ClusterLogForwarder{}, r.enqueueForClusterSpecificResource(), builder.OnlyMetadata).
+		Watches(&otelv1alpha1.OpenTelemetryCollector{}, r.enqueueForClusterSpecificResource(), builder.OnlyMetadata).
 		Complete(r)
 }
 
@@ -128,11 +127,16 @@ func (r *WatcherReconciler) enqueueForClusterSpecificResource() handler.EventHan
 		addon := &addonapiv1alpha1.ManagedClusterAddOn{}
 		if err := r.Client.Get(ctx, key, addon); err != nil {
 			if apierrors.IsNotFound(err) {
+				switch obj.(type) {
+				case *corev1.Secret:
+					return r.getSecretReconcileRequests(ctx, obj, addon)
+				}
 				return nil
 			}
 			r.Log.Error(err, "Error getting managedclusteraddon resources in event handler")
 			return nil
 		}
+
 		return []reconcile.Request{
 			{
 				NamespacedName: types.NamespacedName{
@@ -144,55 +148,26 @@ func (r *WatcherReconciler) enqueueForClusterSpecificResource() handler.EventHan
 	})
 }
 
-func (r *WatcherReconciler) enqueueForClusterWideResource() handler.EventHandler {
-	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
-		addonList := &addonapiv1alpha1.ManagedClusterAddOnList{}
-		if err := r.Client.List(ctx, addonList, &client.ListOptions{
-			LabelSelector: labels.SelectorFromSet(labels.Set{
-				"open-cluster-management.io/addon-name": "multicluster-observability-addon",
-			}),
-		}); err != nil {
-			r.Log.Error(err, "Error listing managedclusteraddon resources in event handler")
-			return nil
-		}
-
-		if len(addonList.Items) == 0 {
-			r.Log.V(2).Info("no managedclusteraddon found")
-			return nil
-		}
-
-		clustersetValue, clustersetExists := obj.GetAnnotations()["cluster.open-cluster-management.io/clusterset"]
-		var clustersInClusterSet map[string]struct{}
-		if clustersetExists {
-			clusterList := &clusterv1.ManagedClusterList{}
-			if err := r.Client.List(ctx, clusterList, &client.ListOptions{
-				LabelSelector: labels.SelectorFromSet(labels.Set{
-					"cluster.open-cluster-management.io/clusterset": clustersetValue,
-				}),
-			}); err != nil {
-				r.Log.Error(err, "Error listing managedcluster resources in event handler")
-				return nil
-			}
-			clustersInClusterSet = make(map[string]struct{}, len(clusterList.Items))
-			for _, cluster := range clusterList.Items {
-				clustersInClusterSet[cluster.Name] = struct{}{}
+// getSecretReconcileRequests gets reconcile.Request for secrets referenced in ManifestWorks.
+func (r *WatcherReconciler) getSecretReconcileRequests(ctx context.Context, obj client.Object, addon *addonapiv1alpha1.ManagedClusterAddOn) []reconcile.Request {
+	rqs := []reconcile.Request{}
+	mws := &workapiv1.ManifestWorkList{}
+	if err := r.Client.List(ctx, mws); err != nil {
+		for _, mw := range mws.Items {
+			for _, m := range mw.Spec.Workload.Manifests {
+				if equality.Semantic.DeepEqual(m.Object, obj) {
+					rqs = append(rqs,
+						// Trigger a reconcile request for the addon in the ManifestWork namespace
+						reconcile.Request{
+							NamespacedName: types.NamespacedName{
+								Name:      addon.Name,
+								Namespace: mw.Namespace,
+							},
+						},
+					)
+				}
 			}
 		}
-
-		var requests []reconcile.Request
-		for _, addon := range addonList.Items {
-			_, installed := clustersInClusterSet[addon.Namespace]
-			if clustersetExists && !installed {
-				continue
-			}
-
-			requests = append(requests, reconcile.Request{
-				NamespacedName: types.NamespacedName{
-					Namespace: addon.Namespace,
-					Name:      addon.Name,
-				},
-			})
-		}
-		return requests
-	})
+	}
+	return rqs
 }
