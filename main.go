@@ -163,8 +163,6 @@ func runController(ctx context.Context, kubeConfig *rest.Config) error {
 
 	mcoaAgentAddon, err := addonfactory.NewAgentAddonFactory(addon.Name, addon.FS, "manifests/charts/mcoa").
 		WithConfigGVRs(
-			schema.GroupVersionResource{Version: "v1", Resource: "secrets"},
-			schema.GroupVersionResource{Version: "v1", Resource: "configmaps"},
 			schema.GroupVersionResource{Version: "v1", Group: "logging.openshift.io", Resource: "clusterlogforwarders"},
 			schema.GroupVersionResource{Version: "v1alpha1", Group: "opentelemetry.io", Resource: "opentelemetrycollectors"},
 			utils.AddOnDeploymentConfigGVR,
