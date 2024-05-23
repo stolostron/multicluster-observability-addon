@@ -12,8 +12,8 @@ import (
 )
 
 var (
-	ErrWrongType      = errors.New("probe condition is not satisfied")
-	ErrValueNotProbed = errors.New("value not probed")
+	errWrongType      = errors.New("probe condition is not satisfied")
+	errValueNotProbed = errors.New("value not probed")
 )
 
 func NewRegistrationOption(agentName string) *agent.RegistrationOption {
