@@ -6,11 +6,10 @@ import (
 	"fmt"
 
 	"github.com/go-logr/logr"
-	otelv1alpha1 "github.com/open-telemetry/opentelemetry-operator/apis/v1alpha1"
-	loggingv1 "github.com/openshift/cluster-logging-operator/apis/logging/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager"
@@ -116,8 +115,6 @@ func (r *WatcherReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&addonapiv1alpha1.ManagedClusterAddOn{}, noReconcilePred).
 		Watches(&corev1.Secret{}, r.enqueueForClusterSpecificResource(), builder.OnlyMetadata).
-		Watches(&loggingv1.ClusterLogForwarder{}, r.enqueueForClusterSpecificResource(), builder.OnlyMetadata).
-		Watches(&otelv1alpha1.OpenTelemetryCollector{}, r.enqueueForClusterSpecificResource(), builder.OnlyMetadata).
 		Complete(r)
 }
 
@@ -127,11 +124,7 @@ func (r *WatcherReconciler) enqueueForClusterSpecificResource() handler.EventHan
 		addon := &addonapiv1alpha1.ManagedClusterAddOn{}
 		if err := r.Client.Get(ctx, key, addon); err != nil {
 			if apierrors.IsNotFound(err) {
-				switch obj.(type) {
-				case *corev1.Secret:
-					return r.getSecretReconcileRequests(ctx, obj, addon)
-				}
-				return nil
+				return r.getSecretReconcileRequests(ctx, obj, addon)
 			}
 			r.Log.Error(err, "Error getting managedclusteraddon resources in event handler")
 			return nil
@@ -152,7 +145,11 @@ func (r *WatcherReconciler) enqueueForClusterSpecificResource() handler.EventHan
 func (r *WatcherReconciler) getSecretReconcileRequests(ctx context.Context, obj client.Object, addon *addonapiv1alpha1.ManagedClusterAddOn) []reconcile.Request {
 	rqs := []reconcile.Request{}
 	mws := &workapiv1.ManifestWorkList{}
-	if err := r.Client.List(ctx, mws); err != nil {
+	if err := r.Client.List(ctx, mws, &client.ListOptions{
+		LabelSelector: labels.SelectorFromSet(labels.Set{
+			"open-cluster-management.io/addon-name": "multicluster-observability-addon",
+		}),
+	}); err != nil {
 		for _, mw := range mws.Items {
 			for _, m := range mw.Spec.Workload.Manifests {
 				if equality.Semantic.DeepEqual(m.Object, obj) {
