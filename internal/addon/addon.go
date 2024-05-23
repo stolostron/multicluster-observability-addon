@@ -112,9 +112,7 @@ func AgentHealthProber() *agent.HealthProber {
 				}
 				if identifier.Resource == ClfResource || identifier.Resource == OtelcolResource {
 					return fmt.Errorf("%w: for %s/%s", ErrValueNotProbed, identifier.Namespace, identifier.Name)
-				} else {
-					return nil
-				}
+			        return nil
 			},
 		},
 	}
