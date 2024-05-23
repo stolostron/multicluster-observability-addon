@@ -49,7 +49,7 @@ func Test_AgentHealthProber_Healthy(t *testing.T) {
 				Name: "replicas",
 				Value: v1.FieldValue{
 					Type:    v1.Integer,
-					Integer: &replicas64,
+					Integer: ptr.To(1),
 				},
 			},
 		},
