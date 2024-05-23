@@ -6,7 +6,6 @@ toolchain go1.21.9
 
 require (
 	github.com/ViaQ/logerr/v2 v2.1.0
-	github.com/cert-manager/cert-manager v1.13.3
 	github.com/imdario/mergo v0.3.16
 	github.com/open-telemetry/opentelemetry-operator v0.93.0
 	github.com/openshift/api v0.0.0-20240124164020-e2ce40831f2e // release-4.15
@@ -133,7 +132,6 @@ require (
 	k8s.io/kube-openapi v0.0.0-20231129212854-f0671cc7e66a // indirect
 	open-cluster-management.io/sdk-go v0.13.0 // indirect
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.28.0 // indirect
-	sigs.k8s.io/gateway-api v0.8.0 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
 	sigs.k8s.io/yaml v1.4.0 // indirect

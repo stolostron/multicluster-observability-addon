@@ -56,23 +56,23 @@ func Test_buildAuthenticationFromAnnotations(t *testing.T) {
 		{
 			name: "valid annotation",
 			annotations: map[string]string{
-				"authentication.mcoa.openshift.io/foo": "ExistingSecret",
+				"authentication.mcoa.openshift.io/foo": "SecretReference",
 			},
 			expectedAuthMap: map[Target]AuthenticationType{
-				Target("foo"): ExistingSecret,
+				Target("foo"): SecretReference,
 			},
 		},
 		{
 			name: "invalid annotation",
 			annotations: map[string]string{
-				"authentication.mcoa.openshift.io/foo/bar": "ExistingSecret",
+				"authentication.mcoa.openshift.io/foo/bar": "SecretReference",
 			},
 			expecedError: true,
 		},
 		{
 			name: "invalid no target specifed",
 			annotations: map[string]string{
-				"authentication.mcoa.openshift.io/": "ExistingSecret",
+				"authentication.mcoa.openshift.io/": "SecretReference",
 			},
 			expecedError: true,
 		},
@@ -88,7 +88,7 @@ func Test_buildAuthenticationFromAnnotations(t *testing.T) {
 		{
 			name: "regular annotation",
 			annotations: map[string]string{
-				"foo": "ExistingSecret",
+				"foo": "SecretReference",
 			},
 			expectedAuthMap: map[Target]AuthenticationType{},
 		},

@@ -53,7 +53,7 @@ func (sp *secretsProvider) GenerateSecrets(ctx context.Context, annotations map[
 	secretKeys := make(map[Target]SecretKey, len(targetSecretTypes))
 	for targetName, authType := range targetSecretTypes {
 		switch authType {
-		case ExistingSecret:
+		case SecretReference:
 			obj, err := sp.discoverSecretRef(ctx, targetSecretName[targetName])
 			if err != nil {
 				return nil, err
@@ -82,20 +82,20 @@ func (sp *secretsProvider) FetchSecrets(ctx context.Context, targetsSecrets map[
 }
 
 func (sp *secretsProvider) discoverSecretRef(ctx context.Context, secretName string) (*corev1.Secret, error) {
-	existingSecret := &corev1.Secret{}
+	secretReference := &corev1.Secret{}
 	key := client.ObjectKey{Name: secretName, Namespace: sp.addonNamespace}
-	err := sp.k8s.Get(ctx, key, existingSecret, &client.GetOptions{})
+	err := sp.k8s.Get(ctx, key, secretReference, &client.GetOptions{})
 	switch {
 	case apierrors.IsNotFound(err):
 		key = client.ObjectKey{Name: secretName, Namespace: sp.configResourceNamespace}
-		err = sp.k8s.Get(ctx, key, existingSecret, &client.GetOptions{})
+		err = sp.k8s.Get(ctx, key, secretReference, &client.GetOptions{})
 		if err != nil {
 			return nil, fmt.Errorf("failed to get existing secret with key %s/%s: %w", key.Namespace, key.Name, err)
 		}
 	case err != nil:
 		return nil, fmt.Errorf("failed to get existing secret with key %s/%s: %w", key.Namespace, key.Name, err)
 	}
-	return existingSecret, nil
+	return secretReference, nil
 }
 
 func buildAuthenticationFromAnnotations(annotations map[string]string) (map[Target]AuthenticationType, error) {
