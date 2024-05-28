@@ -4,57 +4,47 @@ import (
 	"fmt"
 
 	"github.com/ViaQ/logerr/v2/kverrors"
+	otelv1beta1 "github.com/open-telemetry/opentelemetry-operator/apis/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 )
 
-func ConfigureExportersSecrets(cfg map[string]interface{}, secret corev1.Secret, annotation string) error {
+func ConfigureExportersSecrets(otelCol *otelv1beta1.OpenTelemetryCollector, secret corev1.Secret, annotation string) error {
 	otelExporterName, ok := secret.Annotations[annotation]
 	if !ok {
 		return nil
 	}
 
-	exporters, err := getExporters(cfg)
-	if err != nil {
-		return err
-	}
-
-	for exporterName, config := range exporters {
+	for exporterName, config := range otelCol.Spec.Config.Exporters.Object {
 		if otelExporterName != exporterName {
 			continue
 		}
 		var configMap map[string]interface{}
 		if config == nil {
 			configMap = make(map[string]interface{})
-			exporters[otelExporterName] = configMap
 		} else {
 			configMap = config.(map[string]interface{})
 		}
 
 		configureExporterSecrets(configMap, secret)
 
+		otelCol.Spec.Config.Exporters.Object[otelExporterName] = configMap
 	}
 	return nil
 }
 
-func ConfigureExporters(cfg map[string]interface{}, cm corev1.ConfigMap, clusterName string, annotation string) error {
+func ConfigureExporters(otelCol *otelv1beta1.OpenTelemetryCollector, cm corev1.ConfigMap, clusterName string, annotation string) error {
 	otelExporterName, ok := cm.Annotations[annotation]
 	if !ok {
 		return nil
 	}
 
-	exporters, err := getExporters(cfg)
-	if err != nil {
-		return err
-	}
-
-	for exporterName, config := range exporters {
+	for exporterName, config := range otelCol.Spec.Config.Exporters.Object {
 		if otelExporterName != exporterName {
 			continue
 		}
 		var exporterConfig map[string]interface{}
 		if config == nil {
 			exporterConfig = make(map[string]interface{})
-			exporters[otelExporterName] = exporterConfig
 		} else {
 			exporterConfig = config.(map[string]interface{})
 		}
@@ -65,18 +55,9 @@ func ConfigureExporters(cfg map[string]interface{}, cm corev1.ConfigMap, cluster
 		}
 
 		configureTenant(exporterConfig, clusterName)
+		otelCol.Spec.Config.Exporters.Object[otelExporterName] = exporterConfig
 	}
 	return nil
-}
-
-func getExporters(cfg map[string]interface{}) (map[string]interface{}, error) {
-	exportersField, ok := cfg["exporters"]
-	if !ok {
-		return nil, kverrors.New("no exporters available as part of the configuration")
-	}
-
-	exporters := exportersField.(map[string]interface{})
-	return exporters, nil
 }
 
 func configureExporterSecrets(exporter map[string]interface{}, secret corev1.Secret) {

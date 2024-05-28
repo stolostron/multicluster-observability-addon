@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/ViaQ/logerr/v2/kverrors"
-	otelv1alpha1 "github.com/open-telemetry/opentelemetry-operator/apis/v1alpha1"
+	otelv1beta1 "github.com/open-telemetry/opentelemetry-operator/apis/v1beta1"
 	"github.com/rhobs/multicluster-observability-addon/internal/addon"
 	"github.com/rhobs/multicluster-observability-addon/internal/addon/authentication"
 	"github.com/rhobs/multicluster-observability-addon/internal/tracing/manifests"
@@ -26,8 +26,8 @@ func BuildOptions(k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAdd
 	}
 
 	klog.Info("Retrieving OpenTelemetry Collector template")
-	key := addon.GetObjectKey(mcAddon.Status.ConfigReferences, otelv1alpha1.GroupVersion.Group, opentelemetryCollectorResource)
-	otelCol := &otelv1alpha1.OpenTelemetryCollector{}
+	key := addon.GetObjectKey(mcAddon.Status.ConfigReferences, otelv1beta1.GroupVersion.Group, opentelemetryCollectorResource)
+	otelCol := &otelv1beta1.OpenTelemetryCollector{}
 	if err := k8s.Get(context.Background(), key, otelCol, &client.GetOptions{}); err != nil {
 		return resources, err
 	}

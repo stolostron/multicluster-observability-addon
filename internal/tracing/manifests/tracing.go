@@ -2,12 +2,9 @@ package manifests
 
 import (
 	"encoding/json"
-	"fmt"
 
-	"github.com/ViaQ/logerr/v2/kverrors"
-	otelv1alpha1 "github.com/open-telemetry/opentelemetry-operator/apis/v1alpha1"
+	otelv1beta1 "github.com/open-telemetry/opentelemetry-operator/apis/v1beta1"
 	"github.com/rhobs/multicluster-observability-addon/internal/tracing/manifests/otelcol"
-	"gopkg.in/yaml.v3"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -27,9 +24,9 @@ func buildSecrets(resources Options) ([]SecretValue, error) {
 	return secretsValue, nil
 }
 
-func buildOtelColSpec(resources Options) (*otelv1alpha1.OpenTelemetryCollectorSpec, error) {
+func buildOtelColSpec(resources Options) (*otelv1beta1.OpenTelemetryCollectorSpec, error) {
 	for _, secret := range resources.Secrets {
-		if err := templateWithSecret(&resources.OpenTelemetryCollector.Spec, secret); err != nil {
+		if err := templateWithSecret(resources.OpenTelemetryCollector, secret); err != nil {
 			return nil, err
 		}
 	}
@@ -43,45 +40,18 @@ func buildOtelColSpec(resources Options) (*otelv1alpha1.OpenTelemetryCollectorSp
 	return &resources.OpenTelemetryCollector.Spec, nil
 }
 
-func templateWithSecret(spec *otelv1alpha1.OpenTelemetryCollectorSpec, secret corev1.Secret) error {
-	cfg, err := otelcol.ConfigFromString(spec.Config)
-	if err != nil {
-		return nil
-	}
-
-	// iblancasa: add verifications for the exporters
-
-	err = otelcol.ConfigureExportersSecrets(cfg, secret, AnnotationTargetOutputName)
+func templateWithSecret(otelCol *otelv1beta1.OpenTelemetryCollector, secret corev1.Secret) error {
+	err := otelcol.ConfigureExportersSecrets(otelCol, secret, AnnotationTargetOutputName)
 	if err != nil {
 		return err
 	}
 
-	yamlConfig, err := yaml.Marshal(&cfg)
-	if err != nil {
-		return kverrors.New(fmt.Sprint("error while marshaling OTEL Configuration: %w", err))
-	}
-	spec.Config = string(yamlConfig)
-
-	otelcol.ConfigureVolumes(spec, secret)
-	otelcol.ConfigureVolumeMounts(spec, secret)
+	otelcol.ConfigureVolumes(otelCol, secret)
+	otelcol.ConfigureVolumeMounts(otelCol, secret)
 
 	return nil
 }
 
 func templateWithConfigMap(resource *Options, configmap corev1.ConfigMap) error {
-	cfg, err := otelcol.ConfigFromString(resource.OpenTelemetryCollector.Spec.Config)
-	if err != nil {
-		return err
-	}
-	err = otelcol.ConfigureExporters(cfg, configmap, resource.ClusterName, AnnotationTargetOutputName)
-	if err != nil {
-		return err
-	}
-
-	yamlConfig, err := yaml.Marshal(&cfg)
-	if err != nil {
-		return kverrors.New(fmt.Sprint("error while marshaling OTEL Configuration: %w", err))
-	}
-	resource.OpenTelemetryCollector.Spec.Config = string(yamlConfig)
-	return nil
+	return otelcol.ConfigureExporters((*resource).OpenTelemetryCollector, configmap, resource.ClusterName, AnnotationTargetOutputName)
 }

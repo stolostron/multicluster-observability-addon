@@ -9,7 +9,7 @@ import (
 	"time"
 
 	certmanagerv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
-	otelv1alpha1 "github.com/open-telemetry/opentelemetry-operator/apis/v1alpha1"
+	otelv1beta1 "github.com/open-telemetry/opentelemetry-operator/apis/v1beta1"
 	routev1 "github.com/openshift/api/route/v1"
 	loggingapis "github.com/openshift/cluster-logging-operator/apis"
 	operatorsv1 "github.com/operator-framework/api/pkg/operators/v1"
@@ -104,7 +104,7 @@ func runController(ctx context.Context, kubeConfig *rest.Config) error {
 		return err
 	}
 	// Necessary to reconcile OpenTelemetryCollectors
-	err = otelv1alpha1.AddToScheme(scheme.Scheme)
+	err = otelv1beta1.AddToScheme(scheme.Scheme)
 	if err != nil {
 		return err
 	}

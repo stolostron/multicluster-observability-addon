@@ -53,7 +53,7 @@ test:
 	go test -v ./internal/...
 
 .PHONY: addon
-addon: deps ## Build addon binary
+addon: deps fmt ## Build addon binary
 	go build -o bin/multicluster-observability-addon main.go
 
 .PHONY: oci-build
