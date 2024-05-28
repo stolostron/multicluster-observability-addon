@@ -1,5 +1,8 @@
-spokeClusterName: spoke
+spokeClusterName: spoke-1
 
 awsCredentials:
   accessKeyID: XXXXXXX
   accessKeySecret: XXXXXX
+
+hubCollector:
+  route: XXXXXXX
