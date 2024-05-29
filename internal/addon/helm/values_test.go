@@ -102,7 +102,7 @@ func Test_Mcoa_Disable_Chart_Hub(t *testing.T) {
 	)
 
 	managedCluster = addontesting.NewManagedCluster("cluster-1")
-	managedCluster.Annotations = map[string]string{
+	managedCluster.Labels = map[string]string{
 		"local-cluster": "true",
 	}
 	managedClusterAddOn = addontesting.NewAddon("test", "cluster-1")
