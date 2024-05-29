@@ -5,7 +5,6 @@ import (
 	"strconv"
 
 	"github.com/rhobs/multicluster-observability-addon/internal/addon"
-	"github.com/rhobs/multicluster-observability-addon/internal/addon/authentication"
 	lhandlers "github.com/rhobs/multicluster-observability-addon/internal/logging/handlers"
 	lmanifests "github.com/rhobs/multicluster-observability-addon/internal/logging/manifests"
 	"github.com/rhobs/multicluster-observability-addon/internal/metrics"
@@ -19,7 +18,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+const annotationLocalCluster = "local-cluster"
+
 type HelmChartValues struct {
+	Enabled bool                     `json:"enabled"`
 	Metrics metrics.MetricsValues    `json:"metrics"`
 	Logging lmanifests.LoggingValues `json:"logging"`
 	Tracing tmanifests.TracingValues `json:"tracing"`
@@ -36,9 +38,9 @@ func GetValuesFunc(k8s client.Client) addonfactory.GetValuesFunc {
 		cluster *clusterv1.ManagedCluster,
 		addon *addonapiv1alpha1.ManagedClusterAddOn,
 	) (addonfactory.Values, error) {
-		err := authentication.CreateOrUpdateRootCertificate(k8s)
-		if err != nil {
-			return nil, err
+		// if hub cluster, then don't install anything
+		if isHubCluster(cluster) {
+			return addonfactory.JsonStructToValues(HelmChartValues{})
 		}
 
 		aodc, err := getAddOnDeploymentConfig(k8s, addon)
@@ -50,7 +52,9 @@ func GetValuesFunc(k8s client.Client) addonfactory.GetValuesFunc {
 			return nil, err
 		}
 
-		var userValues HelmChartValues
+		userValues := HelmChartValues{
+			Enabled: true,
+		}
 
 		if !opts.MetricsDisabled {
 			metrics, err := metrics.GetValuesFunc(k8s, cluster, addon, aodc)
@@ -136,4 +140,12 @@ func buildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Opti
 
 	}
 	return opts, nil
+}
+
+func isHubCluster(cluster *clusterv1.ManagedCluster) bool {
+	val, ok := cluster.Annotations[annotationLocalCluster]
+	if !ok {
+		return false
+	}
+	return val == "true"
 }

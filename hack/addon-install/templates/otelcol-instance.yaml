@@ -1,0 +1,47 @@
+apiVersion: opentelemetry.io/v1alpha1
+kind: OpenTelemetryCollector
+metadata:
+  name: instance
+  namespace: open-cluster-management
+  annotations:
+    authentication.mcoa.openshift.io/otlp: ExistingSecret
+spec:
+  config: |
+    exporters:
+      debug:
+      otlp:
+        endpoint: {{ .Values.hubCollector.route }}
+        headers:
+            x-scope-orgid: {{ .Values.spokeClusterName }}
+        tls:
+          ca_file: /tracing-otlp-auth/ca-bundle.crt
+          cert_file: /tracing-otlp-auth/tls.crt
+          insecure: false
+          key_file: /tracing-otlp-auth/tls.key
+    processors:
+    receivers:
+      jaeger:
+        protocols:
+            grpc:
+      otlp:
+        protocols:
+          grpc:
+          http:
+    service:
+      pipelines:
+        traces:
+          exporters:
+            - otlp
+            - debug
+          processors: []
+          receivers:
+            - jaeger
+            - otlp
+  mode: deployment
+  volumeMounts:
+  - mountPath: /tracing-otlp-auth
+    name: tracing-otlp-auth
+  volumes:
+  - name: tracing-otlp-auth
+    secret:
+      secretName: tracing-otlp-auth

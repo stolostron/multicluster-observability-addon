@@ -4,28 +4,24 @@ import (
 	"fmt"
 
 	"github.com/ViaQ/logerr/v2/kverrors"
+	"github.com/rhobs/multicluster-observability-addon/internal/addon/authentication"
 	corev1 "k8s.io/api/core/v1"
 )
 
-func ConfigureExportersSecrets(cfg map[string]interface{}, secret corev1.Secret, annotation string) error {
-	otelExporterName, ok := secret.Annotations[annotation]
-	if !ok {
-		return nil
-	}
-
-	exporters, err := getExporters(cfg)
+func ConfigureExportersSecrets(cfg map[string]interface{}, target authentication.Target, secret corev1.Secret) error {
+	exporters, err := GetExporters(cfg)
 	if err != nil {
 		return err
 	}
 
 	for exporterName, config := range exporters {
-		if otelExporterName != exporterName {
+		if string(target) != exporterName {
 			continue
 		}
 		var configMap map[string]interface{}
 		if config == nil {
 			configMap = make(map[string]interface{})
-			exporters[otelExporterName] = configMap
+			exporters[string(target)] = configMap
 		} else {
 			configMap = config.(map[string]interface{})
 		}
@@ -36,40 +32,7 @@ func ConfigureExportersSecrets(cfg map[string]interface{}, secret corev1.Secret,
 	return nil
 }
 
-func ConfigureExporters(cfg map[string]interface{}, cm corev1.ConfigMap, clusterName string, annotation string) error {
-	otelExporterName, ok := cm.Annotations[annotation]
-	if !ok {
-		return nil
-	}
-
-	exporters, err := getExporters(cfg)
-	if err != nil {
-		return err
-	}
-
-	for exporterName, config := range exporters {
-		if otelExporterName != exporterName {
-			continue
-		}
-		var exporterConfig map[string]interface{}
-		if config == nil {
-			exporterConfig = make(map[string]interface{})
-			exporters[otelExporterName] = exporterConfig
-		} else {
-			exporterConfig = config.(map[string]interface{})
-		}
-
-		err := configureExporterEndpoint(exporterConfig, cm)
-		if err != nil {
-			return err
-		}
-
-		configureTenant(exporterConfig, clusterName)
-	}
-	return nil
-}
-
-func getExporters(cfg map[string]interface{}) (map[string]interface{}, error) {
+func GetExporters(cfg map[string]interface{}) (map[string]interface{}, error) {
 	exportersField, ok := cfg["exporters"]
 	if !ok {
 		return nil, kverrors.New("no exporters available as part of the configuration")
@@ -88,19 +51,4 @@ func configureExporterSecrets(exporter map[string]interface{}, secret corev1.Sec
 	certConfig["ca_file"] = fmt.Sprintf("%s/ca-bundle.crt", folder)
 
 	exporter["tls"] = certConfig
-}
-
-func configureExporterEndpoint(exporter map[string]interface{}, cm corev1.ConfigMap) error {
-	url := cm.Data["endpoint"]
-	if url == "" {
-		return kverrors.New("no value for 'endpoint' in configmap", "name", cm.Name)
-	}
-	exporter["endpoint"] = url
-	return nil
-}
-
-func configureTenant(exporter map[string]interface{}, clusterName string) {
-	headers := make(map[string]string)
-	headers["x-scope-orgid"] = clusterName
-	exporter["headers"] = headers
 }

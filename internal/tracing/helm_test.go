@@ -6,7 +6,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
-	certmanagerv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	otelv1alpha1 "github.com/open-telemetry/opentelemetry-operator/apis/v1alpha1"
 	operatorsv1 "github.com/operator-framework/api/pkg/operators/v1"
 	operatorsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
@@ -31,7 +30,6 @@ var (
 	_ = otelv1alpha1.AddToScheme(scheme.Scheme)
 	_ = operatorsv1.AddToScheme(scheme.Scheme)
 	_ = operatorsv1alpha1.AddToScheme(scheme.Scheme)
-	_ = certmanagerv1.AddToScheme(scheme.Scheme)
 )
 
 func fakeGetValues(k8s client.Client) addonfactory.GetValuesFunc {
@@ -185,7 +183,7 @@ func Test_Tracing_AllConfigsTogether_AllResources(t *testing.T) {
 	// Render manifests and return them as k8s runtime objects
 	objects, err := tracingAgentAddon.Manifests(managedCluster, managedClusterAddOn)
 	require.NoError(t, err)
-	require.Equal(t, 6, len(objects))
+	require.Equal(t, 5, len(objects))
 
 	for _, obj := range objects {
 		switch obj := obj.(type) {

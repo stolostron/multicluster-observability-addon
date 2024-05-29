@@ -13,18 +13,11 @@ const (
 	LoggingChartDir = "manifests/charts/mcoa/charts/logging"
 	TracingChartDir = "manifests/charts/mcoa/charts/tracing"
 
-	ConfigMapResource             = "configmaps"
-	SecretResource                = "secrets"
 	AddonDeploymentConfigResource = "addondeploymentconfigs"
 
 	AdcMetricsDisabledKey = "metricsDisabled"
 	AdcLoggingDisabledKey = "loggingDisabled"
 	AdcTracingisabledKey  = "tracingDisabled"
-
-	SignalLabelKey        = "mcoa.openshift.io/signal"
-	Metrics        Signal = "metrics"
-	Logging        Signal = "logging"
-	Tracing        Signal = "tracing"
 )
 
 //go:embed manifests

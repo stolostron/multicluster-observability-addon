@@ -61,7 +61,6 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 		// Addon configuration
 		addOnDeploymentConfig *addonapiv1alpha1.AddOnDeploymentConfig
 		clf                   *loggingv1.ClusterLogForwarder
-		authCM                *corev1.ConfigMap
 		staticCred            *corev1.Secret
 
 		// Test clients
@@ -74,18 +73,6 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 
 	// Register the addon for the managed cluster
 	managedClusterAddOn = addontesting.NewAddon("test", "cluster-1")
-	managedClusterAddOn.Spec.Configs = []addonapiv1alpha1.AddOnConfig{
-		{
-			ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
-				Group:    "",
-				Resource: "configmaps",
-			},
-			ConfigReferent: addonapiv1alpha1.ConfigReferent{
-				Namespace: "open-cluster-management",
-				Name:      "logging-auth",
-			},
-		},
-	}
 	managedClusterAddOn.Status.ConfigReferences = []addonapiv1alpha1.ConfigReference{
 		{
 			ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
@@ -114,6 +101,10 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "instance",
 			Namespace: "open-cluster-management",
+			Annotations: map[string]string{
+				"authentication.mcoa.openshift.io/app-logs":     "SecretReference",
+				"authentication.mcoa.openshift.io/cluster-logs": "SecretReference",
+			},
 		},
 		Spec: loggingv1.ClusterLogForwarderSpec{
 			Inputs: []loggingv1.InputSpec{
@@ -138,6 +129,9 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 							TenantKey: "tenant-x",
 						},
 					},
+					Secret: &loggingv1.OutputSecretSpec{
+						Name: "static-authentication",
+					},
 				},
 				{
 					Name: "cluster-logs",
@@ -147,6 +141,9 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 							GroupBy:     loggingv1.LogGroupByLogType,
 							GroupPrefix: ptr.To("test-prefix"),
 						},
+					},
+					Secret: &loggingv1.OutputSecretSpec{
+						Name: "static-authentication",
 					},
 				},
 			},
@@ -176,20 +173,6 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 		},
 	}
 
-	authCM = &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "logging-auth",
-			Namespace: "open-cluster-management",
-			Labels: map[string]string{
-				"mcoa.openshift.io/signal": "logging",
-			},
-		},
-		Data: map[string]string{
-			"app-logs":     "StaticAuthentication",
-			"cluster-logs": "StaticAuthentication",
-		},
-	}
-
 	addOnDeploymentConfig = &addonapiv1alpha1.AddOnDeploymentConfig{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "multicluster-observability-addon",
@@ -208,7 +191,7 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 	// Setup the fake k8s client
 	fakeKubeClient = fake.NewClientBuilder().
 		WithScheme(scheme.Scheme).
-		WithObjects(clf, staticCred, authCM).
+		WithObjects(clf, staticCred).
 		Build()
 
 	// Setup the fake addon client
@@ -240,17 +223,12 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 		case *loggingv1.ClusterLogForwarder:
 			require.NotNil(t, obj.Spec.Outputs[0].Secret)
 			require.NotNil(t, obj.Spec.Outputs[1].Secret)
-			require.Equal(t, "logging-app-logs-auth", obj.Spec.Outputs[0].Secret.Name)
-			require.Equal(t, "logging-cluster-logs-auth", obj.Spec.Outputs[1].Secret.Name)
+			require.Equal(t, "static-authentication", obj.Spec.Outputs[0].Secret.Name)
+			require.Equal(t, "static-authentication", obj.Spec.Outputs[1].Secret.Name)
 		case *corev1.Secret:
-			if obj.Name == "logging-app-logs-auth" {
+			if obj.Name == "static-authentication" {
 				require.Equal(t, staticCred.Data, obj.Data)
 			}
-
-			if obj.Name == "logging-cluster-logs-auth" {
-				require.Equal(t, staticCred.Data, obj.Data)
-			}
-
 		}
 	}
 }
