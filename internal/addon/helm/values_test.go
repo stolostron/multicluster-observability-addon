@@ -75,25 +75,9 @@ func Test_Mcoa_Disable_Charts(t *testing.T) {
 		},
 	}
 
-	certManagerCertificateCRD := &apiextensionsv1.CustomResourceDefinition{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "certificates.cert-manager.io",
-		},
-	}
-	certManagerIssuerCRD := &apiextensionsv1.CustomResourceDefinition{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "issuers.cert-manager.io",
-		},
-	}
-	certManagerClusterIssuerCRD := &apiextensionsv1.CustomResourceDefinition{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "clusterissuers.cert-manager.io",
-		},
-	}
-
 	fakeKubeClient := fake.NewClientBuilder().
 		WithScheme(scheme.Scheme).
-		WithObjects(addOnDeploymentConfig, certManagerCertificateCRD, certManagerIssuerCRD, certManagerClusterIssuerCRD).
+		WithObjects(addOnDeploymentConfig).
 		Build()
 
 	loggingAgentAddon, err := addonfactory.NewAgentAddonFactory(addon.Name, addon.FS, addon.McoaChartDir).
@@ -108,4 +92,72 @@ func Test_Mcoa_Disable_Charts(t *testing.T) {
 	objects, err := loggingAgentAddon.Manifests(managedCluster, managedClusterAddOn)
 	require.NoError(t, err)
 	require.Equal(t, 2, len(objects))
+}
+
+func Test_Mcoa_Disable_Chart_Hub(t *testing.T) {
+	var (
+		managedCluster        *clusterv1.ManagedCluster
+		managedClusterAddOn   *addonapiv1alpha1.ManagedClusterAddOn
+		addOnDeploymentConfig *addonapiv1alpha1.AddOnDeploymentConfig
+	)
+
+	managedCluster = addontesting.NewManagedCluster("cluster-1")
+	managedCluster.Annotations = map[string]string{
+		"local-cluster": "true",
+	}
+	managedClusterAddOn = addontesting.NewAddon("test", "cluster-1")
+
+	managedClusterAddOn.Status.ConfigReferences = []addonapiv1alpha1.ConfigReference{
+		{
+			ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+				Group:    "addon.open-cluster-management.io",
+				Resource: "addondeploymentconfigs",
+			},
+			ConfigReferent: addonapiv1alpha1.ConfigReferent{
+				Namespace: "open-cluster-management",
+				Name:      "multicluster-observability-addon",
+			},
+		},
+	}
+
+	addOnDeploymentConfig = &addonapiv1alpha1.AddOnDeploymentConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "multicluster-observability-addon",
+			Namespace: "open-cluster-management",
+		},
+		Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
+			CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
+				{
+					Name:  "metricsDisabled",
+					Value: "true",
+				},
+				{
+					Name:  "loggingDisabled",
+					Value: "true",
+				},
+				{
+					Name:  "tracingDisabled",
+					Value: "true",
+				},
+			},
+		},
+	}
+
+	fakeKubeClient := fake.NewClientBuilder().
+		WithScheme(scheme.Scheme).
+		WithObjects(addOnDeploymentConfig).
+		Build()
+
+	loggingAgentAddon, err := addonfactory.NewAgentAddonFactory(addon.Name, addon.FS, addon.McoaChartDir).
+		WithGetValuesFuncs(GetValuesFunc(fakeKubeClient)).
+		WithAgentRegistrationOption(&agent.RegistrationOption{}).
+		WithScheme(scheme.Scheme).
+		BuildHelmAgentAddon()
+	if err != nil {
+		klog.Fatalf("failed to build agent %v", err)
+	}
+
+	objects, err := loggingAgentAddon.Manifests(managedCluster, managedClusterAddOn)
+	require.NoError(t, err)
+	require.Equal(t, 0, len(objects))
 }

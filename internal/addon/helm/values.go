@@ -40,7 +40,7 @@ func GetValuesFunc(k8s client.Client) addonfactory.GetValuesFunc {
 	) (addonfactory.Values, error) {
 		// if hub cluster, then don't install anything
 		if isHubCluster(cluster) {
-			return addonfactory.JsonStructToValues(disabledChart)
+			return addonfactory.JsonStructToValues(HelmChartValues{})
 		}
 
 		aodc, err := getAddOnDeploymentConfig(k8s, addon)
@@ -52,7 +52,9 @@ func GetValuesFunc(k8s client.Client) addonfactory.GetValuesFunc {
 			return nil, err
 		}
 
-		var userValues HelmChartValues
+		userValues := HelmChartValues{
+			Enabled: true,
+		}
 
 		if !opts.MetricsDisabled {
 			metrics, err := metrics.GetValuesFunc(k8s, cluster, addon, aodc)
@@ -146,19 +148,4 @@ func isHubCluster(cluster *clusterv1.ManagedCluster) bool {
 		return false
 	}
 	return val == "true"
-}
-
-func disabledChart() HelmChartValues {
-	return HelmChartValues{
-		Enabled: false,
-		Metrics: metrics.MetricsValues{
-			Enabled: false,
-		},
-		Logging: lmanifests.LoggingValues{
-			Enabled: false,
-		},
-		Tracing: tmanifests.TracingValues{
-			Enabled: false,
-		},
-	}
 }
