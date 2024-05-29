@@ -11,25 +11,29 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// AuthenticationType defines an authentication method between two endpoints
+// AuthenticationType defines an authentication method between two targets.
 type AuthenticationType string
 
 // Target defines the name of an endpoint that will be available to store
-// signal data
+// signal data.
 type Target string
 
 // SecretKey defines a key pair (Name/Namespace) that points to a Secret on the
-// hub cluster in the namespace of the spoke cluster
+// hub cluster.
 type SecretKey client.ObjectKey
 
-// secretsProvider an implementaton of the authentication package API
+// secretsProider an implementaton of the authentication package API
 type secretsProvider struct {
-	k8s                     client.Client
+	k8s client.Client
+	// configResourceNamespace is the namespace where the root config resource
+	// (ClusterLogForwarder or OpenTelemetryCollector) lives.
 	configResourceNamespace string
-	addonNamespace          string
+	// addonNamespace is the namespace where the ManagedClusterAddon resources
+	// lives also know as the namespace of the spoke cluster
+	addonNamespace string
 }
 
-// NewSecretsProvider creates a new instance of *secretsProvider.
+// NewSecretsProvider creates a new instance of secretsProvider.
 func NewSecretsProvider(k8s client.Client, configResourceNamespace string, addonNamespace string) secretsProvider {
 	return secretsProvider{
 		k8s:                     k8s,
@@ -39,11 +43,14 @@ func NewSecretsProvider(k8s client.Client, configResourceNamespace string, addon
 }
 
 // GenerateSecrets requests Kubernetes secrets based on the specified
-// authentication method for each target. The provided targetAuthType map
-// represents a set of targets, where each key corresponds to a Target that that
-// uses a specific AuthenticationType. This function returns a map with the same
-// Target as keys, where the values are `SecretKey` referencing the Kubernetes
-// secret created.
+// authentication method for each target. The provided annotations map should
+// contain a set of annotations that correspond to a set of Targets defined in
+// the root config resource (CLF or OTELCol). With these annotations this
+// package will build a representation of a Target and the corresponding
+// AuthenticationType.
+// The "targetSecretName" parameter should contain a list of
+// the Targets and Secret names. This structure will be used if the user defined
+// the AuthenticationType "SecretReference".
 func (sp *secretsProvider) GenerateSecrets(ctx context.Context, annotations map[string]string, targetSecretName map[Target]string) (map[Target]SecretKey, error) {
 	targetSecretTypes, err := buildAuthenticationFromAnnotations(annotations)
 	if err != nil {
@@ -54,12 +61,11 @@ func (sp *secretsProvider) GenerateSecrets(ctx context.Context, annotations map[
 	for targetName, authType := range targetSecretTypes {
 		switch authType {
 		case SecretReference:
-			obj, err := sp.discoverSecretRef(ctx, targetSecretName[targetName])
+			obj, err := sp.getSecretReference(ctx, targetSecretName[targetName])
 			if err != nil {
 				return nil, err
 			}
 			secretKeys[targetName] = SecretKey(client.ObjectKeyFromObject(obj))
-			continue
 		default:
 			return nil, kverrors.New("missing mutate implementation for authentication type", "type", authType)
 		}
@@ -68,7 +74,7 @@ func (sp *secretsProvider) GenerateSecrets(ctx context.Context, annotations map[
 	return secretKeys, nil
 }
 
-// FetchSecrets transforms a map of Target/SecretKey to a map of Target/Secret
+// FetchSecrets fetch the secrets from their keys and returns them as a map of Target/Secret
 func (sp *secretsProvider) FetchSecrets(ctx context.Context, targetsSecrets map[Target]SecretKey) (map[Target]corev1.Secret, error) {
 	secrets := make(map[Target]corev1.Secret, len(targetsSecrets))
 	for target, key := range targetsSecrets {
@@ -81,7 +87,14 @@ func (sp *secretsProvider) FetchSecrets(ctx context.Context, targetsSecrets map[
 	return secrets, nil
 }
 
-func (sp *secretsProvider) discoverSecretRef(ctx context.Context, secretName string) (*corev1.Secret, error) {
+// getSecretReference given a secret name this function will return a secret
+// with the same name in the namespace of the addon (spoke cluster).
+// Alternatively if not secret with such name exists in the addon namespace it
+// will return a secret with the same name in the namespace of the
+// configResource.
+// This function will return an error if no secret with such name is found in
+// both namespaces.
+func (sp *secretsProvider) getSecretReference(ctx context.Context, secretName string) (*corev1.Secret, error) {
 	secretReference := &corev1.Secret{}
 	key := client.ObjectKey{Name: secretName, Namespace: sp.addonNamespace}
 	err := sp.k8s.Get(ctx, key, secretReference, &client.GetOptions{})
@@ -98,6 +111,9 @@ func (sp *secretsProvider) discoverSecretRef(ctx context.Context, secretName str
 	return secretReference, nil
 }
 
+// buildAuthenticationFromAnnotations given a set of annotations this function
+// will return a map that has as keys the Targets and values AuthenticationTypes.
+// The annotation used is defined in the contant "AnnotationAuthOutput" 
 func buildAuthenticationFromAnnotations(annotations map[string]string) (map[Target]AuthenticationType, error) {
 	result := make(map[Target]AuthenticationType)
 	for annotation, annValue := range annotations {

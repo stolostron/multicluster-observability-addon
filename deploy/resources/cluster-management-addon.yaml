@@ -6,7 +6,7 @@ metadata:
     addon.open-cluster-management.io/lifecycle: addon-manager
 spec:
   addOnMeta:
-    displayName: Multi Cluster Observability Addon
+    displayName: Multicluster Observability Addon
     description: "multicluster-observability-addon is the addon to configure spoke clusters to collect and forward logs/traces to a given set of outputs"
   supportedConfigs:
     # Describes the general addon configuration applicable for all managed clusters. It includes:

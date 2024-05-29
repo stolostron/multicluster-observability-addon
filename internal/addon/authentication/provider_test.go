@@ -103,7 +103,7 @@ func Test_buildAuthenticationFromAnnotations(t *testing.T) {
 	}
 }
 
-func Test_discoverSecretRef(t *testing.T) {
+func Test_getSecretReference(t *testing.T) {
 	var (
 		defaultNamespace = "open-cluster-management"
 		clusterSecret    = &corev1.Secret{
@@ -165,7 +165,7 @@ func Test_discoverSecretRef(t *testing.T) {
 			WithObjects(clusterSecret, defaultSecret).
 			Build()
 		sp := NewSecretsProvider(fakeKubeClient, tc.defaultNamespace, tc.clusterNamespace)
-		gotSecret, err := sp.discoverSecretRef(context.TODO(), tc.secretName)
+		gotSecret, err := sp.getSecretReference(context.TODO(), tc.secretName)
 		if tc.expecedError {
 			require.Error(t, err)
 			return
