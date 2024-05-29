@@ -11,7 +11,6 @@ spec:
   supportedConfigs:
     # Describes the general addon configuration applicable for all managed clusters. It includes:
     # - Default subscription channel name for install the `Red Hat OpenShift Logging` operator on each managed cluster.
-    # - Default subscription channel name for install the `Red Hat OpenShift distributed tracing data collection` operator on each managed cluster.
     - group: addon.open-cluster-management.io
       resource: addondeploymentconfigs
       defaultConfig:

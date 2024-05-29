@@ -113,7 +113,7 @@ func (sp *secretsProvider) getSecretReference(ctx context.Context, secretName st
 
 // buildAuthenticationFromAnnotations given a set of annotations this function
 // will return a map that has as keys the Targets and values AuthenticationTypes.
-// The annotation used is defined in the contant "AnnotationAuthOutput" 
+// The annotation used is defined in the contant "AnnotationAuthOutput"
 func buildAuthenticationFromAnnotations(annotations map[string]string) (map[Target]AuthenticationType, error) {
 	result := make(map[Target]AuthenticationType)
 	for annotation, annValue := range annotations {
