@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/utils/ptr"
 	v1 "open-cluster-management.io/api/work/v1"
 
 	otelv1alpha1 "github.com/open-telemetry/opentelemetry-operator/apis/v1alpha1"
@@ -23,20 +24,17 @@ var (
 )
 
 func Test_AgentHealthProber_Healthy(t *testing.T) {
-	replicas := int32(1)
 	otelcol := &otelv1alpha1.OpenTelemetryCollector{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      OtelcolName,
 			Namespace: OtelcolNS,
 		},
 		Spec: otelv1alpha1.OpenTelemetryCollectorSpec{
-			Replicas: &replicas,
+			Replicas: ptr.To[int32](1),
 		},
 	}
 
 	healthProber := AgentHealthProber()
-
-	replicas64 := int64(replicas)
 
 	err := healthProber.WorkProber.HealthCheck(v1.ResourceIdentifier{
 		Group:     otelcol.APIVersion,
@@ -49,30 +47,27 @@ func Test_AgentHealthProber_Healthy(t *testing.T) {
 				Name: "replicas",
 				Value: v1.FieldValue{
 					Type:    v1.Integer,
-					Integer: ptr.To(1),
+					Integer: ptr.To[int64](1),
 				},
 			},
 		},
 	})
 
 	require.NoError(t, err)
-
 }
 
 func Test_AgentHealthProber_Unhealthy(t *testing.T) {
-	replicas := int32(0)
 	otelcol := &otelv1alpha1.OpenTelemetryCollector{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      OtelcolName,
 			Namespace: OtelcolNS,
 		},
 		Spec: otelv1alpha1.OpenTelemetryCollectorSpec{
-			Replicas: &replicas,
+			Replicas: ptr.To[int32](0),
 		},
 	}
 	healthProber := AgentHealthProber()
 
-	replicas64 := int64(replicas)
 	err := healthProber.WorkProber.HealthCheck(v1.ResourceIdentifier{
 		Group:     otelcol.APIVersion,
 		Resource:  OtelcolResource,
@@ -84,13 +79,12 @@ func Test_AgentHealthProber_Unhealthy(t *testing.T) {
 				Name: "replicas",
 				Value: v1.FieldValue{
 					Type:    v1.Integer,
-					Integer: &replicas64,
+					Integer: ptr.To[int64](0),
 				},
 			},
 		},
 	})
 
-	expectedErr := fmt.Errorf("%w: replicas is %d for %s/%s", ErrWrongType, replicas, otelcol.Namespace, otelcol.Name)
+	expectedErr := fmt.Errorf("%w: replicas is %d for %s/%s", errUnavailable, 0, otelcol.Namespace, otelcol.Name)
 	require.EqualError(t, err, expectedErr.Error())
-
 }

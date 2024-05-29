@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	errWrongType      = errors.New("probe condition is not satisfied")
+	errUnavailable    = errors.New("probe condition is not satisfied")
 	errValueNotProbed = errors.New("value not probed")
 )
 
@@ -42,7 +42,7 @@ func GetObjectKey(configRef []addonapiv1alpha1.ConfigReference, group, resource 
 
 func AgentHealthProber() *agent.HealthProber {
 	return &agent.HealthProber{
-		Type: agent.HealthProberTypeDeploymentAvailability,
+		Type: agent.HealthProberTypeWork,
 		WorkProber: &agent.WorkHealthProber{
 			ProbeFields: []agent.ProbeField{
 				{
@@ -76,8 +76,8 @@ func AgentHealthProber() *agent.HealthProber {
 							Type: workapiv1.JSONPathsType,
 							JsonPaths: []workapiv1.JsonPath{
 								{
-									Name: "type",
-									Path: ".status.conditions[0].type",
+									Name: "isReady",
+									Path: ".status.conditions[?(@.type==\"Ready\")].status",
 								},
 							},
 						},
@@ -86,33 +86,35 @@ func AgentHealthProber() *agent.HealthProber {
 			},
 			HealthCheck: func(identifier workapiv1.ResourceIdentifier, result workapiv1.StatusFeedbackResult) error {
 				for _, value := range result.Values {
-					if identifier.Resource == ClfResource {
-						if value.Name != "type" {
+					switch {
+					case identifier.Resource == ClfResource:
+						if value.Name != "isReady" {
 							continue
 						}
 
-						if *value.Value.String == "Ready" {
-							return nil
+						if *value.Value.String != "True" {
+							return fmt.Errorf("%w: status condition type is %s for %s/%s", errUnavailable, *value.Value.String, identifier.Namespace, identifier.Name)
 						}
 
-						return fmt.Errorf("%w: status condition type is %s for %s/%s", ErrWrongType, *value.Value.String, identifier.Namespace, identifier.Name)
-					} else if identifier.Resource == OtelcolResource {
+						return nil
+					case identifier.Resource == OtelcolResource:
 						if value.Name != "replicas" {
 							continue
 						}
 
-						if *value.Value.Integer >= 1 {
-							return nil
+						if *value.Value.Integer < 1 {
+							return fmt.Errorf("%w: replicas is %d for %s/%s", errUnavailable, *value.Value.Integer, identifier.Namespace, identifier.Name)
 						}
 
-						return fmt.Errorf("%w: replicas is %d for %s/%s", ErrWrongType, *value.Value.Integer, identifier.Namespace, identifier.Name)
-					} else {
+						return nil
+					default:
 						continue
 					}
 				}
 				if identifier.Resource == ClfResource || identifier.Resource == OtelcolResource {
-					return fmt.Errorf("%w: for resource %s with key %s/%s", ErrValueNotProbed, identifier.Resource, identifier.Namespace, identifier.Name)
-			        return nil
+					return fmt.Errorf("%w: for resource %s with key %s/%s", errValueNotProbed, identifier.Resource, identifier.Namespace, identifier.Name)
+				}
+				return nil
 			},
 		},
 	}
