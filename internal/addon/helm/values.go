@@ -143,7 +143,7 @@ func buildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Opti
 }
 
 func isHubCluster(cluster *clusterv1.ManagedCluster) bool {
-	val, ok := cluster.Annotations[annotationLocalCluster]
+	val, ok := cluster.Labels[annotationLocalCluster]
 	if !ok {
 		return false
 	}
