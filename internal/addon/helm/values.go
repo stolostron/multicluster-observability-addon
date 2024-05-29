@@ -18,7 +18,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+const annotationLocalCluster = "local-cluster"
+
 type HelmChartValues struct {
+	Enabled bool                     `json:"enabled"`
 	Metrics metrics.MetricsValues    `json:"metrics"`
 	Logging lmanifests.LoggingValues `json:"logging"`
 	Tracing tmanifests.TracingValues `json:"tracing"`
@@ -35,6 +38,11 @@ func GetValuesFunc(k8s client.Client) addonfactory.GetValuesFunc {
 		cluster *clusterv1.ManagedCluster,
 		addon *addonapiv1alpha1.ManagedClusterAddOn,
 	) (addonfactory.Values, error) {
+		// if hub cluster, then don't install anything
+		if isHubCluster(cluster) {
+			return addonfactory.JsonStructToValues(disabledChart)
+		}
+
 		aodc, err := getAddOnDeploymentConfig(k8s, addon)
 		if err != nil {
 			return nil, err
@@ -130,4 +138,27 @@ func buildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Opti
 
 	}
 	return opts, nil
+}
+
+func isHubCluster(cluster *clusterv1.ManagedCluster) bool {
+	val, ok := cluster.Annotations[annotationLocalCluster]
+	if !ok {
+		return false
+	}
+	return val == "true"
+}
+
+func disabledChart() HelmChartValues {
+	return HelmChartValues{
+		Enabled: false,
+		Metrics: metrics.MetricsValues{
+			Enabled: false,
+		},
+		Logging: lmanifests.LoggingValues{
+			Enabled: false,
+		},
+		Tracing: tmanifests.TracingValues{
+			Enabled: false,
+		},
+	}
 }
