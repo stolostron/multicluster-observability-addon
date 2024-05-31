@@ -18,12 +18,16 @@ const (
 	AdcTracingisabledKey  = "tracingDisabled"
 
 	ClusterLogForwardersResource = "clusterlogforwarders"
-	spokeCLFName                 = "instance"
-	spokeLoggingNamespace        = "openshift-logging"
+	SpokeCLFName                 = "instance"
+	SpokeCLFNamespace            = "openshift-logging"
+	clfProbeKey                  = "isReady"
+	clfProbePath                 = ".status.conditions[?(@.type==\"Ready\")].status"
 
 	OpenTelemetryCollectorsResource = "opentelemetrycollectors"
-	spokeOTELColName                = "spoke-otelcol"
-	spokeOTELColNamespace           = "spoke-otelcol"
+	SpokeOTELColName                = "spoke-otelcol"
+	SpokeOTELColNamespace           = "spoke-otelcol"
+	otelColProbeKey                 = "replicas"
+	otelColProbePath                = ".spec.replicas"
 )
 
 //go:embed manifests

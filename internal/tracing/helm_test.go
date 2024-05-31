@@ -188,8 +188,10 @@ func Test_Tracing_AllConfigsTogether_AllResources(t *testing.T) {
 	for _, obj := range objects {
 		switch obj := obj.(type) {
 		case *otelv1alpha1.OpenTelemetryCollector:
-			require.Equal(t, "spoke-otelcol", obj.ObjectMeta.Name)
-			require.Equal(t, "spoke-otelcol", obj.ObjectMeta.Namespace)
+			// Check name and namespace to make usre that if we change the helm
+			// manifests that we don't break the addon probes
+			require.Equal(t, addon.SpokeOTELColName, obj.Name)
+			require.Equal(t, addon.SpokeOTELColNamespace, obj.Namespace)
 			require.NotEmpty(t, obj.Spec.Config)
 		case *corev1.Secret:
 			if obj.Name == "tracing-otlphttp-auth" {

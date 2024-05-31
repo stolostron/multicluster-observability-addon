@@ -4,87 +4,97 @@ import (
 	"fmt"
 	"testing"
 
-	//"github.com/openshift/cluster-logging-operator/internal/status"
 	"github.com/stretchr/testify/require"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/utils/ptr"
 	v1 "open-cluster-management.io/api/work/v1"
 
 	otelv1alpha1 "github.com/open-telemetry/opentelemetry-operator/apis/v1alpha1"
-	loggingapis "github.com/openshift/cluster-logging-operator/apis"
-	operatorsv1 "github.com/operator-framework/api/pkg/operators/v1"
-	operatorsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
+	loggingv1 "github.com/openshift/cluster-logging-operator/apis/logging/v1"
 )
 
-var (
-	_ = loggingapis.AddToScheme(scheme.Scheme)
-	_ = operatorsv1.AddToScheme(scheme.Scheme)
-	_ = operatorsv1alpha1.AddToScheme(scheme.Scheme)
-)
-
-func Test_AgentHealthProber_Healthy(t *testing.T) {
-	otelcol := &otelv1alpha1.OpenTelemetryCollector{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      spokeOTELColName,
-			Namespace: spokeOTELColNamespace,
+func Test_AgentHealthProber_CLF(t *testing.T) {
+	unhealthyError := fmt.Errorf("%w: clusterlogforwarder status condition type is %s for %s/%s", errUnavailable, "False", SpokeCLFNamespace, SpokeCLFName)
+	for _, tc := range []struct {
+		name        string
+		status      string
+		expectedErr string
+	}{
+		{
+			name:   "healthy",
+			status: "True",
 		},
-		Spec: otelv1alpha1.OpenTelemetryCollectorSpec{
-			Replicas: ptr.To[int32](1),
+		{
+			name:        "unhealthy",
+			status:      "False",
+			expectedErr: unhealthyError.Error(),
 		},
-	}
-
-	healthProber := AgentHealthProber()
-
-	err := healthProber.WorkProber.HealthCheck(v1.ResourceIdentifier{
-		Group:     otelcol.APIVersion,
-		Resource:  OpenTelemetryCollectorsResource,
-		Name:      otelcol.Name,
-		Namespace: otelcol.Namespace,
-	}, v1.StatusFeedbackResult{
-		Values: []v1.FeedbackValue{
-			{
-				Name: "replicas",
-				Value: v1.FieldValue{
-					Type:    v1.Integer,
-					Integer: ptr.To[int64](1),
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			healthProber := AgentHealthProber()
+			err := healthProber.WorkProber.HealthCheck(v1.ResourceIdentifier{
+				Group:     loggingv1.GroupVersion.Group,
+				Resource:  ClusterLogForwardersResource,
+				Name:      SpokeCLFName,
+				Namespace: SpokeCLFNamespace,
+			}, v1.StatusFeedbackResult{
+				Values: []v1.FeedbackValue{
+					{
+						Name: "isReady",
+						Value: v1.FieldValue{
+							Type:   v1.String,
+							String: &tc.status,
+						},
+					},
 				},
-			},
-		},
-	})
-
-	require.NoError(t, err)
+			})
+			if tc.expectedErr != "" {
+				require.EqualError(t, err, tc.expectedErr)
+				return
+			}
+			require.NoError(t, err)
+		})
+	}
 }
 
-func Test_AgentHealthProber_Unhealthy(t *testing.T) {
-	otelcol := &otelv1alpha1.OpenTelemetryCollector{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      spokeOTELColName,
-			Namespace: spokeOTELColNamespace,
+func Test_AgentHealthProber_OTELCol(t *testing.T) {
+	unhealthyError := fmt.Errorf("%w: opentelemetrycollector replicas is %d for %s/%s", errUnavailable, 0, SpokeOTELColNamespace, SpokeOTELColName)
+	for _, tc := range []struct {
+		name        string
+		replicas    int64
+		expectedErr string
+	}{
+		{
+			name:     "healthy",
+			replicas: 1,
 		},
-		Spec: otelv1alpha1.OpenTelemetryCollectorSpec{
-			Replicas: ptr.To[int32](0),
+		{
+			name:        "unhealthy",
+			replicas:    0,
+			expectedErr: unhealthyError.Error(),
 		},
-	}
-	healthProber := AgentHealthProber()
-
-	err := healthProber.WorkProber.HealthCheck(v1.ResourceIdentifier{
-		Group:     otelcol.APIVersion,
-		Resource:  OpenTelemetryCollectorsResource,
-		Name:      otelcol.Name,
-		Namespace: otelcol.Namespace,
-	}, v1.StatusFeedbackResult{
-		Values: []v1.FeedbackValue{
-			{
-				Name: "replicas",
-				Value: v1.FieldValue{
-					Type:    v1.Integer,
-					Integer: ptr.To[int64](0),
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			healthProber := AgentHealthProber()
+			err := healthProber.WorkProber.HealthCheck(v1.ResourceIdentifier{
+				Group:     otelv1alpha1.GroupVersion.Group,
+				Resource:  OpenTelemetryCollectorsResource,
+				Name:      SpokeOTELColName,
+				Namespace: SpokeOTELColNamespace,
+			}, v1.StatusFeedbackResult{
+				Values: []v1.FeedbackValue{
+					{
+						Name: "replicas",
+						Value: v1.FieldValue{
+							Type:    v1.Integer,
+							Integer: &tc.replicas,
+						},
+					},
 				},
-			},
-		},
-	})
-
-	expectedErr := fmt.Errorf("%w: replicas is %d for %s/%s", errUnavailable, 0, otelcol.Namespace, otelcol.Name)
-	require.EqualError(t, err, expectedErr.Error())
+			})
+			if tc.expectedErr != "" {
+				require.EqualError(t, err, tc.expectedErr)
+				return
+			}
+			require.NoError(t, err)
+		})
+	}
 }

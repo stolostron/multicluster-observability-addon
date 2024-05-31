@@ -49,18 +49,18 @@ func AgentHealthProber() *agent.HealthProber {
 			ProbeFields: []agent.ProbeField{
 				{
 					ResourceIdentifier: workapiv1.ResourceIdentifier{
-						Group:     otelv1alpha1.GroupVersion.Group,
-						Resource:  OpenTelemetryCollectorsResource,
-						Name:      spokeOTELColName,
-						Namespace: spokeOTELColNamespace,
+						Group:     loggingv1.GroupVersion.Group,
+						Resource:  ClusterLogForwardersResource,
+						Name:      SpokeCLFName,
+						Namespace: SpokeCLFNamespace,
 					},
 					ProbeRules: []workapiv1.FeedbackRule{
 						{
 							Type: workapiv1.JSONPathsType,
 							JsonPaths: []workapiv1.JsonPath{
 								{
-									Name: "replicas",
-									Path: ".spec.replicas",
+									Name: clfProbeKey,
+									Path: clfProbePath,
 								},
 							},
 						},
@@ -68,18 +68,18 @@ func AgentHealthProber() *agent.HealthProber {
 				},
 				{
 					ResourceIdentifier: workapiv1.ResourceIdentifier{
-						Group:     loggingv1.GroupVersion.Group,
-						Resource:  ClusterLogForwardersResource,
-						Name:      spokeCLFName,
-						Namespace: spokeLoggingNamespace,
+						Group:     otelv1alpha1.GroupVersion.Group,
+						Resource:  OpenTelemetryCollectorsResource,
+						Name:      SpokeOTELColName,
+						Namespace: SpokeOTELColNamespace,
 					},
 					ProbeRules: []workapiv1.FeedbackRule{
 						{
 							Type: workapiv1.JSONPathsType,
 							JsonPaths: []workapiv1.JsonPath{
 								{
-									Name: "isReady",
-									Path: ".status.conditions[?(@.type==\"Ready\")].status",
+									Name: otelColProbeKey,
+									Path: otelColProbePath,
 								},
 							},
 						},
@@ -90,7 +90,7 @@ func AgentHealthProber() *agent.HealthProber {
 				for _, value := range result.Values {
 					switch {
 					case identifier.Resource == ClusterLogForwardersResource:
-						if value.Name != "isReady" {
+						if value.Name != clfProbeKey {
 							continue
 						}
 
@@ -100,7 +100,7 @@ func AgentHealthProber() *agent.HealthProber {
 
 						return nil
 					case identifier.Resource == OpenTelemetryCollectorsResource:
-						if value.Name != "replicas" {
+						if value.Name != otelColProbeKey {
 							continue
 						}
 

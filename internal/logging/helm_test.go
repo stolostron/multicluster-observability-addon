@@ -225,6 +225,10 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 			require.NotNil(t, obj.Spec.Outputs[1].Secret)
 			require.Equal(t, "static-authentication", obj.Spec.Outputs[0].Secret.Name)
 			require.Equal(t, "static-authentication", obj.Spec.Outputs[1].Secret.Name)
+			// Check name and namespace to make usre that if we change the helm
+			// manifests that we don't break the addon probes
+			require.Equal(t, addon.SpokeCLFName, obj.Name)
+			require.Equal(t, addon.SpokeCLFNamespace, obj.Namespace)
 		case *corev1.Secret:
 			if obj.Name == "static-authentication" {
 				require.Equal(t, staticCred.Data, obj.Data)
