@@ -7,7 +7,6 @@ import (
 	"github.com/rhobs/multicluster-observability-addon/internal/addon"
 	lhandlers "github.com/rhobs/multicluster-observability-addon/internal/logging/handlers"
 	lmanifests "github.com/rhobs/multicluster-observability-addon/internal/logging/manifests"
-	"github.com/rhobs/multicluster-observability-addon/internal/metrics"
 	thandlers "github.com/rhobs/multicluster-observability-addon/internal/tracing/handlers"
 	tmanifests "github.com/rhobs/multicluster-observability-addon/internal/tracing/manifests"
 	"k8s.io/klog/v2"
@@ -22,13 +21,11 @@ const annotationLocalCluster = "local-cluster"
 
 type HelmChartValues struct {
 	Enabled bool                     `json:"enabled"`
-	Metrics metrics.MetricsValues    `json:"metrics"`
 	Logging lmanifests.LoggingValues `json:"logging"`
 	Tracing tmanifests.TracingValues `json:"tracing"`
 }
 
 type Options struct {
-	MetricsDisabled bool
 	LoggingDisabled bool
 	TracingDisabled bool
 }
@@ -54,14 +51,6 @@ func GetValuesFunc(k8s client.Client) addonfactory.GetValuesFunc {
 
 		userValues := HelmChartValues{
 			Enabled: true,
-		}
-
-		if !opts.MetricsDisabled {
-			metrics, err := metrics.GetValuesFunc(k8s, cluster, addon, aodc)
-			if err != nil {
-				return nil, err
-			}
-			userValues.Metrics = metrics
 		}
 
 		if !opts.LoggingDisabled {
@@ -116,28 +105,20 @@ func buildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Opti
 	}
 
 	for _, keyvalue := range addOnDeployment.Spec.CustomizedVariables {
-		if keyvalue.Name == addon.AdcMetricsDisabledKey {
-			value, err := strconv.ParseBool(keyvalue.Value)
-			if err != nil {
-				return opts, err
-			}
-			opts.MetricsDisabled = value
-		}
-		if keyvalue.Name == addon.AdcLoggingDisabledKey {
+		switch keyvalue.Name {
+		case addon.AdcLoggingDisabledKey:
 			value, err := strconv.ParseBool(keyvalue.Value)
 			if err != nil {
 				return opts, err
 			}
 			opts.LoggingDisabled = value
-		}
-		if keyvalue.Name == addon.AdcTracingisabledKey {
+		case addon.AdcTracingisabledKey:
 			value, err := strconv.ParseBool(keyvalue.Value)
 			if err != nil {
 				return opts, err
 			}
 			opts.TracingDisabled = value
 		}
-
 	}
 	return opts, nil
 }

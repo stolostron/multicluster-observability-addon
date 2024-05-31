@@ -60,10 +60,6 @@ func Test_Mcoa_Disable_Charts(t *testing.T) {
 		Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
 			CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
 				{
-					Name:  "metricsDisabled",
-					Value: "true",
-				},
-				{
 					Name:  "loggingDisabled",
 					Value: "true",
 				},
@@ -127,10 +123,6 @@ func Test_Mcoa_Disable_Chart_Hub(t *testing.T) {
 		},
 		Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
 			CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
-				{
-					Name:  "metricsDisabled",
-					Value: "true",
-				},
 				{
 					Name:  "loggingDisabled",
 					Value: "true",
