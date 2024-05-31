@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 
+	otelv1alpha1 "github.com/open-telemetry/opentelemetry-operator/apis/v1alpha1"
+	loggingv1 "github.com/openshift/cluster-logging-operator/apis/logging/v1"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	"open-cluster-management.io/addon-framework/pkg/utils"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
@@ -47,10 +49,10 @@ func AgentHealthProber() *agent.HealthProber {
 			ProbeFields: []agent.ProbeField{
 				{
 					ResourceIdentifier: workapiv1.ResourceIdentifier{
-						Group:     OtelcolGroup,
-						Resource:  OtelcolResource,
-						Name:      OtelcolName,
-						Namespace: OtelcolNS,
+						Group:     otelv1alpha1.GroupVersion.Group,
+						Resource:  OpenTelemetryCollectorsResource,
+						Name:      spokeOTELColName,
+						Namespace: spokeOTELColNamespace,
 					},
 					ProbeRules: []workapiv1.FeedbackRule{
 						{
@@ -66,10 +68,10 @@ func AgentHealthProber() *agent.HealthProber {
 				},
 				{
 					ResourceIdentifier: workapiv1.ResourceIdentifier{
-						Group:     ClfGroup,
-						Resource:  ClfResource,
-						Name:      ClfName,
-						Namespace: ClusterLoggingNS,
+						Group:     loggingv1.GroupVersion.Group,
+						Resource:  ClusterLogForwardersResource,
+						Name:      spokeCLFName,
+						Namespace: spokeLoggingNamespace,
 					},
 					ProbeRules: []workapiv1.FeedbackRule{
 						{
@@ -87,23 +89,23 @@ func AgentHealthProber() *agent.HealthProber {
 			HealthCheck: func(identifier workapiv1.ResourceIdentifier, result workapiv1.StatusFeedbackResult) error {
 				for _, value := range result.Values {
 					switch {
-					case identifier.Resource == ClfResource:
+					case identifier.Resource == ClusterLogForwardersResource:
 						if value.Name != "isReady" {
 							continue
 						}
 
 						if *value.Value.String != "True" {
-							return fmt.Errorf("%w: status condition type is %s for %s/%s", errUnavailable, *value.Value.String, identifier.Namespace, identifier.Name)
+							return fmt.Errorf("%w: clusterlogforwarder status condition type is %s for %s/%s", errUnavailable, *value.Value.String, identifier.Namespace, identifier.Name)
 						}
 
 						return nil
-					case identifier.Resource == OtelcolResource:
+					case identifier.Resource == OpenTelemetryCollectorsResource:
 						if value.Name != "replicas" {
 							continue
 						}
 
 						if *value.Value.Integer < 1 {
-							return fmt.Errorf("%w: replicas is %d for %s/%s", errUnavailable, *value.Value.Integer, identifier.Namespace, identifier.Name)
+							return fmt.Errorf("%w: opentelemetrycollector replicas is %d for %s/%s", errUnavailable, *value.Value.Integer, identifier.Namespace, identifier.Name)
 						}
 
 						return nil

@@ -17,15 +17,13 @@ const (
 	AdcLoggingDisabledKey = "loggingDisabled"
 	AdcTracingisabledKey  = "tracingDisabled"
 
-	ClfGroup         = "logging.openshift.io"
-	ClfResource      = "clusterlogforwarders"
-	ClfName          = "instance"
-	ClusterLoggingNS = "openshift-logging"
+	ClusterLogForwardersResource = "clusterlogforwarders"
+	spokeCLFName                 = "instance"
+	spokeLoggingNamespace        = "openshift-logging"
 
-	OtelcolGroup    = "opentelemetry.io"
-	OtelcolResource = "opentelemetrycollectors"
-	OtelcolName     = "spoke-otelcol"
-	OtelcolNS       = "spoke-otelcol"
+	OpenTelemetryCollectorsResource = "opentelemetrycollectors"
+	spokeOTELColName                = "spoke-otelcol"
+	spokeOTELColNamespace           = "spoke-otelcol"
 )
 
 //go:embed manifests

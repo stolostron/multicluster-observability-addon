@@ -26,8 +26,8 @@ var (
 func Test_AgentHealthProber_Healthy(t *testing.T) {
 	otelcol := &otelv1alpha1.OpenTelemetryCollector{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      OtelcolName,
-			Namespace: OtelcolNS,
+			Name:      spokeOTELColName,
+			Namespace: spokeOTELColNamespace,
 		},
 		Spec: otelv1alpha1.OpenTelemetryCollectorSpec{
 			Replicas: ptr.To[int32](1),
@@ -38,7 +38,7 @@ func Test_AgentHealthProber_Healthy(t *testing.T) {
 
 	err := healthProber.WorkProber.HealthCheck(v1.ResourceIdentifier{
 		Group:     otelcol.APIVersion,
-		Resource:  OtelcolResource,
+		Resource:  OpenTelemetryCollectorsResource,
 		Name:      otelcol.Name,
 		Namespace: otelcol.Namespace,
 	}, v1.StatusFeedbackResult{
@@ -59,8 +59,8 @@ func Test_AgentHealthProber_Healthy(t *testing.T) {
 func Test_AgentHealthProber_Unhealthy(t *testing.T) {
 	otelcol := &otelv1alpha1.OpenTelemetryCollector{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      OtelcolName,
-			Namespace: OtelcolNS,
+			Name:      spokeOTELColName,
+			Namespace: spokeOTELColNamespace,
 		},
 		Spec: otelv1alpha1.OpenTelemetryCollectorSpec{
 			Replicas: ptr.To[int32](0),
@@ -70,7 +70,7 @@ func Test_AgentHealthProber_Unhealthy(t *testing.T) {
 
 	err := healthProber.WorkProber.HealthCheck(v1.ResourceIdentifier{
 		Group:     otelcol.APIVersion,
-		Resource:  OtelcolResource,
+		Resource:  OpenTelemetryCollectorsResource,
 		Name:      otelcol.Name,
 		Namespace: otelcol.Namespace,
 	}, v1.StatusFeedbackResult{
