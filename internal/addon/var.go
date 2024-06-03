@@ -18,14 +18,14 @@ const (
 	AdcTracingisabledKey  = "tracingDisabled"
 
 	ClusterLogForwardersResource = "clusterlogforwarders"
-	SpokeCLFName                 = "instance"
+	SpokeCLFName                 = "mcoa-instance"
 	SpokeCLFNamespace            = "openshift-logging"
 	clfProbeKey                  = "isReady"
 	clfProbePath                 = ".status.conditions[?(@.type==\"Ready\")].status"
 
 	OpenTelemetryCollectorsResource = "opentelemetrycollectors"
-	SpokeOTELColName                = "spoke-otelcol"
-	SpokeOTELColNamespace           = "spoke-otelcol"
+	SpokeOTELColName                = "mcoa-instance"
+	SpokeOTELColNamespace           = "mcoa-opentelemetry"
 	otelColProbeKey                 = "replicas"
 	otelColProbePath                = ".spec.replicas"
 )

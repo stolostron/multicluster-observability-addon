@@ -102,7 +102,7 @@ func Test_Tracing_AllConfigsTogether_AllResources(t *testing.T) {
 			},
 			ConfigReferent: addonapiv1alpha1.ConfigReferent{
 				Namespace: "open-cluster-management",
-				Name:      "spoke-otelcol",
+				Name:      "mcoa-instance",
 			},
 		},
 	}
@@ -114,7 +114,7 @@ func Test_Tracing_AllConfigsTogether_AllResources(t *testing.T) {
 
 	otelCol = &otelv1alpha1.OpenTelemetryCollector{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "spoke-otelcol",
+			Name:      "mcoa-instance",
 			Namespace: "open-cluster-management",
 		},
 		Spec: otelv1alpha1.OpenTelemetryCollectorSpec{
@@ -188,7 +188,7 @@ func Test_Tracing_AllConfigsTogether_AllResources(t *testing.T) {
 	for _, obj := range objects {
 		switch obj := obj.(type) {
 		case *otelv1alpha1.OpenTelemetryCollector:
-			// Check name and namespace to make usre that if we change the helm
+			// Check name and namespace to make sure that if we change the helm
 			// manifests that we don't break the addon probes
 			require.Equal(t, addon.SpokeOTELColName, obj.Name)
 			require.Equal(t, addon.SpokeOTELColNamespace, obj.Namespace)

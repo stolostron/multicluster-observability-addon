@@ -2,7 +2,7 @@
 apiVersion: logging.openshift.io/v1
 kind: ClusterLogForwarder
 metadata:
-  name: instance
+  name: mcoa-instance
   namespace: openshift-logging
   labels:
     app: {{ template "logginghelm.name" . }}
