@@ -2,9 +2,6 @@ nameOverride: null
 
 enabled: true
 
-metrics:
-  enabled: true
-
 logging:
   enabled: true
 
