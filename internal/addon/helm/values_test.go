@@ -47,7 +47,7 @@ func Test_Mcoa_Disable_Charts(t *testing.T) {
 				Resource: "addondeploymentconfigs",
 			},
 			ConfigReferent: addonapiv1alpha1.ConfigReferent{
-				Namespace: "open-cluster-management",
+				Namespace: "open-cluster-management-observability",
 				Name:      "multicluster-observability-addon",
 			},
 		},
@@ -56,7 +56,7 @@ func Test_Mcoa_Disable_Charts(t *testing.T) {
 	addOnDeploymentConfig = &addonapiv1alpha1.AddOnDeploymentConfig{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "multicluster-observability-addon",
-			Namespace: "open-cluster-management",
+			Namespace: "open-cluster-management-observability",
 		},
 		Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
 			CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{},
@@ -111,19 +111,10 @@ func Test_Mcoa_Disable_Chart_Hub(t *testing.T) {
 	addOnDeploymentConfig = &addonapiv1alpha1.AddOnDeploymentConfig{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "multicluster-observability-addon",
-			Namespace: "open-cluster-management",
+			Namespace: "open-cluster-management-observability",
 		},
 		Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
-			CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
-				{
-					Name:  "loggingDisabled",
-					Value: "true",
-				},
-				{
-					Name:  "tracingDisabled",
-					Value: "true",
-				},
-			},
+			CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{},
 		},
 	}
 

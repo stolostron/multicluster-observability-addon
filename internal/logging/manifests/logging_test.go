@@ -101,7 +101,7 @@ func Test_BuildCLFSpec(t *testing.T) {
 				Resource: "clusterlogforwarders",
 			},
 			ConfigReferent: addonapiv1alpha1.ConfigReferent{
-				Namespace: "open-cluster-management",
+				Namespace: "open-cluster-management-observability",
 				Name:      "mcoa-instance",
 			},
 		},
@@ -111,7 +111,7 @@ func Test_BuildCLFSpec(t *testing.T) {
 	clf = &loggingv1.ClusterLogForwarder{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "mcoa-instance",
-			Namespace: "open-cluster-management",
+			Namespace: "open-cluster-management-observability",
 		},
 		Spec: loggingv1.ClusterLogForwarderSpec{
 			Inputs: []loggingv1.InputSpec{

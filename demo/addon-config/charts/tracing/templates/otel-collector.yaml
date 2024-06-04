@@ -2,7 +2,7 @@ apiVersion: opentelemetry.io/v1alpha1
 kind: OpenTelemetryCollector
 metadata:
   name: spoke-otelcol
-  namespace: open-cluster-management
+  namespace: open-cluster-management-observability
 spec:
   config: |
     receivers:

@@ -6,7 +6,7 @@ import (
 
 const (
 	Name             = "multicluster-observability-addon"
-	InstallNamespace = "open-cluster-management"
+	InstallNamespace = "open-cluster-management-observability"
 
 	McoaChartDir    = "manifests/charts/mcoa"
 	LoggingChartDir = "manifests/charts/mcoa/charts/logging"

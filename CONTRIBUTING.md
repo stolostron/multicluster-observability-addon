@@ -66,28 +66,40 @@ Then every time you want to test a new version, you can just:
 ```shell
 make oci
 # Delete the mcoa pod which will make the Deployment pull the new image
-oc -n open-cluster-management delete pod -l app=multicluster-observability-addon-manager
+oc -n open-cluster-management-observability delete pod -l app=multicluster-observability-addon-manager
 ```
 
-### Disabeling specific signals 
+### Enable specific Observability Capabilities
 
-The addon supports disabling signals using the resource `AddOnDeploymentConfig`. For instance, to disable the logging signal create the following resource on the hub cluster:
+The addon supports enabling observability capabilities using the resource `AddOnDeploymentConfig`. For instance, to enable platform and user workloads logging/tracing/instrumentation create the following resource on the hub cluster:
 
 ```yaml
 apiVersion: addon.open-cluster-management.io/v1alpha1
 kind: AddOnDeploymentConfig
 metadata:
   name: multicluster-observability-addon
-  namespace: open-cluster-management
+  namespace: open-cluster-management-observability
 spec:
   customizedVariables:
-    - name: loggingDisabled
-      value: "true"
+  # Platform Observability
+  - name: platformLogsCollection
+    value: clusterlogforwarders.v1.logging.openshift.io
+  # User Workloads Observability
+  - name: userWorkloadLogsCollection
+    value: clusterlogforwarders.v1.logging.openshift.io
+  - name: userWorkloadTracesCollection
+    value: opentelemetrycollectors.v1alpha1.opentelemetry.io
+  - name: userWorkloadInstrumentation
+    value: instrumentations.v1alpha1.opentelemetry.io
 ``` 
 
-Supported keys are `metricsDisabled`, `loggingDisabled` and `tracingDisabled`
+Supported keys are:
+- `platformLogsCollection`: Supports values `clusterlogforwarders.v1.logging.openshift.io`
+- `userWorkloadLogsCollection`: Supports values `clusterlogforwarders.v1.logging.openshift.io`
+- `userWorkloadTracesCollection`: Supports values `opentelemetrycollectors.v1alpha1.opentelemetry.io`
+- `userWorkloadTracesInstrumentation`: Supports values `instrumentations.v1alpha1.opentelemetry.io`
 
-## Install the addon on a Spoke Cluster
+__Note__: Keys can hold multiple values separated by semicolon, e.g. `clusterlogforwarders.v1.logging.openshift.io;opentelemetrycollectors.v1alpha1.opentelemetry.io`.
 
 The addon installation is managed by the addon-manager. This means that users
 don't need to explicetelly create resources to install the addon on spoke
@@ -118,7 +130,16 @@ This MCOA supports all outputs defined in [OpenShift Documentation](https://docs
 
 Note: the service account used by the `ClusterLogForwarder` deployed by MCOA is `openshift-logging/mcoa-logcollector`, this information is esential when using the AWS STS authentication.
 
-### Configuring Traces
+### Configuring User Workloads Observability Capabilities
+
+#### Logs Collection
+
+Currently the addon supports configuration to send logs either to:
+
+- CloudWatch: requires the auth configmap to be specified
+- Loki: requires the auth configmap, the url configmap and optionally the inject ca configmap
+
+### Traces Collection & Instrumentation 
 
 Currently MCOA supports deploying a single instance of `OpenTelemetryCollector`
 templated with the stanza created in the hub cluster. The instance deployed in

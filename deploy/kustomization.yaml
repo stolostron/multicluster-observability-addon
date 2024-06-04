@@ -3,7 +3,7 @@ images:
   newName: quay.io/rhobs/multicluster-observability-addon
   newTag: v0.0.1
 
-namespace: open-cluster-management
+namespace: open-cluster-management-observability
 
 resources:
 - resources/cluster_role_binding.yaml

@@ -16,7 +16,7 @@ spec:
       resource: addondeploymentconfigs
       defaultConfig:
         name: multicluster-observability-addon
-        namespace: open-cluster-management
+        namespace: open-cluster-management-observability
     # Describes the default log forwarding outputs for each log type applied to all managed clusters.
     - group: logging.openshift.io
       resource: clusterlogforwarders
@@ -32,8 +32,8 @@ spec:
           - group: logging.openshift.io
             resource: clusterlogforwarders
             name: instance
-            namespace: open-cluster-management
+            namespace: open-cluster-management-observability
           - group: opentelemetry.io
             resource: opentelemetrycollectors
             name: instance
-            namespace: open-cluster-management
+            namespace: open-cluster-management-observability
