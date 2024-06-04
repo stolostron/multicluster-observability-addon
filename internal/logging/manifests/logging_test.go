@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	loggingv1 "github.com/openshift/cluster-logging-operator/apis/logging/v1"
+	"github.com/rhobs/multicluster-observability-addon/internal/addon/authentication"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -57,8 +58,8 @@ func Test_BuildSubscriptionChannel(t *testing.T) {
 
 func Test_BuildSecrets(t *testing.T) {
 	resources := Options{
-		Secrets: []corev1.Secret{
-			{
+		Secrets: map[authentication.Target]corev1.Secret{
+			"foo": {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: "cluster-1",
@@ -68,7 +69,7 @@ func Test_BuildSecrets(t *testing.T) {
 					"foo-2": []byte("foo-pass"),
 				},
 			},
-			{
+			"bar": {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "bar",
 					Namespace: "cluster-1",
@@ -82,18 +83,18 @@ func Test_BuildSecrets(t *testing.T) {
 	}
 	secretsValue, err := buildSecrets(resources)
 	require.NoError(t, err)
-	require.Equal(t, "foo", secretsValue[0].Name)
-	require.Equal(t, "bar", secretsValue[1].Name)
+	require.Equal(t, "bar", secretsValue[0].Name)
+	require.Equal(t, "foo", secretsValue[1].Name)
 
 	gotData := &map[string][]byte{}
 	err = json.Unmarshal([]byte(secretsValue[0].Data), gotData)
 	require.NoError(t, err)
-	require.Equal(t, resources.Secrets[0].Data, *gotData)
+	require.Equal(t, resources.Secrets["bar"].Data, *gotData)
 
 	gotData = &map[string][]byte{}
 	err = json.Unmarshal([]byte(secretsValue[1].Data), gotData)
 	require.NoError(t, err)
-	require.Equal(t, resources.Secrets[1].Data, *gotData)
+	require.Equal(t, resources.Secrets["foo"].Data, *gotData)
 }
 
 func Test_BuildCLFSpec(t *testing.T) {
@@ -103,7 +104,7 @@ func Test_BuildCLFSpec(t *testing.T) {
 
 		// Addon configuration
 		clf                              *loggingv1.ClusterLogForwarder
-		appLogsSecret, clusterLogsSecret *corev1.Secret
+		appLogsSecret, clusterLogsSecret corev1.Secret
 
 		clusterName = "cluster-1"
 	)
@@ -199,16 +200,10 @@ func Test_BuildCLFSpec(t *testing.T) {
 		},
 	}
 
-	appLogsSecret = &corev1.Secret{
+	appLogsSecret = corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-app-logs", clusterName),
 			Namespace: clusterName,
-			Labels: map[string]string{
-				"mcoa.openshift.io/signal": "logging",
-			},
-			Annotations: map[string]string{
-				AnnotationTargetOutputName: "app-logs",
-			},
 		},
 		Data: map[string][]byte{
 			"tls.crt": []byte("cert"),
@@ -216,16 +211,10 @@ func Test_BuildCLFSpec(t *testing.T) {
 		},
 	}
 
-	clusterLogsSecret = &corev1.Secret{
+	clusterLogsSecret = corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-cluster-logs", clusterName),
 			Namespace: clusterName,
-			Labels: map[string]string{
-				"mcoa.openshift.io/signal": "logging",
-			},
-			Annotations: map[string]string{
-				AnnotationTargetOutputName: "cluster-logs",
-			},
 		},
 		Data: map[string][]byte{
 			"tls.crt": []byte("cert"),
@@ -236,9 +225,9 @@ func Test_BuildCLFSpec(t *testing.T) {
 	// Setup the fake k8s client
 	resources := Options{
 		ClusterLogForwarder: clf,
-		Secrets: []corev1.Secret{
-			*appLogsSecret,
-			*clusterLogsSecret,
+		Secrets: map[authentication.Target]corev1.Secret{
+			"app-logs":     appLogsSecret,
+			"cluster-logs": clusterLogsSecret,
 		},
 	}
 	clfSpec, err := buildClusterLogForwarderSpec(resources)
@@ -251,39 +240,30 @@ func Test_BuildCLFSpec(t *testing.T) {
 
 func Test_TemplateWithSecret(t *testing.T) {
 	for _, tc := range []struct {
-		name                       string
-		wrongTargetAnnotationValue bool
-		secretName                 string
-		expectedSecretName         string
+		name               string
+		target             authentication.Target
+		secretName         string
+		expectedSecretName string
 	}{
 		{
-			name:                       "SignalAnnotationSet",
-			wrongTargetAnnotationValue: false,
-			secretName:                 "my-secret",
-			expectedSecretName:         "my-secret",
+			name:               "SignalAnnotationSet",
+			target:             "foo",
+			secretName:         "my-secret",
+			expectedSecretName: "my-secret",
 		},
 		{
-			name:                       "SignalAnnotationNotSet",
-			wrongTargetAnnotationValue: true,
-			secretName:                 "my-secret",
-			expectedSecretName:         "",
+			name:               "SignalAnnotationNotSet",
+			target:             "bar",
+			secretName:         "my-secret",
+			expectedSecretName: "",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			secret := &corev1.Secret{
+			secret := corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      tc.secretName,
 					Namespace: "cluster-1",
-					Annotations: map[string]string{
-						"logging.mcoa.openshift.io/target-output-name": "foo",
-					},
 				},
-			}
-
-			if tc.wrongTargetAnnotationValue {
-				secret.Annotations = map[string]string{
-					"logging.mcoa.openshift.io/target-output-name": "bar",
-				}
 			}
 
 			spec := &loggingv1.ClusterLogForwarderSpec{
@@ -294,70 +274,14 @@ func Test_TemplateWithSecret(t *testing.T) {
 				},
 			}
 
-			err := templateWithSecret(spec, *secret)
+			err := templateWithSecret(spec, tc.target, secret)
 			assert.NoError(t, err)
-			if tc.wrongTargetAnnotationValue {
+			if spec.Outputs[0].Name != string(tc.target) {
 				assert.Nil(t, spec.Outputs[0].Secret)
 			} else {
 				assert.NotNil(t, spec.Outputs[0].Secret)
 				assert.Equal(t, tc.expectedSecretName, spec.Outputs[0].Secret.Name)
 			}
-		})
-	}
-}
-
-func Test_TemplateWithConfigMap(t *testing.T) {
-	for _, tc := range []struct {
-		name                       string
-		wrongTargetAnnotationValue bool
-		configMapUrl               string
-		expectedCLFUrl             string
-	}{
-		{
-			name:                       "SignalAnnotationSet",
-			wrongTargetAnnotationValue: false,
-			configMapUrl:               "http://foo.bar",
-			expectedCLFUrl:             "http://foo.bar",
-		},
-		{
-			name:                       "SignalAnnotationNotSet",
-			wrongTargetAnnotationValue: true,
-			configMapUrl:               "http://foo.bar",
-			expectedCLFUrl:             "",
-		},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			cm := &corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "cluster-1",
-					Namespace: "cluster-1",
-					Annotations: map[string]string{
-						"logging.mcoa.openshift.io/target-output-name": "foo",
-					},
-				},
-				Data: map[string]string{
-					"url": "http://foo.bar",
-				},
-			}
-
-			if tc.wrongTargetAnnotationValue {
-				cm.Annotations = map[string]string{
-					"logging.mcoa.openshift.io/target-output-name": "bar",
-				}
-			}
-
-			spec := &loggingv1.ClusterLogForwarderSpec{
-				Outputs: []loggingv1.OutputSpec{
-					{
-						Name: "foo",
-						Type: "loki",
-					},
-				},
-			}
-
-			err := templateWithConfigMap(spec, *cm)
-			assert.NoError(t, err, "Expected no error")
-			assert.Equal(t, tc.expectedCLFUrl, spec.Outputs[0].URL)
 		})
 	}
 }

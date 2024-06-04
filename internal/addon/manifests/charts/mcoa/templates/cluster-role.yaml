@@ -1,3 +1,4 @@
+{{- if .Values.enabled }}
 # By default the SA used by OCM to apply ManifestWorks does not have the 
 # necessary premissions to create OperatorGroups', since we install the logging
 # operator using the AdddOn we need to grant this SA these premissions
@@ -14,3 +15,4 @@ rules:
   - apiGroups: ["operators.coreos.com"]
     resources: ["operatorgroups"]
     verbs: ["get", "list", "watch", "create", "update", "delete", "patch"]
+{{- end }}
