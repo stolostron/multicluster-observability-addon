@@ -2,10 +2,10 @@ package watcher
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/go-logr/logr"
+	"github.com/rhobs/multicluster-observability-addon/internal/addon"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -89,20 +89,9 @@ type WatcherReconciler struct {
 	addonnManager *addonmanager.AddonManager
 }
 
-var (
-	noNameErr      = errors.New("no name for reconciliation request")
-	noNamespaceErr = errors.New("no namespace for reconciliation request")
-)
-
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.11.0/pkg/reconcile
 func (r *WatcherReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	if req.Name == "" {
-		return ctrl.Result{}, noNameErr
-	}
-	if req.Namespace == "" {
-		return ctrl.Result{}, noNamespaceErr
-	}
 	(*r.addonnManager).Trigger(req.Namespace, req.Name)
 
 	r.Log.V(2).Info("reconciliation triggered", "cluster", req.Namespace)
@@ -114,17 +103,17 @@ func (r *WatcherReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 func (r *WatcherReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&addonapiv1alpha1.ManagedClusterAddOn{}, noReconcilePred).
-		Watches(&corev1.Secret{}, r.enqueueForClusterSpecificResource(), builder.OnlyMetadata).
+		Watches(&corev1.Secret{}, r.enqueueForSecret(), builder.OnlyMetadata).
 		Complete(r)
 }
 
-func (r *WatcherReconciler) enqueueForClusterSpecificResource() handler.EventHandler {
+func (r *WatcherReconciler) enqueueForSecret() handler.EventHandler {
 	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
-		key := client.ObjectKey{Name: "multicluster-observability-addon", Namespace: obj.GetNamespace()}
-		addon := &addonapiv1alpha1.ManagedClusterAddOn{}
-		if err := r.Client.Get(ctx, key, addon); err != nil {
+		key := client.ObjectKey{Name: addon.Name, Namespace: obj.GetNamespace()}
+		mcaddon := &addonapiv1alpha1.ManagedClusterAddOn{}
+		if err := r.Client.Get(ctx, key, mcaddon); err != nil {
 			if apierrors.IsNotFound(err) {
-				return r.getSecretReconcileRequests(ctx, obj, addon)
+				return r.getReconcileRequestsFromManifestWorks(ctx, obj)
 			}
 			r.Log.Error(err, "Error getting managedclusteraddon resources in event handler")
 			return nil
@@ -133,16 +122,16 @@ func (r *WatcherReconciler) enqueueForClusterSpecificResource() handler.EventHan
 		return []reconcile.Request{
 			{
 				NamespacedName: types.NamespacedName{
-					Name:      addon.Name,
-					Namespace: addon.Namespace,
+					Name:      mcaddon.Name,
+					Namespace: mcaddon.Namespace,
 				},
 			},
 		}
 	})
 }
 
-// getSecretReconcileRequests gets reconcile.Request for secrets referenced in ManifestWorks.
-func (r *WatcherReconciler) getSecretReconcileRequests(ctx context.Context, obj client.Object, addon *addonapiv1alpha1.ManagedClusterAddOn) []reconcile.Request {
+// getReconcileRequestsFromManifestWorks gets reconcile.Request for secrets referenced in ManifestWorks.
+func (r *WatcherReconciler) getReconcileRequestsFromManifestWorks(ctx context.Context, obj client.Object) []reconcile.Request {
 	rqs := []reconcile.Request{}
 	mws := &workapiv1.ManifestWorkList{}
 	if err := r.Client.List(ctx, mws, &client.ListOptions{
