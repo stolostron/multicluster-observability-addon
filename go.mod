@@ -26,7 +26,10 @@ require (
 	sigs.k8s.io/controller-runtime v0.17.0
 )
 
-require gopkg.in/yaml.v3 v3.0.1
+require (
+	github.com/go-logr/logr v1.4.1
+	gopkg.in/yaml.v3 v3.0.1
+)
 
 require (
 	github.com/BurntSushi/toml v1.2.1 // indirect
@@ -50,7 +53,6 @@ require (
 	github.com/fatih/structs v1.1.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
-	github.com/go-logr/logr v1.4.1 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-openapi/jsonpointer v0.20.0 // indirect
 	github.com/go-openapi/jsonreference v0.20.2 // indirect
