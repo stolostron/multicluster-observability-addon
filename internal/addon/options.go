@@ -12,9 +12,9 @@ const (
 	KeyPlatformLogsCollection = "platformLogsCollection"
 
 	// User Workloads Observability Keys
-	KeyUserWorkloadLogsCollection        = "userWorkloadLogsCollection"
-	KeyUserWorkloadTracesCollection      = "userWorkloadTracesCollection"
-	KeyUserWorkloadTracesInstrumentation = "userWorkloadTracesInstrumentation"
+	KeyUserWorkloadLogsCollection   = "userWorkloadLogsCollection"
+	KeyUserWorkloadTracesCollection = "userWorkloadTracesCollection"
+	KeyUserWorkloadInstrumentation  = "userWorkloadInstrumentation"
 )
 
 type CollectionKind string
@@ -90,7 +90,7 @@ func BuildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Opti
 				opts.UserWorkloads.Enabled = true
 				opts.UserWorkloads.Traces.CollectionEnabled = true
 			}
-		case KeyUserWorkloadTracesInstrumentation:
+		case KeyUserWorkloadInstrumentation:
 			if keyvalue.Value == string(InstrumentationV1alpha1) {
 				opts.UserWorkloads.Enabled = true
 				opts.UserWorkloads.Traces.InstrumentationEnabled = true
