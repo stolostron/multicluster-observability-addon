@@ -2,22 +2,21 @@ package manifests
 
 import (
 	"encoding/json"
+	"errors"
 	"slices"
 
 	loggingv1 "github.com/openshift/cluster-logging-operator/apis/logging/v1"
 	"github.com/rhobs/multicluster-observability-addon/internal/addon"
 )
 
-func buildSubscriptionChannel(resources Options) string {
-	adoc := resources.AddOnDeploymentConfig
-	if adoc == nil || len(adoc.Spec.CustomizedVariables) == 0 {
-		return defaultLoggingVersion
-	}
+var (
+	errPlatformLogsNotDefined     = errors.New("Platform logs not defined")
+	errUserWorkloadLogsNotDefined = errors.New("User Workloads logs not defined")
+)
 
-	for _, keyvalue := range adoc.Spec.CustomizedVariables {
-		if keyvalue.Name == subscriptionChannelValueKey {
-			return keyvalue.Value
-		}
+func buildSubscriptionChannel(resources Options) string {
+	if resources.SubscriptionChannel != "" {
+		return resources.SubscriptionChannel
 	}
 	return defaultLoggingVersion
 }
@@ -46,9 +45,38 @@ func buildSecrets(resources Options) ([]SecretValue, error) {
 	return secretsValue, nil
 }
 
-func buildClusterLogForwarderSpec(resources Options) (*loggingv1.ClusterLogForwarderSpec, error) {
-	clf := resources.ClusterLogForwarder
+func buildClusterLogForwarderSpec(opts Options) (*loggingv1.ClusterLogForwarderSpec, error) {
+	clf := opts.ClusterLogForwarder
 	clf.Spec.ServiceAccountName = "mcoa-logcollector"
+
+	// Validate Platform Logs enabled
+	var (
+		platformDetected      bool
+		userWorkloadsDetected bool
+	)
+	for _, pipeline := range clf.Spec.Pipelines {
+		// Consider pipelines without outputs invalid
+		if pipeline.OutputRefs == nil {
+			continue
+		}
+
+		for _, ref := range pipeline.InputRefs {
+			if ref == loggingv1.InputNameInfrastructure || ref == loggingv1.InputNameAudit {
+				platformDetected = true
+			}
+			if ref == loggingv1.InputNameApplication {
+				userWorkloadsDetected = true
+			}
+		}
+	}
+
+	if opts.Platform.CollectionEnabled && !platformDetected {
+		return nil, errPlatformLogsNotDefined
+	}
+
+	if opts.UserWorkloads.CollectionEnabled && !userWorkloadsDetected {
+		return nil, errUserWorkloadLogsNotDefined
+	}
 
 	return &clf.Spec, nil
 }

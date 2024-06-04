@@ -59,16 +59,7 @@ func Test_Mcoa_Disable_Charts(t *testing.T) {
 			Namespace: "open-cluster-management",
 		},
 		Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
-			CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
-				{
-					Name:  "loggingDisabled",
-					Value: "true",
-				},
-				{
-					Name:  "tracingDisabled",
-					Value: "true",
-				},
-			},
+			CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{},
 		},
 	}
 
@@ -77,7 +68,7 @@ func Test_Mcoa_Disable_Charts(t *testing.T) {
 		WithObjects(addOnDeploymentConfig).
 		Build()
 
-	loggingAgentAddon, err := addonfactory.NewAgentAddonFactory(addon.Name, addon.FS, addon.McoaChartDir).
+	agentAddon, err := addonfactory.NewAgentAddonFactory(addon.Name, addon.FS, addon.McoaChartDir).
 		WithGetValuesFuncs(GetValuesFunc(context.TODO(), fakeKubeClient)).
 		WithAgentRegistrationOption(&agent.RegistrationOption{}).
 		WithScheme(scheme.Scheme).
@@ -86,9 +77,9 @@ func Test_Mcoa_Disable_Charts(t *testing.T) {
 		klog.Fatalf("failed to build agent %v", err)
 	}
 
-	objects, err := loggingAgentAddon.Manifests(managedCluster, managedClusterAddOn)
+	objects, err := agentAddon.Manifests(managedCluster, managedClusterAddOn)
 	require.NoError(t, err)
-	require.Equal(t, 2, len(objects))
+	require.Empty(t, objects)
 }
 
 func Test_Mcoa_Disable_Chart_Hub(t *testing.T) {

@@ -34,9 +34,9 @@ var (
 func fakeGetValues(k8s client.Client) addonfactory.GetValuesFunc {
 	return func(
 		cluster *clusterv1.ManagedCluster,
-		addon *addonapiv1alpha1.ManagedClusterAddOn,
+		mcAddon *addonapiv1alpha1.ManagedClusterAddOn,
 	) (addonfactory.Values, error) {
-		opts, err := handlers.BuildOptions(context.TODO(), k8s, addon, nil)
+		opts, err := handlers.BuildOptions(context.TODO(), k8s, mcAddon, addon.TracesOptions{})
 		if err != nil {
 			return nil, err
 		}

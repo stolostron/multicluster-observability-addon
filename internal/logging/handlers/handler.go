@@ -10,17 +10,24 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func BuildOptions(ctx context.Context, k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, adoc *addonapiv1alpha1.AddOnDeploymentConfig) (manifests.Options, error) {
-	resources := manifests.Options{
-		AddOnDeploymentConfig: adoc,
+func BuildOptions(ctx context.Context, k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, platform, userWorkloads addon.LogsOptions) (manifests.Options, error) {
+	opts := manifests.Options{
+		Platform:      platform,
+		UserWorkloads: userWorkloads,
+	}
+
+	if platform.SubscriptionChannel != "" {
+		opts.SubscriptionChannel = platform.SubscriptionChannel
+	} else {
+		opts.SubscriptionChannel = userWorkloads.SubscriptionChannel
 	}
 
 	key := addon.GetObjectKey(mcAddon.Status.ConfigReferences, loggingv1.GroupVersion.Group, addon.ClusterLogForwardersResource)
 	clf := &loggingv1.ClusterLogForwarder{}
 	if err := k8s.Get(ctx, key, clf, &client.GetOptions{}); err != nil {
-		return resources, err
+		return opts, err
 	}
-	resources.ClusterLogForwarder = clf
+	opts.ClusterLogForwarder = clf
 
 	targetSecretName := make(map[addon.Endpoint]string)
 	for _, output := range clf.Spec.Outputs {
@@ -29,9 +36,9 @@ func BuildOptions(ctx context.Context, k8s client.Client, mcAddon *addonapiv1alp
 
 	targetSecrets, err := addon.GetSecrets(ctx, k8s, clf.Namespace, mcAddon.Namespace, targetSecretName)
 	if err != nil {
-		return resources, err
+		return opts, err
 	}
-	resources.Secrets = targetSecrets
+	opts.Secrets = targetSecrets
 
-	return resources, nil
+	return opts, nil
 }

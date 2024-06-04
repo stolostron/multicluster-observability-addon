@@ -5,5 +5,16 @@ metadata:
   namespace: open-cluster-management
 spec:
   customizedVariables:
-    - name: loggingSubscriptionChannel
-      value: stable-5.9
+  # Operator Subscription Channels
+  - name: openshiftLoggingChannel
+    value: stable-5.9
+  # Platform Observability
+  - name: platformLogsCollection
+    value: clusterlogforwarders.v1.logging.openshift.io
+  # User Workloads Observability
+  - name: userWorkloadLogsCollection
+    value: clusterlogforwarders.v1.logging.openshift.io
+  - name: userWorkloadTracesCollection
+    value: opentelemetrycollectors.v1beta1.opentelemetry.io
+  - name: userWorkloadInstrumentation
+    value: instrumentations.v1alpha1.opentelemetry.io
