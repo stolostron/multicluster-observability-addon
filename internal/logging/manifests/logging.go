@@ -54,6 +54,7 @@ func buildClusterLogForwarderSpec(resources Options) (*loggingv1.ClusterLogForwa
 			return nil, err
 		}
 	}
+	clf.Spec.ServiceAccountName = "mcoa-logcollector"
 
 	return &clf.Spec, nil
 }
