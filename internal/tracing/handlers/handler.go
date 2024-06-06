@@ -15,10 +15,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-const (
-	opentelemetryCollectorResource = "opentelemetrycollectors"
-)
-
 var (
 	errNoExportersFound       = fmt.Errorf("no exporters found")
 	errNoMountPathFound       = fmt.Errorf("mountpath not found in any secret")
@@ -32,7 +28,7 @@ func BuildOptions(ctx context.Context, k8s client.Client, mcAddon *addonapiv1alp
 	}
 
 	klog.Info("Retrieving OpenTelemetry Collector template")
-	key := addon.GetObjectKey(mcAddon.Status.ConfigReferences, otelv1beta1.GroupVersion.Group, opentelemetryCollectorResource)
+	key := addon.GetObjectKey(mcAddon.Status.ConfigReferences, otelv1beta1.GroupVersion.Group, addon.OpenTelemetryCollectorsResource)
 	otelCol := &otelv1beta1.OpenTelemetryCollector{}
 	if err := k8s.Get(ctx, key, otelCol, &client.GetOptions{}); err != nil {
 		return resources, err

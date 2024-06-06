@@ -11,7 +11,7 @@ metadata:
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: spoke-otelcol
+  name: mcoa-opentelemetry
   labels:
     app: {{ template "tracinghelm.name" . }}
     chart: {{ template "tracinghelm.chart" . }}

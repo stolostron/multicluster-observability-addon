@@ -16,6 +16,18 @@ const (
 
 	AdcLoggingDisabledKey = "loggingDisabled"
 	AdcTracingisabledKey  = "tracingDisabled"
+
+	ClusterLogForwardersResource = "clusterlogforwarders"
+	SpokeCLFName                 = "mcoa-instance"
+	SpokeCLFNamespace            = "openshift-logging"
+	clfProbeKey                  = "isReady"
+	clfProbePath                 = ".status.conditions[?(@.type==\"Ready\")].status"
+
+	OpenTelemetryCollectorsResource = "opentelemetrycollectors"
+	SpokeOTELColName                = "mcoa-instance"
+	SpokeOTELColNamespace           = "mcoa-opentelemetry"
+	otelColProbeKey                 = "replicas"
+	otelColProbePath                = ".spec.replicas"
 )
 
 //go:embed manifests

@@ -100,7 +100,7 @@ func Test_Tracing_AllConfigsTogether_AllResources(t *testing.T) {
 			},
 			ConfigReferent: addonapiv1alpha1.ConfigReferent{
 				Namespace: "open-cluster-management",
-				Name:      "spoke-otelcol",
+				Name:      "mcoa-instance",
 			},
 		},
 	}
@@ -108,7 +108,7 @@ func Test_Tracing_AllConfigsTogether_AllResources(t *testing.T) {
 	// Setup configuration resources: OpenTelemetryCollector, AddOnDeploymentConfig
 	otelCol := otelv1beta1.OpenTelemetryCollector{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "spoke-otelcol",
+			Name:      "mcoa-instance",
 			Namespace: "open-cluster-management",
 		},
 		Spec: otelv1beta1.OpenTelemetryCollectorSpec{
@@ -191,8 +191,10 @@ func Test_Tracing_AllConfigsTogether_AllResources(t *testing.T) {
 	for _, obj := range objects {
 		switch obj := obj.(type) {
 		case *otelv1beta1.OpenTelemetryCollector:
-			require.Equal(t, "spoke-otelcol", obj.ObjectMeta.Name)
-			require.Equal(t, "spoke-otelcol", obj.ObjectMeta.Namespace)
+			// Check name and namespace to make sure that if we change the helm
+			// manifests that we don't break the addon probes
+			require.Equal(t, addon.SpokeOTELColName, obj.Name)
+			require.Equal(t, addon.SpokeOTELColNamespace, obj.Namespace)
 			require.NotEmpty(t, obj.Spec.Config)
 		case *corev1.Secret:
 			if obj.Name == "tracing-otlphttp-auth" {
