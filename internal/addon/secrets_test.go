@@ -10,7 +10,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
-func Test_getSecretReference(t *testing.T) {
+func TestGetSecrets(t *testing.T) {
 	var (
 		defaultNamespace = "open-cluster-management"
 		clusterSecret    = &corev1.Secret{
@@ -34,38 +34,38 @@ func Test_getSecretReference(t *testing.T) {
 	)
 
 	for _, tc := range []struct {
-		name             string
-		secretName       string
-		defaultNamespace string
-		clusterNamespace string
-		expecedError     bool
-		expectedSecret   *corev1.Secret
+		name                    string
+		secretName              string
+		configResourceNamespace string
+		mcAddonNamespace        string
+		expecedError            bool
+		expectedSecret          *corev1.Secret
 	}{
 		{
-			name:             "secret in cluster namespace",
-			clusterNamespace: "cluster",
-			defaultNamespace: defaultNamespace,
-			secretName:       "foo",
-			expectedSecret:   clusterSecret,
+			name:                    "secret in cluster namespace",
+			mcAddonNamespace:        "cluster",
+			configResourceNamespace: defaultNamespace,
+			secretName:              "foo",
+			expectedSecret:          clusterSecret,
 		},
 		{
-			name:             "default secret used",
-			clusterNamespace: "cluster-no-secret",
-			defaultNamespace: defaultNamespace,
-			secretName:       "foo",
-			expectedSecret:   defaultSecret,
+			name:                    "default secret used",
+			mcAddonNamespace:        "cluster-no-secret",
+			configResourceNamespace: defaultNamespace,
+			secretName:              "foo",
+			expectedSecret:          defaultSecret,
 		},
 		{
-			name:             "default namespace not defined",
-			defaultNamespace: "",
-			expecedError:     true,
+			name:                    "default namespace not defined",
+			configResourceNamespace: "",
+			expecedError:            true,
 		},
 		{
-			name:             "no secret found",
-			clusterNamespace: "cluster",
-			defaultNamespace: defaultNamespace,
-			secretName:       "bar",
-			expecedError:     true,
+			name:                    "no secret found",
+			mcAddonNamespace:        "cluster",
+			configResourceNamespace: defaultNamespace,
+			secretName:              "bar",
+			expecedError:            true,
 		},
 	} {
 		fakeKubeClient := fake.NewClientBuilder().
@@ -76,7 +76,7 @@ func Test_getSecretReference(t *testing.T) {
 		targetSecrets := map[Target]string{
 			target: tc.secretName,
 		}
-		secrets, err := GetSecrets(context.TODO(), fakeKubeClient, tc.defaultNamespace, tc.clusterNamespace, targetSecrets)
+		secrets, err := GetSecrets(context.TODO(), fakeKubeClient, tc.configResourceNamespace, tc.mcAddonNamespace, targetSecrets)
 		if tc.expecedError {
 			require.Error(t, err)
 			return

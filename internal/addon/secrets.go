@@ -15,8 +15,8 @@ type Target string
 
 // GetSecrets fetches Kubernetes secrets based on the specified
 // secret name for each target in targetSecretName.
-// If a secret doesn't exist in the namespace of the addon this function will
-// instead look for it in the configResourceNamespace.
+// If a secret doesn't exist in the namespace of the ManagedClusterAddon this
+// function will instead look for it in the configResourceNamespace.
 // If no secret is found an error will be returned.
 func GetSecrets(ctx context.Context, k8s client.Client, configResourceNamespace string, addonNamespace string, targetSecretName map[Target]string) (map[Target]corev1.Secret, error) {
 	secretKeys := make(map[Target]corev1.Secret, len(targetSecretName))

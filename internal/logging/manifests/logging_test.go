@@ -2,12 +2,10 @@ package manifests
 
 import (
 	"encoding/json"
-	"fmt"
 	"testing"
 
 	loggingv1 "github.com/openshift/cluster-logging-operator/apis/logging/v1"
 	"github.com/rhobs/multicluster-observability-addon/internal/addon"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -103,10 +101,7 @@ func Test_BuildCLFSpec(t *testing.T) {
 		managedClusterAddOn *addonapiv1alpha1.ManagedClusterAddOn
 
 		// Addon configuration
-		clf                              *loggingv1.ClusterLogForwarder
-		appLogsSecret, clusterLogsSecret corev1.Secret
-
-		clusterName = "cluster-1"
+		clf *loggingv1.ClusterLogForwarder
 	)
 
 	// Register the addon for the managed cluster
@@ -120,26 +115,6 @@ func Test_BuildCLFSpec(t *testing.T) {
 			ConfigReferent: addonapiv1alpha1.ConfigReferent{
 				Namespace: "open-cluster-management",
 				Name:      "mcoa-instance",
-			},
-		},
-		{
-			ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
-				Group:    "",
-				Resource: "secrets",
-			},
-			ConfigReferent: addonapiv1alpha1.ConfigReferent{
-				Namespace: clusterName,
-				Name:      fmt.Sprintf("%s-app-logs", clusterName),
-			},
-		},
-		{
-			ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
-				Group:    "",
-				Resource: "secrets",
-			},
-			ConfigReferent: addonapiv1alpha1.ConfigReferent{
-				Namespace: clusterName,
-				Name:      fmt.Sprintf("%s-cluster-logs", clusterName),
 			},
 		},
 	}
@@ -173,6 +148,9 @@ func Test_BuildCLFSpec(t *testing.T) {
 							TenantKey: "tenant-x",
 						},
 					},
+					Secret: &loggingv1.OutputSecretSpec{
+						Name: "app-logs-secret",
+					},
 				},
 				{
 					Name: "cluster-logs",
@@ -182,6 +160,9 @@ func Test_BuildCLFSpec(t *testing.T) {
 							GroupBy:     loggingv1.LogGroupByLogType,
 							GroupPrefix: pointer.String("test-prefix"),
 						},
+					},
+					Secret: &loggingv1.OutputSecretSpec{
+						Name: "cluster-logs-secret",
 					},
 				},
 			},
@@ -200,88 +181,14 @@ func Test_BuildCLFSpec(t *testing.T) {
 		},
 	}
 
-	appLogsSecret = corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-app-logs", clusterName),
-			Namespace: clusterName,
-		},
-		Data: map[string][]byte{
-			"tls.crt": []byte("cert"),
-			"tls.key": []byte("key"),
-		},
-	}
-
-	clusterLogsSecret = corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-cluster-logs", clusterName),
-			Namespace: clusterName,
-		},
-		Data: map[string][]byte{
-			"tls.crt": []byte("cert"),
-			"tls.key": []byte("key"),
-		},
-	}
-
 	// Setup the fake k8s client
 	resources := Options{
 		ClusterLogForwarder: clf,
-		Secrets: map[addon.Target]corev1.Secret{
-			"app-logs":     appLogsSecret,
-			"cluster-logs": clusterLogsSecret,
-		},
 	}
 	clfSpec, err := buildClusterLogForwarderSpec(resources)
 	require.NoError(t, err)
 	require.NotNil(t, clfSpec.Outputs[0].Secret)
 	require.NotNil(t, clfSpec.Outputs[1].Secret)
-	require.Equal(t, appLogsSecret.Name, clfSpec.Outputs[0].Secret.Name)
-	require.Equal(t, clusterLogsSecret.Name, clfSpec.Outputs[1].Secret.Name)
-}
-
-func Test_TemplateWithSecret(t *testing.T) {
-	for _, tc := range []struct {
-		name               string
-		target             addon.Target
-		secretName         string
-		expectedSecretName string
-	}{
-		{
-			name:               "TargetMatches",
-			target:             "foo",
-			secretName:         "my-secret",
-			expectedSecretName: "my-secret",
-		},
-		{
-			name:               "TargetDoesNotMatch",
-			target:             "bar",
-			secretName:         "my-secret",
-			expectedSecretName: "",
-		},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			secret := corev1.Secret{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      tc.secretName,
-					Namespace: "cluster-1",
-				},
-			}
-
-			spec := &loggingv1.ClusterLogForwarderSpec{
-				Outputs: []loggingv1.OutputSpec{
-					{
-						Name: "foo",
-					},
-				},
-			}
-
-			err := templateWithSecret(spec, tc.target, secret)
-			assert.NoError(t, err)
-			if spec.Outputs[0].Name != string(tc.target) {
-				assert.Nil(t, spec.Outputs[0].Secret)
-			} else {
-				assert.NotNil(t, spec.Outputs[0].Secret)
-				assert.Equal(t, tc.expectedSecretName, spec.Outputs[0].Secret.Name)
-			}
-		})
-	}
+	require.Equal(t, "app-logs-secret", clfSpec.Outputs[0].Secret.Name)
+	require.Equal(t, "cluster-logs-secret", clfSpec.Outputs[1].Secret.Name)
 }
