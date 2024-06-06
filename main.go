@@ -149,7 +149,7 @@ func runController(ctx context.Context, kubeConfig *rest.Config) error {
 			schema.GroupVersionResource{Version: "v1alpha1", Group: "opentelemetry.io", Resource: "opentelemetrycollectors"},
 			utils.AddOnDeploymentConfigGVR,
 		).
-		WithGetValuesFuncs(addonConfigValuesFn, addonhelm.GetValuesFunc(k8sClient)).
+		WithGetValuesFuncs(addonConfigValuesFn, addonhelm.GetValuesFunc(ctx, k8sClient)).
 		WithAgentRegistrationOption(registrationOption).
 		WithScheme(scheme).
 		BuildHelmAgentAddon()
