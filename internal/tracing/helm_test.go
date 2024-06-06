@@ -116,8 +116,8 @@ func Test_Tracing_AllConfigsTogether_AllResources(t *testing.T) {
 					Object: map[string]interface{}{
 						"otlp": map[string]interface{}{
 							"protocols": map[string]interface{}{
-								"otlp":     nil,
-								"otlphttp": nil,
+								"otlp":     map[string]interface{}{},
+								"otlphttp": map[string]interface{}{},
 							},
 						},
 					},
