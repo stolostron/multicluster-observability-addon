@@ -26,7 +26,7 @@ var (
 	errNoVolumeMountForSecret = fmt.Errorf("no volumemount found for secret")
 )
 
-func BuildOptions(k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, adoc *addonapiv1alpha1.AddOnDeploymentConfig) (manifests.Options, error) {
+func BuildOptions(ctx context.Context, k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, adoc *addonapiv1alpha1.AddOnDeploymentConfig) (manifests.Options, error) {
 	resources := manifests.Options{
 		AddOnDeploymentConfig: adoc,
 		ClusterName:           mcAddon.Namespace,
@@ -34,7 +34,7 @@ func BuildOptions(k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAdd
 
 	key := addon.GetObjectKey(mcAddon.Status.ConfigReferences, otelv1alpha1.GroupVersion.Group, opentelemetryCollectorResource)
 	otelCol := &otelv1alpha1.OpenTelemetryCollector{}
-	if err := k8s.Get(context.Background(), key, otelCol, &client.GetOptions{}); err != nil {
+	if err := k8s.Get(ctx, key, otelCol, &client.GetOptions{}); err != nil {
 		return resources, err
 	}
 	resources.OpenTelemetryCollector = otelCol
@@ -45,7 +45,6 @@ func BuildOptions(k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAdd
 		return resources, nil
 	}
 
-	ctx := context.Background()
 	secretsProvider := authentication.NewSecretsProvider(k8s, otelCol.Namespace, mcAddon.Namespace)
 	targetsSecret, err := secretsProvider.GenerateSecrets(ctx, otelCol.Annotations, targetSecretName)
 	if err != nil {
