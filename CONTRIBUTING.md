@@ -139,7 +139,7 @@ Currently the addon supports configuration to send logs either to:
 - CloudWatch: requires the auth configmap to be specified
 - Loki: requires the auth configmap, the url configmap and optionally the inject ca configmap
 
-### Traces Collection & Instrumentation 
+### Traces Collection
 
 Currently MCOA supports deploying a single instance of `OpenTelemetryCollector`
 templated with the stanza created in the hub cluster. The instance deployed in

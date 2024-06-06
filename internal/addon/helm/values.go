@@ -51,7 +51,7 @@ func GetValuesFunc(ctx context.Context, k8s client.Client) addonfactory.GetValue
 		}
 
 		if opts.Platform.Logs.CollectionEnabled || opts.UserWorkloads.Logs.CollectionEnabled {
-			loggingOpts, err := lhandlers.BuildOptions(ctx, k8s, mcAddon, opts.Platform.Logs, opts.Platform.Logs)
+			loggingOpts, err := lhandlers.BuildOptions(ctx, k8s, mcAddon, opts.Platform.Logs, opts.UserWorkloads.Logs)
 			if err != nil {
 				return nil, err
 			}
