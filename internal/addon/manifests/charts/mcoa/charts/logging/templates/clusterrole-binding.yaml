@@ -4,8 +4,8 @@ kind: ClusterRoleBinding
 metadata:
   name: openshift-logging:mcoa-logcollector:application-logs
   labels:
-    app: {{ template "mcoahelm.name" . }}
-    chart: {{ template "mcoahelm.chart" . }}
+    app: {{ template "logginghelm.name" . }}
+    chart: {{ template "logginghelm.chart" . }}
     release: {{ .Release.Name }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
@@ -21,8 +21,8 @@ kind: ClusterRoleBinding
 metadata:
   name: openshift-logging:mcoa-logcollector:audit-logs
   labels:
-    app: {{ template "mcoahelm.name" . }}
-    chart: {{ template "mcoahelm.chart" . }}
+    app: {{ template "logginghelm.name" . }}
+    chart: {{ template "logginghelm.chart" . }}
     release: {{ .Release.Name }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
@@ -38,8 +38,8 @@ kind: ClusterRoleBinding
 metadata:
   name: openshift-logging:mcoa-logcollector:infrastructure-logs
   labels:
-    app: {{ template "mcoahelm.name" . }}
-    chart: {{ template "mcoahelm.chart" . }}
+    app: {{ template "logginghelm.name" . }}
+    chart: {{ template "logginghelm.chart" . }}
     release: {{ .Release.Name }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
