@@ -101,10 +101,6 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "instance",
 			Namespace: "open-cluster-management",
-			Annotations: map[string]string{
-				"authentication.mcoa.openshift.io/app-logs":     "SecretReference",
-				"authentication.mcoa.openshift.io/cluster-logs": "SecretReference",
-			},
 		},
 		Spec: loggingv1.ClusterLogForwarderSpec{
 			Inputs: []loggingv1.InputSpec{

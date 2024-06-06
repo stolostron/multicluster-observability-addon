@@ -5,7 +5,7 @@ import (
 	"slices"
 
 	loggingv1 "github.com/openshift/cluster-logging-operator/apis/logging/v1"
-	"github.com/rhobs/multicluster-observability-addon/internal/addon/authentication"
+	"github.com/rhobs/multicluster-observability-addon/internal/addon"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -33,7 +33,7 @@ func buildSecrets(resources Options) ([]SecretValue, error) {
 	slices.Sort(keys)
 
 	for _, key := range keys {
-		secret := resources.Secrets[authentication.Target(key)]
+		secret := resources.Secrets[addon.Target(key)]
 		dataJSON, err := json.Marshal(secret.Data)
 		if err != nil {
 			return secretsValue, err
@@ -58,7 +58,7 @@ func buildClusterLogForwarderSpec(resources Options) (*loggingv1.ClusterLogForwa
 	return &clf.Spec, nil
 }
 
-func templateWithSecret(spec *loggingv1.ClusterLogForwarderSpec, target authentication.Target, secret corev1.Secret) error {
+func templateWithSecret(spec *loggingv1.ClusterLogForwarderSpec, target addon.Target, secret corev1.Secret) error {
 	// TODO(JoaoBraveCoding) Validate that clfOutputName actually exists
 	// TODO(JoaoBraveCoding) Validate secret
 

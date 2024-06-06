@@ -9,8 +9,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-var annotation = "tracing.mcoa.openshift.io/target-output-name"
-
 func Test_ConfigureExportersSecrets(t *testing.T) {
 	b, err := os.ReadFile("./test_data/simplest.yaml")
 	require.NoError(t, err)
@@ -22,9 +20,6 @@ func Test_ConfigureExportersSecrets(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "tracing-otlphttp-auth",
 			Namespace: "cluster-1",
-			Annotations: map[string]string{
-				annotation: "otlphttp",
-			},
 		},
 		Data: map[string][]byte{
 			"tls.crt": []byte("data"),

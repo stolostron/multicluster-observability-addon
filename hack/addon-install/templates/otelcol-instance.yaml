@@ -3,8 +3,6 @@ kind: OpenTelemetryCollector
 metadata:
   name: instance
   namespace: open-cluster-management
-  annotations:
-    authentication.mcoa.openshift.io/otlp: ExistingSecret
 spec:
   config: |
     exporters:

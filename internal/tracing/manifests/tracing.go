@@ -6,7 +6,7 @@ import (
 
 	"github.com/ViaQ/logerr/v2/kverrors"
 	otelv1alpha1 "github.com/open-telemetry/opentelemetry-operator/apis/v1alpha1"
-	"github.com/rhobs/multicluster-observability-addon/internal/addon/authentication"
+	"github.com/rhobs/multicluster-observability-addon/internal/addon"
 	"github.com/rhobs/multicluster-observability-addon/internal/tracing/manifests/otelcol"
 	"gopkg.in/yaml.v3"
 	corev1 "k8s.io/api/core/v1"
@@ -38,7 +38,7 @@ func buildOtelColSpec(resources Options) (*otelv1alpha1.OpenTelemetryCollectorSp
 	return &resources.OpenTelemetryCollector.Spec, nil
 }
 
-func templateWithSecret(spec *otelv1alpha1.OpenTelemetryCollectorSpec, target authentication.Target, secret corev1.Secret) error {
+func templateWithSecret(spec *otelv1alpha1.OpenTelemetryCollectorSpec, target addon.Target, secret corev1.Secret) error {
 	cfg, err := otelcol.ConfigFromString(spec.Config)
 	if err != nil {
 		return nil

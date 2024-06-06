@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	loggingv1 "github.com/openshift/cluster-logging-operator/apis/logging/v1"
-	"github.com/rhobs/multicluster-observability-addon/internal/addon/authentication"
+	"github.com/rhobs/multicluster-observability-addon/internal/addon"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -58,7 +58,7 @@ func Test_BuildSubscriptionChannel(t *testing.T) {
 
 func Test_BuildSecrets(t *testing.T) {
 	resources := Options{
-		Secrets: map[authentication.Target]corev1.Secret{
+		Secrets: map[addon.Target]corev1.Secret{
 			"foo": {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
@@ -225,7 +225,7 @@ func Test_BuildCLFSpec(t *testing.T) {
 	// Setup the fake k8s client
 	resources := Options{
 		ClusterLogForwarder: clf,
-		Secrets: map[authentication.Target]corev1.Secret{
+		Secrets: map[addon.Target]corev1.Secret{
 			"app-logs":     appLogsSecret,
 			"cluster-logs": clusterLogsSecret,
 		},
@@ -241,18 +241,18 @@ func Test_BuildCLFSpec(t *testing.T) {
 func Test_TemplateWithSecret(t *testing.T) {
 	for _, tc := range []struct {
 		name               string
-		target             authentication.Target
+		target             addon.Target
 		secretName         string
 		expectedSecretName string
 	}{
 		{
-			name:               "SignalAnnotationSet",
+			name:               "TargetMatches",
 			target:             "foo",
 			secretName:         "my-secret",
 			expectedSecretName: "my-secret",
 		},
 		{
-			name:               "SignalAnnotationNotSet",
+			name:               "TargetDoesNotMatch",
 			target:             "bar",
 			secretName:         "my-secret",
 			expectedSecretName: "",

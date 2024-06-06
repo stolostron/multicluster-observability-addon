@@ -4,11 +4,11 @@ import (
 	"fmt"
 
 	"github.com/ViaQ/logerr/v2/kverrors"
-	"github.com/rhobs/multicluster-observability-addon/internal/addon/authentication"
+	"github.com/rhobs/multicluster-observability-addon/internal/addon"
 	corev1 "k8s.io/api/core/v1"
 )
 
-func ConfigureExportersSecrets(cfg map[string]interface{}, target authentication.Target, secret corev1.Secret) error {
+func ConfigureExportersSecrets(cfg map[string]interface{}, target addon.Target, secret corev1.Secret) error {
 	exporters, err := GetExporters(cfg)
 	if err != nil {
 		return err
