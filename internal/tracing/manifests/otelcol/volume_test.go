@@ -3,7 +3,7 @@ package otelcol
 import (
 	"testing"
 
-	"github.com/open-telemetry/opentelemetry-operator/apis/v1alpha1"
+	"github.com/open-telemetry/opentelemetry-operator/apis/v1beta1"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -22,8 +22,8 @@ func Test_ConfigureVolumes(t *testing.T) {
 		},
 	}
 
-	otelSpec := v1alpha1.OpenTelemetryCollectorSpec{}
+	otelCol := v1beta1.OpenTelemetryCollector{}
 
-	ConfigureVolumes(&otelSpec, secret)
-	require.NotEmpty(t, otelSpec.Volumes)
+	ConfigureVolumes(&otelCol, secret)
+	require.NotEmpty(t, otelCol.Spec.Volumes)
 }

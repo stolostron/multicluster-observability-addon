@@ -1,9 +1,9 @@
 {{- if .Values.enabled }}
-apiVersion: opentelemetry.io/v1alpha1
+apiVersion: opentelemetry.io/v1beta1
 kind: OpenTelemetryCollector
 metadata:
-  name: spoke-otelcol
-  namespace: spoke-otelcol
+  name: mcoa-instance
+  namespace: mcoa-opentelemetry
   labels:
     app: {{ template "tracinghelm.name" . }}
     chart: {{ template "tracinghelm.chart" . }}

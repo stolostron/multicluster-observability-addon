@@ -31,7 +31,7 @@ $(CRD_DIR)/logging.openshift.io_clusterlogforwarders.yaml:
 
 $(CRD_DIR)/opentelemetry.io_opentelemetrycollectors.yaml:
 	@mkdir -p $(CRD_DIR)
-	@curl https://raw.githubusercontent.com/open-telemetry/opentelemetry-operator/v0.92.1/bundle/manifests/opentelemetry.io_opentelemetrycollectors.yaml > $(CRD_DIR)/opentelemetry.io_opentelemetrycollectors.yaml
+	@curl https://raw.githubusercontent.com/open-telemetry/opentelemetry-operator/v0.100.1/bundle/manifests/opentelemetry.io_opentelemetrycollectors.yaml > $(CRD_DIR)/opentelemetry.io_opentelemetrycollectors.yaml
 
 .PHONY: install-crds
 install-crds: $(CRD_DIR)/logging.openshift.io_clusterlogforwarders.yaml $(CRD_DIR)/opentelemetry.io_opentelemetrycollectors.yaml
@@ -53,7 +53,7 @@ test:
 	go test -v ./internal/...
 
 .PHONY: addon
-addon: deps ## Build addon binary
+addon: deps fmt ## Build addon binary
 	go build -o bin/multicluster-observability-addon main.go
 
 .PHONY: oci-build

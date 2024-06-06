@@ -1,6 +1,7 @@
 package logging
 
 import (
+	"context"
 	"testing"
 
 	loggingv1 "github.com/openshift/cluster-logging-operator/apis/logging/v1"
@@ -38,7 +39,7 @@ func fakeGetValues(k8s client.Client) addonfactory.GetValuesFunc {
 		cluster *clusterv1.ManagedCluster,
 		addon *addonapiv1alpha1.ManagedClusterAddOn,
 	) (addonfactory.Values, error) {
-		opts, err := handlers.BuildOptions(k8s, addon, nil)
+		opts, err := handlers.BuildOptions(context.TODO(), k8s, addon, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -91,7 +92,7 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 			},
 			ConfigReferent: addonapiv1alpha1.ConfigReferent{
 				Namespace: "open-cluster-management",
-				Name:      "instance",
+				Name:      "mcoa-instance",
 			},
 		},
 	}
@@ -99,7 +100,7 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 	// Setup configuration resources: ClusterLogForwarder, AddOnDeploymentConfig, Secrets, ConfigMaps
 	clf = &loggingv1.ClusterLogForwarder{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "instance",
+			Name:      "mcoa-instance",
 			Namespace: "open-cluster-management",
 		},
 		Spec: loggingv1.ClusterLogForwarderSpec{
@@ -210,7 +211,7 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 	// Render manifests and return them as k8s runtime objects
 	objects, err := loggingAgentAddon.Manifests(managedCluster, managedClusterAddOn)
 	require.NoError(t, err)
-	require.Equal(t, 7, len(objects))
+	require.Equal(t, 11, len(objects))
 
 	for _, obj := range objects {
 		switch obj := obj.(type) {
@@ -221,6 +222,10 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 			require.NotNil(t, obj.Spec.Outputs[1].Secret)
 			require.Equal(t, "static-authentication", obj.Spec.Outputs[0].Secret.Name)
 			require.Equal(t, "static-authentication", obj.Spec.Outputs[1].Secret.Name)
+			// Check name and namespace to make sure that if we change the helm
+			// manifests that we don't break the addon probes
+			require.Equal(t, addon.SpokeCLFName, obj.Name)
+			require.Equal(t, addon.SpokeCLFNamespace, obj.Namespace)
 		case *corev1.Secret:
 			if obj.Name == "static-authentication" {
 				require.Equal(t, staticCred.Data, obj.Data)

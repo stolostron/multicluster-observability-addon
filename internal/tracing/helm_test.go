@@ -1,12 +1,12 @@
 package tracing
 
 import (
-	"os"
+	"context"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
 
-	otelv1alpha1 "github.com/open-telemetry/opentelemetry-operator/apis/v1alpha1"
+	otelv1beta1 "github.com/open-telemetry/opentelemetry-operator/apis/v1beta1"
 	operatorsv1 "github.com/operator-framework/api/pkg/operators/v1"
 	operatorsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	"github.com/rhobs/multicluster-observability-addon/internal/addon"
@@ -15,7 +15,6 @@ import (
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/klog/v2"
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
 	"open-cluster-management.io/addon-framework/pkg/agent"
@@ -27,7 +26,7 @@ import (
 )
 
 var (
-	_ = otelv1alpha1.AddToScheme(scheme.Scheme)
+	_ = otelv1beta1.AddToScheme(scheme.Scheme)
 	_ = operatorsv1.AddToScheme(scheme.Scheme)
 	_ = operatorsv1alpha1.AddToScheme(scheme.Scheme)
 )
@@ -37,7 +36,7 @@ func fakeGetValues(k8s client.Client) addonfactory.GetValuesFunc {
 		cluster *clusterv1.ManagedCluster,
 		addon *addonapiv1alpha1.ManagedClusterAddOn,
 	) (addonfactory.Values, error) {
-		opts, err := handlers.BuildOptions(k8s, addon, nil)
+		opts, err := handlers.BuildOptions(context.TODO(), k8s, addon, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -59,7 +58,6 @@ func Test_Tracing_AllConfigsTogether_AllResources(t *testing.T) {
 
 		// Addon configuration
 		addOnDeploymentConfig *addonapiv1alpha1.AddOnDeploymentConfig
-		otelCol               *otelv1alpha1.OpenTelemetryCollector
 		authCM                *corev1.ConfigMap
 
 		// Test clients
@@ -102,23 +100,30 @@ func Test_Tracing_AllConfigsTogether_AllResources(t *testing.T) {
 			},
 			ConfigReferent: addonapiv1alpha1.ConfigReferent{
 				Namespace: "open-cluster-management",
-				Name:      "spoke-otelcol",
+				Name:      "mcoa-instance",
 			},
 		},
 	}
 
 	// Setup configuration resources: OpenTelemetryCollector, AddOnDeploymentConfig
-	b, err := os.ReadFile("./manifests/otelcol/test_data/simplest.yaml")
-	require.NoError(t, err)
-	otelColConfig := string(b)
-
-	otelCol = &otelv1alpha1.OpenTelemetryCollector{
+	otelCol := otelv1beta1.OpenTelemetryCollector{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "spoke-otelcol",
+			Name:      "mcoa-instance",
 			Namespace: "open-cluster-management",
 		},
-		Spec: otelv1alpha1.OpenTelemetryCollectorSpec{
-			Config: otelColConfig,
+		Spec: otelv1beta1.OpenTelemetryCollectorSpec{
+			Config: otelv1beta1.Config{
+				Exporters: otelv1beta1.AnyConfig{
+					Object: map[string]interface{}{
+						"otlp": map[string]interface{}{
+							"protocols": map[string]interface{}{
+								"otlp":     map[string]interface{}{},
+								"otlphttp": map[string]interface{}{},
+							},
+						},
+					},
+				},
+			},
 		},
 	}
 
@@ -157,7 +162,7 @@ func Test_Tracing_AllConfigsTogether_AllResources(t *testing.T) {
 	// Setup the fake k8s client
 	fakeKubeClient = fake.NewClientBuilder().
 		WithScheme(scheme.Scheme).
-		WithObjects(otelCol, authCM, generatedSecret).
+		WithObjects(&otelCol, authCM, generatedSecret).
 		Build()
 
 	// Setup the fake addon client
@@ -173,9 +178,7 @@ func Test_Tracing_AllConfigsTogether_AllResources(t *testing.T) {
 		WithAgentRegistrationOption(&agent.RegistrationOption{}).
 		WithScheme(scheme.Scheme).
 		BuildHelmAgentAddon()
-	if err != nil {
-		klog.Fatalf("failed to build agent %v", err)
-	}
+	require.NoError(t, err)
 
 	// Render manifests and return them as k8s runtime objects
 	objects, err := tracingAgentAddon.Manifests(managedCluster, managedClusterAddOn)
@@ -184,9 +187,11 @@ func Test_Tracing_AllConfigsTogether_AllResources(t *testing.T) {
 
 	for _, obj := range objects {
 		switch obj := obj.(type) {
-		case *otelv1alpha1.OpenTelemetryCollector:
-			require.Equal(t, "spoke-otelcol", obj.ObjectMeta.Name)
-			require.Equal(t, "spoke-otelcol", obj.ObjectMeta.Namespace)
+		case *otelv1beta1.OpenTelemetryCollector:
+			// Check name and namespace to make sure that if we change the helm
+			// manifests that we don't break the addon probes
+			require.Equal(t, addon.SpokeOTELColName, obj.Name)
+			require.Equal(t, addon.SpokeOTELColNamespace, obj.Namespace)
 			require.NotEmpty(t, obj.Spec.Config)
 		case *corev1.Secret:
 			if obj.Name == "tracing-otlphttp-auth" {
