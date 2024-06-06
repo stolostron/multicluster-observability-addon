@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/ViaQ/logerr/v2/log"
-	otelv1alpha1 "github.com/open-telemetry/opentelemetry-operator/apis/v1alpha1"
+	otelv1beta1 "github.com/open-telemetry/opentelemetry-operator/apis/v1beta1"
 	loggingapis "github.com/openshift/cluster-logging-operator/apis"
 	operatorsv1 "github.com/operator-framework/api/pkg/operators/v1"
 	operatorsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
@@ -46,7 +46,7 @@ func init() {
 	utilruntime.Must(addonapiv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(workv1.AddToScheme(scheme))
 	utilruntime.Must(loggingapis.AddToScheme(scheme))
-	utilruntime.Must(otelv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(otelv1beta1.AddToScheme(scheme))
 	utilruntime.Must(operatorsv1.AddToScheme(scheme))
 	utilruntime.Must(operatorsv1alpha1.AddToScheme(scheme))
 

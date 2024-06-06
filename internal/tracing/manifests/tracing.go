@@ -2,13 +2,10 @@ package manifests
 
 import (
 	"encoding/json"
-	"fmt"
 
-	"github.com/ViaQ/logerr/v2/kverrors"
-	otelv1alpha1 "github.com/open-telemetry/opentelemetry-operator/apis/v1alpha1"
+	otelv1beta1 "github.com/open-telemetry/opentelemetry-operator/apis/v1beta1"
 	"github.com/rhobs/multicluster-observability-addon/internal/addon/authentication"
-	"github.com/rhobs/multicluster-observability-addon/internal/tracing/manifests/otelcol"
-	"gopkg.in/yaml.v3"
+	addonOtelCol "github.com/rhobs/multicluster-observability-addon/internal/tracing/manifests/otelcol"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -28,9 +25,9 @@ func buildSecrets(resources Options) ([]SecretValue, error) {
 	return secretsValue, nil
 }
 
-func buildOtelColSpec(resources Options) (*otelv1alpha1.OpenTelemetryCollectorSpec, error) {
+func buildOtelColSpec(resources Options) (*otelv1beta1.OpenTelemetryCollectorSpec, error) {
 	for target, secret := range resources.Secrets {
-		if err := templateWithSecret(&resources.OpenTelemetryCollector.Spec, target, secret); err != nil {
+		if err := templateWithSecret(resources.OpenTelemetryCollector, target, secret); err != nil {
 			return nil, err
 		}
 	}
@@ -38,27 +35,14 @@ func buildOtelColSpec(resources Options) (*otelv1alpha1.OpenTelemetryCollectorSp
 	return &resources.OpenTelemetryCollector.Spec, nil
 }
 
-func templateWithSecret(spec *otelv1alpha1.OpenTelemetryCollectorSpec, target authentication.Target, secret corev1.Secret) error {
-	cfg, err := otelcol.ConfigFromString(spec.Config)
-	if err != nil {
-		return nil
-	}
-
-	// iblancasa: add verifications for the exporters
-
-	err = otelcol.ConfigureExportersSecrets(cfg, target, secret)
+func templateWithSecret(otelcol *otelv1beta1.OpenTelemetryCollector, target authentication.Target, secret corev1.Secret) error {
+	err := addonOtelCol.ConfigureExportersSecrets(otelcol, target, secret)
 	if err != nil {
 		return err
 	}
 
-	yamlConfig, err := yaml.Marshal(&cfg)
-	if err != nil {
-		return kverrors.New(fmt.Sprint("error while marshaling OTEL Configuration: %w", err))
-	}
-	spec.Config = string(yamlConfig)
-
-	otelcol.ConfigureVolumes(spec, secret)
-	otelcol.ConfigureVolumeMounts(spec, secret)
+	addonOtelCol.ConfigureVolumes(otelcol, secret)
+	addonOtelCol.ConfigureVolumeMounts(otelcol, secret)
 
 	return nil
 }

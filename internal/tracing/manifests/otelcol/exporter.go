@@ -3,43 +3,50 @@ package otelcol
 import (
 	"fmt"
 
-	"github.com/ViaQ/logerr/v2/kverrors"
+	otelv1beta1 "github.com/open-telemetry/opentelemetry-operator/apis/v1beta1"
 	"github.com/rhobs/multicluster-observability-addon/internal/addon/authentication"
 	corev1 "k8s.io/api/core/v1"
 )
 
-func ConfigureExportersSecrets(cfg map[string]interface{}, target authentication.Target, secret corev1.Secret) error {
-	exporters, err := GetExporters(cfg)
-	if err != nil {
-		return err
-	}
-
-	for exporterName, config := range exporters {
+func ConfigureExportersSecrets(otelCol *otelv1beta1.OpenTelemetryCollector, target authentication.Target, secret corev1.Secret) error {
+	for exporterName, config := range otelCol.Spec.Config.Exporters.Object {
 		if string(target) != exporterName {
 			continue
 		}
 		var configMap map[string]interface{}
 		if config == nil {
 			configMap = make(map[string]interface{})
-			exporters[string(target)] = configMap
 		} else {
 			configMap = config.(map[string]interface{})
 		}
 
 		configureExporterSecrets(configMap, secret)
 
+		otelCol.Spec.Config.Exporters.Object[string(target)] = configMap
 	}
 	return nil
 }
 
-func GetExporters(cfg map[string]interface{}) (map[string]interface{}, error) {
-	exportersField, ok := cfg["exporters"]
+func ConfigureExporters(otelCol *otelv1beta1.OpenTelemetryCollector, cm corev1.ConfigMap, clusterName string, annotation string) error {
+	otelExporterName, ok := cm.Annotations[annotation]
 	if !ok {
-		return nil, kverrors.New("no exporters available as part of the configuration")
+		return nil
 	}
 
-	exporters := exportersField.(map[string]interface{})
-	return exporters, nil
+	for exporterName, config := range otelCol.Spec.Config.Exporters.Object {
+		if otelExporterName != exporterName {
+			continue
+		}
+		var exporterConfig map[string]interface{}
+		if config == nil {
+			exporterConfig = make(map[string]interface{})
+		} else {
+			exporterConfig = config.(map[string]interface{})
+		}
+
+		otelCol.Spec.Config.Exporters.Object[otelExporterName] = exporterConfig
+	}
+	return nil
 }
 
 func configureExporterSecrets(exporter map[string]interface{}, secret corev1.Secret) {
