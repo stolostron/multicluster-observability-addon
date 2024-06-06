@@ -15,14 +15,14 @@ const (
 	clusterLogForwarderResource = "clusterlogforwarders"
 )
 
-func BuildOptions(k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, adoc *addonapiv1alpha1.AddOnDeploymentConfig) (manifests.Options, error) {
+func BuildOptions(ctx context.Context, k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, adoc *addonapiv1alpha1.AddOnDeploymentConfig) (manifests.Options, error) {
 	resources := manifests.Options{
 		AddOnDeploymentConfig: adoc,
 	}
 
 	key := addon.GetObjectKey(mcAddon.Status.ConfigReferences, loggingv1.GroupVersion.Group, clusterLogForwarderResource)
 	clf := &loggingv1.ClusterLogForwarder{}
-	if err := k8s.Get(context.Background(), key, clf, &client.GetOptions{}); err != nil {
+	if err := k8s.Get(ctx, key, clf, &client.GetOptions{}); err != nil {
 		return resources, err
 	}
 	resources.ClusterLogForwarder = clf
@@ -32,7 +32,6 @@ func BuildOptions(k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAdd
 		targetSecretName[authentication.Target(output.Name)] = output.Secret.Name
 	}
 
-	ctx := context.Background()
 	secretsProvider := authentication.NewSecretsProvider(k8s, clf.Namespace, mcAddon.Namespace)
 	targetSecrets, err := secretsProvider.GenerateSecrets(ctx, clf.Annotations, targetSecretName)
 	if err != nil {
