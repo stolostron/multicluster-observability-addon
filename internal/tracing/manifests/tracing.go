@@ -4,7 +4,8 @@ import (
 	"encoding/json"
 
 	otelv1beta1 "github.com/open-telemetry/opentelemetry-operator/apis/v1beta1"
-	"github.com/rhobs/multicluster-observability-addon/internal/tracing/manifests/otelcol"
+	"github.com/rhobs/multicluster-observability-addon/internal/addon/authentication"
+	addonOtelCol "github.com/rhobs/multicluster-observability-addon/internal/tracing/manifests/otelcol"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -25,14 +26,8 @@ func buildSecrets(resources Options) ([]SecretValue, error) {
 }
 
 func buildOtelColSpec(resources Options) (*otelv1beta1.OpenTelemetryCollectorSpec, error) {
-	for _, secret := range resources.Secrets {
-		if err := templateWithSecret(resources.OpenTelemetryCollector, secret); err != nil {
-			return nil, err
-		}
-	}
-
-	for _, configmap := range resources.ConfigMaps {
-		if err := templateWithConfigMap(&resources, configmap); err != nil {
+	for target, secret := range resources.Secrets {
+		if err := templateWithSecret(resources.OpenTelemetryCollector, target, secret); err != nil {
 			return nil, err
 		}
 	}
@@ -40,18 +35,14 @@ func buildOtelColSpec(resources Options) (*otelv1beta1.OpenTelemetryCollectorSpe
 	return &resources.OpenTelemetryCollector.Spec, nil
 }
 
-func templateWithSecret(otelCol *otelv1beta1.OpenTelemetryCollector, secret corev1.Secret) error {
-	err := otelcol.ConfigureExportersSecrets(otelCol, secret, AnnotationTargetOutputName)
+func templateWithSecret(otelcol *otelv1beta1.OpenTelemetryCollector, target authentication.Target, secret corev1.Secret) error {
+	err := addonOtelCol.ConfigureExportersSecrets(otelcol, target, secret)
 	if err != nil {
 		return err
 	}
 
-	otelcol.ConfigureVolumes(otelCol, secret)
-	otelcol.ConfigureVolumeMounts(otelCol, secret)
+	addonOtelCol.ConfigureVolumes(otelcol, secret)
+	addonOtelCol.ConfigureVolumeMounts(otelcol, secret)
 
 	return nil
-}
-
-func templateWithConfigMap(resource *Options, configmap corev1.ConfigMap) error {
-	return otelcol.ConfigureExporters((*resource).OpenTelemetryCollector, configmap, resource.ClusterName, AnnotationTargetOutputName)
 }

@@ -1,16 +1,8 @@
 package authentication
 
 const (
-	// Static represents static authentication type.
-	Static AuthenticationType = "StaticAuthentication"
-	// Managed represents managed authentication type.
-	Managed AuthenticationType = "ManagedAuthentication"
-	// MTLS represents mTLS authentication type.
-	MTLS AuthenticationType = "mTLS"
-	// MCO represents an authentication type that will re-use the MCO provided credentials
-	MCO AuthenticationType = "MCO"
+	// SecretReference represents a pre-existing secret in the cluster.
+	SecretReference AuthenticationType = "SecretReference"
 
-	AnnotationCAToInject = "authentication.mcoa.openshift.io/ca"
+	AnnotationAuthOutput = "authentication.mcoa.openshift.io/"
 )
-
-var certManagerCRDs = []string{"certificates.cert-manager.io", "issuers.cert-manager.io", "clusterissuers.cert-manager.io"}

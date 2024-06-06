@@ -5,10 +5,8 @@ import (
 	"strconv"
 
 	"github.com/rhobs/multicluster-observability-addon/internal/addon"
-	"github.com/rhobs/multicluster-observability-addon/internal/addon/authentication"
 	lhandlers "github.com/rhobs/multicluster-observability-addon/internal/logging/handlers"
 	lmanifests "github.com/rhobs/multicluster-observability-addon/internal/logging/manifests"
-	"github.com/rhobs/multicluster-observability-addon/internal/metrics"
 	thandlers "github.com/rhobs/multicluster-observability-addon/internal/tracing/handlers"
 	tmanifests "github.com/rhobs/multicluster-observability-addon/internal/tracing/manifests"
 	"k8s.io/klog/v2"
@@ -19,14 +17,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+const annotationLocalCluster = "local-cluster"
+
 type HelmChartValues struct {
-	Metrics metrics.MetricsValues    `json:"metrics"`
+	Enabled bool                     `json:"enabled"`
 	Logging lmanifests.LoggingValues `json:"logging"`
 	Tracing tmanifests.TracingValues `json:"tracing"`
 }
 
 type Options struct {
-	MetricsDisabled bool
 	LoggingDisabled bool
 	TracingDisabled bool
 }
@@ -36,9 +35,9 @@ func GetValuesFunc(k8s client.Client) addonfactory.GetValuesFunc {
 		cluster *clusterv1.ManagedCluster,
 		addon *addonapiv1alpha1.ManagedClusterAddOn,
 	) (addonfactory.Values, error) {
-		err := authentication.CreateOrUpdateRootCertificate(k8s)
-		if err != nil {
-			return nil, err
+		// if hub cluster, then don't install anything
+		if isHubCluster(cluster) {
+			return addonfactory.JsonStructToValues(HelmChartValues{})
 		}
 
 		aodc, err := getAddOnDeploymentConfig(k8s, addon)
@@ -50,14 +49,8 @@ func GetValuesFunc(k8s client.Client) addonfactory.GetValuesFunc {
 			return nil, err
 		}
 
-		var userValues HelmChartValues
-
-		if !opts.MetricsDisabled {
-			metrics, err := metrics.GetValuesFunc(k8s, cluster, addon, aodc)
-			if err != nil {
-				return nil, err
-			}
-			userValues.Metrics = metrics
+		userValues := HelmChartValues{
+			Enabled: true,
 		}
 
 		if !opts.LoggingDisabled {
@@ -112,28 +105,28 @@ func buildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Opti
 	}
 
 	for _, keyvalue := range addOnDeployment.Spec.CustomizedVariables {
-		if keyvalue.Name == addon.AdcMetricsDisabledKey {
-			value, err := strconv.ParseBool(keyvalue.Value)
-			if err != nil {
-				return opts, err
-			}
-			opts.MetricsDisabled = value
-		}
-		if keyvalue.Name == addon.AdcLoggingDisabledKey {
+		switch keyvalue.Name {
+		case addon.AdcLoggingDisabledKey:
 			value, err := strconv.ParseBool(keyvalue.Value)
 			if err != nil {
 				return opts, err
 			}
 			opts.LoggingDisabled = value
-		}
-		if keyvalue.Name == addon.AdcTracingisabledKey {
+		case addon.AdcTracingisabledKey:
 			value, err := strconv.ParseBool(keyvalue.Value)
 			if err != nil {
 				return opts, err
 			}
 			opts.TracingDisabled = value
 		}
-
 	}
 	return opts, nil
+}
+
+func isHubCluster(cluster *clusterv1.ManagedCluster) bool {
+	val, ok := cluster.Labels[annotationLocalCluster]
+	if !ok {
+		return false
+	}
+	return val == "true"
 }

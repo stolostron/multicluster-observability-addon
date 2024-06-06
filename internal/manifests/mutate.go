@@ -4,7 +4,6 @@ import (
 	"reflect"
 
 	"github.com/ViaQ/logerr/v2/kverrors"
-	certmanagerv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	"github.com/imdario/mergo"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -47,21 +46,6 @@ func MutateFuncFor(existing, desired client.Object, depAnnotations map[string]st
 			}
 			s.SetAnnotations(existingAnnotations)
 
-		case *certmanagerv1.Issuer:
-			i := existing.(*certmanagerv1.Issuer)
-			wantI := desired.(*certmanagerv1.Issuer)
-			mutateIssuer(i, wantI)
-
-		case *certmanagerv1.Certificate:
-			cr := existing.(*certmanagerv1.Certificate)
-			wantCr := desired.(*certmanagerv1.Certificate)
-			mutateCertificate(cr, wantCr)
-
-		case *certmanagerv1.ClusterIssuer:
-			cr := existing.(*certmanagerv1.ClusterIssuer)
-			wantCr := desired.(*certmanagerv1.ClusterIssuer)
-			mutateClusterIssuer(cr, wantCr)
-
 		default:
 			t := reflect.TypeOf(existing).String()
 			return kverrors.New("missing mutate implementation for resource type", "type", t)
@@ -82,28 +66,4 @@ func mutateSecret(existing, desired *corev1.Secret) {
 	existing.Annotations = desired.Annotations
 	existing.Labels = desired.Labels
 	existing.Data = desired.Data
-}
-
-func mutateIssuer(existing, desired *certmanagerv1.Issuer) {
-	existing.Annotations = desired.Annotations
-	existing.Labels = desired.Labels
-	// TODO(JoaoBraveCoding) Validate that all the spec fields are mutable after
-	// creation
-	existing.Spec = desired.Spec
-}
-
-func mutateCertificate(existing, desired *certmanagerv1.Certificate) {
-	existing.Annotations = desired.Annotations
-	existing.Labels = desired.Labels
-	// TODO(JoaoBraveCoding) Validate that all the spec fields are mutable after
-	// creation
-	existing.Spec = desired.Spec
-}
-
-func mutateClusterIssuer(existing, desired *certmanagerv1.ClusterIssuer) {
-	existing.Annotations = desired.Annotations
-	existing.Labels = desired.Labels
-	// TODO(JoaoBraveCoding) Validate that all the spec fields are mutable after
-	// creation
-	existing.Spec = desired.Spec
 }

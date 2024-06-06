@@ -1,0 +1,22 @@
+apiVersion: logging.openshift.io/v1
+kind: ClusterLogForwarder
+metadata:
+  name: instance
+  namespace: open-cluster-management
+  annotations:
+    authentication.mcoa.openshift.io/cw: SecretReference
+spec:
+  outputs:
+   - cloudwatch:
+       region: eu-central-1
+       groupBy: logType
+     type: cloudwatch
+     name: cw
+     secret:
+       name: aws-credentials
+  pipelines:
+   - name: infra-cw
+     inputRefs:
+     - infrastructure
+     outputRefs:
+     - cw

@@ -3,13 +3,13 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"strings"
 
-	"github.com/ViaQ/logerr/v2/kverrors"
 	otelv1beta1 "github.com/open-telemetry/opentelemetry-operator/apis/v1beta1"
 	"github.com/rhobs/multicluster-observability-addon/internal/addon"
 	"github.com/rhobs/multicluster-observability-addon/internal/addon/authentication"
 	"github.com/rhobs/multicluster-observability-addon/internal/tracing/manifests"
-	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -17,6 +17,12 @@ import (
 
 const (
 	opentelemetryCollectorResource = "opentelemetrycollectors"
+)
+
+var (
+	errNoExportersFound       = fmt.Errorf("no exporters found")
+	errNoMountPathFound       = fmt.Errorf("mountpath not found in any secret")
+	errNoVolumeMountForSecret = fmt.Errorf("no volumemount found for secret")
 )
 
 func BuildOptions(k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, adoc *addonapiv1alpha1.AddOnDeploymentConfig) (manifests.Options, error) {
@@ -34,86 +40,79 @@ func BuildOptions(k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAdd
 	resources.OpenTelemetryCollector = otelCol
 	klog.Info("OpenTelemetry Collector template found")
 
-	var authCM *corev1.ConfigMap = nil
-	var caSecret *corev1.Secret = nil
-
-	for _, config := range mcAddon.Spec.Configs {
-		key := client.ObjectKey{Name: config.Name, Namespace: config.Namespace}
-		switch config.ConfigGroupResource.Resource {
-		case addon.ConfigMapResource:
-			cm := &corev1.ConfigMap{}
-			klog.Infof("processing cm %s/%s", config.Namespace, config.Name)
-			if err := k8s.Get(context.Background(), key, cm, &client.GetOptions{}); err != nil {
-				return resources, err
-			}
-
-			// Only care about cm's that configure tracing
-			if signal, ok := cm.Labels[addon.SignalLabelKey]; !ok || signal != addon.Tracing.String() {
-				klog.Info("skipped configmap")
-				continue
-			}
-
-			// If a cm doesn't have a target annotation then it's configuring authentication
-			if _, ok := cm.Annotations[manifests.AnnotationTargetOutputName]; !ok {
-				if authCM != nil {
-					klog.Warning(fmt.Sprintf("auth configmap already set to %s. new configmap %s", authCM.Name, cm.Name))
-				}
-				klog.Info("auth configmap set")
-				authCM = cm
-				continue
-			}
-
-			resources.ConfigMaps = append(resources.ConfigMaps, *cm)
-		case addon.SecretResource:
-			secret := &corev1.Secret{}
-			klog.Infof("processing secret %s/%s", config.Namespace, config.Name)
-			if err := k8s.Get(context.Background(), key, secret, &client.GetOptions{}); err != nil {
-				return resources, err
-			}
-
-			// Only care about cm's that configure tracing
-			if signal, ok := secret.Labels[addon.SignalLabelKey]; !ok || signal != addon.Tracing.String() {
-				klog.Info("skipped secret")
-				continue
-			}
-
-			// If the secret has the ca annotation then it's the secret containing the ca
-			if _, ok := secret.Annotations[authentication.AnnotationCAToInject]; ok {
-				caSecret = secret
-				continue
-			}
-		}
+	targetSecretName, err := buildExportersSecrets(otelCol)
+	if err != nil {
+		return resources, nil
 	}
 
 	ctx := context.Background()
-	authConfig := manifests.AuthDefaultConfig
-	authConfig.MTLSConfig.CommonName = mcAddon.Namespace
-	if caSecret == nil {
-		klog.Warning("no CA was found")
-	} else if len(caSecret.Data) > 0 {
-		if ca, ok := caSecret.Data["ca.crt"]; ok {
-			authConfig.MTLSConfig.CAToInject = string(ca)
-		} else {
-			return resources, kverrors.New("missing ca bundle in secret", "key", "ca.crt")
-		}
+	secretsProvider := authentication.NewSecretsProvider(k8s, otelCol.Namespace, mcAddon.Namespace)
+	targetsSecret, err := secretsProvider.GenerateSecrets(ctx, otelCol.Annotations, targetSecretName)
+	if err != nil {
+		return resources, err
 	}
 
-	if authCM != nil {
-		secretsProvider, err := authentication.NewSecretsProvider(k8s, mcAddon.Namespace, addon.Tracing, authConfig)
-		if err != nil {
-			return resources, err
-		}
-
-		targetsSecret, err := secretsProvider.GenerateSecrets(ctx, authentication.BuildAuthenticationMap(authCM.Data))
-		if err != nil {
-			return resources, err
-		}
-
-		resources.Secrets, err = secretsProvider.FetchSecrets(ctx, targetsSecret, manifests.AnnotationTargetOutputName)
-		if err != nil {
-			return resources, err
-		}
+	resources.Secrets, err = secretsProvider.FetchSecrets(ctx, targetsSecret)
+	if err != nil {
+		return resources, err
 	}
 
 	return resources, nil
+}
+
+func buildExportersSecrets(otelCol *otelv1beta1.OpenTelemetryCollector) (map[authentication.Target]string, error) {
+	exporterSecrets := map[authentication.Target]string{}
+
+	if len(otelCol.Spec.Config.Exporters.Object) == 0 {
+		return exporterSecrets, errNoExportersFound
+	}
+
+	for _, vol := range otelCol.Spec.Volumes {
+		// We only care about volumes created from secrets
+		if vol.Secret != nil {
+			vm, err := getVolumeMount(otelCol, vol.Secret.SecretName)
+			if err != nil {
+				return exporterSecrets, err
+			}
+			exporter, err := searchVolumeMountInExporter(vm, otelCol.Spec.Config.Exporters.Object)
+			if err != nil {
+				klog.Warning(err)
+				continue
+			}
+			klog.Info("exporter ", exporter, " uses secret ", vol.Secret.SecretName)
+			exporterSecrets[authentication.Target(exporter)] = vol.Secret.SecretName
+		}
+	}
+	return exporterSecrets, nil
+}
+
+// getVolumeMount gets the VolumeMount associated to a secret.
+func getVolumeMount(otelCol *otelv1beta1.OpenTelemetryCollector, secretName string) (v1.VolumeMount, error) {
+	for _, vm := range otelCol.Spec.VolumeMounts {
+		if vm.Name == secretName {
+			return vm, nil
+		}
+	}
+	return v1.VolumeMount{}, errNoVolumeMountForSecret
+}
+
+// searchVolumeMountInExporter checks if the VolumeMount is used in any exporter
+func searchVolumeMountInExporter(vm v1.VolumeMount, exporters map[string]interface{}) (string, error) {
+	for name, eMap := range exporters {
+		if eMap == nil {
+			continue
+		}
+
+		t, ok := eMap.(map[string]interface{})["tls"]
+		if !ok {
+			continue
+		}
+		tls := t.(map[string]interface{})
+		if strings.HasPrefix(tls["cert_file"].(string), vm.MountPath) ||
+			strings.HasPrefix(tls["key_file"].(string), vm.MountPath) ||
+			strings.HasPrefix(tls["ca_file"].(string), vm.MountPath) {
+			return name, nil
+		}
+	}
+	return "", errNoMountPathFound
 }

@@ -3,19 +3,14 @@ package otelcol
 import (
 	"fmt"
 
-	"github.com/ViaQ/logerr/v2/kverrors"
 	otelv1beta1 "github.com/open-telemetry/opentelemetry-operator/apis/v1beta1"
+	"github.com/rhobs/multicluster-observability-addon/internal/addon/authentication"
 	corev1 "k8s.io/api/core/v1"
 )
 
-func ConfigureExportersSecrets(otelCol *otelv1beta1.OpenTelemetryCollector, secret corev1.Secret, annotation string) error {
-	otelExporterName, ok := secret.Annotations[annotation]
-	if !ok {
-		return nil
-	}
-
+func ConfigureExportersSecrets(otelCol *otelv1beta1.OpenTelemetryCollector, target authentication.Target, secret corev1.Secret) error {
 	for exporterName, config := range otelCol.Spec.Config.Exporters.Object {
-		if otelExporterName != exporterName {
+		if string(target) != exporterName {
 			continue
 		}
 		var configMap map[string]interface{}
@@ -27,7 +22,7 @@ func ConfigureExportersSecrets(otelCol *otelv1beta1.OpenTelemetryCollector, secr
 
 		configureExporterSecrets(configMap, secret)
 
-		otelCol.Spec.Config.Exporters.Object[otelExporterName] = configMap
+		otelCol.Spec.Config.Exporters.Object[string(target)] = configMap
 	}
 	return nil
 }
@@ -49,12 +44,6 @@ func ConfigureExporters(otelCol *otelv1beta1.OpenTelemetryCollector, cm corev1.C
 			exporterConfig = config.(map[string]interface{})
 		}
 
-		err := configureExporterEndpoint(exporterConfig, cm)
-		if err != nil {
-			return err
-		}
-
-		configureTenant(exporterConfig, clusterName)
 		otelCol.Spec.Config.Exporters.Object[otelExporterName] = exporterConfig
 	}
 	return nil
@@ -69,19 +58,4 @@ func configureExporterSecrets(exporter map[string]interface{}, secret corev1.Sec
 	certConfig["ca_file"] = fmt.Sprintf("%s/ca-bundle.crt", folder)
 
 	exporter["tls"] = certConfig
-}
-
-func configureExporterEndpoint(exporter map[string]interface{}, cm corev1.ConfigMap) error {
-	url := cm.Data["endpoint"]
-	if url == "" {
-		return kverrors.New("no value for 'endpoint' in configmap", "name", cm.Name)
-	}
-	exporter["endpoint"] = url
-	return nil
-}
-
-func configureTenant(exporter map[string]interface{}, clusterName string) {
-	headers := make(map[string]string)
-	headers["x-scope-orgid"] = clusterName
-	exporter["headers"] = headers
 }
