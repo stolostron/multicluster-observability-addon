@@ -72,8 +72,8 @@ func TestGetSecrets(t *testing.T) {
 			WithObjects(clusterSecret, defaultSecret).
 			Build()
 
-		target := Target("foo")
-		targetSecrets := map[Target]string{
+		target := Endpoint("foo")
+		targetSecrets := map[Endpoint]string{
 			target: tc.secretName,
 		}
 		secrets, err := GetSecrets(context.TODO(), fakeKubeClient, tc.configResourceNamespace, tc.mcAddonNamespace, targetSecrets)

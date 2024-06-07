@@ -32,7 +32,7 @@ func buildSecrets(resources Options) ([]SecretValue, error) {
 	slices.Sort(keys)
 
 	for _, key := range keys {
-		secret := resources.Secrets[addon.Target(key)]
+		secret := resources.Secrets[addon.Endpoint(key)]
 		dataJSON, err := json.Marshal(secret.Data)
 		if err != nil {
 			return secretsValue, err

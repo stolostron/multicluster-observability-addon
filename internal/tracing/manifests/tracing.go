@@ -35,7 +35,7 @@ func buildOtelColSpec(resources Options) (*otelv1beta1.OpenTelemetryCollectorSpe
 	return &resources.OpenTelemetryCollector.Spec, nil
 }
 
-func templateWithSecret(otelcol *otelv1beta1.OpenTelemetryCollector, target addon.Target, secret corev1.Secret) error {
+func templateWithSecret(otelcol *otelv1beta1.OpenTelemetryCollector, target addon.Endpoint, secret corev1.Secret) error {
 	err := addonOtelCol.ConfigureExportersSecrets(otelcol, target, secret)
 	if err != nil {
 		return err

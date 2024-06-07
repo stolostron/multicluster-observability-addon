@@ -56,7 +56,7 @@ func Test_BuildSubscriptionChannel(t *testing.T) {
 
 func Test_BuildSecrets(t *testing.T) {
 	resources := Options{
-		Secrets: map[addon.Target]corev1.Secret{
+		Secrets: map[addon.Endpoint]corev1.Secret{
 			"foo": {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",

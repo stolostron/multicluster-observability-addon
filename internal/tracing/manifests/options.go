@@ -9,7 +9,7 @@ import (
 
 type Options struct {
 	ClusterName            string
-	Secrets                map[addon.Target]corev1.Secret
+	Secrets                map[addon.Endpoint]corev1.Secret
 	ConfigMaps             []corev1.ConfigMap
 	OpenTelemetryCollector *otelv1beta1.OpenTelemetryCollector
 	AddOnDeploymentConfig  *addonapiv1alpha1.AddOnDeploymentConfig

@@ -49,8 +49,8 @@ func BuildOptions(ctx context.Context, k8s client.Client, mcAddon *addonapiv1alp
 	return resources, nil
 }
 
-func buildExportersSecrets(otelCol *otelv1beta1.OpenTelemetryCollector) (map[addon.Target]string, error) {
-	exporterSecrets := map[addon.Target]string{}
+func buildExportersSecrets(otelCol *otelv1beta1.OpenTelemetryCollector) (map[addon.Endpoint]string, error) {
+	exporterSecrets := map[addon.Endpoint]string{}
 
 	if len(otelCol.Spec.Config.Exporters.Object) == 0 {
 		return exporterSecrets, errNoExportersFound
@@ -69,7 +69,7 @@ func buildExportersSecrets(otelCol *otelv1beta1.OpenTelemetryCollector) (map[add
 				continue
 			}
 			klog.Info("exporter ", exporter, " uses secret ", vol.Secret.SecretName)
-			exporterSecrets[addon.Target(exporter)] = vol.Secret.SecretName
+			exporterSecrets[addon.Endpoint(exporter)] = vol.Secret.SecretName
 		}
 	}
 	return exporterSecrets, nil

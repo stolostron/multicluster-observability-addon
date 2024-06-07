@@ -56,7 +56,7 @@ func Test_ConfigureExportersSecrets(t *testing.T) {
 				},
 			}
 
-			err = ConfigureExportersSecrets(&otelCol, addon.Target(tc.secretTarget), secret)
+			err = ConfigureExportersSecrets(&otelCol, addon.Endpoint(tc.secretTarget), secret)
 			require.NoError(t, err)
 			if tc.shouldContainConfiguration {
 				exporterField := otelCol.Spec.Config.Exporters.Object[tc.exporterName]
