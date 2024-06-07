@@ -16,13 +16,13 @@ handy to provision two clusters, one hub and one spoke.
 
 ```shell
 # Download openshift-install client
-./scripts/ocp-download-release.sh 4.14.7
+./scripts/ocp-download-release.sh 4.15.15
 # Prepare bootstrap resources
-./scripts/ocp-install.sh aws eu-central-1 4.14.7
+./scripts/ocp-install.sh aws eu-central-1 4.15.15
 # Launch cluster (takes 40min +-)
-openshift-install-linux-4.14.7 create cluster --dir ./output/jmarcalaws24011261
-./scripts/ocp-install.sh aws eu-central-1 4.14.7
-openshift-install-linux-4.14.7 create cluster --dir ./output/jmarcalaws24011221
+openshift-install-linux-4.15.15 create cluster --dir ./output/jmarcalaws24011261
+./scripts/ocp-install.sh aws eu-central-1 4.15.15
+openshift-install-linux-4.15.15 create cluster --dir ./output/jmarcalaws24011221
 ```
 
 Both clusters are supported by `6` nodes `m6a.4xlarge` (3 masters, 3 workers).
@@ -30,8 +30,8 @@ It's indifferent which cluster you pick to be the hub and the spoke. When you
 are done with developing, be sure to destroy them.
 
 ```shell
-openshift-install-linux-4.14.7 destroy cluster --dir ./output/jmarcalaws24011261
-openshift-install-linux-4.14.7 destroy cluster --dir ./output/jmarcalaws24011221
+openshift-install-linux-4.15.15 destroy cluster --dir ./output/jmarcalaws24011261
+openshift-install-linux-4.15.15 destroy cluster --dir ./output/jmarcalaws24011221
 ```
 
 # Bootstrapping ACM and Linking Clusters
@@ -89,53 +89,39 @@ Supported keys are `metricsDisabled`, `loggingDisabled` and `tracingDisabled`
 
 ## Install the addon on a Spoke Cluster
 
-To actually install the addon on a spoke cluster, you need to:
+The addon installation is managed by the addon-manager. This means that users
+don't need to explicetelly create resources to install the addon on spoke
+clusters, the only requirements is that the clusters have to belong to a managed
+cluster set. By default MCOA will be installed on all the cluster managed by the
+hub. This behaviour can be changed by editing the `ClusterManagementAddOn`
+resource in the `installStrategy` section.
 
-1. Have the addon manager running on the hub cluster.
-2. Create the necessary Kubernetes resources in the namespace of the spoke
-    cluster that will be used by the addon to generate the `ManifestWorks`, e.g.,
-    `secrets`, `configmaps`.
-3. Create the `ManagedClusterAddon` resource in the namespace of the spoke
-    cluster.
+The only resources the user has to create are:
 
-```yaml
-apiVersion: addon.open-cluster-management.io/v1alpha1
-kind: ManagedClusterAddOn
-metadata:
-  name: multicluster-observability-addon
-  namespace: spoke-1
-spec:
-  installNamespace: open-cluster-management-agent-addon
-  configs:
-  - resource: configmaps
-    name: spoke-1
-    namespace: spoke-1
-  - resource: secrets
-    name: spoke-1
-    namespace: spoke-1
-```
-
-4. Once a `ManagedClusterAddon` is reconciled successfuly by the addon we can
+1. Stanzas for `ClusterLogForwarder` and `OpenTelemetryCollector`;
+2. Secrets for the configured `Outputs`/`Exporters`; Secrets can be created either on the namespace of a spoke cluster or in the same namespace as the stanza.
+1. Once a `ManagedClusterAddon` (resource created by the addon-manager) is reconciled successfuly by MCOA we can
    look for the `ManifestWorks`
 
 ```shell
 oc -n spoke-1 get manifestworks addon-multicluster-observability-addon-deploy-0
 ```
 
-### Configuring Metrics
-
-Currently the addon doesn't support any configuration, so no configuration is needed at the `ManagedClusterAddOn` level. However, the addon has a dependency with MCO. 
-Nowadays the addon supports the collection of metrics from the spoke clusters. These metrics are sent to an MCO instance running in the Hub.
-
 ### Configuring Logs
 
-Currently the addon supports configuration to send logs either to:
+Currently MCOA supports deploying a single instance of `ClusterLogForwarder`
+templated with the stanza created in the hub cluster. The instance deployed in
+the spoke cluster will have an exact copy of the `Spec` from the stanza. Except
+for the `serviceAccountName` field that's set by MCOA.
 
-- CloudWatch: requires the auth configmap to be specified
-- Loki: requires the auth configmap, the url configmap and optionally the inject ca configmap
+This MCOA supports all outputs defined in [OpenShift Documentation](https://docs.openshift.com/container-platform/latest/observability/logging/log_collection_forwarding/configuring-log-forwarding.html)([API Ref](https://github.com/openshift/cluster-logging-operator/blob/master/api/logging/v1/output_types.go#L22-L43)). Furthermore, since MCOA will simply ship the specified secrets together with `ClusterLogForwarder` MCOA is also able to support all authentication methods supported by `ClusterLogForwarder`.
+
+Note: the service account used by the `ClusterLogForwarder` deployed by MCOA is `openshift-logging/mcoa-logcollector`, this information is esential when using the AWS STS authentication.
 
 ### Configuring Traces
 
-Currently the addon supports configuration to send traces to:
+Currently MCOA supports deploying a single instance of `OpenTelemetryCollector`
+templated with the stanza created in the hub cluster. The instance deployed in
+the spoke cluster will have an exact copy of the `Spec` from the stanza.
 
-- OpenTelemetryCollector: requires the auth configmap, the url configmap and optionally the inject ca configmap
+This MCOA supports all components defined in [OpenShift Documentation](https://docs.openshift.com/container-platform/latest/observability/otel/otel-configuration-of-otel-collector.html#otel-collector-components_otel-configuration-of-otel-collector). Furthermore, since MCOA will simply ship the specified secrets together with `OpenTelemetryCollector` MCOA is also able to support all authentication methods supported by `OpenTelemetryCollector`.
