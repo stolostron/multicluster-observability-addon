@@ -99,7 +99,20 @@ Supported keys are:
 - `userWorkloadTracesCollection`: Supports values `opentelemetrycollectors.v1alpha1.opentelemetry.io`
 - `userWorkloadTracesInstrumentation`: Supports values `instrumentations.v1alpha1.opentelemetry.io`
 
-__Note__: Keys can hold multiple values separated by semicolon, e.g. `clusterlogforwarders.v1.logging.openshift.io;opentelemetrycollectors.v1alpha1.opentelemetry.io`.
+__Note__: Some keys can hold multiple values separated by semicolon to support multiple data collection capabilities in parallel, e.g:
+
+```yaml
+apiVersion: addon.open-cluster-management.io/v1alpha1
+kind: AddOnDeploymentConfig
+metadata:
+  name: multicluster-observability-addon
+  namespace: open-cluster-management-observability
+spec:
+  customizedVariables:
+  # User Workloads Observability with multiple collectors
+  - name: userWorkloadLogsCollection
+    value: clusterlogforwarders.v1.logging.openshift.io;opentelemetrycollectors.v1alpha1.opentelemetry.io
+```
 
 The addon installation is managed by the addon-manager. This means that users
 don't need to explicetelly create resources to install the addon on spoke
