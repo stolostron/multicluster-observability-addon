@@ -6,14 +6,12 @@ import (
 	"testing"
 
 	otelv1beta1 "github.com/open-telemetry/opentelemetry-operator/apis/v1beta1"
-	"github.com/rhobs/multicluster-observability-addon/internal/addon/authentication"
+	"github.com/rhobs/multicluster-observability-addon/internal/addon"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
-
-var annotation = "tracing.mcoa.openshift.io/target-output-name"
 
 func Test_ConfigureExportersSecrets(t *testing.T) {
 	for _, tc := range []struct {
@@ -50,9 +48,6 @@ func Test_ConfigureExportersSecrets(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      fmt.Sprintf("tracing-%s-auth", tc.secretTarget),
 					Namespace: "cluster-1",
-					Annotations: map[string]string{
-						annotation: tc.secretTarget,
-					},
 				},
 				Data: map[string][]byte{
 					"tls.crt": []byte("data"),
@@ -61,7 +56,7 @@ func Test_ConfigureExportersSecrets(t *testing.T) {
 				},
 			}
 
-			err = ConfigureExportersSecrets(&otelCol, authentication.Target(tc.secretTarget), secret)
+			err = ConfigureExportersSecrets(&otelCol, addon.Endpoint(tc.secretTarget), secret)
 			require.NoError(t, err)
 			if tc.shouldContainConfiguration {
 				exporterField := otelCol.Spec.Config.Exporters.Object[tc.exporterName]

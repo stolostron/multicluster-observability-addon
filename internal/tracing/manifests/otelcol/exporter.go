@@ -4,11 +4,11 @@ import (
 	"fmt"
 
 	otelv1beta1 "github.com/open-telemetry/opentelemetry-operator/apis/v1beta1"
-	"github.com/rhobs/multicluster-observability-addon/internal/addon/authentication"
+	"github.com/rhobs/multicluster-observability-addon/internal/addon"
 	corev1 "k8s.io/api/core/v1"
 )
 
-func ConfigureExportersSecrets(otelCol *otelv1beta1.OpenTelemetryCollector, target authentication.Target, secret corev1.Secret) error {
+func ConfigureExportersSecrets(otelCol *otelv1beta1.OpenTelemetryCollector, target addon.Endpoint, secret corev1.Secret) error {
 	for exporterName, config := range otelCol.Spec.Config.Exporters.Object {
 		if string(target) != exporterName {
 			continue

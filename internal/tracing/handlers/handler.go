@@ -7,7 +7,6 @@ import (
 
 	otelv1beta1 "github.com/open-telemetry/opentelemetry-operator/apis/v1beta1"
 	"github.com/rhobs/multicluster-observability-addon/internal/addon"
-	"github.com/rhobs/multicluster-observability-addon/internal/addon/authentication"
 	"github.com/rhobs/multicluster-observability-addon/internal/tracing/manifests"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
@@ -41,22 +40,17 @@ func BuildOptions(ctx context.Context, k8s client.Client, mcAddon *addonapiv1alp
 		return resources, nil
 	}
 
-	secretsProvider := authentication.NewSecretsProvider(k8s, otelCol.Namespace, mcAddon.Namespace)
-	targetsSecret, err := secretsProvider.GenerateSecrets(ctx, otelCol.Annotations, targetSecretName)
+	targetSecrets, err := addon.GetSecrets(ctx, k8s, otelCol.Namespace, mcAddon.Namespace, targetSecretName)
 	if err != nil {
 		return resources, err
 	}
-
-	resources.Secrets, err = secretsProvider.FetchSecrets(ctx, targetsSecret)
-	if err != nil {
-		return resources, err
-	}
+	resources.Secrets = targetSecrets
 
 	return resources, nil
 }
 
-func buildExportersSecrets(otelCol *otelv1beta1.OpenTelemetryCollector) (map[authentication.Target]string, error) {
-	exporterSecrets := map[authentication.Target]string{}
+func buildExportersSecrets(otelCol *otelv1beta1.OpenTelemetryCollector) (map[addon.Endpoint]string, error) {
+	exporterSecrets := map[addon.Endpoint]string{}
 
 	if len(otelCol.Spec.Config.Exporters.Object) == 0 {
 		return exporterSecrets, errNoExportersFound
@@ -75,7 +69,7 @@ func buildExportersSecrets(otelCol *otelv1beta1.OpenTelemetryCollector) (map[aut
 				continue
 			}
 			klog.Info("exporter ", exporter, " uses secret ", vol.Secret.SecretName)
-			exporterSecrets[authentication.Target(exporter)] = vol.Secret.SecretName
+			exporterSecrets[addon.Endpoint(exporter)] = vol.Secret.SecretName
 		}
 	}
 	return exporterSecrets, nil

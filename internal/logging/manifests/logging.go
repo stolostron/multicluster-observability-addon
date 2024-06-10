@@ -5,8 +5,7 @@ import (
 	"slices"
 
 	loggingv1 "github.com/openshift/cluster-logging-operator/apis/logging/v1"
-	"github.com/rhobs/multicluster-observability-addon/internal/addon/authentication"
-	corev1 "k8s.io/api/core/v1"
+	"github.com/rhobs/multicluster-observability-addon/internal/addon"
 )
 
 func buildSubscriptionChannel(resources Options) string {
@@ -33,7 +32,7 @@ func buildSecrets(resources Options) ([]SecretValue, error) {
 	slices.Sort(keys)
 
 	for _, key := range keys {
-		secret := resources.Secrets[authentication.Target(key)]
+		secret := resources.Secrets[addon.Endpoint(key)]
 		dataJSON, err := json.Marshal(secret.Data)
 		if err != nil {
 			return secretsValue, err
@@ -49,28 +48,7 @@ func buildSecrets(resources Options) ([]SecretValue, error) {
 
 func buildClusterLogForwarderSpec(resources Options) (*loggingv1.ClusterLogForwarderSpec, error) {
 	clf := resources.ClusterLogForwarder
-	for target, secret := range resources.Secrets {
-		if err := templateWithSecret(&clf.Spec, target, secret); err != nil {
-			return nil, err
-		}
-	}
 	clf.Spec.ServiceAccountName = "mcoa-logcollector"
 
 	return &clf.Spec, nil
-}
-
-func templateWithSecret(spec *loggingv1.ClusterLogForwarderSpec, target authentication.Target, secret corev1.Secret) error {
-	// TODO(JoaoBraveCoding) Validate that clfOutputName actually exists
-	// TODO(JoaoBraveCoding) Validate secret
-
-	for k, output := range spec.Outputs {
-		if output.Name == string(target) {
-			output.Secret = &loggingv1.OutputSecretSpec{
-				Name: secret.Name,
-			}
-			spec.Outputs[k] = output
-		}
-	}
-
-	return nil
 }

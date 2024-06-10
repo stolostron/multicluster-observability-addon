@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 
 	otelv1beta1 "github.com/open-telemetry/opentelemetry-operator/apis/v1beta1"
-	"github.com/rhobs/multicluster-observability-addon/internal/addon/authentication"
+	"github.com/rhobs/multicluster-observability-addon/internal/addon"
 	addonOtelCol "github.com/rhobs/multicluster-observability-addon/internal/tracing/manifests/otelcol"
 	corev1 "k8s.io/api/core/v1"
 )
@@ -35,7 +35,7 @@ func buildOtelColSpec(resources Options) (*otelv1beta1.OpenTelemetryCollectorSpe
 	return &resources.OpenTelemetryCollector.Spec, nil
 }
 
-func templateWithSecret(otelcol *otelv1beta1.OpenTelemetryCollector, target authentication.Target, secret corev1.Secret) error {
+func templateWithSecret(otelcol *otelv1beta1.OpenTelemetryCollector, target addon.Endpoint, secret corev1.Secret) error {
 	err := addonOtelCol.ConfigureExportersSecrets(otelcol, target, secret)
 	if err != nil {
 		return err

@@ -6,7 +6,6 @@ toolchain go1.21.9
 
 require (
 	github.com/ViaQ/logerr/v2 v2.1.0
-	github.com/imdario/mergo v0.3.16
 	github.com/open-telemetry/opentelemetry-operator v0.100.1
 	github.com/openshift/api v0.0.0-20240124164020-e2ce40831f2e // indirect; release-4.15
 	github.com/openshift/cluster-logging-operator v0.0.0-20231130135759-9270994dc4bc
@@ -77,6 +76,7 @@ require (
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.19.1 // indirect
 	github.com/huandu/xstrings v1.3.3 // indirect
+	github.com/imdario/mergo v0.3.16 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect

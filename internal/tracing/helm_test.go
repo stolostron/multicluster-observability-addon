@@ -139,9 +139,6 @@ func Test_Tracing_AllConfigsTogether_AllResources(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "tracing-auth",
 			Namespace: "open-cluster-management",
-			Labels: map[string]string{
-				"mcoa.openshift.io/signal": "tracing",
-			},
 		},
 		Data: map[string]string{
 			"otlphttp": "mTLS",
