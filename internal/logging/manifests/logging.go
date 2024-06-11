@@ -51,16 +51,44 @@ func buildClusterLogForwarderSpec(opts Options) (*loggingv1.ClusterLogForwarderS
 
 	// Validate Platform Logs enabled
 	var (
-		platformDetected      bool
+		platformInputRefs []string
+		platformDetected  bool
+
+		userWorkloadInputRefs []string
 		userWorkloadsDetected bool
 	)
+
+	for _, input := range clf.Spec.Inputs {
+		if input.Application != nil {
+			userWorkloadInputRefs = append(userWorkloadInputRefs, input.Name)
+		}
+		if input.Infrastructure != nil || input.Audit != nil {
+			platformInputRefs = append(platformInputRefs, input.Name)
+		}
+	}
+
 	for _, pipeline := range clf.Spec.Pipelines {
 		// Consider pipelines without outputs invalid
 		if pipeline.OutputRefs == nil {
 			continue
 		}
 
+	outer:
 		for _, ref := range pipeline.InputRefs {
+			for _, input := range platformInputRefs {
+				if input == ref {
+					platformDetected = true
+					continue outer
+				}
+			}
+
+			for _, input := range userWorkloadInputRefs {
+				if input == ref {
+					userWorkloadsDetected = true
+					continue outer
+				}
+			}
+
 			if ref == loggingv1.InputNameInfrastructure || ref == loggingv1.InputNameAudit {
 				platformDetected = true
 			}

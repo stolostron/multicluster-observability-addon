@@ -88,7 +88,7 @@ spec:
   - name: userWorkloadLogsCollection
     value: clusterlogforwarders.v1.logging.openshift.io
   - name: userWorkloadTracesCollection
-    value: opentelemetrycollectors.v1alpha1.opentelemetry.io
+    value: opentelemetrycollectors.v1beta1.opentelemetry.io
   - name: userWorkloadInstrumentation
     value: instrumentations.v1alpha1.opentelemetry.io
 ``` 
@@ -96,7 +96,7 @@ spec:
 Supported keys are:
 - `platformLogsCollection`: Supports values `clusterlogforwarders.v1.logging.openshift.io`
 - `userWorkloadLogsCollection`: Supports values `clusterlogforwarders.v1.logging.openshift.io`
-- `userWorkloadTracesCollection`: Supports values `opentelemetrycollectors.v1alpha1.opentelemetry.io`
+- `userWorkloadTracesCollection`: Supports values `opentelemetrycollectors.v1beta1.opentelemetry.io`
 - `userWorkloadTracesInstrumentation`: Supports values `instrumentations.v1alpha1.opentelemetry.io`
 
 __Note__: Some keys can hold multiple values separated by semicolon to support multiple data collection capabilities in parallel, e.g:
@@ -111,7 +111,7 @@ spec:
   customizedVariables:
   # User Workloads Observability with multiple collectors
   - name: userWorkloadLogsCollection
-    value: clusterlogforwarders.v1.logging.openshift.io;opentelemetrycollectors.v1alpha1.opentelemetry.io
+    value: clusterlogforwarders.v1.logging.openshift.io;opentelemetrycollectors.v1beta1.opentelemetry.io
 ```
 
 The addon installation is managed by the addon-manager. This means that users
@@ -142,15 +142,6 @@ for the `serviceAccountName` field that's set by MCOA.
 This MCOA supports all outputs defined in [OpenShift Documentation](https://docs.openshift.com/container-platform/latest/observability/logging/log_collection_forwarding/configuring-log-forwarding.html)([API Ref](https://github.com/openshift/cluster-logging-operator/blob/master/api/logging/v1/output_types.go#L22-L43)). Furthermore, since MCOA will simply ship the specified secrets together with `ClusterLogForwarder` MCOA is also able to support all authentication methods supported by `ClusterLogForwarder`.
 
 Note: the service account used by the `ClusterLogForwarder` deployed by MCOA is `openshift-logging/mcoa-logcollector`, this information is esential when using the AWS STS authentication.
-
-### Configuring User Workloads Observability Capabilities
-
-#### Logs Collection
-
-Currently the addon supports configuration to send logs either to:
-
-- CloudWatch: requires the auth configmap to be specified
-- Loki: requires the auth configmap, the url configmap and optionally the inject ca configmap
 
 ### Traces Collection
 

@@ -4,7 +4,6 @@ import (
 	"context"
 	"testing"
 
-	loggingapis "github.com/openshift/cluster-logging-operator/apis"
 	operatorsv1 "github.com/operator-framework/api/pkg/operators/v1"
 	operatorsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 
@@ -23,7 +22,6 @@ import (
 )
 
 var (
-	_ = loggingapis.AddToScheme(scheme.Scheme)
 	_ = operatorsv1.AddToScheme(scheme.Scheme)
 	_ = operatorsv1alpha1.AddToScheme(scheme.Scheme)
 	_ = addonapiv1alpha1.AddToScheme(scheme.Scheme)
@@ -114,7 +112,12 @@ func Test_Mcoa_Disable_Chart_Hub(t *testing.T) {
 			Namespace: "open-cluster-management-observability",
 		},
 		Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
-			CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{},
+			CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
+				{
+					Name:  addon.KeyPlatformLogsCollection,
+					Value: string(addon.ClusterLogForwarderV1),
+				},
+			},
 		},
 	}
 
@@ -134,5 +137,5 @@ func Test_Mcoa_Disable_Chart_Hub(t *testing.T) {
 
 	objects, err := loggingAgentAddon.Manifests(managedCluster, managedClusterAddOn)
 	require.NoError(t, err)
-	require.Equal(t, 0, len(objects))
+	require.Empty(t, objects)
 }
