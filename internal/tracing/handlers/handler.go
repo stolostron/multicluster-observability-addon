@@ -20,33 +20,33 @@ var (
 	errNoVolumeMountForSecret = fmt.Errorf("no volumemount found for secret")
 )
 
-func BuildOptions(ctx context.Context, k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, adoc *addonapiv1alpha1.AddOnDeploymentConfig) (manifests.Options, error) {
-	resources := manifests.Options{
-		AddOnDeploymentConfig: adoc,
-		ClusterName:           mcAddon.Namespace,
+func BuildOptions(ctx context.Context, k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, userWorkloads addon.TracesOptions) (manifests.Options, error) {
+	opts := manifests.Options{
+		ClusterName:   mcAddon.Namespace,
+		UserWorkloads: userWorkloads,
 	}
 
 	klog.Info("Retrieving OpenTelemetry Collector template")
 	key := addon.GetObjectKey(mcAddon.Status.ConfigReferences, otelv1beta1.GroupVersion.Group, addon.OpenTelemetryCollectorsResource)
 	otelCol := &otelv1beta1.OpenTelemetryCollector{}
 	if err := k8s.Get(ctx, key, otelCol, &client.GetOptions{}); err != nil {
-		return resources, err
+		return opts, err
 	}
-	resources.OpenTelemetryCollector = otelCol
+	opts.OpenTelemetryCollector = otelCol
 	klog.Info("OpenTelemetry Collector template found")
 
 	targetSecretName, err := buildExportersSecrets(otelCol)
 	if err != nil {
-		return resources, nil
+		return opts, nil
 	}
 
 	targetSecrets, err := addon.GetSecrets(ctx, k8s, otelCol.Namespace, mcAddon.Namespace, targetSecretName)
 	if err != nil {
-		return resources, err
+		return opts, err
 	}
-	resources.Secrets = targetSecrets
+	opts.Secrets = targetSecrets
 
-	return resources, nil
+	return opts, nil
 }
 
 func buildExportersSecrets(otelCol *otelv1beta1.OpenTelemetryCollector) (map[addon.Endpoint]string, error) {

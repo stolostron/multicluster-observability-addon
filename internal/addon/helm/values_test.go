@@ -4,7 +4,6 @@ import (
 	"context"
 	"testing"
 
-	loggingapis "github.com/openshift/cluster-logging-operator/apis"
 	operatorsv1 "github.com/operator-framework/api/pkg/operators/v1"
 	operatorsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 
@@ -23,7 +22,6 @@ import (
 )
 
 var (
-	_ = loggingapis.AddToScheme(scheme.Scheme)
 	_ = operatorsv1.AddToScheme(scheme.Scheme)
 	_ = operatorsv1alpha1.AddToScheme(scheme.Scheme)
 	_ = addonapiv1alpha1.AddToScheme(scheme.Scheme)
@@ -47,7 +45,7 @@ func Test_Mcoa_Disable_Charts(t *testing.T) {
 				Resource: "addondeploymentconfigs",
 			},
 			ConfigReferent: addonapiv1alpha1.ConfigReferent{
-				Namespace: "open-cluster-management",
+				Namespace: "open-cluster-management-observability",
 				Name:      "multicluster-observability-addon",
 			},
 		},
@@ -56,19 +54,10 @@ func Test_Mcoa_Disable_Charts(t *testing.T) {
 	addOnDeploymentConfig = &addonapiv1alpha1.AddOnDeploymentConfig{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "multicluster-observability-addon",
-			Namespace: "open-cluster-management",
+			Namespace: "open-cluster-management-observability",
 		},
 		Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
-			CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
-				{
-					Name:  "loggingDisabled",
-					Value: "true",
-				},
-				{
-					Name:  "tracingDisabled",
-					Value: "true",
-				},
-			},
+			CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{},
 		},
 	}
 
@@ -77,7 +66,7 @@ func Test_Mcoa_Disable_Charts(t *testing.T) {
 		WithObjects(addOnDeploymentConfig).
 		Build()
 
-	loggingAgentAddon, err := addonfactory.NewAgentAddonFactory(addon.Name, addon.FS, addon.McoaChartDir).
+	agentAddon, err := addonfactory.NewAgentAddonFactory(addon.Name, addon.FS, addon.McoaChartDir).
 		WithGetValuesFuncs(GetValuesFunc(context.TODO(), fakeKubeClient)).
 		WithAgentRegistrationOption(&agent.RegistrationOption{}).
 		WithScheme(scheme.Scheme).
@@ -86,9 +75,9 @@ func Test_Mcoa_Disable_Charts(t *testing.T) {
 		klog.Fatalf("failed to build agent %v", err)
 	}
 
-	objects, err := loggingAgentAddon.Manifests(managedCluster, managedClusterAddOn)
+	objects, err := agentAddon.Manifests(managedCluster, managedClusterAddOn)
 	require.NoError(t, err)
-	require.Equal(t, 2, len(objects))
+	require.Empty(t, objects)
 }
 
 func Test_Mcoa_Disable_Chart_Hub(t *testing.T) {
@@ -120,17 +109,13 @@ func Test_Mcoa_Disable_Chart_Hub(t *testing.T) {
 	addOnDeploymentConfig = &addonapiv1alpha1.AddOnDeploymentConfig{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "multicluster-observability-addon",
-			Namespace: "open-cluster-management",
+			Namespace: "open-cluster-management-observability",
 		},
 		Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
 			CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
 				{
-					Name:  "loggingDisabled",
-					Value: "true",
-				},
-				{
-					Name:  "tracingDisabled",
-					Value: "true",
+					Name:  addon.KeyPlatformLogsCollection,
+					Value: string(addon.ClusterLogForwarderV1),
 				},
 			},
 		},
@@ -152,5 +137,5 @@ func Test_Mcoa_Disable_Chart_Hub(t *testing.T) {
 
 	objects, err := loggingAgentAddon.Manifests(managedCluster, managedClusterAddOn)
 	require.NoError(t, err)
-	require.Equal(t, 0, len(objects))
+	require.Empty(t, objects)
 }

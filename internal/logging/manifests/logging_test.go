@@ -22,31 +22,19 @@ func Test_BuildSubscriptionChannel(t *testing.T) {
 		subChannel string
 	}{
 		{
-			name:       "unknown key",
-			key:        "test",
-			value:      "stable-1.0",
+			name:       "not set",
 			subChannel: "stable-5.9",
 		},
 		{
-			name:       "known key",
-			key:        "loggingSubscriptionChannel",
+			name:       "user set",
 			value:      "stable-5.7",
 			subChannel: "stable-5.7",
 		},
 	} {
+		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			adoc := &addonapiv1alpha1.AddOnDeploymentConfig{
-				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
-					CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
-						{
-							Name:  tc.key,
-							Value: tc.value,
-						},
-					},
-				},
-			}
 			resources := Options{
-				AddOnDeploymentConfig: adoc,
+				SubscriptionChannel: tc.value,
 			}
 			subChannel := buildSubscriptionChannel(resources)
 			require.Equal(t, tc.subChannel, subChannel)
@@ -113,7 +101,7 @@ func Test_BuildCLFSpec(t *testing.T) {
 				Resource: "clusterlogforwarders",
 			},
 			ConfigReferent: addonapiv1alpha1.ConfigReferent{
-				Namespace: "open-cluster-management",
+				Namespace: "open-cluster-management-observability",
 				Name:      "mcoa-instance",
 			},
 		},
@@ -123,7 +111,7 @@ func Test_BuildCLFSpec(t *testing.T) {
 	clf = &loggingv1.ClusterLogForwarder{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "mcoa-instance",
-			Namespace: "open-cluster-management",
+			Namespace: "open-cluster-management-observability",
 		},
 		Spec: loggingv1.ClusterLogForwarderSpec{
 			Inputs: []loggingv1.InputSpec{

@@ -2,7 +2,7 @@ apiVersion: opentelemetry.io/v1beta1
 kind: OpenTelemetryCollector
 metadata:
   name: instance
-  namespace: open-cluster-management
+  namespace: open-cluster-management-observability
 spec:
   config:
     exporters:

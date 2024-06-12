@@ -2,7 +2,7 @@ apiVersion: logging.openshift.io/v1
 kind: ClusterLogForwarder
 metadata:
   name: instance
-  namespace: open-cluster-management
+  namespace: open-cluster-management-observability
 spec:
   outputs:
 {{- range $_, $dic := .Values.outputs }}

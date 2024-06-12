@@ -36,10 +36,10 @@ var (
 
 func fakeGetValues(k8s client.Client) addonfactory.GetValuesFunc {
 	return func(
-		cluster *clusterv1.ManagedCluster,
-		addon *addonapiv1alpha1.ManagedClusterAddOn,
+		_ *clusterv1.ManagedCluster,
+		mcAddon *addonapiv1alpha1.ManagedClusterAddOn,
 	) (addonfactory.Values, error) {
-		opts, err := handlers.BuildOptions(context.TODO(), k8s, addon, nil)
+		opts, err := handlers.BuildOptions(context.TODO(), k8s, mcAddon, addon.LogsOptions{}, addon.LogsOptions{})
 		if err != nil {
 			return nil, err
 		}
@@ -81,7 +81,7 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 				Resource: "addondeploymentconfigs",
 			},
 			ConfigReferent: addonapiv1alpha1.ConfigReferent{
-				Namespace: "open-cluster-management",
+				Namespace: "open-cluster-management-observability",
 				Name:      "multicluster-observability-addon",
 			},
 		},
@@ -91,7 +91,7 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 				Resource: "clusterlogforwarders",
 			},
 			ConfigReferent: addonapiv1alpha1.ConfigReferent{
-				Namespace: "open-cluster-management",
+				Namespace: "open-cluster-management-observability",
 				Name:      "mcoa-instance",
 			},
 		},
@@ -101,7 +101,7 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 	clf = &loggingv1.ClusterLogForwarder{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "mcoa-instance",
-			Namespace: "open-cluster-management",
+			Namespace: "open-cluster-management-observability",
 		},
 		Spec: loggingv1.ClusterLogForwarderSpec{
 			Inputs: []loggingv1.InputSpec{
@@ -162,7 +162,7 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 	staticCred = &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "static-authentication",
-			Namespace: "open-cluster-management",
+			Namespace: "open-cluster-management-observability",
 		},
 		Data: map[string][]byte{
 			"key":  []byte("data"),
@@ -173,7 +173,7 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 	addOnDeploymentConfig = &addonapiv1alpha1.AddOnDeploymentConfig{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "multicluster-observability-addon",
-			Namespace: "open-cluster-management",
+			Namespace: "open-cluster-management-observability",
 		},
 		Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
 			CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{

@@ -13,4 +13,5 @@ type Options struct {
 	ConfigMaps             []corev1.ConfigMap
 	OpenTelemetryCollector *otelv1beta1.OpenTelemetryCollector
 	AddOnDeploymentConfig  *addonapiv1alpha1.AddOnDeploymentConfig
+	UserWorkloads          addon.TracesOptions
 }

@@ -2,14 +2,12 @@ package helm
 
 import (
 	"context"
-	"strconv"
 
 	"github.com/rhobs/multicluster-observability-addon/internal/addon"
 	lhandlers "github.com/rhobs/multicluster-observability-addon/internal/logging/handlers"
 	lmanifests "github.com/rhobs/multicluster-observability-addon/internal/logging/manifests"
 	thandlers "github.com/rhobs/multicluster-observability-addon/internal/tracing/handlers"
 	tmanifests "github.com/rhobs/multicluster-observability-addon/internal/tracing/manifests"
-	"k8s.io/klog/v2"
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 	addonutils "open-cluster-management.io/addon-framework/pkg/utils"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
@@ -25,36 +23,35 @@ type HelmChartValues struct {
 	Tracing tmanifests.TracingValues `json:"tracing"`
 }
 
-type Options struct {
-	LoggingDisabled bool
-	TracingDisabled bool
-}
-
 func GetValuesFunc(ctx context.Context, k8s client.Client) addonfactory.GetValuesFunc {
 	return func(
 		cluster *clusterv1.ManagedCluster,
-		addon *addonapiv1alpha1.ManagedClusterAddOn,
+		mcAddon *addonapiv1alpha1.ManagedClusterAddOn,
 	) (addonfactory.Values, error) {
 		// if hub cluster, then don't install anything
 		if isHubCluster(cluster) {
 			return addonfactory.JsonStructToValues(HelmChartValues{})
 		}
 
-		aodc, err := getAddOnDeploymentConfig(ctx, k8s, addon)
+		aodc, err := getAddOnDeploymentConfig(ctx, k8s, mcAddon)
 		if err != nil {
 			return nil, err
 		}
-		opts, err := buildOptions(aodc)
+		opts, err := addon.BuildOptions(aodc)
 		if err != nil {
 			return nil, err
+		}
+
+		if !opts.Platform.Enabled && !opts.UserWorkloads.Enabled {
+			return addonfactory.JsonStructToValues(HelmChartValues{})
 		}
 
 		userValues := HelmChartValues{
 			Enabled: true,
 		}
 
-		if !opts.LoggingDisabled {
-			loggingOpts, err := lhandlers.BuildOptions(ctx, k8s, addon, aodc)
+		if opts.Platform.Logs.CollectionEnabled || opts.UserWorkloads.Logs.CollectionEnabled {
+			loggingOpts, err := lhandlers.BuildOptions(ctx, k8s, mcAddon, opts.Platform.Logs, opts.UserWorkloads.Logs)
 			if err != nil {
 				return nil, err
 			}
@@ -66,9 +63,8 @@ func GetValuesFunc(ctx context.Context, k8s client.Client) addonfactory.GetValue
 			userValues.Logging = *logging
 		}
 
-		if !opts.TracingDisabled {
-			klog.Info("Tracing enabled")
-			tracingOpts, err := thandlers.BuildOptions(ctx, k8s, addon, aodc)
+		if opts.UserWorkloads.Traces.CollectionEnabled {
+			tracingOpts, err := thandlers.BuildOptions(ctx, k8s, mcAddon, opts.UserWorkloads.Traces)
 			if err != nil {
 				return nil, err
 			}
@@ -92,35 +88,6 @@ func getAddOnDeploymentConfig(ctx context.Context, k8s client.Client, mcAddon *a
 		return addOnDeployment, err
 	}
 	return addOnDeployment, nil
-}
-
-func buildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Options, error) {
-	var opts Options
-	if addOnDeployment == nil {
-		return opts, nil
-	}
-
-	if addOnDeployment.Spec.CustomizedVariables == nil {
-		return opts, nil
-	}
-
-	for _, keyvalue := range addOnDeployment.Spec.CustomizedVariables {
-		switch keyvalue.Name {
-		case addon.AdcLoggingDisabledKey:
-			value, err := strconv.ParseBool(keyvalue.Value)
-			if err != nil {
-				return opts, err
-			}
-			opts.LoggingDisabled = value
-		case addon.AdcTracingisabledKey:
-			value, err := strconv.ParseBool(keyvalue.Value)
-			if err != nil {
-				return opts, err
-			}
-			opts.TracingDisabled = value
-		}
-	}
-	return opts, nil
 }
 
 func isHubCluster(cluster *clusterv1.ManagedCluster) bool {

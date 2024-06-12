@@ -11,7 +11,7 @@ spec:
   # Logging Auth ConfigMap
   - resource: configmaps
     name: logging-auth
-    namespace: open-cluster-management
+    namespace: open-cluster-management-observability
   # Logging URLs for Loki ConfigMap
 {{- range $_, $dic := $.Values.logging.outputs }}
 {{- if eq $dic.type "loki" }}
@@ -38,7 +38,7 @@ spec:
   # Tracing Auth ConfigMap
   - resource: configmaps
     name: tracing-auth
-    namespace: open-cluster-management
+    namespace: open-cluster-management-observability
   # Tracing ca-bundle configmap
   - resource: secrets
     name: otel-gateway

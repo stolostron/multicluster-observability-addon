@@ -34,9 +34,9 @@ var (
 func fakeGetValues(k8s client.Client) addonfactory.GetValuesFunc {
 	return func(
 		cluster *clusterv1.ManagedCluster,
-		addon *addonapiv1alpha1.ManagedClusterAddOn,
+		mcAddon *addonapiv1alpha1.ManagedClusterAddOn,
 	) (addonfactory.Values, error) {
-		opts, err := handlers.BuildOptions(context.TODO(), k8s, addon, nil)
+		opts, err := handlers.BuildOptions(context.TODO(), k8s, mcAddon, addon.TracesOptions{})
 		if err != nil {
 			return nil, err
 		}
@@ -77,7 +77,7 @@ func Test_Tracing_AllConfigsTogether_AllResources(t *testing.T) {
 				Resource: "configmaps",
 			},
 			ConfigReferent: addonapiv1alpha1.ConfigReferent{
-				Namespace: "open-cluster-management",
+				Namespace: "open-cluster-management-observability",
 				Name:      "tracing-auth",
 			},
 		},
@@ -89,7 +89,7 @@ func Test_Tracing_AllConfigsTogether_AllResources(t *testing.T) {
 				Resource: "addondeploymentconfigs",
 			},
 			ConfigReferent: addonapiv1alpha1.ConfigReferent{
-				Namespace: "open-cluster-management",
+				Namespace: "open-cluster-management-observability",
 				Name:      "multicluster-observability-addon",
 			},
 		},
@@ -99,7 +99,7 @@ func Test_Tracing_AllConfigsTogether_AllResources(t *testing.T) {
 				Resource: "opentelemetrycollectors",
 			},
 			ConfigReferent: addonapiv1alpha1.ConfigReferent{
-				Namespace: "open-cluster-management",
+				Namespace: "open-cluster-management-observability",
 				Name:      "mcoa-instance",
 			},
 		},
@@ -109,7 +109,7 @@ func Test_Tracing_AllConfigsTogether_AllResources(t *testing.T) {
 	otelCol := otelv1beta1.OpenTelemetryCollector{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "mcoa-instance",
-			Namespace: "open-cluster-management",
+			Namespace: "open-cluster-management-observability",
 		},
 		Spec: otelv1beta1.OpenTelemetryCollectorSpec{
 			Config: otelv1beta1.Config{
@@ -130,7 +130,7 @@ func Test_Tracing_AllConfigsTogether_AllResources(t *testing.T) {
 	addOnDeploymentConfig = &addonapiv1alpha1.AddOnDeploymentConfig{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "multicluster-observability-addon",
-			Namespace: "open-cluster-management",
+			Namespace: "open-cluster-management-observability",
 		},
 		Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{},
 	}
@@ -138,7 +138,7 @@ func Test_Tracing_AllConfigsTogether_AllResources(t *testing.T) {
 	authCM = &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "tracing-auth",
-			Namespace: "open-cluster-management",
+			Namespace: "open-cluster-management-observability",
 		},
 		Data: map[string]string{
 			"otlphttp": "mTLS",

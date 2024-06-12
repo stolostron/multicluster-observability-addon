@@ -6,22 +6,18 @@ import (
 
 const (
 	Name             = "multicluster-observability-addon"
-	InstallNamespace = "open-cluster-management"
+	InstallNamespace = "open-cluster-management-observability"
 
 	McoaChartDir    = "manifests/charts/mcoa"
 	LoggingChartDir = "manifests/charts/mcoa/charts/logging"
 	TracingChartDir = "manifests/charts/mcoa/charts/tracing"
 
 	AddonDeploymentConfigResource = "addondeploymentconfigs"
-
-	AdcLoggingDisabledKey = "loggingDisabled"
-	AdcTracingisabledKey  = "tracingDisabled"
-
-	ClusterLogForwardersResource = "clusterlogforwarders"
-	SpokeCLFName                 = "mcoa-instance"
-	SpokeCLFNamespace            = "openshift-logging"
-	clfProbeKey                  = "isReady"
-	clfProbePath                 = ".status.conditions[?(@.type==\"Ready\")].status"
+	ClusterLogForwardersResource  = "clusterlogforwarders"
+	SpokeCLFName                  = "mcoa-instance"
+	SpokeCLFNamespace             = "openshift-logging"
+	clfProbeKey                   = "isReady"
+	clfProbePath                  = ".status.conditions[?(@.type==\"Ready\")].status"
 
 	OpenTelemetryCollectorsResource = "opentelemetrycollectors"
 	SpokeOTELColName                = "mcoa-instance"

@@ -3,7 +3,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: logging-auth
-  namespace: open-cluster-management
+  namespace: open-cluster-management-observability
   labels:
     mcoa.openshift.io/signal: logging
 data:
