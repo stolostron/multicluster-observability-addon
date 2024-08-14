@@ -1,6 +1,7 @@
 package manifests
 
 import (
+	otelv1alpha1 "github.com/open-telemetry/opentelemetry-operator/apis/v1alpha1"
 	otelv1beta1 "github.com/open-telemetry/opentelemetry-operator/apis/v1beta1"
 	"github.com/rhobs/multicluster-observability-addon/internal/addon"
 	corev1 "k8s.io/api/core/v1"
@@ -12,6 +13,7 @@ type Options struct {
 	Secrets                map[addon.Endpoint]corev1.Secret
 	ConfigMaps             []corev1.ConfigMap
 	OpenTelemetryCollector *otelv1beta1.OpenTelemetryCollector
+	Instrumentation        *otelv1alpha1.Instrumentation
 	AddOnDeploymentConfig  *addonapiv1alpha1.AddOnDeploymentConfig
 	UserWorkloads          addon.TracesOptions
 }

@@ -33,8 +33,12 @@ $(CRD_DIR)/opentelemetry.io_opentelemetrycollectors.yaml:
 	@mkdir -p $(CRD_DIR)
 	@curl https://raw.githubusercontent.com/open-telemetry/opentelemetry-operator/v0.100.1/bundle/manifests/opentelemetry.io_opentelemetrycollectors.yaml > $(CRD_DIR)/opentelemetry.io_opentelemetrycollectors.yaml
 
+$(CRD_DIR)/opentelemetry.io_instrumentations.yaml:
+	@mkdir -p $(CRD_DIR)
+	@curl https://raw.githubusercontent.com/open-telemetry/opentelemetry-operator/v0.100.1/bundle/manifests/opentelemetry.io_instrumentations.yaml > $(CRD_DIR)/opentelemetry.io_instrumentations.yaml
+
 .PHONY: install-crds
-install-crds: $(CRD_DIR)/logging.openshift.io_clusterlogforwarders.yaml $(CRD_DIR)/opentelemetry.io_opentelemetrycollectors.yaml
+install-crds: $(CRD_DIR)/logging.openshift.io_clusterlogforwarders.yaml $(CRD_DIR)/opentelemetry.io_opentelemetrycollectors.yaml $(CRD_DIR)/opentelemetry.io_instrumentations.yaml
 
 .PHONY: fmt
 fmt: $(GOFUMPT) ## Run gofumpt on source code.

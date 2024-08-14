@@ -6,6 +6,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
+	otelv1alpha1 "github.com/open-telemetry/opentelemetry-operator/apis/v1alpha1"
 	otelv1beta1 "github.com/open-telemetry/opentelemetry-operator/apis/v1beta1"
 	operatorsv1 "github.com/operator-framework/api/pkg/operators/v1"
 	operatorsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
@@ -27,6 +28,7 @@ import (
 
 var (
 	_ = otelv1beta1.AddToScheme(scheme.Scheme)
+	_ = otelv1alpha1.AddToScheme(scheme.Scheme)
 	_ = operatorsv1.AddToScheme(scheme.Scheme)
 	_ = operatorsv1alpha1.AddToScheme(scheme.Scheme)
 )
@@ -36,7 +38,7 @@ func fakeGetValues(k8s client.Client) addonfactory.GetValuesFunc {
 		cluster *clusterv1.ManagedCluster,
 		mcAddon *addonapiv1alpha1.ManagedClusterAddOn,
 	) (addonfactory.Values, error) {
-		opts, err := handlers.BuildOptions(context.TODO(), k8s, mcAddon, addon.TracesOptions{})
+		opts, err := handlers.BuildOptions(context.TODO(), k8s, mcAddon, addon.TracesOptions{}, true)
 		if err != nil {
 			return nil, err
 		}
@@ -103,6 +105,16 @@ func Test_Tracing_AllConfigsTogether_AllResources(t *testing.T) {
 				Name:      "mcoa-instance",
 			},
 		},
+		{
+			ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+				Group:    "opentelemetry.io",
+				Resource: "instrumentations",
+			},
+			ConfigReferent: addonapiv1alpha1.ConfigReferent{
+				Namespace: "open-cluster-management-observability",
+				Name:      "mcoa-instance",
+			},
+		},
 	}
 
 	// Setup configuration resources: OpenTelemetryCollector, AddOnDeploymentConfig
@@ -123,6 +135,18 @@ func Test_Tracing_AllConfigsTogether_AllResources(t *testing.T) {
 						},
 					},
 				},
+			},
+		},
+	}
+
+	instr := otelv1alpha1.Instrumentation{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "mcoa-instance",
+			Namespace: "open-cluster-management-observability",
+		},
+		Spec: otelv1alpha1.InstrumentationSpec{
+			Exporter: otelv1alpha1.Exporter{
+				Endpoint: "http://test.com",
 			},
 		},
 	}
@@ -162,7 +186,7 @@ func Test_Tracing_AllConfigsTogether_AllResources(t *testing.T) {
 	// Setup the fake k8s client
 	fakeKubeClient = fake.NewClientBuilder().
 		WithScheme(scheme.Scheme).
-		WithObjects(&otelCol, authCM, generatedSecret).
+		WithObjects(&otelCol, &instr, authCM, generatedSecret).
 		Build()
 
 	// Setup the fake addon client
@@ -183,7 +207,7 @@ func Test_Tracing_AllConfigsTogether_AllResources(t *testing.T) {
 	// Render manifests and return them as k8s runtime objects
 	objects, err := tracingAgentAddon.Manifests(managedCluster, managedClusterAddOn)
 	require.NoError(t, err)
-	require.Equal(t, 5, len(objects))
+	require.Equal(t, 6, len(objects))
 
 	for _, obj := range objects {
 		switch obj := obj.(type) {
@@ -193,6 +217,9 @@ func Test_Tracing_AllConfigsTogether_AllResources(t *testing.T) {
 			require.Equal(t, addon.SpokeOTELColName, obj.Name)
 			require.Equal(t, addon.SpokeOTELColNamespace, obj.Namespace)
 			require.NotEmpty(t, obj.Spec.Config)
+		case *otelv1alpha1.Instrumentation:
+			require.Equal(t, addon.SpokeInstrumentationName, obj.Name)
+			require.Equal(t, addon.SpokeOTELColNamespace, obj.Namespace)
 		case *corev1.Secret:
 			if obj.Name == "tracing-otlphttp-auth" {
 				require.Equal(t, generatedSecret.Data, obj.Data)
