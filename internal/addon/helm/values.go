@@ -2,6 +2,7 @@ package helm
 
 import (
 	"context"
+	"errors"
 
 	"github.com/rhobs/multicluster-observability-addon/internal/addon"
 	lhandlers "github.com/rhobs/multicluster-observability-addon/internal/logging/handlers"
@@ -16,6 +17,11 @@ import (
 )
 
 const annotationLocalCluster = "local-cluster"
+
+var (
+	errMissingAODCRef  = errors.New("missing AddOnDeploymentConfig reference on addon installation")
+	errMultipleAODCRef = errors.New("multiple AddOnDeploymentConfig references on addon installation")
+)
 
 type HelmChartValues struct {
 	Enabled bool                     `json:"enabled"`
@@ -81,13 +87,19 @@ func GetValuesFunc(ctx context.Context, k8s client.Client) addonfactory.GetValue
 }
 
 func getAddOnDeploymentConfig(ctx context.Context, k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAddOn) (*addonapiv1alpha1.AddOnDeploymentConfig, error) {
-	key := addon.GetObjectKey(mcAddon.Status.ConfigReferences, addonutils.AddOnDeploymentConfigGVR.Group, addon.AddonDeploymentConfigResource)
-	addOnDeployment := &addonapiv1alpha1.AddOnDeploymentConfig{}
-	if err := k8s.Get(ctx, key, addOnDeployment, &client.GetOptions{}); err != nil {
-		// TODO(JoaoBraveCoding) Add proper error handling
-		return addOnDeployment, err
+	aodc := &addonapiv1alpha1.AddOnDeploymentConfig{}
+	keys := addon.GetObjectKeys(mcAddon.Status.ConfigReferences, addonutils.AddOnDeploymentConfigGVR.Group, addon.AddonDeploymentConfigResource)
+	switch {
+	case len(keys) == 0:
+		return aodc, errMissingAODCRef
+	case len(keys) > 1:
+		return aodc, errMultipleAODCRef
 	}
-	return addOnDeployment, nil
+	if err := k8s.Get(ctx, keys[0], aodc, &client.GetOptions{}); err != nil {
+		// TODO(JoaoBraveCoding) Add proper error handling
+		return aodc, err
+	}
+	return aodc, nil
 }
 
 func isHubCluster(cluster *clusterv1.ManagedCluster) bool {
