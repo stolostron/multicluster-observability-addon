@@ -7,9 +7,9 @@ based on the extensibility provided by
 [addon-framework](https://github.com/open-cluster-management-io/addon-framework)
 which automates the collection and forwarding of observability signals to central stores.
 
-This is acheived through the installation on the spoke clusters of dedicated operators for each observability signal: 
+This is acheived through the installation on the spoke clusters of dedicated operators for each observability signal:
 
-- For Metrics the addon will deploy an instance of Prometheus running in agent mode, that will forward metrics to the hub.
+- For Metrics, currently the multicluster-observability-operator should be used.
 
 - For Logs the operator installed will be [cluster-logging-operator](https://docs.openshift.com/container-platform/latest/logging/cluster-logging.html). The addon will also configure an instance of [ClusterLogForwarder](https://docs.openshift.com/container-platform/latest/logging/log_collection_forwarding/configuring-log-forwarding.html) to forward logs to a configured store.
 
@@ -24,8 +24,6 @@ The logging-ocm-addon consists of one component:
 ### Prerequisite
 
 - OCM registration (>= 0.5.0)
-- cert-manager operator
-- multicluster-observability-operator (for metrics)
 
 ### Steps
 
@@ -37,17 +35,63 @@ The logging-ocm-addon consists of one component:
 $ kubectl apply -k deploy/
 ```
 
-2. The addon should now be installed in you hub cluster 
+1. The addon should now be installed in you hub cluster
+
 ```shell
 $ kubectl get ClusterManagementAddOn multicluster-observability-addon
 ```
 
-3. The addon can now be installed it managed clusters by creating `ManagedClusterAddOn` resources in their respective namespaces
+1. The addon will install automatically in spoke clusters once the resources referenced in `ClusterManagementAddOn` are created.
 
-## Demo
+#### Installing via MCO
 
-Steps to deploy a demo of the addon can be found at [demo/README.md](https://github.com/rhobs/multicluster-observability-addon/tree/main/demo#readme)
+In 2.12, multicluster-observability-operator has the ability to install MCOA using the [capabilities field](https://github.com/stolostron/multicluster-observability-operator/blob/5d1fc789df365b20951b5fe1c378b5eebb306390/operators/multiclusterobservability/api/v1beta2/multiclusterobservability_types.go#L187-L212).
+
+1. Create a `MultiClusterObservability` resource and configure `capabilities`
+
+```yaml
+apiVersion: observability.open-cluster-management.io/v1beta2
+kind: MultiClusterObservability
+metadata:
+  name: observability
+spec:
+  capabilities:
+    platform:
+      logs:
+        collection:
+          enabled: true
+    userWorkloads:
+      logs:
+        collection:
+          clusterLogForwarder:
+            enabled: true
+      traces:
+        collection:
+          instrumentation:
+            enabled: true
+          openTelemetryCollector:
+            enabled: false
+  observabilityAddonSpec: {}
+  storageConfig:
+    metricObjectStorage:
+      name: thanos-object-storage
+      key: thanos.yaml
+```
+
+Note: Deploy a custom image by adding the annotation: `mco-multicluster_observability_addon-image: quay.io/YOUR_ORG_HERE/multicluster-observability-addon:YOUR_TAG_HERE`
+
+1. The addon should now be installed in you hub cluster
+
+```shell
+ kubectl get ClusterManagementAddOn multicluster-observability-addon
+```
+
+1. The addon will install automatically in spoke clusters once the resources referenced in `ClusterManagementAddOn` are created.
 
 ## References
 
+- Open-Cluster-Management: [https://github.com/open-cluster-management-io/ocm](https://github.com/open-cluster-management-io/ocm)
 - Addon-Framework: [https://github.com/open-cluster-management-io/addon-framework](https://github.com/open-cluster-management-io/addon-framework)
+- Multicluster-Observability-Operator: [https://github.com/stolostron/multicluster-observability-operator](https://github.com/stolostron/multicluster-observability-operator)
+- Cluster-Logging-Operator: [https://github.com/openshift/cluster-logging-operator](https://github.com/openshift/cluster-logging-operator)
+- OpenTelemetry-Operator: [https://github.com/open-telemetry/opentelemetry-operator](https://github.com/open-telemetry/opentelemetry-operator)
