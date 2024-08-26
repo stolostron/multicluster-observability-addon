@@ -31,15 +31,15 @@ The logging-ocm-addon consists of one component:
 
 1. Install the AddOn using Kustomize
 
-```shell
-$ kubectl apply -k deploy/
-```
+    ```shell
+    kubectl apply -k deploy/
+    ```
 
 1. The addon should now be installed in you hub cluster
 
-```shell
-$ kubectl get ClusterManagementAddOn multicluster-observability-addon
-```
+    ```shell
+    kubectl get ClusterManagementAddOn multicluster-observability-addon
+    ```
 
 1. The addon will install automatically in spoke clusters once the resources referenced in `ClusterManagementAddOn` are created.
 
@@ -49,42 +49,42 @@ In 2.12, multicluster-observability-operator has the ability to install MCOA usi
 
 1. Create a `MultiClusterObservability` resource and configure `capabilities`
 
-```yaml
-apiVersion: observability.open-cluster-management.io/v1beta2
-kind: MultiClusterObservability
-metadata:
-  name: observability
-spec:
-  capabilities:
-    platform:
-      logs:
-        collection:
-          enabled: true
-    userWorkloads:
-      logs:
-        collection:
-          clusterLogForwarder:
-            enabled: true
-      traces:
-        collection:
-          instrumentation:
-            enabled: true
-          openTelemetryCollector:
-            enabled: false
-  observabilityAddonSpec: {}
-  storageConfig:
-    metricObjectStorage:
-      name: thanos-object-storage
-      key: thanos.yaml
-```
+    ```yaml
+    apiVersion: observability.open-cluster-management.io/v1beta2
+    kind: MultiClusterObservability
+    metadata:
+      name: observability
+    spec:
+      capabilities:
+        platform:
+          logs:
+            collection:
+              enabled: true
+        userWorkloads:
+          logs:
+            collection:
+              clusterLogForwarder:
+                enabled: true
+          traces:
+            collection:
+              instrumentation:
+                enabled: true
+              openTelemetryCollector:
+                enabled: false
+      observabilityAddonSpec: {}
+      storageConfig:
+        metricObjectStorage:
+          name: thanos-object-storage
+          key: thanos.yaml
+    ```
 
-Note: Deploy a custom image by adding the annotation: `mco-multicluster_observability_addon-image: quay.io/YOUR_ORG_HERE/multicluster-observability-addon:YOUR_TAG_HERE`
+    Note: Deploy a custom image by adding the annotation: `mco-multicluster_observability_addon-image: quay.io/YOUR_ORG_HERE/multicluster-observability-addon:YOUR_TAG_HERE`
 
 1. The addon should now be installed in you hub cluster
 
-```shell
- kubectl get ClusterManagementAddOn multicluster-observability-addon
-```
+    ```shell
+    kubectl get ClusterManagementAddOn multicluster-observability-addon
+    ```
 
 1. The addon will install automatically in spoke clusters once the resources referenced in `ClusterManagementAddOn` are created.
 
