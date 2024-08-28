@@ -1,6 +1,6 @@
 {{- if .Values.instrumentationEnabled }}
 apiVersion: opentelemetry.io/v1alpha1
-kind: OpenTelemetryCollector
+kind: Instrumentation
 metadata:
   name: mcoa-instance
   namespace: mcoa-opentelemetry

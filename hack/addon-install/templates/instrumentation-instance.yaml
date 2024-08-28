@@ -1,0 +1,11 @@
+apiVersion: opentelemetry.io/v1alpha1
+kind: Instrumentation
+metadata:
+  name: python
+  namespace: open-cluster-management-observability
+spec:
+  exporter:
+    endpoint: http://mcoa-instance.mcoa-opentelemetry.svc.cluster.local:4317
+  sampler:
+    type: parentbased_traceidratio
+    argument: "0.25"

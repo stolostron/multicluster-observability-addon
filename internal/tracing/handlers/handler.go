@@ -21,7 +21,7 @@ var (
 	errNoVolumeMountForSecret = fmt.Errorf("no volumemount found for secret")
 )
 
-func BuildOptions(ctx context.Context, k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, userWorkloads addon.TracesOptions, instrumentationEnabled bool) (manifests.Options, error) {
+func BuildOptions(ctx context.Context, k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, userWorkloads addon.TracesOptions) (manifests.Options, error) {
 	opts := manifests.Options{
 		ClusterName:   mcAddon.Namespace,
 		UserWorkloads: userWorkloads,
@@ -36,7 +36,7 @@ func BuildOptions(ctx context.Context, k8s client.Client, mcAddon *addonapiv1alp
 	opts.OpenTelemetryCollector = otelCol
 	klog.Info("OpenTelemetry Collector template found")
 
-	if instrumentationEnabled {
+	if userWorkloads.InstrumentationEnabled {
 		klog.Info("Retrieving Instrumentation template")
 		key = addon.GetObjectKey(mcAddon.Status.ConfigReferences, otelv1alpha1.GroupVersion.Group, addon.InstrumentationResource)
 		instr := &otelv1alpha1.Instrumentation{}

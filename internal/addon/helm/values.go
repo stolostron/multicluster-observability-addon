@@ -64,7 +64,7 @@ func GetValuesFunc(ctx context.Context, k8s client.Client) addonfactory.GetValue
 		}
 
 		if opts.UserWorkloads.Traces.CollectionEnabled {
-			tracingOpts, err := thandlers.BuildOptions(ctx, k8s, mcAddon, opts.UserWorkloads.Traces, opts.UserWorkloads.Traces.InstrumentationEnabled)
+			tracingOpts, err := thandlers.BuildOptions(ctx, k8s, mcAddon, opts.UserWorkloads.Traces)
 			if err != nil {
 				return nil, err
 			}
