@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	loggingv1 "github.com/openshift/cluster-logging-operator/apis/logging/v1"
-	"github.com/rhobs/multicluster-observability-addon/internal/addon"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -44,8 +43,8 @@ func Test_BuildSubscriptionChannel(t *testing.T) {
 
 func Test_BuildSecrets(t *testing.T) {
 	resources := Options{
-		Secrets: map[addon.Endpoint]corev1.Secret{
-			"foo": {
+		Secrets: []corev1.Secret{
+			{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: "cluster-1",
@@ -55,7 +54,7 @@ func Test_BuildSecrets(t *testing.T) {
 					"foo-2": []byte("foo-pass"),
 				},
 			},
-			"bar": {
+			{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "bar",
 					Namespace: "cluster-1",
@@ -69,18 +68,18 @@ func Test_BuildSecrets(t *testing.T) {
 	}
 	secretsValue, err := buildSecrets(resources)
 	require.NoError(t, err)
-	require.Equal(t, "bar", secretsValue[0].Name)
-	require.Equal(t, "foo", secretsValue[1].Name)
+	require.Equal(t, "foo", secretsValue[0].Name)
+	require.Equal(t, "bar", secretsValue[1].Name)
 
 	gotData := &map[string][]byte{}
 	err = json.Unmarshal([]byte(secretsValue[0].Data), gotData)
 	require.NoError(t, err)
-	require.Equal(t, resources.Secrets["bar"].Data, *gotData)
+	require.Equal(t, resources.Secrets[0].Data, *gotData)
 
 	gotData = &map[string][]byte{}
 	err = json.Unmarshal([]byte(secretsValue[1].Data), gotData)
 	require.NoError(t, err)
-	require.Equal(t, resources.Secrets["foo"].Data, *gotData)
+	require.Equal(t, resources.Secrets[1].Data, *gotData)
 }
 
 func Test_BuildCLFSpec(t *testing.T) {

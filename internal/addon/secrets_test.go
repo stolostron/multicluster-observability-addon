@@ -68,24 +68,25 @@ func TestGetSecrets(t *testing.T) {
 			expecedError:            true,
 		},
 	} {
-		fakeKubeClient := fake.NewClientBuilder().
-			WithObjects(clusterSecret, defaultSecret).
-			Build()
+		t.Run(tc.name, func(t *testing.T) {
+			fakeKubeClient := fake.NewClientBuilder().
+				WithObjects(clusterSecret, defaultSecret).
+				Build()
 
-		target := Endpoint("foo")
-		targetSecrets := map[Endpoint]string{
-			target: tc.secretName,
-		}
-		secrets, err := GetSecrets(context.TODO(), fakeKubeClient, tc.configResourceNamespace, tc.mcAddonNamespace, targetSecrets)
-		if tc.expecedError {
-			require.Error(t, err)
-			return
-		}
-		secret, ok := secrets[target]
-		require.True(t, ok)
-		require.NoError(t, err)
-		require.Equal(t, tc.expectedSecret.Name, secret.Name)
-		require.Equal(t, tc.expectedSecret.Namespace, secret.Namespace)
-		require.Equal(t, tc.expectedSecret.Data, secret.Data)
+			targetSecrets := []string{
+				tc.secretName,
+			}
+			secrets, err := GetSecrets(context.TODO(), fakeKubeClient, tc.configResourceNamespace, tc.mcAddonNamespace, targetSecrets)
+			if tc.expecedError {
+				require.Error(t, err)
+				return
+			}
+			require.Len(t, secrets, 1)
+			secret := secrets[0]
+			require.NoError(t, err)
+			require.Equal(t, tc.expectedSecret.Name, secret.Name)
+			require.Equal(t, tc.expectedSecret.Namespace, secret.Namespace)
+			require.Equal(t, tc.expectedSecret.Data, secret.Data)
+		})
 	}
 }

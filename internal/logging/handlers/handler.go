@@ -41,16 +41,16 @@ func BuildOptions(ctx context.Context, k8s client.Client, mcAddon *addonapiv1alp
 	}
 	opts.ClusterLogForwarder = clf
 
-	targetSecretName := make(map[addon.Endpoint]string)
+	secretNames := []string{}
 	for _, output := range clf.Spec.Outputs {
-		targetSecretName[addon.Endpoint(output.Name)] = output.Secret.Name
+		secretNames = append(secretNames, output.Secret.Name)
 	}
 
-	targetSecrets, err := addon.GetSecrets(ctx, k8s, clf.Namespace, mcAddon.Namespace, targetSecretName)
+	secrets, err := addon.GetSecrets(ctx, k8s, clf.Namespace, mcAddon.Namespace, secretNames)
 	if err != nil {
 		return opts, err
 	}
-	opts.Secrets = targetSecrets
+	opts.Secrets = secrets
 
 	return opts, nil
 }

@@ -2,8 +2,6 @@ package manifests
 
 import (
 	"encoding/json"
-
-	"k8s.io/klog/v2"
 )
 
 type TracingValues struct {
@@ -28,13 +26,7 @@ func BuildValues(opts Options) (TracingValues, error) {
 	}
 	values.Secrets = secrets
 
-	klog.Info("Building OTEL Collector instance")
-	otelColSpec, err := buildOtelColSpec(opts)
-	if err != nil {
-		return values, err
-	}
-
-	b, err := json.Marshal(otelColSpec)
+	b, err := json.Marshal(opts.OpenTelemetryCollector.Spec)
 	if err != nil {
 		return values, err
 	}
