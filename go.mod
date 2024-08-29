@@ -7,8 +7,7 @@ toolchain go1.21.9
 require (
 	github.com/ViaQ/logerr/v2 v2.1.0
 	github.com/open-telemetry/opentelemetry-operator v0.100.1
-	github.com/openshift/api v0.0.0-20240124164020-e2ce40831f2e // indirect; release-4.15
-	github.com/openshift/cluster-logging-operator v0.0.0-20231130135759-9270994dc4bc
+	github.com/openshift/cluster-logging-operator/api/observability v0.0.0-20240828014436-a19feb86783c
 	github.com/operator-framework/api v0.17.7
 	github.com/spf13/cobra v1.8.0
 	github.com/spf13/pflag v1.0.5
@@ -19,7 +18,6 @@ require (
 	k8s.io/client-go v0.29.3
 	k8s.io/component-base v0.29.3
 	k8s.io/klog/v2 v2.120.1
-	k8s.io/utils v0.0.0-20240102154912-e7106e64919e
 	open-cluster-management.io/addon-framework v0.9.1
 	open-cluster-management.io/api v0.13.0
 	sigs.k8s.io/controller-runtime v0.17.3
@@ -31,13 +29,9 @@ replace github.com/prometheus/common => github.com/prometheus/common v0.46.0
 
 replace github.com/prometheus/client_golang => github.com/prometheus/client_golang v1.18.0
 
-require (
-	github.com/go-logr/logr v1.4.2
-	gopkg.in/yaml.v2 v2.4.0
-)
+require github.com/go-logr/logr v1.4.2
 
 require (
-	cloud.google.com/go/compute/metadata v0.3.0 // indirect
 	github.com/BurntSushi/toml v1.2.1 // indirect
 	github.com/Masterminds/goutils v1.1.1 // indirect
 	github.com/Masterminds/semver/v3 v3.2.1 // indirect
@@ -65,7 +59,6 @@ require (
 	github.com/go-openapi/swag v0.22.9 // indirect
 	github.com/gobwas/glob v0.2.3 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
-	github.com/golang-collections/collections v0.0.0-20130729185459-604e922904d3 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/cel-go v0.17.7 // indirect
@@ -86,7 +79,7 @@ require (
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
-	github.com/openshift/elasticsearch-operator v0.0.0-20220613183908-e1648e67c298 // indirect
+	github.com/openshift/api v0.0.0-20240212125214-04ea3891d9cb // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/prometheus/client_golang v1.19.1 // indirect
@@ -130,10 +123,12 @@ require (
 	google.golang.org/protobuf v1.34.1 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
+	gopkg.in/yaml.v2 v2.4.0 // indirect
 	helm.sh/helm/v3 v3.11.1 // indirect
 	k8s.io/apiserver v0.29.3 // indirect
 	k8s.io/kms v0.29.3 // indirect
 	k8s.io/kube-openapi v0.0.0-20240228011516-70dd3763d340 // indirect
+	k8s.io/utils v0.0.0-20240102154912-e7106e64919e // indirect
 	open-cluster-management.io/sdk-go v0.13.0 // indirect
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.28.0 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect

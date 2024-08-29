@@ -4,11 +4,10 @@ import (
 	"encoding/json"
 	"testing"
 
-	loggingv1 "github.com/openshift/cluster-logging-operator/apis/logging/v1"
+	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/pointer"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 )
@@ -22,7 +21,7 @@ func Test_BuildSubscriptionChannel(t *testing.T) {
 	}{
 		{
 			name:       "not set",
-			subChannel: "stable-5.9",
+			subChannel: "stable-6.0",
 		},
 		{
 			name:       "user set",
@@ -96,7 +95,7 @@ func Test_BuildCLFSpec(t *testing.T) {
 	managedClusterAddOn.Status.ConfigReferences = []addonapiv1alpha1.ConfigReference{
 		{
 			ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
-				Group:    "logging.openshift.io",
+				Group:    "observability.openshift.io",
 				Resource: "clusterlogforwarders",
 			},
 			ConfigReferent: addonapiv1alpha1.ConfigReferent{
@@ -117,7 +116,14 @@ func Test_BuildCLFSpec(t *testing.T) {
 				{
 					Name: "app-logs",
 					Application: &loggingv1.Application{
-						Namespaces: []string{"ns-1", "ns-2"},
+						Includes: []loggingv1.NamespaceContainerSpec{
+							{
+								Namespace: "ns-1",
+							},
+							{
+								Namespace: "ns-2",
+							},
+						},
 					},
 				},
 				{
@@ -129,27 +135,37 @@ func Test_BuildCLFSpec(t *testing.T) {
 				{
 					Name: "app-logs",
 					Type: loggingv1.OutputTypeLoki,
-					OutputTypeSpec: loggingv1.OutputTypeSpec{
-						Loki: &loggingv1.Loki{
-							LabelKeys: []string{"key-1", "key-2"},
-							TenantKey: "tenant-x",
+					Loki: &loggingv1.Loki{
+						Authentication: &loggingv1.HTTPAuthentication{
+							Token: &loggingv1.BearerToken{
+								From: loggingv1.BearerTokenFromSecret,
+								Secret: &loggingv1.BearerTokenSecretKey{
+									Name: "app-logs-secret",
+									Key:  "token",
+								},
+							},
 						},
-					},
-					Secret: &loggingv1.OutputSecretSpec{
-						Name: "app-logs-secret",
+						LabelKeys: []string{"key-1", "key-2"},
+						TenantKey: "tenant-x",
 					},
 				},
 				{
 					Name: "cluster-logs",
 					Type: loggingv1.OutputTypeCloudwatch,
-					OutputTypeSpec: loggingv1.OutputTypeSpec{
-						Cloudwatch: &loggingv1.Cloudwatch{
-							GroupBy:     loggingv1.LogGroupByLogType,
-							GroupPrefix: pointer.String("test-prefix"),
+					Cloudwatch: &loggingv1.Cloudwatch{
+						Authentication: &loggingv1.CloudwatchAuthentication{
+							Type: loggingv1.CloudwatchAuthTypeAccessKey,
+							AWSAccessKey: &loggingv1.CloudwatchAWSAccessKey{
+								KeyId: loggingv1.SecretReference{
+									SecretName: "cluster-logs-secret",
+									Key:        "aws_access_key_id",
+								},
+								KeySecret: loggingv1.SecretReference{
+									SecretName: "cluster-logs-secret",
+									Key:        "aws_secret_access_key",
+								},
+							},
 						},
-					},
-					Secret: &loggingv1.OutputSecretSpec{
-						Name: "cluster-logs-secret",
 					},
 				},
 			},
@@ -161,7 +177,7 @@ func Test_BuildCLFSpec(t *testing.T) {
 				},
 				{
 					Name:       "cluster-logs",
-					InputRefs:  []string{"infra-logs", loggingv1.InputNameAudit},
+					InputRefs:  []string{"infra-logs", string(loggingv1.InputTypeAudit)},
 					OutputRefs: []string{"cluster-logs"},
 				},
 			},
@@ -174,8 +190,8 @@ func Test_BuildCLFSpec(t *testing.T) {
 	}
 	clfSpec, err := buildClusterLogForwarderSpec(resources)
 	require.NoError(t, err)
-	require.NotNil(t, clfSpec.Outputs[0].Secret)
-	require.NotNil(t, clfSpec.Outputs[1].Secret)
-	require.Equal(t, "app-logs-secret", clfSpec.Outputs[0].Secret.Name)
-	require.Equal(t, "cluster-logs-secret", clfSpec.Outputs[1].Secret.Name)
+	require.NotNil(t, clfSpec.Outputs[0].Loki.Authentication.Token.Secret)
+	require.NotNil(t, clfSpec.Outputs[1].Cloudwatch.Authentication.AWSAccessKey)
+	require.Equal(t, "app-logs-secret", clfSpec.Outputs[0].Loki.Authentication.Token.Secret.Name)
+	require.Equal(t, "cluster-logs-secret", clfSpec.Outputs[1].Cloudwatch.Authentication.AWSAccessKey.KeySecret.SecretName)
 }

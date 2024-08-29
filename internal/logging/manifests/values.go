@@ -7,6 +7,7 @@ import (
 type LoggingValues struct {
 	Enabled                    bool          `json:"enabled"`
 	CLFSpec                    string        `json:"clfSpec"`
+	ServiceAccountName         string        `json:"serviceAccountName"`
 	LoggingSubscriptionChannel string        `json:"loggingSubscriptionChannel"`
 	Secrets                    []SecretValue `json:"secrets"`
 }
@@ -38,6 +39,7 @@ func BuildValues(opts Options) (*LoggingValues, error) {
 		return nil, err
 	}
 	values.CLFSpec = string(b)
+	values.ServiceAccountName = opts.ClusterLogForwarder.Spec.ServiceAccount.Name
 
 	return values, nil
 }

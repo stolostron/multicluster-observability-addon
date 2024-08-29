@@ -5,6 +5,9 @@ enabled: true
 # Expects json format
 clfSpec: {}
 
+# Name of the service account to use to forward logs
+serviceAccountName: "foo"
+
 secrets:
   - name: "secret-1"
     # Expects json format

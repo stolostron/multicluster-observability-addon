@@ -12,7 +12,7 @@ resources:
 - resources/service_account.yaml
 - resources/cluster-management-addon.yaml
 - resources/addondeploymentconfig.yaml
-- crds/logging.openshift.io_clusterlogforwarders.yaml
+- crds/observability.openshift.io_clusterlogforwarders.yaml
 - crds/opentelemetry.io_opentelemetrycollectors.yaml
 - crds/opentelemetry.io_instrumentations.yaml
 

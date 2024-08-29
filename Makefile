@@ -25,9 +25,9 @@ deps: go.mod go.sum
 	go mod download
 	go mod verify
 
-$(CRD_DIR)/logging.openshift.io_clusterlogforwarders.yaml:
+$(CRD_DIR)/observability.openshift.io_clusterlogforwarders.yaml:
 	@mkdir -p $(CRD_DIR)
-	@curl https://raw.githubusercontent.com/openshift/cluster-logging-operator/release-5.8/bundle/manifests/logging.openshift.io_clusterlogforwarders.yaml > $(CRD_DIR)/logging.openshift.io_clusterlogforwarders.yaml
+	@curl https://raw.githubusercontent.com/openshift/cluster-logging-operator/release-6.0/bundle/manifests/observability.openshift.io_clusterlogforwarders.yaml > $(CRD_DIR)/observability.openshift.io_clusterlogforwarders.yaml
 
 $(CRD_DIR)/opentelemetry.io_opentelemetrycollectors.yaml:
 	@mkdir -p $(CRD_DIR)
@@ -38,7 +38,7 @@ $(CRD_DIR)/opentelemetry.io_instrumentations.yaml:
 	@curl https://raw.githubusercontent.com/open-telemetry/opentelemetry-operator/v0.100.1/bundle/manifests/opentelemetry.io_instrumentations.yaml > $(CRD_DIR)/opentelemetry.io_instrumentations.yaml
 
 .PHONY: install-crds
-install-crds: $(CRD_DIR)/logging.openshift.io_clusterlogforwarders.yaml $(CRD_DIR)/opentelemetry.io_opentelemetrycollectors.yaml $(CRD_DIR)/opentelemetry.io_instrumentations.yaml
+install-crds: $(CRD_DIR)/observability.openshift.io_clusterlogforwarders.yaml $(CRD_DIR)/opentelemetry.io_opentelemetrycollectors.yaml $(CRD_DIR)/opentelemetry.io_instrumentations.yaml
 
 .PHONY: fmt
 fmt: $(GOFUMPT) ## Run gofumpt on source code.

@@ -7,13 +7,13 @@ spec:
   customizedVariables:
   # Operator Subscription Channels
   - name: openshiftLoggingChannel
-    value: stable-5.9
+    value: stable-6.0
   # Platform Observability
   - name: platformLogsCollection
-    value: clusterlogforwarders.v1.logging.openshift.io
+    value: clusterlogforwarders.v1.observability.openshift.io
   # User Workloads Observability
   - name: userWorkloadLogsCollection
-    value: clusterlogforwarders.v1.logging.openshift.io
+    value: clusterlogforwarders.v1.observability.openshift.io
   - name: userWorkloadTracesCollection
     value: opentelemetrycollectors.v1beta1.opentelemetry.io
   - name: userWorkloadInstrumentation

@@ -17,7 +17,8 @@ const (
 	SpokeCLFName                  = "mcoa-instance"
 	SpokeCLFNamespace             = "openshift-logging"
 	clfProbeKey                   = "isReady"
-	clfProbePath                  = ".status.conditions[?(@.type==\"Ready\")].status"
+	// TODO @JoaoBraveCoding this most likely needs to be updated to reflect the new path
+	clfProbePath = ".status.conditions[?(@.type==\"Ready\")].status"
 
 	OpenTelemetryCollectorsResource = "opentelemetrycollectors"
 	InstrumentationResource         = "instrumentations"

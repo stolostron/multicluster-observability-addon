@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 
-	loggingv1 "github.com/openshift/cluster-logging-operator/apis/logging/v1"
+	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
 )
 
 var (
@@ -37,7 +37,7 @@ func buildSecrets(resources Options) ([]SecretValue, error) {
 
 func buildClusterLogForwarderSpec(opts Options) (*loggingv1.ClusterLogForwarderSpec, error) {
 	clf := opts.ClusterLogForwarder
-	clf.Spec.ServiceAccountName = "mcoa-logcollector"
+	clf.Spec.ManagementState = loggingv1.ManagementStateManaged
 
 	// Validate Platform Logs enabled
 	var (
@@ -79,10 +79,10 @@ func buildClusterLogForwarderSpec(opts Options) (*loggingv1.ClusterLogForwarderS
 				}
 			}
 
-			if ref == loggingv1.InputNameInfrastructure || ref == loggingv1.InputNameAudit {
+			if ref == string(loggingv1.InputTypeInfrastructure) || ref == string(loggingv1.InputTypeAudit) {
 				platformDetected = true
 			}
-			if ref == loggingv1.InputNameApplication {
+			if ref == string(loggingv1.InputTypeApplication) {
 				userWorkloadsDetected = true
 			}
 		}
