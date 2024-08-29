@@ -7,9 +7,9 @@ based on the extensibility provided by
 [addon-framework](https://github.com/open-cluster-management-io/addon-framework)
 which automates the collection and forwarding of observability signals to central stores.
 
-This is acheived through the installation on the spoke clusters of dedicated operators for each observability signal:
+This is achieved through the installation of the spoke clusters of dedicated operators for each observability signal:
 
-- For Metrics, currently the multicluster-observability-operator should be used.
+- Metrics are not supported by this addon. To manage metrics, use the [multicluster-observability-operator](https://github.com/stolostron/multicluster-observability-operator).
 
 - For Logs the operator installed will be [cluster-logging-operator](https://docs.openshift.com/container-platform/latest/logging/cluster-logging.html). The addon will also configure an instance of [ClusterLogForwarder](https://docs.openshift.com/container-platform/latest/logging/log_collection_forwarding/configuring-log-forwarding.html) to forward logs to a configured store.
 
@@ -32,6 +32,7 @@ The logging-ocm-addon consists of one component:
 1. Install the AddOn using Kustomize
 
     ```shell
+    make install-crds
     kubectl apply -k deploy/
     ```
 
