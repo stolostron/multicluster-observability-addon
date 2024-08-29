@@ -150,3 +150,19 @@ templated with the stanza created in the hub cluster. The instance deployed in
 the spoke cluster will have an exact copy of the `Spec` from the stanza.
 
 This MCOA supports all components defined in [OpenShift Documentation](https://docs.openshift.com/container-platform/latest/observability/otel/otel-configuration-of-otel-collector.html#otel-collector-components_otel-configuration-of-otel-collector). Furthermore, since MCOA will simply ship the specified secrets together with `OpenTelemetryCollector` MCOA is also able to support all authentication methods supported by `OpenTelemetryCollector`.
+
+### Test files
+
+Under the `hack` folder there are resources for helping manually testing the operator. For instance, there is a helm chart named `addon-install` for installing the necessary resources for the common use addon use-case. You can install that chart by running:
+
+```shell
+helm -n default upgrade --install addon-install hack/addon-install/
+```
+
+Note: Be sure to fill in the `values.yaml` file to configure the resources propperly otherwise you might endup with an installtion that doesn't actually work.
+
+If you modify the chart you can the run the same command to apply the new version to the cluster. To clean up you can run the following:
+
+```shell
+helm -n default uninstall addon-install
+```

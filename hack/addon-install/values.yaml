@@ -1,8 +1,13 @@
+# -- Namespace od the spoke cluster where some resources will be created.
+##   - aws-secret.yaml used for the log-forwarding use-case
 spokeClusterName: spoke-1
 
+# -- AWS credentials for sending logs to AWS CloudWatch used by the 
+## log-forwarding use-case.
 awsCredentials:
   accessKeyID: XXXXXXX
   accessKeySecret: XXXXXX
 
+# -- Hub route of OpenTelemtry Collector used by the trace-forwarding use-case.
 hubCollector:
   route: XXXXXXX
