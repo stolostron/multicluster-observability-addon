@@ -1,5 +1,0 @@
-enabled: true
-
-outputs:
-  - name: cw-infra
-    type: cloudwatch

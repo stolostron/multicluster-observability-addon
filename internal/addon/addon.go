@@ -26,8 +26,8 @@ func NewRegistrationOption(agentName string) *agent.RegistrationOption {
 	}
 }
 
-func GetObjectKey(configRef []addonapiv1alpha1.ConfigReference, group, resource string) client.ObjectKey {
-	var key client.ObjectKey
+func GetObjectKeys(configRef []addonapiv1alpha1.ConfigReference, group, resource string) []client.ObjectKey {
+	var keys []client.ObjectKey
 	for _, config := range configRef {
 		if config.ConfigGroupResource.Group != group {
 			continue
@@ -36,11 +36,12 @@ func GetObjectKey(configRef []addonapiv1alpha1.ConfigReference, group, resource 
 			continue
 		}
 
-		key.Name = config.Name
-		key.Namespace = config.Namespace
-		break
+		keys = append(keys, client.ObjectKey{
+			Name:      config.Name,
+			Namespace: config.Namespace,
+		})
 	}
-	return key
+	return keys
 }
 
 // AgentHealthProber returns a HealthProber struct that contains the necessary
