@@ -55,6 +55,7 @@ this, you can:
 
 ```shell
 export REGISTRY_BASE=quay.io/YOUR_QUAY_ID
+oc create namepace open-cluster-management-observability
 # Builds and pushes the addon images
 make oci 
 # Deploys the CRDs necessary, the addon using your built image
@@ -115,7 +116,7 @@ spec:
 ```
 
 The addon installation is managed by the addon-manager. This means that users
-don't need to explicetelly create resources to install the addon on spoke
+don't need to explicitly create resources to install the addon on spoke
 clusters, the only requirements is that the clusters have to belong to a managed
 cluster set. By default MCOA will be installed on all the cluster managed by the
 hub. This behaviour can be changed by editing the `ClusterManagementAddOn`

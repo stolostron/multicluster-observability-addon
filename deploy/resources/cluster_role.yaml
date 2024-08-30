@@ -62,5 +62,5 @@
       verbs: ["get", "list", "watch"]
     # Role for addon to perform opentelemetry specific actions
     - apiGroups: ["opentelemetry.io"]
-      resources: ["opentelemetrycollectors, instrumentations"]
+      resources: ["opentelemetrycollectors", "instrumentations"]
       verbs: ["get", "list", "watch"]

@@ -46,9 +46,9 @@ func BuildOptions(ctx context.Context, k8s client.Client, mcAddon *addonapiv1alp
 
 	if userWorkloads.InstrumentationEnabled {
 		klog.Info("Retrieving Instrumentation template")
-		key = addon.GetObjectKey(mcAddon.Status.ConfigReferences, otelv1alpha1.GroupVersion.Group, addon.InstrumentationResource)
+		keys = addon.GetObjectKeys(mcAddon.Status.ConfigReferences, otelv1beta1.GroupVersion.Group, addon.InstrumentationResource)
 		instr := &otelv1alpha1.Instrumentation{}
-		if err := k8s.Get(ctx, key, instr, &client.GetOptions{}); err != nil {
+		if err := k8s.Get(ctx, keys[0], instr, &client.GetOptions{}); err != nil {
 			return opts, err
 		}
 		opts.Instrumentation = instr
