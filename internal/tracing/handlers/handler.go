@@ -2,7 +2,7 @@ package handlers
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"strings"
 
 	otelv1beta1 "github.com/open-telemetry/opentelemetry-operator/apis/v1beta1"
@@ -15,9 +15,11 @@ import (
 )
 
 var (
-	errNoExportersFound       = fmt.Errorf("no exporters found")
-	errNoMountPathFound       = fmt.Errorf("mountpath not found in any secret")
-	errNoVolumeMountForSecret = fmt.Errorf("no volumemount found for secret")
+	errNoExportersFound       = errors.New("no exporters found")
+	errNoMountPathFound       = errors.New("mountpath not found in any secret")
+	errNoVolumeMountForSecret = errors.New("no volumemount found for secret")
+	errMissingOTELColRef      = errors.New("missing OpenTelemetryCollector reference on addon installation")
+	errMultipleOTELColRef     = errors.New("multiple OpenTelemetryCollector references on addon installation")
 )
 
 func BuildOptions(ctx context.Context, k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, userWorkloads addon.TracesOptions) (manifests.Options, error) {
@@ -27,9 +29,15 @@ func BuildOptions(ctx context.Context, k8s client.Client, mcAddon *addonapiv1alp
 	}
 
 	klog.Info("Retrieving OpenTelemetry Collector template")
-	key := addon.GetObjectKey(mcAddon.Status.ConfigReferences, otelv1beta1.GroupVersion.Group, addon.OpenTelemetryCollectorsResource)
+	keys := addon.GetObjectKeys(mcAddon.Status.ConfigReferences, otelv1beta1.GroupVersion.Group, addon.OpenTelemetryCollectorsResource)
+	switch {
+	case len(keys) == 0:
+		return opts, errMissingOTELColRef
+	case len(keys) > 1:
+		return opts, errMultipleOTELColRef
+	}
 	otelCol := &otelv1beta1.OpenTelemetryCollector{}
-	if err := k8s.Get(ctx, key, otelCol, &client.GetOptions{}); err != nil {
+	if err := k8s.Get(ctx, keys[0], otelCol, &client.GetOptions{}); err != nil {
 		return opts, err
 	}
 	opts.OpenTelemetryCollector = otelCol
