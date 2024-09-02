@@ -1,13 +1,16 @@
 {{- if .Values.enabled }}
+{{- range $_, $clf_config := .Values.clfs }}
 apiVersion: logging.openshift.io/v1
 kind: ClusterLogForwarder
 metadata:
-  name: mcoa-instance
-  namespace: openshift-logging
+  name: {{ $clf_config.name }}
+  namespace: {{ $clf_config.namespace }}
   labels:
-    app: {{ template "logginghelm.name" . }}
-    chart: {{ template "logginghelm.chart" . }}
-    release: {{ .Release.Name }}
+    app: {{ template "logginghelm.name" $ }}
+    chart: {{ template "logginghelm.chart" $ }}
+    release: {{ $.Release.Name }}
 spec:
-{{- fromJson .Values.clfSpec | toYaml | nindent 2 }}
+{{- fromJson $clf_config.spec | toYaml | nindent 2 }}
+---
+{{- end }}
 {{- end }}
