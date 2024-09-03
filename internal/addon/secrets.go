@@ -15,7 +15,7 @@ import (
 // function will instead look for it in the `configResourceNamespace`.
 // If no secret is found an error will be returned.
 func GetSecrets(ctx context.Context, k8s client.Client, configResourceNamespace string, addonNamespace string, secretNames []string) ([]corev1.Secret, error) {
-	secrets := make([]corev1.Secret, 0, len(secretNames))
+	secrets := []corev1.Secret{}
 	for _, secretName := range secretNames {
 		secret := &corev1.Secret{}
 		key := client.ObjectKey{Name: secretName, Namespace: addonNamespace}
