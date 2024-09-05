@@ -9,8 +9,10 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
@@ -102,7 +104,7 @@ func (r *WatcherReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 // SetupWithManager sets up the controller with the Manager.
 func (r *WatcherReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&addonapiv1alpha1.ManagedClusterAddOn{}, noReconcilePred).
+		For(&addonapiv1alpha1.ManagedClusterAddOn{}, noReconcilePred, builder.OnlyMetadata).
 		Watches(&corev1.Secret{}, r.enqueueForSecret(), builder.OnlyMetadata).
 		Complete(r)
 }
@@ -110,7 +112,12 @@ func (r *WatcherReconciler) SetupWithManager(mgr ctrl.Manager) error {
 func (r *WatcherReconciler) enqueueForSecret() handler.EventHandler {
 	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
 		key := client.ObjectKey{Name: addon.Name, Namespace: obj.GetNamespace()}
-		mcaddon := &addonapiv1alpha1.ManagedClusterAddOn{}
+		mcaddon := &metav1.PartialObjectMetadata{}
+		mcaddon.SetGroupVersionKind(schema.GroupVersionKind{
+			Group:   "open-cluster-management.io",
+			Version: "v1alpha1",
+			Kind:    "ManagedClusterAddOn",
+		})
 		if err := r.Client.Get(ctx, key, mcaddon); err != nil {
 			if apierrors.IsNotFound(err) {
 				return r.getReconcileRequestsFromManifestWorks(ctx, obj)
