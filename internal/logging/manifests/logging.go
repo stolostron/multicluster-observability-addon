@@ -3,10 +3,8 @@ package manifests
 import (
 	"encoding/json"
 	"errors"
-	"slices"
 
 	loggingv1 "github.com/openshift/cluster-logging-operator/apis/logging/v1"
-	"github.com/rhobs/multicluster-observability-addon/internal/addon"
 )
 
 var (
@@ -23,15 +21,7 @@ func buildSubscriptionChannel(resources Options) string {
 
 func buildSecrets(resources Options) ([]SecretValue, error) {
 	secretsValue := []SecretValue{}
-	// Always go through map in order
-	keys := make([]string, 0, len(resources.Secrets))
-	for t := range resources.Secrets {
-		keys = append(keys, string(t))
-	}
-	slices.Sort(keys)
-
-	for _, key := range keys {
-		secret := resources.Secrets[addon.Endpoint(key)]
+	for _, secret := range resources.Secrets {
 		dataJSON, err := json.Marshal(secret.Data)
 		if err != nil {
 			return secretsValue, err
