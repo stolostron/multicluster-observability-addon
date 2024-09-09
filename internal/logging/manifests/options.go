@@ -7,7 +7,7 @@ import (
 )
 
 type Options struct {
-	Secrets             map[addon.Endpoint]corev1.Secret
+	Secrets             []corev1.Secret
 	ClusterLogForwarder *loggingv1.ClusterLogForwarder
 	Platform            addon.LogsOptions
 	UserWorkloads       addon.LogsOptions

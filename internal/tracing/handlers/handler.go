@@ -55,22 +55,22 @@ func BuildOptions(ctx context.Context, k8s client.Client, mcAddon *addonapiv1alp
 		klog.Info("Instrumentation template found")
 	}
 
-	targetSecretName, err := buildExportersSecrets(otelCol)
+	secretNames, err := buildExportersSecrets(otelCol)
 	if err != nil {
 		return opts, nil
 	}
 
-	targetSecrets, err := addon.GetSecrets(ctx, k8s, otelCol.Namespace, mcAddon.Namespace, targetSecretName)
+	secrets, err := addon.GetSecrets(ctx, k8s, otelCol.Namespace, mcAddon.Namespace, secretNames)
 	if err != nil {
 		return opts, err
 	}
-	opts.Secrets = targetSecrets
+	opts.Secrets = secrets
 
 	return opts, nil
 }
 
-func buildExportersSecrets(otelCol *otelv1beta1.OpenTelemetryCollector) (map[addon.Endpoint]string, error) {
-	exporterSecrets := map[addon.Endpoint]string{}
+func buildExportersSecrets(otelCol *otelv1beta1.OpenTelemetryCollector) ([]string, error) {
+	exporterSecrets := []string{}
 
 	if len(otelCol.Spec.Config.Exporters.Object) == 0 {
 		return exporterSecrets, errNoExportersFound
@@ -89,7 +89,7 @@ func buildExportersSecrets(otelCol *otelv1beta1.OpenTelemetryCollector) (map[add
 				continue
 			}
 			klog.Info("exporter ", exporter, " uses secret ", vol.Secret.SecretName)
-			exporterSecrets[addon.Endpoint(exporter)] = vol.Secret.SecretName
+			exporterSecrets = append(exporterSecrets, vol.Secret.SecretName)
 		}
 	}
 	return exporterSecrets, nil
