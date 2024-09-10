@@ -31,10 +31,7 @@ replace github.com/prometheus/common => github.com/prometheus/common v0.46.0
 
 replace github.com/prometheus/client_golang => github.com/prometheus/client_golang v1.18.0
 
-require (
-	github.com/go-logr/logr v1.4.2
-	gopkg.in/yaml.v2 v2.4.0
-)
+require github.com/go-logr/logr v1.4.2
 
 require (
 	cloud.google.com/go/compute/metadata v0.3.0 // indirect
@@ -130,6 +127,7 @@ require (
 	google.golang.org/protobuf v1.34.1 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
+	gopkg.in/yaml.v2 v2.4.0 // indirect
 	helm.sh/helm/v3 v3.11.1 // indirect
 	k8s.io/apiserver v0.29.3 // indirect
 	k8s.io/kms v0.29.3 // indirect
