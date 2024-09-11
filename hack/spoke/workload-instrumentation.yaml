@@ -15,10 +15,6 @@ spec:
         sidecar.opentelemetry.io/inject: "true"
         instrumentation.opentelemetry.io/inject-python: "true"
     spec:
-      securityContext:
-        runAsUser: 1000
-        runAsGroup: 3000
-        fsGroup: 3000
       containers:
       - name: myapp
         image: ghcr.io/open-telemetry/opentelemetry-operator/e2e-test-app-python:main
@@ -26,3 +22,5 @@ spec:
           allowPrivilegeEscalation: false
           capabilities:
             drop: ["ALL"]
+          privileged: false
+          runAsNonRoot: true
