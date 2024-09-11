@@ -114,7 +114,7 @@ func (r *WatcherReconciler) enqueueForSecret() handler.EventHandler {
 		key := client.ObjectKey{Name: addon.Name, Namespace: obj.GetNamespace()}
 		mcaddon := &metav1.PartialObjectMetadata{}
 		mcaddon.SetGroupVersionKind(schema.GroupVersionKind{
-			Group:   "open-cluster-management.io",
+			Group:   "addon.open-cluster-management.io",
 			Version: "v1alpha1",
 			Kind:    "ManagedClusterAddOn",
 		})
