@@ -20,7 +20,9 @@ const (
 	clfProbePath                  = ".status.conditions[?(@.type==\"Ready\")].status"
 
 	OpenTelemetryCollectorsResource = "opentelemetrycollectors"
+	InstrumentationResource         = "instrumentations"
 	SpokeOTELColName                = "mcoa-instance"
+	SpokeInstrumentationName        = "mcoa-instance"
 	SpokeOTELColNamespace           = "mcoa-opentelemetry"
 	otelColProbeKey                 = "replicas"
 	otelColProbePath                = ".spec.replicas"

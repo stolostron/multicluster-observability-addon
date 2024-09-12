@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 
+	otelv1alpha1 "github.com/open-telemetry/opentelemetry-operator/apis/v1alpha1"
 	otelv1beta1 "github.com/open-telemetry/opentelemetry-operator/apis/v1beta1"
 	"github.com/rhobs/multicluster-observability-addon/internal/addon"
 	"github.com/rhobs/multicluster-observability-addon/internal/tracing/manifests"
@@ -20,6 +21,8 @@ var (
 	errNoVolumeMountForSecret = errors.New("no volumemount found for secret")
 	errMissingOTELColRef      = errors.New("missing OpenTelemetryCollector reference on addon installation")
 	errMultipleOTELColRef     = errors.New("multiple OpenTelemetryCollector references on addon installation")
+	errMissingOTELInstrRef    = errors.New("missing Instrumentation reference on addon installation")
+	errMultipleOTELInstrRef   = errors.New("multiple Instrumentation references on addon installation")
 )
 
 func BuildOptions(ctx context.Context, k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, userWorkloads addon.TracesOptions) (manifests.Options, error) {
@@ -42,6 +45,23 @@ func BuildOptions(ctx context.Context, k8s client.Client, mcAddon *addonapiv1alp
 	}
 	opts.OpenTelemetryCollector = otelCol
 	klog.Info("OpenTelemetry Collector template found")
+
+	if userWorkloads.InstrumentationEnabled {
+		klog.Info("Retrieving Instrumentation template")
+		keys := addon.GetObjectKeys(mcAddon.Status.ConfigReferences, otelv1beta1.GroupVersion.Group, addon.OpenTelemetryCollectorsResource)
+		switch {
+		case len(keys) == 0:
+			return opts, errMissingOTELInstrRef
+		case len(keys) > 1:
+			return opts, errMultipleOTELInstrRef
+		}
+		instr := &otelv1alpha1.Instrumentation{}
+		if err := k8s.Get(ctx, keys[0], instr, &client.GetOptions{}); err != nil {
+			return opts, err
+		}
+		opts.Instrumentation = instr
+		klog.Info("Instrumentation template found")
+	}
 
 	secretNames, err := buildExportersSecrets(otelCol)
 	if err != nil {

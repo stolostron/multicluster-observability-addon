@@ -11,3 +11,9 @@ awsCredentials:
 # -- Hub route of OpenTelemtry Collector used by the trace-forwarding use-case.
 hubCollector:
   route: XXXXXXX
+
+# -- Secret for sending signals to the hub OpenTelemtry Collector.
+otelCollectorSecret:
+  tlsKey: XXXXXXX
+  tlsCrt: XXXXXXX
+  caCrt: XXXXXXX

@@ -5,9 +5,11 @@ import (
 )
 
 type TracingValues struct {
-	Enabled     bool          `json:"enabled"`
-	OTELColSpec string        `json:"otelColSpec"`
-	Secrets     []SecretValue `json:"secrets"`
+	Enabled                bool          `json:"enabled"`
+	InstrumentationEnabled bool          `json:"instrumentationEnabled"`
+	OTELColSpec            string        `json:"otelColSpec"`
+	InstrumenationSpec     string        `json:"instrumentationSpec"`
+	Secrets                []SecretValue `json:"secrets"`
 }
 
 type SecretValue struct {
@@ -32,6 +34,15 @@ func BuildValues(opts Options) (TracingValues, error) {
 	}
 
 	values.OTELColSpec = string(b)
+
+	if opts.Instrumentation != nil {
+		values.InstrumentationEnabled = true
+		b, err = json.Marshal(opts.Instrumentation.Spec)
+		if err != nil {
+			return values, err
+		}
+		values.InstrumenationSpec = string(b)
+	}
 
 	return values, nil
 }
