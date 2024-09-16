@@ -28,7 +28,7 @@ func BuildValues(opts Options) (TracingValues, error) {
 	}
 	values.Secrets = secrets
 
-	b, err := json.Marshal(opts.OpenTelemetryCollector.Spec)
+	b, err := json.Marshal(&opts.OpenTelemetryCollector.Spec)
 	if err != nil {
 		return values, err
 	}
