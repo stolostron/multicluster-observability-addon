@@ -6,7 +6,7 @@ metadata:
 spec:
   config:
     exporters:
-      debug:
+      debug: {}
       otlp:
         endpoint: {{ .Values.hubCollector.route }}
         headers:
@@ -20,11 +20,11 @@ spec:
     receivers:
       jaeger:
         protocols:
-            grpc:
+            grpc: {}
       otlp:
         protocols:
-          grpc:
-          http:
+          grpc: {}
+          http: {}
     service:
       pipelines:
         traces:
