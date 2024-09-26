@@ -28,11 +28,15 @@ func BuildValues(opts Options) (TracingValues, error) {
 	}
 	values.Secrets = secrets
 
-	b, err := json.Marshal(&opts.OpenTelemetryCollector.Spec)
+	otelColSpec, err := buildOTELColSpec(opts)
 	if err != nil {
 		return values, err
 	}
 
+	b, err := json.Marshal(otelColSpec)
+	if err != nil {
+		return values, err
+	}
 	values.OTELColSpec = string(b)
 
 	if opts.Instrumentation != nil {
