@@ -2,6 +2,8 @@ package manifests
 
 import (
 	"encoding/json"
+
+	otelv1beta1 "github.com/open-telemetry/opentelemetry-operator/apis/v1beta1"
 )
 
 func buildSecrets(resources Options) ([]SecretValue, error) {
@@ -18,4 +20,10 @@ func buildSecrets(resources Options) ([]SecretValue, error) {
 		secretsValue = append(secretsValue, secretValue)
 	}
 	return secretsValue, nil
+}
+
+func buildOTELColSpec(opts Options) (*otelv1beta1.OpenTelemetryCollectorSpec, error) {
+	otelColSpec := opts.OpenTelemetryCollector.Spec
+	otelColSpec.ManagementState = otelv1beta1.ManagementStateManaged
+	return &otelColSpec, nil
 }

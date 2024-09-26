@@ -4,6 +4,7 @@ metadata:
   name: instance
   namespace: open-cluster-management-observability
 spec:
+  managementState: unmanaged
   config:
     exporters:
       debug: {}
