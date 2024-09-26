@@ -1,18 +1,24 @@
 package manifests
 
-import (
-	"encoding/json"
-)
+import "encoding/json"
 
 type LoggingValues struct {
 	Enabled                    bool          `json:"enabled"`
-	CLFSpec                    string        `json:"clfSpec"`
+	CLFs                       []CLFValue    `json:"clfs"`
 	LoggingSubscriptionChannel string        `json:"loggingSubscriptionChannel"`
 	Secrets                    []SecretValue `json:"secrets"`
 }
+
+type CLFValue struct {
+	Name      string `json:"name"`
+	Namespace string `json:"namespace"`
+	Spec      string `json:"spec"`
+}
+
 type SecretValue struct {
-	Name string `json:"name"`
-	Data string `json:"data"`
+	Name      string `json:"name"`
+	Namespace string `json:"namespace"`
+	Data      string `json:"data"`
 }
 
 func BuildValues(opts Options) (*LoggingValues, error) {
@@ -28,16 +34,26 @@ func BuildValues(opts Options) (*LoggingValues, error) {
 	}
 	values.Secrets = secrets
 
-	clfSpec, err := buildClusterLogForwarderSpec(opts)
+	clfs, err := buildClusterLogForwarders(opts)
 	if err != nil {
 		return nil, err
 	}
 
-	b, err := json.Marshal(clfSpec)
-	if err != nil {
-		return nil, err
+	clfsValue := []CLFValue{}
+	for _, clf := range clfs {
+		specJSON, err := json.Marshal(clf.Spec)
+		if err != nil {
+			return nil, err
+		}
+		clfValue := CLFValue{
+			Name:      clf.Name,
+			Namespace: clf.Namespace,
+			Spec:      string(specJSON),
+		}
+		clfsValue = append(clfsValue, clfValue)
 	}
-	values.CLFSpec = string(b)
+
+	values.CLFs = clfsValue
 
 	return values, nil
 }

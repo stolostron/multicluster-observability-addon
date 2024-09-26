@@ -8,8 +8,9 @@ import (
 )
 
 var (
-	errPlatformLogsNotDefined     = errors.New("Platform logs not defined")
-	errUserWorkloadLogsNotDefined = errors.New("User Workloads logs not defined")
+	errPlatformLogsNotDefined          = errors.New("no ClusterLogForwarder provided defined Platform logs")
+	errUserWorkloadLogsNotDefined      = errors.New("no ClusterLogForwarder provided defined User Workloads logs")
+	errCLFNamespaceNotOpenshiftLogging = errors.New("to handle platform logs the ClusterLogForwarder must be in the openshift-logging")
 )
 
 func buildSubscriptionChannel(resources Options) string {
@@ -21,24 +22,62 @@ func buildSubscriptionChannel(resources Options) string {
 
 func buildSecrets(resources Options) ([]SecretValue, error) {
 	secretsValue := []SecretValue{}
-	for _, secret := range resources.Secrets {
-		dataJSON, err := json.Marshal(secret.Data)
-		if err != nil {
-			return secretsValue, err
+	for namespace, secrets := range resources.Secrets {
+		for _, secret := range secrets {
+			dataJSON, err := json.Marshal(secret.Data)
+			if err != nil {
+				return secretsValue, err
+			}
+			secretValue := SecretValue{
+				Name:      secret.Name,
+				Namespace: namespace,
+				Data:      string(dataJSON),
+			}
+			secretsValue = append(secretsValue, secretValue)
 		}
-		secretValue := SecretValue{
-			Name: secret.Name,
-			Data: string(dataJSON),
-		}
-		secretsValue = append(secretsValue, secretValue)
 	}
 	return secretsValue, nil
 }
 
-func buildClusterLogForwarderSpec(opts Options) (*loggingv1.ClusterLogForwarderSpec, error) {
-	clf := opts.ClusterLogForwarder
-	clf.Spec.ServiceAccountName = "mcoa-logcollector"
+func buildClusterLogForwarders(resources Options) ([]loggingv1.ClusterLogForwarder, error) {
+	var (
+		platformDetected      bool
+		userWorkloadsDetected bool
+	)
+	clfs := []loggingv1.ClusterLogForwarder{}
+	for _, clf := range resources.ClusterLogForwarders {
+		// TODO @JoaoBraveCoding this would need to be fixed we would need to analize the spec
+		// of each clf and determine which RBAC we would need
+		clf.Spec.ServiceAccountName = "mcoa-logcollector"
 
+		// By default, the namespace is openshift-logging unless users specify
+		// a different namespace
+		clf.Namespace = "openshift-logging"
+		if val, ok := clf.Annotations["mcoa/namespace"]; ok {
+			clf.Namespace = val
+		}
+		pd, uwd, err := validateClusterLogForwarder(clf)
+		if err != nil {
+			return clfs, err
+		}
+		platformDetected = platformDetected || pd
+		userWorkloadsDetected = userWorkloadsDetected || uwd
+
+		clfs = append(clfs, clf)
+	}
+
+	if resources.Platform.CollectionEnabled && !platformDetected {
+		return nil, errPlatformLogsNotDefined
+	}
+
+	if resources.UserWorkloads.CollectionEnabled && !userWorkloadsDetected {
+		return nil, errUserWorkloadLogsNotDefined
+	}
+
+	return clfs, nil
+}
+
+func validateClusterLogForwarder(clf loggingv1.ClusterLogForwarder) (bool, bool, error) {
 	// Validate Platform Logs enabled
 	var (
 		platformInputRefs []string
@@ -55,6 +94,10 @@ func buildClusterLogForwarderSpec(opts Options) (*loggingv1.ClusterLogForwarderS
 		if input.Infrastructure != nil || input.Audit != nil {
 			platformInputRefs = append(platformInputRefs, input.Name)
 		}
+	}
+
+	if len(platformInputRefs) > 0 && clf.Namespace != "openshift-logging" {
+		return false, false, errCLFNamespaceNotOpenshiftLogging
 	}
 
 	for _, pipeline := range clf.Spec.Pipelines {
@@ -88,13 +131,5 @@ func buildClusterLogForwarderSpec(opts Options) (*loggingv1.ClusterLogForwarderS
 		}
 	}
 
-	if opts.Platform.CollectionEnabled && !platformDetected {
-		return nil, errPlatformLogsNotDefined
-	}
-
-	if opts.UserWorkloads.CollectionEnabled && !userWorkloadsDetected {
-		return nil, errUserWorkloadLogsNotDefined
-	}
-
-	return &clf.Spec, nil
+	return platformDetected, userWorkloadsDetected, nil
 }

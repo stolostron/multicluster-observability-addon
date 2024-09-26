@@ -3,10 +3,14 @@ nameOverride: null
 enabled: true
 
 # Expects json format
-clfSpec: {}
+clfs:
+  - name: "foo"
+    namespace: "bar"
+    spec: {}
 
 secrets:
   - name: "secret-1"
+    namespace: "bar"
     # Expects json format
     data: {}
 

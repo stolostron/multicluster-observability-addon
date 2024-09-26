@@ -43,25 +43,29 @@ func Test_BuildSubscriptionChannel(t *testing.T) {
 
 func Test_BuildSecrets(t *testing.T) {
 	resources := Options{
-		Secrets: []corev1.Secret{
-			{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "foo",
-					Namespace: "cluster-1",
-				},
-				Data: map[string][]byte{
-					"foo-1": []byte("foo-user"),
-					"foo-2": []byte("foo-pass"),
+		Secrets: map[string][]corev1.Secret{
+			"foo": {
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "foo",
+						Namespace: "cluster-1",
+					},
+					Data: map[string][]byte{
+						"foo-1": []byte("foo-user"),
+						"foo-2": []byte("foo-pass"),
+					},
 				},
 			},
-			{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "bar",
-					Namespace: "cluster-1",
-				},
-				Data: map[string][]byte{
-					"bar-1": []byte("bar-user"),
-					"bar-2": []byte("bar-pass"),
+			"bar": {
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "bar",
+						Namespace: "cluster-1",
+					},
+					Data: map[string][]byte{
+						"bar-1": []byte("bar-user"),
+						"bar-2": []byte("bar-pass"),
+					},
 				},
 			},
 		},
@@ -74,12 +78,12 @@ func Test_BuildSecrets(t *testing.T) {
 	gotData := &map[string][]byte{}
 	err = json.Unmarshal([]byte(secretsValue[0].Data), gotData)
 	require.NoError(t, err)
-	require.Equal(t, resources.Secrets[0].Data, *gotData)
+	require.Equal(t, resources.Secrets["foo"][0].Data, *gotData)
 
 	gotData = &map[string][]byte{}
 	err = json.Unmarshal([]byte(secretsValue[1].Data), gotData)
 	require.NoError(t, err)
-	require.Equal(t, resources.Secrets[1].Data, *gotData)
+	require.Equal(t, resources.Secrets["bar"][0].Data, *gotData)
 }
 
 func Test_BuildCLFSpec(t *testing.T) {
@@ -170,12 +174,12 @@ func Test_BuildCLFSpec(t *testing.T) {
 
 	// Setup the fake k8s client
 	resources := Options{
-		ClusterLogForwarder: clf,
+		ClusterLogForwarders: []loggingv1.ClusterLogForwarder{*clf},
 	}
-	clfSpec, err := buildClusterLogForwarderSpec(resources)
+	clfs, err := buildClusterLogForwarders(resources)
 	require.NoError(t, err)
-	require.NotNil(t, clfSpec.Outputs[0].Secret)
-	require.NotNil(t, clfSpec.Outputs[1].Secret)
-	require.Equal(t, "app-logs-secret", clfSpec.Outputs[0].Secret.Name)
-	require.Equal(t, "cluster-logs-secret", clfSpec.Outputs[1].Secret.Name)
+	require.NotNil(t, clfs[0].Spec.Outputs[0].Secret)
+	require.NotNil(t, clfs[0].Spec.Outputs[1].Secret)
+	require.Equal(t, "app-logs-secret", clfs[0].Spec.Outputs[0].Secret.Name)
+	require.Equal(t, "cluster-logs-secret", clfs[0].Spec.Outputs[1].Secret.Name)
 }
