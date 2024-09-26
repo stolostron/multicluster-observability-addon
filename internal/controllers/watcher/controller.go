@@ -105,11 +105,12 @@ func (r *WatcherReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 func (r *WatcherReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&addonapiv1alpha1.ManagedClusterAddOn{}, noReconcilePred, builder.OnlyMetadata).
-		Watches(&corev1.Secret{}, r.enqueueForSecret(), builder.OnlyMetadata).
+		Watches(&corev1.Secret{}, r.enqueueForConfigResource(), builder.OnlyMetadata).
+		Watches(&corev1.ConfigMap{}, r.enqueueForConfigResource(), builder.OnlyMetadata).
 		Complete(r)
 }
 
-func (r *WatcherReconciler) enqueueForSecret() handler.EventHandler {
+func (r *WatcherReconciler) enqueueForConfigResource() handler.EventHandler {
 	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
 		key := client.ObjectKey{Name: addon.Name, Namespace: obj.GetNamespace()}
 		mcaddon := &metav1.PartialObjectMetadata{}
