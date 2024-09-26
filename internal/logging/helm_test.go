@@ -61,6 +61,7 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 		addOnDeploymentConfig *addonapiv1alpha1.AddOnDeploymentConfig
 		clf                   *loggingv1.ClusterLogForwarder
 		staticCred            *corev1.Secret
+		caConfigMap           *corev1.ConfigMap
 
 		// Test clients
 		fakeKubeClient  client.Client
@@ -138,6 +139,14 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 						LabelKeys: []string{"key-1", "key-2"},
 						TenantKey: "tenant-x",
 					},
+					// Simply here to test the ConfigMap reference
+					TLS: &loggingv1.OutputTLSSpec{
+						TLSSpec: loggingv1.TLSSpec{
+							CA: &loggingv1.ValueReference{
+								ConfigMapName: "foo",
+							},
+						},
+					},
 				},
 				{
 					Name: "cluster-logs",
@@ -185,6 +194,16 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 		},
 	}
 
+	caConfigMap = &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "foo",
+			Namespace: "open-cluster-management-observability",
+		},
+		Data: map[string]string{
+			"foo": "bar",
+		},
+	}
+
 	addOnDeploymentConfig = &addonapiv1alpha1.AddOnDeploymentConfig{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "multicluster-observability-addon",
@@ -203,7 +222,7 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 	// Setup the fake k8s client
 	fakeKubeClient = fake.NewClientBuilder().
 		WithScheme(scheme.Scheme).
-		WithObjects(clf, staticCred).
+		WithObjects(clf, staticCred, caConfigMap).
 		Build()
 
 	// Setup the fake addon client
@@ -226,7 +245,7 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 	// Render manifests and return them as k8s runtime objects
 	objects, err := loggingAgentAddon.Manifests(managedCluster, managedClusterAddOn)
 	require.NoError(t, err)
-	require.Equal(t, 10, len(objects))
+	require.Equal(t, 11, len(objects))
 
 	for _, obj := range objects {
 		switch obj := obj.(type) {
@@ -244,6 +263,10 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 		case *corev1.Secret:
 			if obj.Name == "static-authentication" {
 				require.Equal(t, staticCred.Data, obj.Data)
+			}
+		case *corev1.ConfigMap:
+			if obj.Name == "foo" {
+				require.Equal(t, caConfigMap.Data, obj.Data)
 			}
 		}
 	}
