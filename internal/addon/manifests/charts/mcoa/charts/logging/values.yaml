@@ -13,4 +13,9 @@ secrets:
     # Expects json format
     data: {}
 
+configmaps:
+  - name: "configmap-1"
+    # Expects json format
+    data: {}
+
 loggingSubscriptionChannel: channelName

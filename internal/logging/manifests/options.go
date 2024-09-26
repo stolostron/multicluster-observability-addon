@@ -7,6 +7,7 @@ import (
 )
 
 type Options struct {
+	ConfigMaps          []corev1.ConfigMap
 	Secrets             []corev1.Secret
 	ClusterLogForwarder *loggingv1.ClusterLogForwarder
 	Platform            addon.LogsOptions

@@ -5,13 +5,14 @@ import (
 )
 
 type LoggingValues struct {
-	Enabled                    bool          `json:"enabled"`
-	CLFSpec                    string        `json:"clfSpec"`
-	ServiceAccountName         string        `json:"serviceAccountName"`
-	LoggingSubscriptionChannel string        `json:"loggingSubscriptionChannel"`
-	Secrets                    []SecretValue `json:"secrets"`
+	Enabled                    bool            `json:"enabled"`
+	CLFSpec                    string          `json:"clfSpec"`
+	ServiceAccountName         string          `json:"serviceAccountName"`
+	LoggingSubscriptionChannel string          `json:"loggingSubscriptionChannel"`
+	Secrets                    []ResourceValue `json:"secrets"`
+	ConfigMaps                 []ResourceValue `json:"configmaps"`
 }
-type SecretValue struct {
+type ResourceValue struct {
 	Name string `json:"name"`
 	Data string `json:"data"`
 }
@@ -22,6 +23,12 @@ func BuildValues(opts Options) (*LoggingValues, error) {
 	}
 
 	values.LoggingSubscriptionChannel = buildSubscriptionChannel(opts)
+
+	configmaps, err := buildConfigMaps(opts)
+	if err != nil {
+		return nil, err
+	}
+	values.ConfigMaps = configmaps
 
 	secrets, err := buildSecrets(opts)
 	if err != nil {

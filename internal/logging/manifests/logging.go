@@ -19,14 +19,30 @@ func buildSubscriptionChannel(resources Options) string {
 	return defaultLoggingVersion
 }
 
-func buildSecrets(resources Options) ([]SecretValue, error) {
-	secretsValue := []SecretValue{}
+func buildConfigMaps(resources Options) ([]ResourceValue, error) {
+	configmapsValue := []ResourceValue{}
+	for _, configmap := range resources.ConfigMaps {
+		dataJSON, err := json.Marshal(configmap.Data)
+		if err != nil {
+			return configmapsValue, err
+		}
+		configmapValue := ResourceValue{
+			Name: configmap.Name,
+			Data: string(dataJSON),
+		}
+		configmapsValue = append(configmapsValue, configmapValue)
+	}
+	return configmapsValue, nil
+}
+
+func buildSecrets(resources Options) ([]ResourceValue, error) {
+	secretsValue := []ResourceValue{}
 	for _, secret := range resources.Secrets {
 		dataJSON, err := json.Marshal(secret.Data)
 		if err != nil {
 			return secretsValue, err
 		}
-		secretValue := SecretValue{
+		secretValue := ResourceValue{
 			Name: secret.Name,
 			Data: string(dataJSON),
 		}
