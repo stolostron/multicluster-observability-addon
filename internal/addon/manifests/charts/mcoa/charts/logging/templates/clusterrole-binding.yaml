@@ -13,7 +13,7 @@ roleRef:
   name: collect-application-logs
 subjects:
   - kind: ServiceAccount
-    name: mcoa-logcollector
+    name: {{ .Values.serviceAccountName }}
     namespace: openshift-logging
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -30,7 +30,7 @@ roleRef:
   name: collect-audit-logs
 subjects:
   - kind: ServiceAccount
-    name: mcoa-logcollector
+    name: {{ .Values.serviceAccountName }}
     namespace: openshift-logging
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -47,6 +47,6 @@ roleRef:
   name: collect-infrastructure-logs
 subjects:
   - kind: ServiceAccount
-    name: mcoa-logcollector
+    name: {{ .Values.serviceAccountName }}
     namespace: openshift-logging
 {{- end }}

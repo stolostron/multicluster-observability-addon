@@ -1,17 +1,27 @@
-apiVersion: logging.openshift.io/v1
+apiVersion: observability.openshift.io/v1
 kind: ClusterLogForwarder
 metadata:
   name: instance
   namespace: open-cluster-management-observability
 spec:
+  managementState: Unmanaged
+  serviceAccount: 
+    name: mcoa-logcollector
   outputs:
    - cloudwatch:
        region: eu-central-1
-       groupBy: logType
+       groupName: mcoa-logs
+       authentication:
+          type: awsAccessKey
+          awsAccessKey:
+            keyId:
+              secretName: aws-credentials
+              key: aws_access_key_id
+            keySecret:
+              secretName: aws-credentials
+              key: aws_secret_access_key
      type: cloudwatch
      name: cw
-     secret:
-       name: aws-credentials
   pipelines:
    - name: infra-cw
      inputRefs:

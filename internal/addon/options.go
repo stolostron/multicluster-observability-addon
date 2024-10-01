@@ -20,7 +20,7 @@ const (
 type CollectionKind string
 
 const (
-	ClusterLogForwarderV1         CollectionKind = "clusterlogforwarders.v1.logging.openshift.io"
+	ClusterLogForwarderV1         CollectionKind = "clusterlogforwarders.v1.observability.openshift.io"
 	OpenTelemetryCollectorV1beta1 CollectionKind = "opentelemetrycollectors.v1beta1.opentelemetry.io"
 )
 

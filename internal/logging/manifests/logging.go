@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 
-	loggingv1 "github.com/openshift/cluster-logging-operator/apis/logging/v1"
+	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
 )
 
 var (
@@ -19,14 +19,30 @@ func buildSubscriptionChannel(resources Options) string {
 	return defaultLoggingVersion
 }
 
-func buildSecrets(resources Options) ([]SecretValue, error) {
-	secretsValue := []SecretValue{}
+func buildConfigMaps(resources Options) ([]ResourceValue, error) {
+	configmapsValue := []ResourceValue{}
+	for _, configmap := range resources.ConfigMaps {
+		dataJSON, err := json.Marshal(configmap.Data)
+		if err != nil {
+			return configmapsValue, err
+		}
+		configmapValue := ResourceValue{
+			Name: configmap.Name,
+			Data: string(dataJSON),
+		}
+		configmapsValue = append(configmapsValue, configmapValue)
+	}
+	return configmapsValue, nil
+}
+
+func buildSecrets(resources Options) ([]ResourceValue, error) {
+	secretsValue := []ResourceValue{}
 	for _, secret := range resources.Secrets {
 		dataJSON, err := json.Marshal(secret.Data)
 		if err != nil {
 			return secretsValue, err
 		}
-		secretValue := SecretValue{
+		secretValue := ResourceValue{
 			Name: secret.Name,
 			Data: string(dataJSON),
 		}
@@ -37,7 +53,7 @@ func buildSecrets(resources Options) ([]SecretValue, error) {
 
 func buildClusterLogForwarderSpec(opts Options) (*loggingv1.ClusterLogForwarderSpec, error) {
 	clf := opts.ClusterLogForwarder
-	clf.Spec.ServiceAccountName = "mcoa-logcollector"
+	clf.Spec.ManagementState = loggingv1.ManagementStateManaged
 
 	// Validate Platform Logs enabled
 	var (
@@ -79,10 +95,10 @@ func buildClusterLogForwarderSpec(opts Options) (*loggingv1.ClusterLogForwarderS
 				}
 			}
 
-			if ref == loggingv1.InputNameInfrastructure || ref == loggingv1.InputNameAudit {
+			if ref == string(loggingv1.InputTypeInfrastructure) || ref == string(loggingv1.InputTypeAudit) {
 				platformDetected = true
 			}
-			if ref == loggingv1.InputNameApplication {
+			if ref == string(loggingv1.InputTypeApplication) {
 				userWorkloadsDetected = true
 			}
 		}

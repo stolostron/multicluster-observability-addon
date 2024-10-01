@@ -84,10 +84,10 @@ spec:
   customizedVariables:
   # Platform Observability
   - name: platformLogsCollection
-    value: clusterlogforwarders.v1.logging.openshift.io
+    value: clusterlogforwarders.v1.observability.openshift.io
   # User Workloads Observability
   - name: userWorkloadLogsCollection
-    value: clusterlogforwarders.v1.logging.openshift.io
+    value: clusterlogforwarders.v1.observability.openshift.io
   - name: userWorkloadTracesCollection
     value: opentelemetrycollectors.v1beta1.opentelemetry.io
   - name: userWorkloadInstrumentation
@@ -95,8 +95,8 @@ spec:
 ``` 
 
 Supported keys are:
-- `platformLogsCollection`: Supports values `clusterlogforwarders.v1.logging.openshift.io`
-- `userWorkloadLogsCollection`: Supports values `clusterlogforwarders.v1.logging.openshift.io`
+- `platformLogsCollection`: Supports values `clusterlogforwarders.v1.observability.openshift.io`
+- `userWorkloadLogsCollection`: Supports values `clusterlogforwarders.v1.observability.openshift.io`
 - `userWorkloadTracesCollection`: Supports values `opentelemetrycollectors.v1beta1.opentelemetry.io`
 - `userWorkloadTracesInstrumentation`: Supports values `instrumentations.v1alpha1.opentelemetry.io`
 
@@ -112,7 +112,7 @@ spec:
   customizedVariables:
   # User Workloads Observability with multiple collectors
   - name: userWorkloadLogsCollection
-    value: clusterlogforwarders.v1.logging.openshift.io;opentelemetrycollectors.v1beta1.opentelemetry.io
+    value: clusterlogforwarders.v1.observability.openshift.io;opentelemetrycollectors.v1beta1.opentelemetry.io
 ```
 
 The addon installation is managed by the addon-manager. This means that users

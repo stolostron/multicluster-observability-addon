@@ -8,7 +8,7 @@ import (
 	workv1 "open-cluster-management.io/api/work/v1"
 
 	otelv1alpha1 "github.com/open-telemetry/opentelemetry-operator/apis/v1alpha1"
-	loggingv1 "github.com/openshift/cluster-logging-operator/apis/logging/v1"
+	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
 )
 
 func Test_AgentHealthProber_CLF(t *testing.T) {

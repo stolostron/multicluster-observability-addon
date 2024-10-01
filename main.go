@@ -11,7 +11,7 @@ import (
 	"github.com/ViaQ/logerr/v2/log"
 	otelv1alpha1 "github.com/open-telemetry/opentelemetry-operator/apis/v1alpha1"
 	otelv1beta1 "github.com/open-telemetry/opentelemetry-operator/apis/v1beta1"
-	loggingv1 "github.com/openshift/cluster-logging-operator/apis/logging/v1"
+	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
 	operatorsv1 "github.com/operator-framework/api/pkg/operators/v1"
 	operatorsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	"github.com/rhobs/multicluster-observability-addon/internal/addon"

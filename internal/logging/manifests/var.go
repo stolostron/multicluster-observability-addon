@@ -2,5 +2,5 @@ package manifests
 
 const (
 	subscriptionChannelValueKey = "loggingSubscriptionChannel"
-	defaultLoggingVersion       = "stable-5.9"
+	defaultLoggingVersion       = "stable-6.0"
 )

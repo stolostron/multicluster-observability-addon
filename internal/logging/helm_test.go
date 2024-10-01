@@ -4,12 +4,11 @@ import (
 	"context"
 	"testing"
 
-	loggingv1 "github.com/openshift/cluster-logging-operator/apis/logging/v1"
+	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
 	"github.com/rhobs/multicluster-observability-addon/internal/addon"
 	"github.com/rhobs/multicluster-observability-addon/internal/logging/handlers"
 	"github.com/rhobs/multicluster-observability-addon/internal/logging/manifests"
 
-	loggingapis "github.com/openshift/cluster-logging-operator/apis"
 	operatorsv1 "github.com/operator-framework/api/pkg/operators/v1"
 	operatorsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	"github.com/stretchr/testify/require"
@@ -17,7 +16,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog/v2"
-	"k8s.io/utils/ptr"
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
 	"open-cluster-management.io/addon-framework/pkg/agent"
@@ -29,7 +27,7 @@ import (
 )
 
 var (
-	_ = loggingapis.AddToScheme(scheme.Scheme)
+	_ = loggingv1.AddToScheme(scheme.Scheme)
 	_ = operatorsv1.AddToScheme(scheme.Scheme)
 	_ = operatorsv1alpha1.AddToScheme(scheme.Scheme)
 )
@@ -63,6 +61,7 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 		addOnDeploymentConfig *addonapiv1alpha1.AddOnDeploymentConfig
 		clf                   *loggingv1.ClusterLogForwarder
 		staticCred            *corev1.Secret
+		caConfigMap           *corev1.ConfigMap
 
 		// Test clients
 		fakeKubeClient  client.Client
@@ -87,7 +86,7 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 		},
 		{
 			ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
-				Group:    "logging.openshift.io",
+				Group:    "observability.openshift.io",
 				Resource: "clusterlogforwarders",
 			},
 			ConfigReferent: addonapiv1alpha1.ConfigReferent{
@@ -108,7 +107,14 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 				{
 					Name: "app-logs",
 					Application: &loggingv1.Application{
-						Namespaces: []string{"ns-1", "ns-2"},
+						Includes: []loggingv1.NamespaceContainerSpec{
+							{
+								Namespace: "ns-1",
+							},
+							{
+								Namespace: "ns-2",
+							},
+						},
 					},
 				},
 				{
@@ -120,27 +126,45 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 				{
 					Name: "app-logs",
 					Type: loggingv1.OutputTypeLoki,
-					OutputTypeSpec: loggingv1.OutputTypeSpec{
-						Loki: &loggingv1.Loki{
-							LabelKeys: []string{"key-1", "key-2"},
-							TenantKey: "tenant-x",
+					Loki: &loggingv1.Loki{
+						Authentication: &loggingv1.HTTPAuthentication{
+							Token: &loggingv1.BearerToken{
+								From: loggingv1.BearerTokenFromSecret,
+								Secret: &loggingv1.BearerTokenSecretKey{
+									Name: "static-authentication",
+									Key:  "pass",
+								},
+							},
 						},
+						LabelKeys: []string{"key-1", "key-2"},
+						TenantKey: "tenant-x",
 					},
-					Secret: &loggingv1.OutputSecretSpec{
-						Name: "static-authentication",
+					// Simply here to test the ConfigMap reference
+					TLS: &loggingv1.OutputTLSSpec{
+						TLSSpec: loggingv1.TLSSpec{
+							CA: &loggingv1.ValueReference{
+								ConfigMapName: "foo",
+							},
+						},
 					},
 				},
 				{
 					Name: "cluster-logs",
 					Type: loggingv1.OutputTypeCloudwatch,
-					OutputTypeSpec: loggingv1.OutputTypeSpec{
-						Cloudwatch: &loggingv1.Cloudwatch{
-							GroupBy:     loggingv1.LogGroupByLogType,
-							GroupPrefix: ptr.To("test-prefix"),
+					Cloudwatch: &loggingv1.Cloudwatch{
+						Authentication: &loggingv1.CloudwatchAuthentication{
+							Type: loggingv1.CloudwatchAuthTypeAccessKey,
+							AWSAccessKey: &loggingv1.CloudwatchAWSAccessKey{
+								KeyId: loggingv1.SecretReference{
+									SecretName: "static-authentication",
+									Key:        "key",
+								},
+								KeySecret: loggingv1.SecretReference{
+									SecretName: "static-authentication",
+									Key:        "pass",
+								},
+							},
 						},
-					},
-					Secret: &loggingv1.OutputSecretSpec{
-						Name: "static-authentication",
 					},
 				},
 			},
@@ -152,7 +176,7 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 				},
 				{
 					Name:       "cluster-logs",
-					InputRefs:  []string{"infra-logs", loggingv1.InputNameAudit},
+					InputRefs:  []string{"infra-logs", string(loggingv1.InputTypeAudit)},
 					OutputRefs: []string{"cluster-logs"},
 				},
 			},
@@ -170,6 +194,16 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 		},
 	}
 
+	caConfigMap = &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "foo",
+			Namespace: "open-cluster-management-observability",
+		},
+		Data: map[string]string{
+			"foo": "bar",
+		},
+	}
+
 	addOnDeploymentConfig = &addonapiv1alpha1.AddOnDeploymentConfig{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "multicluster-observability-addon",
@@ -179,7 +213,7 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 			CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
 				{
 					Name:  "loggingSubscriptionChannel",
-					Value: "stable-5.9",
+					Value: "stable-6.0",
 				},
 			},
 		},
@@ -188,7 +222,7 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 	// Setup the fake k8s client
 	fakeKubeClient = fake.NewClientBuilder().
 		WithScheme(scheme.Scheme).
-		WithObjects(clf, staticCred).
+		WithObjects(clf, staticCred, caConfigMap).
 		Build()
 
 	// Setup the fake addon client
@@ -216,12 +250,12 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 	for _, obj := range objects {
 		switch obj := obj.(type) {
 		case *operatorsv1alpha1.Subscription:
-			require.Equal(t, obj.Spec.Channel, "stable-5.9")
+			require.Equal(t, obj.Spec.Channel, "stable-6.0")
 		case *loggingv1.ClusterLogForwarder:
-			require.NotNil(t, obj.Spec.Outputs[0].Secret)
-			require.NotNil(t, obj.Spec.Outputs[1].Secret)
-			require.Equal(t, "static-authentication", obj.Spec.Outputs[0].Secret.Name)
-			require.Equal(t, "static-authentication", obj.Spec.Outputs[1].Secret.Name)
+			require.NotNil(t, obj.Spec.Outputs[0].Loki.Authentication.Token.Secret)
+			require.NotNil(t, obj.Spec.Outputs[1].Cloudwatch.Authentication.AWSAccessKey)
+			require.Equal(t, "static-authentication", obj.Spec.Outputs[0].Loki.Authentication.Token.Secret.Name)
+			require.Equal(t, "static-authentication", obj.Spec.Outputs[1].Cloudwatch.Authentication.AWSAccessKey.KeySecret.SecretName)
 			// Check name and namespace to make sure that if we change the helm
 			// manifests that we don't break the addon probes
 			require.Equal(t, addon.SpokeCLFName, obj.Name)
@@ -229,6 +263,10 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 		case *corev1.Secret:
 			if obj.Name == "static-authentication" {
 				require.Equal(t, staticCred.Data, obj.Data)
+			}
+		case *corev1.ConfigMap:
+			if obj.Name == "foo" {
+				require.Equal(t, caConfigMap.Data, obj.Data)
 			}
 		}
 	}
