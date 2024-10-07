@@ -2,6 +2,7 @@ package watcher
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/go-logr/logr"
@@ -13,10 +14,11 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
-	workapiv1 "open-cluster-management.io/api/work/v1"
+	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	workv1 "open-cluster-management.io/api/work/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -25,6 +27,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+)
+
+var (
+	managedClusterAddonKind                       = "ManagedClusterAddOn"
+	errMessageGettingManagedClusterAddonResources = "Error getting managedclusteraddon resources in event handler"
+	errMessageListingManifestWorkResources        = "Error listing manifestwork resources in event handler"
+	errMessageDecodingManifestIntoObject          = "Error decoding manifest to client.object"
+	errCastingObject                              = errors.New("object is not a client.Object")
 )
 
 var noReconcilePred = builder.WithPredicates(predicate.Funcs{
@@ -104,7 +114,7 @@ func (r *WatcherReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 // SetupWithManager sets up the controller with the Manager.
 func (r *WatcherReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&addonapiv1alpha1.ManagedClusterAddOn{}, noReconcilePred, builder.OnlyMetadata).
+		For(&addonv1alpha1.ManagedClusterAddOn{}, noReconcilePred, builder.OnlyMetadata).
 		Watches(&corev1.Secret{}, r.enqueueForConfigResource(), builder.OnlyMetadata).
 		Watches(&corev1.ConfigMap{}, r.enqueueForConfigResource(), builder.OnlyMetadata).
 		Complete(r)
@@ -115,15 +125,15 @@ func (r *WatcherReconciler) enqueueForConfigResource() handler.EventHandler {
 		key := client.ObjectKey{Name: addon.Name, Namespace: obj.GetNamespace()}
 		mcaddon := &metav1.PartialObjectMetadata{}
 		mcaddon.SetGroupVersionKind(schema.GroupVersionKind{
-			Group:   "addon.open-cluster-management.io",
-			Version: "v1alpha1",
-			Kind:    "ManagedClusterAddOn",
+			Group:   addonv1alpha1.GroupVersion.Group,
+			Version: addonv1alpha1.GroupVersion.Version,
+			Kind:    managedClusterAddonKind,
 		})
 		if err := r.Client.Get(ctx, key, mcaddon); err != nil {
 			if apierrors.IsNotFound(err) {
 				return r.getReconcileRequestsFromManifestWorks(ctx, obj)
 			}
-			r.Log.Error(err, "Error getting managedclusteraddon resources in event handler")
+			r.Log.Error(err, errMessageGettingManagedClusterAddonResources)
 			return nil
 		}
 
@@ -138,18 +148,33 @@ func (r *WatcherReconciler) enqueueForConfigResource() handler.EventHandler {
 	})
 }
 
-// getReconcileRequestsFromManifestWorks gets reconcile.Request for secrets referenced in ManifestWorks.
-func (r *WatcherReconciler) getReconcileRequestsFromManifestWorks(ctx context.Context, obj client.Object) []reconcile.Request {
+// getReconcileRequestsFromManifestWorks gets reconcile.Request for resources referenced in ManifestWorks.
+func (r *WatcherReconciler) getReconcileRequestsFromManifestWorks(ctx context.Context, newObj client.Object) []reconcile.Request {
 	rqs := []reconcile.Request{}
-	mws := &workapiv1.ManifestWorkList{}
-	if err := r.Client.List(ctx, mws, &client.ListOptions{
-		LabelSelector: labels.SelectorFromSet(labels.Set{
-			"open-cluster-management.io/addon-name": "multicluster-observability-addon",
-		}),
-	}); err != nil {
-		for _, mw := range mws.Items {
-			for _, m := range mw.Spec.Workload.Manifests {
-				if equality.Semantic.DeepEqual(m.Object, obj) {
+	newObjKind := newObj.GetObjectKind()
+	newObjKey := client.ObjectKeyFromObject(newObj)
+
+	mws := &workv1.ManifestWorkList{}
+	labelSelector := labels.SelectorFromSet(labels.Set{
+		addon.LabelOCMAddonName: addon.Name,
+	})
+	if err := r.Client.List(ctx, mws, &client.ListOptions{LabelSelector: labelSelector}); err != nil {
+		r.Log.Error(err, errMessageListingManifestWorkResources)
+		return nil
+	}
+
+	for _, mw := range mws.Items {
+		for _, m := range mw.Spec.Workload.Manifests {
+			obj, err := r.manifestToObject(m)
+			if err != nil {
+				r.Log.Error(err, errMessageDecodingManifestIntoObject)
+				continue
+			}
+			objKind := obj.GetObjectKind()
+			objKey := client.ObjectKeyFromObject(obj)
+			if objKind.GroupVersionKind().String() == newObjKind.GroupVersionKind().String() && objKey == newObjKey {
+				// Only trigger a reconcile request if the object has changed
+				if !equality.Semantic.DeepEqual(newObj, obj) {
 					rqs = append(rqs,
 						// Trigger a reconcile request for the addon in the ManifestWork namespace
 						reconcile.Request{
@@ -164,4 +189,20 @@ func (r *WatcherReconciler) getReconcileRequestsFromManifestWorks(ctx context.Co
 		}
 	}
 	return rqs
+}
+
+func (r *WatcherReconciler) manifestToObject(m workv1.Manifest) (client.Object, error) {
+	decode := serializer.NewCodecFactory(r.Scheme).UniversalDeserializer().Decode
+
+	obj, _, err := decode(m.RawExtension.Raw, nil, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	clientObj, ok := obj.(client.Object)
+	if !ok {
+		return nil, errCastingObject
+	}
+
+	return clientObj, nil
 }
