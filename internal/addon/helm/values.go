@@ -7,6 +7,8 @@ import (
 	"github.com/rhobs/multicluster-observability-addon/internal/addon"
 	lhandlers "github.com/rhobs/multicluster-observability-addon/internal/logging/handlers"
 	lmanifests "github.com/rhobs/multicluster-observability-addon/internal/logging/manifests"
+	mhandlers "github.com/rhobs/multicluster-observability-addon/internal/metrics/handlers"
+	mmanifests "github.com/rhobs/multicluster-observability-addon/internal/metrics/manifests"
 	thandlers "github.com/rhobs/multicluster-observability-addon/internal/tracing/handlers"
 	tmanifests "github.com/rhobs/multicluster-observability-addon/internal/tracing/manifests"
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
@@ -25,6 +27,7 @@ var (
 
 type HelmChartValues struct {
 	Enabled bool                     `json:"enabled"`
+	Metrics mmanifests.MetricsValues `json:"metrics"`
 	Logging lmanifests.LoggingValues `json:"logging"`
 	Tracing tmanifests.TracingValues `json:"tracing"`
 }
@@ -54,6 +57,19 @@ func GetValuesFunc(ctx context.Context, k8s client.Client) addonfactory.GetValue
 
 		userValues := HelmChartValues{
 			Enabled: true,
+		}
+
+		if opts.Platform.Metrics.CollectionEnabled || opts.UserWorkloads.Metrics.CollectionEnabled {
+			metricsOpts, err := mhandlers.BuildOptions(ctx, k8s, mcAddon, opts.Platform.Metrics, opts.UserWorkloads.Metrics)
+			if err != nil {
+				return nil, err
+			}
+
+			metrics, err := mmanifests.BuildValues(metricsOpts)
+			if err != nil {
+				return nil, err
+			}
+			userValues.Metrics = metrics
 		}
 
 		if opts.Platform.Logs.CollectionEnabled || opts.UserWorkloads.Logs.CollectionEnabled {
