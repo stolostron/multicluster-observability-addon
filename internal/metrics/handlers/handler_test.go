@@ -47,6 +47,26 @@ func TestBuildOptions(t *testing.T) {
 		},
 	}
 
+	platformScrapeConfig := &prometheusalpha1.ScrapeConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-scrape-config",
+			Namespace: hubNamespace,
+			Labels: map[string]string{
+				"app": platformMetricsCollectorApp,
+			},
+		},
+	}
+
+	platformRule := &prometheusv1.PrometheusRule{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-prometheus-rule",
+			Namespace: hubNamespace,
+			Labels: map[string]string{
+				"app": platformMetricsCollectorApp,
+			},
+		},
+	}
+
 	uwlAgent := &prometheusalpha1.PrometheusAgent{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-prometheus-agent-uwl",
@@ -93,6 +113,8 @@ func TestBuildOptions(t *testing.T) {
 			},
 		},
 		platformAgent,
+		platformScrapeConfig,
+		platformRule,
 		uwlAgent,
 		&corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
@@ -143,12 +165,39 @@ func TestBuildOptions(t *testing.T) {
 								},
 							},
 						},
+						{
+							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+								Group:    "monitoring.coreos.com",
+								Resource: addon.PrometheusScrapeConfigResource,
+							},
+							DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
+								ConfigReferent: addonapiv1alpha1.ConfigReferent{
+									Name:      platformScrapeConfig.Name,
+									Namespace: platformScrapeConfig.Namespace,
+								},
+							},
+						},
+						{
+							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+								Group:    "monitoring.coreos.com",
+								Resource: addon.PrometheusRuleResource,
+							},
+							DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
+								ConfigReferent: addonapiv1alpha1.ConfigReferent{
+									Name:      platformRule.Name,
+									Namespace: platformRule.Namespace,
+								},
+							},
+						},
 					},
 				},
 			},
 			platformEnabled: true,
 			expects: func(t *testing.T, opts Options, err error) {
-				assert.NoError(t, err)
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+
 				// Check that cluster identifiers are set
 				assert.Equal(t, "test-cluster-id", opts.ClusterID)
 				assert.Equal(t, "test-spoke", opts.ClusterName)
@@ -164,6 +213,10 @@ func TestBuildOptions(t *testing.T) {
 				assert.Len(t, opts.Secrets, 2)
 				// Check that user workloads are not enabled
 				assert.Nil(t, opts.UserWorkloads.PrometheusAgent)
+				// Check that scrape configs are set
+				assert.Len(t, opts.Platform.ScrapeConfigs, 1)
+				// Check that the Prometheus rule is set
+				assert.Len(t, opts.Platform.Rules, 1)
 			},
 		},
 		"user workloads collection is enabled": {
@@ -198,6 +251,10 @@ func TestBuildOptions(t *testing.T) {
 				assert.Equal(t, uwlAgent.Spec.LogLevel, opts.UserWorkloads.PrometheusAgent.Spec.LogLevel)
 			},
 		},
+		// "not found config reference": {
+		// "missing required config reference": {
+		// "missing managed cluster": {
+		// "missing referenced secret": {
 
 		// Test failure cases: missing image override, missing config resource, missing Prometheus agent, missing secrets, missing managed cluster
 		// "error case - missing managed cluster": {

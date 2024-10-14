@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"slices"
 
+	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	prometheusalpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	"github.com/rhobs/multicluster-observability-addon/internal/addon"
 	corev1 "k8s.io/api/core/v1"
@@ -62,12 +63,9 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 			return ret, err
 		}
 
-		// Fetch scrape configs
-		scrapeConfigs, err := o.getScrapeConfigs(ctx, managedCluster.Name, platformMetricsCollectorApp)
-		if err != nil {
-			return ret, fmt.Errorf("failed to get scrape configs: %w", err)
-		}
-		ret.Platform.ScrapeConfigs = scrapeConfigs
+		// Fetch rules and scrape configs
+		ret.Platform.ScrapeConfigs = getResourceByLabelSelector[*prometheusalpha1.ScrapeConfig](configResources, map[string]string{"app": platformMetricsCollectorApp})
+		ret.Platform.Rules = getResourceByLabelSelector[*prometheusv1.PrometheusRule](configResources, map[string]string{"app": platformMetricsCollectorApp})
 	}
 
 	if userWorkloads.CollectionEnabled {
@@ -75,12 +73,9 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 			return ret, err
 		}
 
-		// Fetch scrape configs
-		scrapeConfigs, err := o.getScrapeConfigs(ctx, managedCluster.Name, userWorkloadMetricsCollectorApp)
-		if err != nil {
-			return ret, fmt.Errorf("failed to get scrape configs: %w", err)
-		}
-		ret.UserWorkloads.ScrapeConfigs = scrapeConfigs
+		// Fetch rules and scrape configs
+		ret.UserWorkloads.ScrapeConfigs = getResourceByLabelSelector[*prometheusalpha1.ScrapeConfig](configResources, map[string]string{"app": userWorkloadMetricsCollectorApp})
+		ret.UserWorkloads.Rules = getResourceByLabelSelector[*prometheusv1.PrometheusRule](configResources, map[string]string{"app": userWorkloadMetricsCollectorApp})
 	}
 
 	return ret, nil
@@ -152,17 +147,6 @@ func (o *OptionsBuilder) addSecret(ctx context.Context, secrets *[]corev1.Secret
 	return nil
 }
 
-func (o *OptionsBuilder) getScrapeConfigs(ctx context.Context, namespace string, appName string) ([]*prometheusalpha1.ScrapeConfig, error) {
-	selector := labels.Set{"app": appName}
-
-	scrapeConfigs := prometheusalpha1.ScrapeConfigList{}
-	if err := o.Client.List(ctx, &scrapeConfigs, &client.ListOptions{Namespace: namespace, LabelSelector: labels.SelectorFromSet(selector)}); err != nil {
-		return nil, err
-	}
-
-	return scrapeConfigs.Items, nil
-}
-
 func (o *OptionsBuilder) getImageOverrides(ctx context.Context) (ImagesOptions, error) {
 	ret := ImagesOptions{}
 	// Get the ACM images overrides
@@ -199,6 +183,10 @@ func (o *OptionsBuilder) getConfigResources(ctx context.Context, mcAddon *addona
 		switch cfg.ConfigGroupResource.Resource {
 		case addon.PrometheusAgentResource:
 			obj = &prometheusalpha1.PrometheusAgent{}
+		case addon.PrometheusScrapeConfigResource:
+			obj = &prometheusalpha1.ScrapeConfig{}
+		case addon.PrometheusRuleResource:
+			obj = &prometheusv1.PrometheusRule{}
 		case "configmaps":
 			obj = &corev1.ConfigMap{}
 		default:
