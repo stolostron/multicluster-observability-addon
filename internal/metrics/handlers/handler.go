@@ -9,7 +9,6 @@ import (
 	"github.com/rhobs/multicluster-observability-addon/internal/addon"
 	"github.com/rhobs/multicluster-observability-addon/internal/metrics/manifests"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
@@ -19,21 +18,27 @@ import (
 
 const (
 	clusterIDLabel                  = "clusterID"
-	imagesCMName                    = "images-list"
-	hubNamespace                    = "open-cluster-management-observability"
-	imageManifestLabelKey           = "ocm-configmap-type"
-	imageManifestLabelValue         = "image-manifest"
-	versionLabelKey                 = "ocm-release-version"
-	mceNamespace                    = "open-cluster-management"
+	haProxyImage                    = "registry.connect.redhat.com/haproxytech/haproxy@sha256:07ee4e701e6ce23d6c35b37d159244fb14ef9c90190710542ce60492cbe4d68a"
 	platformMetricsCollectorApp     = "acm-platform-metrics-collector"
 	userWorkloadMetricsCollectorApp = "acm-user-workload-metrics-collector"
 )
 
-func BuildOptions(ctx context.Context, k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, platform, userWorkloads addon.MetricsOptions) (manifests.Options, error) {
+type OptionsBuilder struct {
+	Client          client.Client
+	HubNamespace    string
+	ImagesConfigMap types.NamespacedName
+	RemoteWriteURL  string
+}
+
+func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, platform, userWorkloads addon.MetricsOptions) (manifests.Options, error) {
 	ret := manifests.Options{}
 
-	// Fetch the managed cluster and set identifiers
-	managedCluster, err := getManagedCluster(ctx, k8s, mcAddon.GetNamespace())
+	if !platform.CollectionEnabled && !userWorkloads.CollectionEnabled {
+		return ret, nil
+	}
+
+	// Fetch the managed cluster and set cluster identifiers
+	managedCluster, err := o.getManagedCluster(ctx, mcAddon.GetNamespace())
 	if err != nil {
 		return ret, err
 	}
@@ -41,25 +46,25 @@ func BuildOptions(ctx context.Context, k8s client.Client, mcAddon *addonapiv1alp
 	ret.ClusterID = managedCluster.ObjectMeta.Labels[clusterIDLabel]
 
 	// Fetch image overrides
-	ret.Images, err = getImageOverrides(ctx, k8s, hubNamespace)
+	ret.Images, err = o.getImageOverrides(ctx)
 	if err != nil {
 		return ret, fmt.Errorf("failed to get image overrides: %w", err)
 	}
 
 	// Fetch configuration references
-	configResources, err := getConfigResources(ctx, k8s, mcAddon)
+	configResources, err := o.getConfigResources(ctx, mcAddon)
 	if err != nil {
 		return ret, fmt.Errorf("failed to get configuration resources: %w", err)
 	}
 
 	// Build Prometheus agents for platform and user workloads
 	if platform.CollectionEnabled {
-		if err := buildPrometheusAgent(ctx, k8s, &ret, configResources, platformMetricsCollectorApp); err != nil {
+		if err := o.buildPrometheusAgent(ctx, &ret, configResources, platformMetricsCollectorApp); err != nil {
 			return ret, err
 		}
 
 		// Fetch scrape configs
-		scrapeConfigs, err := getScrapeConfigs(ctx, k8s, managedCluster.Name, platformMetricsCollectorApp)
+		scrapeConfigs, err := o.getScrapeConfigs(ctx, managedCluster.Name, platformMetricsCollectorApp)
 		if err != nil {
 			return ret, fmt.Errorf("failed to get scrape configs: %w", err)
 		}
@@ -67,12 +72,12 @@ func BuildOptions(ctx context.Context, k8s client.Client, mcAddon *addonapiv1alp
 	}
 
 	if userWorkloads.CollectionEnabled {
-		if err := buildPrometheusAgent(ctx, k8s, &ret, configResources, userWorkloadMetricsCollectorApp); err != nil {
+		if err := o.buildPrometheusAgent(ctx, &ret, configResources, userWorkloadMetricsCollectorApp); err != nil {
 			return ret, err
 		}
 
 		// Fetch scrape configs
-		scrapeConfigs, err := getScrapeConfigs(ctx, k8s, managedCluster.Name, userWorkloadMetricsCollectorApp)
+		scrapeConfigs, err := o.getScrapeConfigs(ctx, managedCluster.Name, userWorkloadMetricsCollectorApp)
 		if err != nil {
 			return ret, fmt.Errorf("failed to get scrape configs: %w", err)
 		}
@@ -83,18 +88,18 @@ func BuildOptions(ctx context.Context, k8s client.Client, mcAddon *addonapiv1alp
 }
 
 // Helper function to get ManagedCluster
-func getManagedCluster(ctx context.Context, k8s client.Client, namespace string) (*clusterv1.ManagedCluster, error) {
+func (o *OptionsBuilder) getManagedCluster(ctx context.Context, namespace string) (*clusterv1.ManagedCluster, error) {
 	managedCluster := &clusterv1.ManagedCluster{}
-	if err := k8s.Get(ctx, types.NamespacedName{Name: namespace}, managedCluster); err != nil {
+	if err := o.Client.Get(ctx, types.NamespacedName{Name: namespace}, managedCluster); err != nil {
 		return nil, fmt.Errorf("failed to get managed cluster: %w", err)
 	}
 	return managedCluster, nil
 }
 
 // buildPrometheusAgent abstracts the logic of building a Prometheus agent for platform or user workloads
-func buildPrometheusAgent(ctx context.Context, k8s client.Client, opts *manifests.Options, configResources []client.Object, appName string) error {
+func (o *OptionsBuilder) buildPrometheusAgent(ctx context.Context, opts *manifests.Options, configResources []client.Object, appName string) error {
 	// Fetch Prometheus agent resource
-	platformAgents := GetResourceByLabelSelector[*prometheusalpha1.PrometheusAgent](configResources, map[string]string{"app": appName})
+	platformAgents := getResourceByLabelSelector[*prometheusalpha1.PrometheusAgent](configResources, map[string]string{"app": appName})
 	if len(platformAgents) != 1 {
 		return fmt.Errorf("invalid number of PrometheusAgent resources for app %s: %d", appName, len(platformAgents))
 	}
@@ -108,21 +113,24 @@ func buildPrometheusAgent(ctx context.Context, k8s client.Client, opts *manifest
 		HAProxyConfigMapName: fmt.Sprintf("%s-haproxy-config", appName),
 		HAProxyImage:         opts.Images.HAProxy,
 		MatchLabels:          map[string]string{"app": appName},
+		RemoteWriteEndpoint:  o.RemoteWriteURL,
 	}
 
 	agent := promBuilder.Build()
-	agent.Spec.CommonPrometheusFields.ScrapeConfigNamespaceSelector = &metav1.LabelSelector{} // Restrict scraping to the same namespace
 
 	// Set the built agent in the appropriate workload option
-	if appName == platformMetricsCollectorApp {
+	switch appName {
+	case platformMetricsCollectorApp:
 		opts.Platform.PrometheusAgent = agent
-	} else {
+	case userWorkloadMetricsCollectorApp:
 		opts.UserWorkloads.PrometheusAgent = agent
+	default:
+		return fmt.Errorf("unsupported app name %s", appName)
 	}
 
 	// Fetch related secrets
 	for _, secretName := range agent.Spec.CommonPrometheusFields.Secrets {
-		if err := addSecret(ctx, k8s, &opts.Secrets, secretName, agent.Namespace); err != nil {
+		if err := o.addSecret(ctx, &opts.Secrets, secretName, agent.Namespace); err != nil {
 			return err
 		}
 	}
@@ -131,13 +139,13 @@ func buildPrometheusAgent(ctx context.Context, k8s client.Client, opts *manifest
 }
 
 // Simplified addSecret function (unchanged)
-func addSecret(ctx context.Context, k8s client.Client, secrets *[]corev1.Secret, secretName, secretNamespace string) error {
+func (o *OptionsBuilder) addSecret(ctx context.Context, secrets *[]corev1.Secret, secretName, secretNamespace string) error {
 	if slices.IndexFunc(*secrets, func(s corev1.Secret) bool { return s.Name == secretName && s.Namespace == secretNamespace }) != -1 {
 		return nil
 	}
 
 	secret := corev1.Secret{}
-	if err := k8s.Get(ctx, types.NamespacedName{Name: secretName, Namespace: secretNamespace}, &secret); err != nil {
+	if err := o.Client.Get(ctx, types.NamespacedName{Name: secretName, Namespace: secretNamespace}, &secret); err != nil {
 		return fmt.Errorf("failed to get secret %s in namespace %s: %w", secretName, secretNamespace, err)
 	}
 
@@ -145,22 +153,22 @@ func addSecret(ctx context.Context, k8s client.Client, secrets *[]corev1.Secret,
 	return nil
 }
 
-func getScrapeConfigs(ctx context.Context, c client.Client, namespace string, appName string) ([]*prometheusalpha1.ScrapeConfig, error) {
+func (o *OptionsBuilder) getScrapeConfigs(ctx context.Context, namespace string, appName string) ([]*prometheusalpha1.ScrapeConfig, error) {
 	selector := labels.Set{"app": appName}
 
 	scrapeConfigs := prometheusalpha1.ScrapeConfigList{}
-	if err := c.List(ctx, &scrapeConfigs, &client.ListOptions{Namespace: namespace, LabelSelector: labels.SelectorFromSet(selector)}); err != nil {
+	if err := o.Client.List(ctx, &scrapeConfigs, &client.ListOptions{Namespace: namespace, LabelSelector: labels.SelectorFromSet(selector)}); err != nil {
 		return nil, err
 	}
 
 	return scrapeConfigs.Items, nil
 }
 
-func getImageOverrides(ctx context.Context, c client.Client, cmNamespace string) (manifests.ImagesOptions, error) {
+func (o *OptionsBuilder) getImageOverrides(ctx context.Context) (manifests.ImagesOptions, error) {
 	ret := manifests.ImagesOptions{}
 	// Get the ACM images overrides
 	imagesList := corev1.ConfigMap{}
-	if err := c.Get(ctx, types.NamespacedName{Name: imagesCMName, Namespace: cmNamespace}, &imagesList); err != nil {
+	if err := o.Client.Get(ctx, o.ImagesConfigMap, &imagesList); err != nil {
 		return ret, err
 	}
 
@@ -176,12 +184,16 @@ func getImageOverrides(ctx context.Context, c client.Client, cmNamespace string)
 		}
 	}
 
-	ret.HAProxy = "registry.connect.redhat.com/haproxytech/haproxy@sha256:07ee4e701e6ce23d6c35b37d159244fb14ef9c90190710542ce60492cbe4d68a"
+	ret.HAProxy = haProxyImage
+
+	if ret.PrometheusOperator == "" || ret.PrometheusConfigReloader == "" || ret.KubeRBACProxy == "" {
+		return ret, fmt.Errorf("missing image overrides in ConfigMap %s, got %+v", o.ImagesConfigMap.String(), ret)
+	}
 
 	return ret, nil
 }
 
-func getConfigResources(ctx context.Context, c client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAddOn) ([]client.Object, error) {
+func (o *OptionsBuilder) getConfigResources(ctx context.Context, mcAddon *addonapiv1alpha1.ManagedClusterAddOn) ([]client.Object, error) {
 	ret := []client.Object{}
 	for _, cfg := range mcAddon.Status.ConfigReferences {
 		var obj client.Object
@@ -194,7 +206,7 @@ func getConfigResources(ctx context.Context, c client.Client, mcAddon *addonapiv
 			return ret, fmt.Errorf("unsupported configuration reference resource %s in managedClusterAddon.Status.ConfigReferences of %s/%s", cfg.ConfigGroupResource.Resource, mcAddon.Namespace, mcAddon.Name)
 		}
 
-		if err := c.Get(ctx, types.NamespacedName{Name: cfg.Name, Namespace: cfg.Namespace}, obj); err != nil {
+		if err := o.Client.Get(ctx, types.NamespacedName{Name: cfg.DesiredConfig.Name, Namespace: cfg.DesiredConfig.Namespace}, obj); err != nil {
 			return ret, err
 		}
 
@@ -204,9 +216,9 @@ func getConfigResources(ctx context.Context, c client.Client, mcAddon *addonapiv
 	return ret, nil
 }
 
-// GetResourceByLabelSelector returns the first resource that matches the label selector.
+// getResourceByLabelSelector returns the first resource that matches the label selector.
 // It works generically for any Kubernetes resource that implements client.Object.
-func GetResourceByLabelSelector[T client.Object](resources []client.Object, selector map[string]string) []T {
+func getResourceByLabelSelector[T client.Object](resources []client.Object, selector map[string]string) []T {
 	labelSelector := labels.SelectorFromSet(selector)
 	ret := []T{}
 
