@@ -1,4 +1,4 @@
-package manifests
+package handlers
 
 import (
 	prometheusalpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
