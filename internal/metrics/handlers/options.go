@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	prometheusalpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 )
@@ -18,6 +19,7 @@ type Options struct {
 type Collector struct {
 	PrometheusAgent *prometheusalpha1.PrometheusAgent
 	ScrapeConfigs   []*prometheusalpha1.ScrapeConfig
+	Rules           []*prometheusv1.PrometheusRule
 }
 
 type ImagesOptions struct {
