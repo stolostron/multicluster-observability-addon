@@ -7,7 +7,6 @@ import (
 
 	prometheusalpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	"github.com/rhobs/multicluster-observability-addon/internal/addon"
-	"github.com/rhobs/multicluster-observability-addon/internal/metrics/manifests"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -30,8 +29,8 @@ type OptionsBuilder struct {
 	RemoteWriteURL  string
 }
 
-func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, platform, userWorkloads addon.MetricsOptions) (manifests.Options, error) {
-	ret := manifests.Options{}
+func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, platform, userWorkloads addon.MetricsOptions) (Options, error) {
+	ret := Options{}
 
 	if !platform.CollectionEnabled && !userWorkloads.CollectionEnabled {
 		return ret, nil
@@ -97,7 +96,7 @@ func (o *OptionsBuilder) getManagedCluster(ctx context.Context, namespace string
 }
 
 // buildPrometheusAgent abstracts the logic of building a Prometheus agent for platform or user workloads
-func (o *OptionsBuilder) buildPrometheusAgent(ctx context.Context, opts *manifests.Options, configResources []client.Object, appName string) error {
+func (o *OptionsBuilder) buildPrometheusAgent(ctx context.Context, opts *Options, configResources []client.Object, appName string) error {
 	// Fetch Prometheus agent resource
 	platformAgents := getResourceByLabelSelector[*prometheusalpha1.PrometheusAgent](configResources, map[string]string{"app": appName})
 	if len(platformAgents) != 1 {
@@ -164,8 +163,8 @@ func (o *OptionsBuilder) getScrapeConfigs(ctx context.Context, namespace string,
 	return scrapeConfigs.Items, nil
 }
 
-func (o *OptionsBuilder) getImageOverrides(ctx context.Context) (manifests.ImagesOptions, error) {
-	ret := manifests.ImagesOptions{}
+func (o *OptionsBuilder) getImageOverrides(ctx context.Context) (ImagesOptions, error) {
+	ret := ImagesOptions{}
 	// Get the ACM images overrides
 	imagesList := corev1.ConfigMap{}
 	if err := o.Client.Get(ctx, o.ImagesConfigMap, &imagesList); err != nil {

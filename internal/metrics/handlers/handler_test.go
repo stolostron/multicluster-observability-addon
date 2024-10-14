@@ -7,7 +7,6 @@ import (
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	prometheusalpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	"github.com/rhobs/multicluster-observability-addon/internal/addon"
-	"github.com/rhobs/multicluster-observability-addon/internal/metrics/manifests"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -121,7 +120,7 @@ func TestBuildOptions(t *testing.T) {
 		platformEnabled      bool
 		userWorkloadsEnabled bool
 		resources            []client.Object
-		expects              func(t *testing.T, opts manifests.Options, err error)
+		expects              func(t *testing.T, opts Options, err error)
 	}{
 		"platform collection is enabled": {
 			resources: commonResources,
@@ -148,7 +147,7 @@ func TestBuildOptions(t *testing.T) {
 				},
 			},
 			platformEnabled: true,
-			expects: func(t *testing.T, opts manifests.Options, err error) {
+			expects: func(t *testing.T, opts Options, err error) {
 				assert.NoError(t, err)
 				// Check that cluster identifiers are set
 				assert.Equal(t, "test-cluster-id", opts.ClusterID)
@@ -192,7 +191,7 @@ func TestBuildOptions(t *testing.T) {
 				},
 			},
 			userWorkloadsEnabled: true,
-			expects: func(t *testing.T, opts manifests.Options, err error) {
+			expects: func(t *testing.T, opts Options, err error) {
 				assert.NoError(t, err)
 				assert.NotNil(t, opts.UserWorkloads.PrometheusAgent)
 				assert.Nil(t, opts.Platform.PrometheusAgent)
