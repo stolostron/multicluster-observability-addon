@@ -1,17 +1,22 @@
 package manifests
 
-import "encoding/json"
+import (
+	"encoding/json"
+
+	"github.com/rhobs/multicluster-observability-addon/internal/metrics/handlers"
+	corev1 "k8s.io/api/core/v1"
+)
 
 type MetricsValues struct {
 	PlatformEnabled        bool          `json:"platformEnabled"`
 	UserWorkloadsEnabled   bool          `json:"userWorkloadsEnabled"`
-	Secrets                []SecretValue `json:"secrets"`
-	ConfigMaps             []string      `json:"configMaps"`
+	Secrets                []ConfigValue `json:"secrets"`
+	ConfigMaps             []ConfigValue `json:"configMaps"`
 	PlatformAgentSpec      string        `json:"platformAgentSpec"`
 	UserWorkloadsAgentSpec string        `json:"userWorkloadsAgentSpec"`
 	Images                 ImagesValues  `json:"images"`
 	PrometheusControllerID string        `json:"prometheusControllerID"`
-	ScrapeConfigs          []string      `json:"scrapeConfigs"`
+	ScrapeConfigs          []ConfigValue `json:"scrapeConfigs"`
 }
 
 type ImagesValues struct {
@@ -19,54 +24,101 @@ type ImagesValues struct {
 	PrometheusConfigReloader string `json:"prometheusConfigReloader"`
 }
 
-type SecretValue struct {
+type ConfigValue struct {
 	Name string `json:"name"`
 	Data string `json:"data"`
 }
 
-func BuildValues(opts Options) (MetricsValues, error) {
-	values := MetricsValues{}
+func BuildValues(opts handlers.Options) (MetricsValues, error) {
+	ret := MetricsValues{}
 
 	// Build Prometheus Agent Spec for Platform
 	if opts.Platform.PrometheusAgent != nil {
-		values.PlatformEnabled = true
+		ret.PlatformEnabled = true
 
 		agentJson, err := json.Marshal(opts.Platform.PrometheusAgent.Spec)
 		if err != nil {
-			return values, err
+			return ret, err
 		}
 
-		values.PlatformAgentSpec = string(agentJson)
+		ret.PlatformAgentSpec = string(agentJson)
 	}
 
 	// Build Prometheus Agent Spec for User Workloads
 	if opts.UserWorkloads.PrometheusAgent != nil {
-		values.UserWorkloadsEnabled = true
+		ret.UserWorkloadsEnabled = true
 
 		agentJson, err := json.Marshal(opts.UserWorkloads.PrometheusAgent.Spec)
 		if err != nil {
-			return values, err
+			return ret, err
 		}
 
-		values.UserWorkloadsAgentSpec = string(agentJson)
+		ret.UserWorkloadsAgentSpec = string(agentJson)
 	}
 
 	// Build scrape configs
 	for _, scrapeConfig := range opts.Platform.ScrapeConfigs {
 		scrapeConfigJson, err := json.Marshal(scrapeConfig)
 		if err != nil {
-			return values, err
+			return ret, err
 		}
 
-		values.ScrapeConfigs = append(values.ScrapeConfigs, string(scrapeConfigJson))
+		ret.ScrapeConfigs = append(ret.ScrapeConfigs, ConfigValue{
+			Name: scrapeConfig.Name,
+			Data: string(scrapeConfigJson),
+		})
 	}
 
 	// Build secrets and config maps
 	var err error
-	values.Secrets, err = buildSecrets(opts)
+	ret.Secrets, err = buildSecrets(opts.Secrets)
 	if err != nil {
-		return values, err
+		return ret, err
 	}
 
-	return values, nil
+	// Set config maps
+	ret.ConfigMaps, err = buildConfigMaps(opts.ConfigMaps)
+	if err != nil {
+		return ret, err
+	}
+
+	// Set images
+	ret.Images = ImagesValues{
+		PrometheusOperator:       opts.Images.PrometheusOperator,
+		PrometheusConfigReloader: opts.Images.PrometheusConfigReloader,
+	}
+
+	return ret, nil
+}
+
+func buildSecrets(secrets []*corev1.Secret) ([]ConfigValue, error) {
+	secretsValue := []ConfigValue{}
+	for _, secret := range secrets {
+		dataJSON, err := json.Marshal(secret.Data)
+		if err != nil {
+			return secretsValue, err
+		}
+		secretValue := ConfigValue{
+			Name: secret.Name,
+			Data: string(dataJSON),
+		}
+		secretsValue = append(secretsValue, secretValue)
+	}
+	return secretsValue, nil
+}
+
+func buildConfigMaps(configMaps []*corev1.ConfigMap) ([]ConfigValue, error) {
+	configMapsValue := []ConfigValue{}
+	for _, configMap := range configMaps {
+		dataJSON, err := json.Marshal(configMap.Data)
+		if err != nil {
+			return configMapsValue, err
+		}
+		configMapValue := ConfigValue{
+			Name: configMap.Name,
+			Data: string(dataJSON),
+		}
+		configMapsValue = append(configMapsValue, configMapValue)
+	}
+	return configMapsValue, nil
 }

@@ -29,8 +29,6 @@ const (
 	SpokeOTELColNamespace           = "mcoa-opentelemetry"
 	otelColProbeKey                 = "replicas"
 	otelColProbePath                = ".spec.replicas"
-
-	PrometheusAgentResource = "prometheusagents"
 )
 
 //go:embed manifests

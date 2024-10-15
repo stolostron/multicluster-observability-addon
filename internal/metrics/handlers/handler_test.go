@@ -156,7 +156,7 @@ func TestBuildOptions(t *testing.T) {
 						{
 							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
 								Group:    "monitoring.coreos.com",
-								Resource: addon.PrometheusAgentResource,
+								Resource: prometheusalpha1.PrometheusAgentName,
 							},
 							DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
 								ConfigReferent: addonapiv1alpha1.ConfigReferent{
@@ -168,7 +168,7 @@ func TestBuildOptions(t *testing.T) {
 						{
 							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
 								Group:    "monitoring.coreos.com",
-								Resource: addon.PrometheusScrapeConfigResource,
+								Resource: prometheusalpha1.ScrapeConfigName,
 							},
 							DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
 								ConfigReferent: addonapiv1alpha1.ConfigReferent{
@@ -180,7 +180,7 @@ func TestBuildOptions(t *testing.T) {
 						{
 							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
 								Group:    "monitoring.coreos.com",
-								Resource: addon.PrometheusRuleResource,
+								Resource: prometheusv1.PrometheusRuleName,
 							},
 							DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
 								ConfigReferent: addonapiv1alpha1.ConfigReferent{
@@ -231,7 +231,7 @@ func TestBuildOptions(t *testing.T) {
 						{
 							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
 								Group:    "monitoring.coreos.com",
-								Resource: addon.PrometheusAgentResource,
+								Resource: prometheusalpha1.PrometheusAgentName,
 							},
 							DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
 								ConfigReferent: addonapiv1alpha1.ConfigReferent{
