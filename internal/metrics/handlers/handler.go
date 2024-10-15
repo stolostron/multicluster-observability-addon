@@ -133,13 +133,13 @@ func (o *OptionsBuilder) buildPrometheusAgent(ctx context.Context, opts *Options
 }
 
 // Simplified addSecret function (unchanged)
-func (o *OptionsBuilder) addSecret(ctx context.Context, secrets *[]corev1.Secret, secretName, secretNamespace string) error {
-	if slices.IndexFunc(*secrets, func(s corev1.Secret) bool { return s.Name == secretName && s.Namespace == secretNamespace }) != -1 {
+func (o *OptionsBuilder) addSecret(ctx context.Context, secrets *[]*corev1.Secret, secretName, secretNamespace string) error {
+	if slices.IndexFunc(*secrets, func(s *corev1.Secret) bool { return s.Name == secretName && s.Namespace == secretNamespace }) != -1 {
 		return nil
 	}
 
-	secret := corev1.Secret{}
-	if err := o.Client.Get(ctx, types.NamespacedName{Name: secretName, Namespace: secretNamespace}, &secret); err != nil {
+	secret := &corev1.Secret{}
+	if err := o.Client.Get(ctx, types.NamespacedName{Name: secretName, Namespace: secretNamespace}, secret); err != nil {
 		return fmt.Errorf("failed to get secret %s in namespace %s: %w", secretName, secretNamespace, err)
 	}
 
@@ -181,11 +181,11 @@ func (o *OptionsBuilder) getConfigResources(ctx context.Context, mcAddon *addona
 	for _, cfg := range mcAddon.Status.ConfigReferences {
 		var obj client.Object
 		switch cfg.ConfigGroupResource.Resource {
-		case addon.PrometheusAgentResource:
+		case prometheusalpha1.PrometheusAgentName:
 			obj = &prometheusalpha1.PrometheusAgent{}
-		case addon.PrometheusScrapeConfigResource:
+		case prometheusalpha1.ScrapeConfigName:
 			obj = &prometheusalpha1.ScrapeConfig{}
-		case addon.PrometheusRuleResource:
+		case prometheusv1.PrometheusRuleName:
 			obj = &prometheusv1.PrometheusRule{}
 		case "configmaps":
 			obj = &corev1.ConfigMap{}

@@ -9,7 +9,7 @@ import (
 type Options struct {
 	Platform      Collector
 	UserWorkloads Collector
-	Secrets       []corev1.Secret
+	Secrets       []*corev1.Secret
 	ConfigMaps    []*corev1.ConfigMap
 	ClusterName   string
 	ClusterID     string
