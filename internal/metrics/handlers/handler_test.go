@@ -312,7 +312,6 @@ func TestBuildOptions(t *testing.T) {
 
 			optsBuilder := &OptionsBuilder{
 				Client:          fakeClient,
-				HubNamespace:    hubNamespace,
 				ImagesConfigMap: types.NamespacedName{Name: imagesCMName, Namespace: hubNamespace},
 				RemoteWriteURL:  "https://example.com/write",
 			}

@@ -24,7 +24,6 @@ const (
 
 type OptionsBuilder struct {
 	Client          client.Client
-	HubNamespace    string
 	ImagesConfigMap types.NamespacedName
 	RemoteWriteURL  string
 }
@@ -111,6 +110,7 @@ func (o *OptionsBuilder) buildPrometheusAgent(ctx context.Context, opts *Options
 	}
 	haProxyConfigMapName := fmt.Sprintf("%s-haproxy-config", appName)
 	haProxyConfigMap[0].Name = haProxyConfigMapName
+	haProxyConfigMap[0].Labels = labelsMatcher // For convienence and easier retrieval, especially in tests
 	opts.ConfigMaps = append(opts.ConfigMaps, haProxyConfigMap[0])
 
 	// Build the agent using a builder pattern

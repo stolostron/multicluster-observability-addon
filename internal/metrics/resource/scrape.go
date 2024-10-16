@@ -32,9 +32,7 @@ func PlatformScrapeConfig(ns string) *prometheusalpha1.ScrapeConfig {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      defaultPlatformScrapeConfigName,
 			Namespace: ns,
-			Labels: map[string]string{
-				"app": config.PlatformMetricsCollectorApp,
-			},
+			Labels:    config.PlatformPrometheusMatchLabels,
 		},
 		Spec: prometheusalpha1.ScrapeConfigSpec{
 			JobName:     toPtr("platform-metrics"),
