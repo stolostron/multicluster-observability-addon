@@ -8,3 +8,12 @@ const (
 	ClientCertSecretName            = "observability-controller-open-cluster-management.io-observability-signer-client-cert"
 	PrometheusCAConfigMapName       = "prometheus-server-ca"
 )
+
+var (
+	PlatformPrometheusMatchLabels = map[string]string{
+		"app": PlatformMetricsCollectorApp,
+	}
+	UserWorkloadPrometheusMatchLabels = map[string]string{
+		"app": UserWorkloadMetricsCollectorApp,
+	}
+)

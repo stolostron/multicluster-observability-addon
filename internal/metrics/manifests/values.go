@@ -2,6 +2,7 @@ package manifests
 
 import (
 	"encoding/json"
+	"slices"
 
 	"github.com/rhobs/multicluster-observability-addon/internal/metrics/config"
 	"github.com/rhobs/multicluster-observability-addon/internal/metrics/handlers"
@@ -20,6 +21,7 @@ type MetricsValues struct {
 	ScrapeConfigs             []ConfigValue `json:"scrapeConfigs"`
 	Rules                     []ConfigValue `json:"rules"`
 	PrometheusCAConfigMapName string        `json:"prometheusCAConfigMapName"`
+	PlatformAppName           string        `json:"platformAppName"`
 }
 
 type ImagesValues struct {
@@ -37,6 +39,7 @@ func BuildValues(opts handlers.Options) (MetricsValues, error) {
 	ret := MetricsValues{
 		PrometheusControllerID:    config.PrometheusControllerID,
 		PrometheusCAConfigMapName: config.PrometheusCAConfigMapName,
+		PlatformAppName:           config.PlatformMetricsCollectorApp,
 	}
 
 	// Build Prometheus Agent Spec for Platform
@@ -64,7 +67,7 @@ func BuildValues(opts handlers.Options) (MetricsValues, error) {
 	}
 
 	// Build scrape configs
-	for _, scrapeConfig := range opts.Platform.ScrapeConfigs {
+	for _, scrapeConfig := range slices.Concat(opts.Platform.ScrapeConfigs, opts.UserWorkloads.ScrapeConfigs) {
 		scrapeConfigJson, err := json.Marshal(scrapeConfig.Spec)
 		if err != nil {
 			return ret, err
@@ -78,7 +81,7 @@ func BuildValues(opts handlers.Options) (MetricsValues, error) {
 	}
 
 	// Build rules
-	for _, rule := range opts.Platform.Rules {
+	for _, rule := range slices.Concat(opts.Platform.Rules, opts.UserWorkloads.Rules) {
 		ruleJson, err := json.Marshal(rule.Spec)
 		if err != nil {
 			return ret, err
