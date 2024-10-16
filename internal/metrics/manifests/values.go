@@ -22,6 +22,7 @@ type MetricsValues struct {
 	Rules                     []ConfigValue `json:"rules"`
 	PrometheusCAConfigMapName string        `json:"prometheusCAConfigMapName"`
 	PlatformAppName           string        `json:"platformAppName"`
+	UserWorkloadAppName       string        `json:"userWorkloadAppName"`
 }
 
 type ImagesValues struct {
@@ -40,6 +41,7 @@ func BuildValues(opts handlers.Options) (MetricsValues, error) {
 		PrometheusControllerID:    config.PrometheusControllerID,
 		PrometheusCAConfigMapName: config.PrometheusCAConfigMapName,
 		PlatformAppName:           config.PlatformMetricsCollectorApp,
+		UserWorkloadAppName:       config.UserWorkloadMetricsCollectorApp,
 	}
 
 	// Build Prometheus Agent Spec for Platform
@@ -124,8 +126,9 @@ func buildSecrets(secrets []*corev1.Secret) ([]ConfigValue, error) {
 			return secretsValue, err
 		}
 		secretValue := ConfigValue{
-			Name: secret.Name,
-			Data: string(dataJSON),
+			Name:   secret.Name,
+			Data:   string(dataJSON),
+			Labels: secret.Labels,
 		}
 		secretsValue = append(secretsValue, secretValue)
 	}
@@ -140,8 +143,9 @@ func buildConfigMaps(configMaps []*corev1.ConfigMap) ([]ConfigValue, error) {
 			return configMapsValue, err
 		}
 		configMapValue := ConfigValue{
-			Name: configMap.Name,
-			Data: string(dataJSON),
+			Name:   configMap.Name,
+			Data:   string(dataJSON),
+			Labels: configMap.Labels,
 		}
 		configMapsValue = append(configMapsValue, configMapValue)
 	}

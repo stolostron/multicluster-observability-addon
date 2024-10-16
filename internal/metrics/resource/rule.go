@@ -21,9 +21,7 @@ func PlatformRecordingRules(ns string) *prometheusv1.PrometheusRule {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      defaultPlatformRuleName,
 			Namespace: ns,
-			Labels: map[string]string{
-				"app": config.PlatformMetricsCollectorApp,
-			},
+			Labels:    config.PlatformPrometheusMatchLabels,
 		},
 		Spec: prometheusv1.PrometheusRuleSpec{
 			Groups: []prometheusv1.RuleGroup{
