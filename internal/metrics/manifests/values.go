@@ -3,20 +3,23 @@ package manifests
 import (
 	"encoding/json"
 
+	"github.com/rhobs/multicluster-observability-addon/internal/metrics/config"
 	"github.com/rhobs/multicluster-observability-addon/internal/metrics/handlers"
 	corev1 "k8s.io/api/core/v1"
 )
 
 type MetricsValues struct {
-	PlatformEnabled        bool          `json:"platformEnabled"`
-	UserWorkloadsEnabled   bool          `json:"userWorkloadsEnabled"`
-	Secrets                []ConfigValue `json:"secrets"`
-	ConfigMaps             []ConfigValue `json:"configMaps"`
-	PlatformAgentSpec      string        `json:"platformAgentSpec"`
-	UserWorkloadsAgentSpec string        `json:"userWorkloadsAgentSpec"`
-	Images                 ImagesValues  `json:"images"`
-	PrometheusControllerID string        `json:"prometheusControllerID"`
-	ScrapeConfigs          []ConfigValue `json:"scrapeConfigs"`
+	PlatformEnabled           bool          `json:"platformEnabled"`
+	UserWorkloadsEnabled      bool          `json:"userWorkloadsEnabled"`
+	Secrets                   []ConfigValue `json:"secrets"`
+	ConfigMaps                []ConfigValue `json:"configMaps"`
+	PlatformAgentSpec         string        `json:"platformAgentSpec"`
+	UserWorkloadsAgentSpec    string        `json:"userWorkloadsAgentSpec"`
+	Images                    ImagesValues  `json:"images"`
+	PrometheusControllerID    string        `json:"prometheusControllerID"`
+	ScrapeConfigs             []ConfigValue `json:"scrapeConfigs"`
+	Rules                     []ConfigValue `json:"rules"`
+	PrometheusCAConfigMapName string        `json:"prometheusCAConfigMapName"`
 }
 
 type ImagesValues struct {
@@ -25,12 +28,16 @@ type ImagesValues struct {
 }
 
 type ConfigValue struct {
-	Name string `json:"name"`
-	Data string `json:"data"`
+	Name   string            `json:"name"`
+	Data   string            `json:"data"`
+	Labels map[string]string `json:"labels"`
 }
 
 func BuildValues(opts handlers.Options) (MetricsValues, error) {
-	ret := MetricsValues{}
+	ret := MetricsValues{
+		PrometheusControllerID:    config.PrometheusControllerID,
+		PrometheusCAConfigMapName: config.PrometheusCAConfigMapName,
+	}
 
 	// Build Prometheus Agent Spec for Platform
 	if opts.Platform.PrometheusAgent != nil {
@@ -58,14 +65,29 @@ func BuildValues(opts handlers.Options) (MetricsValues, error) {
 
 	// Build scrape configs
 	for _, scrapeConfig := range opts.Platform.ScrapeConfigs {
-		scrapeConfigJson, err := json.Marshal(scrapeConfig)
+		scrapeConfigJson, err := json.Marshal(scrapeConfig.Spec)
 		if err != nil {
 			return ret, err
 		}
 
 		ret.ScrapeConfigs = append(ret.ScrapeConfigs, ConfigValue{
-			Name: scrapeConfig.Name,
-			Data: string(scrapeConfigJson),
+			Name:   scrapeConfig.Name,
+			Data:   string(scrapeConfigJson),
+			Labels: scrapeConfig.Labels,
+		})
+	}
+
+	// Build rules
+	for _, rule := range opts.Platform.Rules {
+		ruleJson, err := json.Marshal(rule.Spec)
+		if err != nil {
+			return ret, err
+		}
+
+		ret.Rules = append(ret.Rules, ConfigValue{
+			Name:   rule.Name,
+			Data:   string(ruleJson),
+			Labels: rule.Labels,
 		})
 	}
 

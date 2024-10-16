@@ -5,16 +5,11 @@ import (
 
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	prometheusalpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
+	"github.com/rhobs/multicluster-observability-addon/internal/metrics/config"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-)
-
-const (
-	hubCASecretName      = "observability-managed-cluster-certs"
-	clientCertSecretName = "observability-controller-open-cluster-management.io-observability-signer-client-cert"
-	prometheusCaCm       = "prometheus-server-ca"
 )
 
 type PrometheusAgentBuilder struct {
@@ -54,16 +49,16 @@ func (p *PrometheusAgentBuilder) setCommonFields() *PrometheusAgentBuilder {
 }
 
 func (p *PrometheusAgentBuilder) setPrometheusRemoteWriteConfig() *PrometheusAgentBuilder {
-	secrets := []string{hubCASecretName, clientCertSecretName}
+	secrets := []string{config.HubCASecretName, config.ClientCertSecretName}
 	p.Agent.Spec.CommonPrometheusFields.Secrets = append(p.Agent.Spec.CommonPrometheusFields.Secrets, secrets...)
 
 	p.Agent.Spec.CommonPrometheusFields.RemoteWrite = []prometheusv1.RemoteWriteSpec{
 		{
 			URL: p.RemoteWriteEndpoint,
 			TLSConfig: &prometheusv1.TLSConfig{
-				CAFile:   p.formatSecretPath(hubCASecretName, "ca.crt"),
-				CertFile: p.formatSecretPath(clientCertSecretName, "tls.crt"),
-				KeyFile:  p.formatSecretPath(clientCertSecretName, "tls.key"),
+				CAFile:   p.formatSecretPath(config.HubCASecretName, "ca.crt"),
+				CertFile: p.formatSecretPath(config.ClientCertSecretName, "tls.crt"),
+				KeyFile:  p.formatSecretPath(config.ClientCertSecretName, "tls.key"),
 			},
 		},
 	}
@@ -160,7 +155,7 @@ func (p *PrometheusAgentBuilder) setHAProxySidecar() *PrometheusAgentBuilder {
 			VolumeSource: corev1.VolumeSource{
 				ConfigMap: &corev1.ConfigMapVolumeSource{
 					LocalObjectReference: corev1.LocalObjectReference{
-						Name: prometheusCaCm,
+						Name: config.PrometheusCAConfigMapName,
 					},
 				},
 			},

@@ -7,6 +7,7 @@ import (
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	prometheusalpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	"github.com/rhobs/multicluster-observability-addon/internal/addon"
+	"github.com/rhobs/multicluster-observability-addon/internal/metrics/config"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -37,7 +38,7 @@ func TestBuildOptions(t *testing.T) {
 			Name:      "test-prometheus-agent",
 			Namespace: hubNamespace,
 			Labels: map[string]string{
-				"app": platformMetricsCollectorApp,
+				"app": config.PlatformMetricsCollectorApp,
 			},
 		},
 		Spec: prometheusalpha1.PrometheusAgentSpec{
@@ -47,12 +48,21 @@ func TestBuildOptions(t *testing.T) {
 		},
 	}
 
+	platformHAProxyCM := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-haproxy-config",
+			Namespace: hubNamespace,
+			Labels:    PlatformMatchLabels,
+		},
+		Data: map[string]string{},
+	}
+
 	platformScrapeConfig := &prometheusalpha1.ScrapeConfig{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-scrape-config",
 			Namespace: hubNamespace,
 			Labels: map[string]string{
-				"app": platformMetricsCollectorApp,
+				"app": config.PlatformMetricsCollectorApp,
 			},
 		},
 	}
@@ -62,7 +72,7 @@ func TestBuildOptions(t *testing.T) {
 			Name:      "test-prometheus-rule",
 			Namespace: hubNamespace,
 			Labels: map[string]string{
-				"app": platformMetricsCollectorApp,
+				"app": config.PlatformMetricsCollectorApp,
 			},
 		},
 	}
@@ -72,7 +82,7 @@ func TestBuildOptions(t *testing.T) {
 			Name:      "test-prometheus-agent-uwl",
 			Namespace: hubNamespace,
 			Labels: map[string]string{
-				"app": userWorkloadMetricsCollectorApp,
+				"app": config.UserWorkloadMetricsCollectorApp,
 			},
 		},
 		Spec: prometheusalpha1.PrometheusAgentSpec{
@@ -80,6 +90,15 @@ func TestBuildOptions(t *testing.T) {
 				LogLevel: "warn",
 			},
 		},
+	}
+
+	uwlHAProxyCM := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-haproxy-config-uwl",
+			Namespace: hubNamespace,
+			Labels:    UserWorkloadMatchLabels,
+		},
+		Data: map[string]string{},
 	}
 
 	commonResources := []client.Object{
@@ -113,12 +132,14 @@ func TestBuildOptions(t *testing.T) {
 			},
 		},
 		platformAgent,
+		platformHAProxyCM,
 		platformScrapeConfig,
 		platformRule,
 		uwlAgent,
+		uwlHAProxyCM,
 		&corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      clientCertSecretName,
+				Name:      config.ClientCertSecretName,
 				Namespace: hubNamespace,
 			},
 			Data: map[string][]byte{
@@ -128,7 +149,7 @@ func TestBuildOptions(t *testing.T) {
 		},
 		&corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      hubCASecretName,
+				Name:      config.HubCASecretName,
 				Namespace: hubNamespace,
 			},
 			Data: map[string][]byte{
@@ -162,6 +183,18 @@ func TestBuildOptions(t *testing.T) {
 								ConfigReferent: addonapiv1alpha1.ConfigReferent{
 									Name:      platformAgent.Name,
 									Namespace: platformAgent.Namespace,
+								},
+							},
+						},
+						{
+							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+								Group:    "",
+								Resource: "configmaps",
+							},
+							DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
+								ConfigReferent: addonapiv1alpha1.ConfigReferent{
+									Name:      platformHAProxyCM.Name,
+									Namespace: platformHAProxyCM.Namespace,
 								},
 							},
 						},
@@ -209,6 +242,8 @@ func TestBuildOptions(t *testing.T) {
 				assert.NotNil(t, opts.Platform.PrometheusAgent)
 				assert.Equal(t, platformAgent.Spec.LogLevel, opts.Platform.PrometheusAgent.Spec.LogLevel)
 				assert.Len(t, opts.Platform.PrometheusAgent.Spec.RemoteWrite, 1)
+				// Check that the HAProxy config map is set
+				assert.Len(t, opts.ConfigMaps, 1)
 				// Check that the secrets are set
 				assert.Len(t, opts.Secrets, 2)
 				// Check that user workloads are not enabled
@@ -240,6 +275,18 @@ func TestBuildOptions(t *testing.T) {
 								},
 							},
 						},
+						{
+							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+								Group:    "",
+								Resource: "configmaps",
+							},
+							DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
+								ConfigReferent: addonapiv1alpha1.ConfigReferent{
+									Name:      uwlHAProxyCM.Name,
+									Namespace: uwlHAProxyCM.Namespace,
+								},
+							},
+						},
 					},
 				},
 			},
@@ -249,6 +296,8 @@ func TestBuildOptions(t *testing.T) {
 				assert.NotNil(t, opts.UserWorkloads.PrometheusAgent)
 				assert.Nil(t, opts.Platform.PrometheusAgent)
 				assert.Equal(t, uwlAgent.Spec.LogLevel, opts.UserWorkloads.PrometheusAgent.Spec.LogLevel)
+				// Check that the HAProxy config map is set
+				assert.Len(t, opts.ConfigMaps, 1)
 			},
 		},
 		// "not found config reference": {
@@ -257,49 +306,6 @@ func TestBuildOptions(t *testing.T) {
 		// "missing referenced secret": {
 
 		// Test failure cases: missing image override, missing config resource, missing Prometheus agent, missing secrets, missing managed cluster
-		// "error case - missing managed cluster": {
-		// 	resources: []client.Object{
-		// 		&corev1.ConfigMap{
-		// 			ObjectMeta: metav1.ObjectMeta{
-		// 				Name:      imagesCMName,
-		// 				Namespace: hubNamespace,
-		// 			},
-		// 			Data: map[string]string{
-		// 				"prometheus_operator": "prom-operator-image",
-		// 				"haproxy":             "haproxy-image",
-		// 			},
-		// 		},
-		// 	},
-		// 	expects: func(t *testing.T, opts manifests.Options, err error) {
-		// 		assert.Error(t, err)
-		// 	},
-		// },
-		// "missing HAProxy image in ConfigMap": {
-		// 	resources: []client.Object{
-		// 		&clusterv1.ManagedCluster{
-		// 			ObjectMeta: metav1.ObjectMeta{
-		// 				Name: "test-cluster",
-		// 				Labels: map[string]string{
-		// 					clusterIDLabel: "test-cluster-id",
-		// 				},
-		// 			},
-		// 		},
-		// 		&corev1.ConfigMap{
-		// 			ObjectMeta: metav1.ObjectMeta{
-		// 				Name:      imagesCMName,
-		// 				Namespace: hubNamespace,
-		// 			},
-		// 			Data: map[string]string{
-		// 				"prometheus_operator": "prom-operator-image",
-		// 			},
-		// 		},
-		// 	},
-		// 	expects: func(t *testing.T, opts manifests.Options, err error) {
-		// 		assert.NoError(t, err)
-		// 		// Default HAProxy image should be used
-		// 		assert.Equal(t, "registry.connect.redhat.com/haproxytech/haproxy@sha256:07ee4e701e6ce23d6c35b37d159244fb14ef9c90190710542ce60492cbe4d68a", opts.Images.HAProxy)
-		// 	},
-		// },
 	}
 
 	// Run the test cases

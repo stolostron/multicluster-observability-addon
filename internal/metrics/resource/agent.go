@@ -5,6 +5,8 @@ import (
 
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	prometheusalpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
+	"github.com/rhobs/multicluster-observability-addon/internal/metrics/config"
+	"github.com/rhobs/multicluster-observability-addon/internal/metrics/handlers"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -12,38 +14,47 @@ import (
 )
 
 const (
-	defaultPlatformMetricsCollectorApp     = "acm-platform-metrics-collector-default"
-	defaultUserWorkloadMetricsCollectorApp = "acm-user-workload-metrics-collector-default"
+	defaultPlatformMetricsCollectorApp     = config.PlatformMetricsCollectorApp + "-default"
+	defaultUserWorkloadMetricsCollectorApp = config.UserWorkloadMetricsCollectorApp + "-default"
 	platformPrometheusService              = "prometheus-k8s.openshift-monitoring.svc.cluster.local:9091"
 	userWorkloadPrometheusService          = "prometheus-user-workload.openshift-user-workload-monitoring.svc.cluster.local:9091"
 	haProxyPort                            = 8090
 )
 
-func NewDefaultResources(ns string) ([]client.Object, error) {
+func DefaultPlaftformAgentResources(ns string) []client.Object {
 	ret := []client.Object{}
 
 	// Create platform resources
+	ret = append(ret, newPrometheusAgent(ns, defaultPlatformMetricsCollectorApp, handlers.PlatformMatchLabels, &metav1.LabelSelector{})) // listen only to the same namespace
 	haProxyCm := fmt.Sprintf("%s-haproxy-config", defaultPlatformMetricsCollectorApp)
-	ret = append(ret, newPrometheusAgent(ns, defaultPlatformMetricsCollectorApp, &metav1.LabelSelector{}, haProxyCm)) // listen only to the same namespace
-	ret = append(ret, newHaproxyConfig(ns, haProxyCm, platformPrometheusService))
+	ret = append(ret, newHaproxyConfig(ns, haProxyCm, platformPrometheusService, handlers.PlatformMatchLabels))
+
+	return ret
+}
+
+func DefaultUserWorkloadAgentResources(ns string) []client.Object {
+	ret := []client.Object{}
 
 	// Create user workload resources
-	haProxyCm = fmt.Sprintf("%s-haproxy-config", defaultUserWorkloadMetricsCollectorApp)
-	ret = append(ret, newPrometheusAgent(ns, defaultUserWorkloadMetricsCollectorApp, nil, haProxyCm)) // listen to all namespaces
-	ret = append(ret, newHaproxyConfig(ns, haProxyCm, userWorkloadPrometheusService))
+	ret = append(ret, newPrometheusAgent(ns, defaultUserWorkloadMetricsCollectorApp, handlers.UserWorkloadMatchLabels, nil)) // listen to all namespaces
+	haProxyCm := fmt.Sprintf("%s-haproxy-config", defaultUserWorkloadMetricsCollectorApp)
+	ret = append(ret, newHaproxyConfig(ns, haProxyCm, userWorkloadPrometheusService, handlers.UserWorkloadMatchLabels))
 
-	return ret, nil
+	return ret
 }
 
 // newPrometheusAgent is a helper function to create a PrometheusAgent resource with given parameters
-func newPrometheusAgent(ns, appName string, namespaceSelector *metav1.LabelSelector, haProxyCm string) *prometheusalpha1.PrometheusAgent {
+func newPrometheusAgent(ns, appName string, labels map[string]string, namespaceSelector *metav1.LabelSelector) *prometheusalpha1.PrometheusAgent {
 	agent := newDefaultPrometheusAgent()
 	agent.ObjectMeta.Name = appName
 	agent.ObjectMeta.Namespace = ns
 	if agent.ObjectMeta.Labels == nil {
-		agent.ObjectMeta.Labels = map[string]string{}
+		agent.ObjectMeta.Labels = labels
+	} else {
+		for k, v := range labels {
+			agent.ObjectMeta.Labels[k] = v
+		}
 	}
-	agent.ObjectMeta.Labels["app"] = appName
 	agent.Spec.CommonPrometheusFields.ScrapeConfigNamespaceSelector = namespaceSelector
 
 	return agent
@@ -77,7 +88,7 @@ func newDefaultPrometheusAgent() *prometheusalpha1.PrometheusAgent {
 	}
 }
 
-func newHaproxyConfig(ns, name, prometheusURL string) *corev1.ConfigMap {
+func newHaproxyConfig(ns, name, prometheusURL string, labels map[string]string) *corev1.ConfigMap {
 	cfg := fmt.Sprintf(`global
 	log stdout format raw daemon
 	maxconn 100
@@ -122,6 +133,7 @@ backend prometheus_backend
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: ns,
+			Labels:    labels,
 		},
 		Data: map[string]string{
 			"haproxy.cfg": cfg,

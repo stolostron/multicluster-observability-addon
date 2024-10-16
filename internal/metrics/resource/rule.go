@@ -2,6 +2,7 @@ package resource
 
 import (
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	"github.com/rhobs/multicluster-observability-addon/internal/metrics/config"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
@@ -11,7 +12,7 @@ const (
 	defaultUserWorkloadRuleName = "user-workload-rules-default"
 )
 
-func newRecordingRule(ns string) *prometheusv1.PrometheusRule {
+func PlatformRecordingRules(ns string) *prometheusv1.PrometheusRule {
 	return &prometheusv1.PrometheusRule{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       prometheusv1.PrometheusRuleKind,
@@ -20,6 +21,9 @@ func newRecordingRule(ns string) *prometheusv1.PrometheusRule {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      defaultPlatformRuleName,
 			Namespace: ns,
+			Labels: map[string]string{
+				"app": config.PlatformMetricsCollectorApp,
+			},
 		},
 		Spec: prometheusv1.PrometheusRuleSpec{
 			Groups: []prometheusv1.RuleGroup{
