@@ -22,11 +22,6 @@ const (
 	haProxyImage   = "registry.connect.redhat.com/haproxytech/haproxy@sha256:07ee4e701e6ce23d6c35b37d159244fb14ef9c90190710542ce60492cbe4d68a"
 )
 
-var (
-	PlatformMatchLabels     = map[string]string{"app": config.PlatformMetricsCollectorApp}
-	UserWorkloadMatchLabels = map[string]string{"app": config.UserWorkloadMetricsCollectorApp}
-)
-
 type OptionsBuilder struct {
 	Client          client.Client
 	HubNamespace    string
@@ -71,8 +66,8 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 		}
 
 		// Fetch rules and scrape configs
-		ret.Platform.ScrapeConfigs = getResourceByLabelSelector[*prometheusalpha1.ScrapeConfig](configResources, map[string]string{"app": config.PlatformMetricsCollectorApp})
-		ret.Platform.Rules = getResourceByLabelSelector[*prometheusv1.PrometheusRule](configResources, map[string]string{"app": config.PlatformMetricsCollectorApp})
+		ret.Platform.ScrapeConfigs = getResourceByLabelSelector[*prometheusalpha1.ScrapeConfig](configResources, config.PlatformPrometheusMatchLabels)
+		ret.Platform.Rules = getResourceByLabelSelector[*prometheusv1.PrometheusRule](configResources, config.PlatformPrometheusMatchLabels)
 	}
 
 	if userWorkloads.CollectionEnabled {
@@ -81,8 +76,8 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 		}
 
 		// Fetch rules and scrape configs
-		ret.UserWorkloads.ScrapeConfigs = getResourceByLabelSelector[*prometheusalpha1.ScrapeConfig](configResources, map[string]string{"app": config.UserWorkloadMetricsCollectorApp})
-		ret.UserWorkloads.Rules = getResourceByLabelSelector[*prometheusv1.PrometheusRule](configResources, map[string]string{"app": config.UserWorkloadMetricsCollectorApp})
+		ret.UserWorkloads.ScrapeConfigs = getResourceByLabelSelector[*prometheusalpha1.ScrapeConfig](configResources, config.UserWorkloadPrometheusMatchLabels)
+		ret.UserWorkloads.Rules = getResourceByLabelSelector[*prometheusv1.PrometheusRule](configResources, config.UserWorkloadPrometheusMatchLabels)
 	}
 
 	return ret, nil
@@ -100,7 +95,10 @@ func (o *OptionsBuilder) getManagedCluster(ctx context.Context, namespace string
 // buildPrometheusAgent abstracts the logic of building a Prometheus agent for platform or user workloads
 func (o *OptionsBuilder) buildPrometheusAgent(ctx context.Context, opts *Options, configResources []client.Object, appName string) error {
 	// Fetch Prometheus agent resource
-	labelsMatcher := map[string]string{"app": appName}
+	labelsMatcher := config.PlatformPrometheusMatchLabels
+	if appName == config.UserWorkloadMetricsCollectorApp {
+		labelsMatcher = config.UserWorkloadPrometheusMatchLabels
+	}
 	platformAgents := getResourceByLabelSelector[*prometheusalpha1.PrometheusAgent](configResources, labelsMatcher)
 	if len(platformAgents) != 1 {
 		return fmt.Errorf("invalid number of PrometheusAgent resources with labels %+v for application %s, found %d agents", labelsMatcher, appName, len(platformAgents))
@@ -127,13 +125,17 @@ func (o *OptionsBuilder) buildPrometheusAgent(ctx context.Context, opts *Options
 		RemoteWriteEndpoint:  o.RemoteWriteURL,
 	}
 
-	agent := promBuilder.Build()
+	var agent *prometheusalpha1.PrometheusAgent
 
 	// Set the built agent in the appropriate workload option
 	switch appName {
 	case config.PlatformMetricsCollectorApp:
+		promBuilder.MatchLabels = config.PlatformPrometheusMatchLabels
+		agent = promBuilder.Build()
 		opts.Platform.PrometheusAgent = agent
 	case config.UserWorkloadMetricsCollectorApp:
+		promBuilder.MatchLabels = config.UserWorkloadPrometheusMatchLabels
+		agent = promBuilder.Build()
 		opts.UserWorkloads.PrometheusAgent = agent
 	default:
 		return fmt.Errorf("unsupported app name %s", appName)

@@ -37,9 +37,7 @@ func TestBuildOptions(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-prometheus-agent",
 			Namespace: hubNamespace,
-			Labels: map[string]string{
-				"app": config.PlatformMetricsCollectorApp,
-			},
+			Labels:    config.PlatformPrometheusMatchLabels,
 		},
 		Spec: prometheusalpha1.PrometheusAgentSpec{
 			CommonPrometheusFields: prometheusv1.CommonPrometheusFields{
@@ -52,7 +50,7 @@ func TestBuildOptions(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-haproxy-config",
 			Namespace: hubNamespace,
-			Labels:    PlatformMatchLabels,
+			Labels:    config.PlatformPrometheusMatchLabels,
 		},
 		Data: map[string]string{},
 	}
@@ -61,9 +59,7 @@ func TestBuildOptions(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-scrape-config",
 			Namespace: hubNamespace,
-			Labels: map[string]string{
-				"app": config.PlatformMetricsCollectorApp,
-			},
+			Labels:    config.PlatformPrometheusMatchLabels,
 		},
 	}
 
@@ -71,9 +67,7 @@ func TestBuildOptions(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-prometheus-rule",
 			Namespace: hubNamespace,
-			Labels: map[string]string{
-				"app": config.PlatformMetricsCollectorApp,
-			},
+			Labels:    config.PlatformPrometheusMatchLabels,
 		},
 	}
 
@@ -81,9 +75,7 @@ func TestBuildOptions(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-prometheus-agent-uwl",
 			Namespace: hubNamespace,
-			Labels: map[string]string{
-				"app": config.UserWorkloadMetricsCollectorApp,
-			},
+			Labels:    config.UserWorkloadPrometheusMatchLabels,
 		},
 		Spec: prometheusalpha1.PrometheusAgentSpec{
 			CommonPrometheusFields: prometheusv1.CommonPrometheusFields{
@@ -96,7 +88,7 @@ func TestBuildOptions(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-haproxy-config-uwl",
 			Namespace: hubNamespace,
-			Labels:    UserWorkloadMatchLabels,
+			Labels:    config.UserWorkloadPrometheusMatchLabels,
 		},
 		Data: map[string]string{},
 	}
