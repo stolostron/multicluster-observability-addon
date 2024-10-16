@@ -8,6 +8,7 @@ import (
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	prometheusalpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	"github.com/rhobs/multicluster-observability-addon/internal/addon"
+	"github.com/rhobs/multicluster-observability-addon/internal/metrics/config"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -17,10 +18,13 @@ import (
 )
 
 const (
-	clusterIDLabel                  = "clusterID"
-	haProxyImage                    = "registry.connect.redhat.com/haproxytech/haproxy@sha256:07ee4e701e6ce23d6c35b37d159244fb14ef9c90190710542ce60492cbe4d68a"
-	platformMetricsCollectorApp     = "acm-platform-metrics-collector"
-	userWorkloadMetricsCollectorApp = "acm-user-workload-metrics-collector"
+	clusterIDLabel = "clusterID"
+	haProxyImage   = "registry.connect.redhat.com/haproxytech/haproxy@sha256:07ee4e701e6ce23d6c35b37d159244fb14ef9c90190710542ce60492cbe4d68a"
+)
+
+var (
+	PlatformMatchLabels     = map[string]string{"app": config.PlatformMetricsCollectorApp}
+	UserWorkloadMatchLabels = map[string]string{"app": config.UserWorkloadMetricsCollectorApp}
 )
 
 type OptionsBuilder struct {
@@ -44,6 +48,9 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 	}
 	ret.ClusterName = managedCluster.Name
 	ret.ClusterID = managedCluster.ObjectMeta.Labels[clusterIDLabel]
+	if ret.ClusterID == "" {
+		ret.ClusterID = managedCluster.Name
+	}
 
 	// Fetch image overrides
 	ret.Images, err = o.getImageOverrides(ctx)
@@ -59,23 +66,23 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 
 	// Build Prometheus agents for platform and user workloads
 	if platform.CollectionEnabled {
-		if err := o.buildPrometheusAgent(ctx, &ret, configResources, platformMetricsCollectorApp); err != nil {
+		if err := o.buildPrometheusAgent(ctx, &ret, configResources, config.PlatformMetricsCollectorApp); err != nil {
 			return ret, err
 		}
 
 		// Fetch rules and scrape configs
-		ret.Platform.ScrapeConfigs = getResourceByLabelSelector[*prometheusalpha1.ScrapeConfig](configResources, map[string]string{"app": platformMetricsCollectorApp})
-		ret.Platform.Rules = getResourceByLabelSelector[*prometheusv1.PrometheusRule](configResources, map[string]string{"app": platformMetricsCollectorApp})
+		ret.Platform.ScrapeConfigs = getResourceByLabelSelector[*prometheusalpha1.ScrapeConfig](configResources, map[string]string{"app": config.PlatformMetricsCollectorApp})
+		ret.Platform.Rules = getResourceByLabelSelector[*prometheusv1.PrometheusRule](configResources, map[string]string{"app": config.PlatformMetricsCollectorApp})
 	}
 
 	if userWorkloads.CollectionEnabled {
-		if err := o.buildPrometheusAgent(ctx, &ret, configResources, userWorkloadMetricsCollectorApp); err != nil {
+		if err := o.buildPrometheusAgent(ctx, &ret, configResources, config.UserWorkloadMetricsCollectorApp); err != nil {
 			return ret, err
 		}
 
 		// Fetch rules and scrape configs
-		ret.UserWorkloads.ScrapeConfigs = getResourceByLabelSelector[*prometheusalpha1.ScrapeConfig](configResources, map[string]string{"app": userWorkloadMetricsCollectorApp})
-		ret.UserWorkloads.Rules = getResourceByLabelSelector[*prometheusv1.PrometheusRule](configResources, map[string]string{"app": userWorkloadMetricsCollectorApp})
+		ret.UserWorkloads.ScrapeConfigs = getResourceByLabelSelector[*prometheusalpha1.ScrapeConfig](configResources, map[string]string{"app": config.UserWorkloadMetricsCollectorApp})
+		ret.UserWorkloads.Rules = getResourceByLabelSelector[*prometheusv1.PrometheusRule](configResources, map[string]string{"app": config.UserWorkloadMetricsCollectorApp})
 	}
 
 	return ret, nil
@@ -93,10 +100,20 @@ func (o *OptionsBuilder) getManagedCluster(ctx context.Context, namespace string
 // buildPrometheusAgent abstracts the logic of building a Prometheus agent for platform or user workloads
 func (o *OptionsBuilder) buildPrometheusAgent(ctx context.Context, opts *Options, configResources []client.Object, appName string) error {
 	// Fetch Prometheus agent resource
-	platformAgents := getResourceByLabelSelector[*prometheusalpha1.PrometheusAgent](configResources, map[string]string{"app": appName})
+	labelsMatcher := map[string]string{"app": appName}
+	platformAgents := getResourceByLabelSelector[*prometheusalpha1.PrometheusAgent](configResources, labelsMatcher)
 	if len(platformAgents) != 1 {
-		return fmt.Errorf("invalid number of PrometheusAgent resources for app %s: %d", appName, len(platformAgents))
+		return fmt.Errorf("invalid number of PrometheusAgent resources with labels %+v for application %s, found %d agents", labelsMatcher, appName, len(platformAgents))
 	}
+
+	// Fetch the haproxy config
+	haProxyConfigMap := getResourceByLabelSelector[*corev1.ConfigMap](configResources, labelsMatcher)
+	if len(haProxyConfigMap) != 1 {
+		return fmt.Errorf("invalid number of ConfigMap for HAProxy resource with labels %+v for application %s, found %d configmaps", labelsMatcher, appName, len(haProxyConfigMap))
+	}
+	haProxyConfigMapName := fmt.Sprintf("%s-haproxy-config", appName)
+	haProxyConfigMap[0].Name = haProxyConfigMapName
+	opts.ConfigMaps = append(opts.ConfigMaps, haProxyConfigMap[0])
 
 	// Build the agent using a builder pattern
 	promBuilder := PrometheusAgentBuilder{
@@ -104,7 +121,7 @@ func (o *OptionsBuilder) buildPrometheusAgent(ctx context.Context, opts *Options
 		Name:                 appName,
 		ClusterName:          opts.ClusterName,
 		ClusterID:            opts.ClusterID,
-		HAProxyConfigMapName: fmt.Sprintf("%s-haproxy-config", appName),
+		HAProxyConfigMapName: haProxyConfigMapName,
 		HAProxyImage:         opts.Images.HAProxy,
 		MatchLabels:          map[string]string{"app": appName},
 		RemoteWriteEndpoint:  o.RemoteWriteURL,
@@ -114,9 +131,9 @@ func (o *OptionsBuilder) buildPrometheusAgent(ctx context.Context, opts *Options
 
 	// Set the built agent in the appropriate workload option
 	switch appName {
-	case platformMetricsCollectorApp:
+	case config.PlatformMetricsCollectorApp:
 		opts.Platform.PrometheusAgent = agent
-	case userWorkloadMetricsCollectorApp:
+	case config.UserWorkloadMetricsCollectorApp:
 		opts.UserWorkloads.PrometheusAgent = agent
 	default:
 		return fmt.Errorf("unsupported app name %s", appName)
@@ -191,6 +208,10 @@ func (o *OptionsBuilder) getConfigResources(ctx context.Context, mcAddon *addona
 			obj = &corev1.ConfigMap{}
 		default:
 			return ret, fmt.Errorf("unsupported configuration reference resource %s in managedClusterAddon.Status.ConfigReferences of %s/%s", cfg.ConfigGroupResource.Resource, mcAddon.Namespace, mcAddon.Name)
+		}
+
+		if cfg.DesiredConfig == nil {
+			return ret, fmt.Errorf("missing desiredConfig in managedClusterAddon.Status.ConfigReferences of %s/%s", mcAddon.Namespace, mcAddon.Name)
 		}
 
 		if err := o.Client.Get(ctx, types.NamespacedName{Name: cfg.DesiredConfig.Name, Namespace: cfg.DesiredConfig.Namespace}, obj); err != nil {

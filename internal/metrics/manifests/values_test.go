@@ -110,6 +110,18 @@ func TestBuildValues(t *testing.T) {
 				assert.Equal(t, values.ScrapeConfigs[1].Name, "b")
 			},
 		},
+		"with rules": {
+			Options: handlers.Options{
+				Platform: handlers.Collector{
+					Rules: []*prometheusv1.PrometheusRule{newRule("a"), newRule("b")},
+				},
+			},
+			Expect: func(t *testing.T, values manifests.MetricsValues) {
+				assert.Len(t, values.Rules, 2)
+				assert.Equal(t, values.Rules[0].Name, "a")
+				assert.Equal(t, values.Rules[1].Name, "b")
+			},
+		},
 	}
 
 	for name, tc := range testCases {
@@ -149,6 +161,14 @@ func newConfigmap(name string) *corev1.ConfigMap {
 
 func newScrapeConfig(name string) *prometheusalpha1.ScrapeConfig {
 	return &prometheusalpha1.ScrapeConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+	}
+}
+
+func newRule(name string) *prometheusv1.PrometheusRule {
+	return &prometheusv1.PrometheusRule{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},

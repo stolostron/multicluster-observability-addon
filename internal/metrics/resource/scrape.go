@@ -5,6 +5,7 @@ import (
 
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	prometheusalpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
+	"github.com/rhobs/multicluster-observability-addon/internal/metrics/config"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -13,7 +14,7 @@ const (
 	defaultUserWorkloadScrapeConfigName = "user-workload-metrics-default"
 )
 
-func newPlatformScrapeConfig(ns string) *prometheusalpha1.ScrapeConfig {
+func PlatformScrapeConfig(ns string) *prometheusalpha1.ScrapeConfig {
 	matchMetrics := make([]string, 0, len(metricsList)+len(matchList))
 	for _, metric := range metricsList {
 		matchMetrics = append(matchMetrics, fmt.Sprintf("{__name__=\"%s\"}", metric))
@@ -32,7 +33,7 @@ func newPlatformScrapeConfig(ns string) *prometheusalpha1.ScrapeConfig {
 			Name:      defaultPlatformScrapeConfigName,
 			Namespace: ns,
 			Labels: map[string]string{
-				"app": defaultPlatformMetricsCollectorApp,
+				"app": config.PlatformMetricsCollectorApp,
 			},
 		},
 		Spec: prometheusalpha1.ScrapeConfigSpec{
@@ -189,14 +190,14 @@ var metricsList = []string{
 }
 
 var matchList = []string{
-	`__name__="container_memory_cache",container!=""`,
-	`__name__="container_memory_rss",container!=""`,
-	`__name__="container_memory_swap",container!=""`,
-	`__name__="container_memory_working_set_bytes",container!=""`,
-	`__name__="go_goroutines",job="apiserver"`,
-	`__name__="process_cpu_seconds_total",job="apiserver"`,
-	`__name__="process_resident_memory_bytes",job=~"apiserver|etcd"`,
-	`__name__="workqueue_adds_total",job="apiserver"`,
-	`__name__="workqueue_depth",job="apiserver"`,
-	`__name__="workqueue_queue_duration_seconds_bucket",job="apiserver"`,
+	`{__name__="container_memory_cache",container!=""}`,
+	`{__name__="container_memory_rss",container!=""}`,
+	`{__name__="container_memory_swap",container!=""}`,
+	`{__name__="container_memory_working_set_bytes",container!=""}`,
+	`{__name__="go_goroutines",job="apiserver"}`,
+	`{__name__="process_cpu_seconds_total",job="apiserver"}`,
+	`{__name__="process_resident_memory_bytes",job=~"apiserver|etcd"}`,
+	`{__name__="workqueue_adds_total",job="apiserver"}`,
+	`{__name__="workqueue_depth",job="apiserver"}`,
+	`{__name__="workqueue_queue_duration_seconds_bucket",job="apiserver"}`,
 }
