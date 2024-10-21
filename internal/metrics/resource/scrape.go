@@ -66,7 +66,7 @@ func PlatformScrapeConfig(ns string) *prometheusalpha1.ScrapeConfig {
 			StaticConfigs: []prometheusalpha1.StaticConfig{
 				{
 					Targets: []prometheusalpha1.Target{
-						prometheusalpha1.Target(fmt.Sprintf("localhost:%d", haProxyPort)),
+						prometheusalpha1.Target(fmt.Sprintf("localhost:%d", envoyProxyPortForPrometheus)),
 					},
 				},
 			},
@@ -74,8 +74,8 @@ func PlatformScrapeConfig(ns string) *prometheusalpha1.ScrapeConfig {
 	}
 }
 
-func toPtr(s string) *string {
-	return &s
+func toPtr[T any](v T) *T {
+	return &v
 }
 
 var metricsList = []string{

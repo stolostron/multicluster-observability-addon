@@ -19,7 +19,6 @@ import (
 
 const (
 	clusterIDLabel = "clusterID"
-	haProxyImage   = "registry.connect.redhat.com/haproxytech/haproxy@sha256:07ee4e701e6ce23d6c35b37d159244fb14ef9c90190710542ce60492cbe4d68a"
 )
 
 type OptionsBuilder struct {
@@ -104,25 +103,25 @@ func (o *OptionsBuilder) buildPrometheusAgent(ctx context.Context, opts *Options
 	}
 
 	// Fetch the haproxy config
-	haProxyConfigMap := getResourceByLabelSelector[*corev1.ConfigMap](configResources, labelsMatcher)
-	if len(haProxyConfigMap) != 1 {
-		return fmt.Errorf("invalid number of ConfigMap for HAProxy resource with labels %+v for application %s, found %d configmaps", labelsMatcher, appName, len(haProxyConfigMap))
+	envoyProxyConfigMap := getResourceByLabelSelector[*corev1.ConfigMap](configResources, labelsMatcher)
+	if len(envoyProxyConfigMap) != 1 {
+		return fmt.Errorf("invalid number of ConfigMap for Envoy resource with labels %+v for application %s, found %d configmaps", labelsMatcher, appName, len(envoyProxyConfigMap))
 	}
-	haProxyConfigMapName := fmt.Sprintf("%s-haproxy-config", appName)
-	haProxyConfigMap[0].Name = haProxyConfigMapName
-	haProxyConfigMap[0].Labels = labelsMatcher // For convienence and easier retrieval, especially in tests
-	opts.ConfigMaps = append(opts.ConfigMaps, haProxyConfigMap[0])
+	envoyProxyConfigMapName := fmt.Sprintf("%s-envoy-config", appName)
+	envoyProxyConfigMap[0].Name = envoyProxyConfigMapName
+	envoyProxyConfigMap[0].Labels = labelsMatcher // For convienence and easier retrieval, especially in tests
+	opts.ConfigMaps = append(opts.ConfigMaps, envoyProxyConfigMap[0])
 
 	// Build the agent using a builder pattern
 	promBuilder := PrometheusAgentBuilder{
-		Agent:                platformAgents[0].DeepCopy(),
-		Name:                 appName,
-		ClusterName:          opts.ClusterName,
-		ClusterID:            opts.ClusterID,
-		HAProxyConfigMapName: haProxyConfigMapName,
-		HAProxyImage:         opts.Images.HAProxy,
-		MatchLabels:          map[string]string{"app": appName},
-		RemoteWriteEndpoint:  o.RemoteWriteURL,
+		Agent:               platformAgents[0].DeepCopy(),
+		Name:                appName,
+		ClusterName:         opts.ClusterName,
+		ClusterID:           opts.ClusterID,
+		EnvoyConfigMapName:  envoyProxyConfigMapName,
+		EnvoyProxyImage:     opts.Images.Envoy,
+		MatchLabels:         map[string]string{"app": appName},
+		RemoteWriteEndpoint: o.RemoteWriteURL,
 	}
 
 	var agent *prometheusalpha1.PrometheusAgent
@@ -186,7 +185,7 @@ func (o *OptionsBuilder) getImageOverrides(ctx context.Context) (ImagesOptions, 
 		}
 	}
 
-	ret.HAProxy = haProxyImage
+	ret.Envoy = config.EnvoyImage
 
 	if ret.PrometheusOperator == "" || ret.PrometheusConfigReloader == "" || ret.KubeRBACProxy == "" {
 		return ret, fmt.Errorf("missing image overrides in ConfigMap %s, got %+v", o.ImagesConfigMap.String(), ret)

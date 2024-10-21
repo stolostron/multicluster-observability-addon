@@ -1,0 +1,20 @@
+{{- if or .Values.platformEnabled }}
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: {{ .Values.platformAppName }}-role
+  labels:
+    app.kubernetes.io/component: prometheus-agent
+    app.kubernetes.io/name: prometheus-agent
+rules:
+  - verbs:
+      - get
+      - list
+      - watch
+    apiGroups:
+      - ''
+    resources:
+      - services
+      - endpoints
+      - pods
+{{- end }}

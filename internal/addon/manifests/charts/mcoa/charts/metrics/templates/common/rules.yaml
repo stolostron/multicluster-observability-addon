@@ -1,0 +1,14 @@
+{{- range $_, $rule := .Values.rules }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ $rule.name }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- $incomingLabels := $rule.labels }}
+    {{- $stdLabels := dict "release" $.Release.Name }}
+    {{- $mergedLabels := merge $incomingLabels $stdLabels }}
+    {{- toYaml $mergedLabels | nindent 4 }}
+spec:
+{{ fromJson $rule.data | toYaml | nindent 2 }}
+{{- end }}

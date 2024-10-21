@@ -25,6 +25,6 @@ type Collector struct {
 type ImagesOptions struct {
 	PrometheusOperator       string
 	PrometheusConfigReloader string
-	HAProxy                  string
+	Envoy                    string
 	KubeRBACProxy            string
 }

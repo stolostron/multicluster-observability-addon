@@ -46,15 +46,15 @@ func TestPrometheusAgentBuilder_EnforcedFields(t *testing.T) {
 	}
 
 	builder := handler.PrometheusAgentBuilder{
-		Agent:                promAgent,
-		Name:                 "test-agent",
-		RemoteWriteEndpoint:  "https://example.com/write",
-		ClusterName:          "test-cluster",
-		ClusterID:            "test-cluster-id",
-		HAProxyConfigMapName: "haproxy-config",
-		HAProxyImage:         "haproxy:latest",
-		PrometheusImage:      "prometheus:latest",
-		MatchLabels:          map[string]string{"app": "test-app"},
+		Agent:               promAgent,
+		Name:                "test-agent",
+		RemoteWriteEndpoint: "https://example.com/write",
+		ClusterName:         "test-cluster",
+		ClusterID:           "test-cluster-id",
+		EnvoyConfigMapName:  "haproxy-config",
+		EnvoyProxyImage:     "haproxy:latest",
+		PrometheusImage:     "prometheus:latest",
+		MatchLabels:         map[string]string{"app": "test-app"},
 	}
 
 	result := builder.Build()
@@ -125,15 +125,15 @@ func TestPrometheusAgentBuilder_ConfigurableFields(t *testing.T) {
 		},
 	}
 	builder := handler.PrometheusAgentBuilder{
-		Agent:                promAgent.DeepCopy(),
-		Name:                 "test-agent",
-		RemoteWriteEndpoint:  "https://example.com/write",
-		ClusterName:          "test-cluster",
-		ClusterID:            "test-cluster-id",
-		HAProxyConfigMapName: "haproxy-config",
-		HAProxyImage:         "haproxy:latest",
-		PrometheusImage:      "prometheus:latest",
-		MatchLabels:          map[string]string{"app": "test-app"},
+		Agent:               promAgent.DeepCopy(),
+		Name:                "test-agent",
+		RemoteWriteEndpoint: "https://example.com/write",
+		ClusterName:         "test-cluster",
+		ClusterID:           "test-cluster-id",
+		EnvoyConfigMapName:  "haproxy-config",
+		EnvoyProxyImage:     "haproxy:latest",
+		PrometheusImage:     "prometheus:latest",
+		MatchLabels:         map[string]string{"app": "test-app"},
 	}
 
 	builtSpec := reflect.ValueOf(builder.Build().Spec.CommonPrometheusFields)

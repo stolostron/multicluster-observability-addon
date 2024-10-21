@@ -1,0 +1,14 @@
+{{- if or .Values.userWorkloadsEnabled }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ .Values.userWorkloadAppName }}-cluster-monitoring-view-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-monitoring-view
+subjects:
+- kind: ServiceAccount
+  name: {{ .Values.userWorkloadAppName }}
+  namespace: {{ .Release.Namespace }}
+{{- end }}
