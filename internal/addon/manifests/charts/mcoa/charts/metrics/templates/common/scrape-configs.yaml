@@ -1,0 +1,14 @@
+{{- range $_, $scrapeconfig := .Values.scrapeConfigs }}
+apiVersion: monitoring.coreos.com/v1alpha1
+kind: ScrapeConfig
+metadata:
+  name: {{ $scrapeconfig.name }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- $incomingLabels := $scrapeconfig.labels }}
+    {{- $stdLabels := dict "release" $.Release.Name }}
+    {{- $mergedLabels := merge $incomingLabels $stdLabels }}
+    {{- toYaml $mergedLabels | nindent 4 }}
+spec:
+{{ fromJson $scrapeconfig.data | toYaml | nindent 2 }}
+{{- end }}

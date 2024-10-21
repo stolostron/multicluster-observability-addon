@@ -1,0 +1,3 @@
+# platformEnabled: false
+# userWorkloadsEnabled: false
+# enabled: {{ .Values.metrics.enabled }}

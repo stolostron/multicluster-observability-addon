@@ -1,0 +1,14 @@
+{{- if or .Values.userWorkloadsEnabled }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ .Values.userWorkloadAppName }}-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ .Values.userWorkloadAppName }}-role
+subjects:
+- kind: ServiceAccount
+  name: {{ .Values.userWorkloadAppName }}
+  namespace: open-cluster-management-addon-observability
+{{- end }}

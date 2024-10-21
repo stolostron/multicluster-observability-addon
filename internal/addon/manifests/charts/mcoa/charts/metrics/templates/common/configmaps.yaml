@@ -1,0 +1,14 @@
+{{- range $_, $configmap := .Values.configMaps }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $configmap.name }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- $incomingLabels := $configmap.labels }}
+    {{- $stdLabels := dict "release" $.Release.Name }}
+    {{- $mergedLabels := merge $incomingLabels $stdLabels }}
+    {{- toYaml $mergedLabels | nindent 4 }}
+data: {{ fromJson $configmap.data | toYaml | nindent 2 }}
+---
+{{- end }}

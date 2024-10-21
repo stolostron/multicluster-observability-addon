@@ -2,6 +2,9 @@ nameOverride: null
 
 enabled: true
 
+metrics:
+  enabled: {{ or .Values.metrics.platformEnabled .Values.metrics.userWorkloadsEnabled }}
+
 logging:
   enabled: true
 
