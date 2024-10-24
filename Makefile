@@ -16,6 +16,9 @@ CRD_DIR := $(shell pwd)/deploy/crds
 REGISTRY_BASE_OPENSHIFT = quay.io/rhobs
 REGISTRY_BASE ?= $(REGISTRY_BASE_OPENSHIFT)
 
+ARCH ?= $(shell go env GOARCH)
+GOOS ?= $(shell go env GOOS)
+
 # Image URL to use all building/pushing image targets
 IMG ?= $(REGISTRY_BASE)/multicluster-observability-addon:$(VERSION)
 
@@ -58,10 +61,11 @@ test:
 
 .PHONY: addon
 addon: deps fmt ## Build addon binary
-	go build -o bin/multicluster-observability-addon main.go
+	CGO_ENABLED=0 GOOS=$(GOOS) GOARCH=$(ARCH) go build -o bin/multicluster-observability-addon_${ARCH} -ldflags "-s -w" main.go
 
 .PHONY: oci-build
-oci-build: ## Build the image
+oci-build: GOOS = linux
+oci-build: addon ## Build the image
 	podman build -t ${IMG} .
 
 .PHONY: oci-push
