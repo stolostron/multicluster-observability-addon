@@ -58,20 +58,22 @@ test:
 
 .PHONY: integration-test
 integration-test:
-	go test -tags integration -timeout 30s -run=Integration ./
+	go test -timeout 30s ./test/integration/...
 
 .PHONY: integration-env
 integration-env:
-	mkdir -p tmp/crds
-	curl -sL -o tmp/crds/addon.open-cluster-management.io_addondeploymentconfigs.crd.yaml https://raw.githubusercontent.com/open-cluster-management-io/api/f6c65820279078afbe536d5a6012e0b3badde3c5/addon/v1alpha1/0000_02_addon.open-cluster-management.io_addondeploymentconfigs.crd.yaml
-	curl -sL -o tmp/crds/addon.open-cluster-management.io_clustermanagementaddons.crd.yaml https://raw.githubusercontent.com/open-cluster-management-io/api/f6c65820279078afbe536d5a6012e0b3badde3c5/addon/v1alpha1/0000_00_addon.open-cluster-management.io_clustermanagementaddons.crd.yaml
-	curl -sL -o tmp/crds/addon.open-cluster-management.io_managedclusteraddons.crd.yaml https://raw.githubusercontent.com/open-cluster-management-io/api/f6c65820279078afbe536d5a6012e0b3badde3c5/addon/v1alpha1/0000_01_addon.open-cluster-management.io_managedclusteraddons.crd.yaml
-	curl -sL -o tmp/crds/clusters.open-cluster-management.io_managedclusters.crd.yaml https://raw.githubusercontent.com/open-cluster-management-io/api/f6c65820279078afbe536d5a6012e0b3badde3c5/cluster/v1/0000_00_clusters.open-cluster-management.io_managedclusters.crd.yaml
-	curl -sL -o tmp/crds/work.open-cluster-management.io_manifestworks.crd.yaml https://raw.githubusercontent.com/open-cluster-management-io/api/f6c65820279078afbe536d5a6012e0b3badde3c5/work/v1/0000_00_work.open-cluster-management.io_manifestworks.crd.yaml
-	curl -sL -o tmp/crds/opentelemetry.io_instrumentations.yaml https://raw.githubusercontent.com/open-telemetry/opentelemetry-operator/70dff6948ad00a971840b1dce71e8c4d3a52e02c/bundle/community/manifests/opentelemetry.io_instrumentations.yaml
-	curl -sL -o tmp/crds/opentelemetry.io_opentelemetrycollectors.yaml https://raw.githubusercontent.com/open-telemetry/opentelemetry-operator/70dff6948ad00a971840b1dce71e8c4d3a52e02c/bundle/community/manifests/opentelemetry.io_opentelemetrycollectors.yaml
-	curl -sL -o tmp/crds/logging.openshift.io_clusterlogforwarders.yaml https://raw.githubusercontent.com/openshift/cluster-logging-operator/bced99a9889abe7714b2c5e558f3056b95701baf/config/crd/bases/observability.openshift.io_clusterlogforwarders.yaml && sed -i 's/observability.openshift.io/logging.openshift.io/g' tmp/crds/logging.openshift.io_clusterlogforwarders.yaml
-	curl -sL -o tmp/crds/monitoring.coreos.com_prometheusagents.yaml https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/ca4f84f2bb6ce42fd9e3bb81a46e0bb32d042db1/example/prometheus-operator-crd-full/monitoring.coreos.com_prometheusagents.yaml
+	@mkdir -p tmp/crds
+	@curl -sL -o tmp/crds/addon.open-cluster-management.io_addondeploymentconfigs.crd.yaml https://raw.githubusercontent.com/open-cluster-management-io/api/f6c65820279078afbe536d5a6012e0b3badde3c5/addon/v1alpha1/0000_02_addon.open-cluster-management.io_addondeploymentconfigs.crd.yaml
+	@curl -sL -o tmp/crds/addon.open-cluster-management.io_clustermanagementaddons.crd.yaml https://raw.githubusercontent.com/open-cluster-management-io/api/f6c65820279078afbe536d5a6012e0b3badde3c5/addon/v1alpha1/0000_00_addon.open-cluster-management.io_clustermanagementaddons.crd.yaml
+	@curl -sL -o tmp/crds/addon.open-cluster-management.io_managedclusteraddons.crd.yaml https://raw.githubusercontent.com/open-cluster-management-io/api/f6c65820279078afbe536d5a6012e0b3badde3c5/addon/v1alpha1/0000_01_addon.open-cluster-management.io_managedclusteraddons.crd.yaml 
+	@curl -sL -o tmp/crds/clusters.open-cluster-management.io_managedclusters.crd.yaml https://raw.githubusercontent.com/open-cluster-management-io/api/f6c65820279078afbe536d5a6012e0b3badde3c5/cluster/v1/0000_00_clusters.open-cluster-management.io_managedclusters.crd.yaml 
+	@curl -sL -o tmp/crds/work.open-cluster-management.io_manifestworks.crd.yaml https://raw.githubusercontent.com/open-cluster-management-io/api/f6c65820279078afbe536d5a6012e0b3badde3c5/work/v1/0000_00_work.open-cluster-management.io_manifestworks.crd.yaml 
+	@curl -sL -o tmp/crds/opentelemetry.io_instrumentations.yaml https://raw.githubusercontent.com/open-telemetry/opentelemetry-operator/70dff6948ad00a971840b1dce71e8c4d3a52e02c/bundle/community/manifests/opentelemetry.io_instrumentations.yaml 
+	@curl -sL -o tmp/crds/opentelemetry.io_opentelemetrycollectors.yaml https://raw.githubusercontent.com/open-telemetry/opentelemetry-operator/70dff6948ad00a971840b1dce71e8c4d3a52e02c/bundle/community/manifests/opentelemetry.io_opentelemetrycollectors.yaml 
+	@curl -sL -o tmp/crds/logging.openshift.io_clusterlogforwarders.yaml https://raw.githubusercontent.com/openshift/cluster-logging-operator/bced99a9889abe7714b2c5e558f3056b95701baf/config/crd/bases/observability.openshift.io_clusterlogforwarders.yaml && sed -i 's/observability.openshift.io/logging.openshift.io/g' tmp/crds/logging.openshift.io_clusterlogforwarders.yaml 
+	@curl -sL -o tmp/crds/monitoring.coreos.com_prometheusagents.yaml https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/ca4f84f2bb6ce42fd9e3bb81a46e0bb32d042db1/example/prometheus-operator-crd-full/monitoring.coreos.com_prometheusagents.yaml 
+	@go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
+	@setup-envtest -p env use 1.30.x
 
 .PHONY: addon
 addon: deps fmt ## Build addon binary
