@@ -111,23 +111,28 @@ func newAddonDeploymentConfig(ns, name string) *addonDeploymentConfigBuilder {
 }
 
 func (a *addonDeploymentConfigBuilder) WithPlatformMetricsCollection() *addonDeploymentConfigBuilder {
-	a.Spec.CustomizedVariables = []addonapiv1alpha1.CustomizedVariable{
-		{
-			Name:  addon.KeyPlatformMetricsCollection,
-			Value: string(addon.PrometheusAgentMetricsCollectorV1alpha1),
-		},
-	}
+	a.Spec.CustomizedVariables = append(a.Spec.CustomizedVariables, addonapiv1alpha1.CustomizedVariable{
+		Name:  addon.KeyPlatformMetricsCollection,
+		Value: string(addon.PrometheusAgentMetricsCollectorV1alpha1),
+	})
 
 	return a
 }
 
 func (a *addonDeploymentConfigBuilder) WithUserWorkloadsMetricsCollection() *addonDeploymentConfigBuilder {
-	a.Spec.CustomizedVariables = []addonapiv1alpha1.CustomizedVariable{
-		{
-			Name:  addon.KeyUserWorkloadMetricsCollection,
-			Value: string(addon.PrometheusAgentMetricsCollectorV1alpha1),
-		},
-	}
+	a.Spec.CustomizedVariables = append(a.Spec.CustomizedVariables, addonapiv1alpha1.CustomizedVariable{
+		Name:  addon.KeyUserWorkloadMetricsCollection,
+		Value: string(addon.PrometheusAgentMetricsCollectorV1alpha1),
+	})
+
+	return a
+}
+
+func (a *addonDeploymentConfigBuilder) WithPlatformHubEndpoint(endpoint string) *addonDeploymentConfigBuilder {
+	a.Spec.CustomizedVariables = append(a.Spec.CustomizedVariables, addonapiv1alpha1.CustomizedVariable{
+		Name:  addon.KeyPlatformSignalsHubEndpoint,
+		Value: endpoint,
+	})
 
 	return a
 }

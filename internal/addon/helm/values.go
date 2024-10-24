@@ -3,6 +3,7 @@ package helm
 import (
 	"context"
 	"errors"
+	"path"
 
 	"github.com/rhobs/multicluster-observability-addon/internal/addon"
 	lhandlers "github.com/rhobs/multicluster-observability-addon/internal/logging/handlers"
@@ -10,6 +11,7 @@ import (
 	"github.com/rhobs/multicluster-observability-addon/internal/metrics/config"
 	mhandlers "github.com/rhobs/multicluster-observability-addon/internal/metrics/handlers"
 	mmanifests "github.com/rhobs/multicluster-observability-addon/internal/metrics/manifests"
+	"github.com/rhobs/multicluster-observability-addon/internal/metrics/resource"
 	thandlers "github.com/rhobs/multicluster-observability-addon/internal/tracing/handlers"
 	tmanifests "github.com/rhobs/multicluster-observability-addon/internal/tracing/manifests"
 	clusterinfov1beta1 "github.com/stolostron/cluster-lifecycle-api/clusterinfo/v1beta1"
@@ -62,10 +64,18 @@ func GetValuesFunc(ctx context.Context, k8s client.Client) addonfactory.GetValue
 		}
 
 		if opts.Platform.Metrics.CollectionEnabled || opts.UserWorkloads.Metrics.CollectionEnabled {
+			if opts.Platform.HubEndpoint == "" {
+				return nil, errors.New("platform hub endpoint is required for metrics collection")
+			}
+
+			if err := resource.DeployDefaultResources(ctx, k8s, config.HubInstallNamespace); err != nil {
+				return nil, err
+			}
+
 			optsBuilder := mhandlers.OptionsBuilder{
 				Client:          k8s,
 				ImagesConfigMap: config.ImagesConfigMap,
-				RemoteWriteURL:  "to-be-set",
+				RemoteWriteURL:  path.Join(opts.Platform.HubEndpoint, "/api/metrics/v1/default/api/v1/receive"),
 			}
 			metricsOpts, err := optsBuilder.Build(ctx, mcAddon, opts.Platform.Metrics, opts.UserWorkloads.Metrics)
 			if err != nil {

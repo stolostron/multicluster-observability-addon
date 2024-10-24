@@ -18,8 +18,10 @@ import (
 var envoyConfig string
 
 const (
-	defaultPlatformMetricsCollectorApp     = config.PlatformMetricsCollectorApp + "-default"
+	DefaultPlatformMetricsCollectorApp     = config.PlatformMetricsCollectorApp + "-default"
+	DefaultPlatformEnvoyConfigMap          = DefaultPlatformMetricsCollectorApp + "-envoy-config"
 	defaultUserWorkloadMetricsCollectorApp = config.UserWorkloadMetricsCollectorApp + "-default"
+	DefaultUserWorkloadEnvoyConfigMap      = defaultUserWorkloadMetricsCollectorApp + "-envoy-config"
 	platformPrometheusService              = "prometheus-k8s.openshift-monitoring.svc.cluster.local:9091"
 	userWorkloadPrometheusService          = "prometheus-user-workload.openshift-user-workload-monitoring.svc.cluster.local:9091"
 	envoyAdminPort                         = 9091
@@ -31,9 +33,8 @@ func DefaultPlaftformAgentResources(ns string) []client.Object {
 	ret := []client.Object{}
 
 	// Create platform resources
-	ret = append(ret, newPrometheusAgent(ns, defaultPlatformMetricsCollectorApp, config.PlatformPrometheusMatchLabels, &metav1.LabelSelector{})) // listen only to the same namespace
-	haProxyCm := fmt.Sprintf("%s-haproxy-config", defaultPlatformMetricsCollectorApp)
-	ret = append(ret, newEnvoyConfigMap(ns, haProxyCm, platformPrometheusService, config.PlatformPrometheusMatchLabels))
+	ret = append(ret, newPrometheusAgent(ns, DefaultPlatformMetricsCollectorApp, config.PlatformPrometheusMatchLabels, &metav1.LabelSelector{})) // listen only to the same namespace
+	ret = append(ret, newEnvoyConfigMap(ns, DefaultPlatformEnvoyConfigMap, platformPrometheusService, config.PlatformPrometheusMatchLabels))
 
 	return ret
 }
@@ -43,8 +44,7 @@ func DefaultUserWorkloadAgentResources(ns string) []client.Object {
 
 	// Create user workload resources
 	ret = append(ret, newPrometheusAgent(ns, defaultUserWorkloadMetricsCollectorApp, config.UserWorkloadPrometheusMatchLabels, nil)) // listen to all namespaces
-	haProxyCm := fmt.Sprintf("%s-haproxy-config", defaultUserWorkloadMetricsCollectorApp)
-	ret = append(ret, newEnvoyConfigMap(ns, haProxyCm, userWorkloadPrometheusService, config.UserWorkloadPrometheusMatchLabels))
+	ret = append(ret, newEnvoyConfigMap(ns, DefaultUserWorkloadEnvoyConfigMap, userWorkloadPrometheusService, config.UserWorkloadPrometheusMatchLabels))
 
 	return ret
 }

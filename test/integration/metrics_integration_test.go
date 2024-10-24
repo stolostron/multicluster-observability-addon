@@ -12,6 +12,7 @@ import (
 	"github.com/rhobs/multicluster-observability-addon/internal/addon"
 	addonctrl "github.com/rhobs/multicluster-observability-addon/internal/controllers/addon"
 	"github.com/rhobs/multicluster-observability-addon/internal/metrics/config"
+	"github.com/rhobs/multicluster-observability-addon/internal/metrics/resource"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,19 +32,18 @@ func TestIntegration_Metrics(t *testing.T) {
 	spokeName := "managed-cluster-1"
 	obsNamespace := "open-cluster-management-observability"
 
-	promAgentConfig := types.NamespacedName{Namespace: obsNamespace, Name: "default-agent"}
-	envoyConfig := types.NamespacedName{Namespace: obsNamespace, Name: "default-envoy-config"}
+	promAgentConfig := types.NamespacedName{Namespace: obsNamespace, Name: resource.DefaultPlatformMetricsCollectorApp}
+	envoyConfig := types.NamespacedName{Namespace: obsNamespace, Name: resource.DefaultPlatformEnvoyConfigMap}
+	addonConfigName := "addon-config"
 	remoteWriteSecrets := newRemoteWriteSecrets(obsNamespace)
 	resources := []client.Object{
 		newManagedCluster(spokeName),
 		newNamespace(spokeName),
 		newManagedClusterAddon(spokeName, promAgentConfig, envoyConfig),
 		newNamespace(obsNamespace),
-		newClusterManagementAddon(obsNamespace, "foo"),
-		newAddonDeploymentConfig(obsNamespace, "foo").WithPlatformMetricsCollection().Build(),
+		newClusterManagementAddon(obsNamespace, addonConfigName),
+		newAddonDeploymentConfig(obsNamespace, addonConfigName).WithPlatformMetricsCollection().WithPlatformHubEndpoint("https://gogo.go").Build(),
 		mewImagesListConfigMap(obsNamespace),
-		newPrometheusAgent(promAgentConfig.Namespace, promAgentConfig.Name),
-		newEnvoyConfigMap(envoyConfig.Namespace, envoyConfig.Name),
 		remoteWriteSecrets[0],
 		remoteWriteSecrets[1],
 	}
@@ -178,26 +178,6 @@ func mewImagesListConfigMap(ns string) *corev1.ConfigMap {
 			"prometheus_operator":        "operator-image",
 			"prometheus_config_reloader": "reloader-image",
 			"kube_rbac_proxy":            "proxy-image",
-		},
-	}
-}
-
-func newPrometheusAgent(ns, name string) *prometheusalpha1.PrometheusAgent {
-	return &prometheusalpha1.PrometheusAgent{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: ns,
-			Name:      name,
-			Labels:    config.PlatformPrometheusMatchLabels,
-		},
-	}
-}
-
-func newEnvoyConfigMap(ns, name string) *corev1.ConfigMap {
-	return &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: ns,
-			Name:      name,
-			Labels:    config.PlatformPrometheusMatchLabels,
 		},
 	}
 }

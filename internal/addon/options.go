@@ -9,8 +9,9 @@ const (
 	KeyOpenShiftLoggingChannel = "openshiftLoggingChannel"
 
 	// Platform Observability Keys
-	KeyPlatformMetricsCollection = "platformMetricsCollection"
-	KeyPlatformLogsCollection    = "platformLogsCollection"
+	KeyPlatformMetricsCollection  = "platformMetricsCollection"
+	KeyPlatformLogsCollection     = "platformLogsCollection"
+	KeyPlatformSignalsHubEndpoint = "signalsHubEndpoint"
 
 	// User Workloads Observability Keys
 	KeyUserWorkloadMetricsCollection = "userWorkloadMetricsCollection"
@@ -49,9 +50,10 @@ type TracesOptions struct {
 }
 
 type PlatformOptions struct {
-	Enabled bool
-	Metrics MetricsOptions
-	Logs    LogsOptions
+	Enabled     bool
+	Metrics     MetricsOptions
+	Logs        LogsOptions
+	HubEndpoint string
 }
 
 type UserWorkloadOptions struct {
@@ -83,6 +85,8 @@ func BuildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Opti
 			opts.Platform.Logs.SubscriptionChannel = keyvalue.Value
 			opts.UserWorkloads.Logs.SubscriptionChannel = keyvalue.Value
 		// Platform Observability Options
+		case KeyPlatformSignalsHubEndpoint:
+			opts.Platform.HubEndpoint = keyvalue.Value
 		case KeyPlatformMetricsCollection:
 			if keyvalue.Value == string(PrometheusAgentMetricsCollectorV1alpha1) {
 				opts.Platform.Enabled = true
