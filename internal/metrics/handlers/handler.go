@@ -207,8 +207,10 @@ func (o *OptionsBuilder) getConfigResources(ctx context.Context, mcAddon *addona
 			obj = &prometheusv1.PrometheusRule{}
 		case "configmaps":
 			obj = &corev1.ConfigMap{}
+		case addon.AddonDeploymentConfigResource:
+			continue
 		default:
-			return ret, fmt.Errorf("unsupported configuration reference resource %s in managedClusterAddon.Status.ConfigReferences of %s/%s", cfg.ConfigGroupResource.Resource, mcAddon.Namespace, mcAddon.Name)
+			return ret, fmt.Errorf("unsupported configuration reference resource %q in managedClusterAddon.Status.ConfigReferences of %s/%s", cfg.ConfigGroupResource.Resource, mcAddon.Namespace, mcAddon.Name)
 		}
 
 		if cfg.DesiredConfig == nil {

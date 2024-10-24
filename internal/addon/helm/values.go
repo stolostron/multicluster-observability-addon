@@ -7,6 +7,7 @@ import (
 	"github.com/rhobs/multicluster-observability-addon/internal/addon"
 	lhandlers "github.com/rhobs/multicluster-observability-addon/internal/logging/handlers"
 	lmanifests "github.com/rhobs/multicluster-observability-addon/internal/logging/manifests"
+	"github.com/rhobs/multicluster-observability-addon/internal/metrics/config"
 	mhandlers "github.com/rhobs/multicluster-observability-addon/internal/metrics/handlers"
 	mmanifests "github.com/rhobs/multicluster-observability-addon/internal/metrics/manifests"
 	thandlers "github.com/rhobs/multicluster-observability-addon/internal/tracing/handlers"
@@ -61,7 +62,12 @@ func GetValuesFunc(ctx context.Context, k8s client.Client) addonfactory.GetValue
 		}
 
 		if opts.Platform.Metrics.CollectionEnabled || opts.UserWorkloads.Metrics.CollectionEnabled {
-			metricsOpts, err := mhandlers.BuildOptions(ctx, k8s, mcAddon, opts.Platform.Metrics, opts.UserWorkloads.Metrics)
+			optsBuilder := mhandlers.OptionsBuilder{
+				Client:          k8s,
+				ImagesConfigMap: config.ImagesConfigMap,
+				RemoteWriteURL:  "to-be-set",
+			}
+			metricsOpts, err := optsBuilder.Build(ctx, mcAddon, opts.Platform.Metrics, opts.UserWorkloads.Metrics)
 			if err != nil {
 				return nil, err
 			}

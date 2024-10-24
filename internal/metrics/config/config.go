@@ -1,5 +1,7 @@
 package config
 
+import "k8s.io/apimachinery/pkg/types"
+
 const (
 	PrometheusControllerID          = "acm-observability"
 	PlatformMetricsCollectorApp     = "acm-platform-metrics-collector"
@@ -17,5 +19,9 @@ var (
 	}
 	UserWorkloadPrometheusMatchLabels = map[string]string{
 		"app": UserWorkloadMetricsCollectorApp,
+	}
+	ImagesConfigMap = types.NamespacedName{
+		Name:      "images-list",
+		Namespace: "open-cluster-management-observability",
 	}
 )
