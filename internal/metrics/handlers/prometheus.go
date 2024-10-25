@@ -48,30 +48,30 @@ func (p *PrometheusAgentBuilder) setCommonFields() *PrometheusAgentBuilder {
 	p.Agent.Spec.CommonPrometheusFields.WALCompression = toPtr(true)
 	// Add default scrape class with relabeling to add clusterID and cluster labels
 	// p.Agent.Spec.CommonPrometheusFields.ScrapeClass = "openshift-monitoring"
-	p.Agent.Spec.CommonPrometheusFields.ScrapeClasses = []prometheusv1.ScrapeClass{
-		{
-			Name:    "openshift-monitoring",
-			Default: toPtr(true),
-			MetricRelabelings: []prometheusv1.RelabelConfig{
-				{
-					Replacement: toPtr(p.ClusterName),
-					TargetLabel: "testing",
-					Action:      "replace",
-				},
-				// {
-				// 	Replacement: toPtr(p.ClusterID),
-				// 	TargetLabel: "clusterID",
-				// 	Action:      "replace",
-				// },
-				// // TODO: remove
-				// {
-				// 	Replacement: toPtr("mcoa"),
-				// 	TargetLabel: "collector",
-				// 	Action:      "replace",
-				// },
-			},
-		},
-	}
+	// p.Agent.Spec.CommonPrometheusFields.ScrapeClasses = []prometheusv1.ScrapeClass{
+	// 	{
+	// 		Name:    "openshift-monitoring",
+	// 		Default: toPtr(true),
+	// 		MetricRelabelings: []prometheusv1.RelabelConfig{
+	// 			{
+	// 				Replacement: toPtr(p.ClusterName),
+	// 				TargetLabel: "testing",
+	// 				Action:      "replace",
+	// 			},
+	// 			// {
+	// 			// 	Replacement: toPtr(p.ClusterID),
+	// 			// 	TargetLabel: "clusterID",
+	// 			// 	Action:      "replace",
+	// 			// },
+	// 			// // TODO: remove
+	// 			// {
+	// 			// 	Replacement: toPtr("mcoa"),
+	// 			// 	TargetLabel: "collector",
+	// 			// 	Action:      "replace",
+	// 			// },
+	// 		},
+	// 	},
+	// }
 
 	return p
 }

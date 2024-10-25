@@ -3,7 +3,7 @@ nameOverride: null
 enabled: true
 
 metrics:
-  enabled: {{ or .Values.metrics.platformEnabled .Values.metrics.userWorkloadsEnabled }}
+  enabled: true
 
 logging:
   enabled: true

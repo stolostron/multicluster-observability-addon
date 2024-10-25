@@ -35,11 +35,12 @@ func PlatformScrapeConfig(ns string) *prometheusalpha1.ScrapeConfig {
 			Labels:    config.PlatformPrometheusMatchLabels,
 		},
 		Spec: prometheusalpha1.ScrapeConfigSpec{
-			JobName:     toPtr("platform-metrics"),
+			// JobName:     toPtr("platform-metrics"),
 			MetricsPath: toPtr("/federate"),
 			Params: map[string][]string{
 				"match[]": matchMetrics,
 			},
+			ScrapeClassName: toPtr("openshift-monitoring"),
 			MetricRelabelConfigs: []prometheusv1.RelabelConfig{
 				{
 					SourceLabels: []prometheusv1.LabelName{"__name__"},
