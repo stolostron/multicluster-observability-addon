@@ -68,7 +68,7 @@ func GetValuesFunc(ctx context.Context, k8s client.Client) addonfactory.GetValue
 				return nil, errors.New("platform hub endpoint is required for metrics collection")
 			}
 
-			if err := resource.DeployDefaultResources(ctx, k8s, config.HubInstallNamespace); err != nil {
+			if err := resource.DeployDefaultResourcesOnce(ctx, k8s, config.HubInstallNamespace); err != nil {
 				return nil, err
 			}
 

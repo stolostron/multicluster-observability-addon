@@ -3,22 +3,24 @@ package metrics_test
 import (
 	"context"
 	"fmt"
-	"os"
 	"slices"
+	"strings"
 	"testing"
 
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	prometheusalpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	"github.com/rhobs/multicluster-observability-addon/internal/addon"
+	"github.com/rhobs/multicluster-observability-addon/internal/metrics/config"
 	"github.com/rhobs/multicluster-observability-addon/internal/metrics/handlers"
 	"github.com/rhobs/multicluster-observability-addon/internal/metrics/manifests"
+	"github.com/rhobs/multicluster-observability-addon/internal/metrics/resource"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/types"
 	kubescheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog/v2"
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
@@ -29,21 +31,127 @@ import (
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	fakeclient "sigs.k8s.io/controller-runtime/pkg/client/fake"
-	"sigs.k8s.io/yaml"
 )
 
 func TestHelmBuild_Metrics_All(t *testing.T) {
+	testCases := map[string]struct {
+		PlatformMetrics bool
+		UserMetrics     bool
+		Expects         func(*testing.T, []runtime.Object)
+	}{
+		"no metrics": {
+			PlatformMetrics: false,
+			UserMetrics:     false,
+			Expects: func(t *testing.T, objects []runtime.Object) {
+				assert.Len(t, objects, 0)
+			},
+		},
+		"platform metrics": {
+			PlatformMetrics: true,
+			UserMetrics:     false,
+			Expects: func(t *testing.T, objects []runtime.Object) {
+				// ensure the agent is created
+				agent := getResourceByLabelSelector[*prometheusalpha1.PrometheusAgent](objects, config.PlatformPrometheusMatchLabels)
+				assert.Len(t, agent, 1)
+				assert.Equal(t, config.PlatformMetricsCollectorApp, agent[0].GetName())
+				assert.NotEmpty(t, agent[0].Spec.CommonPrometheusFields.RemoteWrite[0].URL)
+				// ensure that the haproxy config is created
+				haProxyConfig := getResourceByLabelSelector[*corev1.ConfigMap](objects, config.PlatformPrometheusMatchLabels)
+				assert.Len(t, haProxyConfig, 1)
+				// ensure that scrape config is created and matches the agent
+				scrapeCfgs := getResourceByLabelSelector[*prometheusalpha1.ScrapeConfig](objects, config.PlatformPrometheusMatchLabels)
+				assert.Len(t, scrapeCfgs, 1)
+				for k, v := range agent[0].Spec.ScrapeConfigSelector.MatchLabels {
+					assert.Equal(t, v, scrapeCfgs[0].Labels[k])
+				}
+				// ensure that recording rules are created
+				recordingRules := getResourceByLabelSelector[*prometheusv1.PrometheusRule](objects, config.PlatformPrometheusMatchLabels)
+				assert.Len(t, recordingRules, 1)
+				// ensure that the number of objects is correct
+				// 4 (prom operator) + 6 (agent + haproxy config) + 2 secrets (mTLS to hub) + 1 cm (prom ca) + 1 rule + 1 scrape config = 15
+				assert.Len(t, objects, 15)
+				assert.Len(t, getResourceByLabelSelector[*corev1.Secret](objects, nil), 2) // 2 secrets (mTLS to hub)
+			},
+		},
+		"user workload metrics": {
+			PlatformMetrics: false,
+			UserMetrics:     true,
+			Expects: func(t *testing.T, objects []runtime.Object) {
+				// ensure the agent is created
+				agent := getResourceByLabelSelector[*prometheusalpha1.PrometheusAgent](objects, config.UserWorkloadPrometheusMatchLabels)
+				assert.Len(t, agent, 1)
+				assert.Equal(t, config.UserWorkloadMetricsCollectorApp, agent[0].GetName())
+				assert.NotEmpty(t, agent[0].Spec.CommonPrometheusFields.RemoteWrite[0].URL)
+				// ensure that the haproxy config is created
+				haProxyConfig := getResourceByLabelSelector[*corev1.ConfigMap](objects, config.UserWorkloadPrometheusMatchLabels)
+				assert.Len(t, haProxyConfig, 1)
+
+				assert.Len(t, objects, 13)
+				assert.Len(t, getResourceByLabelSelector[*corev1.Secret](objects, nil), 2) // 2 secrets (mTLS to hub)
+			},
+		},
+	}
+
 	scheme := runtime.NewScheme()
 	assert.NoError(t, kubescheme.AddToScheme(scheme))
 	assert.NoError(t, prometheusalpha1.AddToScheme(scheme))
 	assert.NoError(t, prometheusv1.AddToScheme(scheme))
+	assert.NoError(t, clusterv1.AddToScheme(scheme))
 
 	installNamespace := "open-cluster-management-addon-observability"
-	clientObjects := []client.Object{
-		newPrometheusAgent(addon.PlatformPrometheusAgentName, "open-cluster-management-observability"),
-		newSecret("observability-controller-open-cluster-management.io-observability-signer-client-cert", "open-cluster-management-observability"),
-		newSecret("observability-managed-cluster-certs", "open-cluster-management-observability"),
+	hubNamespace := "open-cluster-management-observability"
+
+	// Add platform resources
+	defaultAgentResources := resource.DefaultPlaftformAgentResources(hubNamespace)
+	defaultAgentResources = append(defaultAgentResources, resource.PlatformScrapeConfig(hubNamespace))
+	defaultAgentResources = append(defaultAgentResources, resource.PlatformRecordingRules(hubNamespace))
+
+	// Add user workload resources
+	defaultAgentResources = append(defaultAgentResources, resource.DefaultUserWorkloadAgentResources(hubNamespace)...)
+	// defaultAgentResources = append(defaultAgentResources, resource.UserWorkloadScrapeConfig(hubNamespace))
+
+	configReferences := []addonapiv1alpha1.ConfigReference{}
+	for _, obj := range defaultAgentResources {
+		resource := strings.ToLower(obj.GetObjectKind().GroupVersionKind().Kind) + "s"
+		configReferences = append(configReferences, addonapiv1alpha1.ConfigReference{
+			ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+				Group:    obj.GetObjectKind().GroupVersionKind().Group,
+				Resource: resource,
+			},
+			DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
+				ConfigReferent: addonapiv1alpha1.ConfigReferent{
+					Namespace: obj.GetNamespace(),
+					Name:      obj.GetName(),
+				},
+			},
+		})
 	}
+
+	clientObjects := []client.Object{}
+	clientObjects = append(clientObjects, defaultAgentResources...)
+
+	// Add secrets needed for the agent connection to the hub
+	clientObjects = append(clientObjects, newSecret(config.HubCASecretName, hubNamespace))
+	clientObjects = append(clientObjects, newSecret(config.ClientCertSecretName, hubNamespace))
+
+	// Setup a managed cluster
+	managedCluster := addontesting.NewManagedCluster("cluster-1")
+	clientObjects = append(clientObjects, managedCluster)
+
+	// Images overrides configMap
+	imagesCM := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "images-list",
+			Namespace: hubNamespace,
+		},
+		Data: map[string]string{
+			"prometheus_operator":        "registry.redhat.io/rhacm2/acm-prometheus-rhel9@sha256:4234bab8666dad7917cfcf10fdaed87b60e549ef6f8fb23d1760881d922e03e9",
+			"prometheus_config_reloader": "registry.redhat.io/rhacm2/acm-prometheus-config-reloader-rhel9@sha256:ab1632ec7aca478cf368e80ac9d98da3f2306a0cae8a4e9d29f95e149fd47ced",
+			"kube_rbac_proxy":            "registry.redhat.io/rhacm2/kube-rbac-proxy-rhel9@sha256:c60a1d52359493a41b2b6f820d11716d67290e9b83dc18c16039dbc6f120e5f2",
+		},
+	}
+	clientObjects = append(clientObjects, imagesCM)
+
 	// Setup the fake k8s client
 	client := fakeclient.NewClientBuilder().
 		WithScheme(scheme).
@@ -57,220 +165,56 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 		addonfactory.ToAddOnCustomizedVariableValues,
 	)
 
-	// Wire everything together to a fake addon instance
-	agentAddon, err := addonfactory.NewAgentAddonFactory(addon.Name, addon.FS, addon.MetricsChartDir).
-		WithGetValuesFuncs(addonConfigValuesFn, fakeGetValues(client)).
-		WithAgentRegistrationOption(&agent.RegistrationOption{}).
-		WithScheme(scheme).
-		BuildHelmAgentAddon()
-	if err != nil {
-		klog.Fatalf("failed to build agent %v", err)
-	}
-
-	// Setup a managed cluster
-	managedCluster := addontesting.NewManagedCluster("cluster-1")
-
 	// Register the addon for the managed cluster
 	managedClusterAddOn := addontesting.NewAddon("test", "cluster-1")
 	managedClusterAddOn.Spec.InstallNamespace = installNamespace
-	managedClusterAddOn.Status.ConfigReferences = []addonapiv1alpha1.ConfigReference{
-		{
-			ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
-				Group:    "addon.open-cluster-management.io",
-				Resource: "addondeploymentconfigs",
-			},
-			ConfigReferent: addonapiv1alpha1.ConfigReferent{
-				Namespace: "open-cluster-management-observability",
-				Name:      "multicluster-observability-addon",
-			},
-		},
-		{
-			ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
-				Group:    "monitoring.coreos.com",
-				Resource: addon.PrometheusAgentResource,
-			},
-			ConfigReferent: addonapiv1alpha1.ConfigReferent{
-				Namespace: "open-cluster-management-observability",
-				Name:      addon.PlatformPrometheusAgentName,
-			},
-		},
-	}
+	managedClusterAddOn.Status.ConfigReferences = []addonapiv1alpha1.ConfigReference{}
+	managedClusterAddOn.Status.ConfigReferences = append(managedClusterAddOn.Status.ConfigReferences, configReferences...)
 
-	// Render manifests and return them as k8s runtime objects
-	objects, err := agentAddon.Manifests(managedCluster, managedClusterAddOn)
-	assert.NoError(t, err)
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			// Wire everything together to a fake addon instance
+			agentAddon, err := addonfactory.NewAgentAddonFactory(addon.Name, addon.FS, addon.MetricsChartDir).
+				WithGetValuesFuncs(addonConfigValuesFn, fakeGetValues(client, tc.PlatformMetrics, tc.UserMetrics)).
+				WithAgentRegistrationOption(&agent.RegistrationOption{}).
+				WithScheme(scheme).
+				BuildHelmAgentAddon()
+			if err != nil {
+				klog.Fatalf("failed to build agent %v", err)
+			}
 
-	for _, obj := range objects {
-		accessor, err := meta.Accessor(obj)
-		assert.NoError(t, err)
+			// Render manifests and return them as k8s runtime objects
+			objects, err := agentAddon.Manifests(managedCluster, managedClusterAddOn)
+			assert.NoError(t, err)
 
-		// if not a global object, check namespace
-		if !slices.Contains([]string{"ClusterRole", "ClusterRoleBinding"}, obj.GetObjectKind().GroupVersionKind().Kind) {
-			assert.Equal(t, installNamespace, accessor.GetNamespace(), fmt.Sprintf("Object: %s/%s", obj.GetObjectKind().GroupVersionKind(), accessor.GetName()))
-		}
+			tc.Expects(t, objects)
 
-		// Write out the object to a file
-		data, err := yaml.Marshal(obj)
-		assert.NoError(t, err)
+			// err = os.RemoveAll("output")
+			// assert.NoError(t, err)
+			// err = os.MkdirAll("output", 0755)
+			// assert.NoError(t, err)
 
-		yamlData, err := yaml.JSONToYAML(data)
-		assert.NoError(t, err)
+			// Check common properties of the objects
+			for _, obj := range objects {
+				accessor, err := meta.Accessor(obj)
+				assert.NoError(t, err)
 
-		// write data to file in subdirectory
-		err = os.MkdirAll("output", 0755)
-		assert.NoError(t, err)
-		err = os.WriteFile(fmt.Sprintf("output/%s-%s.yaml", obj.GetObjectKind().GroupVersionKind().Kind, accessor.GetName()), yamlData, 0644)
-		assert.NoError(t, err)
-		// fmt.Printf("---- Object Name: %s ----\n", obj.GetObjectKind())
-		// fmt.Printf("Object: %v\n", obj)
-		// t.Logf("Object: %v", obj)
-	}
-}
+				// if not a global object, check namespace
+				if !slices.Contains([]string{"ClusterRole", "ClusterRoleBinding"}, obj.GetObjectKind().GroupVersionKind().Kind) {
+					assert.Equal(t, installNamespace, accessor.GetNamespace(), fmt.Sprintf("Object: %s/%s", obj.GetObjectKind().GroupVersionKind(), accessor.GetName()))
+				}
 
-func newPrometheusAgent(name, ns string) *prometheusalpha1.PrometheusAgent {
-	intPtr := func(i int32) *int32 {
-		return &i
-	}
-	return &prometheusalpha1.PrometheusAgent{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: ns,
-		},
-		Spec: prometheusalpha1.PrometheusAgentSpec{
-			CommonPrometheusFields: prometheusv1.CommonPrometheusFields{
-				Replicas:           intPtr(1),
-				LogLevel:           "debug",
-				ServiceAccountName: "metrics-collector-agent",
-				ArbitraryFSAccessThroughSMs: prometheusv1.ArbitraryFSAccessThroughSMsConfig{
-					Deny: true,
-				},
-				ServiceMonitorSelector: &metav1.LabelSelector{
-					MatchLabels: map[string]string{
-						"app": "acm-platform-metrics-collector",
-					},
-				},
-				ServiceMonitorNamespaceSelector: &metav1.LabelSelector{},
-				ScrapeConfigSelector: &metav1.LabelSelector{
-					MatchLabels: map[string]string{
-						"app": "acm-platform-metrics-collector",
-					},
-				},
-				ScrapeConfigNamespaceSelector: &metav1.LabelSelector{},
-				ScrapeInterval:                "15s",
-				ScrapeTimeout:                 "10s",
-				ExternalLabels: map[string]string{
-					"clusterID": "0e2c6b1b-fdae-4581-8009-119349edac7e",
-					"cluster":   "spoke",
-				},
-				Resources: corev1.ResourceRequirements{
-					Requests: corev1.ResourceList{
-						corev1.ResourceCPU:    resource.MustParse("100m"),
-						corev1.ResourceMemory: resource.MustParse("100Mi"),
-					},
-				},
-				Secrets: []string{
-					"observability-controller-open-cluster-management.io-observability-signer-client-cert",
-					"observability-managed-cluster-certs",
-				},
-				ConfigMaps: []string{
-					"prom-server-ca",
-				},
-				RemoteWrite: []prometheusv1.RemoteWriteSpec{
-					{
-						URL: "https://observatorium-api-open-cluster-management-observability.apps.sno-4xlarge-416-lqsr2.dev07.red-chesterfield.com/api/metrics/v1/default/api/v1/receive",
-						TLSConfig: &prometheusv1.TLSConfig{
-							CAFile:   "/etc/prometheus/secrets/observability-managed-cluster-certs/ca.crt",
-							CertFile: "/etc/prometheus/secrets/observability-controller-open-cluster-management.io-observability-signer-client-cert/tls.crt",
-							KeyFile:  "/etc/prometheus/secrets/observability-controller-open-cluster-management.io-observability-signer-client-cert/tls.key",
-						},
-					},
-				},
-				Containers: []corev1.Container{
-					{
-						Name:  "haproxy",
-						Image: "haproxy:latest",
-						Ports: []corev1.ContainerPort{
-							{
-								Name:          "healthz",
-								ContainerPort: 8081,
-							},
-							{
-								Name:          "metrics",
-								ContainerPort: 8082,
-							},
-						},
-						ReadinessProbe: &corev1.Probe{
-							ProbeHandler: corev1.ProbeHandler{
-								HTTPGet: &corev1.HTTPGetAction{
-									Path: "/healthz",
-									Port: intstr.FromString("healthz"),
-								},
-							},
-							InitialDelaySeconds: 2,
-							PeriodSeconds:       5,
-						},
-						LivenessProbe: &corev1.Probe{
-							ProbeHandler: corev1.ProbeHandler{
-								HTTPGet: &corev1.HTTPGetAction{
-									Path: "/healthz",
-									Port: intstr.FromString("healthz"),
-								},
-							},
-							InitialDelaySeconds: 5,
-							PeriodSeconds:       10,
-						},
+				// // Write out the object to a file for testing
+				// data, err := yaml.Marshal(obj)
+				// assert.NoError(t, err)
 
-						Resources: corev1.ResourceRequirements{
-							Requests: corev1.ResourceList{
-								corev1.ResourceCPU:    resource.MustParse("100m"),
-								corev1.ResourceMemory: resource.MustParse("100Mi"),
-							},
-						},
-						// 				command: ["/bin/sh", "-c"]
-						// args:
-						// - |
-						//   export BEARER_TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token) && \
-						//   haproxy -f /usr/local/etc/haproxy/haproxy.cfg
-						Command: []string{"/bin/sh", "-c"},
-						Args: []string{
-							"export BEARER_TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token) && haproxy -f /etc/haproxy/haproxy.cfg",
-						},
-						VolumeMounts: []corev1.VolumeMount{
-							{
-								Name:      "haproxy-config",
-								MountPath: "/etc/haproxy",
-							},
-							{
-								Name:      "prom-server-ca",
-								MountPath: "/etc/haproxy/certs",
-							},
-						},
-					},
-				},
-				Volumes: []corev1.Volume{
-					{
-						Name: "haproxy-config",
-						VolumeSource: corev1.VolumeSource{
-							ConfigMap: &corev1.ConfigMapVolumeSource{
-								LocalObjectReference: corev1.LocalObjectReference{
-									Name: "haproxy-config",
-								},
-							},
-						},
-					},
-					{
-						Name: "prom-server-ca",
-						VolumeSource: corev1.VolumeSource{
-							ConfigMap: &corev1.ConfigMapVolumeSource{
-								LocalObjectReference: corev1.LocalObjectReference{
-									Name: "prom-server-ca",
-								},
-							},
-						},
-					},
-				},
-			},
-		},
+				// yamlData, err := yaml.JSONToYAML(data)
+				// assert.NoError(t, err)
+
+				// err = os.WriteFile(fmt.Sprintf("output/%s-%s.yaml", obj.GetObjectKind().GroupVersionKind().Kind, accessor.GetName()), yamlData, 0644)
+				// assert.NoError(t, err)
+			}
+		})
 	}
 }
 
@@ -304,12 +248,21 @@ func newSecret(name, ns string) *corev1.Secret {
 	}
 }
 
-func fakeGetValues(k8s client.Client) addonfactory.GetValuesFunc {
+func fakeGetValues(k8s client.Client, platformMetrics, userWorkloadMetrics bool) addonfactory.GetValuesFunc {
 	return func(
 		_ *clusterv1.ManagedCluster,
 		mcAddon *addonapiv1alpha1.ManagedClusterAddOn,
 	) (addonfactory.Values, error) {
-		opts, err := handlers.BuildOptions(context.TODO(), k8s, mcAddon, addon.MetricsOptions{CollectionEnabled: true}, addon.MetricsOptions{})
+		optionsBuilder := handlers.OptionsBuilder{
+			Client: k8s,
+			ImagesConfigMap: types.NamespacedName{
+				Name:      "images-list",
+				Namespace: "open-cluster-management-observability",
+			},
+			RemoteWriteURL: "https://observatorium-api-open-cluster-management-observability.apps.sno-4xlarge-416-lqsr2.dev07.red-chesterfield.com/api/metrics/v1/default/api/v1/receive",
+		}
+
+		opts, err := optionsBuilder.Build(context.Background(), mcAddon, addon.MetricsOptions{CollectionEnabled: platformMetrics}, addon.MetricsOptions{CollectionEnabled: userWorkloadMetrics})
 		if err != nil {
 			return nil, err
 		}
@@ -321,4 +274,21 @@ func fakeGetValues(k8s client.Client) addonfactory.GetValuesFunc {
 
 		return addonfactory.JsonStructToValues(helmValues)
 	}
+}
+
+// getResourceByLabelSelector returns the first resource that matches the label selector.
+// It works generically for any Kubernetes resource that implements client.Object.
+func getResourceByLabelSelector[T client.Object](resources []runtime.Object, selector map[string]string) []T {
+	labelSelector := labels.SelectorFromSet(selector)
+	ret := []T{}
+
+	for _, obj := range resources {
+		if resource, ok := obj.(T); ok {
+			if labelSelector.Matches(labels.Set(resource.GetLabels())) {
+				ret = append(ret, resource)
+			}
+		}
+	}
+
+	return ret
 }
