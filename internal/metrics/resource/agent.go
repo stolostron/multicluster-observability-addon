@@ -1,7 +1,6 @@
 package resource
 
 import (
-	_ "embed"
 	"fmt"
 	"strings"
 
@@ -12,6 +11,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	_ "embed"
 )
 
 //go:embed resources/envoy.yaml

@@ -21,6 +21,14 @@ const (
 	clusterIDLabel = "clusterID"
 )
 
+var (
+	ErrInvalidConfigResourcesCount = fmt.Errorf("invalid number of configuration resources")
+	ErrUnsupportedAppName          = fmt.Errorf("unsupported app name")
+	ErrMissingImageOverride        = fmt.Errorf("missing image override")
+	ErrUnsupportedConfigResource   = fmt.Errorf("unsupported configuration reference resource")
+	ErrMissingDesiredConfig        = fmt.Errorf("missing desiredConfig in managedClusterAddon.Status.ConfigReferences")
+)
+
 type OptionsBuilder struct {
 	Client          client.Client
 	ImagesConfigMap types.NamespacedName
@@ -99,20 +107,20 @@ func (o *OptionsBuilder) buildPrometheusAgent(ctx context.Context, opts *Options
 	}
 	platformAgents := getResourceByLabelSelector[*prometheusalpha1.PrometheusAgent](configResources, labelsMatcher)
 	if len(platformAgents) != 1 {
-		return fmt.Errorf("invalid number of PrometheusAgent resources with labels %+v for application %s, found %d agents", labelsMatcher, appName, len(platformAgents))
+		return fmt.Errorf("%w: for application %s, found %d agents with labels %+v", ErrInvalidConfigResourcesCount, appName, len(platformAgents), labelsMatcher)
 	}
 
 	// Fetch the haproxy config
 	envoyProxyConfigMap := getResourceByLabelSelector[*corev1.ConfigMap](configResources, labelsMatcher)
 	if len(envoyProxyConfigMap) != 1 {
-		return fmt.Errorf("invalid number of ConfigMap for Envoy resource with labels %+v for application %s, found %d configmaps", labelsMatcher, appName, len(envoyProxyConfigMap))
+		return fmt.Errorf("%w: for application %s, found %d configmaps with labels %+v", ErrInvalidConfigResourcesCount, appName, len(envoyProxyConfigMap), labelsMatcher)
 	}
 	envoyProxyConfigMapName := fmt.Sprintf("%s-envoy-config", appName)
 	envoyProxyConfigMap[0].Name = envoyProxyConfigMapName
-	envoyProxyConfigMap[0].Labels = labelsMatcher // For convienence and easier retrieval, especially in tests
+	envoyProxyConfigMap[0].Labels = labelsMatcher // For convenience and easier retrieval, especially in tests
 	opts.ConfigMaps = append(opts.ConfigMaps, envoyProxyConfigMap[0])
 
-	// Build the agent using a builder pattern
+	// Build the agent
 	promBuilder := PrometheusAgentBuilder{
 		Agent:               platformAgents[0].DeepCopy(),
 		Name:                appName,
@@ -137,7 +145,7 @@ func (o *OptionsBuilder) buildPrometheusAgent(ctx context.Context, opts *Options
 		agent = promBuilder.Build()
 		opts.UserWorkloads.PrometheusAgent = agent
 	default:
-		return fmt.Errorf("unsupported app name %s", appName)
+		return fmt.Errorf("%w: %s", ErrUnsupportedAppName, appName)
 	}
 
 	// Fetch related secrets
@@ -188,7 +196,7 @@ func (o *OptionsBuilder) getImageOverrides(ctx context.Context) (ImagesOptions, 
 	ret.Envoy = config.EnvoyImage
 
 	if ret.PrometheusOperator == "" || ret.PrometheusConfigReloader == "" || ret.KubeRBACProxy == "" {
-		return ret, fmt.Errorf("missing image overrides in ConfigMap %s, got %+v", o.ImagesConfigMap.String(), ret)
+		return ret, fmt.Errorf("%w: %+v", ErrMissingImageOverride, ret)
 	}
 
 	return ret, nil
@@ -210,11 +218,11 @@ func (o *OptionsBuilder) getConfigResources(ctx context.Context, mcAddon *addona
 		case addon.AddonDeploymentConfigResource:
 			continue
 		default:
-			return ret, fmt.Errorf("unsupported configuration reference resource %q in managedClusterAddon.Status.ConfigReferences of %s/%s", cfg.ConfigGroupResource.Resource, mcAddon.Namespace, mcAddon.Name)
+			return ret, fmt.Errorf("%w: %s from %s/%s", ErrUnsupportedConfigResource, cfg.ConfigGroupResource.Resource, mcAddon.Namespace, mcAddon.Name)
 		}
 
 		if cfg.DesiredConfig == nil {
-			return ret, fmt.Errorf("missing desiredConfig in managedClusterAddon.Status.ConfigReferences of %s/%s", mcAddon.Namespace, mcAddon.Name)
+			return ret, fmt.Errorf("%w: %s from %s/%s", ErrMissingDesiredConfig, cfg.ConfigGroupResource.Resource, mcAddon.Namespace, mcAddon.Name)
 		}
 
 		if err := o.Client.Get(ctx, types.NamespacedName{Name: cfg.DesiredConfig.Name, Namespace: cfg.DesiredConfig.Namespace}, obj); err != nil {

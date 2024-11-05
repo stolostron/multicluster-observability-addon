@@ -7,9 +7,6 @@ import (
 	otelv1alpha1 "github.com/open-telemetry/opentelemetry-operator/apis/v1alpha1"
 	otelv1beta1 "github.com/open-telemetry/opentelemetry-operator/apis/v1beta1"
 	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
-
-	// routev1 "github.com/openshift/api/route/v1"
-
 	"github.com/rhobs/multicluster-observability-addon/internal/addon"
 	addonhelm "github.com/rhobs/multicluster-observability-addon/internal/addon/helm"
 	"k8s.io/apimachinery/pkg/runtime"
