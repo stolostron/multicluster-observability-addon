@@ -51,8 +51,8 @@ func TestPrometheusAgentBuilder_EnforcedFields(t *testing.T) {
 		RemoteWriteEndpoint: "https://example.com/write",
 		ClusterName:         "test-cluster",
 		ClusterID:           "test-cluster-id",
-		EnvoyConfigMapName:  "haproxy-config",
-		EnvoyProxyImage:     "haproxy:latest",
+		EnvoyConfigMapName:  "envoy-config",
+		EnvoyProxyImage:     "envoy:latest",
 		PrometheusImage:     "prometheus:latest",
 		MatchLabels:         map[string]string{"app": "test-app"},
 	}
@@ -62,19 +62,17 @@ func TestPrometheusAgentBuilder_EnforcedFields(t *testing.T) {
 	assert.Equal(t, int32(1), *result.Spec.CommonPrometheusFields.Replicas)
 	assert.True(t, builder.Agent.Spec.CommonPrometheusFields.ArbitraryFSAccessThroughSMs.Deny)
 
-	// External labels
-	assert.True(t, result.Spec.CommonPrometheusFields.OverrideHonorLabels)
-	assert.Len(t, result.Spec.CommonPrometheusFields.ExternalLabels, 3)
-	assert.Equal(t, "test-cluster", result.Spec.CommonPrometheusFields.ExternalLabels["cluster"])
-	assert.Equal(t, "test-cluster-id", result.Spec.CommonPrometheusFields.ExternalLabels["clusterID"])
-	assert.Equal(t, "label", result.Spec.CommonPrometheusFields.ExternalLabels["custom"])
-
 	// Remote write
 	assert.Len(t, result.Spec.CommonPrometheusFields.Secrets, 2)
 	assert.Equal(t, "https://example.com/write", result.Spec.CommonPrometheusFields.RemoteWrite[0].URL)
 	assert.Contains(t, builder.Agent.Spec.CommonPrometheusFields.RemoteWrite[0].TLSConfig.CAFile, "ca.crt")
 	assert.Contains(t, builder.Agent.Spec.CommonPrometheusFields.RemoteWrite[0].TLSConfig.CertFile, "tls.crt")
 	assert.Contains(t, builder.Agent.Spec.CommonPrometheusFields.RemoteWrite[0].TLSConfig.KeyFile, "tls.key")
+	// Check that relabelling is added to the remote write config
+	assert.Equal(t, *result.Spec.CommonPrometheusFields.RemoteWrite[0].WriteRelabelConfigs[0].Replacement, "test-cluster")
+	assert.Equal(t, result.Spec.CommonPrometheusFields.RemoteWrite[0].WriteRelabelConfigs[0].TargetLabel, "cluster")
+	assert.Equal(t, *result.Spec.CommonPrometheusFields.RemoteWrite[0].WriteRelabelConfigs[1].Replacement, "test-cluster-id")
+	assert.Equal(t, result.Spec.CommonPrometheusFields.RemoteWrite[0].WriteRelabelConfigs[1].TargetLabel, "clusterID")
 
 	// Version and Image
 	assert.Equal(t, "", result.Spec.CommonPrometheusFields.Version)
@@ -89,11 +87,11 @@ func TestPrometheusAgentBuilder_EnforcedFields(t *testing.T) {
 	assert.Nil(t, builder.Agent.Spec.CommonPrometheusFields.ProbeNamespaceSelector)
 	assert.Nil(t, builder.Agent.Spec.CommonPrometheusFields.ProbeSelector)
 
-	// HAProxy sidecar
+	// Envoy sidecar
 	containers := builder.Agent.Spec.CommonPrometheusFields.Containers
 	assert.Len(t, containers, 1)
-	assert.Equal(t, "haproxy", containers[0].Name)
-	assert.Equal(t, "haproxy:latest", containers[0].Image)
+	assert.Equal(t, "envoy", containers[0].Name)
+	assert.Equal(t, "envoy:latest", containers[0].Image)
 	assert.Len(t, builder.Agent.Spec.CommonPrometheusFields.Volumes, 2)
 	assert.Len(t, builder.Agent.Spec.CommonPrometheusFields.VolumeMounts, 0)
 }
@@ -129,8 +127,8 @@ func TestPrometheusAgentBuilder_ConfigurableFields(t *testing.T) {
 		RemoteWriteEndpoint: "https://example.com/write",
 		ClusterName:         "test-cluster",
 		ClusterID:           "test-cluster-id",
-		EnvoyConfigMapName:  "haproxy-config",
-		EnvoyProxyImage:     "haproxy:latest",
+		EnvoyConfigMapName:  "envoy-config",
+		EnvoyProxyImage:     "envoy:latest",
 		PrometheusImage:     "prometheus:latest",
 		MatchLabels:         map[string]string{"app": "test-app"},
 	}

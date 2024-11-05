@@ -12,8 +12,6 @@ jobs:
   test:
     runs-on: ubuntu-latest
     name: Integration tests
-    env:
-      GOBIN: /tmp/.bin
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
