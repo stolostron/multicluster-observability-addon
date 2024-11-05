@@ -79,20 +79,23 @@ func newDefaultPrometheusAgent() *prometheusalpha1.PrometheusAgent {
 		ObjectMeta: metav1.ObjectMeta{},
 		Spec: prometheusalpha1.PrometheusAgentSpec{
 			CommonPrometheusFields: prometheusv1.CommonPrometheusFields{
-				Replicas:       intPtr(1),
-				LogLevel:       "debug", // TODO: reset to info
-				ScrapeInterval: "300s",
-				// ScrapeInterval: "30s",   // TODO: reset to 300s
-				ScrapeTimeout: scrapeTimeout,
+				Replicas: intPtr(1),
+				LogLevel: "debug", // TODO: reset to info
+				NodeSelector: map[string]string{
+					"kubernetes.io/os": "linux",
+				},
 				Resources: corev1.ResourceRequirements{
 					Requests: corev1.ResourceList{
 						corev1.ResourceCPU:    resource.MustParse("6m"),
 						corev1.ResourceMemory: resource.MustParse("200Mi"),
 					},
 				},
+				ScrapeInterval: "300s",
+				// ScrapeInterval: "30s",   // TODO: reset to 300s
 				SecurityContext: &corev1.PodSecurityContext{
 					RunAsNonRoot: toPtr(true),
 				},
+				ScrapeTimeout: scrapeTimeout,
 			},
 		},
 	}

@@ -10,6 +10,7 @@ default: all
 VERSION ?= v0.0.1
 
 CRD_DIR := $(shell pwd)/deploy/crds
+BIN_DIR := $(CURDIR)/bin
 
 # REGISTRY_BASE
 # defines the container registry and organization for the bundle and operator container images.
@@ -61,7 +62,7 @@ integration-test:
 	go test -timeout 30s ./test/integration/...
 
 .PHONY: integration-env
-integration-env:
+integration-env: prepare-bin
 	@mkdir -p tmp/crds
 	@curl -sL -o tmp/crds/addon.open-cluster-management.io_addondeploymentconfigs.crd.yaml https://raw.githubusercontent.com/open-cluster-management-io/api/f6c65820279078afbe536d5a6012e0b3badde3c5/addon/v1alpha1/0000_02_addon.open-cluster-management.io_addondeploymentconfigs.crd.yaml
 	@curl -sL -o tmp/crds/addon.open-cluster-management.io_clustermanagementaddons.crd.yaml https://raw.githubusercontent.com/open-cluster-management-io/api/f6c65820279078afbe536d5a6012e0b3badde3c5/addon/v1alpha1/0000_00_addon.open-cluster-management.io_clustermanagementaddons.crd.yaml
@@ -72,8 +73,12 @@ integration-env:
 	@curl -sL -o tmp/crds/opentelemetry.io_opentelemetrycollectors.yaml https://raw.githubusercontent.com/open-telemetry/opentelemetry-operator/70dff6948ad00a971840b1dce71e8c4d3a52e02c/bundle/community/manifests/opentelemetry.io_opentelemetrycollectors.yaml 
 	@curl -sL -o tmp/crds/logging.openshift.io_clusterlogforwarders.yaml https://raw.githubusercontent.com/openshift/cluster-logging-operator/bced99a9889abe7714b2c5e558f3056b95701baf/config/crd/bases/observability.openshift.io_clusterlogforwarders.yaml && sed -i 's/observability.openshift.io/logging.openshift.io/g' tmp/crds/logging.openshift.io_clusterlogforwarders.yaml 
 	@curl -sL -o tmp/crds/monitoring.coreos.com_prometheusagents.yaml https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/ca4f84f2bb6ce42fd9e3bb81a46e0bb32d042db1/example/prometheus-operator-crd-full/monitoring.coreos.com_prometheusagents.yaml 
-	@go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
-	@setup-envtest -p env use 1.30.x
+	@GOBIN=$(BIN_DIR) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
+	@$(BIN_DIR)/setup-envtest -p env use 1.30.x
+
+.PHONY: prepare-bin
+prepare-bin:
+	@mkdir -p $(BIN_DIR)
 
 .PHONY: addon
 addon: deps fmt ## Build addon binary

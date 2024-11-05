@@ -41,9 +41,6 @@ func (p *PrometheusAgentBuilder) setCommonFields() *PrometheusAgentBuilder {
 	// Set prometheus image
 	p.Agent.Spec.CommonPrometheusFields.Image = &p.PrometheusImage
 	p.Agent.Spec.CommonPrometheusFields.Version = ""
-	p.Agent.Spec.CommonPrometheusFields.NodeSelector = map[string]string{
-		"kubernetes.io/os": "linux",
-	}
 	p.Agent.Spec.CommonPrometheusFields.ServiceAccountName = p.Name
 	p.Agent.Spec.CommonPrometheusFields.WALCompression = toPtr(true)
 	// Add default scrape class with relabeling to add clusterID and cluster labels
