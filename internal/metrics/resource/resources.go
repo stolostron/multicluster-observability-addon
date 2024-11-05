@@ -8,15 +8,15 @@ import (
 	"github.com/rhobs/multicluster-observability-addon/internal/addon"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
+	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 )
 
 var (
 	mu          sync.Mutex
 	initialized bool
+	ErrNotOwner = fmt.Errorf("controller is not the owner")
 )
 
 func DeployDefaultResourcesOnce(ctx context.Context, c client.Client, ns string) error {
@@ -37,7 +37,7 @@ func DeployDefaultResourcesOnce(ctx context.Context, c client.Client, ns string)
 	resources := DefaultPlaftformAgentResources(ns)
 	for _, resource := range resources {
 		if err := CreateOrUpdateResource(ctx, c, resource, owner); err != nil {
-			return err
+			return fmt.Errorf("failed to create or update resource %s: %w", resource.GetName(), err)
 		}
 	}
 
@@ -69,7 +69,7 @@ func CreateOrUpdateResource(ctx context.Context, c client.Client, newResource, o
 		}
 
 		if !isOwner {
-			return fmt.Errorf("cannot update resource, controller is not the owner")
+			return ErrNotOwner
 		}
 
 		// Overwrite the resource

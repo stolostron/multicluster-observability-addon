@@ -26,6 +26,7 @@ import (
 var (
 	errMissingAODCRef  = errors.New("missing AddOnDeploymentConfig reference on addon installation")
 	errMultipleAODCRef = errors.New("multiple AddOnDeploymentConfig references on addon installation")
+	errMissingHubEP    = errors.New("platform hub endpoint is required for metrics collection")
 )
 
 type HelmChartValues struct {
@@ -65,7 +66,7 @@ func GetValuesFunc(ctx context.Context, k8s client.Client) addonfactory.GetValue
 
 		if opts.Platform.Metrics.CollectionEnabled || opts.UserWorkloads.Metrics.CollectionEnabled {
 			if opts.Platform.HubEndpoint == "" {
-				return nil, errors.New("platform hub endpoint is required for metrics collection")
+				return nil, errMissingHubEP
 			}
 
 			if err := resource.DeployDefaultResourcesOnce(ctx, k8s, config.HubInstallNamespace); err != nil {

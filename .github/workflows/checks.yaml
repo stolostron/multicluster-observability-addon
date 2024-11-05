@@ -45,7 +45,7 @@ jobs:
       id: go
     - uses: actions/checkout@v4
     - name: Run tests
-      run: go test -coverprofile=profile.cov $(go list ./... | grep -v tests/)  # Run all tests excluding integration and e2e tests directories
+      run: go test -coverprofile=profile.cov $(go list ./... | grep -v test/)  # Run all tests excluding integration and e2e tests directories
     - name: Send coverage
       uses: shogo82148/actions-goveralls@v1
       with:
