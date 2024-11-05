@@ -171,7 +171,6 @@ func (p *PrometheusAgentBuilder) setEnvoyProxySidecar() *PrometheusAgentBuilder 
 		},
 		Command: []string{"/bin/sh", "-c"},
 		Args: []string{
-
 			"/usr/local/bin/envoy -c /etc/envoy/envoy.yaml",
 		},
 		VolumeMounts: []corev1.VolumeMount{

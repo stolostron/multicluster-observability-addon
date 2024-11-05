@@ -140,7 +140,6 @@ func TestBuildValues(t *testing.T) {
 			tc.Expect(t, values)
 		})
 	}
-
 }
 
 func newSecret(name string) *corev1.Secret {

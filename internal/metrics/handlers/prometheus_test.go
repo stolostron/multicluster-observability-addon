@@ -96,7 +96,6 @@ func TestPrometheusAgentBuilder_EnforcedFields(t *testing.T) {
 	assert.Equal(t, "haproxy:latest", containers[0].Image)
 	assert.Len(t, builder.Agent.Spec.CommonPrometheusFields.Volumes, 2)
 	assert.Len(t, builder.Agent.Spec.CommonPrometheusFields.VolumeMounts, 0)
-
 }
 
 func TestPrometheusAgentBuilder_ConfigurableFields(t *testing.T) {
@@ -151,7 +150,6 @@ func TestPrometheusAgentBuilder_ConfigurableFields(t *testing.T) {
 		// Field should be the configured value
 		assert.Equal(t, field.Interface(), builtSpec.Field(i).Interface())
 	}
-
 }
 
 func isZeroValue(v reflect.Value) bool {
