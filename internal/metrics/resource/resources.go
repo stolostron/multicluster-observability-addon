@@ -41,6 +41,8 @@ func DeployDefaultResourcesOnce(ctx context.Context, c client.Client, ns string)
 		}
 	}
 
+	initialized = true
+
 	return nil
 }
 
@@ -75,7 +77,7 @@ func CreateOrUpdateResource(ctx context.Context, c client.Client, newResource, o
 		// Overwrite the resource
 		newResource.SetResourceVersion(existingResource.GetResourceVersion())
 
-		if err := c.Update(ctx, existingResource); err != nil {
+		if err := c.Update(ctx, newResource); err != nil {
 			return err
 		}
 

@@ -189,11 +189,6 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 
 			tc.Expects(t, objects)
 
-			// err = os.RemoveAll("output")
-			// assert.NoError(t, err)
-			// err = os.MkdirAll("output", 0755)
-			// assert.NoError(t, err)
-
 			// Check common properties of the objects
 			for _, obj := range objects {
 				accessor, err := meta.Accessor(obj)
@@ -203,16 +198,6 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				if !slices.Contains([]string{"ClusterRole", "ClusterRoleBinding"}, obj.GetObjectKind().GroupVersionKind().Kind) {
 					assert.Equal(t, installNamespace, accessor.GetNamespace(), fmt.Sprintf("Object: %s/%s", obj.GetObjectKind().GroupVersionKind(), accessor.GetName()))
 				}
-
-				// // Write out the object to a file for testing
-				// data, err := yaml.Marshal(obj)
-				// assert.NoError(t, err)
-
-				// yamlData, err := yaml.JSONToYAML(data)
-				// assert.NoError(t, err)
-
-				// err = os.WriteFile(fmt.Sprintf("output/%s-%s.yaml", obj.GetObjectKind().GroupVersionKind().Kind, accessor.GetName()), yamlData, 0644)
-				// assert.NoError(t, err)
 			}
 		})
 	}
