@@ -47,6 +47,7 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 	if err != nil {
 		return ret, err
 	}
+
 	ret.ClusterName = managedCluster.Name
 	ret.ClusterID = managedCluster.ObjectMeta.Labels[clusterIDLabel]
 	if ret.ClusterID == "" {
@@ -215,10 +216,8 @@ func (o *OptionsBuilder) getConfigResources(ctx context.Context, mcAddon *addona
 			obj = &prometheusv1.PrometheusRule{}
 		case "configmaps":
 			obj = &corev1.ConfigMap{}
-		case addon.AddonDeploymentConfigResource:
-			continue
 		default:
-			return ret, fmt.Errorf("%w: %s from %s/%s", ErrUnsupportedConfigResource, cfg.ConfigGroupResource.Resource, mcAddon.Namespace, mcAddon.Name)
+			continue
 		}
 
 		if cfg.DesiredConfig == nil {
