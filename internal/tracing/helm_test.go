@@ -94,6 +94,13 @@ func Test_Tracing_AllConfigsTogether_AllResources(t *testing.T) {
 				Namespace: "open-cluster-management-observability",
 				Name:      "multicluster-observability-addon",
 			},
+			DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
+				ConfigReferent: addonapiv1alpha1.ConfigReferent{
+					Namespace: "open-cluster-management-observability",
+					Name:      "multicluster-observability-addon",
+				},
+				SpecHash: "fake-spec-hash",
+			},
 		},
 		{
 			ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
