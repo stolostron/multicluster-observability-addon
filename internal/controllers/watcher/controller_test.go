@@ -142,7 +142,6 @@ func TestGetReconcileRequestsFromManifestWorks(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-
 			manifestWork := &workv1.ManifestWork{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-manifestwork",
@@ -174,7 +173,6 @@ func TestGetReconcileRequestsFromManifestWorks(t *testing.T) {
 			cliObj := tc.object.(client.Object)
 			rqs := r.getReconcileRequestsFromManifestWorks(context.TODO(), cliObj)
 			assert.Equal(t, tc.expectedReconcileRequests, rqs)
-
 		})
 	}
 }

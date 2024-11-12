@@ -16,7 +16,7 @@ jobs:
  publish-image:
    runs-on: ubuntu-latest
    steps:
-     - uses: actions/checkout@v3
+     - uses: actions/checkout@v4
 
      - name: Set up QEMU
        uses: docker/setup-qemu-action@v3
@@ -45,7 +45,7 @@ jobs:
          echo "IMAGE_TAGS=$IMAGE_TAGS" >> $GITHUB_OUTPUT
 
      - name: Build and publish image on quay.io
-       uses: docker/build-push-action@v5
+       uses: docker/build-push-action@v6
        with:
          push: true
          tags: "${{ steps.image_tags.outputs.IMAGE_TAGS }}"
