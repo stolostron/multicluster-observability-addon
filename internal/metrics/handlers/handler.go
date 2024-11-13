@@ -2,14 +2,17 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 
+	"github.com/go-logr/logr"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	prometheusalpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	"github.com/rhobs/multicluster-observability-addon/internal/addon"
 	"github.com/rhobs/multicluster-observability-addon/internal/metrics/config"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
@@ -22,17 +25,18 @@ const (
 )
 
 var (
-	ErrInvalidConfigResourcesCount = fmt.Errorf("invalid number of configuration resources")
-	ErrUnsupportedAppName          = fmt.Errorf("unsupported app name")
-	ErrMissingImageOverride        = fmt.Errorf("missing image override")
-	ErrUnsupportedConfigResource   = fmt.Errorf("unsupported configuration reference resource")
-	ErrMissingDesiredConfig        = fmt.Errorf("missing desiredConfig in managedClusterAddon.Status.ConfigReferences")
+	ErrInvalidConfigResourcesCount = errors.New("invalid number of configuration resources")
+	ErrUnsupportedAppName          = errors.New("unsupported app name")
+	ErrMissingImageOverride        = errors.New("missing image override")
+	ErrUnsupportedConfigResource   = errors.New("unsupported configuration reference resource")
+	ErrMissingDesiredConfig        = errors.New("missing desiredConfig in managedClusterAddon.Status.ConfigReferences")
 )
 
 type OptionsBuilder struct {
 	Client          client.Client
 	ImagesConfigMap types.NamespacedName
 	RemoteWriteURL  string
+	Logger          logr.Logger
 }
 
 func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, platform, userWorkloads addon.MetricsOptions) (Options, error) {
@@ -61,7 +65,7 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 	}
 
 	// Fetch configuration references
-	configResources, err := o.getConfigResources(ctx, mcAddon)
+	configResources, err := o.getAvailableConfigResources(ctx, mcAddon)
 	if err != nil {
 		return ret, fmt.Errorf("failed to get configuration resources: %w", err)
 	}
@@ -74,7 +78,13 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 
 		// Fetch rules and scrape configs
 		ret.Platform.ScrapeConfigs = getResourceByLabelSelector[*prometheusalpha1.ScrapeConfig](configResources, config.PlatformPrometheusMatchLabels)
+		if len(ret.Platform.ScrapeConfigs) == 0 {
+			o.Logger.Info("No scrape configs found for platform metrics")
+		}
 		ret.Platform.Rules = getResourceByLabelSelector[*prometheusv1.PrometheusRule](configResources, config.PlatformPrometheusMatchLabels)
+		if len(ret.Platform.Rules) == 0 {
+			o.Logger.Info("No rules found for platform metrics")
+		}
 	}
 
 	if userWorkloads.CollectionEnabled {
@@ -84,7 +94,13 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 
 		// Fetch rules and scrape configs
 		ret.UserWorkloads.ScrapeConfigs = getResourceByLabelSelector[*prometheusalpha1.ScrapeConfig](configResources, config.UserWorkloadPrometheusMatchLabels)
+		if len(ret.UserWorkloads.ScrapeConfigs) == 0 {
+			o.Logger.Info("No scrape configs found for user workloads")
+		}
 		ret.UserWorkloads.Rules = getResourceByLabelSelector[*prometheusv1.PrometheusRule](configResources, config.UserWorkloadPrometheusMatchLabels)
+		if len(ret.UserWorkloads.Rules) == 0 {
+			o.Logger.Info("No rules found for user workloads")
+		}
 	}
 
 	return ret, nil
@@ -203,7 +219,7 @@ func (o *OptionsBuilder) getImageOverrides(ctx context.Context) (ImagesOptions, 
 	return ret, nil
 }
 
-func (o *OptionsBuilder) getConfigResources(ctx context.Context, mcAddon *addonapiv1alpha1.ManagedClusterAddOn) ([]client.Object, error) {
+func (o *OptionsBuilder) getAvailableConfigResources(ctx context.Context, mcAddon *addonapiv1alpha1.ManagedClusterAddOn) ([]client.Object, error) {
 	ret := []client.Object{}
 	for _, cfg := range mcAddon.Status.ConfigReferences {
 		var obj client.Object
@@ -225,6 +241,9 @@ func (o *OptionsBuilder) getConfigResources(ctx context.Context, mcAddon *addona
 		}
 
 		if err := o.Client.Get(ctx, types.NamespacedName{Name: cfg.DesiredConfig.Name, Namespace: cfg.DesiredConfig.Namespace}, obj); err != nil {
+			if apierrors.IsNotFound(err) {
+				continue
+			}
 			return ret, err
 		}
 

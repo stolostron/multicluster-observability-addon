@@ -5,6 +5,7 @@ import (
 	"errors"
 	"path"
 
+	"github.com/go-logr/logr"
 	"github.com/rhobs/multicluster-observability-addon/internal/addon"
 	lhandlers "github.com/rhobs/multicluster-observability-addon/internal/logging/handlers"
 	lmanifests "github.com/rhobs/multicluster-observability-addon/internal/logging/manifests"
@@ -36,7 +37,7 @@ type HelmChartValues struct {
 	Tracing tmanifests.TracingValues `json:"tracing"`
 }
 
-func GetValuesFunc(ctx context.Context, k8s client.Client) addonfactory.GetValuesFunc {
+func GetValuesFunc(ctx context.Context, k8s client.Client, logger logr.Logger) addonfactory.GetValuesFunc {
 	return func(
 		cluster *clusterv1.ManagedCluster,
 		mcAddon *addonapiv1alpha1.ManagedClusterAddOn,
@@ -69,7 +70,7 @@ func GetValuesFunc(ctx context.Context, k8s client.Client) addonfactory.GetValue
 				return nil, errMissingHubEndpoint
 			}
 
-			if err := resource.DeployDefaultResourcesOnce(ctx, k8s, config.HubInstallNamespace); err != nil {
+			if err := resource.DeployDefaultResourcesOnce(ctx, k8s, logger, config.HubInstallNamespace); err != nil {
 				return nil, err
 			}
 
@@ -77,6 +78,7 @@ func GetValuesFunc(ctx context.Context, k8s client.Client) addonfactory.GetValue
 				Client:          k8s,
 				ImagesConfigMap: config.ImagesConfigMap,
 				RemoteWriteURL:  path.Join(opts.Platform.HubEndpoint, "/api/metrics/v1/default/api/v1/receive"),
+				Logger:          logger,
 			}
 			metricsOpts, err := optsBuilder.Build(ctx, mcAddon, opts.Platform.Metrics, opts.UserWorkloads.Metrics)
 			if err != nil {
