@@ -38,8 +38,16 @@ $(CRD_DIR)/opentelemetry.io_instrumentations.yaml:
 	@mkdir -p $(CRD_DIR)
 	@curl https://raw.githubusercontent.com/open-telemetry/opentelemetry-operator/v0.100.1/bundle/manifests/opentelemetry.io_instrumentations.yaml > $(CRD_DIR)/opentelemetry.io_instrumentations.yaml
 
+$(CRD_DIR)/monitoring.coreos.com_prometheusagents.yaml:
+	@mkdir -p $(CRD_DIR)
+	@curl https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/ca4f84f2bb6ce42fd9e3bb81a46e0bb32d042db1/example/prometheus-operator-crd-full/monitoring.coreos.com_prometheusagents.yaml  > $(CRD_DIR)/monitoring.coreos.com_prometheusagents.yaml
+
+$(CRD_DIR)/monitoring.coreos.com_scrapeconfigs.yaml:
+	@mkdir -p $(CRD_DIR)
+	@curl https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/refs/heads/release-0.77/example/prometheus-operator-crd-full/monitoring.coreos.com_scrapeconfigs.yaml  > $(CRD_DIR)/monitoring.coreos.com_scrapeconfigs.yaml
+
 .PHONY: install-crds
-install-crds: $(CRD_DIR)/observability.openshift.io_clusterlogforwarders.yaml $(CRD_DIR)/opentelemetry.io_opentelemetrycollectors.yaml $(CRD_DIR)/opentelemetry.io_instrumentations.yaml
+install-crds: $(CRD_DIR)/observability.openshift.io_clusterlogforwarders.yaml $(CRD_DIR)/opentelemetry.io_opentelemetrycollectors.yaml $(CRD_DIR)/opentelemetry.io_instrumentations.yaml $(CRD_DIR)/monitoring.coreos.com_prometheusagents.yaml $(CRD_DIR)/monitoring.coreos.com_scrapeconfigs.yaml
 
 .PHONY: fmt
 fmt: $(GOFUMPT) ## Run gofumpt on source code.

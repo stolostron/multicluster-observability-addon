@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/go-logr/logr"
 	"github.com/rhobs/multicluster-observability-addon/internal/addon"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
@@ -19,13 +20,15 @@ var (
 	ErrNotOwner = fmt.Errorf("controller is not the owner")
 )
 
-func DeployDefaultResourcesOnce(ctx context.Context, c client.Client, ns string) error {
+func DeployDefaultResourcesOnce(ctx context.Context, c client.Client, logger logr.Logger, ns string) error {
 	mu.Lock()
 	defer mu.Unlock()
 
 	if initialized {
 		return nil
 	}
+
+	logger.Info("deploying default monitoring resources")
 
 	// Get clusterManagementAddon resource to use as owner
 	owner := &addonapiv1alpha1.ClusterManagementAddOn{}
@@ -36,7 +39,7 @@ func DeployDefaultResourcesOnce(ctx context.Context, c client.Client, ns string)
 	// Deploy default resources
 	resources := DefaultPlaftformAgentResources(ns)
 	for _, resource := range resources {
-		if err := CreateOrUpdateResource(ctx, c, resource, owner); err != nil {
+		if err := CreateOrUpdateResource(ctx, c, resource, owner, logger); err != nil {
 			return fmt.Errorf("failed to create or update resource %s: %w", resource.GetName(), err)
 		}
 	}
@@ -46,13 +49,13 @@ func DeployDefaultResourcesOnce(ctx context.Context, c client.Client, ns string)
 	return nil
 }
 
-func CreateOrUpdateResource(ctx context.Context, c client.Client, newResource, owner client.Object) error {
+func CreateOrUpdateResource(ctx context.Context, c client.Client, newResource, owner client.Object, logger logr.Logger) error {
 	if err := controllerutil.SetControllerReference(owner, newResource, c.Scheme()); err != nil {
 		return err
 	}
 
-	if client.IgnoreAlreadyExists(c.Create(ctx, newResource)) != nil {
-		return nil
+	if err := client.IgnoreAlreadyExists(c.Create(ctx, newResource)); err != nil {
+		return err
 	}
 
 	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {

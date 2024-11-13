@@ -7,6 +7,7 @@ import (
 	otelv1alpha1 "github.com/open-telemetry/opentelemetry-operator/apis/v1alpha1"
 	otelv1beta1 "github.com/open-telemetry/opentelemetry-operator/apis/v1beta1"
 	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
+	monitoringv1alpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	"github.com/rhobs/multicluster-observability-addon/internal/addon"
 	addonhelm "github.com/rhobs/multicluster-observability-addon/internal/addon/helm"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -69,9 +70,10 @@ func NewAddonManager(ctx context.Context, kubeConfig *rest.Config, scheme *runti
 			schema.GroupVersionResource{Version: loggingv1.GroupVersion.Version, Group: loggingv1.GroupVersion.Group, Resource: addon.ClusterLogForwardersResource},
 			schema.GroupVersionResource{Version: otelv1beta1.GroupVersion.Version, Group: otelv1beta1.GroupVersion.Group, Resource: addon.OpenTelemetryCollectorsResource},
 			schema.GroupVersionResource{Version: otelv1alpha1.GroupVersion.Version, Group: otelv1alpha1.GroupVersion.Group, Resource: addon.InstrumentationResource},
+			schema.GroupVersionResource{Version: monitoringv1alpha1.SchemeGroupVersion.Version, Group: monitoringv1alpha1.SchemeGroupVersion.Group, Resource: monitoringv1alpha1.PrometheusAgentName},
 			utils.AddOnDeploymentConfigGVR,
 		).
-		WithGetValuesFuncs(addonConfigValuesFn, addonhelm.GetValuesFunc(ctx, k8sClient)).
+		WithGetValuesFuncs(addonConfigValuesFn, addonhelm.GetValuesFunc(ctx, k8sClient, logger)).
 		WithAgentHealthProber(addon.AgentHealthProber()).
 		WithAgentRegistrationOption(registrationOption).
 		WithScheme(scheme).

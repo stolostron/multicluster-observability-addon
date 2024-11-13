@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/go-logr/logr"
 	prometheusalpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	"github.com/rhobs/multicluster-observability-addon/internal/addon"
 	"github.com/stretchr/testify/assert"
@@ -113,7 +114,7 @@ func TestDeployDefaultResourcesOnce(t *testing.T) {
 				Build()
 
 			// Run the function
-			err := DeployDefaultResourcesOnce(context.Background(), fakeClient, tc.namespace)
+			err := DeployDefaultResourcesOnce(context.Background(), fakeClient, logr.Logger{}, tc.namespace)
 
 			// Verify error matches expected
 			if tc.expectedError != nil {
