@@ -8,7 +8,7 @@ import (
 )
 
 var (
-	errPlatformLogsNotDefined     = errors.New("Platform logs not defined")
+	errPlatformLogsNotDefined     = errors.New("platform logs not defined")
 	errUserWorkloadLogsNotDefined = errors.New("User Workloads logs not defined")
 )
 

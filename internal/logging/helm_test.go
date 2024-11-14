@@ -110,6 +110,9 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 			Namespace: "open-cluster-management-observability",
 		},
 		Spec: loggingv1.ClusterLogForwarderSpec{
+			ServiceAccount: loggingv1.ServiceAccount{
+				Name: "mcoa-sa",
+			},
 			Inputs: []loggingv1.InputSpec{
 				{
 					Name: "app-logs",
@@ -256,6 +259,8 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 
 	for _, obj := range objects {
 		switch obj := obj.(type) {
+		case *corev1.ServiceAccount:
+			require.Equal(t, "mcoa-sa", obj.Name)
 		case *operatorsv1alpha1.Subscription:
 			require.Equal(t, obj.Spec.Channel, "stable-6.0")
 		case *loggingv1.ClusterLogForwarder:

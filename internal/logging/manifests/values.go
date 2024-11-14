@@ -5,13 +5,36 @@ import (
 )
 
 type LoggingValues struct {
-	Enabled                    bool            `json:"enabled"`
-	CLFSpec                    string          `json:"clfSpec"`
-	ServiceAccountName         string          `json:"serviceAccountName"`
-	LoggingSubscriptionChannel string          `json:"loggingSubscriptionChannel"`
-	Secrets                    []ResourceValue `json:"secrets"`
-	ConfigMaps                 []ResourceValue `json:"configmaps"`
+	Enabled                    bool      `json:"enabled"`
+	LoggingSubscriptionChannel string    `json:"loggingSubscriptionChannel"`
+	Unmanaged                  Unmanaged `json:"unmanaged"`
+	Managed                    Managed   `json:"managed"`
 }
+
+// Unmanaged is a struct that holds configuration for resources managed by
+// the user.
+type Unmanaged struct {
+	Collection Collection `json:"collection"`
+}
+
+// Managed is a struct that holds configuration for resources managed by
+// MCOA.
+type Managed struct {
+	Collection Collection `json:"collection"`
+	Storage    Storage    `json:"storage"`
+}
+
+type Collection struct {
+	Enabled    bool            `json:"enabled"`
+	CLFSpec    string          `json:"clfSpec"`
+	Secrets    []ResourceValue `json:"secrets"`
+	ConfigMaps []ResourceValue `json:"configmaps"`
+}
+
+type Storage struct {
+	Enabled bool `json:"enabled"`
+}
+
 type ResourceValue struct {
 	Name string `json:"name"`
 	Data string `json:"data"`
@@ -20,6 +43,19 @@ type ResourceValue struct {
 func BuildValues(opts Options) (*LoggingValues, error) {
 	values := &LoggingValues{
 		Enabled: true,
+		Managed: Managed{
+			Collection: Collection{
+				Enabled: false,
+			},
+			Storage: Storage{
+				Enabled: false,
+			},
+		},
+		Unmanaged: Unmanaged{
+			Collection: Collection{
+				Enabled: true,
+			},
+		},
 	}
 
 	values.LoggingSubscriptionChannel = buildSubscriptionChannel(opts)
@@ -28,13 +64,13 @@ func BuildValues(opts Options) (*LoggingValues, error) {
 	if err != nil {
 		return nil, err
 	}
-	values.ConfigMaps = configmaps
+	values.Unmanaged.Collection.ConfigMaps = configmaps
 
 	secrets, err := buildSecrets(opts)
 	if err != nil {
 		return nil, err
 	}
-	values.Secrets = secrets
+	values.Unmanaged.Collection.Secrets = secrets
 
 	clfSpec, err := buildClusterLogForwarderSpec(opts)
 	if err != nil {
@@ -45,8 +81,7 @@ func BuildValues(opts Options) (*LoggingValues, error) {
 	if err != nil {
 		return nil, err
 	}
-	values.CLFSpec = string(b)
-	values.ServiceAccountName = opts.ClusterLogForwarder.Spec.ServiceAccount.Name
+	values.Unmanaged.Collection.CLFSpec = string(b)
 
 	return values, nil
 }

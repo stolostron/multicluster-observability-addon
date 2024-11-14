@@ -2,20 +2,41 @@ nameOverride: null
 
 enabled: true
 
-# Expects json format
-clfSpec: {}
-
-# Name of the service account to use to forward logs
-serviceAccountName: "foo"
-
-secrets:
-  - name: "secret-1"
-    # Expects json format
-    data: {}
-
-configmaps:
-  - name: "configmap-1"
-    # Expects json format
-    data: {}
-
 loggingSubscriptionChannel: channelName
+
+managed:
+  collection:
+    enabled: true
+    # Expects json format
+    clfSpec: {}
+
+    # List of secrets used by the managed collection resource
+    secrets:
+      - name: "secret-1"
+        # Expects json format
+        data: {}
+    
+    configmaps:
+      - name: "configmap-1"
+        # Expects json format
+        data: {}
+  storage:
+    enabled: true
+
+unmanaged:
+  collection:
+    enabled: true
+    # Expects json format
+    clfSpec: {}
+
+    # List of secrets referenced by clfSpec
+    secrets:
+      - name: "secret-1"
+        # Expects json format
+        data: {}
+    
+    # List of configmaps referenced by clfSpec
+    configmaps:
+      - name: "configmap-1"
+        # Expects json format
+        data: {}

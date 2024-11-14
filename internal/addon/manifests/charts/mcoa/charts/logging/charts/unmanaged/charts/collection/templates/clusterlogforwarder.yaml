@@ -1,0 +1,13 @@
+{{- if .Values.enabled }}
+apiVersion: observability.openshift.io/v1
+kind: ClusterLogForwarder
+metadata:
+  name: mcoa-instance
+  namespace: openshift-logging
+  labels:
+    app: {{ template "loggingCollection.name" . }}
+    chart: {{ template "loggingCollection.chart" . }}
+    release: {{ .Release.Name }}
+spec:
+{{- fromJson .Values.clfSpec | toYaml | nindent 2 }}
+{{- end }}
