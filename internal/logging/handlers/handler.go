@@ -37,25 +37,49 @@ func BuildOptions(ctx context.Context, k8s client.Client, mcAddon *addonapiv1alp
 		opts.SubscriptionChannel = userWorkloads.SubscriptionChannel
 	}
 
+	// If unmanaged collection is enabled validate a CLF is configured
+	if err := unmagedBuildOptions(ctx, k8s, mcAddon, &opts); err != nil {
+		return opts, err
+	}
+
+	// If managed collection is enabled
+	// If !hub create mTLS Certificate for Spoke
+	// If !hub try to get mTLS Secret
+	// Generate Loki URL to send logs to
+	// Done?!
+
+	// If hub create mTLS Certificate for Hub
+	// If hub try to get mTLS Secret for store
+	// If hub get a list of all the tenants
+	// Done?!
+
+	return opts, nil
+}
+
+func unmagedBuildOptions(ctx context.Context, k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, opts *manifests.Options) error {
+	if !opts.UnmanagedCollectionEnabled() {
+		return nil
+	}
+
 	keys := addon.GetObjectKeys(mcAddon.Status.ConfigReferences, loggingv1.GroupVersion.Group, addon.ClusterLogForwardersResource)
 	switch {
 	case len(keys) == 0:
-		return opts, errMissingCLFRef
+		return errMissingCLFRef
 	case len(keys) > 1:
-		return opts, errMultipleCLFRef
+		return errMultipleCLFRef
 	}
 	clf := &loggingv1.ClusterLogForwarder{}
 	if err := k8s.Get(ctx, keys[0], clf, &client.GetOptions{}); err != nil {
-		return opts, err
+		return err
 	}
-	opts.ClusterLogForwarder = clf
+	opts.Unmanaged.Collection.ClusterLogForwarder = clf
 
 	secretNames := []string{}
 	configmapNames := []string{}
 	for _, output := range clf.Spec.Outputs {
 		extractedSecretsNames, extracedConfigmapNames, err := getOutputResourcesNames(output)
 		if err != nil {
-			return opts, err
+			return err
 		}
 		secretNames = append(secretNames, extractedSecretsNames...)
 		configmapNames = append(configmapNames, extracedConfigmapNames...)
@@ -63,17 +87,17 @@ func BuildOptions(ctx context.Context, k8s client.Client, mcAddon *addonapiv1alp
 
 	secrets, err := addon.GetSecrets(ctx, k8s, clf.Namespace, mcAddon.Namespace, secretNames)
 	if err != nil {
-		return opts, err
+		return err
 	}
-	opts.Secrets = secrets
+	opts.Unmanaged.Collection.Secrets = secrets
 
 	configMaps, err := addon.GetConfigMaps(ctx, k8s, clf.Namespace, mcAddon.Namespace, configmapNames)
 	if err != nil {
-		return opts, err
+		return err
 	}
-	opts.ConfigMaps = configMaps
+	opts.Unmanaged.Collection.ConfigMaps = configMaps
 
-	return opts, nil
+	return nil
 }
 
 func getOutputResourcesNames(output loggingv1.OutputSpec) ([]string, []string, error) {

@@ -3,7 +3,7 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: openshift-logging:mcoa-logcollector:application-logs
+  name: openshift-logging:mcoa-managed-logcollector:application-logs
   labels:
     app: {{ template "loggingCollection.name" . }}
     chart: {{ template "loggingCollection.chart" . }}
@@ -20,7 +20,7 @@ subjects:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: openshift-logging:mcoa-logcollector:audit-logs
+  name: openshift-logging:mcoa-managed-logcollector:audit-logs
   labels:
     app: {{ template "loggingCollection.name" . }}
     chart: {{ template "loggingCollection.chart" . }}
@@ -37,7 +37,7 @@ subjects:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: openshift-logging:mcoa-logcollector:infrastructure-logs
+  name: openshift-logging:mcoa-managed-logcollector:infrastructure-logs
   labels:
     app: {{ template "loggingCollection.name" . }}
     chart: {{ template "loggingCollection.chart" . }}

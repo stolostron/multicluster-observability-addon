@@ -42,25 +42,29 @@ func Test_BuildSubscriptionChannel(t *testing.T) {
 
 func Test_BuildSecrets(t *testing.T) {
 	resources := Options{
-		Secrets: []corev1.Secret{
-			{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "foo",
-					Namespace: "cluster-1",
-				},
-				Data: map[string][]byte{
-					"foo-1": []byte("foo-user"),
-					"foo-2": []byte("foo-pass"),
-				},
-			},
-			{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "bar",
-					Namespace: "cluster-1",
-				},
-				Data: map[string][]byte{
-					"bar-1": []byte("bar-user"),
-					"bar-2": []byte("bar-pass"),
+		Unmanaged: Unmanaged{
+			Collection: Collection{
+				Secrets: []corev1.Secret{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "foo",
+							Namespace: "cluster-1",
+						},
+						Data: map[string][]byte{
+							"foo-1": []byte("foo-user"),
+							"foo-2": []byte("foo-pass"),
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "bar",
+							Namespace: "cluster-1",
+						},
+						Data: map[string][]byte{
+							"bar-1": []byte("bar-user"),
+							"bar-2": []byte("bar-pass"),
+						},
+					},
 				},
 			},
 		},
@@ -73,12 +77,12 @@ func Test_BuildSecrets(t *testing.T) {
 	gotData := &map[string][]byte{}
 	err = json.Unmarshal([]byte(secretsValue[0].Data), gotData)
 	require.NoError(t, err)
-	require.Equal(t, resources.Secrets[0].Data, *gotData)
+	require.Equal(t, resources.Unmanaged.Collection.Secrets[0].Data, *gotData)
 
 	gotData = &map[string][]byte{}
 	err = json.Unmarshal([]byte(secretsValue[1].Data), gotData)
 	require.NoError(t, err)
-	require.Equal(t, resources.Secrets[1].Data, *gotData)
+	require.Equal(t, resources.Unmanaged.Collection.Secrets[1].Data, *gotData)
 }
 
 func Test_BuildCLFSpec(t *testing.T) {
@@ -186,7 +190,11 @@ func Test_BuildCLFSpec(t *testing.T) {
 
 	// Setup the fake k8s client
 	resources := Options{
-		ClusterLogForwarder: clf,
+		Unmanaged: Unmanaged{
+			Collection: Collection{
+				ClusterLogForwarder: clf,
+			},
+		},
 	}
 	clfSpec, err := buildClusterLogForwarderSpec(resources)
 	require.NoError(t, err)

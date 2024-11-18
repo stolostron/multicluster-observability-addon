@@ -5,33 +5,33 @@ import (
 )
 
 type LoggingValues struct {
-	Enabled                    bool      `json:"enabled"`
-	LoggingSubscriptionChannel string    `json:"loggingSubscriptionChannel"`
-	Unmanaged                  Unmanaged `json:"unmanaged"`
-	Managed                    Managed   `json:"managed"`
+	Enabled                    bool            `json:"enabled"`
+	LoggingSubscriptionChannel string          `json:"loggingSubscriptionChannel"`
+	Unmanaged                  UnmanagedValues `json:"unmanaged"`
+	Managed                    ManagedValues   `json:"managed"`
 }
 
-// Unmanaged is a struct that holds configuration for resources managed by
+// UnmanagedValues is a struct that holds configuration for resources managed by
 // the user.
-type Unmanaged struct {
-	Collection Collection `json:"collection"`
+type UnmanagedValues struct {
+	Collection CollectionValues `json:"collection"`
 }
 
-// Managed is a struct that holds configuration for resources managed by
+// ManagedValues is a struct that holds configuration for resources managed by
 // MCOA.
-type Managed struct {
-	Collection Collection `json:"collection"`
-	Storage    Storage    `json:"storage"`
+type ManagedValues struct {
+	Collection CollectionValues `json:"collection"`
+	Storage    StorageValues    `json:"storage"`
 }
 
-type Collection struct {
+type CollectionValues struct {
 	Enabled    bool            `json:"enabled"`
 	CLFSpec    string          `json:"clfSpec"`
 	Secrets    []ResourceValue `json:"secrets"`
 	ConfigMaps []ResourceValue `json:"configmaps"`
 }
 
-type Storage struct {
+type StorageValues struct {
 	Enabled bool `json:"enabled"`
 }
 
@@ -41,47 +41,98 @@ type ResourceValue struct {
 }
 
 func BuildValues(opts Options) (*LoggingValues, error) {
-	values := &LoggingValues{
-		Enabled: true,
-		Managed: Managed{
-			Collection: Collection{
-				Enabled: false,
-			},
-			Storage: Storage{
-				Enabled: false,
-			},
-		},
-		Unmanaged: Unmanaged{
-			Collection: Collection{
-				Enabled: true,
-			},
-		},
+
+	uValues, err := buildUnmangedValues(opts)
+	if err != nil {
+		return nil, err
 	}
 
-	values.LoggingSubscriptionChannel = buildSubscriptionChannel(opts)
+	mValues, err := buildMangedValues(opts)
+	if err != nil {
+		return nil, err
+	}
+
+	return &LoggingValues{
+		Enabled:                    true,
+		LoggingSubscriptionChannel: buildSubscriptionChannel(opts),
+		Unmanaged:                  uValues,
+		Managed:                    mValues,
+	}, nil
+}
+
+func buildUnmangedValues(opts Options) (UnmanagedValues, error) {
+	if !(opts.Platform.CollectionEnabled || opts.UserWorkloads.CollectionEnabled) {
+		return UnmanagedValues{}, nil
+	}
+
+	uValues := UnmanagedValues{
+		Collection: CollectionValues{
+			Enabled: true,
+		},
+	}
 
 	configmaps, err := buildConfigMaps(opts)
 	if err != nil {
-		return nil, err
+		return uValues, err
 	}
-	values.Unmanaged.Collection.ConfigMaps = configmaps
+	uValues.Collection.ConfigMaps = configmaps
 
 	secrets, err := buildSecrets(opts)
 	if err != nil {
-		return nil, err
+		return uValues, err
 	}
-	values.Unmanaged.Collection.Secrets = secrets
+	uValues.Collection.Secrets = secrets
 
 	clfSpec, err := buildClusterLogForwarderSpec(opts)
 	if err != nil {
-		return nil, err
+		return uValues, err
 	}
 
 	b, err := json.Marshal(clfSpec)
 	if err != nil {
-		return nil, err
+		return uValues, err
 	}
-	values.Unmanaged.Collection.CLFSpec = string(b)
+	uValues.Collection.CLFSpec = string(b)
 
-	return values, nil
+	return uValues, nil
+}
+
+func buildMangedValues(opts Options) (ManagedValues, error) {
+	if !opts.Platform.StorageEnabled {
+		return ManagedValues{}, nil
+	}
+
+	mValues := ManagedValues{
+		Collection: CollectionValues{
+			Enabled: true,
+		},
+		Storage: StorageValues{
+			Enabled: true,
+		},
+	}
+
+	configmaps, err := buildManagedConfigMaps(opts)
+	if err != nil {
+		return mValues, err
+	}
+	mValues.Collection.ConfigMaps = configmaps
+
+	secrets, err := buildManagedSecrets(opts)
+	if err != nil {
+		return mValues, err
+	}
+	mValues.Collection.Secrets = secrets
+
+	clfSpec, err := buildManagedCLFSpec(opts)
+	if err != nil {
+		return mValues, err
+	}
+
+	b, err := json.Marshal(clfSpec)
+	if err != nil {
+		return mValues, err
+	}
+	mValues.Collection.CLFSpec = string(b)
+
+	return mValues, nil
 }

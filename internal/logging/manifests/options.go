@@ -7,10 +7,32 @@ import (
 )
 
 type Options struct {
-	ConfigMaps          []corev1.ConfigMap
-	Secrets             []corev1.Secret
-	ClusterLogForwarder *loggingv1.ClusterLogForwarder
+	Unmanaged           Unmanaged
+	Managed             Managed
 	Platform            addon.LogsOptions
 	UserWorkloads       addon.LogsOptions
 	SubscriptionChannel string
+}
+
+type Unmanaged struct {
+	Collection Collection
+}
+
+type Managed struct {
+	LokiURL    string
+	Collection Collection
+}
+
+type Collection struct {
+	ConfigMaps          []corev1.ConfigMap
+	Secrets             []corev1.Secret
+	ClusterLogForwarder *loggingv1.ClusterLogForwarder
+}
+
+func (opts Options) UnmanagedCollectionEnabled() bool {
+	return opts.Platform.CollectionEnabled || opts.UserWorkloads.CollectionEnabled
+}
+
+func (opts Options) ManagedStackEnabled() bool {
+	return opts.Platform.StorageEnabled
 }

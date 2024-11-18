@@ -19,6 +19,7 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
 	"open-cluster-management.io/addon-framework/pkg/agent"
+	addonutils "open-cluster-management.io/addon-framework/pkg/utils"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	fakeaddon "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
@@ -28,8 +29,10 @@ import (
 
 var (
 	_ = loggingv1.AddToScheme(scheme.Scheme)
+	_ = loggingv1.AddToScheme(scheme.Scheme)
 	_ = operatorsv1.AddToScheme(scheme.Scheme)
 	_ = operatorsv1alpha1.AddToScheme(scheme.Scheme)
+	_ = addonapiv1alpha1.AddToScheme(scheme.Scheme)
 )
 
 func fakeGetValues(k8s client.Client) addonfactory.GetValuesFunc {
@@ -37,7 +40,17 @@ func fakeGetValues(k8s client.Client) addonfactory.GetValuesFunc {
 		_ *clusterv1.ManagedCluster,
 		mcAddon *addonapiv1alpha1.ManagedClusterAddOn,
 	) (addonfactory.Values, error) {
-		opts, err := handlers.BuildOptions(context.TODO(), k8s, mcAddon, addon.LogsOptions{}, addon.LogsOptions{})
+		aodc := &addonapiv1alpha1.AddOnDeploymentConfig{}
+		keys := addon.GetObjectKeys(mcAddon.Status.ConfigReferences, addonutils.AddOnDeploymentConfigGVR.Group, addon.AddonDeploymentConfigResource)
+		if err := k8s.Get(context.TODO(), keys[0], aodc, &client.GetOptions{}); err != nil {
+			return nil, err
+		}
+		addonOpts, err := addon.BuildOptions(aodc)
+		if err != nil {
+			return nil, err
+		}
+
+		opts, err := handlers.BuildOptions(context.TODO(), k8s, mcAddon, addonOpts.Platform.Logs, addonOpts.UserWorkloads.Logs)
 		if err != nil {
 			return nil, err
 		}
@@ -225,6 +238,10 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 					Name:  "loggingSubscriptionChannel",
 					Value: "stable-6.0",
 				},
+				{
+					Name:  "platformLogsCollection",
+					Value: "clusterlogforwarders.v1.observability.openshift.io",
+				},
 			},
 		},
 	}
@@ -232,7 +249,7 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 	// Setup the fake k8s client
 	fakeKubeClient = fake.NewClientBuilder().
 		WithScheme(scheme.Scheme).
-		WithObjects(clf, staticCred, caConfigMap).
+		WithObjects(clf, staticCred, caConfigMap, addOnDeploymentConfig).
 		Build()
 
 	// Setup the fake addon client
