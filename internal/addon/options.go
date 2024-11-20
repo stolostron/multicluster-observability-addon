@@ -1,6 +1,9 @@
 package addon
 
 import (
+	"net/url"
+	"strings"
+
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 )
 
@@ -86,7 +89,12 @@ func BuildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Opti
 			opts.UserWorkloads.Logs.SubscriptionChannel = keyvalue.Value
 		// Platform Observability Options
 		case KeyPlatformSignalsHubEndpoint:
-			opts.Platform.HubEndpoint = keyvalue.Value
+			url.Parse(keyvalue.Value)
+			if !strings.HasPrefix(keyvalue.Value, "http") {
+				opts.Platform.HubEndpoint = "https://" + keyvalue.Value
+			} else {
+				opts.Platform.HubEndpoint = keyvalue.Value
+			}
 		case KeyPlatformMetricsCollection:
 			if keyvalue.Value == string(PrometheusAgentMetricsCollectorV1alpha1) {
 				opts.Platform.Enabled = true

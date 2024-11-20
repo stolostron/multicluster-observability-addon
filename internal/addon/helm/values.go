@@ -3,7 +3,7 @@ package helm
 import (
 	"context"
 	"errors"
-	"path"
+	"net/url"
 
 	"github.com/go-logr/logr"
 	"github.com/rhobs/multicluster-observability-addon/internal/addon"
@@ -74,10 +74,14 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, logger logr.Logger) a
 				return nil, err
 			}
 
+			remoteWriteURL, err := url.JoinPath(opts.Platform.HubEndpoint, "/api/metrics/v1/default/api/v1/receive")
+			if err != nil {
+				return nil, err
+			}
 			optsBuilder := mhandlers.OptionsBuilder{
 				Client:          k8s,
 				ImagesConfigMap: config.ImagesConfigMap,
-				RemoteWriteURL:  path.Join(opts.Platform.HubEndpoint, "/api/metrics/v1/default/api/v1/receive"),
+				RemoteWriteURL:  remoteWriteURL,
 				Logger:          logger,
 			}
 			metricsOpts, err := optsBuilder.Build(ctx, mcAddon, opts.Platform.Metrics, opts.UserWorkloads.Metrics)
