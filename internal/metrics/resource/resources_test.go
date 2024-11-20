@@ -5,9 +5,11 @@ import (
 	"testing"
 
 	"github.com/go-logr/logr"
+	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	prometheusalpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	"github.com/rhobs/multicluster-observability-addon/internal/addon"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -21,9 +23,10 @@ import (
 func TestDeployDefaultResourcesOnce(t *testing.T) {
 	// Create a scheme and add required types
 	scheme := runtime.NewScheme()
-	_ = addonapiv1alpha1.AddToScheme(scheme)
-	_ = corev1.AddToScheme(scheme)
-	_ = prometheusalpha1.AddToScheme(scheme)
+	require.NoError(t, addonapiv1alpha1.AddToScheme(scheme))
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, prometheusalpha1.AddToScheme(scheme))
+	require.NoError(t, prometheusv1.AddToScheme(scheme))
 
 	cmAddon := &addonapiv1alpha1.ClusterManagementAddOn{
 		ObjectMeta: metav1.ObjectMeta{
@@ -257,7 +260,7 @@ func TestCreateOrUpdateResource(t *testing.T) {
 				WithObjects(tc.existingObjs...).
 				Build()
 
-			err := CreateOrUpdateResource(context.Background(), fakeClient, tc.newResource, tc.owner)
+			err := CreateOrUpdateResource(context.Background(), fakeClient, tc.newResource, tc.owner, logr.Discard())
 
 			if tc.expectedError != nil {
 				assert.Equal(t, tc.expectedError, err)
