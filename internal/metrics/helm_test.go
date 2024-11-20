@@ -64,9 +64,11 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				for k, v := range agent[0].Spec.ScrapeConfigSelector.MatchLabels {
 					assert.Equal(t, v, scrapeCfgs[0].Labels[k])
 				}
+				assert.Equal(t, config.PrometheusControllerID, scrapeCfgs[0].Annotations["operator.prometheus.io/controller-id"])
 				// ensure that recording rules are created
 				recordingRules := getResourceByLabelSelector[*prometheusv1.PrometheusRule](objects, config.PlatformPrometheusMatchLabels)
 				assert.Len(t, recordingRules, 1)
+				assert.Equal(t, "openshift-monitoring/prometheus-operator", recordingRules[0].Annotations["operator.prometheus.io/controller-id"])
 				// ensure that the number of objects is correct
 				// 4 (prom operator) + 6 (agent + haproxy config) + 2 secrets (mTLS to hub) + 1 cm (prom ca) + 1 rule + 1 scrape config = 15
 				assert.Len(t, objects, 15)
@@ -103,8 +105,8 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 
 	// Add platform resources
 	defaultAgentResources := resource.DefaultPlaftformAgentResources(hubNamespace)
-	defaultAgentResources = append(defaultAgentResources, resource.PlatformScrapeConfig(hubNamespace))
-	defaultAgentResources = append(defaultAgentResources, resource.PlatformRecordingRules(hubNamespace))
+	// defaultAgentResources = append(defaultAgentResources, resource.PlatformScrapeConfig(hubNamespace))
+	// defaultAgentResources = append(defaultAgentResources, resource.PlatformRecordingRules(hubNamespace))
 
 	// Add user workload resources
 	defaultAgentResources = append(defaultAgentResources, resource.DefaultUserWorkloadAgentResources(hubNamespace)...)

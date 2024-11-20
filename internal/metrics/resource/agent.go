@@ -36,7 +36,8 @@ func DefaultPlaftformAgentResources(ns string) []client.Object {
 	// Create platform resources
 	ret = append(ret, newPrometheusAgent(ns, DefaultPlatformMetricsCollectorApp, config.PlatformPrometheusMatchLabels, &metav1.LabelSelector{})) // listen only to the same namespace
 	ret = append(ret, newEnvoyConfigMap(ns, DefaultPlatformEnvoyConfigMap, platformPrometheusService, config.PlatformPrometheusMatchLabels))
-
+	ret = append(ret, PlatformScrapeConfig(ns))
+	ret = append(ret, PlatformRecordingRules(ns))
 	return ret
 }
 
