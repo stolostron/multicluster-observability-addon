@@ -3,7 +3,6 @@ package integration
 import (
 	"context"
 	"fmt"
-	"os"
 	"testing"
 	"time"
 
@@ -14,6 +13,7 @@ import (
 	"github.com/rhobs/multicluster-observability-addon/internal/metrics/config"
 	"github.com/rhobs/multicluster-observability-addon/internal/metrics/resource"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -36,50 +36,97 @@ func TestIntegration_Metrics(t *testing.T) {
 	envoyConfig := types.NamespacedName{Namespace: obsNamespace, Name: resource.DefaultPlatformEnvoyConfigMap}
 	addonConfigName := "addon-config"
 	remoteWriteSecrets := newRemoteWriteSecrets(obsNamespace)
+	cma := newClusterManagementAddon()
 	resources := []client.Object{
 		newManagedCluster(spokeName),
 		newNamespace(spokeName),
-		newManagedClusterAddon(spokeName, promAgentConfig, envoyConfig),
 		newNamespace(obsNamespace),
-		newClusterManagementAddon(obsNamespace, addonConfigName),
-		newAddonDeploymentConfig(obsNamespace, addonConfigName).WithPlatformMetricsCollection().WithPlatformHubEndpoint("https://gogo.go").Build(),
 		mewImagesListConfigMap(obsNamespace),
 		remoteWriteSecrets[0],
 		remoteWriteSecrets[1],
+		cma,
 	}
-
 	k8sClient, err := client.New(restCfgHub, client.Options{Scheme: scheme})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
+	require.NoError(t, applyResources(context.Background(), k8sClient, resources))
 
-	for _, resource := range resources {
-		if err := k8sClient.Create(context.Background(), resource); err != nil {
-			t.Fatal(err, resource.GetName(), resource.GetNamespace())
-		}
-	}
+	mca := newManagedClusterAddon(spokeName)
+	require.NoError(t, setOwner(k8sClient, mca, cma))
 
-	// Restrict the test to the agent controller
-	os.Setenv("DISABLE_WATCHER_CONTROLLER", "true")
+	adc := newAddonDeploymentConfig(obsNamespace, addonConfigName).WithPlatformMetricsCollection().WithPlatformHubEndpoint("https://gogo.go").Build()
+	adc.Spec.AgentInstallNamespace = spokeName
+	require.NoError(t, setOwner(k8sClient, adc, cma))
+
+	resources = []client.Object{mca, adc}
+	require.NoError(t, applyResources(context.Background(), k8sClient, resources))
+
+	// update the mca status to have the addon config
+	mca.Status.ConfigReferences = []addonapiv1alpha1.ConfigReference{
+		{
+			ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+				Group:    addonapiv1alpha1.GroupName,
+				Resource: addon.AddonDeploymentConfigResource,
+			},
+			ConfigReferent: addonapiv1alpha1.ConfigReferent{
+				Namespace: promAgentConfig.Namespace,
+				Name:      "addon-config",
+			},
+			DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
+				ConfigReferent: addonapiv1alpha1.ConfigReferent{
+					Namespace: promAgentConfig.Namespace,
+					Name:      "addon-config",
+				},
+				SpecHash: "1234",
+			},
+		},
+		{
+			ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+				Group:    prometheusapi.GroupName,
+				Resource: prometheusalpha1.PrometheusAgentName,
+			},
+			ConfigReferent: addonapiv1alpha1.ConfigReferent{
+				Namespace: promAgentConfig.Namespace,
+				Name:      promAgentConfig.Name,
+			},
+			DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
+				ConfigReferent: addonapiv1alpha1.ConfigReferent{
+					Namespace: promAgentConfig.Namespace,
+					Name:      promAgentConfig.Name,
+				},
+				SpecHash: "1234",
+			},
+		},
+		{
+			ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+				Group:    "",
+				Resource: "configmaps",
+			},
+			ConfigReferent: addonapiv1alpha1.ConfigReferent{
+				Namespace: envoyConfig.Namespace,
+				Name:      envoyConfig.Name,
+			},
+			DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
+				ConfigReferent: addonapiv1alpha1.ConfigReferent{
+					Namespace: envoyConfig.Namespace,
+					Name:      envoyConfig.Name,
+				},
+				SpecHash: "1234",
+			},
+		},
+	}
+	require.NoError(t, k8sClient.Status().Update(context.Background(), mca))
 
 	// Start the controller
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	mgr, err := addonctrl.NewAddonManager(ctx, restCfgHub, scheme)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
-	if err := mgr.Start(ctx); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, mgr.Start(ctx))
+	require.NoError(t, waitForController(ctx, k8sClient))
 
-	if err := waitForController(ctx, k8sClient); err != nil {
-		t.Fatalf("failed to wait for controller to start: %v", err)
-	}
-
-	// Validate that the manifest work for the managed cluster is created and contains the prometheus agent
+	// Ensure that the manifest work was created with the prometheus agent
 	manifestWork := &workv1.ManifestWork{}
 	err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 15*time.Second, false, func(ctx context.Context) (bool, error) {
 		manifestWorkList := &workv1.ManifestWorkList{}
@@ -100,7 +147,7 @@ func TestIntegration_Metrics(t *testing.T) {
 
 		return true, nil
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	dec := serializer.NewCodecFactory(scheme).UniversalDeserializer()
 	var found bool
@@ -116,7 +163,7 @@ func TestIntegration_Metrics(t *testing.T) {
 	assert.Truef(t, found, "expected prometheus agent in manifest work")
 }
 
-func newManagedClusterAddon(ns string, promAgent, envoyConfig types.NamespacedName) *addonapiv1alpha1.ManagedClusterAddOn {
+func newManagedClusterAddon(ns string) *addonapiv1alpha1.ManagedClusterAddOn {
 	return &addonapiv1alpha1.ManagedClusterAddOn{
 		ObjectMeta: ctrl.ObjectMeta{
 			Name:      addon.Name,
@@ -124,49 +171,9 @@ func newManagedClusterAddon(ns string, promAgent, envoyConfig types.NamespacedNa
 		},
 		Spec: addonapiv1alpha1.ManagedClusterAddOnSpec{
 			InstallNamespace: "foo",
-			Configs: []addonapiv1alpha1.AddOnConfig{
-				{
-					ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
-						Group:    prometheusapi.GroupName,
-						Resource: prometheusalpha1.PrometheusAgentName,
-					},
-					ConfigReferent: addonapiv1alpha1.ConfigReferent{
-						Namespace: promAgent.Namespace,
-						Name:      promAgent.Name,
-					},
-				},
-				{
-					ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
-						Group:    "",
-						Resource: "configmaps",
-					},
-					ConfigReferent: addonapiv1alpha1.ConfigReferent{
-						Namespace: envoyConfig.Namespace,
-						Name:      envoyConfig.Name,
-					},
-				},
-			},
 		},
 	}
 }
-
-// func newAddonDeploymentConfig(ns, name string) *addonapiv1alpha1.AddOnDeploymentConfig {
-// 	return &addonapiv1alpha1.AddOnDeploymentConfig{
-// 		ObjectMeta: ctrl.ObjectMeta{
-// 			Namespace: ns,
-// 			Name:      name,
-// 		},
-// 		Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
-// 			AgentInstallNamespace: "foo",
-// 			CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
-// 				{
-// 					Name:  addon.KeyPlatformMetricsCollection,
-// 					Value: string(addon.PrometheusAgentMetricsCollectorV1alpha1),
-// 				},
-// 			},
-// 		},
-// 	}
-// }
 
 func mewImagesListConfigMap(ns string) *corev1.ConfigMap {
 	return &corev1.ConfigMap{

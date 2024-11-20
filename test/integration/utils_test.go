@@ -7,20 +7,22 @@ import (
 	telv1alpha1 "github.com/open-telemetry/opentelemetry-operator/apis/v1alpha1"
 	otelv1beta1 "github.com/open-telemetry/opentelemetry-operator/apis/v1beta1"
 	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
+	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	prometheusalpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	"github.com/rhobs/multicluster-observability-addon/internal/addon"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-	addonutils "open-cluster-management.io/addon-framework/pkg/utils"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	workv1 "open-cluster-management.io/api/work/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 func newScheme() *runtime.Scheme {
@@ -33,6 +35,7 @@ func newScheme() *runtime.Scheme {
 	utilruntime.Must(workv1.Install(scheme))
 	utilruntime.Must(addonapiv1alpha1.Install(scheme))
 	utilruntime.Must(prometheusalpha1.AddToScheme(scheme))
+	utilruntime.Must(prometheusv1.AddToScheme(scheme))
 
 	return scheme
 }
@@ -58,6 +61,16 @@ func waitForController(ctx context.Context, k8sClient client.Client) error {
 	return err
 }
 
+func applyResources(ctx context.Context, k8sClient client.Client, resources []client.Object) error {
+	for _, resource := range resources {
+		if err := k8sClient.Create(ctx, resource); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func newNamespace(name string) *corev1.Namespace {
 	return &corev1.Namespace{
 		ObjectMeta: ctrl.ObjectMeta{
@@ -74,26 +87,14 @@ func newManagedCluster(name string) *clusterv1.ManagedCluster {
 	}
 }
 
-func newClusterManagementAddon(configNs, configName string) *addonapiv1alpha1.ClusterManagementAddOn {
-	supportedConfigs := addonapiv1alpha1.ConfigMeta{
-		ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
-			Group:    addonutils.AddOnDeploymentConfigGVR.Group,
-			Resource: addon.AddonDeploymentConfigResource,
-		},
-		DefaultConfig: &addonapiv1alpha1.ConfigReferent{
-			Namespace: configNs,
-			Name:      configName,
-		},
-	}
-
+func newClusterManagementAddon() *addonapiv1alpha1.ClusterManagementAddOn {
 	return &addonapiv1alpha1.ClusterManagementAddOn{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: addon.Name,
 		},
 		Spec: addonapiv1alpha1.ClusterManagementAddOnSpec{
-			SupportedConfigs: []addonapiv1alpha1.ConfigMeta{supportedConfigs},
 			InstallStrategy: addonapiv1alpha1.InstallStrategy{
-				Type: addonapiv1alpha1.AddonInstallStrategyManual,
+				Type: addonapiv1alpha1.AddonInstallStrategyPlacements,
 			},
 		},
 	}
@@ -139,4 +140,12 @@ func (a *addonDeploymentConfigBuilder) WithPlatformHubEndpoint(endpoint string) 
 
 func (a *addonDeploymentConfigBuilder) Build() *addonapiv1alpha1.AddOnDeploymentConfig {
 	return (*addonapiv1alpha1.AddOnDeploymentConfig)(a)
+}
+
+func setOwner(client client.Client, resource, owner client.Object) error {
+	if err := client.Get(context.Background(), types.NamespacedName{Name: owner.GetName(), Namespace: owner.GetNamespace()}, owner); err != nil {
+		return err
+	}
+
+	return controllerutil.SetControllerReference(owner, resource, client.Scheme())
 }
