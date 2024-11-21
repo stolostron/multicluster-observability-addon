@@ -32,7 +32,9 @@ type CollectionValues struct {
 }
 
 type StorageValues struct {
-	Enabled bool `json:"enabled"`
+	Enabled bool            `json:"enabled"`
+	Secrets []ResourceValue `json:"secrets"`
+	LSSpec  string          `json:"lsSpec"`
 }
 
 type ResourceValue struct {
@@ -41,7 +43,6 @@ type ResourceValue struct {
 }
 
 func BuildValues(opts Options) (*LoggingValues, error) {
-
 	uValues, err := buildUnmangedValues(opts)
 	if err != nil {
 		return nil, err
@@ -111,13 +112,13 @@ func buildMangedValues(opts Options) (ManagedValues, error) {
 		},
 	}
 
-	configmaps, err := buildManagedConfigMaps(opts)
+	configmaps, err := buildManagedCollectionConfigMaps(opts)
 	if err != nil {
 		return mValues, err
 	}
 	mValues.Collection.ConfigMaps = configmaps
 
-	secrets, err := buildManagedSecrets(opts)
+	secrets, err := buildManagedCollectionSecrets(opts)
 	if err != nil {
 		return mValues, err
 	}
@@ -128,11 +129,28 @@ func buildMangedValues(opts Options) (ManagedValues, error) {
 		return mValues, err
 	}
 
-	b, err := json.Marshal(clfSpec)
+	clfMarshaled, err := json.Marshal(clfSpec)
 	if err != nil {
 		return mValues, err
 	}
-	mValues.Collection.CLFSpec = string(b)
+	mValues.Collection.CLFSpec = string(clfMarshaled)
+
+	secrets, err = buildManagedStorageSecrets(opts)
+	if err != nil {
+		return mValues, err
+	}
+	mValues.Storage.Secrets = secrets
+
+	lsSpec, err := buildManagedLokistackSpec(opts)
+	if err != nil {
+		return mValues, err
+	}
+
+	lsMarshaled, err := json.Marshal(lsSpec)
+	if err != nil {
+		return mValues, err
+	}
+	mValues.Storage.LSSpec = string(lsMarshaled)
 
 	return mValues, nil
 }

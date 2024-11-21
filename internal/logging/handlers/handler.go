@@ -6,16 +6,31 @@ import (
 	"fmt"
 	"slices"
 
+	certmanagerv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
 	"github.com/rhobs/multicluster-observability-addon/internal/addon"
 	"github.com/rhobs/multicluster-observability-addon/internal/logging/manifests"
+	addonmanifests "github.com/rhobs/multicluster-observability-addon/internal/manifests"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/rest"
+	"k8s.io/klog/v2"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
 	fieldAuthentication = "authentication"
 	fieldSASL           = "sasl"
+
+	managedCollectionCertCommonName = "mcoa-logging-collection-storage"
+	managedCollectionSecretName     = "mcoa-logging-managed-collection-tls"
+
+	managedStorageCertCommonName = "mcoa-logging-managed-storage"
+	managedStorageSecretName     = "mcoa-logging-managed-storage-tls"
+
+	openshiftLoggingNamespace = "openshift-logging"
 )
 
 var (
@@ -25,10 +40,11 @@ var (
 	errMissingField          = errors.New("missing field needed by output type")
 )
 
-func BuildOptions(ctx context.Context, k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, platform, userWorkloads addon.LogsOptions) (manifests.Options, error) {
+func BuildOptions(ctx context.Context, k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, platform, userWorkloads addon.LogsOptions, isHubCluster bool) (manifests.Options, error) {
 	opts := manifests.Options{
 		Platform:      platform,
 		UserWorkloads: userWorkloads,
+		IsHubCluster:  isHubCluster,
 	}
 
 	if platform.SubscriptionChannel != "" {
@@ -37,23 +53,139 @@ func BuildOptions(ctx context.Context, k8s client.Client, mcAddon *addonapiv1alp
 		opts.SubscriptionChannel = userWorkloads.SubscriptionChannel
 	}
 
-	// If unmanaged collection is enabled validate a CLF is configured
+	if err := createResourcesManaged(ctx, k8s, mcAddon, opts); err != nil {
+		return opts, err
+	}
+
 	if err := unmagedBuildOptions(ctx, k8s, mcAddon, &opts); err != nil {
 		return opts, err
 	}
 
-	// If managed collection is enabled
-	// If !hub create mTLS Certificate for Spoke
-	// If !hub try to get mTLS Secret
-	// Generate Loki URL to send logs to
-	// Done?!
-
-	// If hub create mTLS Certificate for Hub
-	// If hub try to get mTLS Secret for store
-	// If hub get a list of all the tenants
-	// Done?!
+	if err := managedBuildOptions(ctx, k8s, mcAddon, &opts); err != nil {
+		return opts, err
+	}
 
 	return opts, nil
+}
+
+func createResourcesManaged(ctx context.Context, k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, opts manifests.Options) error {
+	if !opts.ManagedStackEnabled() {
+		return nil
+	}
+
+	objects := []client.Object{}
+	if !opts.IsHubCluster {
+		certConfig := addonmanifests.CertificateConfig{
+			CommonName: managedCollectionCertCommonName,
+			Subject: &certmanagerv1.X509Subject{
+				// Gateway uses Organizational unit to identify the tenant
+				Organizations: []string{mcAddon.Namespace},
+			},
+			DNSNames: []string{managedCollectionCertCommonName},
+		}
+		key := client.ObjectKey{Name: managedCollectionSecretName, Namespace: mcAddon.Namespace}
+		cert, err := addonmanifests.BuildClientCertificate(key, certConfig)
+		if err != nil {
+			return err
+		}
+		objects = append(objects, cert)
+	}
+
+	if opts.IsHubCluster {
+		certConfig := addonmanifests.CertificateConfig{
+			CommonName: managedStorageCertCommonName,
+			Subject:    &certmanagerv1.X509Subject{},
+			DNSNames:   []string{managedStorageCertCommonName},
+		}
+		key := client.ObjectKey{Name: managedStorageSecretName, Namespace: mcAddon.Namespace}
+		cert, err := addonmanifests.BuildServerCertificate(key, certConfig)
+		if err != nil {
+			return err
+		}
+		objects = append(objects, cert)
+	}
+
+	for _, obj := range objects {
+		desired := obj.DeepCopyObject().(client.Object)
+		mutateFn := addonmanifests.MutateFuncFor(obj, desired, nil)
+
+		op, err := ctrl.CreateOrUpdate(ctx, k8s, obj, mutateFn)
+		if err != nil {
+			klog.Error(err, "failed to configure resource")
+			continue
+		}
+
+		msg := fmt.Sprintf("Resource has been %s", op)
+		switch op {
+		default:
+			klog.Info(msg)
+		}
+	}
+
+	return nil
+}
+
+func managedBuildOptions(ctx context.Context, k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, opts *manifests.Options) error {
+	if !opts.ManagedStackEnabled() {
+		return nil
+	}
+
+	if !opts.IsHubCluster {
+		secret := &corev1.Secret{}
+		key := client.ObjectKey{Name: managedCollectionSecretName, Namespace: mcAddon.Namespace}
+		err := k8s.Get(ctx, key, secret, &client.GetOptions{})
+		if err != nil {
+			// Even for not found we probably just want to return and wait for the next
+			// reconciliation loop to try again.
+			return err
+		}
+		opts.Managed.Collection.Secrets = []corev1.Secret{*secret}
+
+		// Get the cluster hostname
+		config, err := rest.InClusterConfig()
+		if err != nil {
+			return err
+		}
+		opts.Managed.LokiURL = fmt.Sprintf("https://lokistack-hub-openshift-logging.%s/api/logs/v1/%s", config.Host, mcAddon.Namespace)
+
+		return nil
+	}
+
+	if opts.IsHubCluster {
+		// Get objstorage secret
+
+		// Get mTLS secret
+		secret := &corev1.Secret{}
+		key := client.ObjectKey{Name: managedStorageSecretName, Namespace: openshiftLoggingNamespace}
+		err := k8s.Get(ctx, key, secret, &client.GetOptions{})
+		if err != nil {
+			// Even for not found we probably just want to return and wait for the next
+			// reconciliation loop to try again.
+			return err
+		}
+		opts.Managed.Storage.MTLSSecret = *secret
+
+		// List all the tenants
+		mcaoList := &addonapiv1alpha1.ManagedClusterAddOnList{}
+		labelSelector := labels.SelectorFromSet(labels.Set{
+			addon.LabelOCMAddonName: addon.Name,
+		})
+		if err := k8s.List(ctx, mcaoList, &client.ListOptions{LabelSelector: labelSelector}); err != nil {
+			return err
+		}
+
+		tenants := make([]string, 0, len(mcaoList.Items)-1)
+		for _, tenant := range mcaoList.Items {
+			if tenant.Name != mcAddon.Name {
+				tenants = append(tenants, tenant.Name)
+			}
+		}
+		opts.Managed.Storage.Tenants = tenants
+
+		return nil
+	}
+
+	return nil
 }
 
 func unmagedBuildOptions(ctx context.Context, k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, opts *manifests.Options) error {

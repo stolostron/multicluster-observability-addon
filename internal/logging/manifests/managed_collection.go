@@ -46,7 +46,7 @@ func buildManagedCLFSpec(opts Options) (loggingv1.ClusterLogForwarderSpec, error
 	}, nil
 }
 
-func buildManagedSecrets(resources Options) ([]ResourceValue, error) {
+func buildManagedCollectionSecrets(resources Options) ([]ResourceValue, error) {
 	secretsValue := []ResourceValue{}
 	for _, secret := range resources.Managed.Collection.Secrets {
 		dataJSON, err := json.Marshal(secret.Data)
@@ -62,7 +62,7 @@ func buildManagedSecrets(resources Options) ([]ResourceValue, error) {
 	return secretsValue, nil
 }
 
-func buildManagedConfigMaps(resources Options) ([]ResourceValue, error) {
+func buildManagedCollectionConfigMaps(resources Options) ([]ResourceValue, error) {
 	configmapsValue := []ResourceValue{}
 	for _, configmap := range resources.Managed.Collection.ConfigMaps {
 		dataJSON, err := json.Marshal(configmap.Data)
