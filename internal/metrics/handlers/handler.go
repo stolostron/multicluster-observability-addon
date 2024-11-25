@@ -28,7 +28,6 @@ var (
 	ErrInvalidConfigResourcesCount = errors.New("invalid number of configuration resources")
 	ErrUnsupportedAppName          = errors.New("unsupported app name")
 	ErrMissingImageOverride        = errors.New("missing image override")
-	ErrUnsupportedConfigResource   = errors.New("unsupported configuration reference resource")
 	ErrMissingDesiredConfig        = errors.New("missing desiredConfig in managedClusterAddon.Status.ConfigReferences")
 )
 
