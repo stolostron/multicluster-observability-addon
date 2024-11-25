@@ -71,6 +71,9 @@ func NewAddonManager(ctx context.Context, kubeConfig *rest.Config, scheme *runti
 			schema.GroupVersionResource{Version: otelv1beta1.GroupVersion.Version, Group: otelv1beta1.GroupVersion.Group, Resource: addon.OpenTelemetryCollectorsResource},
 			schema.GroupVersionResource{Version: otelv1alpha1.GroupVersion.Version, Group: otelv1alpha1.GroupVersion.Group, Resource: addon.InstrumentationResource},
 			schema.GroupVersionResource{Version: monitoringv1alpha1.SchemeGroupVersion.Version, Group: monitoringv1alpha1.SchemeGroupVersion.Group, Resource: monitoringv1alpha1.PrometheusAgentName},
+			schema.GroupVersionResource{Version: monitoringv1alpha1.SchemeGroupVersion.Version, Group: monitoringv1alpha1.SchemeGroupVersion.Group, Resource: monitoringv1alpha1.ScrapeConfigName},
+			schema.GroupVersionResource{Version: monitoringv1.SchemeGroupVersion.Version, Group: monitoringv1.SchemeGroupVersion.Group, Resource: monitoringv1.PrometheusRuleName},
+			schema.GroupVersionResource{Resource: "configmaps", Group: "", Version: "v1"},
 			utils.AddOnDeploymentConfigGVR,
 		).
 		WithGetValuesFuncs(addonConfigValuesFn, addonhelm.GetValuesFunc(ctx, k8sClient, logger)).
