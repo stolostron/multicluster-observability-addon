@@ -12,7 +12,7 @@ import (
 )
 
 func Test_AgentHealthProber_CLF(t *testing.T) {
-	unhealthyError := fmt.Errorf("%w: clusterlogforwarder status condition type is %s for %s/%s", errProbeConditionNotSatisfied, "False", SpokeCLFNamespace, SpokeCLFName)
+	unhealthyError := fmt.Errorf("%w: clusterlogforwarder status condition type is %s for %s/%s", errProbeConditionNotSatisfied, "False", LoggingNamespace, SpokeUnmanagedCLFName)
 	for _, tc := range []struct {
 		name        string
 		status      string
@@ -33,8 +33,8 @@ func Test_AgentHealthProber_CLF(t *testing.T) {
 			err := healthProber.WorkProber.HealthCheck(workv1.ResourceIdentifier{
 				Group:     loggingv1.GroupVersion.Group,
 				Resource:  ClusterLogForwardersResource,
-				Name:      SpokeCLFName,
-				Namespace: SpokeCLFNamespace,
+				Name:      SpokeUnmanagedCLFName,
+				Namespace: LoggingNamespace,
 			}, workv1.StatusFeedbackResult{
 				Values: []workv1.FeedbackValue{
 					{

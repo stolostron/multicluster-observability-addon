@@ -10,6 +10,7 @@ type Options struct {
 	Unmanaged           Unmanaged
 	Managed             Managed
 	IsHubCluster        bool
+	HubHostname         string
 	Platform            addon.LogsOptions
 	UserWorkloads       addon.LogsOptions
 	SubscriptionChannel string

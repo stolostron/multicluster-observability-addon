@@ -69,7 +69,7 @@ func Test_Mcoa_Disable_Charts(t *testing.T) {
 		Build()
 
 	agentAddon, err := addonfactory.NewAgentAddonFactory(addon.Name, addon.FS, addon.McoaChartDir).
-		WithGetValuesFuncs(GetValuesFunc(context.TODO(), fakeKubeClient)).
+		WithGetValuesFuncs(GetValuesFunc(context.TODO(), fakeKubeClient, "myhub.foo.com")).
 		WithAgentRegistrationOption(&agent.RegistrationOption{}).
 		WithScheme(scheme.Scheme).
 		BuildHelmAgentAddon()
@@ -129,7 +129,7 @@ func Test_Mcoa_Disable_Chart_Hub(t *testing.T) {
 		Build()
 
 	loggingAgentAddon, err := addonfactory.NewAgentAddonFactory(addon.Name, addon.FS, addon.McoaChartDir).
-		WithGetValuesFuncs(GetValuesFunc(context.TODO(), fakeKubeClient)).
+		WithGetValuesFuncs(GetValuesFunc(context.TODO(), fakeKubeClient, "myhub.foo.com")).
 		WithAgentRegistrationOption(&agent.RegistrationOption{}).
 		WithScheme(scheme.Scheme).
 		BuildHelmAgentAddon()

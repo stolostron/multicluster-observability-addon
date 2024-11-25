@@ -62,7 +62,7 @@ func BuildValues(opts Options) (*LoggingValues, error) {
 }
 
 func buildUnmangedValues(opts Options) (UnmanagedValues, error) {
-	if !(opts.Platform.CollectionEnabled || opts.UserWorkloads.CollectionEnabled) {
+	if !opts.UnmanagedCollectionEnabled() {
 		return UnmanagedValues{}, nil
 	}
 
@@ -99,58 +99,60 @@ func buildUnmangedValues(opts Options) (UnmanagedValues, error) {
 }
 
 func buildMangedValues(opts Options) (ManagedValues, error) {
-	if !opts.Platform.StorageEnabled {
+	if !opts.ManagedStackEnabled() {
 		return ManagedValues{}, nil
 	}
+	mValues := ManagedValues{}
 
-	mValues := ManagedValues{
-		Collection: CollectionValues{
+	if !opts.IsHubCluster {
+		mValues.Collection = CollectionValues{
 			Enabled: true,
-		},
-		Storage: StorageValues{
+		}
+		configmaps, err := buildManagedCollectionConfigMaps(opts)
+		if err != nil {
+			return mValues, err
+		}
+		mValues.Collection.ConfigMaps = configmaps
+
+		secrets, err := buildManagedCollectionSecrets(opts)
+		if err != nil {
+			return mValues, err
+		}
+		mValues.Collection.Secrets = secrets
+
+		clfSpec, err := buildManagedCLFSpec(opts)
+		if err != nil {
+			return mValues, err
+		}
+
+		clfMarshaled, err := json.Marshal(clfSpec)
+		if err != nil {
+			return mValues, err
+		}
+		mValues.Collection.CLFSpec = string(clfMarshaled)
+	}
+
+	if opts.IsHubCluster {
+		mValues.Storage = StorageValues{
 			Enabled: true,
-		},
-	}
+		}
+		secrets, err := buildManagedStorageSecrets(opts)
+		if err != nil {
+			return mValues, err
+		}
+		mValues.Storage.Secrets = secrets
 
-	configmaps, err := buildManagedCollectionConfigMaps(opts)
-	if err != nil {
-		return mValues, err
-	}
-	mValues.Collection.ConfigMaps = configmaps
+		lsSpec, err := buildManagedLokistackSpec(opts)
+		if err != nil {
+			return mValues, err
+		}
 
-	secrets, err := buildManagedCollectionSecrets(opts)
-	if err != nil {
-		return mValues, err
+		lsMarshaled, err := json.Marshal(lsSpec)
+		if err != nil {
+			return mValues, err
+		}
+		mValues.Storage.LSSpec = string(lsMarshaled)
 	}
-	mValues.Collection.Secrets = secrets
-
-	clfSpec, err := buildManagedCLFSpec(opts)
-	if err != nil {
-		return mValues, err
-	}
-
-	clfMarshaled, err := json.Marshal(clfSpec)
-	if err != nil {
-		return mValues, err
-	}
-	mValues.Collection.CLFSpec = string(clfMarshaled)
-
-	secrets, err = buildManagedStorageSecrets(opts)
-	if err != nil {
-		return mValues, err
-	}
-	mValues.Storage.Secrets = secrets
-
-	lsSpec, err := buildManagedLokistackSpec(opts)
-	if err != nil {
-		return mValues, err
-	}
-
-	lsMarshaled, err := json.Marshal(lsSpec)
-	if err != nil {
-		return mValues, err
-	}
-	mValues.Storage.LSSpec = string(lsMarshaled)
 
 	return mValues, nil
 }

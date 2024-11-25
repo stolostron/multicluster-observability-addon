@@ -152,7 +152,7 @@ func runController(ctx context.Context, kubeConfig *rest.Config) error {
 			schema.GroupVersionResource{Version: otelv1alpha1.GroupVersion.Version, Group: otelv1alpha1.GroupVersion.Group, Resource: addon.InstrumentationResource},
 			utils.AddOnDeploymentConfigGVR,
 		).
-		WithGetValuesFuncs(addonConfigValuesFn, addonhelm.GetValuesFunc(ctx, k8sClient)).
+		WithGetValuesFuncs(addonConfigValuesFn, addonhelm.GetValuesFunc(ctx, k8sClient, kubeConfig.Host)).
 		WithAgentHealthProber(addon.AgentHealthProber()).
 		WithAgentRegistrationOption(registrationOption).
 		WithScheme(scheme).

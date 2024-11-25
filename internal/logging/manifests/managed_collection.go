@@ -6,10 +6,12 @@ import (
 	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
 )
 
+const managedCollectionServiceAccount = "mcoa-logging-managed-collector"
+
 func buildManagedCLFSpec(opts Options) (loggingv1.ClusterLogForwarderSpec, error) {
 	return loggingv1.ClusterLogForwarderSpec{
 		ServiceAccount: loggingv1.ServiceAccount{
-			Name: "mcoa-logging-managed-collector",
+			Name: managedCollectionServiceAccount,
 		},
 		Outputs: []loggingv1.OutputSpec{
 			{

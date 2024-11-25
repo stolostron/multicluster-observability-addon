@@ -15,8 +15,10 @@ const (
 
 	AddonDeploymentConfigResource = "addondeploymentconfigs"
 	ClusterLogForwardersResource  = "clusterlogforwarders"
-	SpokeCLFName                  = "mcoa-instance"
-	SpokeCLFNamespace             = "openshift-logging"
+	SpokeUnmanagedCLFName         = "mcoa-instance"
+	SpokeManagedCLFName           = "mcoa-managed-instance"
+	SpokeManagedLSName            = "mcoa-managed-instance"
+	LoggingNamespace              = "openshift-logging"
 	clfProbeKey                   = "isReady"
 	// TODO @JoaoBraveCoding this most likely needs to be updated to reflect the new path
 	clfProbePath = ".status.conditions[?(@.type==\"Ready\")].status"
@@ -36,5 +38,6 @@ const (
 //go:embed manifests/charts/mcoa/charts/logging/templates/_helpers.tpl
 //go:embed manifests/charts/mcoa/charts/logging/charts/unmanaged/charts/collection/templates/_helpers.tpl
 //go:embed manifests/charts/mcoa/charts/logging/charts/managed/charts/collection/templates/_helpers.tpl
+//go:embed manifests/charts/mcoa/charts/logging/charts/managed/charts/storage/templates/_helpers.tpl
 //go:embed manifests/charts/mcoa/charts/tracing/templates/_helpers.tpl
 var FS embed.FS
