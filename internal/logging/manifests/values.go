@@ -54,11 +54,15 @@ func BuildValues(opts Options) (*LoggingValues, error) {
 	}
 
 	return &LoggingValues{
-		Enabled:                    true,
+		Enabled:                    enabledLogging(opts),
 		LoggingSubscriptionChannel: buildSubscriptionChannel(opts),
 		Unmanaged:                  uValues,
 		Managed:                    mValues,
 	}, nil
+}
+
+func enabledLogging(opts Options) bool {
+	return opts.UnmanagedCollectionEnabled() || opts.ManagedStackEnabled()
 }
 
 func buildUnmangedValues(opts Options) (UnmanagedValues, error) {

@@ -555,6 +555,19 @@ func Test_Logging_Managed_Storage(t *testing.T) {
 	}
 
 	expectedLS := lokiv1.LokiStack{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: lokiv1.GroupVersion.String(),
+			Kind:       "LokiStack",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "mcoa-managed-storage",
+			Namespace: "openshift-logging",
+			Labels: map[string]string{
+				"release": "multicluster-observability-addon",
+				"chart":   "storage-1.0.0",
+				"app":     "storage",
+			},
+		},
 		Spec: lokiv1.LokiStackSpec{
 			Size:             lokiv1.SizeOneXDemo,
 			StorageClassName: "gp3-csi",
@@ -678,7 +691,7 @@ func Test_Logging_Managed_Storage(t *testing.T) {
 	// Render manifests and return them as k8s runtime objects
 	objects, err := loggingAgentAddon.Manifests(managedCluster, managedClusterAddOn)
 	require.NoError(t, err)
-	require.Equal(t, 7, len(objects))
+	require.Equal(t, 6, len(objects))
 
 	for _, obj := range objects {
 		switch obj := obj.(type) {

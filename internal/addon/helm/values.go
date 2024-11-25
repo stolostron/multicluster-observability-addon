@@ -34,11 +34,7 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, hubHostname string) a
 		cluster *clusterv1.ManagedCluster,
 		mcAddon *addonapiv1alpha1.ManagedClusterAddOn,
 	) (addonfactory.Values, error) {
-		// if hub cluster, then don't install anything
-		if isHubCluster(cluster) {
-			return addonfactory.JsonStructToValues(HelmChartValues{})
-		}
-
+		isHubCluster := isHubCluster(cluster)
 		aodc, err := getAddOnDeploymentConfig(ctx, k8s, mcAddon)
 		if err != nil {
 			return nil, err
@@ -52,12 +48,12 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, hubHostname string) a
 			return addonfactory.JsonStructToValues(HelmChartValues{})
 		}
 
-		userValues := HelmChartValues{
+		values := HelmChartValues{
 			Enabled: true,
 		}
 
 		if opts.Platform.Logs.CollectionEnabled || opts.UserWorkloads.Logs.CollectionEnabled || opts.Platform.Logs.StorageEnabled {
-			loggingOpts, err := lhandlers.BuildOptions(ctx, k8s, mcAddon, opts.Platform.Logs, opts.UserWorkloads.Logs, isHubCluster(cluster), hubHostname)
+			loggingOpts, err := lhandlers.BuildOptions(ctx, k8s, mcAddon, opts.Platform.Logs, opts.UserWorkloads.Logs, isHubCluster, hubHostname)
 			if err != nil {
 				return nil, err
 			}
@@ -66,10 +62,10 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, hubHostname string) a
 			if err != nil {
 				return nil, err
 			}
-			userValues.Logging = *logging
+			values.Logging = *logging
 		}
 
-		if opts.UserWorkloads.Traces.CollectionEnabled {
+		if !isHubCluster && opts.UserWorkloads.Traces.CollectionEnabled {
 			tracingOpts, err := thandlers.BuildOptions(ctx, k8s, mcAddon, opts.UserWorkloads.Traces)
 			if err != nil {
 				return nil, err
@@ -79,10 +75,10 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, hubHostname string) a
 			if err != nil {
 				return nil, err
 			}
-			userValues.Tracing = tracing
+			values.Tracing = tracing
 		}
 
-		return addonfactory.JsonStructToValues(userValues)
+		return addonfactory.JsonStructToValues(values)
 	}
 }
 

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ViaQ/logerr/v2/log"
+	certmanagerv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	otelv1alpha1 "github.com/open-telemetry/opentelemetry-operator/apis/v1alpha1"
 	otelv1beta1 "github.com/open-telemetry/opentelemetry-operator/apis/v1beta1"
 	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
@@ -35,6 +36,7 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/version"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
+
 	workv1 "open-cluster-management.io/api/work/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
@@ -51,6 +53,7 @@ func init() {
 	utilruntime.Must(otelv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(operatorsv1.AddToScheme(scheme))
 	utilruntime.Must(operatorsv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(certmanagerv1.AddToScheme(scheme))
 
 	// +kubebuilder:scaffold:scheme
 }
