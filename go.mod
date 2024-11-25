@@ -17,10 +17,12 @@ require (
 	k8s.io/client-go v0.30.3
 	k8s.io/component-base v0.30.3
 	k8s.io/klog/v2 v2.130.1
-	open-cluster-management.io/addon-framework v0.11.0
-	open-cluster-management.io/api v0.15.0
+	open-cluster-management.io/addon-framework v0.0.0-00010101000000-000000000000
+	open-cluster-management.io/api v0.15.1-0.20241120090202-cb7ce98ab874
 	sigs.k8s.io/controller-runtime v0.18.5
 )
+
+replace open-cluster-management.io/addon-framework => github.com/zhiweiyin318/addon-framework v0.0.0-20241125074036-754aecccaf2b
 
 replace github.com/prometheus/common => github.com/prometheus/common v0.60.1
 
