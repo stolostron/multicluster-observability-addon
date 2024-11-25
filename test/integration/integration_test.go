@@ -27,7 +27,7 @@ func TestMain(m *testing.M) {
 	var err error
 
 	testEnvHub = &envtest.Environment{
-		CRDDirectoryPaths:       []string{filepath.Join("..", "..", "tmp", "crds")},
+		CRDDirectoryPaths:       []string{filepath.Join("..", "..", "tmp", "crds"), filepath.Join("..", "..", "deploy", "crds")},
 		ControlPlaneStopTimeout: 5 * time.Minute,
 	}
 

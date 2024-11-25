@@ -105,12 +105,9 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 
 	// Add platform resources
 	defaultAgentResources := resource.DefaultPlaftformAgentResources(hubNamespace)
-	// defaultAgentResources = append(defaultAgentResources, resource.PlatformScrapeConfig(hubNamespace))
-	// defaultAgentResources = append(defaultAgentResources, resource.PlatformRecordingRules(hubNamespace))
 
 	// Add user workload resources
 	defaultAgentResources = append(defaultAgentResources, resource.DefaultUserWorkloadAgentResources(hubNamespace)...)
-	// defaultAgentResources = append(defaultAgentResources, resource.UserWorkloadScrapeConfig(hubNamespace))
 
 	configReferences := []addonapiv1alpha1.ConfigReference{}
 	for _, obj := range defaultAgentResources {
