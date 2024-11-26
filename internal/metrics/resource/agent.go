@@ -24,7 +24,7 @@ const (
 	defaultUserWorkloadMetricsCollectorApp = config.UserWorkloadMetricsCollectorApp + "-default"
 	DefaultUserWorkloadEnvoyConfigMap      = defaultUserWorkloadMetricsCollectorApp + "-envoy-config"
 	platformPrometheusService              = "prometheus-k8s.openshift-monitoring.svc.cluster.local:9091"
-	userWorkloadPrometheusService          = "prometheus-user-workload.openshift-user-workload-monitoring.svc.cluster.local:9091"
+	userWorkloadPrometheusService          = "prometheus-user-workload.openshift-user-workload-monitoring.svc.cluster.local:9092"
 	envoyAdminPort                         = 9091
 	envoyProxyPortForPrometheus            = 8090
 	scrapeTimeout                          = "30s"
@@ -82,7 +82,7 @@ func newDefaultPrometheusAgent() *prometheusalpha1.PrometheusAgent {
 		Spec: prometheusalpha1.PrometheusAgentSpec{
 			CommonPrometheusFields: prometheusv1.CommonPrometheusFields{
 				Replicas: intPtr(1),
-				LogLevel: "debug", // TODO: reset to info
+				LogLevel: "info",
 				NodeSelector: map[string]string{
 					"kubernetes.io/os": "linux",
 				},
@@ -93,7 +93,6 @@ func newDefaultPrometheusAgent() *prometheusalpha1.PrometheusAgent {
 					},
 				},
 				ScrapeInterval: "300s",
-				// ScrapeInterval: "30s",   // TODO: reset to 300s
 				SecurityContext: &corev1.PodSecurityContext{
 					RunAsNonRoot: toPtr(true),
 				},

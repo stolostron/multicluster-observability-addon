@@ -118,6 +118,10 @@ func (p *PrometheusAgentBuilder) setWatchedResources() *PrometheusAgentBuilder {
 	p.Agent.Spec.CommonPrometheusFields.ScrapeConfigSelector = &metav1.LabelSelector{
 		MatchLabels: p.MatchLabels,
 	}
+	if p.Name == config.UserWorkloadMetricsCollectorApp {
+		// Listen to all namespaces
+		p.Agent.Spec.CommonPrometheusFields.ScrapeConfigNamespaceSelector = &metav1.LabelSelector{}
+	}
 	p.clearSelectors()
 	return p
 }

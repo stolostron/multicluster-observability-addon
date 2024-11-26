@@ -16,10 +16,10 @@ const (
 
 var (
 	PlatformPrometheusMatchLabels = map[string]string{
-		"app": PlatformMetricsCollectorApp,
+		"app.kubernetes.io/component": "platform-metrics-collector",
 	}
 	UserWorkloadPrometheusMatchLabels = map[string]string{
-		"app": UserWorkloadMetricsCollectorApp,
+		"app.kubernetes.io/component": "user-workload-metrics-collector",
 	}
 	ImagesConfigMap = types.NamespacedName{
 		Name:      "images-list",

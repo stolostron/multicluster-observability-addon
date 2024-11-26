@@ -2,13 +2,16 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: {{ .Values.platformAppName }}-rolebinding
+  name: {{ .Values.platform.appName }}-rolebinding
+  labels:
+    app.kubernetes.io/component: platform-metrics-collector
+    {{ include "metricshelm.labels" . | nindent 4 }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: {{ .Values.platformAppName }}-role
+  name: {{ .Values.platform.appName }}-role
 subjects:
 - kind: ServiceAccount
-  name: {{ .Values.platformAppName }}
+  name: {{ .Values.platform.appName }}
   namespace: open-cluster-management-addon-observability
 {{- end }}

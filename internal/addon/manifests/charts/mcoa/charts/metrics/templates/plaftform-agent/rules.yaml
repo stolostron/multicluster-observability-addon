@@ -1,4 +1,4 @@
-{{- range $_, $rule := .Values.rules }}
+{{- range $_, $rule := .Values.platform.rules }}
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
 metadata:
@@ -6,8 +6,9 @@ metadata:
   namespace: {{ $.Release.Namespace }}
   labels:
     {{- $incomingLabels := $rule.labels }}
-    {{- $stdLabels := dict "release" $.Release.Name }}
-    {{- $mergedLabels := merge $incomingLabels $stdLabels }}
+    {{- $metricsHelmLabels := fromYaml (include "metricshelm.labels" $) }}
+    {{- $customLabel := dict "app.kubernetes.io/component" "platform-metrics-collector" }}
+    {{- $mergedLabels := merge $incomingLabels $metricsHelmLabels $customLabel }}
     {{- toYaml $mergedLabels | nindent 4 }}
   annotations:
     {{- $incomingAnnotations := $rule.annotations }}

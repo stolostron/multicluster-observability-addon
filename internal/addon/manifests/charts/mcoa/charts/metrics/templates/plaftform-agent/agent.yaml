@@ -2,12 +2,13 @@
 apiVersion: monitoring.coreos.com/v1alpha1
 kind: PrometheusAgent
 metadata:
-  name: {{ .Values.platformAppName }}
+  name: {{ .Values.platform.appName }}
   namespace: {{ .Release.Namespace }}
   annotations:
     operator.prometheus.io/controller-id: {{ .Values.prometheusControllerID }}
   labels:
-    app: {{ .Values.platformAppName }}
+    app.kubernetes.io/component: platform-metrics-collector
+    {{ include "metricshelm.labels" . | nindent 4 }}
 spec:
-{{- fromJson .Values.platformAgentSpec | toYaml | nindent 2 }}
+{{- fromJson .Values.platform.prometheusAgentSpec | toYaml | nindent 2 }}
 {{- end }}
