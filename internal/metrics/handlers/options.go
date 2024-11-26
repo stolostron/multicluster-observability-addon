@@ -10,13 +10,13 @@ type Options struct {
 	Platform      Collector
 	UserWorkloads Collector
 	Secrets       []*corev1.Secret
-	ConfigMaps    []*corev1.ConfigMap
 	ClusterName   string
 	ClusterID     string
 	Images        ImagesOptions
 }
 
 type Collector struct {
+	ConfigMaps      []*corev1.ConfigMap
 	PrometheusAgent *prometheusalpha1.PrometheusAgent
 	ScrapeConfigs   []*prometheusalpha1.ScrapeConfig
 	Rules           []*prometheusv1.PrometheusRule

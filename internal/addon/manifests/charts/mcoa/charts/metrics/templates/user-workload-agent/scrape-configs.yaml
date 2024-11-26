@@ -1,4 +1,4 @@
-{{- range $_, $scrapeconfig := .Values.scrapeConfigs }}
+{{- range $_, $scrapeconfig := .Values.userWorkload.scrapeConfigs }}
 apiVersion: monitoring.coreos.com/v1alpha1
 kind: ScrapeConfig
 metadata:
@@ -6,8 +6,9 @@ metadata:
   namespace: {{ $.Release.Namespace }}
   labels:
     {{- $incomingLabels := $scrapeconfig.labels }}
-    {{- $stdLabels := dict "release" $.Release.Name }}
-    {{- $mergedLabels := merge $incomingLabels $stdLabels }}
+    {{- $metricsHelmLabels := fromYaml (include "metricshelm.labels" $) }}
+    {{- $customLabel := dict "app.kubernetes.io/component" "user-workload-metrics-collector" }}
+    {{- $mergedLabels := merge $incomingLabels $metricsHelmLabels $customLabel }}
     {{- toYaml $mergedLabels | nindent 4 }}
   annotations:
     {{- $incomingAnnotations := $scrapeconfig.annotations }}

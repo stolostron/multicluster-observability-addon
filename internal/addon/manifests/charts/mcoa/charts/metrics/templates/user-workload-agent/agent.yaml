@@ -2,12 +2,14 @@
 apiVersion: monitoring.coreos.com/v1alpha1
 kind: PrometheusAgent
 metadata:
-  name: {{ .Values.userWorkloadAppName }}
+  name: {{ .Values.userWorkload.appName }}
   namespace: {{ .Release.Namespace }}
   annotations:
     operator.prometheus.io/controller-id: {{ .Values.prometheusControllerID }}
   labels:
-    app: {{ .Values.userWorkloadAppName }}
+    app.kubernetes.io/name: {{ .Values.userWorkload.appName }}
+    {{ include "metricshelm.labels" . | nindent 4 }}
+    app.kubernetes.io/component: user-workload-metrics-collector
 spec:
-{{- fromJson .Values.userWorkloadsAgentSpec | toYaml | nindent 2 }}
+{{- fromJson .Values.userWorkload.prometheusAgentSpec | toYaml | nindent 2 }}
 {{- end }}

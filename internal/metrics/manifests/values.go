@@ -2,7 +2,6 @@ package manifests
 
 import (
 	"encoding/json"
-	"slices"
 
 	"github.com/rhobs/multicluster-observability-addon/internal/metrics/config"
 	"github.com/rhobs/multicluster-observability-addon/internal/metrics/handlers"
@@ -13,16 +12,19 @@ type MetricsValues struct {
 	PlatformEnabled           bool          `json:"platformEnabled"`
 	UserWorkloadsEnabled      bool          `json:"userWorkloadsEnabled"`
 	Secrets                   []ConfigValue `json:"secrets"`
-	ConfigMaps                []ConfigValue `json:"configMaps"`
-	PlatformAgentSpec         string        `json:"platformAgentSpec"`
-	UserWorkloadsAgentSpec    string        `json:"userWorkloadsAgentSpec"`
 	Images                    ImagesValues  `json:"images"`
 	PrometheusControllerID    string        `json:"prometheusControllerID"`
-	ScrapeConfigs             []ConfigValue `json:"scrapeConfigs"`
-	Rules                     []ConfigValue `json:"rules"`
 	PrometheusCAConfigMapName string        `json:"prometheusCAConfigMapName"`
-	PlatformAppName           string        `json:"platformAppName"`
-	UserWorkloadAppName       string        `json:"userWorkloadAppName"`
+	Platform                  Collector     `json:"platform"`
+	UserWorkload              Collector     `json:"userWorkload"`
+}
+
+type Collector struct {
+	AppName             string        `json:"appName"`
+	ConfigMaps          []ConfigValue `json:"configMaps"`
+	PrometheusAgentSpec string        `json:"prometheusAgentSpec"`
+	ScrapeConfigs       []ConfigValue `json:"scrapeConfigs"`
+	Rules               []ConfigValue `json:"rules"`
 }
 
 type ImagesValues struct {
@@ -40,8 +42,12 @@ func BuildValues(opts handlers.Options) (MetricsValues, error) {
 	ret := MetricsValues{
 		PrometheusControllerID:    config.PrometheusControllerID,
 		PrometheusCAConfigMapName: config.PrometheusCAConfigMapName,
-		PlatformAppName:           config.PlatformMetricsCollectorApp,
-		UserWorkloadAppName:       config.UserWorkloadMetricsCollectorApp,
+		Platform: Collector{
+			AppName: config.PlatformMetricsCollectorApp,
+		},
+		UserWorkload: Collector{
+			AppName: config.UserWorkloadMetricsCollectorApp,
+		},
 	}
 
 	// Build Prometheus Agent Spec for Platform
@@ -53,7 +59,7 @@ func BuildValues(opts handlers.Options) (MetricsValues, error) {
 			return ret, err
 		}
 
-		ret.PlatformAgentSpec = string(agentJson)
+		ret.Platform.PrometheusAgentSpec = string(agentJson)
 	}
 
 	// Build Prometheus Agent Spec for User Workloads
@@ -65,17 +71,30 @@ func BuildValues(opts handlers.Options) (MetricsValues, error) {
 			return ret, err
 		}
 
-		ret.UserWorkloadsAgentSpec = string(agentJson)
+		ret.UserWorkload.PrometheusAgentSpec = string(agentJson)
 	}
 
 	// Build scrape configs
-	for _, scrapeConfig := range slices.Concat(opts.Platform.ScrapeConfigs, opts.UserWorkloads.ScrapeConfigs) {
+	for _, scrapeConfig := range opts.Platform.ScrapeConfigs {
 		scrapeConfigJson, err := json.Marshal(scrapeConfig.Spec)
 		if err != nil {
 			return ret, err
 		}
 
-		ret.ScrapeConfigs = append(ret.ScrapeConfigs, ConfigValue{
+		ret.Platform.ScrapeConfigs = append(ret.Platform.ScrapeConfigs, ConfigValue{
+			Name:   scrapeConfig.Name,
+			Data:   string(scrapeConfigJson),
+			Labels: scrapeConfig.Labels,
+		})
+	}
+
+	for _, scrapeConfig := range opts.UserWorkloads.ScrapeConfigs {
+		scrapeConfigJson, err := json.Marshal(scrapeConfig.Spec)
+		if err != nil {
+			return ret, err
+		}
+
+		ret.UserWorkload.ScrapeConfigs = append(ret.UserWorkload.ScrapeConfigs, ConfigValue{
 			Name:   scrapeConfig.Name,
 			Data:   string(scrapeConfigJson),
 			Labels: scrapeConfig.Labels,
@@ -83,13 +102,26 @@ func BuildValues(opts handlers.Options) (MetricsValues, error) {
 	}
 
 	// Build rules
-	for _, rule := range slices.Concat(opts.Platform.Rules, opts.UserWorkloads.Rules) {
+	for _, rule := range opts.Platform.Rules {
 		ruleJson, err := json.Marshal(rule.Spec)
 		if err != nil {
 			return ret, err
 		}
 
-		ret.Rules = append(ret.Rules, ConfigValue{
+		ret.Platform.Rules = append(ret.Platform.Rules, ConfigValue{
+			Name:   rule.Name,
+			Data:   string(ruleJson),
+			Labels: rule.Labels,
+		})
+	}
+
+	for _, rule := range opts.UserWorkloads.Rules {
+		ruleJson, err := json.Marshal(rule.Spec)
+		if err != nil {
+			return ret, err
+		}
+
+		ret.UserWorkload.Rules = append(ret.UserWorkload.Rules, ConfigValue{
 			Name:   rule.Name,
 			Data:   string(ruleJson),
 			Labels: rule.Labels,
@@ -104,7 +136,12 @@ func BuildValues(opts handlers.Options) (MetricsValues, error) {
 	}
 
 	// Set config maps
-	ret.ConfigMaps, err = buildConfigMaps(opts.ConfigMaps)
+	ret.Platform.ConfigMaps, err = buildConfigMaps(opts.Platform.ConfigMaps)
+	if err != nil {
+		return ret, err
+	}
+
+	ret.UserWorkload.ConfigMaps, err = buildConfigMaps(opts.UserWorkloads.ConfigMaps)
 	if err != nil {
 		return ret, err
 	}

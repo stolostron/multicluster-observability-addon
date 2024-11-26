@@ -2,10 +2,10 @@
 kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: {{ .Values.userWorkloadAppName }}-role
+  name: {{ .Values.userWorkload.appName }}-role
   labels:
-    app.kubernetes.io/component: prometheus-agent
-    app.kubernetes.io/name: prometheus-agent
+    app.kubernetes.io/component: user-workload-metrics-collector
+    {{ include "metricshelm.labels" . | nindent 4 }}
 rules:
   - verbs:
       - get

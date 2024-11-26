@@ -6,6 +6,8 @@ metadata:
   namespace: {{ .Release.Namespace }}
   annotations:
     service.beta.openshift.io/inject-cabundle: "true"
+  labels:
+    {{ include "metricshelm.labels" . | nindent 4 }}
 data:
   "ca.crt": ""
 {{- end }}

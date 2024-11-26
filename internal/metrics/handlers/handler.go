@@ -126,7 +126,7 @@ func (o *OptionsBuilder) buildPrometheusAgent(ctx context.Context, opts *Options
 		return fmt.Errorf("%w: for application %s, found %d agents with labels %+v", ErrInvalidConfigResourcesCount, appName, len(platformAgents), labelsMatcher)
 	}
 
-	// Fetch the haproxy config
+	// Fetch the envoy config
 	envoyProxyConfigMap := getResourceByLabelSelector[*corev1.ConfigMap](configResources, labelsMatcher)
 	if len(envoyProxyConfigMap) != 1 {
 		return fmt.Errorf("%w: for application %s, found %d configmaps with labels %+v", ErrInvalidConfigResourcesCount, appName, len(envoyProxyConfigMap), labelsMatcher)
@@ -134,7 +134,6 @@ func (o *OptionsBuilder) buildPrometheusAgent(ctx context.Context, opts *Options
 	envoyProxyConfigMapName := fmt.Sprintf("%s-envoy-config", appName)
 	envoyProxyConfigMap[0].Name = envoyProxyConfigMapName
 	envoyProxyConfigMap[0].Labels = labelsMatcher // For convenience and easier retrieval, especially in tests
-	opts.ConfigMaps = append(opts.ConfigMaps, envoyProxyConfigMap[0])
 
 	// Build the agent
 	promBuilder := PrometheusAgentBuilder{
@@ -156,10 +155,12 @@ func (o *OptionsBuilder) buildPrometheusAgent(ctx context.Context, opts *Options
 		promBuilder.MatchLabels = config.PlatformPrometheusMatchLabels
 		agent = promBuilder.Build()
 		opts.Platform.PrometheusAgent = agent
+		opts.Platform.ConfigMaps = append(opts.Platform.ConfigMaps, envoyProxyConfigMap[0])
 	case config.UserWorkloadMetricsCollectorApp:
 		promBuilder.MatchLabels = config.UserWorkloadPrometheusMatchLabels
 		agent = promBuilder.Build()
 		opts.UserWorkloads.PrometheusAgent = agent
+		opts.UserWorkloads.ConfigMaps = append(opts.UserWorkloads.ConfigMaps, envoyProxyConfigMap[0])
 	default:
 		return fmt.Errorf("%w: %s", ErrUnsupportedAppName, appName)
 	}

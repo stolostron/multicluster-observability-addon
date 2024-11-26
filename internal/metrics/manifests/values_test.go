@@ -33,7 +33,7 @@ func TestBuildValues(t *testing.T) {
 			Expect: func(t *testing.T, values manifests.MetricsValues) {
 				assert.True(t, values.PlatformEnabled)
 				assert.False(t, values.UserWorkloadsEnabled)
-				assert.NotEmpty(t, values.PlatformAgentSpec)
+				assert.NotEmpty(t, values.Platform.PrometheusAgentSpec)
 			},
 		},
 		"with user workloads resources": {
@@ -53,7 +53,7 @@ func TestBuildValues(t *testing.T) {
 			Expect: func(t *testing.T, values manifests.MetricsValues) {
 				assert.False(t, values.PlatformEnabled)
 				assert.True(t, values.UserWorkloadsEnabled)
-				assert.NotEmpty(t, values.UserWorkloadsAgentSpec)
+				assert.NotEmpty(t, values.UserWorkload.PrometheusAgentSpec)
 			},
 		},
 		"image overrides": {
@@ -81,20 +81,37 @@ func TestBuildValues(t *testing.T) {
 				assert.Equal(t, "b", values.Secrets[1].Name)
 			},
 		},
-		"with configmaps": {
+		"with platform configmaps": {
 			Options: handlers.Options{
-				ConfigMaps: []*corev1.ConfigMap{
-					newConfigmap("a"),
-					newConfigmap("b"),
+				Platform: handlers.Collector{
+					ConfigMaps: []*corev1.ConfigMap{
+						newConfigmap("a"),
+						newConfigmap("b"),
+					},
 				},
 			},
 			Expect: func(t *testing.T, values manifests.MetricsValues) {
-				assert.Len(t, values.ConfigMaps, 2)
-				assert.Equal(t, "a", values.ConfigMaps[0].Name)
-				assert.Equal(t, "b", values.ConfigMaps[1].Name)
+				assert.Len(t, values.Platform.ConfigMaps, 2)
+				assert.Equal(t, "a", values.Platform.ConfigMaps[0].Name)
+				assert.Equal(t, "b", values.Platform.ConfigMaps[1].Name)
 			},
 		},
-		"with scrape configs": {
+		"with user workload configmaps": {
+			Options: handlers.Options{
+				UserWorkloads: handlers.Collector{
+					ConfigMaps: []*corev1.ConfigMap{
+						newConfigmap("a"),
+						newConfigmap("b"),
+					},
+				},
+			},
+			Expect: func(t *testing.T, values manifests.MetricsValues) {
+				assert.Len(t, values.UserWorkload.ConfigMaps, 2)
+				assert.Equal(t, "a", values.UserWorkload.ConfigMaps[0].Name)
+				assert.Equal(t, "b", values.UserWorkload.ConfigMaps[1].Name)
+			},
+		},
+		"with platform scrape configs": {
 			Options: handlers.Options{
 				Platform: handlers.Collector{
 					ScrapeConfigs: []*prometheusalpha1.ScrapeConfig{
@@ -104,21 +121,48 @@ func TestBuildValues(t *testing.T) {
 				},
 			},
 			Expect: func(t *testing.T, values manifests.MetricsValues) {
-				assert.Len(t, values.ScrapeConfigs, 2)
-				assert.Equal(t, values.ScrapeConfigs[0].Name, "a")
-				assert.Equal(t, values.ScrapeConfigs[1].Name, "b")
+				assert.Len(t, values.Platform.ScrapeConfigs, 2)
+				assert.Equal(t, values.Platform.ScrapeConfigs[0].Name, "a")
+				assert.Equal(t, values.Platform.ScrapeConfigs[1].Name, "b")
 			},
 		},
-		"with rules": {
+		"with user workload scrape configs": {
+			Options: handlers.Options{
+				UserWorkloads: handlers.Collector{
+					ScrapeConfigs: []*prometheusalpha1.ScrapeConfig{
+						newScrapeConfig("a"),
+						newScrapeConfig("b"),
+					},
+				},
+			},
+			Expect: func(t *testing.T, values manifests.MetricsValues) {
+				assert.Len(t, values.UserWorkload.ScrapeConfigs, 2)
+				assert.Equal(t, values.UserWorkload.ScrapeConfigs[0].Name, "a")
+				assert.Equal(t, values.UserWorkload.ScrapeConfigs[1].Name, "b")
+			},
+		},
+		"with platform rules": {
 			Options: handlers.Options{
 				Platform: handlers.Collector{
 					Rules: []*prometheusv1.PrometheusRule{newRule("a"), newRule("b")},
 				},
 			},
 			Expect: func(t *testing.T, values manifests.MetricsValues) {
-				assert.Len(t, values.Rules, 2)
-				assert.Equal(t, values.Rules[0].Name, "a")
-				assert.Equal(t, values.Rules[1].Name, "b")
+				assert.Len(t, values.Platform.Rules, 2)
+				assert.Equal(t, values.Platform.Rules[0].Name, "a")
+				assert.Equal(t, values.Platform.Rules[1].Name, "b")
+			},
+		},
+		"with user workload rules": {
+			Options: handlers.Options{
+				UserWorkloads: handlers.Collector{
+					Rules: []*prometheusv1.PrometheusRule{newRule("a"), newRule("b")},
+				},
+			},
+			Expect: func(t *testing.T, values manifests.MetricsValues) {
+				assert.Len(t, values.UserWorkload.Rules, 2)
+				assert.Equal(t, values.UserWorkload.Rules[0].Name, "a")
+				assert.Equal(t, values.UserWorkload.Rules[1].Name, "b")
 			},
 		},
 	}

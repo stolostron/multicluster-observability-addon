@@ -5,7 +5,7 @@ metadata:
   labels:
     app.kubernetes.io/component: controller
     app.kubernetes.io/name: prometheus-operator
-    app.kubernetes.io/part-of: acm-observability-addon
+    app.kubernetes.io/part-of: multicluster-observability-addon
     app.kubernetes.io/managed-by: {{ .Release.Name }}
   name: prometheus-operator
   namespace: {{ .Release.Namespace }}
@@ -15,7 +15,7 @@ spec:
     matchLabels:
       app.kubernetes.io/component: controller
       app.kubernetes.io/name: prometheus-operator
-      app.kubernetes.io/part-of: acm-observability-addon
+      app.kubernetes.io/part-of: multicluster-observability-addon
   template:
     metadata:
       annotations:
@@ -23,7 +23,7 @@ spec:
       labels:
         app.kubernetes.io/component: controller
         app.kubernetes.io/name: prometheus-operator
-        app.kubernetes.io/part-of: acm-observability-addon
+        app.kubernetes.io/part-of: multicluster-observability-addon
     spec:
       containers:
       - image: {{ .Values.images.prometheusOperator }}
