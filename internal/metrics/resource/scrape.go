@@ -61,6 +61,11 @@ func PlatformScrapeConfig(ns string) *prometheusalpha1.ScrapeConfig {
 					Replacement:  toPtr("etcd_debugging_mvcc_db_total_size_in_bytes"),
 					Action:       "replace",
 				},
+				// strip unneeded labels
+				{
+					SourceLabels: []prometheusv1.LabelName{"prometheus_replica", "managed_cluster"},
+					Action:       "labeldrop",
+				},
 			},
 			StaticConfigs: []prometheusalpha1.StaticConfig{
 				{
