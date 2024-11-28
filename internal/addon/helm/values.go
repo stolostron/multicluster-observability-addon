@@ -29,7 +29,7 @@ type HelmChartValues struct {
 	Tracing tmanifests.TracingValues `json:"tracing"`
 }
 
-func GetValuesFunc(ctx context.Context, k8s client.Client, hubHostname string) addonfactory.GetValuesFunc {
+func GetValuesFunc(ctx context.Context, k8s client.Client) addonfactory.GetValuesFunc {
 	return func(
 		cluster *clusterv1.ManagedCluster,
 		mcAddon *addonapiv1alpha1.ManagedClusterAddOn,
@@ -53,7 +53,7 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, hubHostname string) a
 		}
 
 		if opts.Platform.Logs.CollectionEnabled || opts.UserWorkloads.Logs.CollectionEnabled || opts.Platform.Logs.StorageEnabled {
-			loggingOpts, err := lhandlers.BuildOptions(ctx, k8s, mcAddon, opts.Platform.Logs, opts.UserWorkloads.Logs, isHubCluster, hubHostname)
+			loggingOpts, err := lhandlers.BuildOptions(ctx, k8s, mcAddon, opts.Platform.Logs, opts.UserWorkloads.Logs, isHubCluster, opts.HubHostname)
 			if err != nil {
 				return nil, err
 			}

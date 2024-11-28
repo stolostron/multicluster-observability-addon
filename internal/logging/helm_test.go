@@ -54,7 +54,7 @@ func fakeGetValues(k8s client.Client, isHub bool) addonfactory.GetValuesFunc {
 			return nil, err
 		}
 
-		opts, err := handlers.BuildOptions(context.TODO(), k8s, mcAddon, addonOpts.Platform.Logs, addonOpts.UserWorkloads.Logs, isHub, "myhub.foo.com")
+		opts, err := handlers.BuildOptions(context.TODO(), k8s, mcAddon, addonOpts.Platform.Logs, addonOpts.UserWorkloads.Logs, isHub, addonOpts.HubHostname)
 		if err != nil {
 			return nil, err
 		}
@@ -239,7 +239,7 @@ func Test_Logging_Unmanaged_Collection(t *testing.T) {
 		Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
 			CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
 				{
-					Name:  "loggingSubscriptionChannel",
+					Name:  "openshiftLoggingChannel",
 					Value: "stable-6.0",
 				},
 				{
@@ -352,8 +352,12 @@ func Test_Logging_Managed_Collection(t *testing.T) {
 		Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
 			CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
 				{
-					Name:  "loggingSubscriptionChannel",
+					Name:  "openshiftLoggingChannel",
 					Value: "stable-6.0",
+				},
+				{
+					Name:  "hubHostname",
+					Value: "myhub.foo.com",
 				},
 				{
 					Name:  "platformLogsStorage",
@@ -382,8 +386,11 @@ func Test_Logging_Managed_Collection(t *testing.T) {
 			Kind:       "ClusterLogForwarder",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "mcoa-managed-instance",
+			Name:      addon.SpokeManagedCLFName,
 			Namespace: "openshift-logging",
+			Annotations: map[string]string{
+				"observability.openshift.io/tech-preview-otlp-output": "enabled",
+			},
 			Labels: map[string]string{
 				"release": "multicluster-observability-addon",
 				"chart":   "collection-1.0.0",
@@ -399,21 +406,22 @@ func Test_Logging_Managed_Collection(t *testing.T) {
 					Name: "hub-lokistack",
 					Type: loggingv1.OutputTypeOTLP,
 					OTLP: &loggingv1.OTLP{
-						URL: "https://lokistack-hub-openshift-logging.myhub.foo.com/api/logs/v1/cluster-1",
+						URL: "https://mcoa-managed-instance-openshift-logging.apps.myhub.foo.com/api/logs/v1/cluster-1/otlp/v1/logs",
 					},
 					TLS: &loggingv1.OutputTLSSpec{
+						InsecureSkipVerify: true,
 						TLSSpec: loggingv1.TLSSpec{
 							CA: &loggingv1.ValueReference{
 								Key:        "ca.crt",
-								SecretName: "mcoa-managed-collector-tls",
+								SecretName: "mcoa-logging-managed-collection-tls",
 							},
 							Certificate: &loggingv1.ValueReference{
 								Key:        "tls.crt",
-								SecretName: "mcoa-managed-collector-tls",
+								SecretName: "mcoa-logging-managed-collection-tls",
 							},
 							Key: &loggingv1.SecretReference{
 								Key:        "tls.key",
-								SecretName: "mcoa-managed-collector-tls",
+								SecretName: "mcoa-logging-managed-collection-tls",
 							},
 						},
 					},
@@ -488,10 +496,10 @@ func Test_Logging_Managed_Storage(t *testing.T) {
 	)
 
 	// Setup a managed cluster
-	managedCluster = addontesting.NewManagedCluster("cluster-1")
+	managedCluster = addontesting.NewManagedCluster("local-cluster")
 
 	// Register the addon for the managed cluster
-	managedClusterAddOn = addontesting.NewAddon("test", "cluster-1")
+	managedClusterAddOn = addontesting.NewAddon("test", "local-cluster")
 	managedClusterAddOn.Status.ConfigReferences = []addonapiv1alpha1.ConfigReference{
 		{
 			ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
@@ -520,7 +528,7 @@ func Test_Logging_Managed_Storage(t *testing.T) {
 		Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
 			CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
 				{
-					Name:  "loggingSubscriptionChannel",
+					Name:  "openshiftLoggingChannel",
 					Value: "stable-6.0",
 				},
 				{
@@ -531,11 +539,15 @@ func Test_Logging_Managed_Storage(t *testing.T) {
 		},
 	}
 
+	// Tenants
+	tenant1 := addontesting.NewAddon("multicluster-observability-addon", "tenant-1")
+	tenant2 := addontesting.NewAddon("multicluster-observability-addon", "tenant-2")
+
 	// Emulate the secret that would've been created by the cert-manager
 	mtls := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "mcoa-logging-managed-storage-tls",
-			Namespace: "openshift-logging",
+			Namespace: "local-cluster",
 		},
 		Data: map[string][]byte{
 			"ca.crt":  []byte("data"),
@@ -547,20 +559,20 @@ func Test_Logging_Managed_Storage(t *testing.T) {
 	objstorage := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "mcoa-logging-managed-storage-objstorage",
-			Namespace: "openshift-logging",
+			Namespace: "local-cluster",
 		},
 		Data: map[string][]byte{
 			"foo": []byte("bar"),
 		},
 	}
 
-	expectedLS := lokiv1.LokiStack{
+	expectedLS := &lokiv1.LokiStack{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: lokiv1.GroupVersion.String(),
 			Kind:       "LokiStack",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "mcoa-managed-storage",
+			Name:      addon.SpokeManagedLSName,
 			Namespace: "openshift-logging",
 			Labels: map[string]string{
 				"release": "multicluster-observability-addon",
@@ -574,7 +586,7 @@ func Test_Logging_Managed_Storage(t *testing.T) {
 			Storage: lokiv1.ObjectStorageSpec{
 				Secret: lokiv1.ObjectStorageSecretSpec{
 					Type: "s3",
-					Name: "mcoa-logging-managed-storage",
+					Name: "mcoa-logging-managed-storage-objstorage",
 				},
 				Schemas: []lokiv1.ObjectStorageSchema{
 					{
@@ -592,7 +604,7 @@ func Test_Logging_Managed_Storage(t *testing.T) {
 						MTLS: &lokiv1.MTLSSpec{
 							CA: &lokiv1.CASpec{
 								CAKey: "ca.crt",
-								CA:    "mcoa-managed-storage-tls",
+								CA:    "mcoa-logging-managed-storage-tls",
 							},
 						},
 					},
@@ -602,7 +614,7 @@ func Test_Logging_Managed_Storage(t *testing.T) {
 						MTLS: &lokiv1.MTLSSpec{
 							CA: &lokiv1.CASpec{
 								CAKey: "ca.crt",
-								CA:    "mcoa-managed-storage-tls",
+								CA:    "mcoa-logging-managed-storage-tls",
 							},
 						},
 					},
@@ -634,7 +646,7 @@ func Test_Logging_Managed_Storage(t *testing.T) {
 							Roles: []string{"tenant-1-logs"},
 							Subjects: []lokiv1.Subject{
 								{
-									Kind: "Group",
+									Kind: "group",
 									Name: "tenant-1",
 								},
 							},
@@ -644,7 +656,7 @@ func Test_Logging_Managed_Storage(t *testing.T) {
 							Roles: []string{"tenant-2-logs"},
 							Subjects: []lokiv1.Subject{
 								{
-									Kind: "Group",
+									Kind: "group",
 									Name: "tenant-2",
 								},
 							},
@@ -654,7 +666,7 @@ func Test_Logging_Managed_Storage(t *testing.T) {
 							Roles: []string{"cluster-reader"},
 							Subjects: []lokiv1.Subject{
 								{
-									Kind: "Group",
+									Kind: "group",
 									Name: "mcoa-logs-admin",
 								},
 							},
@@ -668,7 +680,7 @@ func Test_Logging_Managed_Storage(t *testing.T) {
 	// Setup the fake k8s client
 	fakeKubeClient = fake.NewClientBuilder().
 		WithScheme(scheme.Scheme).
-		WithObjects(addOnDeploymentConfig, mtls, objstorage).
+		WithObjects(addOnDeploymentConfig, mtls, objstorage, tenant1, tenant2).
 		Build()
 
 	// Setup the fake addon client

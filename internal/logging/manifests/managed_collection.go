@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 
 	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
+	corev1 "k8s.io/api/core/v1"
 )
 
 const managedCollectionServiceAccount = "mcoa-logging-managed-collector"
@@ -21,18 +22,21 @@ func buildManagedCLFSpec(opts Options) (loggingv1.ClusterLogForwarderSpec, error
 					URL: opts.Managed.LokiURL,
 				},
 				TLS: &loggingv1.OutputTLSSpec{
+					// TODO(JoaoBraveCoding): currently this is required due to LokiStack not
+					// being configued with mTLS
+					InsecureSkipVerify: true,
 					TLSSpec: loggingv1.TLSSpec{
 						CA: &loggingv1.ValueReference{
 							Key:        "ca.crt",
-							SecretName: "mcoa-managed-collector-tls",
+							SecretName: ManagedCollectionSecretName,
 						},
 						Certificate: &loggingv1.ValueReference{
-							Key:        "tls.crt",
-							SecretName: "mcoa-managed-collector-tls",
+							Key:        corev1.TLSCertKey,
+							SecretName: ManagedCollectionSecretName,
 						},
 						Key: &loggingv1.SecretReference{
-							Key:        "tls.key",
-							SecretName: "mcoa-managed-collector-tls",
+							Key:        corev1.TLSPrivateKeyKey,
+							SecretName: ManagedCollectionSecretName,
 						},
 					},
 				},

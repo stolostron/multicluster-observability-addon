@@ -12,7 +12,6 @@ import (
 	"github.com/rhobs/multicluster-observability-addon/internal/logging/manifests"
 	addonmanifests "github.com/rhobs/multicluster-observability-addon/internal/manifests"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/klog/v2"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -22,15 +21,6 @@ import (
 const (
 	fieldAuthentication = "authentication"
 	fieldSASL           = "sasl"
-
-	managedCollectionCertCommonName = "mcoa-logging-collection-storage"
-	managedCollectionSecretName     = "mcoa-logging-managed-collection-tls"
-
-	managedStorageCertCommonName       = "mcoa-logging-managed-storage"
-	managedStorageMTLSSecretName       = "mcoa-logging-managed-storage-tls"
-	managedStorageObjStorageSecretName = "mcoa-logging-managed-storage-objstorage"
-
-	openshiftLoggingNamespace = "openshift-logging"
 )
 
 var (
@@ -77,14 +67,14 @@ func createResourcesManaged(ctx context.Context, k8s client.Client, mcAddon *add
 	objects := []client.Object{}
 	if !opts.IsHubCluster {
 		certConfig := addonmanifests.CertificateConfig{
-			CommonName: managedCollectionCertCommonName,
+			CommonName: manifests.ManagedCollectionCertCommonName,
 			Subject: &certmanagerv1.X509Subject{
 				// Gateway uses Organizational unit to identify the tenant
-				Organizations: []string{mcAddon.Namespace},
+				OrganizationalUnits: []string{mcAddon.Namespace},
 			},
-			DNSNames: []string{managedCollectionCertCommonName},
+			DNSNames: []string{manifests.ManagedCollectionCertCommonName},
 		}
-		key := client.ObjectKey{Name: managedCollectionSecretName, Namespace: mcAddon.Namespace}
+		key := client.ObjectKey{Name: manifests.ManagedCollectionSecretName, Namespace: mcAddon.Namespace}
 		cert, err := addonmanifests.BuildClientCertificate(key, certConfig)
 		if err != nil {
 			return err
@@ -94,11 +84,11 @@ func createResourcesManaged(ctx context.Context, k8s client.Client, mcAddon *add
 
 	if opts.IsHubCluster {
 		certConfig := addonmanifests.CertificateConfig{
-			CommonName: managedStorageCertCommonName,
+			CommonName: manifests.ManagedStorageCertCommonName,
 			Subject:    &certmanagerv1.X509Subject{},
-			DNSNames:   []string{managedStorageCertCommonName},
+			DNSNames:   []string{manifests.ManagedStorageCertCommonName},
 		}
-		key := client.ObjectKey{Name: managedStorageMTLSSecretName, Namespace: mcAddon.Namespace}
+		key := client.ObjectKey{Name: manifests.ManagedStorageMTLSSecretName, Namespace: mcAddon.Namespace}
 		cert, err := addonmanifests.BuildServerCertificate(key, certConfig)
 		if err != nil {
 			return err
@@ -133,7 +123,7 @@ func managedBuildOptions(ctx context.Context, k8s client.Client, mcAddon *addona
 
 	if !opts.IsHubCluster {
 		secret := &corev1.Secret{}
-		key := client.ObjectKey{Name: managedCollectionSecretName, Namespace: mcAddon.Namespace}
+		key := client.ObjectKey{Name: manifests.ManagedCollectionSecretName, Namespace: mcAddon.Namespace}
 		err := k8s.Get(ctx, key, secret, &client.GetOptions{})
 		if err != nil {
 			// Even for not found we probably just want to return and wait for the next
@@ -143,7 +133,8 @@ func managedBuildOptions(ctx context.Context, k8s client.Client, mcAddon *addona
 		opts.Managed.Collection.Secrets = []corev1.Secret{*secret}
 
 		// Get the cluster hostname
-		opts.Managed.LokiURL = fmt.Sprintf("https://lokistack-hub-openshift-logging.%s/api/logs/v1/%s", opts.HubHostname, mcAddon.Namespace)
+
+		opts.Managed.LokiURL = fmt.Sprintf("https://mcoa-managed-instance-openshift-logging.apps.%s/api/logs/v1/%s/otlp/v1/logs", opts.HubHostname, mcAddon.Namespace)
 
 		return nil
 	}
@@ -151,7 +142,7 @@ func managedBuildOptions(ctx context.Context, k8s client.Client, mcAddon *addona
 	if opts.IsHubCluster {
 		// Get objstorage secret
 		objStorageSecret := &corev1.Secret{}
-		key := client.ObjectKey{Name: managedStorageObjStorageSecretName, Namespace: openshiftLoggingNamespace}
+		key := client.ObjectKey{Name: manifests.ManagedStorageObjStorageSecretName, Namespace: mcAddon.Namespace}
 		err := k8s.Get(ctx, key, objStorageSecret, &client.GetOptions{})
 		if err != nil {
 			// Even for not found we probably just want to return and wait for the next
@@ -162,7 +153,7 @@ func managedBuildOptions(ctx context.Context, k8s client.Client, mcAddon *addona
 
 		// Get mTLS secret
 		secret := &corev1.Secret{}
-		key = client.ObjectKey{Name: managedStorageMTLSSecretName, Namespace: openshiftLoggingNamespace}
+		key = client.ObjectKey{Name: manifests.ManagedStorageMTLSSecretName, Namespace: mcAddon.Namespace}
 		err = k8s.Get(ctx, key, secret, &client.GetOptions{})
 		if err != nil {
 			// Even for not found we probably just want to return and wait for the next
@@ -171,19 +162,19 @@ func managedBuildOptions(ctx context.Context, k8s client.Client, mcAddon *addona
 		}
 		opts.Managed.Storage.MTLSSecret = *secret
 
-		// List all the tenants
+		// TODO (JoaoBraveCoding) This might be rather heavy in big clusters,
+		// this might be a good place to lower memory consumption.
 		mcaoList := &addonapiv1alpha1.ManagedClusterAddOnList{}
-		labelSelector := labels.SelectorFromSet(labels.Set{
-			addon.LabelOCMAddonName: addon.Name,
-		})
-		if err := k8s.List(ctx, mcaoList, &client.ListOptions{LabelSelector: labelSelector}); err != nil {
+		if err := k8s.List(ctx, mcaoList, &client.ListOptions{}); err != nil {
 			return err
 		}
 
 		tenants := make([]string, 0, len(mcaoList.Items))
 		for _, tenant := range mcaoList.Items {
-			if tenant.Name != mcAddon.Name {
-				tenants = append(tenants, tenant.Name)
+			// TODO (JoaoBraveCoding) This is not the best way to match tenants due
+			// to the addon-framework supporting tenantcy, but it will do for now
+			if tenant.Name == addon.Name && tenant.Namespace != mcAddon.Namespace {
+				tenants = append(tenants, tenant.Namespace)
 			}
 		}
 		opts.Managed.Storage.Tenants = tenants

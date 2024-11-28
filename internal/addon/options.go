@@ -5,6 +5,8 @@ import (
 )
 
 const (
+	KeyHubHostname = "hubHostname"
+
 	// Operator Subscription Channels
 	KeyOpenShiftLoggingChannel = "openshiftLoggingChannel"
 
@@ -61,6 +63,7 @@ type UserWorkloadOptions struct {
 }
 
 type Options struct {
+	HubHostname   string
 	Platform      PlatformOptions
 	UserWorkloads UserWorkloadOptions
 }
@@ -77,6 +80,8 @@ func BuildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Opti
 
 	for _, keyvalue := range addOnDeployment.Spec.CustomizedVariables {
 		switch keyvalue.Name {
+		case KeyHubHostname:
+			opts.HubHostname = keyvalue.Value
 		// Operator Subscriptions
 		case KeyOpenShiftLoggingChannel:
 			opts.Platform.Logs.SubscriptionChannel = keyvalue.Value

@@ -4,6 +4,8 @@ kind: ClusterLogForwarder
 metadata:
   name: mcoa-managed-instance
   namespace: openshift-logging
+  annotations:
+    observability.openshift.io/tech-preview-otlp-output: enabled
   labels:
     app: {{ template "loggingCollection.name" . }}
     chart: {{ template "loggingCollection.chart" . }}

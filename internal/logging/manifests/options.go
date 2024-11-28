@@ -40,7 +40,7 @@ type Storage struct {
 
 // UnmanagedCollectionEnabled returns true if the unmanaged collection is enabled.
 // Note we have disabled unmanaged collection for hub cluster on purpose due to
-// have never been designed in the first version of MCOA. This can change but it 
+// have never been designed in the first version of MCOA. This can change but it
 // should be done in its own PR.
 func (opts Options) UnmanagedCollectionEnabled() bool {
 	return (opts.Platform.CollectionEnabled || opts.UserWorkloads.CollectionEnabled) && !opts.IsHubCluster
