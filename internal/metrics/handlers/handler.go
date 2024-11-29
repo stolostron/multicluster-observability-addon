@@ -29,6 +29,7 @@ var (
 	ErrUnsupportedAppName          = errors.New("unsupported app name")
 	ErrMissingImageOverride        = errors.New("missing image override")
 	ErrMissingDesiredConfig        = errors.New("missing desiredConfig in managedClusterAddon.Status.ConfigReferences")
+	ErrMissingProxyConfig          = errors.New("missing envoy proxy config in the prometheus agent configmaps")
 )
 
 type OptionsBuilder struct {
@@ -127,13 +128,16 @@ func (o *OptionsBuilder) buildPrometheusAgent(ctx context.Context, opts *Options
 	}
 
 	// Fetch the envoy config
-	envoyProxyConfigMap := getResourceByLabelSelector[*corev1.ConfigMap](configResources, labelsMatcher)
-	if len(envoyProxyConfigMap) != 1 {
-		return fmt.Errorf("%w: for application %s, found %d configmaps with labels %+v", ErrInvalidConfigResourcesCount, appName, len(envoyProxyConfigMap), labelsMatcher)
+	if len(platformAgents[0].Spec.ConfigMaps) == 0 {
+		return fmt.Errorf("%w: %s", ErrMissingProxyConfig, appName)
 	}
-	envoyProxyConfigMapName := fmt.Sprintf("%s-envoy-config", appName)
-	envoyProxyConfigMap[0].Name = envoyProxyConfigMapName
-	envoyProxyConfigMap[0].Labels = labelsMatcher // For convenience and easier retrieval, especially in tests
+	envoyProxyConfigMap := &corev1.ConfigMap{}
+	err := o.Client.Get(ctx, types.NamespacedName{Name: platformAgents[0].Spec.ConfigMaps[0], Namespace: platformAgents[0].Namespace}, envoyProxyConfigMap)
+	if err != nil {
+		return fmt.Errorf("failed to get envoy configmap: %w", err)
+	}
+
+	envoyProxyConfigMap.Labels = labelsMatcher // For convenience and easier retrieval, especially in tests
 
 	// Build the agent
 	promBuilder := PrometheusAgentBuilder{
@@ -141,7 +145,7 @@ func (o *OptionsBuilder) buildPrometheusAgent(ctx context.Context, opts *Options
 		Name:                appName,
 		ClusterName:         opts.ClusterName,
 		ClusterID:           opts.ClusterID,
-		EnvoyConfigMapName:  envoyProxyConfigMapName,
+		EnvoyConfigMapName:  platformAgents[0].Spec.ConfigMaps[0],
 		EnvoyProxyImage:     opts.Images.Envoy,
 		MatchLabels:         map[string]string{"app": appName},
 		RemoteWriteEndpoint: o.RemoteWriteURL,
@@ -155,12 +159,12 @@ func (o *OptionsBuilder) buildPrometheusAgent(ctx context.Context, opts *Options
 		promBuilder.MatchLabels = config.PlatformPrometheusMatchLabels
 		agent = promBuilder.Build()
 		opts.Platform.PrometheusAgent = agent
-		opts.Platform.ConfigMaps = append(opts.Platform.ConfigMaps, envoyProxyConfigMap[0])
+		opts.Platform.ConfigMaps = append(opts.Platform.ConfigMaps, envoyProxyConfigMap)
 	case config.UserWorkloadMetricsCollectorApp:
 		promBuilder.MatchLabels = config.UserWorkloadPrometheusMatchLabels
 		agent = promBuilder.Build()
 		opts.UserWorkloads.PrometheusAgent = agent
-		opts.UserWorkloads.ConfigMaps = append(opts.UserWorkloads.ConfigMaps, envoyProxyConfigMap[0])
+		opts.UserWorkloads.ConfigMaps = append(opts.UserWorkloads.ConfigMaps, envoyProxyConfigMap)
 	default:
 		return fmt.Errorf("%w: %s", ErrUnsupportedAppName, appName)
 	}

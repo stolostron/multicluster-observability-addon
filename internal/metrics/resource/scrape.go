@@ -63,8 +63,8 @@ func PlatformScrapeConfig(ns string) *prometheusalpha1.ScrapeConfig {
 				},
 				// strip unneeded labels
 				{
-					SourceLabels: []prometheusv1.LabelName{"prometheus_replica", "managed_cluster"},
-					Action:       "labeldrop",
+					Action: "labeldrop",
+					Regex:  "prometheus_replica|managed_cluster",
 				},
 			},
 			StaticConfigs: []prometheusalpha1.StaticConfig{
