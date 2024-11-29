@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: multicluster-observability-addon-manager
+  namespace: open-cluster-management-observability
   labels:
     app: multicluster-observability-addon-manager
 spec:

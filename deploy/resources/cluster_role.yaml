@@ -64,3 +64,11 @@
     - apiGroups: ["opentelemetry.io"]
       resources: ["opentelemetrycollectors", "instrumentations"]
       verbs: ["get", "list", "watch"]
+    # Roles for addon to manage certificates managed logging
+    - apiGroups: ["cert-manager.io"]
+      resources: ["certificates"]
+      verbs: ["get", "list", "watch", "create", "update", "delete", "patch"]
+    # Roles for addon to manage certificates managed logging
+    - apiGroups: ["cert-manager.io"]
+      resources: ["certificates/status"]
+      verbs: ["get", "update"]

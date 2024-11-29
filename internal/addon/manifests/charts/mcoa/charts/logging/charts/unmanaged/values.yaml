@@ -1,6 +1,6 @@
 collection:
   # Expects json format
-  clfSpec: {}
+  clfSpec: []
 
   # List of secrets referenced by clfSpec
   secrets:
