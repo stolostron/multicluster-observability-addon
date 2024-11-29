@@ -45,7 +45,8 @@ func TestBuildOptions(t *testing.T) {
 		},
 		Spec: prometheusalpha1.PrometheusAgentSpec{
 			CommonPrometheusFields: prometheusv1.CommonPrometheusFields{
-				LogLevel: "debug",
+				LogLevel:   "debug",
+				ConfigMaps: []string{"test-haproxy-config"},
 			},
 		},
 	}
@@ -83,7 +84,8 @@ func TestBuildOptions(t *testing.T) {
 		},
 		Spec: prometheusalpha1.PrometheusAgentSpec{
 			CommonPrometheusFields: prometheusv1.CommonPrometheusFields{
-				LogLevel: "warn",
+				LogLevel:   "warn",
+				ConfigMaps: []string{"test-haproxy-config-uwl"},
 			},
 		},
 	}

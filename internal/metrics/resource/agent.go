@@ -34,8 +34,11 @@ func DefaultPlaftformAgentResources(ns string) []client.Object {
 	ret := []client.Object{}
 
 	// Create platform resources
-	ret = append(ret, newPrometheusAgent(ns, DefaultPlatformMetricsCollectorApp, config.PlatformPrometheusMatchLabels, &metav1.LabelSelector{})) // listen only to the same namespace
-	ret = append(ret, newEnvoyConfigMap(ns, DefaultPlatformEnvoyConfigMap, platformPrometheusService, config.PlatformPrometheusMatchLabels))
+	agent := newPrometheusAgent(ns, DefaultPlatformMetricsCollectorApp, config.PlatformPrometheusMatchLabels, &metav1.LabelSelector{})
+	proxyCfg := newEnvoyConfigMap(ns, DefaultPlatformEnvoyConfigMap, platformPrometheusService, config.PlatformPrometheusMatchLabels)
+	agent.Spec.ConfigMaps = []string{proxyCfg.Name}
+	ret = append(ret, agent) // listen only to the same namespace
+	ret = append(ret, proxyCfg)
 	ret = append(ret, PlatformScrapeConfig(ns))
 	ret = append(ret, PlatformRecordingRules(ns))
 	return ret
@@ -45,8 +48,11 @@ func DefaultUserWorkloadAgentResources(ns string) []client.Object {
 	ret := []client.Object{}
 
 	// Create user workload resources
-	ret = append(ret, newPrometheusAgent(ns, defaultUserWorkloadMetricsCollectorApp, config.UserWorkloadPrometheusMatchLabels, nil)) // listen to all namespaces
-	ret = append(ret, newEnvoyConfigMap(ns, DefaultUserWorkloadEnvoyConfigMap, userWorkloadPrometheusService, config.UserWorkloadPrometheusMatchLabels))
+	agent := newPrometheusAgent(ns, defaultUserWorkloadMetricsCollectorApp, config.UserWorkloadPrometheusMatchLabels, nil)
+	proxyCfg := newEnvoyConfigMap(ns, DefaultUserWorkloadEnvoyConfigMap, userWorkloadPrometheusService, config.UserWorkloadPrometheusMatchLabels)
+	agent.Spec.ConfigMaps = []string{proxyCfg.Name}
+	ret = append(ret, agent) // listen to all namespaces
+	ret = append(ret, proxyCfg)
 
 	return ret
 }
