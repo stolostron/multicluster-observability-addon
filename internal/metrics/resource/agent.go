@@ -103,6 +103,7 @@ func newDefaultPrometheusAgent() *prometheusalpha1.PrometheusAgent {
 					RunAsNonRoot: toPtr(true),
 				},
 				ScrapeTimeout: scrapeTimeout,
+				PortName:      "web", // set this value to the default to avoid triggering update when comparing the spec
 			},
 		},
 	}
