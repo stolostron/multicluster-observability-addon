@@ -3,13 +3,17 @@ package resource
 import (
 	"context"
 	"fmt"
+	"maps"
 	"sync"
 
 	"github.com/go-logr/logr"
+	prometheus "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	prometheusalpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	"github.com/rhobs/multicluster-observability-addon/internal/addon"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/util/retry"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
@@ -40,8 +44,16 @@ func DeployDefaultResourcesOnce(ctx context.Context, c client.Client, logger log
 	resources := DefaultPlaftformAgentResources(ns)
 	resources = append(resources, DefaultUserWorkloadAgentResources(ns)...)
 	for _, resource := range resources {
-		if err := CreateOrUpdateResource(ctx, c, resource, owner, logger); err != nil {
+		if err := controllerutil.SetControllerReference(owner, resource, c.Scheme()); err != nil {
+			return err
+		}
+
+		res, err := ctrl.CreateOrUpdate(ctx, c, resource, mutateFn(resource.DeepCopyObject().(client.Object), resource))
+		if err != nil {
 			return fmt.Errorf("failed to create or update resource %s: %w", resource.GetName(), err)
+		}
+		if res != controllerutil.OperationResultNone {
+			logger.Info("resource created or updated", "kind", resource.DeepCopyObject().GetObjectKind().GroupVersionKind().Kind, "name", resource.GetName(), "action", res)
 		}
 	}
 
@@ -50,47 +62,31 @@ func DeployDefaultResourcesOnce(ctx context.Context, c client.Client, logger log
 	return nil
 }
 
-func CreateOrUpdateResource(ctx context.Context, c client.Client, newResource, owner client.Object, logger logr.Logger) error {
-	if err := controllerutil.SetControllerReference(owner, newResource, c.Scheme()); err != nil {
-		return err
-	}
+func mutateFn(want, existing client.Object) controllerutil.MutateFn {
+	return func() error {
+		existingLabels := existing.GetLabels()
+		maps.Copy(existingLabels, want.GetLabels())
+		existing.SetLabels(existingLabels)
 
-	if err := client.IgnoreAlreadyExists(c.Create(ctx, newResource)); err != nil {
-		return err
-	}
+		existingAnnotations := existing.GetAnnotations()
+		maps.Copy(existingAnnotations, want.GetAnnotations())
+		existing.SetAnnotations(existingAnnotations)
 
-	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		existingResource := newResource.DeepCopyObject().(client.Object)
-		if err := c.Get(ctx, types.NamespacedName{Namespace: newResource.GetNamespace(), Name: newResource.GetName()}, existingResource); err != nil {
-			return err
-		}
+		existing.SetOwnerReferences(want.GetOwnerReferences())
 
-		// Check if this controller is the owner
-		isOwner := false
-		for _, ownerRef := range existingResource.GetOwnerReferences() {
-			if ownerRef.UID == owner.GetUID() {
-				isOwner = true
-				break
-			}
-		}
-
-		if !isOwner {
-			return ErrNotOwner
-		}
-
-		// Overwrite the resource
-		newResource.SetResourceVersion(existingResource.GetResourceVersion())
-
-		if err := c.Update(ctx, newResource); err != nil {
-			return err
+		switch existing.(type) {
+		case *prometheusalpha1.PrometheusAgent:
+			existing.(*prometheusalpha1.PrometheusAgent).Spec = want.(*prometheusalpha1.PrometheusAgent).Spec
+		case *prometheus.PrometheusRule:
+			existing.(*prometheus.PrometheusRule).Spec = want.(*prometheus.PrometheusRule).Spec
+		case *prometheusalpha1.ScrapeConfig:
+			existing.(*prometheusalpha1.ScrapeConfig).Spec = want.(*prometheusalpha1.ScrapeConfig).Spec
+		case *corev1.ConfigMap:
+			existing.(*corev1.ConfigMap).Data = want.(*corev1.ConfigMap).Data
+		default:
+			return fmt.Errorf("unsupported type %T", existing)
 		}
 
 		return nil
-	})
-
-	if retryErr != nil {
-		return retryErr
 	}
-
-	return nil
 }
