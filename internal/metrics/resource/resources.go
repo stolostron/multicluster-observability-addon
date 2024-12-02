@@ -19,9 +19,9 @@ import (
 )
 
 var (
-	mu          sync.Mutex
-	initialized bool
-	ErrNotOwner = fmt.Errorf("controller is not the owner")
+	mu                 sync.Mutex
+	initialized        bool
+	ErrUnsupportedType = fmt.Errorf("unsupported type")
 )
 
 func DeployDefaultResourcesOnce(ctx context.Context, c client.Client, logger logr.Logger, ns string) error {
@@ -84,7 +84,7 @@ func mutateFn(want, existing client.Object) controllerutil.MutateFn {
 		case *corev1.ConfigMap:
 			existing.(*corev1.ConfigMap).Data = want.(*corev1.ConfigMap).Data
 		default:
-			return fmt.Errorf("unsupported type %T", existing)
+			return fmt.Errorf("%w: %T", ErrUnsupportedType, existing)
 		}
 
 		return nil
