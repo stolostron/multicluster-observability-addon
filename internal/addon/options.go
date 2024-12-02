@@ -11,9 +11,9 @@ const (
 	KeyOpenShiftLoggingChannel = "openshiftLoggingChannel"
 
 	// Platform Observability Keys
-	KeyPlatformMetricsCollection  = "platformMetricsCollection"
-	KeyPlatformLogsCollection     = "platformLogsCollection"
-	KeyPlatformSignalsHubEndpoint = "signalsHubEndpoint"
+	KeyPlatformMetricsCollection = "platformMetricsCollection"
+	KeyPlatformLogsCollection    = "platformLogsCollection"
+	KeyMetricsHubHostname        = "metricsHubHostname"
 
 	// User Workloads Observability Keys
 	KeyUserWorkloadMetricsCollection = "userWorkloadMetricsCollection"
@@ -87,7 +87,7 @@ func BuildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Opti
 			opts.Platform.Logs.SubscriptionChannel = keyvalue.Value
 			opts.UserWorkloads.Logs.SubscriptionChannel = keyvalue.Value
 		// Platform Observability Options
-		case KeyPlatformSignalsHubEndpoint:
+		case KeyMetricsHubHostname:
 			if !strings.HasPrefix(keyvalue.Value, "http") {
 				opts.Platform.HubEndpoint = "https://" + keyvalue.Value
 			} else {

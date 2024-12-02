@@ -20,7 +20,7 @@ func PlatformScrapeConfig(ns string) *prometheusalpha1.ScrapeConfig {
 		matchMetrics = append(matchMetrics, fmt.Sprintf("{__name__=\"%s\"}", metric))
 	}
 	matchMetrics = append(matchMetrics, matchList...)
-	for _, metric := range ruleMetrics {
+	for _, metric := range getRulesMetrics() {
 		matchMetrics = append(matchMetrics, fmt.Sprintf("{__name__=\"%s\"}", metric))
 	}
 
