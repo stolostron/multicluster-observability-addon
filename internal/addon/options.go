@@ -101,7 +101,7 @@ func BuildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Opti
 		case KeyPlatformLogsCollection:
 			if keyvalue.Value == string(ClusterLogForwarderV1) {
 				opts.Platform.Enabled = true
-				opts.Platform.Metrics.CollectionEnabled = true
+				opts.Platform.Logs.CollectionEnabled = true
 			}
 		// User Workload Observability Options
 		case KeyUserWorkloadMetricsCollection:
