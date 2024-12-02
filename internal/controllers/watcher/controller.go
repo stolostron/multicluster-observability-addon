@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ViaQ/logerr/v2/log"
 	"github.com/go-logr/logr"
 	"github.com/rhobs/multicluster-observability-addon/internal/addon"
 	corev1 "k8s.io/api/core/v1"
@@ -49,8 +50,8 @@ type WatcherManager struct {
 	logger logr.Logger
 }
 
-func NewWatcherManager(logger logr.Logger, scheme *runtime.Scheme, addonManager *addonmanager.AddonManager) (*WatcherManager, error) {
-	l := logger.WithName("mcoa-watcher")
+func NewWatcherManager(addonManager *addonmanager.AddonManager, scheme *runtime.Scheme) (*WatcherManager, error) {
+	l := log.NewLogger("mcoa-watcher")
 
 	ctrl.SetLogger(l)
 
