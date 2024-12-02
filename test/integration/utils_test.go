@@ -131,7 +131,7 @@ func (a *addonDeploymentConfigBuilder) WithUserWorkloadsMetricsCollection() *add
 
 func (a *addonDeploymentConfigBuilder) WithPlatformHubEndpoint(endpoint string) *addonDeploymentConfigBuilder {
 	a.Spec.CustomizedVariables = append(a.Spec.CustomizedVariables, addonapiv1alpha1.CustomizedVariable{
-		Name:  addon.KeyPlatformSignalsHubEndpoint,
+		Name:  addon.KeyMetricsHubHostname,
 		Value: endpoint,
 	})
 
