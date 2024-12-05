@@ -1,18 +1,18 @@
-{{- if .Values.enabled }}
+{{- if eq (include "logginghelm.installLO" .) "true" }}
 apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
 metadata:
-  name: cluster-logging
-  namespace: openshift-logging
+  name: loki-operator
+  namespace: openshift-operators-redhat
   labels:
-    operators.coreos.com/cluster-logging.openshift-logging: ''
+    operators.coreos.com/loki-operator.openshift-operators-redhat: ''
     app: {{ template "logginghelm.name" . }}
     chart: {{ template "logginghelm.chart" . }}
     release: {{ .Release.Name }}
 spec:
   channel: {{ .Values.loggingSubscriptionChannel }}
   installPlanApproval: Automatic
-  name: cluster-logging
+  name: loki-operator
   source: redhat-operators
   sourceNamespace: openshift-marketplace
 {{- end }}

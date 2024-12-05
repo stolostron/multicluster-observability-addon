@@ -2,5 +2,12 @@ package manifests
 
 const (
 	subscriptionChannelValueKey = "loggingSubscriptionChannel"
-	defaultLoggingVersion       = "stable-6.0"
+	defaultLoggingVersion       = "stable-6.1"
+
+	ManagedCollectionCertCommonName = "mcoa-logging-managed-collection"
+	ManagedCollectionSecretName     = "mcoa-logging-managed-collection-tls"
+
+	ManagedStorageCertCommonName       = "mcoa-logging-managed-storage"
+	ManagedStorageMTLSSecretName       = "mcoa-logging-managed-storage-tls"
+	ManagedStorageObjStorageSecretName = "mcoa-logging-managed-storage-objstorage"
 )
