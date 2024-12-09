@@ -4,6 +4,9 @@ run:
   skip-files:
     - "example_.+_test.go$"
 
+output:
+  format: colored-tab
+
 # golangci.com configuration
 # https://github.com/golangci/golangci/wiki/Configuration
 linters-settings:

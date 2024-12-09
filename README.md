@@ -89,6 +89,51 @@ In 2.12, multicluster-observability-operator has the ability to install MCOA usi
 
 1. The addon will install automatically in spoke clusters once the resources referenced in `ClusterManagementAddOn` are created.
 
+#### Default configurations references
+
+```yaml
+apiVersion: addon.open-cluster-management.io/v1alpha1
+kind: ClusterManagementAddOn
+spec:
+  installStrategy:
+    type: Placements
+    placements:
+      - name: <placement_name> # Use global for selecting all clusters
+        namespace: open-cluster-management-global-set
+        configs:
+          - group: observability.openshift.io
+            resource: clusterlogforwarders
+            name: instance
+            namespace: open-cluster-management-observability
+          - group: opentelemetry.io
+            resource: opentelemetrycollectors
+            name: instance
+            namespace: open-cluster-management-observability
+          - group: opentelemetry.io
+            resource: instrumentations
+            name: instance
+            namespace: open-cluster-management-observability
+          # Default metrics forwarding configuration for the ACM platform metrics collector
+          - group: monitoring.coreos.com
+            resource: prometheusagents
+            name: acm-platform-metrics-collector-default
+            namespace: open-cluster-management-observability
+          - group: monitoring.coreos.com
+            resource: scrapeconfigs
+            name: platform-metrics-default
+            namespace: open-cluster-management-observability
+          - group: monitoring.coreos.com
+            resource: prometheusrules
+            name: platform-rules-default
+            namespace: open-cluster-management-observability
+          # Default metrics forwarding configuration for the ACM user workload metrics collector
+          # There are no default configurations for the scrapeConfigs and prometheusRules
+          - group: monitoring.coreos.com
+            resource: prometheusagents
+            name: acm-user-workload-metrics-collector-default
+            namespace: open-cluster-management-observability
+```
+
 ## References
 
 - Open-Cluster-Management: [https://github.com/open-cluster-management-io/ocm](https://github.com/open-cluster-management-io/ocm)

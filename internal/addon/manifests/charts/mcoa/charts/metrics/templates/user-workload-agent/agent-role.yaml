@@ -1,0 +1,20 @@
+{{- if or .Values.userWorkloadsEnabled }}
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: {{ .Values.userWorkload.appName }}-role
+  labels:
+    app.kubernetes.io/component: user-workload-metrics-collector
+    {{ include "metricshelm.labels" . | nindent 4 }}
+rules:
+  - verbs:
+      - get
+      - list
+      - watch
+    apiGroups:
+      - ''
+    resources:
+      - services
+      - endpoints
+      - pods
+{{- end }}
