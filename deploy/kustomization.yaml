@@ -1,9 +1,7 @@
 images:
 - name: controller
-  newName: quay.io/rhobs/multicluster-observability-addon
+  newName: quay.io/jmarcal/multicluster-observability-addon
   newTag: v0.0.1
-
-namespace: open-cluster-management-observability
 
 resources:
 - resources/cluster_role_binding.yaml
@@ -12,6 +10,7 @@ resources:
 - resources/service_account.yaml
 - resources/cluster-management-addon.yaml
 - resources/addondeploymentconfig.yaml
+- resources/root_certificates.yaml
 - crds/observability.openshift.io_clusterlogforwarders.yaml
 - crds/opentelemetry.io_opentelemetrycollectors.yaml
 - crds/opentelemetry.io_instrumentations.yaml
