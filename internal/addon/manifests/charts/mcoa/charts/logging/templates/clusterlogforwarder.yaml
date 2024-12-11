@@ -4,6 +4,9 @@ kind: ClusterLogForwarder
 metadata:
   name: mcoa-instance
   namespace: openshift-logging
+  {{- if and .Values.clfAnnotations (ne .Values.clfAnnotations "null") }}
+  annotations: {{- fromJson .Values.clfAnnotations | toYaml | nindent 4 }}
+  {{- end }}
   labels:
     app: {{ template "logginghelm.name" . }}
     chart: {{ template "logginghelm.chart" . }}

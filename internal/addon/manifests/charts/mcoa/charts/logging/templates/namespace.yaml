@@ -7,5 +7,6 @@ metadata:
     app: {{ template "logginghelm.name" . }}
     chart: {{ template "logginghelm.chart" . }}
     release: {{ .Release.Name }}
+    openshift.io/cluster-monitoring: "true"
 spec: {}
 {{- end }}
