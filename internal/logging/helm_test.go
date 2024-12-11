@@ -24,12 +24,14 @@ import (
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	addonutils "open-cluster-management.io/addon-framework/pkg/utils"
 )
 
 var (
 	_ = loggingv1.AddToScheme(scheme.Scheme)
 	_ = operatorsv1.AddToScheme(scheme.Scheme)
 	_ = operatorsv1alpha1.AddToScheme(scheme.Scheme)
+	_ = addonapiv1alpha1.AddToScheme(scheme.Scheme)
 )
 
 func fakeGetValues(k8s client.Client) addonfactory.GetValuesFunc {
@@ -37,7 +39,17 @@ func fakeGetValues(k8s client.Client) addonfactory.GetValuesFunc {
 		_ *clusterv1.ManagedCluster,
 		mcAddon *addonapiv1alpha1.ManagedClusterAddOn,
 	) (addonfactory.Values, error) {
-		opts, err := handlers.BuildOptions(context.TODO(), k8s, mcAddon, addon.LogsOptions{}, addon.LogsOptions{})
+		aodc := &addonapiv1alpha1.AddOnDeploymentConfig{}
+		keys := addon.GetObjectKeys(mcAddon.Status.ConfigReferences, addonutils.AddOnDeploymentConfigGVR.Group, addon.AddonDeploymentConfigResource)
+		if err := k8s.Get(context.TODO(), keys[0], aodc, &client.GetOptions{}); err != nil {
+			return nil, err
+		}
+		addonOpts, err := addon.BuildOptions(aodc)
+		if err != nil {
+			return nil, err
+		}
+
+		opts, err := handlers.BuildOptions(context.TODO(), k8s, mcAddon, addonOpts.Platform.Logs, addonOpts.UserWorkloads.Logs)
 		if err != nil {
 			return nil, err
 		}
@@ -232,7 +244,7 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 	// Setup the fake k8s client
 	fakeKubeClient = fake.NewClientBuilder().
 		WithScheme(scheme.Scheme).
-		WithObjects(clf, staticCred, caConfigMap).
+		WithObjects(addOnDeploymentConfig, clf, staticCred, caConfigMap).
 		Build()
 
 	// Setup the fake addon client
@@ -260,7 +272,7 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 	for _, obj := range objects {
 		switch obj := obj.(type) {
 		case *operatorsv1alpha1.Subscription:
-			require.Equal(t, obj.Spec.Channel, "latest-version")
+			require.Equal(t, "latest-version", obj.Spec.Channel)
 		case *loggingv1.ClusterLogForwarder:
 			require.Equal(t, "true", obj.GetAnnotations()["observability.openshift.io/tech-preview-otlp-output"])
 			require.NotNil(t, obj.Spec.Outputs[0].Loki.Authentication.Token.Secret)
