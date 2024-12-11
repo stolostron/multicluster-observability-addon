@@ -1,6 +1,6 @@
 package manifests
 
 const (
-	subscriptionChannelValueKey = "loggingSubscriptionChannel"
-	defaultLoggingVersion       = "stable-6.0"
+	subscriptionChannelValueKey = "openshiftLoggingChannel"
+	defaultLoggingVersion       = "stable-6.1"
 )

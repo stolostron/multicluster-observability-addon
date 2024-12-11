@@ -7,7 +7,7 @@ spec:
   customizedVariables:
   # Operator Subscription Channels
   - name: openshiftLoggingChannel
-    value: stable-6.0
+    value: stable-6.1
   # Platform Observability
   - name: platformLogsCollection
     value: clusterlogforwarders.v1.observability.openshift.io

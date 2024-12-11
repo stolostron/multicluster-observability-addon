@@ -108,6 +108,9 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "mcoa-instance",
 			Namespace: "open-cluster-management-observability",
+			Annotations: map[string]string{
+				"observability.openshift.io/tech-preview-otlp-output": "true",
+			},
 		},
 		Spec: loggingv1.ClusterLogForwarderSpec{
 			Inputs: []loggingv1.InputSpec{
@@ -219,8 +222,8 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 		Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
 			CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
 				{
-					Name:  "loggingSubscriptionChannel",
-					Value: "stable-6.0",
+					Name:  "openshiftLoggingChannel",
+					Value: "latest-version",
 				},
 			},
 		},
@@ -257,8 +260,9 @@ func Test_Logging_AllConfigsTogether_AllResources(t *testing.T) {
 	for _, obj := range objects {
 		switch obj := obj.(type) {
 		case *operatorsv1alpha1.Subscription:
-			require.Equal(t, obj.Spec.Channel, "stable-6.0")
+			require.Equal(t, obj.Spec.Channel, "latest-version")
 		case *loggingv1.ClusterLogForwarder:
+			require.Equal(t, "true", obj.GetAnnotations()["observability.openshift.io/tech-preview-otlp-output"])
 			require.NotNil(t, obj.Spec.Outputs[0].Loki.Authentication.Token.Secret)
 			require.NotNil(t, obj.Spec.Outputs[1].Cloudwatch.Authentication.AWSAccessKey)
 			require.Equal(t, "static-authentication", obj.Spec.Outputs[0].Loki.Authentication.Token.Secret.Name)
