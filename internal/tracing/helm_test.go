@@ -4,8 +4,6 @@ import (
 	"context"
 	"testing"
 
-	corev1 "k8s.io/api/core/v1"
-
 	otelv1alpha1 "github.com/open-telemetry/opentelemetry-operator/apis/v1alpha1"
 	otelv1beta1 "github.com/open-telemetry/opentelemetry-operator/apis/v1beta1"
 	operatorsv1 "github.com/operator-framework/api/pkg/operators/v1"
@@ -14,6 +12,7 @@ import (
 	"github.com/rhobs/multicluster-observability-addon/internal/tracing/handlers"
 	"github.com/rhobs/multicluster-observability-addon/internal/tracing/manifests"
 	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"

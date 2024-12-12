@@ -1,0 +1,15 @@
+{{- range $_, $configmap := .Values.userWorkload.configMaps }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $configmap.name }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- $incomingLabels := $configmap.labels }}
+    {{- $metricsHelmLabels := fromYaml (include "metricshelm.labels" $) }}
+    {{- $customLabel := dict "app.kubernetes.io/component" "user-workload-metrics-collector" }}
+    {{- $mergedLabels := merge $incomingLabels $metricsHelmLabels $customLabel }}
+    {{- toYaml $mergedLabels | nindent 4 }}
+data: {{ fromJson $configmap.data | toYaml | nindent 2 }}
+---
+{{- end }}
