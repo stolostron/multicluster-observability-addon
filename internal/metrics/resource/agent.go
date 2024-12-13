@@ -10,6 +10,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	_ "embed"
@@ -100,7 +101,7 @@ func newDefaultPrometheusAgent() *prometheusalpha1.PrometheusAgent {
 				},
 				ScrapeInterval: "300s",
 				SecurityContext: &corev1.PodSecurityContext{
-					RunAsNonRoot: toPtr(true),
+					RunAsNonRoot: ptr.To(true),
 				},
 				ScrapeTimeout: scrapeTimeout,
 				PortName:      "web", // set this value to the default to avoid triggering update when comparing the spec

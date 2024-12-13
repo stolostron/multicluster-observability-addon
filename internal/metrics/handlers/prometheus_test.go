@@ -12,6 +12,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 )
 
 func TestPrometheusAgentBuilder_EnforcedFields(t *testing.T) {
@@ -33,13 +34,13 @@ func TestPrometheusAgentBuilder_EnforcedFields(t *testing.T) {
 				ProbeSelector:                   labelSelector,
 				ProbeNamespaceSelector:          labelSelector,
 				Version:                         "invalid",
-				Image:                           toPtr("invalid"),
-				Replicas:                        toPtr(int32(10)),
-				Shards:                          toPtr(int32(10)),
+				Image:                           ptr.To("invalid"),
+				Replicas:                        ptr.To(int32(10)),
+				Shards:                          ptr.To(int32(10)),
 				EnableFeatures:                  []prometheusv1.EnableFeature{"tt"},
 				ExternalURL:                     "http://example.com",
 				ServiceAccountName:              "invalid",
-				AutomountServiceAccountToken:    toPtr(false),
+				AutomountServiceAccountToken:    ptr.To(false),
 				ConfigMaps:                      []string{"invalid"},
 			},
 		},
@@ -153,8 +154,4 @@ func TestPrometheusAgentBuilder_ConfigurableFields(t *testing.T) {
 func isZeroValue(v reflect.Value) bool {
 	zeroValue := reflect.Zero(v.Type()).Interface()
 	return reflect.DeepEqual(v.Interface(), zeroValue)
-}
-
-func toPtr[T any](v T) *T {
-	return &v
 }
