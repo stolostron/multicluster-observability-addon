@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"maps"
-	"sync"
 
 	"github.com/go-logr/logr"
 	prometheus "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
@@ -19,15 +18,11 @@ import (
 )
 
 var (
-	mu                 sync.Mutex
 	initialized        bool
 	ErrUnsupportedType = fmt.Errorf("unsupported type")
 )
 
 func DeployDefaultResourcesOnce(ctx context.Context, c client.Client, logger logr.Logger, ns string) error {
-	mu.Lock()
-	defer mu.Unlock()
-
 	if initialized {
 		return nil
 	}
