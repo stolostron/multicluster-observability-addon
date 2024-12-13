@@ -9,14 +9,14 @@ import (
 	lmanifests "github.com/rhobs/multicluster-observability-addon/internal/logging/manifests"
 	thandlers "github.com/rhobs/multicluster-observability-addon/internal/tracing/handlers"
 	tmanifests "github.com/rhobs/multicluster-observability-addon/internal/tracing/manifests"
+	clusterinfov1beta1 "github.com/stolostron/cluster-lifecycle-api/clusterinfo/v1beta1"
+	clusterlifecycleconstants "github.com/stolostron/cluster-lifecycle-api/constants"
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 	addonutils "open-cluster-management.io/addon-framework/pkg/utils"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
-
-const annotationLocalCluster = "local-cluster"
 
 var (
 	errMissingAODCRef  = errors.New("missing AddOnDeploymentConfig reference on addon installation")
@@ -34,8 +34,9 @@ func GetValuesFunc(ctx context.Context, k8s client.Client) addonfactory.GetValue
 		cluster *clusterv1.ManagedCluster,
 		mcAddon *addonapiv1alpha1.ManagedClusterAddOn,
 	) (addonfactory.Values, error) {
-		// if hub cluster, then don't install anything
-		if isHubCluster(cluster) {
+		// if hub cluster, then don't install anything.
+		// some kube flavors are also currently not supported
+		if isHubCluster(cluster) || !supportedKubeVendors(cluster) {
 			return addonfactory.JsonStructToValues(HelmChartValues{})
 		}
 
@@ -103,9 +104,17 @@ func getAddOnDeploymentConfig(ctx context.Context, k8s client.Client, mcAddon *a
 }
 
 func isHubCluster(cluster *clusterv1.ManagedCluster) bool {
-	val, ok := cluster.Labels[annotationLocalCluster]
+	val, ok := cluster.Labels[clusterlifecycleconstants.SelfManagedClusterLabelKey]
 	if !ok {
 		return false
 	}
 	return val == "true"
+}
+
+func supportedKubeVendors(cluster *clusterv1.ManagedCluster) bool {
+	val, ok := cluster.Labels[clusterinfov1beta1.LabelKubeVendor]
+	if !ok {
+		return false
+	}
+	return val == string(clusterinfov1beta1.KubeVendorOpenShift)
 }
