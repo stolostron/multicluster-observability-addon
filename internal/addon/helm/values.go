@@ -66,7 +66,7 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, logger logr.Logger) a
 		}
 
 		if opts.Platform.Metrics.CollectionEnabled || opts.UserWorkloads.Metrics.CollectionEnabled {
-			if opts.Platform.HubEndpoint == "" {
+			if opts.Platform.Metrics.HubEndpoint == "" {
 				return nil, errMissingHubEndpoint
 			}
 
@@ -74,7 +74,7 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, logger logr.Logger) a
 				return nil, err
 			}
 
-			remoteWriteURL, err := url.JoinPath(opts.Platform.HubEndpoint, "/api/metrics/v1/default/api/v1/receive")
+			remoteWriteURL, err := url.JoinPath(opts.Platform.Metrics.HubEndpoint, "/api/metrics/v1/default/api/v1/receive")
 			if err != nil {
 				return nil, err
 			}
