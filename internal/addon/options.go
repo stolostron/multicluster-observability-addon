@@ -38,6 +38,7 @@ const (
 
 type MetricsOptions struct {
 	CollectionEnabled bool
+	HubEndpoint       string
 }
 
 type LogsOptions struct {
@@ -52,10 +53,9 @@ type TracesOptions struct {
 }
 
 type PlatformOptions struct {
-	Enabled     bool
-	Metrics     MetricsOptions
-	Logs        LogsOptions
-	HubEndpoint string
+	Enabled bool
+	Metrics MetricsOptions
+	Logs    LogsOptions
 }
 
 type UserWorkloadOptions struct {
@@ -89,9 +89,9 @@ func BuildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Opti
 		// Platform Observability Options
 		case KeyMetricsHubHostname:
 			if !strings.HasPrefix(keyvalue.Value, "http") {
-				opts.Platform.HubEndpoint = "https://" + keyvalue.Value
+				opts.Platform.Metrics.HubEndpoint = "https://" + keyvalue.Value
 			} else {
-				opts.Platform.HubEndpoint = keyvalue.Value
+				opts.Platform.Metrics.HubEndpoint = keyvalue.Value
 			}
 		case KeyPlatformMetricsCollection:
 			if keyvalue.Value == string(PrometheusAgentMetricsCollectorV1alpha1) {
