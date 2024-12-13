@@ -13,10 +13,7 @@ import (
 // MutateFuncFor returns a mutate function based on the existing resource's concrete type.
 // It currently supports the following types and will return an error for other types:
 //
-//   - Secret
-//   - Issuer
 //   - Certificate
-//   - ClusterIssuer
 func MutateFuncFor(existing, desired client.Object, depAnnotations map[string]string) controllerutil.MutateFn {
 	return func() error {
 		existingAnnotations := existing.GetAnnotations()

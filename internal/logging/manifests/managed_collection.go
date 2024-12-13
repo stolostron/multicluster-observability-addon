@@ -19,7 +19,7 @@ func buildManagedCLFSpec(opts Options) (loggingv1.ClusterLogForwarderSpec, error
 				Name: "hub-lokistack",
 				Type: loggingv1.OutputTypeOTLP,
 				OTLP: &loggingv1.OTLP{
-					URL: opts.Managed.LokiURL,
+					URL: opts.ManagedStack.LokiURL,
 				},
 				TLS: &loggingv1.OutputTLSSpec{
 					// TODO(JoaoBraveCoding): currently this is required due to LokiStack not
@@ -54,7 +54,7 @@ func buildManagedCLFSpec(opts Options) (loggingv1.ClusterLogForwarderSpec, error
 
 func buildManagedCollectionSecrets(resources Options) ([]ResourceValue, error) {
 	secretsValue := []ResourceValue{}
-	for _, secret := range resources.Managed.Collection.Secrets {
+	for _, secret := range resources.ManagedStack.Collection.Secrets {
 		dataJSON, err := json.Marshal(secret.Data)
 		if err != nil {
 			return secretsValue, err
@@ -70,7 +70,7 @@ func buildManagedCollectionSecrets(resources Options) ([]ResourceValue, error) {
 
 func buildManagedCollectionConfigMaps(resources Options) ([]ResourceValue, error) {
 	configmapsValue := []ResourceValue{}
-	for _, configmap := range resources.Managed.Collection.ConfigMaps {
+	for _, configmap := range resources.ManagedStack.Collection.ConfigMaps {
 		dataJSON, err := json.Marshal(configmap.Data)
 		if err != nil {
 			return configmapsValue, err

@@ -52,7 +52,7 @@ func GetValuesFunc(ctx context.Context, k8s client.Client) addonfactory.GetValue
 			Enabled: true,
 		}
 
-		if opts.Platform.Logs.CollectionEnabled || opts.UserWorkloads.Logs.CollectionEnabled || opts.Platform.Logs.StorageEnabled {
+		if opts.Platform.Logs.CollectionEnabled || opts.UserWorkloads.Logs.CollectionEnabled || opts.Platform.Logs.ManagedStack {
 			loggingOpts, err := lhandlers.BuildOptions(ctx, k8s, mcAddon, opts.Platform.Logs, opts.UserWorkloads.Logs, isHubCluster, opts.HubHostname)
 			if err != nil {
 				return nil, err

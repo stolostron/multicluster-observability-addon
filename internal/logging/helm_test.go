@@ -360,8 +360,8 @@ func Test_Logging_Managed_Collection(t *testing.T) {
 					Value: "myhub.foo.com",
 				},
 				{
-					Name:  "platformLogsStorage",
-					Value: "lokistacks.v1.loki.grafana.io",
+					Name:  "platformLogsDefault",
+					Value: "true",
 				},
 			},
 		},
@@ -532,8 +532,8 @@ func Test_Logging_Managed_Storage(t *testing.T) {
 					Value: "stable-6.0",
 				},
 				{
-					Name:  "platformLogsStorage",
-					Value: "lokistacks.v1.loki.grafana.io",
+					Name:  "platformLogsDefault",
+					Value: "true",
 				},
 			},
 		},

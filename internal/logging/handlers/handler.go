@@ -130,11 +130,11 @@ func managedBuildOptions(ctx context.Context, k8s client.Client, mcAddon *addona
 			// reconciliation loop to try again.
 			return err
 		}
-		opts.Managed.Collection.Secrets = []corev1.Secret{*secret}
+		opts.ManagedStack.Collection.Secrets = []corev1.Secret{*secret}
 
 		// Get the cluster hostname
 
-		opts.Managed.LokiURL = fmt.Sprintf("https://mcoa-managed-instance-openshift-logging.apps.%s/api/logs/v1/%s/otlp/v1/logs", opts.HubHostname, mcAddon.Namespace)
+		opts.ManagedStack.LokiURL = fmt.Sprintf("https://mcoa-managed-instance-openshift-logging.apps.%s/api/logs/v1/%s/otlp/v1/logs", opts.HubHostname, mcAddon.Namespace)
 
 		return nil
 	}
@@ -149,7 +149,7 @@ func managedBuildOptions(ctx context.Context, k8s client.Client, mcAddon *addona
 			// reconciliation loop to try again.
 			return err
 		}
-		opts.Managed.Storage.ObjStorageSecret = *objStorageSecret
+		opts.ManagedStack.Storage.ObjStorageSecret = *objStorageSecret
 
 		// Get mTLS secret
 		secret := &corev1.Secret{}
@@ -160,7 +160,7 @@ func managedBuildOptions(ctx context.Context, k8s client.Client, mcAddon *addona
 			// reconciliation loop to try again.
 			return err
 		}
-		opts.Managed.Storage.MTLSSecret = *secret
+		opts.ManagedStack.Storage.MTLSSecret = *secret
 
 		// TODO (JoaoBraveCoding) This might be rather heavy in big clusters,
 		// this might be a good place to lower memory consumption.
@@ -177,7 +177,7 @@ func managedBuildOptions(ctx context.Context, k8s client.Client, mcAddon *addona
 				tenants = append(tenants, tenant.Namespace)
 			}
 		}
-		opts.Managed.Storage.Tenants = tenants
+		opts.ManagedStack.Storage.Tenants = tenants
 
 		return nil
 	}

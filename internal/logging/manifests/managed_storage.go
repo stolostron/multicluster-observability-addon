@@ -12,7 +12,7 @@ const mcoaAdmin = "mcoa-logs-admin"
 func buildManagedLokistackSpec(opts Options) (lokiv1.LokiStackSpec, error) {
 	// Tenants definition
 	tenantsAuthentication := []lokiv1.AuthenticationSpec{}
-	for _, tenant := range opts.Managed.Storage.Tenants {
+	for _, tenant := range opts.ManagedStack.Storage.Tenants {
 		tenantAuth := lokiv1.AuthenticationSpec{
 			TenantName: tenant,
 			TenantID:   tenant,
@@ -33,7 +33,7 @@ func buildManagedLokistackSpec(opts Options) (lokiv1.LokiStackSpec, error) {
 	// Tenants Read & Write RBAC
 	roles := []lokiv1.RoleSpec{}
 	rolesBinding := []lokiv1.RoleBindingsSpec{}
-	for _, tenant := range opts.Managed.Storage.Tenants {
+	for _, tenant := range opts.ManagedStack.Storage.Tenants {
 		role := lokiv1.RoleSpec{
 			Name:        fmt.Sprintf("%s-logs", tenant),
 			Resources:   []string{"logs"},
@@ -57,7 +57,7 @@ func buildManagedLokistackSpec(opts Options) (lokiv1.LokiStackSpec, error) {
 		Name:        "cluster-reader",
 		Resources:   []string{"logs"},
 		Permissions: []lokiv1.PermissionType{"read"},
-		Tenants:     opts.Managed.Storage.Tenants,
+		Tenants:     opts.ManagedStack.Storage.Tenants,
 	}
 	roles = append(roles, adminRole)
 	adminRoleBinding := lokiv1.RoleBindingsSpec{
@@ -162,24 +162,24 @@ func buildManagedLokistackSpec(opts Options) (lokiv1.LokiStackSpec, error) {
 func buildManagedStorageSecrets(resources Options) ([]ResourceValue, error) {
 	secretsValue := []ResourceValue{}
 
-	dataJSON, err := json.Marshal(resources.Managed.Storage.ObjStorageSecret.Data)
+	dataJSON, err := json.Marshal(resources.ManagedStack.Storage.ObjStorageSecret.Data)
 	if err != nil {
 		return secretsValue, err
 	}
 
 	rv := ResourceValue{
-		Name: resources.Managed.Storage.ObjStorageSecret.Name,
+		Name: resources.ManagedStack.Storage.ObjStorageSecret.Name,
 		Data: string(dataJSON),
 	}
 	secretsValue = append(secretsValue, rv)
 
-	dataJSON, err = json.Marshal(resources.Managed.Storage.MTLSSecret.Data)
+	dataJSON, err = json.Marshal(resources.ManagedStack.Storage.MTLSSecret.Data)
 	if err != nil {
 		return secretsValue, err
 	}
 
 	rv = ResourceValue{
-		Name: resources.Managed.Storage.MTLSSecret.Name,
+		Name: resources.ManagedStack.Storage.MTLSSecret.Name,
 		Data: string(dataJSON),
 	}
 	secretsValue = append(secretsValue, rv)

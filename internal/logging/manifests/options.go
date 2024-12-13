@@ -8,7 +8,7 @@ import (
 
 type Options struct {
 	Unmanaged           Unmanaged
-	Managed             Managed
+	ManagedStack        ManagedStack
 	IsHubCluster        bool
 	HubHostname         string
 	Platform            addon.LogsOptions
@@ -20,7 +20,7 @@ type Unmanaged struct {
 	Collection Collection
 }
 
-type Managed struct {
+type ManagedStack struct {
 	LokiURL    string
 	Collection Collection
 	Storage    Storage
@@ -47,5 +47,5 @@ func (opts Options) UnmanagedCollectionEnabled() bool {
 }
 
 func (opts Options) ManagedStackEnabled() bool {
-	return opts.Platform.StorageEnabled
+	return opts.Platform.ManagedStack
 }

@@ -12,7 +12,7 @@ const (
 
 	// Platform Observability Keys
 	KeyPlatformLogsCollection = "platformLogsCollection"
-	KeyPlatformLogsStorage    = "platformLogsStorage"
+	KeyPlatformLogsDefault    = "platformLogsDefault"
 
 	// User Workloads Observability Keys
 	KeyUserWorkloadLogsCollection   = "userWorkloadLogsCollection"
@@ -27,12 +27,6 @@ const (
 	OpenTelemetryCollectorV1beta1 CollectionKind = "opentelemetrycollectors.v1beta1.opentelemetry.io"
 )
 
-type StorageKind string
-
-const (
-	LokiStackV1 StorageKind = "lokistacks.v1.loki.grafana.io"
-)
-
 type InstrumentationKind string
 
 const (
@@ -42,7 +36,7 @@ const (
 type LogsOptions struct {
 	CollectionEnabled   bool
 	SubscriptionChannel string
-	StorageEnabled      bool
+	ManagedStack        bool
 }
 
 type TracesOptions struct {
@@ -92,10 +86,11 @@ func BuildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Opti
 				opts.Platform.Enabled = true
 				opts.Platform.Logs.CollectionEnabled = true
 			}
-		case KeyPlatformLogsStorage:
-			if keyvalue.Value == string(LokiStackV1) {
+		case KeyPlatformLogsDefault:
+			// TODO(JoaoBraveCoding): we need to review what the value should be
+			if keyvalue.Value == "true" {
 				opts.Platform.Enabled = true
-				opts.Platform.Logs.StorageEnabled = true
+				opts.Platform.Logs.ManagedStack = true
 			}
 		// User Workload Observability Options
 		case KeyUserWorkloadLogsCollection:
