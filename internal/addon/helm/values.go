@@ -84,7 +84,7 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, logger logr.Logger) a
 				RemoteWriteURL:  remoteWriteURL,
 				Logger:          logger,
 			}
-			metricsOpts, err := optsBuilder.Build(ctx, mcAddon, opts.Platform.Metrics, opts.UserWorkloads.Metrics)
+			metricsOpts, err := optsBuilder.Build(ctx, mcAddon, cluster, opts.Platform.Metrics, opts.UserWorkloads.Metrics)
 			if err != nil {
 				return nil, err
 			}
