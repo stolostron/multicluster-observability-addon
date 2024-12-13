@@ -7,6 +7,7 @@ import (
 	prometheusalpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	"github.com/rhobs/multicluster-observability-addon/internal/metrics/config"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -35,7 +36,7 @@ func PlatformScrapeConfig(ns string) *prometheusalpha1.ScrapeConfig {
 			Labels:    config.PlatformPrometheusMatchLabels,
 		},
 		Spec: prometheusalpha1.ScrapeConfigSpec{
-			MetricsPath: toPtr("/federate"),
+			MetricsPath: ptr.To("/federate"),
 			Params: map[string][]string{
 				"match[]": matchMetrics,
 			},
@@ -44,21 +45,21 @@ func PlatformScrapeConfig(ns string) *prometheusalpha1.ScrapeConfig {
 					SourceLabels: []prometheusv1.LabelName{"__name__"},
 					Regex:        "mixin_pod_workload",
 					TargetLabel:  "__name__",
-					Replacement:  toPtr("namespace_workload_pod:kube_pod_owner:relabel"),
+					Replacement:  ptr.To("namespace_workload_pod:kube_pod_owner:relabel"),
 					Action:       "replace",
 				},
 				{
 					SourceLabels: []prometheusv1.LabelName{"__name__"},
 					Regex:        "node_namespace_pod_container:container_cpu_usage_seconds_total:sum_irate",
 					TargetLabel:  "__name__",
-					Replacement:  toPtr("node_namespace_pod_container:container_cpu_usage_seconds_total:sum_rate"),
+					Replacement:  ptr.To("node_namespace_pod_container:container_cpu_usage_seconds_total:sum_rate"),
 					Action:       "replace",
 				},
 				{
 					SourceLabels: []prometheusv1.LabelName{"__name__"},
 					Regex:        "etcd_mvcc_db_total_size_in_bytes",
 					TargetLabel:  "__name__",
-					Replacement:  toPtr("etcd_debugging_mvcc_db_total_size_in_bytes"),
+					Replacement:  ptr.To("etcd_debugging_mvcc_db_total_size_in_bytes"),
 					Action:       "replace",
 				},
 				// strip unneeded labels
@@ -76,10 +77,6 @@ func PlatformScrapeConfig(ns string) *prometheusalpha1.ScrapeConfig {
 			},
 		},
 	}
-}
-
-func toPtr[T any](v T) *T {
-	return &v
 }
 
 var metricsList = []string{
