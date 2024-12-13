@@ -384,7 +384,10 @@ func TestBuildOptions(t *testing.T) {
 				ImagesConfigMap: types.NamespacedName{Name: imagesCMName, Namespace: hubNamespace},
 				RemoteWriteURL:  "https://example.com/write",
 			}
-			opts, err := optsBuilder.Build(context.Background(), tc.addon, platform, userWorkloads)
+			foundManagedCluster := &clusterv1.ManagedCluster{}
+			err := fakeClient.Get(context.Background(), types.NamespacedName{Name: spokeName}, foundManagedCluster)
+			require.NoError(t, err)
+			opts, err := optsBuilder.Build(context.Background(), tc.addon, foundManagedCluster, platform, userWorkloads)
 
 			tc.expects(t, opts, err)
 		})

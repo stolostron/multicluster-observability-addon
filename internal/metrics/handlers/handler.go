@@ -39,17 +39,11 @@ type OptionsBuilder struct {
 	Logger          logr.Logger
 }
 
-func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, platform, userWorkloads addon.MetricsOptions) (Options, error) {
+func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, managedCluster *clusterv1.ManagedCluster, platform, userWorkloads addon.MetricsOptions) (Options, error) {
 	ret := Options{}
 
 	if !platform.CollectionEnabled && !userWorkloads.CollectionEnabled {
 		return ret, nil
-	}
-
-	// Fetch the managed cluster and set cluster identifiers
-	managedCluster, err := o.getManagedCluster(ctx, mcAddon.GetNamespace())
-	if err != nil {
-		return ret, err
 	}
 
 	ret.ClusterName = managedCluster.Name
@@ -59,6 +53,7 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 	}
 
 	// Fetch image overrides
+	var err error
 	ret.Images, err = o.getImageOverrides(ctx)
 	if err != nil {
 		return ret, fmt.Errorf("failed to get image overrides: %w", err)
@@ -104,15 +99,6 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 	}
 
 	return ret, nil
-}
-
-// Helper function to get ManagedCluster
-func (o *OptionsBuilder) getManagedCluster(ctx context.Context, namespace string) (*clusterv1.ManagedCluster, error) {
-	managedCluster := &clusterv1.ManagedCluster{}
-	if err := o.Client.Get(ctx, types.NamespacedName{Name: namespace}, managedCluster); err != nil {
-		return nil, fmt.Errorf("failed to get managed cluster: %w", err)
-	}
-	return managedCluster, nil
 }
 
 // buildPrometheusAgent abstracts the logic of building a Prometheus agent for platform or user workloads
