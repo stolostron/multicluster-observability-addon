@@ -10,6 +10,7 @@ import (
 	prometheusalpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	"github.com/rhobs/multicluster-observability-addon/internal/addon"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -43,7 +44,7 @@ func DeployDefaultResourcesOnce(ctx context.Context, c client.Client, logger log
 			return err
 		}
 
-		res, err := ctrl.CreateOrUpdate(ctx, c, resource, mutateFn(resource.DeepCopyObject().(client.Object), resource))
+		res, err := ctrl.CreateOrUpdate(ctx, c, resource, mutateFn(resource.DeepCopyObject().(client.Object), resource, owner, c.Scheme()))
 		if err != nil {
 			return fmt.Errorf("failed to create or update resource %s: %w", resource.GetName(), err)
 		}
@@ -57,7 +58,7 @@ func DeployDefaultResourcesOnce(ctx context.Context, c client.Client, logger log
 	return nil
 }
 
-func mutateFn(want, existing client.Object) controllerutil.MutateFn {
+func mutateFn(want, existing, owner client.Object, scheme *runtime.Scheme) controllerutil.MutateFn {
 	return func() error {
 		existingLabels := existing.GetLabels()
 		maps.Copy(existingLabels, want.GetLabels())
@@ -67,7 +68,9 @@ func mutateFn(want, existing client.Object) controllerutil.MutateFn {
 		maps.Copy(existingAnnotations, want.GetAnnotations())
 		existing.SetAnnotations(existingAnnotations)
 
-		existing.SetOwnerReferences(want.GetOwnerReferences())
+		if err := controllerutil.SetControllerReference(owner, existing, scheme); err != nil {
+			return fmt.Errorf("failed to set owner reference: %w", err)
+		}
 
 		switch existing.(type) {
 		case *prometheusalpha1.PrometheusAgent:
