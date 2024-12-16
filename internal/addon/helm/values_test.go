@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
+	"github.com/go-logr/logr"
 	operatorsv1 "github.com/operator-framework/api/pkg/operators/v1"
 	operatorsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
-
 	"github.com/rhobs/multicluster-observability-addon/internal/addon"
 	"github.com/stretchr/testify/require"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -69,7 +69,7 @@ func Test_Mcoa_Disable_Charts(t *testing.T) {
 		Build()
 
 	agentAddon, err := addonfactory.NewAgentAddonFactory(addon.Name, addon.FS, addon.McoaChartDir).
-		WithGetValuesFuncs(GetValuesFunc(context.TODO(), fakeKubeClient)).
+		WithGetValuesFuncs(GetValuesFunc(context.TODO(), fakeKubeClient, logr.Discard())).
 		WithAgentRegistrationOption(&agent.RegistrationOption{}).
 		WithScheme(scheme.Scheme).
 		BuildHelmAgentAddon()
@@ -129,7 +129,7 @@ func Test_Mcoa_Disable_Chart_Hub(t *testing.T) {
 		Build()
 
 	loggingAgentAddon, err := addonfactory.NewAgentAddonFactory(addon.Name, addon.FS, addon.McoaChartDir).
-		WithGetValuesFuncs(GetValuesFunc(context.TODO(), fakeKubeClient)).
+		WithGetValuesFuncs(GetValuesFunc(context.TODO(), fakeKubeClient, logr.Discard())).
 		WithAgentRegistrationOption(&agent.RegistrationOption{}).
 		WithScheme(scheme.Scheme).
 		BuildHelmAgentAddon()

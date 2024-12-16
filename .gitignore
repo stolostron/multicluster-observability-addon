@@ -2,3 +2,4 @@
 /deploy/crds/
 /.idea
 /.vscode
+tmp/

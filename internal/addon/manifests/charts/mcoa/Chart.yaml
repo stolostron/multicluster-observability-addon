@@ -5,6 +5,9 @@ version: 1.0.0
 appVersion: "1.0.0"
 
 dependencies:
+- name: metrics
+  repository: 'file://./charts/metrics'
+  condition: metrics.enabled
 - name: logging
   repository: 'file://./charts/logging'
   condition: logging.enabled
