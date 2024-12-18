@@ -10,7 +10,7 @@ metadata:
     chart: {{ template "logginghelm.chart" . }}
     release: {{ .Release.Name }}
 spec:
-  channel: {{ .Values.loggingSubscriptionChannel }}
+  channel: {{ .Values.openshiftLoggingChannel }}
   installPlanApproval: Automatic
   name: cluster-logging
   source: redhat-operators

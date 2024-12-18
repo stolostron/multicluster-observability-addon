@@ -2,11 +2,14 @@ nameOverride: null
 
 enabled: true
 
-loggingSubscriptionChannel: channelName
+openshiftLoggingChannel: channelName
 
 managed:
   collection:
     enabled: true
+    # Expects json format
+    clfAnnotations: []
+
     # Expects json format
     clfSpec: []
 
@@ -36,6 +39,9 @@ managed:
 unmanaged:
   collection:
     enabled: true
+    # Expects json format
+    clfAnnotations: []
+
     # Expects json format
     clfSpec: []
 

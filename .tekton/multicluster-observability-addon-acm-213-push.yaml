@@ -10,10 +10,10 @@ metadata:
       == "main"
   creationTimestamp: null
   labels:
-    appstudio.openshift.io/application: release-acm-212
-    appstudio.openshift.io/component: multicluster-observability-addon-acm-212
+    appstudio.openshift.io/application: release-acm-213
+    appstudio.openshift.io/component: multicluster-observability-addon-acm-213
     pipelines.appstudio.openshift.io/type: build
-  name: multicluster-observability-addon-acm-212-on-push
+  name: multicluster-observability-addon-acm-213-on-push
   namespace: crt-redhat-acm-tenant
 spec:
   params:
@@ -22,7 +22,10 @@ spec:
   - name: revision
     value: '{{revision}}'
   - name: output-image
-    value: quay.io/redhat-user-workloads/crt-redhat-acm-tenant/release-acm-212/multicluster-observability-addon-acm-212:{{revision}}
+    value: quay.io/redhat-user-workloads/crt-redhat-acm-tenant/multicluster-observability-addon-acm-213:{{revision}}
+  - name: build-platforms
+    value:
+    - linux/x86_64
   - name: dockerfile
     value: Dockerfile
   - name: path-context
@@ -106,7 +109,6 @@ spec:
       type: string
     - default:
       - linux/x86_64
-      - linux/arm64
       description: List of platforms to build the container images on. The available
         set of values is determined by the configuration of the multi-platform-controller.
       name: build-platforms
@@ -452,6 +454,28 @@ spec:
         - name: kind
           value: task
         resolver: bundles
+    - name: rpms-signature-scan
+      params:
+      - name: image-url
+        value: $(tasks.build-image-index.results.IMAGE_URL)
+      - name: image-digest
+        value: $(tasks.build-image-index.results.IMAGE_DIGEST)
+      runAfter:
+      - build-image-index
+      taskRef:
+        params:
+        - name: name
+          value: rpms-signature-scan
+        - name: bundle
+          value: quay.io/konflux-ci/tekton-catalog/task-rpms-signature-scan:0.2@sha256:ec536e55a039052823ba74e07db3175554fb046649671d1fefd776ca064d00ac
+        - name: kind
+          value: task
+        resolver: bundles
+      when:
+      - input: $(params.skip-checks)
+        operator: in
+        values:
+        - "false"
     workspaces:
     - name: git-auth
       optional: true

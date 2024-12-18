@@ -5,10 +5,10 @@ import (
 )
 
 type LoggingValues struct {
-	Enabled                    bool            `json:"enabled"`
-	LoggingSubscriptionChannel string          `json:"loggingSubscriptionChannel"`
-	Unmanaged                  UnmanagedValues `json:"unmanaged"`
-	Managed                    ManagedValues   `json:"managed"`
+	Enabled                 bool            `json:"enabled"`
+	OpenshiftLoggingChannel string          `json:"openshiftLoggingChannel"`
+	Unmanaged               UnmanagedValues `json:"unmanaged"`
+	Managed                 ManagedValues   `json:"managed"`
 }
 
 // UnmanagedValues is a struct that holds configuration for resources managed by
@@ -25,10 +25,11 @@ type ManagedValues struct {
 }
 
 type CollectionValues struct {
-	Enabled    bool            `json:"enabled"`
-	CLFSpec    string          `json:"clfSpec"`
-	Secrets    []ResourceValue `json:"secrets"`
-	ConfigMaps []ResourceValue `json:"configmaps"`
+	Enabled        bool            `json:"enabled"`
+	CLFAnnotations string          `json:"clfAnnotations"`
+	CLFSpec        string          `json:"clfSpec"`
+	Secrets        []ResourceValue `json:"secrets"`
+	ConfigMaps     []ResourceValue `json:"configmaps"`
 }
 
 type StorageValues struct {
@@ -54,10 +55,10 @@ func BuildValues(opts Options) (*LoggingValues, error) {
 	}
 
 	return &LoggingValues{
-		Enabled:                    enabledLogging(opts),
-		LoggingSubscriptionChannel: buildSubscriptionChannel(opts),
-		Unmanaged:                  uValues,
-		Managed:                    mValues,
+		Enabled:                 enabledLogging(opts),
+		OpenshiftLoggingChannel: buildSubscriptionChannel(opts),
+		Unmanaged:               uValues,
+		Managed:                 mValues,
 	}, nil
 }
 
@@ -87,6 +88,15 @@ func buildUnmangedValues(opts Options) (UnmanagedValues, error) {
 		return uValues, err
 	}
 	uValues.Collection.Secrets = secrets
+
+	// CLO uses annotations to signal feature flags so users must be able to set
+	// them
+	clfAnnotations := opts.Unmanaged.Collection.ClusterLogForwarder.GetAnnotations()
+	clfAnnotationsJson, err := json.Marshal(clfAnnotations)
+	if err != nil {
+		return uValues, err
+	}
+	uValues.Collection.CLFAnnotations = string(clfAnnotationsJson)
 
 	clfSpec, err := buildClusterLogForwarderSpec(opts)
 	if err != nil {

@@ -1,7 +1,7 @@
 package manifests
 
 const (
-	subscriptionChannelValueKey = "loggingSubscriptionChannel"
+	subscriptionChannelValueKey = "openshiftLoggingChannel"
 	defaultLoggingVersion       = "stable-6.1"
 
 	ManagedCollectionCertCommonName = "mcoa-logging-managed-collection"
