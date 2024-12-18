@@ -102,7 +102,7 @@ func Test_Mcoa_Disable_Chart_Hub(t *testing.T) {
 				Resource: "addondeploymentconfigs",
 			},
 			ConfigReferent: addonapiv1alpha1.ConfigReferent{
-				Namespace: "open-cluster-management",
+				Namespace: "open-cluster-management-observability",
 				Name:      "multicluster-observability-addon",
 			},
 		},
@@ -139,7 +139,7 @@ func Test_Mcoa_Disable_Chart_Hub(t *testing.T) {
 
 	objects, err := loggingAgentAddon.Manifests(managedCluster, managedClusterAddOn)
 	require.NoError(t, err)
-	require.Empty(t, objects)
+	require.Len(t, objects, 2)
 }
 
 func TestGetAddOnDeploymentConfig(t *testing.T) {

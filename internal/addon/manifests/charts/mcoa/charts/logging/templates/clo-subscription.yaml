@@ -1,4 +1,4 @@
-{{- if .Values.enabled }}
+{{- if eq (include "logginghelm.installCLO" .) "true" }}
 apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
 metadata:
