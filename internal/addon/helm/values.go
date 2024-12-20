@@ -9,14 +9,14 @@ import (
 	lmanifests "github.com/rhobs/multicluster-observability-addon/internal/logging/manifests"
 	thandlers "github.com/rhobs/multicluster-observability-addon/internal/tracing/handlers"
 	tmanifests "github.com/rhobs/multicluster-observability-addon/internal/tracing/manifests"
+	clusterinfov1beta1 "github.com/stolostron/cluster-lifecycle-api/clusterinfo/v1beta1"
+	clusterlifecycleconstants "github.com/stolostron/cluster-lifecycle-api/constants"
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 	addonutils "open-cluster-management.io/addon-framework/pkg/utils"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
-
-const annotationLocalCluster = "local-cluster"
 
 var (
 	errMissingAODCRef  = errors.New("missing AddOnDeploymentConfig reference on addon installation")
@@ -34,7 +34,12 @@ func GetValuesFunc(ctx context.Context, k8s client.Client) addonfactory.GetValue
 		cluster *clusterv1.ManagedCluster,
 		mcAddon *addonapiv1alpha1.ManagedClusterAddOn,
 	) (addonfactory.Values, error) {
-		isHubCluster := isHubCluster(cluster)
+		// Skip unsupported kube vendors
+		if !supportedKubeVendors(cluster) {
+			return addonfactory.JsonStructToValues(HelmChartValues{})
+		}
+
+		// Build options from AddOnDeploymentConfig
 		aodc, err := getAddOnDeploymentConfig(ctx, k8s, mcAddon)
 		if err != nil {
 			return nil, err
@@ -44,14 +49,13 @@ func GetValuesFunc(ctx context.Context, k8s client.Client) addonfactory.GetValue
 			return nil, err
 		}
 
+		// Skip if no configuration was provided
 		if !opts.Platform.Enabled && !opts.UserWorkloads.Enabled {
 			return addonfactory.JsonStructToValues(HelmChartValues{})
 		}
 
-		values := HelmChartValues{
-			Enabled: true,
-		}
-
+		isHubCluster := isHubCluster(cluster)
+		values := HelmChartValues{}
 		if opts.Platform.Logs.CollectionEnabled || opts.UserWorkloads.Logs.CollectionEnabled || opts.Platform.Logs.ManagedStack {
 			loggingOpts, err := lhandlers.BuildOptions(ctx, k8s, mcAddon, opts.Platform.Logs, opts.UserWorkloads.Logs, isHubCluster, opts.HubHostname)
 			if err != nil {
@@ -78,6 +82,7 @@ func GetValuesFunc(ctx context.Context, k8s client.Client) addonfactory.GetValue
 			values.Tracing = tracing
 		}
 
+		values.Enabled = values.Logging.Enabled || values.Tracing.Enabled
 		return addonfactory.JsonStructToValues(values)
 	}
 }
@@ -99,9 +104,17 @@ func getAddOnDeploymentConfig(ctx context.Context, k8s client.Client, mcAddon *a
 }
 
 func isHubCluster(cluster *clusterv1.ManagedCluster) bool {
-	val, ok := cluster.Labels[annotationLocalCluster]
+	val, ok := cluster.Labels[clusterlifecycleconstants.SelfManagedClusterLabelKey]
 	if !ok {
 		return false
 	}
 	return val == "true"
+}
+
+func supportedKubeVendors(cluster *clusterv1.ManagedCluster) bool {
+	val, ok := cluster.Labels[clusterinfov1beta1.LabelKubeVendor]
+	if !ok {
+		return false
+	}
+	return val == string(clusterinfov1beta1.KubeVendorOpenShift)
 }
