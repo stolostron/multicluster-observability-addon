@@ -16,6 +16,7 @@ const (
 
 	AddonDeploymentConfigResource = "addondeploymentconfigs"
 	ClusterLogForwardersResource  = "clusterlogforwarders"
+	LokiStacksResource            = "lokistacks"
 	SpokeUnmanagedCLFName         = "mcoa-instance"
 	SpokeManagedCLFName           = "mcoa-managed-instance"
 	SpokeManagedLSName            = "mcoa-managed-instance"

@@ -5,8 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 
 	certmanagerv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
+	lokiv1 "github.com/grafana/loki/operator/api/loki/v1"
 	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
 	"github.com/rhobs/multicluster-observability-addon/internal/addon"
 	"github.com/rhobs/multicluster-observability-addon/internal/logging/manifests"
@@ -25,6 +27,7 @@ const (
 )
 
 var (
+	errMissingDefaultLSRef   = errors.New("missing LokiStack reference on addon installation for default stack")
 	errMissingCLFRef         = errors.New("missing ClusterLogForwarder reference on addon installation")
 	errMultipleCLFRef        = errors.New("multiple ClusterLogForwarder references on addon installation")
 	errMissingImplementation = errors.New("missing secret implementation for output type")
@@ -196,9 +199,31 @@ func managedBuildOptions(ctx context.Context, k8s client.Client, mcAddon *addona
 	}
 
 	if opts.IsHubCluster {
+		// Get LS from ManagedClusterAddOn
+		keys := addon.GetObjectKeys(mcAddon.Status.ConfigReferences, lokiv1.GroupVersion.Group, addon.LokiStacksResource)
+		if len(keys) == 0 {
+			return errMissingDefaultLSRef
+		}
+		lsKey := client.ObjectKey{}
+		for _, key := range keys {
+			if strings.HasPrefix(key.Name, addon.DefaultStackPrefix) {
+				lsKey = key
+				break
+			}
+		}
+		if lsKey.Name == "" {
+			return errMissingDefaultLSRef
+		}
+
+		ls := &lokiv1.LokiStack{}
+		if err := k8s.Get(ctx, lsKey, ls, &client.GetOptions{}); err != nil {
+			return err
+		}
+		opts.ManagedStack.Storage.LokiStack = ls
+
 		// Get objstorage secret
 		objStorageSecret := &corev1.Secret{}
-		key := client.ObjectKey{Name: manifests.ManagedStorageObjStorageSecretName, Namespace: mcAddon.Namespace}
+		key := client.ObjectKey{Name: ls.Spec.Storage.Secret.Name, Namespace: ls.Namespace}
 		err := k8s.Get(ctx, key, objStorageSecret, &client.GetOptions{})
 		if err != nil {
 			// Even for not found we probably just want to return and wait for the next

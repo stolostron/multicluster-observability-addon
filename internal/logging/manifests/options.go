@@ -37,6 +37,7 @@ type Storage struct {
 	Tenants          []string
 	ObjStorageSecret corev1.Secret
 	MTLSSecret       corev1.Secret
+	LokiStack        *lokiv1.LokiStack
 }
 
 // UnmanagedCollectionEnabled returns true if the unmanaged collection is enabled.

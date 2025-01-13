@@ -522,6 +522,22 @@ func Test_Logging_Managed_Storage(t *testing.T) {
 				SpecHash: "fake-spec-hash",
 			},
 		},
+		{
+			ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+				Group:    "loki.grafana.com",
+				Resource: "lokistacks",
+			},
+			ConfigReferent: addonapiv1alpha1.ConfigReferent{
+				Namespace: "local-cluster",
+				Name:      "default-stack-instance-bar",
+			},
+			DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
+				ConfigReferent: addonapiv1alpha1.ConfigReferent{
+					Namespace: "local-cluster",
+					Name:      "default-stack-instance-bar",
+				},
+			},
+		},
 	}
 
 	addOnDeploymentConfig = &addonapiv1alpha1.AddOnDeploymentConfig{
@@ -538,6 +554,37 @@ func Test_Logging_Managed_Storage(t *testing.T) {
 				{
 					Name:  "platformLogsDefault",
 					Value: "true",
+				},
+			},
+		},
+	}
+
+	existingLS := &lokiv1.LokiStack{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "default-stack-instance-bar",
+			Namespace: "local-cluster",
+		},
+		Spec: lokiv1.LokiStackSpec{
+			ManagementState:  lokiv1.ManagementStateUnmanaged,
+			Size:             lokiv1.SizeOneXMedium,
+			StorageClassName: "foo-blob",
+			Storage: lokiv1.ObjectStorageSpec{
+				Secret: lokiv1.ObjectStorageSecretSpec{
+					Type: "azure",
+					Name: "mcoa-bar-azure-secret",
+				},
+				Schemas: []lokiv1.ObjectStorageSchema{
+					{
+						Version:       lokiv1.ObjectStorageSchemaV13,
+						EffectiveDate: "2025-01-01",
+					},
+				},
+			},
+			Limits: &lokiv1.LimitsSpec{
+				Global: &lokiv1.LimitsTemplateSpec{
+					IngestionLimits: &lokiv1.IngestionLimitSpec{
+						IngestionRate: 200,
+					},
 				},
 			},
 		},
@@ -562,7 +609,7 @@ func Test_Logging_Managed_Storage(t *testing.T) {
 
 	objstorage := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "mcoa-logging-managed-storage-objstorage",
+			Name:      "mcoa-bar-azure-secret",
 			Namespace: "local-cluster",
 		},
 		Data: map[string][]byte{
@@ -585,17 +632,18 @@ func Test_Logging_Managed_Storage(t *testing.T) {
 			},
 		},
 		Spec: lokiv1.LokiStackSpec{
-			Size:             lokiv1.SizeOneXDemo,
-			StorageClassName: "gp3-csi",
+			ManagementState:  lokiv1.ManagementStateManaged,
+			Size:             lokiv1.SizeOneXMedium,
+			StorageClassName: "foo-blob",
 			Storage: lokiv1.ObjectStorageSpec{
 				Secret: lokiv1.ObjectStorageSecretSpec{
-					Type: "s3",
-					Name: "mcoa-logging-managed-storage-objstorage",
+					Type: "azure",
+					Name: "mcoa-bar-azure-secret",
 				},
 				Schemas: []lokiv1.ObjectStorageSchema{
 					{
 						Version:       lokiv1.ObjectStorageSchemaV13,
-						EffectiveDate: "2024-11-18",
+						EffectiveDate: "2025-01-01",
 					},
 				},
 			},
@@ -624,6 +672,7 @@ func Test_Logging_Managed_Storage(t *testing.T) {
 					},
 				},
 				Authorization: &lokiv1.AuthorizationSpec{
+					OPA: &lokiv1.OPASpec{},
 					Roles: []lokiv1.RoleSpec{
 						{
 							Name:        "tenant-1-logs",
@@ -680,6 +729,9 @@ func Test_Logging_Managed_Storage(t *testing.T) {
 			},
 			Limits: &lokiv1.LimitsSpec{
 				Global: &lokiv1.LimitsTemplateSpec{
+					IngestionLimits: &lokiv1.IngestionLimitSpec{
+						IngestionRate: 200,
+					},
 					OTLP: &lokiv1.OTLPSpec{
 						StreamLabels: &lokiv1.OTLPStreamLabelSpec{
 							ResourceAttributes: []lokiv1.OTLPAttributeReference{
@@ -744,7 +796,7 @@ func Test_Logging_Managed_Storage(t *testing.T) {
 	// Setup the fake k8s client
 	fakeKubeClient = fake.NewClientBuilder().
 		WithScheme(scheme.Scheme).
-		WithObjects(addOnDeploymentConfig, mtls, objstorage, tenant1, tenant2).
+		WithObjects(addOnDeploymentConfig, existingLS, mtls, objstorage, tenant1, tenant2).
 		Build()
 
 	// Setup the fake addon client

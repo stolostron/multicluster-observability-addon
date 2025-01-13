@@ -11,5 +11,5 @@ spec:
   - name: hubHostname
     value: jmarcalaws2411297.devcluster.openshift.com
   # Platform Observability
-  - name: platformLogsStorage
-    value: lokistacks.v1.loki.grafana.io
+  - name: platformLogsDefault
+    value: "true"

@@ -39,7 +39,6 @@ func Test_Mcoa_Disabled(t *testing.T) {
 		addonDeploymentConfig []addonapiv1alpha1.CustomizedVariable
 		expectedObjects       bool
 	}{
-
 		{
 			name: "ManagedCluster with correct labels but no configuration",
 			managedClusterLabels: map[string]string{
