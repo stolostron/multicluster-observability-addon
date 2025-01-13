@@ -5,6 +5,8 @@ import (
 	"fmt"
 
 	lokiv1 "github.com/grafana/loki/operator/api/loki/v1"
+	"github.com/rhobs/multicluster-observability-addon/internal/addon"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const mcoaAdmin = "mcoa-logs-admin"
@@ -71,29 +73,13 @@ func buildManagedLokistackSpec(opts Options) (lokiv1.LokiStackSpec, error) {
 	rolesBinding = append(rolesBinding, adminRoleBinding)
 
 	return lokiv1.LokiStackSpec{
-		// TODO (JoaoBraveCoding): This should be dynamic
-		Size: lokiv1.SizeOneXDemo,
-		// TODO (JoaoBraveCoding): This should be be user defined
-		StorageClassName: "gp3-csi",
-		// TODO (JoaoBraveCoding): This should be be user defined
-		Storage: lokiv1.ObjectStorageSpec{
-			Secret: lokiv1.ObjectStorageSecretSpec{
-				Type: "s3",
-				Name: ManagedStorageObjStorageSecretName,
-			},
-			Schemas: []lokiv1.ObjectStorageSchema{
-				{
-					Version:       lokiv1.ObjectStorageSchemaV13,
-					EffectiveDate: "2024-11-18",
-				},
-			},
-		},
 		Tenants: &lokiv1.TenantsSpec{
 			Mode:           lokiv1.Static,
 			Authentication: tenantsAuthentication,
 			Authorization: &lokiv1.AuthorizationSpec{
 				Roles:        roles,
 				RoleBindings: rolesBinding,
+				OPA:          &lokiv1.OPASpec{},
 			},
 		},
 		Limits: &lokiv1.LimitsSpec{
@@ -185,4 +171,48 @@ func buildManagedStorageSecrets(resources Options) ([]ResourceValue, error) {
 	secretsValue = append(secretsValue, rv)
 
 	return secretsValue, nil
+}
+
+func BuildSSALokiStack(opts Options, existingLS *lokiv1.LokiStack) (*lokiv1.LokiStack, error) {
+	lokistackSpec, err := buildManagedLokistackSpec(opts)
+	if err != nil {
+		return nil, err
+	}
+	lokistackSpec.ManagementState = lokiv1.ManagementStateUnmanaged
+
+	// SSA requires us to provide all the required fields, so if the resource is not yet created
+	// we default otherwise we use the existing resource, since we are using SSA we only need to 
+	// copy the required fields
+	if existingLS.Name == "" {
+		lokistackSpec.Size = lokiv1.SizeOneXDemo
+		lokistackSpec.StorageClassName = "gp3-csi"
+		lokistackSpec.Storage = lokiv1.ObjectStorageSpec{
+			Secret: lokiv1.ObjectStorageSecretSpec{
+				Type: "s3",
+				Name: ManagedStorageObjStorageSecretName,
+			},
+			Schemas: []lokiv1.ObjectStorageSchema{
+				{
+					Version:       lokiv1.ObjectStorageSchemaV13,
+					EffectiveDate: "2024-11-18",
+				},
+			},
+		}
+	} else {
+		lokistackSpec.Size = existingLS.Spec.Size
+		lokistackSpec.StorageClassName = existingLS.Spec.StorageClassName
+		lokistackSpec.Storage = existingLS.Spec.Storage
+	}
+
+	return &lokiv1.LokiStack{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "LokiStack",
+			APIVersion: lokiv1.GroupVersion.String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      addon.DefaultStackPrefix,
+			Namespace: addon.InstallNamespace,
+		},
+		Spec: lokistackSpec,
+	}, nil
 }

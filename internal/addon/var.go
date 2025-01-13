@@ -8,6 +8,7 @@ const (
 	Name              = "multicluster-observability-addon"
 	LabelOCMAddonName = "open-cluster-management.io/addon-name"
 	InstallNamespace  = "open-cluster-management-observability"
+	HubNamespace      = "local-cluster"
 
 	McoaChartDir    = "manifests/charts/mcoa"
 	LoggingChartDir = "manifests/charts/mcoa/charts/logging"
@@ -30,6 +31,8 @@ const (
 	SpokeOTELColNamespace           = "mcoa-opentelemetry"
 	otelColProbeKey                 = "replicas"
 	otelColProbePath                = ".spec.replicas"
+
+	DefaultStackPrefix = "default-stack-instance"
 )
 
 //go:embed manifests

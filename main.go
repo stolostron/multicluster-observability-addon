@@ -18,7 +18,7 @@ import (
 	operatorsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	"github.com/rhobs/multicluster-observability-addon/internal/addon"
 	addonhelm "github.com/rhobs/multicluster-observability-addon/internal/addon/helm"
-	"github.com/rhobs/multicluster-observability-addon/internal/controllers/watcher"
+	"github.com/rhobs/multicluster-observability-addon/internal/controllers/resourcecreator"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -172,17 +172,25 @@ func runController(ctx context.Context, kubeConfig *rest.Config) error {
 		return err
 	}
 
-	disableReconciliation := os.Getenv("DISABLE_WATCHER_CONTROLLER")
-	if disableReconciliation == "" {
-		var wm *watcher.WatcherManager
-		wm, err = watcher.NewWatcherManager(logger, scheme, &mgr)
-		if err != nil {
-			logger.Error(err, "unable to create watcher manager")
-			return err
-		}
+	// disableReconciliation := os.Getenv("DISABLE_WATCHER_CONTROLLER")
+	// if disableReconciliation == "" {
+	// 	var wm *watcher.WatcherManager
+	// 	wm, err = watcher.NewWatcherManager(logger, scheme, &mgr)
+	// 	if err != nil {
+	// 		logger.Error(err, "unable to create watcher manager")
+	// 		return err
+	// 	}
 
-		wm.Start(ctx)
+	// 	wm.Start(ctx)
+	// }
+
+	var rcm *resourcecreator.ResourceCreatorManager
+	rcm, err = resourcecreator.NewResourceCreatorManager(logger, scheme)
+	if err != nil {
+		logger.Error(err, "unable to create resource creator manager")
+		return err
 	}
+	rcm.Start(ctx)
 
 	err = mgr.Start(ctx)
 	if err != nil {

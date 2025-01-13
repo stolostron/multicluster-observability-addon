@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 
 	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
+	"github.com/rhobs/multicluster-observability-addon/internal/addon"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const managedCollectionServiceAccount = "mcoa-logging-managed-collector"
@@ -82,4 +84,25 @@ func buildManagedCollectionConfigMaps(resources Options) ([]ResourceValue, error
 		configmapsValue = append(configmapsValue, configmapValue)
 	}
 	return configmapsValue, nil
+}
+
+func BuildSSAClusterLogForwarder(opts Options) (*loggingv1.ClusterLogForwarder, error) {
+	clfSpec, err := buildManagedCLFSpec(opts)
+	if err != nil {
+		return nil, err
+	}
+	clfSpec.ManagementState = loggingv1.ManagementStateUnmanaged
+
+	return &loggingv1.ClusterLogForwarder{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "ClusterLogForwarder",
+			APIVersion: loggingv1.GroupVersion.String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			// TODO(JoaoBraveCoding) should have the placement as the suffix
+			Name:      addon.DefaultStackPrefix,
+			Namespace: addon.InstallNamespace,
+		},
+		Spec: clfSpec,
+	}, nil
 }

@@ -12,6 +12,7 @@ import (
 	"github.com/rhobs/multicluster-observability-addon/internal/logging/manifests"
 	addonmanifests "github.com/rhobs/multicluster-observability-addon/internal/manifests"
 	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -29,6 +30,61 @@ var (
 	errMissingImplementation = errors.New("missing secret implementation for output type")
 	errMissingField          = errors.New("missing field needed by output type")
 )
+
+func BuildDefaultOptions(ctx context.Context, k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, platform, userWorkloads addon.LogsOptions, isHubCluster bool, hubHostname string) (manifests.Options, error) {
+	opts := manifests.Options{
+		Platform:      platform,
+		UserWorkloads: userWorkloads,
+		IsHubCluster:  isHubCluster,
+		HubHostname:   hubHostname,
+		ManagedStack: manifests.ManagedStack{
+			LokiURL: fmt.Sprintf("https://mcoa-managed-instance-openshift-logging.apps.%s/api/logs/v1/%s/otlp/v1/logs", hubHostname, "tenant"),
+			Collection: manifests.Collection{
+				Secrets: []corev1.Secret{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name:      manifests.ManagedCollectionSecretName,
+							Namespace: addon.InstallNamespace,
+						},
+					},
+				},
+			},
+			Storage: manifests.Storage{
+				ObjStorageSecret: corev1.Secret{
+					ObjectMeta: v1.ObjectMeta{
+						Name:      manifests.ManagedStorageMTLSSecretName,
+						Namespace: addon.InstallNamespace,
+					},
+				},
+				MTLSSecret: corev1.Secret{
+					ObjectMeta: v1.ObjectMeta{
+						Name:      manifests.ManagedStorageMTLSSecretName,
+						Namespace: addon.HubNamespace,
+					},
+				},
+			},
+		},
+	}
+
+	// TODO (JoaoBraveCoding) This might be rather heavy in big clusters,
+	// this might be a good place to lower memory consumption.
+	mcaoList := &addonapiv1alpha1.ManagedClusterAddOnList{}
+	if err := k8s.List(ctx, mcaoList, &client.ListOptions{}); err != nil {
+		return opts, err
+	}
+
+	tenants := make([]string, 0, len(mcaoList.Items))
+	for _, tenant := range mcaoList.Items {
+		// TODO (JoaoBraveCoding) This is not the best way to match tenants due
+		// to the addon-framework supporting tenantcy, but it will do for now
+		if tenant.Name == addon.Name && tenant.Namespace != mcAddon.Namespace {
+			tenants = append(tenants, tenant.Namespace)
+		}
+	}
+	opts.ManagedStack.Storage.Tenants = tenants
+
+	return opts, nil
+}
 
 func BuildOptions(ctx context.Context, k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, platform, userWorkloads addon.LogsOptions, isHubCluster bool, hubHostname string) (manifests.Options, error) {
 	opts := manifests.Options{
