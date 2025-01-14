@@ -12,8 +12,6 @@ import (
 const mcoaAdmin = "mcoa-logs-admin"
 
 func buildManagedLokistackSpec(opts Options) (lokiv1.LokiStackSpec, error) {
-	lokiStackSpec := opts.ManagedStack.Storage.LokiStack.Spec
-	lokiStackSpec.ManagementState = lokiv1.ManagementStateManaged
 	// Tenants definition
 	tenantsAuthentication := []lokiv1.AuthenticationSpec{}
 	for _, tenant := range opts.ManagedStack.Storage.Tenants {
@@ -74,7 +72,7 @@ func buildManagedLokistackSpec(opts Options) (lokiv1.LokiStackSpec, error) {
 	}
 	rolesBinding = append(rolesBinding, adminRoleBinding)
 
-	lokiStackSpec.Tenants = &lokiv1.TenantsSpec{
+	tenants := &lokiv1.TenantsSpec{
 		Mode:           lokiv1.Static,
 		Authentication: tenantsAuthentication,
 		Authorization: &lokiv1.AuthorizationSpec{
@@ -83,7 +81,7 @@ func buildManagedLokistackSpec(opts Options) (lokiv1.LokiStackSpec, error) {
 			OPA:          &lokiv1.OPASpec{},
 		},
 	}
-	lokiStackSpec.Limits.Global.OTLP = &lokiv1.OTLPSpec{
+	limitsOTLP := &lokiv1.OTLPSpec{
 		StreamLabels: &lokiv1.OTLPStreamLabelSpec{
 			ResourceAttributes: []lokiv1.OTLPAttributeReference{
 				{Name: "k8s.namespace.name"},
@@ -140,7 +138,11 @@ func buildManagedLokistackSpec(opts Options) (lokiv1.LokiStackSpec, error) {
 		},
 	}
 
-	return lokiStackSpec, nil
+	lsSpec := opts.ManagedStack.Storage.LokiStack.Spec
+	lsSpec.ManagementState = lokiv1.ManagementStateManaged
+	lsSpec.Tenants = tenants
+	lsSpec.Limits.Global.OTLP = limitsOTLP
+	return lsSpec, nil
 }
 
 func buildManagedStorageSecrets(resources Options) ([]ResourceValue, error) {

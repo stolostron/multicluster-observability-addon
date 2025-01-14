@@ -28,6 +28,7 @@ const (
 
 var (
 	errMissingDefaultLSRef   = errors.New("missing LokiStack reference on addon installation for default stack")
+	errMissingDefaultCLFRef  = errors.New("missing ClusterLogForwarder reference on addon installation for default stack")
 	errMissingCLFRef         = errors.New("missing ClusterLogForwarder reference on addon installation")
 	errMultipleCLFRef        = errors.New("multiple ClusterLogForwarder references on addon installation")
 	errMissingImplementation = errors.New("missing secret implementation for output type")
@@ -181,6 +182,28 @@ func managedBuildOptions(ctx context.Context, k8s client.Client, mcAddon *addona
 	}
 
 	if !opts.IsHubCluster {
+		// Get CLF from ManagedClusterAddOn
+		keys := addon.GetObjectKeys(mcAddon.Status.ConfigReferences, loggingv1.GroupVersion.Group, addon.ClusterLogForwardersResource)
+		if len(keys) == 0 {
+			return errMissingDefaultCLFRef
+		}
+		clfKey := client.ObjectKey{}
+		for _, key := range keys {
+			if strings.HasPrefix(key.Name, addon.DefaultStackPrefix) {
+				clfKey = key
+				break
+			}
+		}
+		if clfKey.Name == "" {
+			return errMissingDefaultCLFRef
+		}
+
+		clf := &loggingv1.ClusterLogForwarder{}
+		if err := k8s.Get(ctx, clfKey, clf, &client.GetOptions{}); err != nil {
+			return err
+		}
+		opts.ManagedStack.Collection.ClusterLogForwarder = clf
+
 		secret := &corev1.Secret{}
 		key := client.ObjectKey{Name: manifests.ManagedCollectionSecretName, Namespace: mcAddon.Namespace}
 		err := k8s.Get(ctx, key, secret, &client.GetOptions{})

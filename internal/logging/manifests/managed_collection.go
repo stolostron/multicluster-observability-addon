@@ -12,46 +12,52 @@ import (
 const managedCollectionServiceAccount = "mcoa-logging-managed-collector"
 
 func buildManagedCLFSpec(opts Options) (loggingv1.ClusterLogForwarderSpec, error) {
-	return loggingv1.ClusterLogForwarderSpec{
-		ServiceAccount: loggingv1.ServiceAccount{
-			Name: managedCollectionServiceAccount,
-		},
-		Outputs: []loggingv1.OutputSpec{
-			{
-				Name: "hub-lokistack",
-				Type: loggingv1.OutputTypeOTLP,
-				OTLP: &loggingv1.OTLP{
-					URL: opts.ManagedStack.LokiURL,
-				},
-				TLS: &loggingv1.OutputTLSSpec{
-					// TODO(JoaoBraveCoding): currently this is required due to LokiStack not
-					// being configued with mTLS
-					InsecureSkipVerify: true,
-					TLSSpec: loggingv1.TLSSpec{
-						CA: &loggingv1.ValueReference{
-							Key:        "ca.crt",
-							SecretName: ManagedCollectionSecretName,
-						},
-						Certificate: &loggingv1.ValueReference{
-							Key:        corev1.TLSCertKey,
-							SecretName: ManagedCollectionSecretName,
-						},
-						Key: &loggingv1.SecretReference{
-							Key:        corev1.TLSPrivateKeyKey,
-							SecretName: ManagedCollectionSecretName,
-						},
+	sa := loggingv1.ServiceAccount{
+		Name: managedCollectionServiceAccount,
+	}
+	outputs := []loggingv1.OutputSpec{
+		{
+			Name: "hub-lokistack",
+			Type: loggingv1.OutputTypeOTLP,
+			OTLP: &loggingv1.OTLP{
+				URL: opts.ManagedStack.LokiURL,
+			},
+			TLS: &loggingv1.OutputTLSSpec{
+				// TODO(JoaoBraveCoding): currently this is required due to LokiStack not
+				// being configued with mTLS
+				InsecureSkipVerify: true,
+				TLSSpec: loggingv1.TLSSpec{
+					CA: &loggingv1.ValueReference{
+						Key:        "ca.crt",
+						SecretName: ManagedCollectionSecretName,
+					},
+					Certificate: &loggingv1.ValueReference{
+						Key:        corev1.TLSCertKey,
+						SecretName: ManagedCollectionSecretName,
+					},
+					Key: &loggingv1.SecretReference{
+						Key:        corev1.TLSPrivateKeyKey,
+						SecretName: ManagedCollectionSecretName,
 					},
 				},
 			},
 		},
-		Pipelines: []loggingv1.PipelineSpec{
-			{
-				Name:       "infra-hub-lokistack",
-				InputRefs:  []string{"infrastructure"},
-				OutputRefs: []string{"hub-lokistack"},
-			},
+	}
+	pipelines := []loggingv1.PipelineSpec{
+		{
+			Name:       "infra-hub-lokistack",
+			InputRefs:  []string{"infrastructure"},
+			OutputRefs: []string{"hub-lokistack"},
 		},
-	}, nil
+	}
+
+	clfSpec := opts.ManagedStack.Collection.ClusterLogForwarder.Spec
+	clfSpec.ManagementState = loggingv1.ManagementStateManaged
+	clfSpec.ServiceAccount = sa
+	clfSpec.Outputs = outputs
+	clfSpec.Pipelines = pipelines
+
+	return clfSpec, nil
 }
 
 func buildManagedCollectionSecrets(resources Options) ([]ResourceValue, error) {

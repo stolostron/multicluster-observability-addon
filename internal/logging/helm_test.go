@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	auditv1 "k8s.io/apiserver/pkg/apis/audit/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog/v2"
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
@@ -346,6 +347,16 @@ func Test_Logging_Managed_Collection(t *testing.T) {
 				SpecHash: "fake-spec-hash",
 			},
 		},
+		{
+			ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+				Group:    "observability.openshift.io",
+				Resource: "clusterlogforwarders",
+			},
+			ConfigReferent: addonapiv1alpha1.ConfigReferent{
+				Namespace: "local-cluster",
+				Name:      "default-stack-instance-bar",
+			},
+		},
 	}
 
 	addOnDeploymentConfig = &addonapiv1alpha1.AddOnDeploymentConfig{
@@ -384,6 +395,65 @@ func Test_Logging_Managed_Collection(t *testing.T) {
 		},
 	}
 
+	existingCLF := &loggingv1.ClusterLogForwarder{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "default-stack-instance-bar",
+			Namespace: "local-cluster",
+		},
+		Spec: loggingv1.ClusterLogForwarderSpec{
+			ServiceAccount: loggingv1.ServiceAccount{
+				Name: "mcoa-logging-managed-collector",
+			},
+			ManagementState: loggingv1.ManagementStateUnmanaged,
+			Filters: []loggingv1.FilterSpec{
+				{
+					Name: "filter-1",
+					Type: loggingv1.FilterTypeDrop,
+					KubeAPIAudit: &loggingv1.KubeAPIAudit{
+						Rules: []auditv1.PolicyRule{
+							{
+								Level: auditv1.LevelMetadata,
+							},
+						},
+					},
+				},
+			},
+			Outputs: []loggingv1.OutputSpec{
+				{
+					Name: "hub-lokistack",
+					Type: loggingv1.OutputTypeOTLP,
+					OTLP: &loggingv1.OTLP{
+						URL: "https://not-the-final-url",
+					},
+					TLS: &loggingv1.OutputTLSSpec{
+						InsecureSkipVerify: true,
+						TLSSpec: loggingv1.TLSSpec{
+							CA: &loggingv1.ValueReference{
+								Key:        "ca.crt",
+								SecretName: "mcoa-logging-managed-collection-tls",
+							},
+							Certificate: &loggingv1.ValueReference{
+								Key:        "tls.crt",
+								SecretName: "mcoa-logging-managed-collection-tls",
+							},
+							Key: &loggingv1.SecretReference{
+								Key:        "tls.key",
+								SecretName: "mcoa-logging-managed-collection-tls",
+							},
+						},
+					},
+				},
+			},
+			Pipelines: []loggingv1.PipelineSpec{
+				{
+					Name:       "not-the-correct-name",
+					InputRefs:  []string{"infrastructure"},
+					OutputRefs: []string{"hub-lokistack"},
+				},
+			},
+		},
+	}
+
 	expectedCLF := &loggingv1.ClusterLogForwarder{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: loggingv1.GroupVersion.String(),
@@ -402,8 +472,22 @@ func Test_Logging_Managed_Collection(t *testing.T) {
 			},
 		},
 		Spec: loggingv1.ClusterLogForwarderSpec{
+			ManagementState: loggingv1.ManagementStateManaged,
 			ServiceAccount: loggingv1.ServiceAccount{
 				Name: "mcoa-logging-managed-collector",
+			},
+			Filters: []loggingv1.FilterSpec{
+				{
+					Name: "filter-1",
+					Type: loggingv1.FilterTypeDrop,
+					KubeAPIAudit: &loggingv1.KubeAPIAudit{
+						Rules: []auditv1.PolicyRule{
+							{
+								Level: auditv1.LevelMetadata,
+							},
+						},
+					},
+				},
 			},
 			Outputs: []loggingv1.OutputSpec{
 				{
@@ -444,7 +528,7 @@ func Test_Logging_Managed_Collection(t *testing.T) {
 	// Setup the fake k8s client
 	fakeKubeClient = fake.NewClientBuilder().
 		WithScheme(scheme.Scheme).
-		WithObjects(addOnDeploymentConfig, mtls).
+		WithObjects(addOnDeploymentConfig, existingCLF, mtls).
 		Build()
 
 	// Setup the fake addon client
@@ -530,12 +614,6 @@ func Test_Logging_Managed_Storage(t *testing.T) {
 			ConfigReferent: addonapiv1alpha1.ConfigReferent{
 				Namespace: "local-cluster",
 				Name:      "default-stack-instance-bar",
-			},
-			DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
-				ConfigReferent: addonapiv1alpha1.ConfigReferent{
-					Namespace: "local-cluster",
-					Name:      "default-stack-instance-bar",
-				},
 			},
 		},
 	}

@@ -110,9 +110,6 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, err
 	}
 
-	// TODO(JoaoBraveCoding) tmp
-	r.Log.Info("Reconciling ResourceCreator", "AddOnDeploymentConfig", aodc.Name)
-
 	// TODO(JoaoBraveCoding) Delete flow
 
 	// TODO(JoaoBraveCoding) Fetch the ManagedClusterAddOn instance to get the placements
@@ -120,8 +117,6 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	objects := []client.Object{}
 	switch {
 	case opts.Platform.Logs.ManagedStack:
-		// TODO(JoaoBraveCoding) tmp
-		r.Log.Info("Reconciling Logs ManagedStack", "AddOnDeploymentConfig", aodc.Name)
 		// Get ManagedClusterAddOn for buildOptions
 		key = client.ObjectKey{Namespace: "local-cluster", Name: addon.Name}
 		mcAddon := &addonv1alpha1.ManagedClusterAddOn{}
