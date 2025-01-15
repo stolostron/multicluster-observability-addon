@@ -3,6 +3,7 @@ package resourcecreator
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/go-logr/logr"
 	lokiv1 "github.com/grafana/loki/operator/api/loki/v1"
@@ -10,7 +11,6 @@ import (
 	"github.com/rhobs/multicluster-observability-addon/internal/addon"
 	lhandlers "github.com/rhobs/multicluster-observability-addon/internal/logging/handlers"
 	lmanifests "github.com/rhobs/multicluster-observability-addon/internal/logging/manifests"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
@@ -26,10 +26,7 @@ import (
 )
 
 func validateAODC(namespace, name string) bool {
-	if namespace != addon.InstallNamespace {
-		return false
-	}
-	if name != addon.Name {
+	if namespace != addon.InstallNamespace || name != addon.Name {
 		return false
 	}
 	return true
@@ -104,54 +101,45 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	if err := r.Get(ctx, key, aodc); err != nil {
 		return ctrl.Result{}, err
 	}
-
 	opts, err := addon.BuildOptions(aodc)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
-	// TODO(JoaoBraveCoding) Delete flow
+	// TODO(JoaoBraveCoding) Delete flow for when a placement is removed
 
-	// TODO(JoaoBraveCoding) Fetch the ManagedClusterAddOn instance to get the placements
+	key = client.ObjectKey{Name: addon.Name}
+	cmao := &addonv1alpha1.ClusterManagementAddOn{}
+	if err := r.Get(ctx, key, cmao); err != nil {
+		return ctrl.Result{}, err
+	}
 
 	objects := []client.Object{}
-	switch {
-	case opts.Platform.Logs.ManagedStack:
-		// Get ManagedClusterAddOn for buildOptions
-		key = client.ObjectKey{Namespace: "local-cluster", Name: addon.Name}
-		mcAddon := &addonv1alpha1.ManagedClusterAddOn{}
-		if err := r.Get(ctx, key, mcAddon); err != nil {
-			return ctrl.Result{}, err
-		}
+	for _, placement := range cmao.Spec.InstallStrategy.Placements {
+		resourceName := fmt.Sprintf("%s-%s", addon.DefaultStackPrefix, placement.Name)
+		switch {
+		case opts.Platform.Logs.DefaultStack:
+			loggingOpts, err := lhandlers.DefaultStackOptions(ctx, r.Client, opts.Platform.Logs, opts.UserWorkloads.Logs, opts.HubHostname, resourceName)
+			if err != nil {
+				return ctrl.Result{}, err
+			}
 
-		loggingOpts, err := lhandlers.BuildDefaultOptions(ctx, r.Client, mcAddon, opts.Platform.Logs, opts.UserWorkloads.Logs, true, opts.HubHostname)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
+			// Currently there is no difference between the necessary fields to create a
+			// CLF instance and the fields that we want to enforce on the default-stack CLF
+			// so there is no need to customize BuildSSAClusterLogForwarder to return a
+			// slightly different CLF if there is already an instance on the cluster
+			clf, err := lmanifests.BuildSSAClusterLogForwarder(loggingOpts, resourceName)
+			if err != nil {
+				return ctrl.Result{}, err
+			}
+			objects = append(objects, clf)
 
-		// Currently there is no difference between the necessary fields to create a
-		// CLF instance and the fields that we want to enforce on the default-stack CLF
-		// so there is no need to customize BuildSSAClusterLogForwarder to return a
-		// slightly different CLF if there is already an instance on the cluster
-		clf, err := lmanifests.BuildSSAClusterLogForwarder(loggingOpts)
-		if err != nil {
-			return ctrl.Result{}, err
+			ls, err := lmanifests.BuildSSALokiStack(loggingOpts, resourceName)
+			if err != nil {
+				return ctrl.Result{}, err
+			}
+			objects = append(objects, ls)
 		}
-		objects = append(objects, clf)
-
-		// TODO(JoaoBraveCoding) update the name
-		key = client.ObjectKey{Namespace: addon.InstallNamespace, Name: addon.DefaultStackPrefix}
-		existingLS := &lokiv1.LokiStack{}
-		err = r.Get(ctx, key, existingLS)
-		if err != nil && !apierrors.IsNotFound(err) {
-			return ctrl.Result{}, err
-		}
-		// Build the loki instances
-		ls, err := lmanifests.BuildSSALokiStack(loggingOpts, existingLS)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
-		objects = append(objects, ls)
 	}
 
 	// SSA the objects rendered
@@ -176,14 +164,16 @@ func (r *ResourceCreatorReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 func (r *ResourceCreatorReconciler) enqueueDefaultResources() handler.EventHandler {
 	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
-		// Always re-trigger a reconciliation of the AODC
-		return []reconcile.Request{
-			{
-				NamespacedName: types.NamespacedName{
-					Name:      addon.Name,
-					Namespace: addon.InstallNamespace,
+		if strings.HasSuffix(obj.GetName(), addon.DefaultStackPrefix) {
+			return []reconcile.Request{
+				{
+					NamespacedName: types.NamespacedName{
+						Name:      addon.Name,
+						Namespace: addon.InstallNamespace,
+					},
 				},
-			},
+			}
 		}
+		return []reconcile.Request{}
 	})
 }

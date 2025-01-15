@@ -63,7 +63,7 @@ func BuildValues(opts Options) (*LoggingValues, error) {
 }
 
 func enabledLogging(opts Options) bool {
-	return opts.UnmanagedCollectionEnabled() || opts.ManagedStackEnabled()
+	return opts.UnmanagedCollectionEnabled() || opts.DefaultStackEnabled()
 }
 
 func buildUnmangedValues(opts Options) (UnmanagedValues, error) {
@@ -113,7 +113,7 @@ func buildUnmangedValues(opts Options) (UnmanagedValues, error) {
 }
 
 func buildMangedValues(opts Options) (ManagedValues, error) {
-	if !opts.ManagedStackEnabled() {
+	if !opts.DefaultStackEnabled() {
 		return ManagedValues{}, nil
 	}
 	mValues := ManagedValues{}

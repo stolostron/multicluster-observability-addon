@@ -14,7 +14,7 @@ const mcoaAdmin = "mcoa-logs-admin"
 func buildManagedLokistackSpec(opts Options) (lokiv1.LokiStackSpec, error) {
 	// Tenants definition
 	tenantsAuthentication := []lokiv1.AuthenticationSpec{}
-	for _, tenant := range opts.ManagedStack.Storage.Tenants {
+	for _, tenant := range opts.DefaultStack.Storage.Tenants {
 		tenantAuth := lokiv1.AuthenticationSpec{
 			TenantName: tenant,
 			TenantID:   tenant,
@@ -25,7 +25,7 @@ func buildManagedLokistackSpec(opts Options) (lokiv1.LokiStackSpec, error) {
 					CAKey: "ca.crt",
 					// TODO (JoaoBraveCoding): This for now this will have to be manually
 					// created, since LokiStack doesn't allow for secrets to be referenced
-					CA: ManagedStorageMTLSSecretName,
+					CA: DefaultStorageMTLSSecretName,
 				},
 			},
 		}
@@ -35,7 +35,7 @@ func buildManagedLokistackSpec(opts Options) (lokiv1.LokiStackSpec, error) {
 	// Tenants Read & Write RBAC
 	roles := []lokiv1.RoleSpec{}
 	rolesBinding := []lokiv1.RoleBindingsSpec{}
-	for _, tenant := range opts.ManagedStack.Storage.Tenants {
+	for _, tenant := range opts.DefaultStack.Storage.Tenants {
 		role := lokiv1.RoleSpec{
 			Name:        fmt.Sprintf("%s-logs", tenant),
 			Resources:   []string{"logs"},
@@ -59,7 +59,7 @@ func buildManagedLokistackSpec(opts Options) (lokiv1.LokiStackSpec, error) {
 		Name:        "cluster-reader",
 		Resources:   []string{"logs"},
 		Permissions: []lokiv1.PermissionType{"read"},
-		Tenants:     opts.ManagedStack.Storage.Tenants,
+		Tenants:     opts.DefaultStack.Storage.Tenants,
 	}
 	roles = append(roles, adminRole)
 	adminRoleBinding := lokiv1.RoleBindingsSpec{
@@ -138,7 +138,7 @@ func buildManagedLokistackSpec(opts Options) (lokiv1.LokiStackSpec, error) {
 		},
 	}
 
-	lsSpec := opts.ManagedStack.Storage.LokiStack.Spec
+	lsSpec := opts.DefaultStack.Storage.LokiStack.Spec
 	lsSpec.ManagementState = lokiv1.ManagementStateManaged
 	lsSpec.Tenants = tenants
 	lsSpec.Limits.Global.OTLP = limitsOTLP
@@ -148,24 +148,24 @@ func buildManagedLokistackSpec(opts Options) (lokiv1.LokiStackSpec, error) {
 func buildManagedStorageSecrets(resources Options) ([]ResourceValue, error) {
 	secretsValue := []ResourceValue{}
 
-	dataJSON, err := json.Marshal(resources.ManagedStack.Storage.ObjStorageSecret.Data)
+	dataJSON, err := json.Marshal(resources.DefaultStack.Storage.ObjStorageSecret.Data)
 	if err != nil {
 		return secretsValue, err
 	}
 
 	rv := ResourceValue{
-		Name: resources.ManagedStack.Storage.ObjStorageSecret.Name,
+		Name: resources.DefaultStack.Storage.ObjStorageSecret.Name,
 		Data: string(dataJSON),
 	}
 	secretsValue = append(secretsValue, rv)
 
-	dataJSON, err = json.Marshal(resources.ManagedStack.Storage.MTLSSecret.Data)
+	dataJSON, err = json.Marshal(resources.DefaultStack.Storage.MTLSSecret.Data)
 	if err != nil {
 		return secretsValue, err
 	}
 
 	rv = ResourceValue{
-		Name: resources.ManagedStack.Storage.MTLSSecret.Name,
+		Name: resources.DefaultStack.Storage.MTLSSecret.Name,
 		Data: string(dataJSON),
 	}
 	secretsValue = append(secretsValue, rv)
@@ -173,7 +173,9 @@ func buildManagedStorageSecrets(resources Options) ([]ResourceValue, error) {
 	return secretsValue, nil
 }
 
-func BuildSSALokiStack(opts Options, existingLS *lokiv1.LokiStack) (*lokiv1.LokiStack, error) {
+func BuildSSALokiStack(opts Options, lsName string) (*lokiv1.LokiStack, error) {
+	existingLS := opts.DefaultStack.Storage.LokiStack
+
 	lokistackSpec, err := buildManagedLokistackSpec(opts)
 	if err != nil {
 		return nil, err
@@ -189,7 +191,7 @@ func BuildSSALokiStack(opts Options, existingLS *lokiv1.LokiStack) (*lokiv1.Loki
 		lokistackSpec.Storage = lokiv1.ObjectStorageSpec{
 			Secret: lokiv1.ObjectStorageSecretSpec{
 				Type: "s3",
-				Name: ManagedStorageObjStorageSecretName,
+				Name: DefaultStorageObjStorageSecretName,
 			},
 			Schemas: []lokiv1.ObjectStorageSchema{
 				{
@@ -210,7 +212,7 @@ func BuildSSALokiStack(opts Options, existingLS *lokiv1.LokiStack) (*lokiv1.Loki
 			APIVersion: lokiv1.GroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      addon.DefaultStackPrefix,
+			Name:      lsName,
 			Namespace: addon.InstallNamespace,
 		},
 		Spec: lokistackSpec,

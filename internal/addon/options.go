@@ -36,7 +36,7 @@ const (
 type LogsOptions struct {
 	CollectionEnabled   bool
 	SubscriptionChannel string
-	ManagedStack        bool
+	DefaultStack        bool
 }
 
 type TracesOptions struct {
@@ -90,7 +90,7 @@ func BuildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Opti
 			// TODO(JoaoBraveCoding): we need to review what the value should be
 			if keyvalue.Value == "true" {
 				opts.Platform.Enabled = true
-				opts.Platform.Logs.ManagedStack = true
+				opts.Platform.Logs.DefaultStack = true
 			}
 		// User Workload Observability Options
 		case KeyUserWorkloadLogsCollection:

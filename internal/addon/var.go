@@ -18,8 +18,8 @@ const (
 	ClusterLogForwardersResource  = "clusterlogforwarders"
 	LokiStacksResource            = "lokistacks"
 	SpokeUnmanagedCLFName         = "mcoa-instance"
-	SpokeManagedCLFName           = "mcoa-managed-instance"
-	SpokeManagedLSName            = "mcoa-managed-instance"
+	SpokeDefaultStackCLFName      = "mcoa-managed-instance"
+	SpokeDefaultStackLSName       = "mcoa-managed-instance"
 	LoggingNamespace              = "openshift-logging"
 	clfProbeKey                   = "isReady"
 	// TODO @JoaoBraveCoding this most likely needs to be updated to reflect the new path

@@ -56,7 +56,7 @@ func GetValuesFunc(ctx context.Context, k8s client.Client) addonfactory.GetValue
 
 		isHubCluster := isHubCluster(cluster)
 		values := HelmChartValues{}
-		if opts.Platform.Logs.CollectionEnabled || opts.UserWorkloads.Logs.CollectionEnabled || opts.Platform.Logs.ManagedStack {
+		if opts.Platform.Logs.CollectionEnabled || opts.UserWorkloads.Logs.CollectionEnabled || opts.Platform.Logs.DefaultStack {
 			loggingOpts, err := lhandlers.BuildOptions(ctx, k8s, mcAddon, opts.Platform.Logs, opts.UserWorkloads.Logs, isHubCluster, opts.HubHostname)
 			if err != nil {
 				return nil, err

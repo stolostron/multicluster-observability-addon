@@ -20,7 +20,7 @@ func buildManagedCLFSpec(opts Options) (loggingv1.ClusterLogForwarderSpec, error
 			Name: "hub-lokistack",
 			Type: loggingv1.OutputTypeOTLP,
 			OTLP: &loggingv1.OTLP{
-				URL: opts.ManagedStack.LokiURL,
+				URL: opts.DefaultStack.LokiURL,
 			},
 			TLS: &loggingv1.OutputTLSSpec{
 				// TODO(JoaoBraveCoding): currently this is required due to LokiStack not
@@ -29,15 +29,15 @@ func buildManagedCLFSpec(opts Options) (loggingv1.ClusterLogForwarderSpec, error
 				TLSSpec: loggingv1.TLSSpec{
 					CA: &loggingv1.ValueReference{
 						Key:        "ca.crt",
-						SecretName: ManagedCollectionSecretName,
+						SecretName: DefaultCollectionSecretName,
 					},
 					Certificate: &loggingv1.ValueReference{
 						Key:        corev1.TLSCertKey,
-						SecretName: ManagedCollectionSecretName,
+						SecretName: DefaultCollectionSecretName,
 					},
 					Key: &loggingv1.SecretReference{
 						Key:        corev1.TLSPrivateKeyKey,
-						SecretName: ManagedCollectionSecretName,
+						SecretName: DefaultCollectionSecretName,
 					},
 				},
 			},
@@ -51,7 +51,7 @@ func buildManagedCLFSpec(opts Options) (loggingv1.ClusterLogForwarderSpec, error
 		},
 	}
 
-	clfSpec := opts.ManagedStack.Collection.ClusterLogForwarder.Spec
+	clfSpec := opts.DefaultStack.Collection.ClusterLogForwarder.Spec
 	clfSpec.ManagementState = loggingv1.ManagementStateManaged
 	clfSpec.ServiceAccount = sa
 	clfSpec.Outputs = outputs
@@ -62,7 +62,7 @@ func buildManagedCLFSpec(opts Options) (loggingv1.ClusterLogForwarderSpec, error
 
 func buildManagedCollectionSecrets(resources Options) ([]ResourceValue, error) {
 	secretsValue := []ResourceValue{}
-	for _, secret := range resources.ManagedStack.Collection.Secrets {
+	for _, secret := range resources.DefaultStack.Collection.Secrets {
 		dataJSON, err := json.Marshal(secret.Data)
 		if err != nil {
 			return secretsValue, err
@@ -78,7 +78,7 @@ func buildManagedCollectionSecrets(resources Options) ([]ResourceValue, error) {
 
 func buildManagedCollectionConfigMaps(resources Options) ([]ResourceValue, error) {
 	configmapsValue := []ResourceValue{}
-	for _, configmap := range resources.ManagedStack.Collection.ConfigMaps {
+	for _, configmap := range resources.DefaultStack.Collection.ConfigMaps {
 		dataJSON, err := json.Marshal(configmap.Data)
 		if err != nil {
 			return configmapsValue, err
@@ -92,7 +92,7 @@ func buildManagedCollectionConfigMaps(resources Options) ([]ResourceValue, error
 	return configmapsValue, nil
 }
 
-func BuildSSAClusterLogForwarder(opts Options) (*loggingv1.ClusterLogForwarder, error) {
+func BuildSSAClusterLogForwarder(opts Options, clfName string) (*loggingv1.ClusterLogForwarder, error) {
 	clfSpec, err := buildManagedCLFSpec(opts)
 	if err != nil {
 		return nil, err
@@ -105,8 +105,7 @@ func BuildSSAClusterLogForwarder(opts Options) (*loggingv1.ClusterLogForwarder, 
 			APIVersion: loggingv1.GroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			// TODO(JoaoBraveCoding) should have the placement as the suffix
-			Name:      addon.DefaultStackPrefix,
+			Name:      clfName,
 			Namespace: addon.InstallNamespace,
 		},
 		Spec: clfSpec,

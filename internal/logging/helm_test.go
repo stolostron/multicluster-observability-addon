@@ -460,7 +460,7 @@ func Test_Logging_Managed_Collection(t *testing.T) {
 			Kind:       "ClusterLogForwarder",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      addon.SpokeManagedCLFName,
+			Name:      addon.SpokeDefaultStackCLFName,
 			Namespace: "openshift-logging",
 			Annotations: map[string]string{
 				"observability.openshift.io/tech-preview-otlp-output": "enabled",
@@ -563,7 +563,7 @@ func Test_Logging_Managed_Collection(t *testing.T) {
 			require.Equal(t, expectedCLF, obj)
 			// Check name and namespace to make sure that if we change the helm
 			// manifests that we don't break the addon probes
-			require.Equal(t, addon.SpokeManagedCLFName, obj.Name)
+			require.Equal(t, addon.SpokeDefaultStackCLFName, obj.Name)
 			require.Equal(t, addon.LoggingNamespace, obj.Namespace)
 		}
 	}
@@ -701,7 +701,7 @@ func Test_Logging_Managed_Storage(t *testing.T) {
 			Kind:       "LokiStack",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      addon.SpokeManagedLSName,
+			Name:      addon.SpokeDefaultStackLSName,
 			Namespace: "openshift-logging",
 			Labels: map[string]string{
 				"release": "multicluster-observability-addon",
@@ -909,7 +909,7 @@ func Test_Logging_Managed_Storage(t *testing.T) {
 			require.Equal(t, expectedLS, obj)
 			// Check name and namespace to make sure that if we change the helm
 			// manifests that we don't break the addon probes
-			require.Equal(t, addon.SpokeManagedCLFName, obj.Name)
+			require.Equal(t, addon.SpokeDefaultStackCLFName, obj.Name)
 			require.Equal(t, addon.LoggingNamespace, obj.Namespace)
 		}
 	}
