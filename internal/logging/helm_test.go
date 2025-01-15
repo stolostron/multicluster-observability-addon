@@ -897,7 +897,7 @@ func Test_Logging_Managed_Storage(t *testing.T) {
 	// Render manifests and return them as k8s runtime objects
 	objects, err := loggingAgentAddon.Manifests(managedCluster, managedClusterAddOn)
 	require.NoError(t, err)
-	require.Equal(t, 6, len(objects))
+	require.Equal(t, 4, len(objects))
 
 	for _, obj := range objects {
 		switch obj := obj.(type) {

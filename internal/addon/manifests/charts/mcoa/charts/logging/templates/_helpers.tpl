@@ -14,11 +14,3 @@ true
 false
 {{- end -}}
 {{- end -}}
-
-{{- define "logginghelm.installLO" -}}
-{{- if and .Values.enabled .Values.managed.storage.enabled -}}
-true
-{{- else -}}
-false
-{{- end -}}
-{{- end -}}
