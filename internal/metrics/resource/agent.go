@@ -40,8 +40,6 @@ func DefaultPlaftformAgentResources(ns string) []client.Object {
 	agent.Spec.ConfigMaps = []string{proxyCfg.Name}
 	ret = append(ret, agent) // listen only to the same namespace
 	ret = append(ret, proxyCfg)
-	ret = append(ret, PlatformScrapeConfig(ns))
-	ret = append(ret, PlatformRecordingRules(ns))
 	return ret
 }
 

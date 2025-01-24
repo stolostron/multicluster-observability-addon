@@ -61,9 +61,6 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				// ensure that scrape config is created and matches the agent
 				scrapeCfgs := getResourceByLabelSelector[*prometheusalpha1.ScrapeConfig](objects, config.PlatformPrometheusMatchLabels)
 				assert.Len(t, scrapeCfgs, 1)
-				for k, v := range agent[0].Spec.ScrapeConfigSelector.MatchLabels {
-					assert.Equal(t, v, scrapeCfgs[0].Labels[k])
-				}
 				assert.Equal(t, config.PrometheusControllerID, scrapeCfgs[0].Annotations["operator.prometheus.io/controller-id"])
 				// ensure that recording rules are created
 				recordingRules := getResourceByLabelSelector[*prometheusv1.PrometheusRule](objects, config.PlatformPrometheusMatchLabels)
@@ -105,6 +102,32 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 
 	// Add platform resources
 	defaultAgentResources := resource.DefaultPlaftformAgentResources(hubNamespace)
+	platformScrapeConfig := &prometheusalpha1.ScrapeConfig{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       prometheusalpha1.ScrapeConfigsKind,
+			APIVersion: prometheusalpha1.SchemeGroupVersion.Identifier(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "platform",
+			Namespace: hubNamespace,
+			Labels:    config.PlatformPrometheusMatchLabels,
+		},
+		Spec: prometheusalpha1.ScrapeConfigSpec{},
+	}
+	defaultAgentResources = append(defaultAgentResources, platformScrapeConfig)
+	platformRules := &prometheusv1.PrometheusRule{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       prometheusv1.PrometheusRuleKind,
+			APIVersion: prometheusv1.SchemeGroupVersion.Identifier(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "platform",
+			Namespace: hubNamespace,
+			Labels:    config.PlatformPrometheusMatchLabels,
+		},
+		Spec: prometheusv1.PrometheusRuleSpec{},
+	}
+	defaultAgentResources = append(defaultAgentResources, platformRules)
 
 	// Add user workload resources
 	defaultAgentResources = append(defaultAgentResources, resource.DefaultUserWorkloadAgentResources(hubNamespace)...)
