@@ -17,4 +17,5 @@ metadata:
     {{- toYaml $mergedAnnotations | nindent 4 }}
 spec:
 {{ fromJson $scrapeconfig.data | toYaml | nindent 2 }}
+---
 {{- end }}

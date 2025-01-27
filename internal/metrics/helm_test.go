@@ -60,15 +60,15 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				assert.Len(t, haProxyConfig, 1)
 				// ensure that scrape config is created and matches the agent
 				scrapeCfgs := getResourceByLabelSelector[*prometheusalpha1.ScrapeConfig](objects, config.PlatformPrometheusMatchLabels)
-				assert.Len(t, scrapeCfgs, 1)
+				assert.Len(t, scrapeCfgs, 2)
 				assert.Equal(t, config.PrometheusControllerID, scrapeCfgs[0].Annotations["operator.prometheus.io/controller-id"])
 				// ensure that recording rules are created
 				recordingRules := getResourceByLabelSelector[*prometheusv1.PrometheusRule](objects, config.PlatformPrometheusMatchLabels)
-				assert.Len(t, recordingRules, 1)
+				assert.Len(t, recordingRules, 2)
 				assert.Equal(t, "openshift-monitoring/prometheus-operator", recordingRules[0].Annotations["operator.prometheus.io/controller-id"])
 				// ensure that the number of objects is correct
-				// 4 (prom operator) + 6 (agent + haproxy config) + 2 secrets (mTLS to hub) + 1 cm (prom ca) + 1 rule + 1 scrape config = 15
-				assert.Len(t, objects, 15)
+				// 4 (prom operator) + 6 (agent + haproxy config) + 2 secrets (mTLS to hub) + 1 cm (prom ca) + 2 rule + 2 scrape config = 16
+				assert.Len(t, objects, 17)
 				assert.Len(t, getResourceByLabelSelector[*corev1.Secret](objects, nil), 2) // 2 secrets (mTLS to hub)
 			},
 		},
@@ -84,8 +84,16 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				// ensure that the haproxy config is created
 				haProxyConfig := getResourceByLabelSelector[*corev1.ConfigMap](objects, config.UserWorkloadPrometheusMatchLabels)
 				assert.Len(t, haProxyConfig, 1)
+				// ensure that scrape config is created and matches the agent
+				scrapeCfgs := getResourceByLabelSelector[*prometheusalpha1.ScrapeConfig](objects, config.UserWorkloadPrometheusMatchLabels)
+				assert.Len(t, scrapeCfgs, 2)
+				assert.Equal(t, config.PrometheusControllerID, scrapeCfgs[0].Annotations["operator.prometheus.io/controller-id"])
+				// ensure that recording rules are created
+				recordingRules := getResourceByLabelSelector[*prometheusv1.PrometheusRule](objects, config.UserWorkloadPrometheusMatchLabels)
+				assert.Len(t, recordingRules, 2)
+				assert.Equal(t, "openshift-user-workload-monitoring/prometheus-operator", recordingRules[0].Annotations["operator.prometheus.io/controller-id"])
 
-				assert.Len(t, objects, 13)
+				assert.Len(t, objects, 17)
 				assert.Len(t, getResourceByLabelSelector[*corev1.Secret](objects, nil), 2) // 2 secrets (mTLS to hub)
 			},
 		},
@@ -114,7 +122,9 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 		},
 		Spec: prometheusalpha1.ScrapeConfigSpec{},
 	}
-	defaultAgentResources = append(defaultAgentResources, platformScrapeConfig)
+	platformScrapeConfigAdditional := platformScrapeConfig.DeepCopy() // Checks that the helm loop is well set
+	platformScrapeConfigAdditional.Name = platformScrapeConfigAdditional.Name + "- additional"
+	defaultAgentResources = append(defaultAgentResources, platformScrapeConfig, platformScrapeConfigAdditional)
 	platformRules := &prometheusv1.PrometheusRule{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       prometheusv1.PrometheusRuleKind,
@@ -127,30 +137,38 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 		},
 		Spec: prometheusv1.PrometheusRuleSpec{},
 	}
-	defaultAgentResources = append(defaultAgentResources, platformRules)
+	platformRulesAdditional := platformRules.DeepCopy() // Checks that the helm loop is well set
+	platformRulesAdditional.Name = platformRulesAdditional.Name + "-additional"
+	defaultAgentResources = append(defaultAgentResources, platformRules, platformRulesAdditional)
 
 	// Add user workload resources
 	defaultAgentResources = append(defaultAgentResources, resource.DefaultUserWorkloadAgentResources(hubNamespace)...)
 
 	configReferences := []addonapiv1alpha1.ConfigReference{}
 	for _, obj := range defaultAgentResources {
-		resource := strings.ToLower(obj.GetObjectKind().GroupVersionKind().Kind) + "s"
-		configReferences = append(configReferences, addonapiv1alpha1.ConfigReference{
-			ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
-				Group:    obj.GetObjectKind().GroupVersionKind().Group,
-				Resource: resource,
-			},
-			DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
-				ConfigReferent: addonapiv1alpha1.ConfigReferent{
-					Namespace: obj.GetNamespace(),
-					Name:      obj.GetName(),
-				},
-			},
-		})
+		configReferences = append(configReferences, newConfigReference(obj))
 	}
 
 	clientObjects := []client.Object{}
 	clientObjects = append(clientObjects, defaultAgentResources...)
+
+	// Add uwl scrape configs
+	uwlScrapeConfig := platformScrapeConfig.DeepCopy()
+	uwlScrapeConfig.Name = "uwl-scrape-config"
+	uwlScrapeConfig.Labels = config.UserWorkloadPrometheusMatchLabels
+	uwlScrapeConfigAdditional := uwlScrapeConfig.DeepCopy() // Checks that the helm loop is well set
+	uwlScrapeConfigAdditional.Name = "uwl-scrape-config-additional"
+	configReferences = append(configReferences, newConfigReference(uwlScrapeConfig), newConfigReference(uwlScrapeConfigAdditional))
+	clientObjects = append(clientObjects, uwlScrapeConfig, uwlScrapeConfigAdditional)
+
+	// Add uwl rules
+	uwlRules := platformRules.DeepCopy()
+	uwlRules.Name = "uwl-rules"
+	uwlRules.Labels = config.UserWorkloadPrometheusMatchLabels
+	uwlRulesAdditional := uwlRules.DeepCopy()
+	uwlRulesAdditional.Name = "uwl-rules-additional"
+	configReferences = append(configReferences, newConfigReference(uwlRules), newConfigReference(uwlRulesAdditional))
+	clientObjects = append(clientObjects, uwlRules, uwlRulesAdditional)
 
 	// Add secrets needed for the agent connection to the hub
 	clientObjects = append(clientObjects, newSecret(config.HubCASecretName, hubNamespace))
@@ -280,6 +298,23 @@ func fakeGetValues(k8s client.Client, platformMetrics, userWorkloadMetrics bool)
 		}
 
 		return addonfactory.JsonStructToValues(helmValues)
+	}
+}
+
+func newConfigReference(obj client.Object) addonapiv1alpha1.ConfigReference {
+	resource := strings.ToLower(obj.GetObjectKind().GroupVersionKind().Kind) + "s"
+
+	return addonapiv1alpha1.ConfigReference{
+		ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+			Group:    obj.GetObjectKind().GroupVersionKind().Group,
+			Resource: resource,
+		},
+		DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
+			ConfigReferent: addonapiv1alpha1.ConfigReferent{
+				Namespace: obj.GetNamespace(),
+				Name:      obj.GetName(),
+			},
+		},
 	}
 }
 
