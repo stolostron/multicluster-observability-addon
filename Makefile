@@ -65,22 +65,6 @@ lint-fix: $(GOLANGCI_LINT) ## Attempt to automatically fix lint issues in source
 test:
 	go test ./internal/...
 
-.PHONY: integration-test
-integration-test:
-	go test -timeout 30s ./test/integration/...
-
-.PHONY: integration-env
-integration-env: prepare-bin install-crds
-	@mkdir -p tmp/crds
-	@curl -sL -o tmp/crds/addon.open-cluster-management.io_addondeploymentconfigs.crd.yaml https://raw.githubusercontent.com/open-cluster-management-io/api/f6c65820279078afbe536d5a6012e0b3badde3c5/addon/v1alpha1/0000_02_addon.open-cluster-management.io_addondeploymentconfigs.crd.yaml
-	@curl -sL -o tmp/crds/addon.open-cluster-management.io_clustermanagementaddons.crd.yaml https://raw.githubusercontent.com/open-cluster-management-io/api/f6c65820279078afbe536d5a6012e0b3badde3c5/addon/v1alpha1/0000_00_addon.open-cluster-management.io_clustermanagementaddons.crd.yaml
-	@curl -sL -o tmp/crds/addon.open-cluster-management.io_managedclusteraddons.crd.yaml https://raw.githubusercontent.com/open-cluster-management-io/api/f6c65820279078afbe536d5a6012e0b3badde3c5/addon/v1alpha1/0000_01_addon.open-cluster-management.io_managedclusteraddons.crd.yaml 
-	@curl -sL -o tmp/crds/clusters.open-cluster-management.io_managedclusters.crd.yaml https://raw.githubusercontent.com/open-cluster-management-io/api/f6c65820279078afbe536d5a6012e0b3badde3c5/cluster/v1/0000_00_clusters.open-cluster-management.io_managedclusters.crd.yaml 
-	@curl -sL -o tmp/crds/work.open-cluster-management.io_manifestworks.crd.yaml https://raw.githubusercontent.com/open-cluster-management-io/api/f6c65820279078afbe536d5a6012e0b3badde3c5/work/v1/0000_00_work.open-cluster-management.io_manifestworks.crd.yaml 
-	@curl -sL -o tmp/crds/monitoring.coreos.com_prometheusrules.yaml https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/refs/heads/release-0.77/example/prometheus-operator-crd/monitoring.coreos.com_prometheusrules.yaml
-	@GOBIN=$(BIN_DIR) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
-	@$(BIN_DIR)/setup-envtest -p env use 1.30.x
-
 .PHONY: prepare-bin
 prepare-bin:
 	@mkdir -p $(BIN_DIR)
