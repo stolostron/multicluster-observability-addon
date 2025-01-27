@@ -19,12 +19,15 @@ require (
 	k8s.io/client-go v0.30.3
 	k8s.io/component-base v0.30.3
 	k8s.io/klog/v2 v2.130.1
+	k8s.io/utils v0.0.0-20240502163921-fe8a2dddb1d0
 	open-cluster-management.io/addon-framework v0.11.0
 	open-cluster-management.io/api v0.15.0
 	sigs.k8s.io/controller-runtime v0.18.5
 )
 
 replace github.com/prometheus/common => github.com/prometheus/common v0.60.1
+
+// replace open-cluster-management.io/addon-framework => ../addon-framework
 
 replace github.com/prometheus/client_golang => github.com/prometheus/client_golang v1.20.5
 
@@ -134,7 +137,6 @@ require (
 	k8s.io/apiserver v0.30.3 // indirect
 	k8s.io/kms v0.30.3 // indirect
 	k8s.io/kube-openapi v0.0.0-20240620174524-b456828f718b // indirect
-	k8s.io/utils v0.0.0-20240502163921-fe8a2dddb1d0 // indirect
 	open-cluster-management.io/sdk-go v0.15.0 // indirect
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.29.0 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
