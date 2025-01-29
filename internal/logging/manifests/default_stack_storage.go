@@ -78,7 +78,6 @@ func buildManagedLokistackSpec(opts Options) (lokiv1.LokiStackSpec, error) {
 		Authorization: &lokiv1.AuthorizationSpec{
 			Roles:        roles,
 			RoleBindings: rolesBinding,
-			OPA:          &lokiv1.OPASpec{},
 		},
 	}
 	limitsOTLP := &lokiv1.OTLPSpec{
@@ -141,6 +140,12 @@ func buildManagedLokistackSpec(opts Options) (lokiv1.LokiStackSpec, error) {
 	lsSpec := opts.DefaultStack.Storage.LokiStack.Spec
 	lsSpec.ManagementState = lokiv1.ManagementStateManaged
 	lsSpec.Tenants = tenants
+	if lsSpec.Limits == nil {
+		lsSpec.Limits = &lokiv1.LimitsSpec{Global: &lokiv1.LimitsTemplateSpec{}}
+	}
+	if lsSpec.Limits.Global == nil {
+		lsSpec.Limits.Global = &lokiv1.LimitsTemplateSpec{}
+	}
 	lsSpec.Limits.Global.OTLP = limitsOTLP
 	return lsSpec, nil
 }

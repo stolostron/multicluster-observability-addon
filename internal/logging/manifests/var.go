@@ -5,7 +5,7 @@ const (
 	defaultLoggingVersion       = "stable-6.1"
 
 	DefaultCollectionCertCommonName = "mcoa-logging-managed-collection"
-	DefaultCollectionSecretName     = "mcoa-logging-managed-collection-tls"
+	DefaultCollectionMTLSSecretName = "mcoa-logging-managed-collection-tls"
 
 	DefaultStorageCertCommonName       = "mcoa-logging-managed-storage"
 	DefaultStorageMTLSSecretName       = "mcoa-logging-managed-storage-tls"

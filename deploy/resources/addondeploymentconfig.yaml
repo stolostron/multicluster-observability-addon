@@ -9,7 +9,7 @@ spec:
   - name: openshiftLoggingChannel
     value: stable-6.1
   - name: hubHostname
-    value: jmarcalaws2411297.devcluster.openshift.com
+    value: jmarcalaws2501299.devcluster.openshift.com
   # Platform Observability
   - name: platformLogsDefault
     value: "true"

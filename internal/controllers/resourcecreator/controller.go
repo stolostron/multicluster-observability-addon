@@ -164,7 +164,7 @@ func (r *ResourceCreatorReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 func (r *ResourceCreatorReconciler) enqueueDefaultResources() handler.EventHandler {
 	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
-		if strings.HasSuffix(obj.GetName(), addon.DefaultStackPrefix) {
+		if strings.HasPrefix(obj.GetName(), addon.DefaultStackPrefix) {
 			return []reconcile.Request{
 				{
 					NamespacedName: types.NamespacedName{

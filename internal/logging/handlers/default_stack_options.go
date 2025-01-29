@@ -32,7 +32,7 @@ func DefaultStackOptions(ctx context.Context, k8s client.Client, platform, userW
 				Secrets: []corev1.Secret{
 					{
 						ObjectMeta: metav1.ObjectMeta{
-							Name:      manifests.DefaultCollectionSecretName,
+							Name:      manifests.DefaultCollectionMTLSSecretName,
 							Namespace: addon.InstallNamespace,
 						},
 					},
@@ -107,7 +107,7 @@ func createDefaultStackCertificates(ctx context.Context, k8s client.Client, mcAd
 			},
 			DNSNames: []string{manifests.DefaultCollectionCertCommonName},
 		}
-		key := client.ObjectKey{Name: manifests.DefaultCollectionSecretName, Namespace: mcAddon.Namespace}
+		key := client.ObjectKey{Name: manifests.DefaultCollectionMTLSSecretName, Namespace: mcAddon.Namespace}
 		cert, err := addonmanifests.BuildClientCertificate(key, certConfig)
 		if err != nil {
 			return err
@@ -177,15 +177,13 @@ func buildDefaultStackOptions(ctx context.Context, k8s client.Client, mcAddon *a
 		}
 		opts.DefaultStack.Collection.ClusterLogForwarder = clf
 
-		secret := &corev1.Secret{}
-		key := client.ObjectKey{Name: manifests.DefaultCollectionSecretName, Namespace: mcAddon.Namespace}
-		err := k8s.Get(ctx, key, secret, &client.GetOptions{})
+		mTLSSecret, err := addon.GetSecret(ctx, k8s, clf.Namespace, mcAddon.Namespace, manifests.DefaultCollectionMTLSSecretName)
 		if err != nil {
 			// Even for not found we probably just want to return and wait for the next
 			// reconciliation loop to try again.
 			return err
 		}
-		opts.DefaultStack.Collection.Secrets = []corev1.Secret{*secret}
+		opts.DefaultStack.Collection.Secrets = []corev1.Secret{*mTLSSecret}
 
 		// Get the cluster hostname
 
@@ -218,9 +216,7 @@ func buildDefaultStackOptions(ctx context.Context, k8s client.Client, mcAddon *a
 		opts.DefaultStack.Storage.LokiStack = ls
 
 		// Get objstorage secret
-		objStorageSecret := &corev1.Secret{}
-		key := client.ObjectKey{Name: ls.Spec.Storage.Secret.Name, Namespace: ls.Namespace}
-		err := k8s.Get(ctx, key, objStorageSecret, &client.GetOptions{})
+		objStorageSecret, err := addon.GetSecret(ctx, k8s, ls.Namespace, mcAddon.Namespace, ls.Spec.Storage.Secret.Name)
 		if err != nil {
 			// Even for not found we probably just want to return and wait for the next
 			// reconciliation loop to try again.
@@ -229,15 +225,13 @@ func buildDefaultStackOptions(ctx context.Context, k8s client.Client, mcAddon *a
 		opts.DefaultStack.Storage.ObjStorageSecret = *objStorageSecret
 
 		// Get mTLS secret
-		secret := &corev1.Secret{}
-		key = client.ObjectKey{Name: manifests.DefaultStorageMTLSSecretName, Namespace: mcAddon.Namespace}
-		err = k8s.Get(ctx, key, secret, &client.GetOptions{})
+		mTLSSecret, err := addon.GetSecret(ctx, k8s, ls.Namespace, mcAddon.Namespace, manifests.DefaultStorageMTLSSecretName)
 		if err != nil {
 			// Even for not found we probably just want to return and wait for the next
 			// reconciliation loop to try again.
 			return err
 		}
-		opts.DefaultStack.Storage.MTLSSecret = *secret
+		opts.DefaultStack.Storage.MTLSSecret = *mTLSSecret
 
 		// TODO (JoaoBraveCoding) This might be rather heavy in big clusters,
 		// this might be a good place to lower memory consumption.

@@ -31,4 +31,12 @@ spec:
     placements:
       - name: global
         namespace: open-cluster-management-global-set
-        configs: []
+        configs: 
+        - group: observability.openshift.io
+          resource: clusterlogforwarders
+          name: default-stack-instance-global
+          namespace: open-cluster-management-observability
+        - group: loki.grafana.com
+          resource: lokistacks
+          name: default-stack-instance-global
+          namespace: open-cluster-management-observability

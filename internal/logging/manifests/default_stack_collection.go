@@ -29,15 +29,15 @@ func buildManagedCLFSpec(opts Options) (loggingv1.ClusterLogForwarderSpec, error
 				TLSSpec: loggingv1.TLSSpec{
 					CA: &loggingv1.ValueReference{
 						Key:        "ca.crt",
-						SecretName: DefaultCollectionSecretName,
+						SecretName: DefaultCollectionMTLSSecretName,
 					},
 					Certificate: &loggingv1.ValueReference{
 						Key:        corev1.TLSCertKey,
-						SecretName: DefaultCollectionSecretName,
+						SecretName: DefaultCollectionMTLSSecretName,
 					},
 					Key: &loggingv1.SecretReference{
 						Key:        corev1.TLSPrivateKeyKey,
-						SecretName: DefaultCollectionSecretName,
+						SecretName: DefaultCollectionMTLSSecretName,
 					},
 				},
 			},

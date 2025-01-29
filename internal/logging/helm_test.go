@@ -750,7 +750,6 @@ func Test_Logging_Managed_Storage(t *testing.T) {
 					},
 				},
 				Authorization: &lokiv1.AuthorizationSpec{
-					OPA: &lokiv1.OPASpec{},
 					Roles: []lokiv1.RoleSpec{
 						{
 							Name:        "tenant-1-logs",
