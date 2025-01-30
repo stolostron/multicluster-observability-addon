@@ -8,6 +8,7 @@ const (
 	Name              = "multicluster-observability-addon"
 	LabelOCMAddonName = "open-cluster-management.io/addon-name"
 	InstallNamespace  = "open-cluster-management-observability"
+	HubNamespace      = "local-cluster"
 
 	McoaChartDir    = "manifests/charts/mcoa"
 	LoggingChartDir = "manifests/charts/mcoa/charts/logging"
@@ -15,10 +16,13 @@ const (
 
 	AddonDeploymentConfigResource = "addondeploymentconfigs"
 	ClusterLogForwardersResource  = "clusterlogforwarders"
-	SpokeCLFName                  = "mcoa-instance"
-	SpokeCLFNamespace             = "openshift-logging"
+	LokiStacksResource            = "lokistacks"
+	SpokeUnmanagedCLFName         = "mcoa-instance"
+	SpokeDefaultStackCLFName      = "mcoa-managed-instance"
+	SpokeDefaultStackLSName       = "mcoa-managed-instance"
+	LoggingNamespace              = "openshift-logging"
 	clfProbeKey                   = "isReady"
-	// TODO @JoaoBraveCoding this most likely needs to be updated to reflect the new path
+	// TODO(JoaoBraveCoding): this most likely needs to be updated to reflect the new path
 	clfProbePath = ".status.conditions[?(@.type==\"Ready\")].status"
 
 	OpenTelemetryCollectorsResource = "opentelemetrycollectors"
@@ -28,11 +32,16 @@ const (
 	SpokeOTELColNamespace           = "mcoa-opentelemetry"
 	otelColProbeKey                 = "replicas"
 	otelColProbePath                = ".spec.replicas"
+
+	DefaultStackPrefix = "default-stack-instance"
 )
 
 //go:embed manifests
 //go:embed manifests/charts/mcoa
 //go:embed manifests/charts/mcoa/templates/_helpers.tpl
 //go:embed manifests/charts/mcoa/charts/logging/templates/_helpers.tpl
+//go:embed manifests/charts/mcoa/charts/logging/charts/unmanaged/charts/collection/templates/_helpers.tpl
+//go:embed manifests/charts/mcoa/charts/logging/charts/managed/charts/collection/templates/_helpers.tpl
+//go:embed manifests/charts/mcoa/charts/logging/charts/managed/charts/storage/templates/_helpers.tpl
 //go:embed manifests/charts/mcoa/charts/tracing/templates/_helpers.tpl
 var FS embed.FS

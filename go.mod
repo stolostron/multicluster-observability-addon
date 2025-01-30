@@ -4,7 +4,10 @@ go 1.22.9
 
 require (
 	github.com/ViaQ/logerr/v2 v2.1.0
+	github.com/cert-manager/cert-manager v1.15.0
 	github.com/go-logr/logr v1.4.2
+	github.com/grafana/loki/operator/api/loki v0.0.0-20241126095010-949bfb9e074b
+	github.com/imdario/mergo v0.3.16
 	github.com/open-telemetry/opentelemetry-operator v0.107.0
 	github.com/openshift/cluster-logging-operator/api/observability v0.0.0-20241106184417-73a5857dc558
 	github.com/operator-framework/api v0.26.0
@@ -66,7 +69,6 @@ require (
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.20.0 // indirect
 	github.com/huandu/xstrings v1.4.0 // indirect
-	github.com/imdario/mergo v0.3.16 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
@@ -93,10 +95,10 @@ require (
 	github.com/xeipuuv/gojsonpointer v0.0.0-20190905194746-02993c407bfb // indirect
 	github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415 // indirect
 	github.com/xeipuuv/gojsonschema v1.2.0 // indirect
-	go.etcd.io/etcd/api/v3 v3.5.12 // indirect
-	go.etcd.io/etcd/client/pkg/v3 v3.5.12 // indirect
-	go.etcd.io/etcd/client/v3 v3.5.12 // indirect
-	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.49.0 // indirect
+	go.etcd.io/etcd/api/v3 v3.5.13 // indirect
+	go.etcd.io/etcd/client/pkg/v3 v3.5.13 // indirect
+	go.etcd.io/etcd/client/v3 v3.5.13 // indirect
+	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.51.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.53.0 // indirect
 	go.opentelemetry.io/otel v1.28.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.28.0 // indirect
@@ -132,9 +134,10 @@ require (
 	k8s.io/apiserver v0.30.3 // indirect
 	k8s.io/kms v0.30.3 // indirect
 	k8s.io/kube-openapi v0.0.0-20240620174524-b456828f718b // indirect
-	k8s.io/utils v0.0.0-20240502163921-fe8a2dddb1d0 // indirect
+	k8s.io/utils v0.0.0-20240902221715-702e33fdd3c3 // indirect
 	open-cluster-management.io/sdk-go v0.15.0 // indirect
-	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.29.0 // indirect
+	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.30.3 // indirect
+	sigs.k8s.io/gateway-api v1.1.0 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
 	sigs.k8s.io/yaml v1.4.0 // indirect
