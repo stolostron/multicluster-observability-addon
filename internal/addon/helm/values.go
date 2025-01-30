@@ -97,7 +97,7 @@ func getAddOnDeploymentConfig(ctx context.Context, k8s client.Client, mcAddon *a
 		return aodc, errMultipleAODCRef
 	}
 	if err := k8s.Get(ctx, keys[0], aodc, &client.GetOptions{}); err != nil {
-		// TODO(JoaoBraveCoding) Add proper error handling
+		// TODO(JoaoBraveCoding): Add proper error handling
 		return aodc, err
 	}
 	return aodc, nil

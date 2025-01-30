@@ -71,7 +71,7 @@ func DefaultStackOptions(ctx context.Context, k8s client.Client, platform, userW
 	}
 	opts.DefaultStack.Storage.LokiStack = existingLS
 
-	// TODO (JoaoBraveCoding) This might be rather heavy in big clusters,
+	// TODO(JoaoBraveCoding): This might be rather heavy in big clusters,
 	// good place to lower memory consumption.
 	mcaoList := &addonapiv1alpha1.ManagedClusterAddOnList{}
 	if err := k8s.List(ctx, mcaoList, &client.ListOptions{}); err != nil {
@@ -80,7 +80,7 @@ func DefaultStackOptions(ctx context.Context, k8s client.Client, platform, userW
 
 	tenants := make([]string, 0, len(mcaoList.Items))
 	for _, tenant := range mcaoList.Items {
-		// TODO (JoaoBraveCoding) This is not the best way to match tenants due
+		// TODO(JoaoBraveCoding): This is not the best way to match tenants due
 		// to the addon-framework supporting clustersets, but it will do for now
 		if tenant.Name == addon.Name && tenant.Namespace != addon.HubNamespace {
 			tenants = append(tenants, tenant.Namespace)
@@ -233,7 +233,7 @@ func buildDefaultStackOptions(ctx context.Context, k8s client.Client, mcAddon *a
 		}
 		opts.DefaultStack.Storage.MTLSSecret = *mTLSSecret
 
-		// TODO (JoaoBraveCoding) This might be rather heavy in big clusters,
+		// TODO(JoaoBraveCoding): This might be rather heavy in big clusters,
 		// this might be a good place to lower memory consumption.
 		mcaoList := &addonapiv1alpha1.ManagedClusterAddOnList{}
 		if err := k8s.List(ctx, mcaoList, &client.ListOptions{}); err != nil {
@@ -242,7 +242,7 @@ func buildDefaultStackOptions(ctx context.Context, k8s client.Client, mcAddon *a
 
 		tenants := make([]string, 0, len(mcaoList.Items))
 		for _, tenant := range mcaoList.Items {
-			// TODO (JoaoBraveCoding) This is not the best way to match tenants due
+			// TODO(JoaoBraveCoding): This is not the best way to match tenants due
 			// to the addon-framework supporting tenantcy, but it will do for now
 			if tenant.Name == addon.Name && tenant.Namespace != mcAddon.Namespace {
 				tenants = append(tenants, tenant.Namespace)

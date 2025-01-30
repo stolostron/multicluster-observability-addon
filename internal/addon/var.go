@@ -22,7 +22,7 @@ const (
 	SpokeDefaultStackLSName       = "mcoa-managed-instance"
 	LoggingNamespace              = "openshift-logging"
 	clfProbeKey                   = "isReady"
-	// TODO @JoaoBraveCoding this most likely needs to be updated to reflect the new path
+	// TODO(JoaoBraveCoding): this most likely needs to be updated to reflect the new path
 	clfProbePath = ".status.conditions[?(@.type==\"Ready\")].status"
 
 	OpenTelemetryCollectorsResource = "opentelemetrycollectors"

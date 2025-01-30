@@ -106,7 +106,7 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, err
 	}
 
-	// TODO(JoaoBraveCoding) Delete flow for when a placement is removed
+	// TODO(JoaoBraveCoding): Delete flow for when a placement is removed
 
 	key = client.ObjectKey{Name: addon.Name}
 	cmao := &addonv1alpha1.ClusterManagementAddOn{}

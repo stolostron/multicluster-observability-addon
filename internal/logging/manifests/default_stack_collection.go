@@ -23,8 +23,7 @@ func buildManagedCLFSpec(opts Options) (loggingv1.ClusterLogForwarderSpec, error
 				URL: opts.DefaultStack.LokiURL,
 			},
 			TLS: &loggingv1.OutputTLSSpec{
-				// TODO(JoaoBraveCoding): currently this is required due to LokiStack not
-				// being configued with mTLS
+				// TODO(JoaoBraveCoding): can remove once https://issues.redhat.com/browse/LOG-4289
 				InsecureSkipVerify: true,
 				TLSSpec: loggingv1.TLSSpec{
 					CA: &loggingv1.ValueReference{
