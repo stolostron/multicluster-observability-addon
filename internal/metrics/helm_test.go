@@ -18,7 +18,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	kubescheme "k8s.io/client-go/kubernetes/scheme"
@@ -37,64 +36,64 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 	testCases := map[string]struct {
 		PlatformMetrics bool
 		UserMetrics     bool
-		Expects         func(*testing.T, []runtime.Object)
+		Expects         func(*testing.T, []client.Object)
 	}{
 		"no metrics": {
 			PlatformMetrics: false,
 			UserMetrics:     false,
-			Expects: func(t *testing.T, objects []runtime.Object) {
+			Expects: func(t *testing.T, objects []client.Object) {
 				assert.Len(t, objects, 0)
 			},
 		},
 		"platform metrics": {
 			PlatformMetrics: true,
 			UserMetrics:     false,
-			Expects: func(t *testing.T, objects []runtime.Object) {
+			Expects: func(t *testing.T, objects []client.Object) {
 				// ensure the agent is created
-				agent := getResourceByLabelSelector[*prometheusalpha1.PrometheusAgent](objects, config.PlatformPrometheusMatchLabels)
+				agent := addon.GetResourcesByLabelSelector[*prometheusalpha1.PrometheusAgent](objects, config.PlatformPrometheusMatchLabels)
 				assert.Len(t, agent, 1)
 				assert.Equal(t, config.PlatformMetricsCollectorApp, agent[0].GetName())
 				assert.NotEmpty(t, agent[0].Spec.CommonPrometheusFields.RemoteWrite[0].URL)
 				// ensure that the haproxy config is created
-				haProxyConfig := getResourceByLabelSelector[*corev1.ConfigMap](objects, config.PlatformPrometheusMatchLabels)
+				haProxyConfig := addon.GetResourcesByLabelSelector[*corev1.ConfigMap](objects, config.PlatformPrometheusMatchLabels)
 				assert.Len(t, haProxyConfig, 1)
 				// ensure that scrape config is created and matches the agent
-				scrapeCfgs := getResourceByLabelSelector[*prometheusalpha1.ScrapeConfig](objects, config.PlatformPrometheusMatchLabels)
+				scrapeCfgs := addon.GetResourcesByLabelSelector[*prometheusalpha1.ScrapeConfig](objects, config.PlatformPrometheusMatchLabels)
 				assert.Len(t, scrapeCfgs, 2)
 				assert.Equal(t, config.PrometheusControllerID, scrapeCfgs[0].Annotations["operator.prometheus.io/controller-id"])
 				// ensure that recording rules are created
-				recordingRules := getResourceByLabelSelector[*prometheusv1.PrometheusRule](objects, config.PlatformPrometheusMatchLabels)
+				recordingRules := addon.GetResourcesByLabelSelector[*prometheusv1.PrometheusRule](objects, config.PlatformPrometheusMatchLabels)
 				assert.Len(t, recordingRules, 2)
 				assert.Equal(t, "openshift-monitoring/prometheus-operator", recordingRules[0].Annotations["operator.prometheus.io/controller-id"])
 				// ensure that the number of objects is correct
 				// 4 (prom operator) + 6 (agent + haproxy config) + 2 secrets (mTLS to hub) + 1 cm (prom ca) + 2 rule + 2 scrape config = 16
 				assert.Len(t, objects, 17)
-				assert.Len(t, getResourceByLabelSelector[*corev1.Secret](objects, nil), 2) // 2 secrets (mTLS to hub)
+				assert.Len(t, addon.GetResourcesByLabelSelector[*corev1.Secret](objects, nil), 2) // 2 secrets (mTLS to hub)
 			},
 		},
 		"user workload metrics": {
 			PlatformMetrics: false,
 			UserMetrics:     true,
-			Expects: func(t *testing.T, objects []runtime.Object) {
+			Expects: func(t *testing.T, objects []client.Object) {
 				// ensure the agent is created
-				agent := getResourceByLabelSelector[*prometheusalpha1.PrometheusAgent](objects, config.UserWorkloadPrometheusMatchLabels)
+				agent := addon.GetResourcesByLabelSelector[*prometheusalpha1.PrometheusAgent](objects, config.UserWorkloadPrometheusMatchLabels)
 				assert.Len(t, agent, 1)
 				assert.Equal(t, config.UserWorkloadMetricsCollectorApp, agent[0].GetName())
 				assert.NotEmpty(t, agent[0].Spec.CommonPrometheusFields.RemoteWrite[0].URL)
 				// ensure that the haproxy config is created
-				haProxyConfig := getResourceByLabelSelector[*corev1.ConfigMap](objects, config.UserWorkloadPrometheusMatchLabels)
+				haProxyConfig := addon.GetResourcesByLabelSelector[*corev1.ConfigMap](objects, config.UserWorkloadPrometheusMatchLabels)
 				assert.Len(t, haProxyConfig, 1)
 				// ensure that scrape config is created and matches the agent
-				scrapeCfgs := getResourceByLabelSelector[*prometheusalpha1.ScrapeConfig](objects, config.UserWorkloadPrometheusMatchLabels)
+				scrapeCfgs := addon.GetResourcesByLabelSelector[*prometheusalpha1.ScrapeConfig](objects, config.UserWorkloadPrometheusMatchLabels)
 				assert.Len(t, scrapeCfgs, 2)
 				assert.Equal(t, config.PrometheusControllerID, scrapeCfgs[0].Annotations["operator.prometheus.io/controller-id"])
 				// ensure that recording rules are created
-				recordingRules := getResourceByLabelSelector[*prometheusv1.PrometheusRule](objects, config.UserWorkloadPrometheusMatchLabels)
+				recordingRules := addon.GetResourcesByLabelSelector[*prometheusv1.PrometheusRule](objects, config.UserWorkloadPrometheusMatchLabels)
 				assert.Len(t, recordingRules, 2)
 				assert.Equal(t, "openshift-user-workload-monitoring/prometheus-operator", recordingRules[0].Annotations["operator.prometheus.io/controller-id"])
 
 				assert.Len(t, objects, 17)
-				assert.Len(t, getResourceByLabelSelector[*corev1.Secret](objects, nil), 2) // 2 secrets (mTLS to hub)
+				assert.Len(t, addon.GetResourcesByLabelSelector[*corev1.Secret](objects, nil), 2) // 2 secrets (mTLS to hub)
 			},
 		},
 	}
@@ -226,8 +225,9 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 			// Render manifests and return them as k8s runtime objects
 			objects, err := agentAddon.Manifests(managedCluster, managedClusterAddOn)
 			assert.NoError(t, err)
+			clientObjs := runtimeToClientObjects(t, objects)
 
-			tc.Expects(t, objects)
+			tc.Expects(t, clientObjs)
 
 			// Check common properties of the objects
 			for _, obj := range objects {
@@ -318,19 +318,15 @@ func newConfigReference(obj client.Object) addonapiv1alpha1.ConfigReference {
 	}
 }
 
-// getResourceByLabelSelector returns the first resource that matches the label selector.
-// It works generically for any Kubernetes resource that implements client.Object.
-func getResourceByLabelSelector[T client.Object](resources []runtime.Object, selector map[string]string) []T {
-	labelSelector := labels.SelectorFromSet(selector)
-	ret := []T{}
-
-	for _, obj := range resources {
-		if resource, ok := obj.(T); ok {
-			if labelSelector.Matches(labels.Set(resource.GetLabels())) {
-				ret = append(ret, resource)
-			}
+func runtimeToClientObjects(t *testing.T, objs []runtime.Object) []client.Object {
+	clientObjs := make([]client.Object, 0, len(objs))
+	for _, obj := range objs {
+		co, ok := obj.(client.Object)
+		if !ok {
+			t.Fatalf("failed to convert %q to client.Object", obj.GetObjectKind().GroupVersionKind())
 		}
-	}
+		clientObjs = append(clientObjs, co)
 
-	return ret
+	}
+	return clientObjs
 }

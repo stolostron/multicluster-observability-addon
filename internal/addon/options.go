@@ -25,9 +25,9 @@ const (
 type CollectionKind string
 
 const (
-	ClusterLogForwarderV1                   CollectionKind = "clusterlogforwarders.v1.observability.openshift.io"
-	OpenTelemetryCollectorV1beta1           CollectionKind = "opentelemetrycollectors.v1beta1.opentelemetry.io"
-	PrometheusAgentMetricsCollectorV1alpha1 CollectionKind = "prometheusagents.v1alpha1.monitoring.coreos.com"
+	ClusterLogForwarderV1         CollectionKind = "clusterlogforwarders.v1.observability.openshift.io"
+	OpenTelemetryCollectorV1beta1 CollectionKind = "opentelemetrycollectors.v1beta1.opentelemetry.io"
+	PrometheusAgentV1alpha1       CollectionKind = "prometheusagents.v1alpha1.monitoring.coreos.com"
 )
 
 type InstrumentationKind string
@@ -94,7 +94,7 @@ func BuildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Opti
 				opts.Platform.Metrics.HubEndpoint = keyvalue.Value
 			}
 		case KeyPlatformMetricsCollection:
-			if keyvalue.Value == string(PrometheusAgentMetricsCollectorV1alpha1) {
+			if keyvalue.Value == string(PrometheusAgentV1alpha1) {
 				opts.Platform.Enabled = true
 				opts.Platform.Metrics.CollectionEnabled = true
 			}
@@ -105,7 +105,7 @@ func BuildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Opti
 			}
 		// User Workload Observability Options
 		case KeyUserWorkloadMetricsCollection:
-			if keyvalue.Value == string(PrometheusAgentMetricsCollectorV1alpha1) {
+			if keyvalue.Value == string(PrometheusAgentV1alpha1) {
 				opts.UserWorkloads.Enabled = true
 				opts.UserWorkloads.Metrics.CollectionEnabled = true
 			}

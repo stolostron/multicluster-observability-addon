@@ -9,10 +9,10 @@ import (
 	"github.com/rhobs/multicluster-observability-addon/internal/addon"
 	lhandlers "github.com/rhobs/multicluster-observability-addon/internal/logging/handlers"
 	lmanifests "github.com/rhobs/multicluster-observability-addon/internal/logging/manifests"
-	"github.com/rhobs/multicluster-observability-addon/internal/metrics/config"
+	mconfig "github.com/rhobs/multicluster-observability-addon/internal/metrics/config"
 	mhandlers "github.com/rhobs/multicluster-observability-addon/internal/metrics/handlers"
 	mmanifests "github.com/rhobs/multicluster-observability-addon/internal/metrics/manifests"
-	"github.com/rhobs/multicluster-observability-addon/internal/metrics/resource"
+	mresource "github.com/rhobs/multicluster-observability-addon/internal/metrics/resource"
 	thandlers "github.com/rhobs/multicluster-observability-addon/internal/tracing/handlers"
 	tmanifests "github.com/rhobs/multicluster-observability-addon/internal/tracing/manifests"
 	clusterinfov1beta1 "github.com/stolostron/cluster-lifecycle-api/clusterinfo/v1beta1"
@@ -70,7 +70,7 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, logger logr.Logger) a
 				return nil, errMissingHubEndpoint
 			}
 
-			if err := resource.DeployDefaultResourcesOnce(ctx, k8s, logger, config.HubInstallNamespace); err != nil {
+			if err := mresource.DeployDefaultResourcesOnce(ctx, k8s, logger, mconfig.HubInstallNamespace); err != nil {
 				return nil, err
 			}
 
@@ -80,7 +80,7 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, logger logr.Logger) a
 			}
 			optsBuilder := mhandlers.OptionsBuilder{
 				Client:          k8s,
-				ImagesConfigMap: config.ImagesConfigMap,
+				ImagesConfigMap: mconfig.ImagesConfigMap,
 				RemoteWriteURL:  remoteWriteURL,
 				Logger:          logger,
 			}

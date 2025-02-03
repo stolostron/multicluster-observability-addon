@@ -13,7 +13,6 @@ import (
 	"github.com/rhobs/multicluster-observability-addon/internal/metrics/config"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
@@ -72,13 +71,13 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 		}
 
 		// Fetch rules and scrape configs
-		ret.Platform.ScrapeConfigs = getResourceByLabelSelector[*prometheusalpha1.ScrapeConfig](configResources, config.PlatformPrometheusMatchLabels)
+		ret.Platform.ScrapeConfigs = addon.GetResourcesByLabelSelector[*prometheusalpha1.ScrapeConfig](configResources, config.PlatformPrometheusMatchLabels)
 		if len(ret.Platform.ScrapeConfigs) == 0 {
-			o.Logger.Info("No scrape configs found for platform metrics")
+			o.Logger.V(1).Info("No scrape configs found for platform metrics")
 		}
-		ret.Platform.Rules = getResourceByLabelSelector[*prometheusv1.PrometheusRule](configResources, config.PlatformPrometheusMatchLabels)
+		ret.Platform.Rules = addon.GetResourcesByLabelSelector[*prometheusv1.PrometheusRule](configResources, config.PlatformPrometheusMatchLabels)
 		if len(ret.Platform.Rules) == 0 {
-			o.Logger.Info("No rules found for platform metrics")
+			o.Logger.V(1).Info("No rules found for platform metrics")
 		}
 	}
 
@@ -88,13 +87,13 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 		}
 
 		// Fetch rules and scrape configs
-		ret.UserWorkloads.ScrapeConfigs = getResourceByLabelSelector[*prometheusalpha1.ScrapeConfig](configResources, config.UserWorkloadPrometheusMatchLabels)
+		ret.UserWorkloads.ScrapeConfigs = addon.GetResourcesByLabelSelector[*prometheusalpha1.ScrapeConfig](configResources, config.UserWorkloadPrometheusMatchLabels)
 		if len(ret.UserWorkloads.ScrapeConfigs) == 0 {
-			o.Logger.Info("No scrape configs found for user workloads")
+			o.Logger.V(1).Info("No scrape configs found for user workloads")
 		}
-		ret.UserWorkloads.Rules = getResourceByLabelSelector[*prometheusv1.PrometheusRule](configResources, config.UserWorkloadPrometheusMatchLabels)
+		ret.UserWorkloads.Rules = addon.GetResourcesByLabelSelector[*prometheusv1.PrometheusRule](configResources, config.UserWorkloadPrometheusMatchLabels)
 		if len(ret.UserWorkloads.Rules) == 0 {
-			o.Logger.Info("No rules found for user workloads")
+			o.Logger.V(1).Info("No rules found for user workloads")
 		}
 	}
 
@@ -108,7 +107,7 @@ func (o *OptionsBuilder) buildPrometheusAgent(ctx context.Context, opts *Options
 	if appName == config.UserWorkloadMetricsCollectorApp {
 		labelsMatcher = config.UserWorkloadPrometheusMatchLabels
 	}
-	platformAgents := getResourceByLabelSelector[*prometheusalpha1.PrometheusAgent](configResources, labelsMatcher)
+	platformAgents := addon.GetResourcesByLabelSelector[*prometheusalpha1.PrometheusAgent](configResources, labelsMatcher)
 	if len(platformAgents) != 1 {
 		return fmt.Errorf("%w: for application %s, found %d agents with labels %+v", ErrInvalidConfigResourcesCount, appName, len(platformAgents), labelsMatcher)
 	}
@@ -241,21 +240,4 @@ func (o *OptionsBuilder) getAvailableConfigResources(ctx context.Context, mcAddo
 	}
 
 	return ret, nil
-}
-
-// getResourceByLabelSelector returns the first resource that matches the label selector.
-// It works generically for any Kubernetes resource that implements client.Object.
-func getResourceByLabelSelector[T client.Object](resources []client.Object, selector map[string]string) []T {
-	labelSelector := labels.SelectorFromSet(selector)
-	ret := []T{}
-
-	for _, obj := range resources {
-		if resource, ok := obj.(T); ok {
-			if labelSelector.Matches(labels.Set(resource.GetLabels())) {
-				ret = append(ret, resource)
-			}
-		}
-	}
-
-	return ret
 }
