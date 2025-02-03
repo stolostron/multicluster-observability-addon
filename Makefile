@@ -40,7 +40,7 @@ $(CRD_DIR)/opentelemetry.io_instrumentations.yaml:
 
 $(CRD_DIR)/monitoring.coreos.com_prometheusagents.yaml:
 	@mkdir -p $(CRD_DIR)
-	@curl https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/ca4f84f2bb6ce42fd9e3bb81a46e0bb32d042db1/example/prometheus-operator-crd-full/monitoring.coreos.com_prometheusagents.yaml  > $(CRD_DIR)/monitoring.coreos.com_prometheusagents.yaml
+	@curl https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/refs/heads/release-0.77/example/prometheus-operator-crd-full/monitoring.coreos.com_prometheusagents.yaml  > $(CRD_DIR)/monitoring.coreos.com_prometheusagents.yaml
 
 $(CRD_DIR)/monitoring.coreos.com_scrapeconfigs.yaml:
 	@mkdir -p $(CRD_DIR)
