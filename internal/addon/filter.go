@@ -5,9 +5,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// GetResourcesByLabelSelector returns the list of resources of type T matching the label selector.
+// FilterResourcesByLabelSelector returns the list of resources of type T matching the label selector.
 // It works generically for any Kubernetes resource that implements client.Object.
-func GetResourcesByLabelSelector[T client.Object](resources []client.Object, selector map[string]string) []T {
+func FilterResourcesByLabelSelector[T client.Object](resources []client.Object, selector map[string]string) []T {
 	labelSelector := labels.SelectorFromSet(selector)
 	ret := []T{}
 

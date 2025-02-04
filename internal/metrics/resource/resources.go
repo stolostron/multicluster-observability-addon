@@ -40,10 +40,6 @@ func DeployDefaultResourcesOnce(ctx context.Context, c client.Client, logger log
 	resources := DefaultPlaftformAgentResources(ns)
 	resources = append(resources, DefaultUserWorkloadAgentResources(ns)...)
 	for _, resource := range resources {
-		if err := controllerutil.SetControllerReference(owner, resource, c.Scheme()); err != nil {
-			return err
-		}
-
 		res, err := ctrl.CreateOrUpdate(ctx, c, resource, mutateFn(resource.DeepCopyObject().(client.Object), resource, owner, c.Scheme()))
 		if err != nil {
 			return fmt.Errorf("failed to create or update resource %s: %w", resource.GetName(), err)
