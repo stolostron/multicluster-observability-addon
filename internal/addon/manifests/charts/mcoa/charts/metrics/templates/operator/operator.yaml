@@ -1,0 +1,67 @@
+{{- if or .Values.platformEnabled .Values.userWorkloadsEnabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app.kubernetes.io/component: controller
+    app.kubernetes.io/name: prometheus-operator
+    app.kubernetes.io/part-of: multicluster-observability-addon
+    app.kubernetes.io/managed-by: {{ .Release.Name }}
+  name: prometheus-operator
+  namespace: {{ .Release.Namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: controller
+      app.kubernetes.io/name: prometheus-operator
+      app.kubernetes.io/part-of: multicluster-observability-addon
+  template:
+    metadata:
+      annotations:
+        kubectl.kubernetes.io/default-container: prometheus-operator
+      labels:
+        app.kubernetes.io/component: controller
+        app.kubernetes.io/name: prometheus-operator
+        app.kubernetes.io/part-of: multicluster-observability-addon
+    spec:
+      containers:
+      - image: {{ .Values.images.prometheusOperator }}
+        args:
+          - '--prometheus-config-reloader={{ .Values.images.prometheusConfigReloader }}'
+          - '--prometheus-instance-namespaces={{ .Release.Namespace }}'
+          - '--thanos-ruler-instance-namespaces={{ .Release.Namespace }}'
+          - '--alertmanager-instance-namespaces={{ .Release.Namespace }}'
+          - '--kubelet-service=kube-system/kubelet'
+          - '--config-reloader-cpu-limit=0'
+          - '--config-reloader-memory-limit=0'
+          - '--config-reloader-cpu-request=1m'
+          - '--config-reloader-memory-request=10Mi'
+          - '--controller-id={{ .Values.prometheusControllerID }}'
+        imagePullPolicy: IfNotPresent
+        name: prometheus-operator
+        ports:
+          - name: http
+            containerPort: 8080
+            protocol: TCP
+        securityContext: 
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          privileged: false
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+        resources:
+          requests:
+            cpu: 5m
+            memory: 100Mi
+      dnsPolicy: ClusterFirst
+      nodeSelector:
+        kubernetes.io/os: linux
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      serviceAccount: prometheus-operator
+      serviceAccountName: prometheus-operator
+      terminationGracePeriodSeconds: 600
+{{- end }}

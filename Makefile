@@ -10,6 +10,7 @@ default: all
 VERSION ?= v0.0.1
 
 CRD_DIR := $(shell pwd)/deploy/crds
+BIN_DIR := $(CURDIR)/bin
 
 # REGISTRY_BASE
 # defines the container registry and organization for the bundle and operator container images.
@@ -37,8 +38,16 @@ $(CRD_DIR)/opentelemetry.io_instrumentations.yaml:
 	@mkdir -p $(CRD_DIR)
 	@curl https://raw.githubusercontent.com/open-telemetry/opentelemetry-operator/v0.100.1/bundle/manifests/opentelemetry.io_instrumentations.yaml > $(CRD_DIR)/opentelemetry.io_instrumentations.yaml
 
+$(CRD_DIR)/monitoring.coreos.com_prometheusagents.yaml:
+	@mkdir -p $(CRD_DIR)
+	@curl https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/refs/heads/release-0.77/example/prometheus-operator-crd-full/monitoring.coreos.com_prometheusagents.yaml  > $(CRD_DIR)/monitoring.coreos.com_prometheusagents.yaml
+
+$(CRD_DIR)/monitoring.coreos.com_scrapeconfigs.yaml:
+	@mkdir -p $(CRD_DIR)
+	@curl https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/refs/heads/release-0.77/example/prometheus-operator-crd-full/monitoring.coreos.com_scrapeconfigs.yaml  > $(CRD_DIR)/monitoring.coreos.com_scrapeconfigs.yaml
+
 .PHONY: install-crds
-install-crds: $(CRD_DIR)/observability.openshift.io_clusterlogforwarders.yaml $(CRD_DIR)/opentelemetry.io_opentelemetrycollectors.yaml $(CRD_DIR)/opentelemetry.io_instrumentations.yaml
+install-crds: $(CRD_DIR)/observability.openshift.io_clusterlogforwarders.yaml $(CRD_DIR)/opentelemetry.io_opentelemetrycollectors.yaml $(CRD_DIR)/opentelemetry.io_instrumentations.yaml $(CRD_DIR)/monitoring.coreos.com_prometheusagents.yaml $(CRD_DIR)/monitoring.coreos.com_scrapeconfigs.yaml
 
 .PHONY: fmt
 fmt: $(GOFUMPT) ## Run gofumpt on source code.
@@ -54,7 +63,11 @@ lint-fix: $(GOLANGCI_LINT) ## Attempt to automatically fix lint issues in source
 
 .PHONY: test
 test:
-	go test -v ./internal/...
+	go test ./internal/...
+
+.PHONY: prepare-bin
+prepare-bin:
+	@mkdir -p $(BIN_DIR)
 
 .PHONY: addon
 addon: deps fmt ## Build addon binary
