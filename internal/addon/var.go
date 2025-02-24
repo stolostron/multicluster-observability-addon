@@ -9,10 +9,11 @@ const (
 	LabelOCMAddonName = "open-cluster-management.io/addon-name"
 	InstallNamespace  = "open-cluster-management-observability"
 
-	McoaChartDir    = "manifests/charts/mcoa"
-	MetricsChartDir = "manifests/charts/mcoa/charts/metrics"
-	LoggingChartDir = "manifests/charts/mcoa/charts/logging"
-	TracingChartDir = "manifests/charts/mcoa/charts/tracing"
+	McoaChartDir                  = "manifests/charts/mcoa"
+	MetricsChartDir               = "manifests/charts/mcoa/charts/metrics"
+	LoggingChartDir               = "manifests/charts/mcoa/charts/logging"
+	TracingChartDir               = "manifests/charts/mcoa/charts/tracing"
+	ObservabilityOperatorChartDir = "manifests/charts/mcoa/charts/observability-operator"
 
 	AddonDeploymentConfigResource = "addondeploymentconfigs"
 	ClusterLogForwardersResource  = "clusterlogforwarders"
@@ -37,4 +38,5 @@ const (
 //go:embed manifests/charts/mcoa/charts/logging/templates/_helpers.tpl
 //go:embed manifests/charts/mcoa/charts/metrics/templates/_helpers.tpl
 //go:embed manifests/charts/mcoa/charts/tracing/templates/_helpers.tpl
+//go:embed manifests/charts/mcoa/charts/observability-operator/templates/_helpers.tpl
 var FS embed.FS
