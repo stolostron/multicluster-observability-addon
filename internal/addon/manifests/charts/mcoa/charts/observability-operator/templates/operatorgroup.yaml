@@ -1,0 +1,13 @@
+{{- if .Values.enabled }}
+apiVersion: operators.coreos.com/v1
+kind: OperatorGroup
+metadata:
+  name: openshift-cluster-observability-operator
+  namespace: openshift-cluster-observability-operator
+  labels:
+    app: {{ template "observability-operatorhelm.name" . }}
+    chart: {{ template "observability-operatorhelm.chart" . }}
+    release: {{ .Release.Name }}
+spec:
+  upgradeStrategy: Default
+{{- end }}

@@ -10,3 +10,6 @@ logging:
 
 tracing:
   enabled: true
+
+observability-operator:
+  enabled: true
