@@ -21,6 +21,7 @@ const (
 	KeyUserWorkloadLogsCollection    = "userWorkloadLogsCollection"
 	KeyUserWorkloadTracesCollection  = "userWorkloadTracesCollection"
 	KeyUserWorkloadInstrumentation   = "userWorkloadInstrumentation"
+	KeyObservabilityOperator         = "observabilityOperator"
 )
 
 type CollectionKind string
@@ -42,6 +43,10 @@ type MetricsOptions struct {
 	HubEndpoint       *url.URL
 }
 
+type ObservabilityOperatorOptions struct {
+	Enabled bool
+}
+
 type LogsOptions struct {
 	CollectionEnabled   bool
 	SubscriptionChannel string
@@ -54,9 +59,10 @@ type TracesOptions struct {
 }
 
 type PlatformOptions struct {
-	Enabled bool
-	Metrics MetricsOptions
-	Logs    LogsOptions
+	Enabled               bool
+	Metrics               MetricsOptions
+	Logs                  LogsOptions
+	ObservabilityOperator ObservabilityOperatorOptions
 }
 
 type UserWorkloadOptions struct {
@@ -128,6 +134,9 @@ func BuildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Opti
 				opts.UserWorkloads.Enabled = true
 				opts.UserWorkloads.Traces.InstrumentationEnabled = true
 			}
+		case KeyObservabilityOperator:
+			opts.Platform.Enabled = true
+			opts.Platform.ObservabilityOperator.Enabled = true
 		}
 	}
 	return opts, nil

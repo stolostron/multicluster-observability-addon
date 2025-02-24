@@ -31,10 +31,11 @@ var (
 )
 
 type HelmChartValues struct {
-	Enabled bool                     `json:"enabled"`
-	Metrics mmanifests.MetricsValues `json:"metrics"`
-	Logging lmanifests.LoggingValues `json:"logging"`
-	Tracing tmanifests.TracingValues `json:"tracing"`
+	Enabled               bool                                   `json:"enabled"`
+	Metrics               mmanifests.MetricsValues               `json:"metrics"`
+	Logging               lmanifests.LoggingValues               `json:"logging"`
+	Tracing               tmanifests.TracingValues               `json:"tracing"`
+	ObservabilityOperator cmanifests.ObservabilityOperatorValues `json:"observability-operator"`
 }
 
 func GetValuesFunc(ctx context.Context, k8s client.Client, logger logr.Logger) addonfactory.GetValuesFunc {
@@ -116,6 +117,11 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, logger logr.Logger) a
 				return nil, err
 			}
 			userValues.Tracing = tracing
+		}
+
+		if opts.Platform.ObservabilityOperator.Enabled {
+			oboOptions := oboHandlers.BuildOptions(ctx, k8s, mcAddon, opts.Platform.ObservabilityOperator)
+			userValues.ObservabilityOperator = *cmanifests.BuildValues(oboOptions)
 		}
 
 		return addonfactory.JsonStructToValues(userValues)
