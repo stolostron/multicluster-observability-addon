@@ -18,3 +18,5 @@ spec:
     value: opentelemetrycollectors.v1beta1.opentelemetry.io
   - name: userWorkloadInstrumentation
     value: instrumentations.v1alpha1.opentelemetry.io
+  - name: observabilityOperator
+    value: monitoring.rhobs
