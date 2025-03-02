@@ -157,8 +157,8 @@ github.com/open-telemetry/opentelemetry-operator v0.107.0 h1:TYJ6BEU65zV4RGOtb3S
 github.com/open-telemetry/opentelemetry-operator v0.107.0/go.mod h1:Mo8G8wXibYymPnYjKDZjs2YDjT+ffE+G1cAcdSUHOjg=
 github.com/openshift/api v0.0.0-20240212125214-04ea3891d9cb h1:xOfQ4FjP7GiWeW7GgAvxfLbX3ISoVGy9Zru22i3ENCc=
 github.com/openshift/api v0.0.0-20240212125214-04ea3891d9cb/go.mod h1:CxgbWAlvu2iQB0UmKTtRu1YfepRg1/vJ64n2DlIEVz4=
-github.com/openshift/cluster-logging-operator/api/observability v0.0.0-20241106184417-73a5857dc558 h1:yzhMUt9I6K6zhsmi6wGqRlNR4OIru53WyA76dESpFVk=
-github.com/openshift/cluster-logging-operator/api/observability v0.0.0-20241106184417-73a5857dc558/go.mod h1:iYbyyrn/zt46Tl9lEr30u4ZPRQpDSGjqKrerALwSBXs=
+github.com/openshift/cluster-logging-operator/api/observability v0.0.0-20250228165433-3665fb550c08 h1:WsQyQQYwrquX9hLM6je2cjKZq6/5LALbd2b1jGU8hI4=
+github.com/openshift/cluster-logging-operator/api/observability v0.0.0-20250228165433-3665fb550c08/go.mod h1:iYbyyrn/zt46Tl9lEr30u4ZPRQpDSGjqKrerALwSBXs=
 github.com/operator-framework/api v0.26.0 h1:YVntU2NkVl5zSLLwK5kFcH6P3oSvN9QDgTsY9mb4yUM=
 github.com/operator-framework/api v0.26.0/go.mod h1:3IxOwzVUeGxYlzfwKCcfCyS+q3EEhWA/4kv7UehbeyM=
 github.com/pkg/errors v0.9.1 h1:FEBLx1zS214owpjy7qsBeixbURkuhQAwrK5UwLGTwt4=
