@@ -31,5 +31,5 @@ spec:
   # Enables Opentelemetry Instrumentation
   - name: userWorkloadInstrumentation
     value: instrumentations.v1alpha1.opentelemetry.io
-  - name: observabilityOperator
+  - name: incidentDetection
     value: monitoring.rhobs

@@ -11,5 +11,5 @@ logging:
 tracing:
   enabled: true
 
-observability-operator:
+analytics:
   enabled: true
