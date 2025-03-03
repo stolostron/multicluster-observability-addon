@@ -10,11 +10,11 @@ const (
 	LabelOCMAddonName = "open-cluster-management.io/addon-name"
 	InstallNamespace  = "open-cluster-management-observability"
 
-	McoaChartDir                  = "manifests/charts/mcoa"
-	MetricsChartDir               = "manifests/charts/mcoa/charts/metrics"
-	LoggingChartDir               = "manifests/charts/mcoa/charts/logging"
-	TracingChartDir               = "manifests/charts/mcoa/charts/tracing"
-	ObservabilityOperatorChartDir = "manifests/charts/mcoa/charts/observability-operator"
+	McoaChartDir              = "manifests/charts/mcoa"
+	MetricsChartDir           = "manifests/charts/mcoa/charts/metrics"
+	LoggingChartDir           = "manifests/charts/mcoa/charts/logging"
+	TracingChartDir           = "manifests/charts/mcoa/charts/tracing"
+	IncidentDetectionChartDir = "manifests/charts/mcoa/charts/analytics/charts/incident-detection"
 
 	AddonDeploymentConfigResource = "addondeploymentconfigs"
 	ClusterLogForwardersResource  = "clusterlogforwarders"
@@ -41,5 +41,5 @@ var errInvalidMetricsHubHostname = errors.New("invalid metrics hub hostname")
 //go:embed manifests/charts/mcoa/charts/logging/templates/_helpers.tpl
 //go:embed manifests/charts/mcoa/charts/metrics/templates/_helpers.tpl
 //go:embed manifests/charts/mcoa/charts/tracing/templates/_helpers.tpl
-//go:embed manifests/charts/mcoa/charts/observability-operator/templates/_helpers.tpl
+//go:embed manifests/charts/mcoa/charts/analytics/charts/incident-detection/templates/_helpers.tpl
 var FS embed.FS
