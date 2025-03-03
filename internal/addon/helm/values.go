@@ -7,14 +7,14 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/rhobs/multicluster-observability-addon/internal/addon"
+	ihandlers "github.com/rhobs/multicluster-observability-addon/internal/incident-detection/handlers"
+	imanifests "github.com/rhobs/multicluster-observability-addon/internal/incident-detection/manifests"
 	lhandlers "github.com/rhobs/multicluster-observability-addon/internal/logging/handlers"
 	lmanifests "github.com/rhobs/multicluster-observability-addon/internal/logging/manifests"
 	mconfig "github.com/rhobs/multicluster-observability-addon/internal/metrics/config"
 	mhandlers "github.com/rhobs/multicluster-observability-addon/internal/metrics/handlers"
 	mmanifests "github.com/rhobs/multicluster-observability-addon/internal/metrics/manifests"
 	mresource "github.com/rhobs/multicluster-observability-addon/internal/metrics/resource"
-	oboHandlers "github.com/rhobs/multicluster-observability-addon/internal/observability-operator/handlers"
-	cmanifests "github.com/rhobs/multicluster-observability-addon/internal/observability-operator/manifests"
 	thandlers "github.com/rhobs/multicluster-observability-addon/internal/tracing/handlers"
 	tmanifests "github.com/rhobs/multicluster-observability-addon/internal/tracing/manifests"
 	clusterinfov1beta1 "github.com/stolostron/cluster-lifecycle-api/clusterinfo/v1beta1"
@@ -33,11 +33,11 @@ var (
 )
 
 type HelmChartValues struct {
-	Enabled               bool                                   `json:"enabled"`
-	Metrics               mmanifests.MetricsValues               `json:"metrics"`
-	Logging               lmanifests.LoggingValues               `json:"logging"`
-	Tracing               tmanifests.TracingValues               `json:"tracing"`
-	ObservabilityOperator cmanifests.ObservabilityOperatorValues `json:"observability-operator"`
+	Enabled   bool                       `json:"enabled"`
+	Metrics   mmanifests.MetricsValues   `json:"metrics"`
+	Logging   lmanifests.LoggingValues   `json:"logging"`
+	Tracing   tmanifests.TracingValues   `json:"tracing"`
+	Analytics imanifests.AnalyticsValues `json:"analytics"`
 }
 
 func GetValuesFunc(ctx context.Context, k8s client.Client, logger logr.Logger) addonfactory.GetValuesFunc {
@@ -125,9 +125,9 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, logger logr.Logger) a
 			userValues.Tracing = tracing
 		}
 
-		if opts.Platform.ObservabilityOperator.Enabled {
-			oboOptions := oboHandlers.BuildOptions(ctx, k8s, mcAddon, opts.Platform.ObservabilityOperator)
-			userValues.ObservabilityOperator = *cmanifests.BuildValues(oboOptions)
+		if opts.Platform.AnalyticsOptions.IncidentDetection.Enabled {
+			incDecOptions := ihandlers.BuildOptions(ctx, k8s, mcAddon, opts.Platform.AnalyticsOptions.IncidentDetection)
+			userValues.Analytics = *imanifests.BuildValues(incDecOptions)
 		}
 
 		return addonfactory.JsonStructToValues(userValues)

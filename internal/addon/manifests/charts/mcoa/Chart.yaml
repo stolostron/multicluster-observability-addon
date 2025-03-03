@@ -14,6 +14,6 @@ dependencies:
 - name: tracing
   repository: 'file://./charts/tracing'
   condition: tracing.enabled
-- name: observability-operator
-  repository: 'file://./charts/observability-operator'
-  condition: observability-operator.enabled
+- name: analytics
+  repository: 'file://./charts/analytics'
+  condition: analytics.enabled

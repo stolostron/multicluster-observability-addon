@@ -1,4 +1,4 @@
-package observabilityoperator
+package incidentdetection
 
 import (
 	"context"
@@ -7,8 +7,9 @@ import (
 	operatorsv1 "github.com/operator-framework/api/pkg/operators/v1"
 	operatorsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	"github.com/rhobs/multicluster-observability-addon/internal/addon"
-	"github.com/rhobs/multicluster-observability-addon/internal/observability-operator/handlers"
-	"github.com/rhobs/multicluster-observability-addon/internal/observability-operator/manifests"
+	"github.com/rhobs/multicluster-observability-addon/internal/incident-detection/handlers"
+	"github.com/rhobs/multicluster-observability-addon/internal/incident-detection/manifests"
+	uiplugin "github.com/rhobs/observability-operator/pkg/apis/uiplugin/v1alpha1"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -28,6 +29,7 @@ var (
 	_ = operatorsv1.AddToScheme(scheme.Scheme)
 	_ = operatorsv1alpha1.AddToScheme(scheme.Scheme)
 	_ = addonapiv1alpha1.AddToScheme(scheme.Scheme)
+	_ = uiplugin.AddToScheme(scheme.Scheme)
 )
 
 func fakeGetValues(ctx context.Context, k8s client.Client) addonfactory.GetValuesFunc {
@@ -45,14 +47,14 @@ func fakeGetValues(ctx context.Context, k8s client.Client) addonfactory.GetValue
 			return nil, err
 		}
 
-		opts := handlers.BuildOptions(ctx, k8s, mcAddon, addonOpts.Platform.ObservabilityOperator)
-		oboValues := manifests.BuildValues(opts)
+		opts := handlers.BuildOptions(ctx, k8s, mcAddon, addonOpts.Platform.AnalyticsOptions.IncidentDetection)
+		analyticsValues := manifests.BuildValues(opts)
 
-		return addonfactory.JsonStructToValues(oboValues)
+		return addonfactory.JsonStructToValues(analyticsValues)
 	}
 }
 
-func Test_ObservabilityOperator_AllConfigsTogether_AllResources(t *testing.T) {
+func Test_IncidentDetection_AllConfigsTogether_AllResources(t *testing.T) {
 	const oboNamespace = "openshift-cluster-observability-operator"
 	var (
 		// Addon envinronment and registration
@@ -121,7 +123,7 @@ func Test_ObservabilityOperator_AllConfigsTogether_AllResources(t *testing.T) {
 	ctx := context.Background()
 
 	// Wire everything together to a fake addon instance
-	oboAgentAddon, err := addonfactory.NewAgentAddonFactory(addon.Name, addon.FS, addon.ObservabilityOperatorChartDir).
+	oboAgentAddon, err := addonfactory.NewAgentAddonFactory(addon.Name, addon.FS, addon.IncidentDetectionChartDir).
 		WithGetValuesFuncs(addonConfigValuesFn, fakeGetValues(ctx, fakeKubeClient)).
 		WithAgentRegistrationOption(&agent.RegistrationOption{}).
 		WithScheme(scheme.Scheme).
@@ -131,7 +133,7 @@ func Test_ObservabilityOperator_AllConfigsTogether_AllResources(t *testing.T) {
 	// Render manifests and return them as k8s runtime objects
 	objects, err := oboAgentAddon.Manifests(managedCluster, managedClusterAddOn)
 	require.NoError(t, err)
-	require.Equal(t, 3, len(objects))
+	require.Equal(t, 4, len(objects))
 
 	for _, o := range objects {
 		switch o := o.(type) {
@@ -146,6 +148,8 @@ func Test_ObservabilityOperator_AllConfigsTogether_AllResources(t *testing.T) {
 			require.Equal(t, oboNamespace, o.Namespace)
 		case *corev1.Namespace:
 			require.Equal(t, oboNamespace, o.Name)
+		case *uiplugin.UIPlugin:
+			require.Equal(t, "monitoring", o.Name)
 		}
 	}
 }

@@ -20,7 +20,7 @@ const (
 	KeyUserWorkloadLogsCollection    = "userWorkloadLogsCollection"
 	KeyUserWorkloadTracesCollection  = "userWorkloadTracesCollection"
 	KeyUserWorkloadInstrumentation   = "userWorkloadInstrumentation"
-	KeyObservabilityOperator         = "observabilityOperator"
+	KeyIncidentDetection             = "incidentDetection"
 )
 
 type CollectionKind string
@@ -42,7 +42,7 @@ type MetricsOptions struct {
 	HubEndpoint       string
 }
 
-type ObservabilityOperatorOptions struct {
+type IncidentDetection struct {
 	Enabled bool
 }
 
@@ -58,10 +58,14 @@ type TracesOptions struct {
 }
 
 type PlatformOptions struct {
-	Enabled               bool
-	Metrics               MetricsOptions
-	Logs                  LogsOptions
-	ObservabilityOperator ObservabilityOperatorOptions
+	Enabled          bool
+	Metrics          MetricsOptions
+	Logs             LogsOptions
+	AnalyticsOptions AnalyticsOptions
+}
+
+type AnalyticsOptions struct {
+	IncidentDetection IncidentDetection
 }
 
 type UserWorkloadOptions struct {
@@ -130,9 +134,9 @@ func BuildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Opti
 				opts.UserWorkloads.Enabled = true
 				opts.UserWorkloads.Traces.InstrumentationEnabled = true
 			}
-		case KeyObservabilityOperator:
+		case KeyIncidentDetection:
 			opts.Platform.Enabled = true
-			opts.Platform.ObservabilityOperator.Enabled = true
+			opts.Platform.AnalyticsOptions.IncidentDetection.Enabled = true
 		}
 	}
 	return opts, nil
