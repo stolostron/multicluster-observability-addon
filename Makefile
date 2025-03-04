@@ -55,6 +55,7 @@ fmt: $(GOFUMPT) ## Run gofumpt on source code.
 
 .PHONY: lint
 lint: $(GOLANGCI_LINT) ## Run golangci-lint on source code.
+	$(GOLANGCI_LINT) config verify
 	$(GOLANGCI_LINT) run --timeout=5m ./...
 
 .PHONY: lint-fix
