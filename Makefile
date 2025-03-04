@@ -40,14 +40,14 @@ $(CRD_DIR)/opentelemetry.io_instrumentations.yaml:
 
 $(CRD_DIR)/monitoring.coreos.com_prometheusagents.yaml:
 	@mkdir -p $(CRD_DIR)
-	@curl https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/refs/heads/release-0.77/example/prometheus-operator-crd-full/monitoring.coreos.com_prometheusagents.yaml  > $(CRD_DIR)/monitoring.coreos.com_prometheusagents.yaml
+	@curl https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/refs/heads/release-0.77/example/prometheus-operator-crd/monitoring.coreos.com_prometheusagents.yaml  > $(CRD_DIR)/monitoring.coreos.com_prometheusagents.yaml
 
 $(CRD_DIR)/monitoring.coreos.com_scrapeconfigs.yaml:
 	@mkdir -p $(CRD_DIR)
-	@curl https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/refs/heads/release-0.77/example/prometheus-operator-crd-full/monitoring.coreos.com_scrapeconfigs.yaml  > $(CRD_DIR)/monitoring.coreos.com_scrapeconfigs.yaml
+	@curl https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/refs/heads/release-0.77/example/prometheus-operator-crd/monitoring.coreos.com_scrapeconfigs.yaml  > $(CRD_DIR)/monitoring.coreos.com_scrapeconfigs.yaml
 
-.PHONY: install-crds
-install-crds: $(CRD_DIR)/observability.openshift.io_clusterlogforwarders.yaml $(CRD_DIR)/opentelemetry.io_opentelemetrycollectors.yaml $(CRD_DIR)/opentelemetry.io_instrumentations.yaml $(CRD_DIR)/monitoring.coreos.com_prometheusagents.yaml $(CRD_DIR)/monitoring.coreos.com_scrapeconfigs.yaml
+.PHONY: download-crds
+download-crds: $(CRD_DIR)/observability.openshift.io_clusterlogforwarders.yaml $(CRD_DIR)/opentelemetry.io_opentelemetrycollectors.yaml $(CRD_DIR)/opentelemetry.io_instrumentations.yaml $(CRD_DIR)/monitoring.coreos.com_prometheusagents.yaml $(CRD_DIR)/monitoring.coreos.com_scrapeconfigs.yaml
 
 .PHONY: fmt
 fmt: $(GOFUMPT) ## Run gofumpt on source code.
@@ -85,11 +85,15 @@ oci-push: ## Push the image
 .PHONY: oci
 oci: oci-build oci-push
 
+.PHONY: install-crds
+install-crds: download-crds
+	kubectl apply --server-side -f $(CRD_DIR)
+
 .PHONY: addon-deploy
-addon-deploy: $(KUSTOMIZE) install-crds
+addon-deploy: download-crds
 	cd deploy && $(KUSTOMIZE) edit set image controller=${IMG}
-	$(KUSTOMIZE) build ./deploy | kubectl apply -f -
+	$(KUSTOMIZE) build ./deploy | kubectl apply --server-side -f -
 
 .PHONY: addon-undeploy
-addon-undeploy: $(KUSTOMIZE) install-crds
+addon-undeploy: download-crds
 	$(KUSTOMIZE) build ./deploy | kubectl delete -f -
