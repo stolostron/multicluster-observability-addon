@@ -1,0 +1,21 @@
+{{- range $_, $rule := .Values.platform.rules }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ $rule.name }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- $incomingLabels := $rule.labels }}
+    {{- $metricsHelmLabels := fromYaml (include "metricshelm.labels" $) }}
+    {{- $customLabel := dict "app.kubernetes.io/component" "platform-metrics-collector" }}
+    {{- $mergedLabels := merge $incomingLabels $metricsHelmLabels $customLabel }}
+    {{- toYaml $mergedLabels | nindent 4 }}
+  annotations:
+    {{- $incomingAnnotations := $rule.annotations }}
+    {{- $stdAnnotations := dict "operator.prometheus.io/controller-id" "openshift-monitoring/prometheus-operator" }}
+    {{- $mergedAnnotations := merge $stdAnnotations $incomingAnnotations }}
+    {{- toYaml $mergedAnnotations | nindent 4 }}
+spec:
+{{ fromJson $rule.data | toYaml | nindent 2 }}
+---
+{{- end }}

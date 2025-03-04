@@ -16,30 +16,24 @@ import (
 	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
 	operatorsv1 "github.com/operator-framework/api/pkg/operators/v1"
 	operatorsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
-	"github.com/rhobs/multicluster-observability-addon/internal/addon"
-	addonhelm "github.com/rhobs/multicluster-observability-addon/internal/addon/helm"
+	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	prometheusv1alpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
+	addonctrl "github.com/rhobs/multicluster-observability-addon/internal/controllers/addon"
 	"github.com/rhobs/multicluster-observability-addon/internal/controllers/resourcecreator"
+	"github.com/rhobs/multicluster-observability-addon/internal/controllers/watcher"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	utilflag "k8s.io/component-base/cli/flag"
 	logs "k8s.io/component-base/logs/api/v1"
-	"k8s.io/klog/v2"
-	"open-cluster-management.io/addon-framework/pkg/addonfactory"
-	"open-cluster-management.io/addon-framework/pkg/addonmanager"
 	cmdfactory "open-cluster-management.io/addon-framework/pkg/cmd/factory"
-	"open-cluster-management.io/addon-framework/pkg/utils"
 	"open-cluster-management.io/addon-framework/pkg/version"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
-	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	workv1 "open-cluster-management.io/api/work/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 )
 
 var scheme = runtime.NewScheme()
@@ -53,6 +47,9 @@ func init() {
 	utilruntime.Must(otelv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(operatorsv1.AddToScheme(scheme))
 	utilruntime.Must(operatorsv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(clusterv1.AddToScheme(scheme))
+	utilruntime.Must(prometheusv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(prometheusv1.AddToScheme(scheme))
 	utilruntime.Must(certmanagerv1.AddToScheme(scheme))
 	utilruntime.Must(lokiv1.AddToScheme(scheme))
 
@@ -99,7 +96,7 @@ func newCommand() *cobra.Command {
 
 func newControllerCommand() *cobra.Command {
 	cmd := cmdfactory.
-		NewControllerCommandConfig("multicluster-observability-addon-controller", version.Get(), runController).
+		NewControllerCommandConfig("multicluster-observability-addon-controller", version.Get(), runControllers).
 		NewCommand()
 	cmd.Use = "controller"
 	cmd.Short = "Start the addon controller"
@@ -107,82 +104,24 @@ func newControllerCommand() *cobra.Command {
 	return cmd
 }
 
-func runController(ctx context.Context, kubeConfig *rest.Config) error {
+func runControllers(ctx context.Context, kubeConfig *rest.Config) error {
 	logger := log.NewLogger("mcoa")
-
-	addonClient, err := addonv1alpha1client.NewForConfig(kubeConfig)
+	mgr, err := addonctrl.NewAddonManager(ctx, kubeConfig, scheme)
 	if err != nil {
 		return err
 	}
 
-	mgr, err := addonmanager.New(kubeConfig)
-	if err != nil {
-		klog.Errorf("failed to new addon manager %v", err)
-		return err
+	disableReconciliation := os.Getenv("DISABLE_WATCHER_CONTROLLER")
+	if disableReconciliation == "" {
+		var wm *watcher.WatcherManager
+		wm, err = watcher.NewWatcherManager(&mgr, scheme)
+		if err != nil {
+			logger.Error(err, "unable to create watcher manager")
+			return err
+		}
+
+		wm.Start(ctx)
 	}
-
-	registrationOption := addon.NewRegistrationOption(utilrand.String(5))
-
-	httpClient, err := rest.HTTPClientFor(kubeConfig)
-	if err != nil {
-		return err
-	}
-
-	mapper, err := apiutil.NewDynamicRESTMapper(kubeConfig, httpClient)
-	if err != nil {
-		return err
-	}
-
-	opts := client.Options{
-		Scheme:     scheme,
-		Mapper:     mapper,
-		HTTPClient: httpClient,
-	}
-
-	k8sClient, err := client.New(kubeConfig, opts)
-	if err != nil {
-		return err
-	}
-
-	addonConfigValuesFn := addonfactory.GetAddOnDeploymentConfigValues(
-		addonfactory.NewAddOnDeploymentConfigGetter(addonClient),
-		addonfactory.ToAddOnCustomizedVariableValues,
-	)
-
-	mcoaAgentAddon, err := addonfactory.NewAgentAddonFactory(addon.Name, addon.FS, "manifests/charts/mcoa").
-		WithConfigGVRs(
-			schema.GroupVersionResource{Version: loggingv1.GroupVersion.Version, Group: loggingv1.GroupVersion.Group, Resource: addon.ClusterLogForwardersResource},
-			schema.GroupVersionResource{Version: otelv1beta1.GroupVersion.Version, Group: otelv1beta1.GroupVersion.Group, Resource: addon.OpenTelemetryCollectorsResource},
-			schema.GroupVersionResource{Version: otelv1alpha1.GroupVersion.Version, Group: otelv1alpha1.GroupVersion.Group, Resource: addon.InstrumentationResource},
-			utils.AddOnDeploymentConfigGVR,
-		).
-		WithGetValuesFuncs(addonConfigValuesFn, addonhelm.GetValuesFunc(ctx, k8sClient)).
-		WithAgentHealthProber(addon.AgentHealthProber()).
-		WithAgentRegistrationOption(registrationOption).
-		WithScheme(scheme).
-		BuildHelmAgentAddon()
-	if err != nil {
-		logger.Error(err, "failed to build agent")
-		return err
-	}
-
-	err = mgr.AddAgent(mcoaAgentAddon)
-	if err != nil {
-		logger.Error(err, "unable to add mcoa agent addon")
-		return err
-	}
-
-	// disableReconciliation := os.Getenv("DISABLE_WATCHER_CONTROLLER")
-	// if disableReconciliation == "" {
-	// 	var wm *watcher.WatcherManager
-	// 	wm, err = watcher.NewWatcherManager(logger, scheme, &mgr)
-	// 	if err != nil {
-	// 		logger.Error(err, "unable to create watcher manager")
-	// 		return err
-	// 	}
-
-	// 	wm.Start(ctx)
-	// }
 
 	var rcm *resourcecreator.ResourceCreatorManager
 	rcm, err = resourcecreator.NewResourceCreatorManager(logger, scheme)
@@ -196,6 +135,7 @@ func runController(ctx context.Context, kubeConfig *rest.Config) error {
 	if err != nil {
 		return err
 	}
+
 	<-ctx.Done()
 
 	return nil

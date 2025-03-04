@@ -3,10 +3,16 @@ package helm
 import (
 	"context"
 	"errors"
+	"net/url"
 
+	"github.com/go-logr/logr"
 	"github.com/rhobs/multicluster-observability-addon/internal/addon"
 	lhandlers "github.com/rhobs/multicluster-observability-addon/internal/logging/handlers"
 	lmanifests "github.com/rhobs/multicluster-observability-addon/internal/logging/manifests"
+	mconfig "github.com/rhobs/multicluster-observability-addon/internal/metrics/config"
+	mhandlers "github.com/rhobs/multicluster-observability-addon/internal/metrics/handlers"
+	mmanifests "github.com/rhobs/multicluster-observability-addon/internal/metrics/manifests"
+	mresource "github.com/rhobs/multicluster-observability-addon/internal/metrics/resource"
 	thandlers "github.com/rhobs/multicluster-observability-addon/internal/tracing/handlers"
 	tmanifests "github.com/rhobs/multicluster-observability-addon/internal/tracing/manifests"
 	clusterinfov1beta1 "github.com/stolostron/cluster-lifecycle-api/clusterinfo/v1beta1"
@@ -19,17 +25,19 @@ import (
 )
 
 var (
-	errMissingAODCRef  = errors.New("missing AddOnDeploymentConfig reference on addon installation")
-	errMultipleAODCRef = errors.New("multiple AddOnDeploymentConfig references on addon installation")
+	errMissingAODCRef     = errors.New("missing AddOnDeploymentConfig reference on addon installation")
+	errMultipleAODCRef    = errors.New("multiple AddOnDeploymentConfig references on addon installation")
+	errMissingHubEndpoint = errors.New("platform hub endpoint is required for metrics collection")
 )
 
 type HelmChartValues struct {
 	Enabled bool                     `json:"enabled"`
+	Metrics mmanifests.MetricsValues `json:"metrics"`
 	Logging lmanifests.LoggingValues `json:"logging"`
 	Tracing tmanifests.TracingValues `json:"tracing"`
 }
 
-func GetValuesFunc(ctx context.Context, k8s client.Client) addonfactory.GetValuesFunc {
+func GetValuesFunc(ctx context.Context, k8s client.Client, logger logr.Logger) addonfactory.GetValuesFunc {
 	return func(
 		cluster *clusterv1.ManagedCluster,
 		mcAddon *addonapiv1alpha1.ManagedClusterAddOn,
@@ -56,6 +64,41 @@ func GetValuesFunc(ctx context.Context, k8s client.Client) addonfactory.GetValue
 
 		isHubCluster := isHubCluster(cluster)
 		values := HelmChartValues{}
+		userValues := HelmChartValues{
+			Enabled: true,
+		}
+
+		if opts.Platform.Metrics.CollectionEnabled || opts.UserWorkloads.Metrics.CollectionEnabled {
+			if opts.Platform.Metrics.HubEndpoint == "" {
+				return nil, errMissingHubEndpoint
+			}
+
+			if err := mresource.DeployDefaultResourcesOnce(ctx, k8s, logger, mconfig.HubInstallNamespace); err != nil {
+				return nil, err
+			}
+
+			remoteWriteURL, err := url.JoinPath(opts.Platform.Metrics.HubEndpoint, "/api/metrics/v1/default/api/v1/receive")
+			if err != nil {
+				return nil, err
+			}
+			optsBuilder := mhandlers.OptionsBuilder{
+				Client:          k8s,
+				ImagesConfigMap: mconfig.ImagesConfigMap,
+				RemoteWriteURL:  remoteWriteURL,
+				Logger:          logger,
+			}
+			metricsOpts, err := optsBuilder.Build(ctx, mcAddon, cluster, opts.Platform.Metrics, opts.UserWorkloads.Metrics)
+			if err != nil {
+				return nil, err
+			}
+
+			metrics, err := mmanifests.BuildValues(metricsOpts)
+			if err != nil {
+				return nil, err
+			}
+			userValues.Metrics = metrics
+		}
+
 		if opts.Platform.Logs.CollectionEnabled || opts.UserWorkloads.Logs.CollectionEnabled || opts.Platform.Logs.DefaultStack {
 			loggingOpts, err := lhandlers.BuildOptions(ctx, k8s, mcAddon, opts.Platform.Logs, opts.UserWorkloads.Logs, isHubCluster, opts.HubHostname)
 			if err != nil {

@@ -1,0 +1,111 @@
+{{- if or .Values.platformEnabled .Values.userWorkloadsEnabled }}
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: acm-prometheus-operator
+  labels:
+    app.kubernetes.io/component: controller
+    app.kubernetes.io/name: prometheus-operator
+    app.kubernetes.io/part-of: acm-observability-addon
+rules:
+  - verbs:
+      - '*'
+    apiGroups:
+      - monitoring.coreos.com
+    resources:
+      # - alertmanagers
+      # - alertmanagers/finalizers
+      # - alertmanagers/status
+      # - alertmanagerconfigs
+      - prometheuses
+      - prometheuses/finalizers
+      - prometheuses/status
+      # - thanosrulers
+      # - thanosrulers/finalizers
+      # - thanosrulers/status
+      - servicemonitors
+      - podmonitors
+      - probes
+      - prometheusrules
+      - prometheuses/status
+      - prometheusagents
+      - prometheusagents/finalizers
+      - prometheusagents/status
+      - scrapeconfigs
+  - verbs:
+      - '*'
+    apiGroups:
+      - apps
+    resources:
+      - statefulsets
+  - verbs:
+      - '*'
+    apiGroups:
+      - ''
+    resources:
+      - configmaps
+      - secrets
+  - verbs:
+      - list
+      - delete
+    apiGroups:
+      - ''
+    resources:
+      - pods
+  - verbs:
+      - get
+      - create
+      - update
+      - delete
+    apiGroups:
+      - ''
+    resources:
+      - services
+      - services/finalizers
+      - endpoints
+  - verbs:
+      - list
+      - watch
+    apiGroups:
+      - ''
+    resources:
+      - nodes
+  - verbs:
+      - get
+      - list
+      - watch
+    apiGroups:
+      - ''
+    resources:
+      - namespaces
+  # - verbs:
+  #     - get
+  #     - list
+  #     - watch
+  #   apiGroups:
+  #     - networking.k8s.io
+  #   resources:
+  #     - ingresses
+  # - verbs:
+  #     - create
+  #   apiGroups:
+  #     - authentication.k8s.io
+  #   resources:
+  #     - tokenreviews
+  # - verbs:
+  #     - create
+  #   apiGroups:
+  #     - authorization.k8s.io
+  #   resources:
+  #     - subjectaccessreviews
+  - verbs:
+      - get
+      - list
+      - watch
+      - create
+      - patch
+    apiGroups:
+      - ''
+    resources:
+      - events
+{{- end }}

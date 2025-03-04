@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/go-logr/logr"
 	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
 	operatorsv1 "github.com/operator-framework/api/pkg/operators/v1"
 	operatorsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
@@ -192,7 +193,7 @@ func Test_Mcoa_Disabled(t *testing.T) {
 				Build()
 
 			loggingAgentAddon, err := addonfactory.NewAgentAddonFactory(addon.Name, addon.FS, addon.McoaChartDir).
-				WithGetValuesFuncs(GetValuesFunc(context.TODO(), fakeKubeClient)).
+				WithGetValuesFuncs(GetValuesFunc(context.TODO(), fakeKubeClient, logr.Discard())).
 				WithAgentRegistrationOption(&agent.RegistrationOption{}).
 				WithScheme(scheme.Scheme).
 				BuildHelmAgentAddon()
