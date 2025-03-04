@@ -67,6 +67,10 @@
     - apiGroups: ["opentelemetry.io"]
       resources: ["opentelemetrycollectors", "instrumentations"]
       verbs: ["get", "list", "watch"]
+    # Role for addon to perform metrics specific actions
+    - apiGroups: ["monitoring.coreos.com"]
+      resources: ["scrapeconfigs", "prometheusagents", "prometheusrules"]
+      verbs: ["get", "list", "watch"]
     # Roles for addon to manage certificates managed logging
     - apiGroups: ["cert-manager.io"]
       resources: ["certificates"]
@@ -75,3 +79,4 @@
     - apiGroups: ["cert-manager.io"]
       resources: ["certificates/status"]
       verbs: ["get", "update"]
+
