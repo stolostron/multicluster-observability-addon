@@ -100,7 +100,15 @@ func Test_ObservabilityOperator_AllConfigsTogether_AllResources(t *testing.T) {
 			Name:      "multicluster-observability-addon",
 			Namespace: "open-cluster-management-observability",
 		},
-		Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{},
+		Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
+			CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
+				{
+					Name:  "observabilityOperator",
+					Value: "monitoring.rhobs",
+				},
+			},
+		},
+
 	}
 
 	fakeAddonClient = fakeaddon.NewSimpleClientset(addOnDeploymentConfig)
