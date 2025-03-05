@@ -33,7 +33,17 @@ func fakeGetValues(ctx context.Context, k8s client.Client) addonfactory.GetValue
 		_ *clusterv1.ManagedCluster,
 		mcAddon *addonapiv1alpha1.ManagedClusterAddOn,
 	) (addonfactory.Values, error) {
-		opts := handlers.BuildOptions(ctx, k8s, mcAddon, addon.ObservabilityOperatorOptions{Enabled: true})
+		aodc := &addonapiv1alpha1.AddOnDeploymentConfig{}
+		keys := addon.GetObjectKeys(mcAddon.Status.ConfigReferences, addonutils.AddOnDeploymentConfigGVR.Group, addon.AddonDeploymentConfigResource)
+		if err := k8s.Get(context.TODO(), keys[0], aodc, &client.GetOptions{}); err != nil {
+			return nil, err
+		}
+		addonOpts, err := addon.BuildOptions(aodc)
+		if err != nil {
+			return nil, err
+		}
+
+		opts := handlers.BuildOptions(ctx, k8s, mcAddon, addonOpts.Platform.ObservabilityOperator)
 		oboValues := manifests.BuildValues(opts)
 
 		return addonfactory.JsonStructToValues(oboValues)
