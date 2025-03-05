@@ -16,6 +16,7 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
 	"open-cluster-management.io/addon-framework/pkg/agent"
+	addonutils "open-cluster-management.io/addon-framework/pkg/utils"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	fakeaddon "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
@@ -26,6 +27,7 @@ import (
 var (
 	_ = operatorsv1.AddToScheme(scheme.Scheme)
 	_ = operatorsv1alpha1.AddToScheme(scheme.Scheme)
+	_ = addonapiv1alpha1.AddToScheme(scheme.Scheme)
 )
 
 func fakeGetValues(ctx context.Context, k8s client.Client) addonfactory.GetValuesFunc {
@@ -33,7 +35,17 @@ func fakeGetValues(ctx context.Context, k8s client.Client) addonfactory.GetValue
 		_ *clusterv1.ManagedCluster,
 		mcAddon *addonapiv1alpha1.ManagedClusterAddOn,
 	) (addonfactory.Values, error) {
-		opts := handlers.BuildOptions(ctx, k8s, mcAddon, addon.ObservabilityOperatorOptions{Enabled: true})
+		aodc := &addonapiv1alpha1.AddOnDeploymentConfig{}
+		keys := addon.GetObjectKeys(mcAddon.Status.ConfigReferences, addonutils.AddOnDeploymentConfigGVR.Group, addon.AddonDeploymentConfigResource)
+		if err := k8s.Get(ctx, keys[0], aodc, &client.GetOptions{}); err != nil {
+			return nil, err
+		}
+		addonOpts, err := addon.BuildOptions(aodc)
+		if err != nil {
+			return nil, err
+		}
+
+		opts := handlers.BuildOptions(ctx, k8s, mcAddon, addonOpts.Platform.ObservabilityOperator)
 		oboValues := manifests.BuildValues(opts)
 
 		return addonfactory.JsonStructToValues(oboValues)
@@ -80,18 +92,26 @@ func Test_ObservabilityOperator_AllConfigsTogether_AllResources(t *testing.T) {
 		},
 	}
 
-	// Setup the fake k8s client
-	fakeKubeClient = fake.NewClientBuilder().
-		WithScheme(scheme.Scheme).
-		Build()
-
 	addOnDeploymentConfig = &addonapiv1alpha1.AddOnDeploymentConfig{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "multicluster-observability-addon",
 			Namespace: "open-cluster-management-observability",
 		},
-		Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{},
+		Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
+			CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
+				{
+					Name:  "observabilityOperator",
+					Value: "monitoring.rhobs",
+				},
+			},
+		},
 	}
+
+	// Setup the fake k8s client
+	fakeKubeClient = fake.NewClientBuilder().
+		WithScheme(scheme.Scheme).
+		WithObjects(addOnDeploymentConfig).
+		Build()
 
 	fakeAddonClient = fakeaddon.NewSimpleClientset(addOnDeploymentConfig)
 	addonConfigValuesFn := addonfactory.GetAddOnDeploymentConfigValues(
