@@ -27,8 +27,6 @@ require (
 
 replace github.com/prometheus/common => github.com/prometheus/common v0.62.0
 
-replace github.com/prometheus/client_golang => github.com/prometheus/client_golang v1.21.0
-
 require (
 	github.com/BurntSushi/toml v1.3.2 // indirect
 	github.com/Masterminds/goutils v1.1.1 // indirect
@@ -84,7 +82,7 @@ require (
 	github.com/openshift/api v0.0.0-20240212125214-04ea3891d9cb // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
-	github.com/prometheus/client_golang v1.20.4 // indirect
+	github.com/prometheus/client_golang v1.21.1 // indirect
 	github.com/prometheus/client_model v0.6.1 // indirect
 	github.com/prometheus/common v0.62.0 // indirect
 	github.com/prometheus/procfs v0.15.1 // indirect
