@@ -4,6 +4,8 @@ kind: OperatorGroup
 metadata:
   name: openshift-cluster-observability-operator
   namespace: openshift-cluster-observability-operator
+  annotations:
+    olm.providedAPIs: Alertmanager.v1.monitoring.rhobs,AlertmanagerConfig.v1alpha1.monitoring.rhobs,MonitoringStack.v1alpha1.monitoring.rhobs,PodMonitor.v1.monitoring.rhobs,Probe.v1.monitoring.rhobs,Prometheus.v1.monitoring.rhobs,PrometheusAgent.v1alpha1.monitoring.rhobs,PrometheusRule.v1.monitoring.rhobs,ScrapeConfig.v1alpha1.monitoring.rhobs,ServiceMonitor.v1.monitoring.rhobs,ThanosQuerier.v1alpha1.monitoring.rhobs,ThanosRuler.v1.monitoring.rhobs,UIPlugin.v1alpha1.observability.openshift.io
   labels:
     app: {{ template "observability-operatorhelm.name" . }}
     chart: {{ template "observability-operatorhelm.chart" . }}
