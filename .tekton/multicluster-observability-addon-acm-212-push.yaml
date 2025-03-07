@@ -24,7 +24,7 @@ spec:
   - name: output-image
     value: quay.io/redhat-user-workloads/crt-redhat-acm-tenant/release-acm-212/multicluster-observability-addon-acm-212:{{revision}}
   - name: dockerfile
-    value: Dockerfile
+    value: Dockerfile.Konflux
   - name: path-context
     value: .
   pipelineSpec:
