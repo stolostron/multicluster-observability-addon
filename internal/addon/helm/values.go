@@ -42,12 +42,12 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, logger logr.Logger) a
 		cluster *clusterv1.ManagedCluster,
 		mcAddon *addonapiv1alpha1.ManagedClusterAddOn,
 	) (addonfactory.Values, error) {
-		// if hub cluster, then don't install anything.
-		// some kube flavors are also currently not supported
-		if isHubCluster(cluster) || !supportedKubeVendors(cluster) {
+		// Skip unsupported kube vendors
+		if !supportedKubeVendors(cluster) {
 			return addonfactory.JsonStructToValues(HelmChartValues{})
 		}
 
+		// Build options from AddOnDeploymentConfig
 		aodc, err := getAddOnDeploymentConfig(ctx, k8s, mcAddon)
 		if err != nil {
 			return nil, err
@@ -57,10 +57,13 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, logger logr.Logger) a
 			return nil, err
 		}
 
+		// Skip if no configuration was provided
 		if !opts.Platform.Enabled && !opts.UserWorkloads.Enabled {
 			return addonfactory.JsonStructToValues(HelmChartValues{})
 		}
 
+		isHubCluster := isHubCluster(cluster)
+		values := HelmChartValues{}
 		userValues := HelmChartValues{
 			Enabled: true,
 		}
@@ -96,8 +99,8 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, logger logr.Logger) a
 			userValues.Metrics = metrics
 		}
 
-		if opts.Platform.Logs.CollectionEnabled || opts.UserWorkloads.Logs.CollectionEnabled {
-			loggingOpts, err := lhandlers.BuildOptions(ctx, k8s, mcAddon, opts.Platform.Logs, opts.UserWorkloads.Logs)
+		if opts.Platform.Logs.CollectionEnabled || opts.UserWorkloads.Logs.CollectionEnabled || opts.Platform.Logs.DefaultStack {
+			loggingOpts, err := lhandlers.BuildOptions(ctx, k8s, mcAddon, opts.Platform.Logs, opts.UserWorkloads.Logs, isHubCluster, opts.HubHostname)
 			if err != nil {
 				return nil, err
 			}
@@ -106,10 +109,10 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, logger logr.Logger) a
 			if err != nil {
 				return nil, err
 			}
-			userValues.Logging = *logging
+			values.Logging = *logging
 		}
 
-		if opts.UserWorkloads.Traces.CollectionEnabled {
+		if !isHubCluster && opts.UserWorkloads.Traces.CollectionEnabled {
 			tracingOpts, err := thandlers.BuildOptions(ctx, k8s, mcAddon, opts.UserWorkloads.Traces)
 			if err != nil {
 				return nil, err
@@ -119,10 +122,11 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, logger logr.Logger) a
 			if err != nil {
 				return nil, err
 			}
-			userValues.Tracing = tracing
+			values.Tracing = tracing
 		}
 
-		return addonfactory.JsonStructToValues(userValues)
+		values.Enabled = values.Logging.Enabled || values.Tracing.Enabled
+		return addonfactory.JsonStructToValues(values)
 	}
 }
 
@@ -136,7 +140,7 @@ func getAddOnDeploymentConfig(ctx context.Context, k8s client.Client, mcAddon *a
 		return aodc, errMultipleAODCRef
 	}
 	if err := k8s.Get(ctx, keys[0], aodc, &client.GetOptions{}); err != nil {
-		// TODO(JoaoBraveCoding) Add proper error handling
+		// TODO(JoaoBraveCoding): Add proper error handling
 		return aodc, err
 	}
 	return aodc, nil

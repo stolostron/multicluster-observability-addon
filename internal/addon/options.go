@@ -7,12 +7,15 @@ import (
 )
 
 const (
+	KeyHubHostname = "hubHostname"
+
 	// Operator Subscription Channels
 	KeyOpenShiftLoggingChannel = "openshiftLoggingChannel"
 
 	// Platform Observability Keys
-	KeyPlatformMetricsCollection = "platformMetricsCollection"
 	KeyPlatformLogsCollection    = "platformLogsCollection"
+	KeyPlatformLogsDefault       = "platformLogsDefault"
+	KeyPlatformMetricsCollection = "platformMetricsCollection"
 	KeyMetricsHubHostname        = "metricsHubHostname"
 
 	// User Workloads Observability Keys
@@ -44,6 +47,7 @@ type MetricsOptions struct {
 type LogsOptions struct {
 	CollectionEnabled   bool
 	SubscriptionChannel string
+	DefaultStack        bool
 }
 
 type TracesOptions struct {
@@ -66,6 +70,7 @@ type UserWorkloadOptions struct {
 }
 
 type Options struct {
+	HubHostname   string
 	Platform      PlatformOptions
 	UserWorkloads UserWorkloadOptions
 }
@@ -82,6 +87,8 @@ func BuildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Opti
 
 	for _, keyvalue := range addOnDeployment.Spec.CustomizedVariables {
 		switch keyvalue.Name {
+		case KeyHubHostname:
+			opts.HubHostname = keyvalue.Value
 		// Operator Subscriptions
 		case KeyOpenShiftLoggingChannel:
 			opts.Platform.Logs.SubscriptionChannel = keyvalue.Value
@@ -102,6 +109,12 @@ func BuildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Opti
 			if keyvalue.Value == string(ClusterLogForwarderV1) {
 				opts.Platform.Enabled = true
 				opts.Platform.Logs.CollectionEnabled = true
+			}
+		case KeyPlatformLogsDefault:
+			// TODO(JoaoBraveCoding): we need to review what the value should be
+			if keyvalue.Value == "true" {
+				opts.Platform.Enabled = true
+				opts.Platform.Logs.DefaultStack = true
 			}
 		// User Workload Observability Options
 		case KeyUserWorkloadMetricsCollection:
