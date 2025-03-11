@@ -7,6 +7,8 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/rhobs/multicluster-observability-addon/internal/addon"
+	ihandlers "github.com/rhobs/multicluster-observability-addon/internal/incident-detection/handlers"
+	imanifests "github.com/rhobs/multicluster-observability-addon/internal/incident-detection/manifests"
 	lhandlers "github.com/rhobs/multicluster-observability-addon/internal/logging/handlers"
 	lmanifests "github.com/rhobs/multicluster-observability-addon/internal/logging/manifests"
 	mconfig "github.com/rhobs/multicluster-observability-addon/internal/metrics/config"
@@ -31,10 +33,11 @@ var (
 )
 
 type HelmChartValues struct {
-	Enabled bool                     `json:"enabled"`
-	Metrics mmanifests.MetricsValues `json:"metrics"`
-	Logging lmanifests.LoggingValues `json:"logging"`
-	Tracing tmanifests.TracingValues `json:"tracing"`
+	Enabled   bool                       `json:"enabled"`
+	Metrics   mmanifests.MetricsValues   `json:"metrics"`
+	Logging   lmanifests.LoggingValues   `json:"logging"`
+	Tracing   tmanifests.TracingValues   `json:"tracing"`
+	Analytics imanifests.AnalyticsValues `json:"analytics"`
 }
 
 func GetValuesFunc(ctx context.Context, k8s client.Client, logger logr.Logger) addonfactory.GetValuesFunc {
@@ -120,6 +123,11 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, logger logr.Logger) a
 				return nil, err
 			}
 			userValues.Tracing = tracing
+		}
+
+		if opts.Platform.AnalyticsOptions.IncidentDetection.Enabled {
+			incDecOptions := ihandlers.BuildOptions(ctx, k8s, mcAddon, opts.Platform.AnalyticsOptions.IncidentDetection)
+			userValues.Analytics = *imanifests.BuildValues(incDecOptions)
 		}
 
 		return addonfactory.JsonStructToValues(userValues)

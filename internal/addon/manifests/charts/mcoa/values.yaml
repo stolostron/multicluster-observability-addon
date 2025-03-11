@@ -10,3 +10,6 @@ logging:
 
 tracing:
   enabled: true
+
+analytics:
+  enabled: true
