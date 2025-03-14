@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	hyperv1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	prometheusalpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
@@ -21,6 +22,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	kubescheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog/v2"
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
@@ -242,6 +244,223 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestHelmBuild_Metrics_HCP(t *testing.T) {
+	scheme := runtime.NewScheme()
+	assert.NoError(t, kubescheme.AddToScheme(scheme))
+	assert.NoError(t, prometheusalpha1.AddToScheme(scheme))
+	assert.NoError(t, prometheusv1.AddToScheme(scheme))
+	assert.NoError(t, clusterv1.AddToScheme(scheme))
+	assert.NoError(t, hyperv1.AddToScheme(scheme))
+
+	installNamespace := "open-cluster-management-addon-observability"
+	hubNamespace := "open-cluster-management-observability"
+
+	// Add user workload resources
+	defaultAgentResources := resource.DefaultUserWorkloadAgentResources(hubNamespace)
+
+	configReferences := []addonapiv1alpha1.ConfigReference{}
+	for _, obj := range defaultAgentResources {
+		configReferences = append(configReferences, newConfigReference(obj))
+	}
+
+	clientObjects := []client.Object{}
+	clientObjects = append(clientObjects, defaultAgentResources...)
+
+	// Add hcp scrape configs and rules
+	etcdHcpScrapeConfig := &prometheusalpha1.ScrapeConfig{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       prometheusalpha1.ScrapeConfigsKind,
+			APIVersion: prometheusalpha1.SchemeGroupVersion.Identifier(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "etcd-base",
+			Namespace: hubNamespace,
+			Labels:    config.EtcdHcpUserWorkloadPrometheusMatchLabels,
+		},
+		Spec: prometheusalpha1.ScrapeConfigSpec{
+			Params: map[string][]string{
+				"match[]": {
+					`{__name__="etcd_metric"}`,
+				},
+			},
+		},
+	}
+	apiserverHcpScrapeConfig := &prometheusalpha1.ScrapeConfig{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       prometheusalpha1.ScrapeConfigsKind,
+			APIVersion: prometheusalpha1.SchemeGroupVersion.Identifier(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "apiserver-base",
+			Namespace: hubNamespace,
+			Labels:    config.ApiserverHcpUserWorkloadPrometheusMatchLabels,
+		},
+		Spec: prometheusalpha1.ScrapeConfigSpec{
+			Params: map[string][]string{
+				"match[]": {
+					`{__name__="apiserver_metric"}`,
+				},
+			},
+		},
+	}
+	etcdHcpRule := &prometheusv1.PrometheusRule{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       prometheusv1.PrometheusRuleKind,
+			APIVersion: prometheusv1.SchemeGroupVersion.Identifier(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "etcd-base",
+			Namespace: hubNamespace,
+			Labels:    config.EtcdHcpUserWorkloadPrometheusMatchLabels,
+		},
+		Spec: prometheusv1.PrometheusRuleSpec{
+			Groups: []prometheusv1.RuleGroup{
+				{
+					Rules: []prometheusv1.Rule{
+						{
+							Expr: intstr.FromString("sum(etcd_rule_dependent_metric)"),
+						},
+					},
+				},
+			},
+		},
+	}
+	apiserverHcpRule := &prometheusv1.PrometheusRule{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       prometheusv1.PrometheusRuleKind,
+			APIVersion: prometheusv1.SchemeGroupVersion.Identifier(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "apiserver-base",
+			Namespace: hubNamespace,
+			Labels:    config.ApiserverHcpUserWorkloadPrometheusMatchLabels,
+		},
+		Spec: prometheusv1.PrometheusRuleSpec{
+			Groups: []prometheusv1.RuleGroup{
+				{
+					Rules: []prometheusv1.Rule{
+						{
+							Expr: intstr.FromString("apiserver_rule_dependent_metric"),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	configReferences = append(configReferences, newConfigReference(etcdHcpScrapeConfig), newConfigReference(apiserverHcpScrapeConfig), newConfigReference(etcdHcpRule), newConfigReference(apiserverHcpRule))
+	clientObjects = append(clientObjects, etcdHcpScrapeConfig, apiserverHcpScrapeConfig, etcdHcpRule, apiserverHcpRule)
+
+	// Add hypershift dependencies
+	hostedCluster := &hyperv1.HostedCluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "a",
+			Namespace: "clusters",
+		},
+		Spec: hyperv1.HostedClusterSpec{
+			ClusterID: "cluster-id-a",
+		},
+	}
+	etcdSM := &prometheusv1.ServiceMonitor{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "etcd",
+			Namespace: "clusters-a",
+		},
+		Spec: prometheusv1.ServiceMonitorSpec{
+			Endpoints: []prometheusv1.Endpoint{
+				{
+					Port: "metrics",
+				},
+			},
+		},
+	}
+	apiserverSM := &prometheusv1.ServiceMonitor{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "kube-apiserver",
+			Namespace: "clusters-a",
+		},
+		Spec: prometheusv1.ServiceMonitorSpec{
+			Endpoints: []prometheusv1.Endpoint{
+				{
+					Port: "client",
+				},
+			},
+		},
+	}
+	clientObjects = append(clientObjects, hostedCluster, etcdSM, apiserverSM)
+
+	// Add secrets needed for the agent connection to the hub
+	clientObjects = append(clientObjects, newSecret(config.HubCASecretName, hubNamespace))
+	clientObjects = append(clientObjects, newSecret(config.ClientCertSecretName, hubNamespace))
+
+	// Setup a the local cluster as managed cluster
+	managedCluster := addontesting.NewManagedCluster("cluster-1")
+	managedCluster.Labels = map[string]string{
+		config.LocalManagedClusterLabel:  "true",
+		config.HypershiftAddonStateLabel: "available",
+	}
+	clientObjects = append(clientObjects, managedCluster)
+
+	// Images overrides configMap
+	imagesCM := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "images-list",
+			Namespace: hubNamespace,
+		},
+		Data: map[string]string{
+			"prometheus_operator":        "registry.redhat.io/rhacm2/acm-prometheus-rhel9@sha256:4234bab8666dad7917cfcf10fdaed87b60e549ef6f8fb23d1760881d922e03e9",
+			"prometheus_config_reloader": "registry.redhat.io/rhacm2/acm-prometheus-config-reloader-rhel9@sha256:ab1632ec7aca478cf368e80ac9d98da3f2306a0cae8a4e9d29f95e149fd47ced",
+			"kube_rbac_proxy":            "registry.redhat.io/rhacm2/kube-rbac-proxy-rhel9@sha256:c60a1d52359493a41b2b6f820d11716d67290e9b83dc18c16039dbc6f120e5f2",
+		},
+	}
+	clientObjects = append(clientObjects, imagesCM)
+
+	// Setup the fake k8s client
+	client := fakeclient.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(clientObjects...).
+		Build()
+
+	// Setup the fake addon client
+	addonClient := fakeaddon.NewSimpleClientset(newAddonDeploymentConfig())
+	addonConfigValuesFn := addonfactory.GetAddOnDeploymentConfigValues(
+		addonfactory.NewAddOnDeploymentConfigGetter(addonClient),
+		addonfactory.ToAddOnCustomizedVariableValues,
+	)
+
+	// Register the addon for the managed cluster
+	managedClusterAddOn := addontesting.NewAddon("test", "cluster-1")
+	managedClusterAddOn.Spec.InstallNamespace = installNamespace
+	managedClusterAddOn.Status.ConfigReferences = []addonapiv1alpha1.ConfigReference{}
+	managedClusterAddOn.Status.ConfigReferences = append(managedClusterAddOn.Status.ConfigReferences, configReferences...)
+
+	// Wire everything together to a fake addon instance
+	agentAddon, err := addonfactory.NewAgentAddonFactory(addon.Name, addon.FS, addon.MetricsChartDir).
+		WithGetValuesFuncs(addonConfigValuesFn, fakeGetValues(client, false, true)).
+		WithAgentRegistrationOption(&agent.RegistrationOption{}).
+		WithScheme(scheme).
+		BuildHelmAgentAddon()
+	if err != nil {
+		klog.Fatalf("failed to build agent %v", err)
+	}
+
+	// Render manifests and return them as k8s runtime objects
+	objects, err := agentAddon.Manifests(managedCluster, managedClusterAddOn)
+	assert.NoError(t, err)
+	clientObjs := runtimeToClientObjects(t, objects)
+
+	recordingRules := addon.FilterResourcesByLabelSelector[*prometheusv1.PrometheusRule](clientObjs, nil)
+	assert.Len(t, recordingRules, 2)
+	scrapeConfigs := addon.FilterResourcesByLabelSelector[*prometheusalpha1.ScrapeConfig](clientObjs, nil)
+	assert.Len(t, scrapeConfigs, 2)
+	serviceMonitors := addon.FilterResourcesByLabelSelector[*prometheusv1.ServiceMonitor](clientObjs, nil)
+	assert.Len(t, serviceMonitors, 2)
+	assert.Equal(t, "clusters-a", serviceMonitors[0].Namespace)
+	assert.Len(t, serviceMonitors[0].Spec.Endpoints, 1)
+	assert.Len(t, serviceMonitors[1].Spec.Endpoints, 1)
+
 }
 
 func newAddonDeploymentConfig() *addonapiv1alpha1.AddOnDeploymentConfig {

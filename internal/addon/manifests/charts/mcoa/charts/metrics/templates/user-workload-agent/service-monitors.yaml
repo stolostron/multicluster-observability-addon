@@ -1,0 +1,16 @@
+{{- range $_, $servicemonitor := .Values.userWorkload.serviceMonitors }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ $servicemonitor.name }}
+  namespace: {{ $servicemonitor.namespace }}
+  labels:
+    {{- $incomingLabels := $servicemonitor.labels }}
+    {{- $metricsHelmLabels := fromYaml (include "metricshelm.labels" $) }}
+    {{- $customLabel := dict "app.kubernetes.io/component" "user-workload-metrics-collector" }}
+    {{- $mergedLabels := merge $incomingLabels $metricsHelmLabels $customLabel }}
+    {{- toYaml $mergedLabels | nindent 4 }}
+spec:
+{{ fromJson $servicemonitor.data | toYaml | nindent 2 }}
+---
+{{- end }}
