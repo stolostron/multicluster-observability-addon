@@ -44,7 +44,7 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, logger logr.Logger) a
 	) (addonfactory.Values, error) {
 		// if hub cluster, then don't install anything.
 		// some kube flavors are also currently not supported
-		if isHubCluster(cluster) || !supportedKubeVendors(cluster) {
+		if !supportedKubeVendors(cluster) {
 			return addonfactory.JsonStructToValues(HelmChartValues{})
 		}
 
@@ -93,6 +93,10 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, logger logr.Logger) a
 		}
 
 		if opts.Platform.Logs.CollectionEnabled || opts.UserWorkloads.Logs.CollectionEnabled {
+			if isHubCluster(cluster) {
+				return addonfactory.JsonStructToValues(HelmChartValues{})
+			}
+
 			loggingOpts, err := lhandlers.BuildOptions(ctx, k8s, mcAddon, opts.Platform.Logs, opts.UserWorkloads.Logs)
 			if err != nil {
 				return nil, err
@@ -106,6 +110,10 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, logger logr.Logger) a
 		}
 
 		if opts.UserWorkloads.Traces.CollectionEnabled {
+			if isHubCluster(cluster) {
+				return addonfactory.JsonStructToValues(HelmChartValues{})
+			}
+
 			tracingOpts, err := thandlers.BuildOptions(ctx, k8s, mcAddon, opts.UserWorkloads.Traces)
 			if err != nil {
 				return nil, err
