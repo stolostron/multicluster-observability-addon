@@ -165,6 +165,18 @@ func TestBuildValues(t *testing.T) {
 				assert.Equal(t, values.UserWorkload.Rules[1].Name, "b")
 			},
 		},
+		"with user workload service monitors": {
+			Options: handlers.Options{
+				UserWorkloads: handlers.Collector{
+					ServiceMonitors: []*prometheusv1.ServiceMonitor{newServiceMonitor("a"), newServiceMonitor("b")},
+				},
+			},
+			Expect: func(t *testing.T, values manifests.MetricsValues) {
+				assert.Len(t, values.UserWorkload.ServiceMonitors, 2)
+				assert.Equal(t, values.UserWorkload.ServiceMonitors[0].Name, "a")
+				assert.Equal(t, values.UserWorkload.ServiceMonitors[1].Name, "b")
+			},
+		},
 	}
 
 	for name, tc := range testCases {
@@ -211,6 +223,14 @@ func newScrapeConfig(name string) *prometheusalpha1.ScrapeConfig {
 
 func newRule(name string) *prometheusv1.PrometheusRule {
 	return &prometheusv1.PrometheusRule{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+	}
+}
+
+func newServiceMonitor(name string) *prometheusv1.ServiceMonitor {
+	return &prometheusv1.ServiceMonitor{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},

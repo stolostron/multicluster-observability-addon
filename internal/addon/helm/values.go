@@ -46,6 +46,7 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, logger logr.Logger) a
 		cluster *clusterv1.ManagedCluster,
 		mcAddon *addonapiv1alpha1.ManagedClusterAddOn,
 	) (addonfactory.Values, error) {
+		logger.V(2).Info("reconciliation triggered", "cluster", cluster.Name)
 		// if hub cluster, then don't install anything.
 		// some kube flavors are also currently not supported
 		if !supportedKubeVendors(cluster) {
