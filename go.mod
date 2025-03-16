@@ -2,7 +2,7 @@ module github.com/rhobs/multicluster-observability-addon
 
 go 1.23
 
-toolchain go1.23.4
+toolchain go1.24.1
 
 require (
 	github.com/ViaQ/logerr/v2 v2.1.0
