@@ -8,7 +8,7 @@ require (
 	github.com/ViaQ/logerr/v2 v2.1.0
 	github.com/go-logr/logr v1.4.2
 	github.com/open-telemetry/opentelemetry-operator v0.107.0
-	github.com/openshift/cluster-logging-operator/api/observability v0.0.0-20250228165433-3665fb550c08
+	github.com/openshift/cluster-logging-operator/api/observability v0.0.0-20250313233210-073925e39f17
 	github.com/operator-framework/api v0.26.0
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.76.2
 	github.com/spf13/cobra v1.9.1
