@@ -19,10 +19,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-const (
-	clusterIDLabel = "clusterID"
-)
-
 var (
 	ErrInvalidConfigResourcesCount = errors.New("invalid number of configuration resources")
 	ErrUnsupportedAppName          = errors.New("unsupported app name")
@@ -46,7 +42,7 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 	}
 
 	ret.ClusterName = managedCluster.Name
-	ret.ClusterID = managedCluster.ObjectMeta.Labels[clusterIDLabel]
+	ret.ClusterID = managedCluster.ObjectMeta.Labels[config.ManagedClusterLabelClusterID]
 	if ret.ClusterID == "" {
 		ret.ClusterID = managedCluster.Name
 	}
@@ -66,7 +62,7 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 
 	// Build Prometheus agents for platform and user workloads
 	if platform.CollectionEnabled {
-		if err := o.buildPrometheusAgent(ctx, &ret, configResources, config.PlatformMetricsCollectorApp); err != nil {
+		if err := o.buildPrometheusAgent(ctx, &ret, configResources, config.PlatformMetricsCollectorApp, false); err != nil {
 			return ret, err
 		}
 
@@ -81,8 +77,10 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 		}
 	}
 
+	isHypershiftCluster := IsHypershiftEnabled(managedCluster)
+
 	if userWorkloads.CollectionEnabled {
-		if err := o.buildPrometheusAgent(ctx, &ret, configResources, config.UserWorkloadMetricsCollectorApp); err != nil {
+		if err := o.buildPrometheusAgent(ctx, &ret, configResources, config.UserWorkloadMetricsCollectorApp, isHypershiftCluster); err != nil {
 			return ret, err
 		}
 
@@ -97,11 +95,21 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 		}
 	}
 
+	if isHypershiftCluster {
+		if userWorkloads.CollectionEnabled {
+			if err := o.buildHypershiftResources(ctx, &ret, managedCluster, configResources); err != nil {
+				return ret, fmt.Errorf("failed to generate hypershift resources: %w", err)
+			}
+		} else {
+			o.Logger.Info("User workload monitoring is needed to monitor Hosted Control Planes managed by the hypershift addon. Ignoring related resources creation.")
+		}
+	}
+
 	return ret, nil
 }
 
 // buildPrometheusAgent abstracts the logic of building a Prometheus agent for platform or user workloads
-func (o *OptionsBuilder) buildPrometheusAgent(ctx context.Context, opts *Options, configResources []client.Object, appName string) error {
+func (o *OptionsBuilder) buildPrometheusAgent(ctx context.Context, opts *Options, configResources []client.Object, appName string, isHypershift bool) error {
 	// Fetch Prometheus agent resource
 	labelsMatcher := config.PlatformPrometheusMatchLabels
 	if appName == config.UserWorkloadMetricsCollectorApp {
@@ -126,14 +134,15 @@ func (o *OptionsBuilder) buildPrometheusAgent(ctx context.Context, opts *Options
 
 	// Build the agent
 	promBuilder := PrometheusAgentBuilder{
-		Agent:               platformAgents[0].DeepCopy(),
-		Name:                appName,
-		ClusterName:         opts.ClusterName,
-		ClusterID:           opts.ClusterID,
-		EnvoyConfigMapName:  platformAgents[0].Spec.ConfigMaps[0],
-		EnvoyProxyImage:     opts.Images.Envoy,
-		MatchLabels:         map[string]string{"app": appName},
-		RemoteWriteEndpoint: o.RemoteWriteURL,
+		Agent:                    platformAgents[0].DeepCopy(),
+		Name:                     appName,
+		ClusterName:              opts.ClusterName,
+		ClusterID:                opts.ClusterID,
+		EnvoyConfigMapName:       platformAgents[0].Spec.ConfigMaps[0],
+		EnvoyProxyImage:          opts.Images.Envoy,
+		MatchLabels:              map[string]string{"app": appName},
+		RemoteWriteEndpoint:      o.RemoteWriteURL,
+		IsHypershiftLocalCluster: isHypershift,
 	}
 
 	var agent *prometheusalpha1.PrometheusAgent
@@ -161,6 +170,40 @@ func (o *OptionsBuilder) buildPrometheusAgent(ctx context.Context, opts *Options
 		}
 	}
 
+	return nil
+}
+
+func (o *OptionsBuilder) buildHypershiftResources(ctx context.Context, opts *Options, managedCluster *clusterv1.ManagedCluster, configResources []client.Object) error {
+	etcdScrapeConfigs := addon.FilterResourcesByLabelSelector[*prometheusalpha1.ScrapeConfig](configResources, config.EtcdHcpUserWorkloadPrometheusMatchLabels)
+	etcdRules := addon.FilterResourcesByLabelSelector[*prometheusv1.PrometheusRule](configResources, config.EtcdHcpUserWorkloadPrometheusMatchLabels)
+	apiserverScrapeConfigs := addon.FilterResourcesByLabelSelector[*prometheusalpha1.ScrapeConfig](configResources, config.ApiserverHcpUserWorkloadPrometheusMatchLabels)
+	apiserverRules := addon.FilterResourcesByLabelSelector[*prometheusv1.PrometheusRule](configResources, config.ApiserverHcpUserWorkloadPrometheusMatchLabels)
+
+	if len(etcdScrapeConfigs) == 0 {
+		o.Logger.V(1).Info("no scrapeConfigs found in configuration resources for etcd HPCs", "expectedLabel", fmt.Sprintf("%+v", config.EtcdHcpUserWorkloadPrometheusMatchLabels))
+	}
+
+	if len(apiserverScrapeConfigs) == 0 {
+		o.Logger.V(1).Info("no scrapeConfigs found in configuration resources for apiserver HPCs", "expectedLabel", fmt.Sprintf("%+v", config.ApiserverHcpUserWorkloadPrometheusMatchLabels))
+	}
+
+	hyper := Hypershift{
+		Client:         o.Client,
+		ManagedCluster: managedCluster,
+		Logger:         o.Logger,
+	}
+
+	hyperResources, err := hyper.GenerateResources(ctx,
+		CollectionConfig{ScrapeConfigs: etcdScrapeConfigs, Rules: etcdRules},
+		CollectionConfig{ScrapeConfigs: apiserverScrapeConfigs, Rules: apiserverRules},
+	)
+	if err != nil {
+		return fmt.Errorf("failed to generate hypershift resources: %w", err)
+	}
+
+	opts.UserWorkloads.ScrapeConfigs = append(opts.UserWorkloads.ScrapeConfigs, hyperResources.ScrapeConfigs...)
+	opts.UserWorkloads.Rules = append(opts.UserWorkloads.Rules, hyperResources.Rules...)
+	opts.UserWorkloads.ServiceMonitors = append(opts.UserWorkloads.ServiceMonitors, hyperResources.ServiceMonitors...)
 	return nil
 }
 
@@ -210,6 +253,7 @@ func (o *OptionsBuilder) getImageOverrides(ctx context.Context) (ImagesOptions, 
 
 func (o *OptionsBuilder) getAvailableConfigResources(ctx context.Context, mcAddon *addonapiv1alpha1.ManagedClusterAddOn) ([]client.Object, error) {
 	ret := []client.Object{}
+
 	for _, cfg := range mcAddon.Status.ConfigReferences {
 		var obj client.Object
 		switch cfg.ConfigGroupResource.Resource {
