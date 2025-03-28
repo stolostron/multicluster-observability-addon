@@ -52,7 +52,7 @@
     - apiGroups: ["rbac.authorization.k8s.io"]
       resources: ["rolebindings"]
       verbs: ["get", "list", "watch", "create", "delete"]
-    # The addon will need to create secrets to ensure secure communication
+    # The addon will need to pull secrets to configure the signals deployments
     - apiGroups: [""]
       resources: ["secrets"]
       verbs: ["get", "list", "watch"]

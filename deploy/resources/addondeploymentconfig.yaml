@@ -8,13 +8,26 @@ spec:
   # Operator Subscription Channels
   - name: openshiftLoggingChannel
     value: stable-6.1
+  # Metrics hostname where to forward metrics
+  - name: metricsHubHostname
+    value: metrics-hub.openshift-monitoring.svc
   # Platform Observability
+  # Enables Metrics Collection
+  - name: platformMetricsCollection
+    value: prometheusagents.v1alpha1.monitoring.coreos.com
+  # Enables Log Collection
   - name: platformLogsCollection
     value: clusterlogforwarders.v1.observability.openshift.io
   # User Workloads Observability
+  # Enables Metrics Collection
+  - name: userWorkloadMetricsCollection
+    value: prometheusagents.v1alpha1.monitoring.coreos.com
+  # Enables Log Collection
   - name: userWorkloadLogsCollection
     value: clusterlogforwarders.v1.observability.openshift.io
+  # Enables Opentelemetry Collection
   - name: userWorkloadTracesCollection
     value: opentelemetrycollectors.v1beta1.opentelemetry.io
+  # Enables Opentelemetry Instrumentation
   - name: userWorkloadInstrumentation
     value: instrumentations.v1alpha1.opentelemetry.io

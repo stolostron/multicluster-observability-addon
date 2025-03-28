@@ -269,7 +269,7 @@ func TestBuildOptions(t *testing.T) {
 			},
 			expects: func(t *testing.T, opts Options, err error) {
 				assert.Error(t, err)
-				assert.ErrorIs(t, err, ErrMissingImageOverride)
+				assert.ErrorIs(t, err, errMissingImageOverride)
 			},
 		},
 		"missing config reference": {
@@ -283,7 +283,7 @@ func TestBuildOptions(t *testing.T) {
 			resources:       createResources,
 			expects: func(t *testing.T, opts Options, err error) {
 				assert.Error(t, err)
-				assert.ErrorIs(t, err, ErrInvalidConfigResourcesCount)
+				assert.ErrorIs(t, err, errInvalidConfigResourcesCount)
 			},
 		},
 
