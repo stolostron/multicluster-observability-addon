@@ -51,8 +51,8 @@ func CreateOrUpdateWithAddOnOwner(ctx context.Context, logger logr.Logger, k8s c
 
 func mutateFuncFor(want, existing client.Object) controllerutil.MutateFn {
 	return func() error {
-		copyMapFields(existing.GetLabels(), want.GetLabels())
-		copyMapFields(existing.GetAnnotations(), want.GetAnnotations())
+		maps.Copy(existing.GetLabels(), want.GetLabels())
+		maps.Copy(existing.GetAnnotations(), want.GetAnnotations())
 
 		switch existingTyped := existing.(type) {
 		case *prometheusalpha1.PrometheusAgent:
@@ -69,11 +69,4 @@ func mutateFuncFor(want, existing client.Object) controllerutil.MutateFn {
 
 		return nil
 	}
-}
-
-func copyMapFields(target, source map[string]string) {
-	if target == nil {
-		target = make(map[string]string)
-	}
-	maps.Copy(target, source)
 }
