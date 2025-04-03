@@ -251,27 +251,19 @@ var hypershiftServiceMonitorsPredicate = builder.WithPredicates(predicate.Funcs{
 
 func isHypershiftServiceMonitor(obj client.Object) bool {
 	if obj.GetName() == mconfig.HypershiftEtcdServiceMonitorName || obj.GetName() == mconfig.HypershiftApiServerServiceMonitorName {
-		return isHypershiftOwned(obj)
+		for _, owner := range obj.GetOwnerReferences() {
+			gv, err := schema.ParseGroupVersion(owner.APIVersion)
+			if err != nil {
+				continue
+			}
+
+			if gv.Group == hyperv1.GroupVersion.Group {
+				return true
+			}
+		}
 	}
 
 	if obj.GetName() == mconfig.AcmEtcdServiceMonitorName || obj.GetName() == mconfig.AcmApiServerServiceMonitorName {
-		return true
-	}
-
-	return false
-}
-
-func isHypershiftOwned(obj client.Object) bool {
-	for _, owner := range obj.GetOwnerReferences() {
-		gv, err := schema.ParseGroupVersion(owner.APIVersion)
-		if err != nil {
-			continue
-		}
-
-		if gv.Group != hyperv1.GroupVersion.Group {
-			continue
-		}
-
 		return true
 	}
 
