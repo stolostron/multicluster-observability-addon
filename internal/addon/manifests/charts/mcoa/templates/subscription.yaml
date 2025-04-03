@@ -6,8 +6,8 @@ metadata:
   namespace: openshift-cluster-observability-operator
   labels:
     operators.coreos.com/cluster-observability-operator.openshift-cluster-observability: ''
-    app: {{ template "incidentDetectionhelm.name" . }}
-    chart: {{ template "incidentDetectionhelm.chart" . }}
+    app: {{ template "mcoahelm.name" . }}
+    chart: {{ template "mcoahelm.chart" . }}
     release: {{ .Release.Name }}
 spec:
   channel: stable

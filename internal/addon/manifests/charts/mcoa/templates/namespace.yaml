@@ -4,7 +4,7 @@ kind: Namespace
 metadata:
   name: openshift-cluster-observability-operator
   labels:
-    app: {{ template "incidentDetectionhelm.name" . }}
-    chart: {{ template "incidentDetectionhelm.chart" . }}
+    app: {{ template "mcoahelm.name" . }}
+    chart: {{ template "mcoahelm.chart" . }}
     release: {{ .Release.Name }}
 {{- end }}
