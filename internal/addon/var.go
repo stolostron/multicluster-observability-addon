@@ -2,6 +2,7 @@ package addon
 
 import (
 	"embed"
+	"errors"
 )
 
 const (
@@ -30,6 +31,8 @@ const (
 	otelColProbeKey                 = "replicas"
 	otelColProbePath                = ".spec.replicas"
 )
+
+var errInvalidMetricsHubHostname = errors.New("invalid metrics hub hostname")
 
 //go:embed manifests
 //go:embed manifests/charts/mcoa

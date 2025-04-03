@@ -9,21 +9,26 @@ spec:
     displayName: Multicluster Observability Addon
     description: "multicluster-observability-addon is the addon to configure spoke clusters to collect and forward logs/traces to a given set of outputs"
   supportedConfigs:
-    # Describes the general addon configuration applicable for all managed clusters. It includes:
-    # - Default subscription channel name for install the `Red Hat OpenShift Logging` operator on each managed cluster.
-    # - Default subscription channel name for install the `Red Hat build of OpenTelemetry` operator on each managed cluster.
+    # Describes the general addon configuration applicable for all managed clusters.
     - group: addon.open-cluster-management.io
       resource: addondeploymentconfigs
       defaultConfig:
         name: multicluster-observability-addon
         namespace: open-cluster-management-observability
-    # Describes the default log forwarding outputs for each log type applied to all managed clusters.
+    # Resources for configuring the deployment of the Metrics collection
+    - group: monitoring.coreos.com
+      resource: scrapeconfigs
+    - group: monitoring.coreos.com
+      resource: prometheusagents
+    - group: monitoring.coreos.com
+      resource: prometheusrules
+    # Resources for configuring the deployment of the Log collection
     - group: observability.openshift.io
       resource: clusterlogforwarders
-    # Describes the default OpenTelemetryCollector type applied to all managed clusters.
+    # Resources for configuring the deployment of OpenTelemetry collection
     - group: opentelemetry.io
       resource: opentelemetrycollectors
-    # Describes the default Instrumentation type applied to all managed clusters.
+    # Resources for configuring the deployment of OpenTelemetry Instrumentation
     - group: opentelemetry.io
       resource: instrumentations
   installStrategy:

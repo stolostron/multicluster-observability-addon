@@ -8,6 +8,7 @@ import (
 	operatorsv1 "github.com/operator-framework/api/pkg/operators/v1"
 	operatorsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	"github.com/rhobs/multicluster-observability-addon/internal/addon"
+	"github.com/rhobs/multicluster-observability-addon/internal/addon/common"
 	"github.com/rhobs/multicluster-observability-addon/internal/logging/handlers"
 	"github.com/rhobs/multicluster-observability-addon/internal/logging/manifests"
 	"github.com/stretchr/testify/require"
@@ -18,12 +19,12 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
 	"open-cluster-management.io/addon-framework/pkg/agent"
+	addonutils "open-cluster-management.io/addon-framework/pkg/utils"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	fakeaddon "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-	addonutils "open-cluster-management.io/addon-framework/pkg/utils"
 )
 
 var (
@@ -39,7 +40,7 @@ func fakeGetValues(k8s client.Client) addonfactory.GetValuesFunc {
 		mcAddon *addonapiv1alpha1.ManagedClusterAddOn,
 	) (addonfactory.Values, error) {
 		aodc := &addonapiv1alpha1.AddOnDeploymentConfig{}
-		keys := addon.GetObjectKeys(mcAddon.Status.ConfigReferences, addonutils.AddOnDeploymentConfigGVR.Group, addon.AddonDeploymentConfigResource)
+		keys := common.GetObjectKeys(mcAddon.Status.ConfigReferences, addonutils.AddOnDeploymentConfigGVR.Group, addon.AddonDeploymentConfigResource)
 		if err := k8s.Get(context.TODO(), keys[0], aodc, &client.GetOptions{}); err != nil {
 			return nil, err
 		}
