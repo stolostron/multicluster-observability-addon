@@ -3,10 +3,10 @@ package helm
 import (
 	"context"
 	"errors"
-	"net/url"
 
 	"github.com/go-logr/logr"
 	"github.com/rhobs/multicluster-observability-addon/internal/addon"
+	"github.com/rhobs/multicluster-observability-addon/internal/addon/common"
 	lhandlers "github.com/rhobs/multicluster-observability-addon/internal/logging/handlers"
 	lmanifests "github.com/rhobs/multicluster-observability-addon/internal/logging/manifests"
 	mconfig "github.com/rhobs/multicluster-observability-addon/internal/metrics/config"
@@ -27,9 +27,9 @@ import (
 )
 
 var (
-	errMissingAODCRef     = errors.New("missing AddOnDeploymentConfig reference on addon installation")
-	errMultipleAODCRef    = errors.New("multiple AddOnDeploymentConfig references on addon installation")
-	errMissingHubEndpoint = errors.New("platform hub endpoint is required for metrics collection")
+	errMissingAODCRef     = errors.New("missing required AddOnDeploymentConfig reference in addon configuration")
+	errMultipleAODCRef    = errors.New("addonmultiple AddOnDeploymentConfig references found - only one is supported")
+	errMissingHubEndpoint = errors.New("metricsHubHostname key is missing but it's required when either platformMetricsCollection or userWorkloadMetricsCollection are present")
 )
 
 type HelmChartValues struct {
@@ -69,7 +69,7 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, logger logr.Logger) a
 		}
 
 		if opts.Platform.Metrics.CollectionEnabled || opts.UserWorkloads.Metrics.CollectionEnabled {
-			if opts.Platform.Metrics.HubEndpoint == "" {
+			if opts.Platform.Metrics.HubEndpoint == nil {
 				return nil, errMissingHubEndpoint
 			}
 
@@ -77,14 +77,10 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, logger logr.Logger) a
 				return nil, err
 			}
 
-			remoteWriteURL, err := url.JoinPath(opts.Platform.Metrics.HubEndpoint, "/api/metrics/v1/default/api/v1/receive")
-			if err != nil {
-				return nil, err
-			}
 			optsBuilder := mhandlers.OptionsBuilder{
 				Client:          k8s,
 				ImagesConfigMap: mconfig.ImagesConfigMap,
-				RemoteWriteURL:  remoteWriteURL,
+				RemoteWriteURL:  opts.Platform.Metrics.HubEndpoint.JoinPath("/api/metrics/v1/default/api/v1/receive").String(),
 				Logger:          logger,
 			}
 			metricsOpts, err := optsBuilder.Build(ctx, mcAddon, cluster, opts.Platform.Metrics, opts.UserWorkloads.Metrics)
@@ -143,7 +139,7 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, logger logr.Logger) a
 
 func getAddOnDeploymentConfig(ctx context.Context, k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAddOn) (*addonapiv1alpha1.AddOnDeploymentConfig, error) {
 	aodc := &addonapiv1alpha1.AddOnDeploymentConfig{}
-	keys := addon.GetObjectKeys(mcAddon.Status.ConfigReferences, addonutils.AddOnDeploymentConfigGVR.Group, addon.AddonDeploymentConfigResource)
+	keys := common.GetObjectKeys(mcAddon.Status.ConfigReferences, addonutils.AddOnDeploymentConfigGVR.Group, addon.AddonDeploymentConfigResource)
 	switch {
 	case len(keys) == 0:
 		return aodc, errMissingAODCRef

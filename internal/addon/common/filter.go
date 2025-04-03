@@ -1,4 +1,4 @@
-package addon
+package common
 
 import (
 	"k8s.io/apimachinery/pkg/labels"
