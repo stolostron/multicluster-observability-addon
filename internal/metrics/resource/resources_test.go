@@ -8,7 +8,7 @@ import (
 	"github.com/go-logr/logr"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	prometheusalpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
-	"github.com/rhobs/multicluster-observability-addon/internal/addon"
+	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -98,8 +98,8 @@ func TestDeployDefaultResourcesOnce(t *testing.T) {
 		{
 			name:          "Fail when owner resource not found",
 			namespace:     addon.InstallNamespace,
-			existingObjs:  []client.Object{}, // No existing objects
-			expectedError: fmt.Errorf("failed to deploy default monitoring resources: %s", "clustermanagementaddons.addon.open-cluster-management.io \"multicluster-observability-addon\" not found"),
+			existingObjs:  []client.Object{},                                                                                                                                                          // No existing objects
+			expectedError: fmt.Errorf("failed to deploy default monitoring resources: %s", "clustermanagementaddons.addon.open-cluster-management.io \"multicluster-observability-addon\" not found"), //nolint:err113
 			validate: func(t *testing.T, c client.Client, ns string) {
 				assert.False(t, initialized)
 			},

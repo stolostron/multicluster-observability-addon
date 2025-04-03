@@ -9,9 +9,9 @@ import (
 	"github.com/go-logr/logr"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	prometheusalpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
-	"github.com/rhobs/multicluster-observability-addon/internal/addon"
-	"github.com/rhobs/multicluster-observability-addon/internal/addon/common"
-	"github.com/rhobs/multicluster-observability-addon/internal/metrics/config"
+	"github.com/stolostron/multicluster-observability-addon/internal/addon"
+	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
+	"github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -47,7 +47,7 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 	}
 
 	ret.ClusterName = managedCluster.Name
-	ret.ClusterID = managedCluster.ObjectMeta.Labels[clusterIDLabel]
+	ret.ClusterID = managedCluster.Labels[clusterIDLabel]
 	if ret.ClusterID == "" {
 		ret.ClusterID = managedCluster.Name
 	}
@@ -156,7 +156,7 @@ func (o *OptionsBuilder) buildPrometheusAgent(ctx context.Context, opts *Options
 	}
 
 	// Fetch related secrets
-	for _, secretName := range agent.Spec.CommonPrometheusFields.Secrets {
+	for _, secretName := range agent.Spec.Secrets {
 		if err := o.addSecret(ctx, &opts.Secrets, secretName, agent.Namespace); err != nil {
 			return err
 		}
@@ -213,7 +213,7 @@ func (o *OptionsBuilder) getAvailableConfigResources(ctx context.Context, mcAddo
 	ret := []client.Object{}
 	for _, cfg := range mcAddon.Status.ConfigReferences {
 		var obj client.Object
-		switch cfg.ConfigGroupResource.Resource {
+		switch cfg.Resource {
 		case prometheusalpha1.PrometheusAgentName:
 			obj = &prometheusalpha1.PrometheusAgent{}
 		case prometheusalpha1.ScrapeConfigName:
@@ -227,7 +227,7 @@ func (o *OptionsBuilder) getAvailableConfigResources(ctx context.Context, mcAddo
 		}
 
 		if cfg.DesiredConfig == nil {
-			return ret, fmt.Errorf("%w: %s from %s/%s", errMissingDesiredConfig, cfg.ConfigGroupResource.Resource, mcAddon.Namespace, mcAddon.Name)
+			return ret, fmt.Errorf("%w: %s from %s/%s", errMissingDesiredConfig, cfg.Resource, mcAddon.Namespace, mcAddon.Name)
 		}
 
 		if err := o.Client.Get(ctx, types.NamespacedName{Name: cfg.DesiredConfig.Name, Namespace: cfg.DesiredConfig.Namespace}, obj); err != nil {
