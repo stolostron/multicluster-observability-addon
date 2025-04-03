@@ -8,10 +8,10 @@ import (
 func GetObjectKeys(configRef []addonapiv1alpha1.ConfigReference, group, resource string) []client.ObjectKey {
 	var keys []client.ObjectKey
 	for _, config := range configRef {
-		if config.ConfigGroupResource.Group != group {
+		if config.Group != group {
 			continue
 		}
-		if config.ConfigGroupResource.Resource != resource {
+		if config.Resource != resource {
 			continue
 		}
 

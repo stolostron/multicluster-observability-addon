@@ -72,8 +72,8 @@ func AgentHealthProber() *agent.HealthProber {
 			},
 			HealthCheck: func(identifier workv1.ResourceIdentifier, result workv1.StatusFeedbackResult) error {
 				for _, value := range result.Values {
-					switch {
-					case identifier.Resource == ClusterLogForwardersResource:
+					switch identifier.Resource {
+					case ClusterLogForwardersResource:
 						if value.Name != clfProbeKey {
 							continue
 						}
@@ -87,7 +87,7 @@ func AgentHealthProber() *agent.HealthProber {
 						}
 
 						return nil
-					case identifier.Resource == OpenTelemetryCollectorsResource:
+					case OpenTelemetryCollectorsResource:
 						if value.Name != otelColProbeKey {
 							continue
 						}
