@@ -9,7 +9,7 @@ require (
 	github.com/openshift/cluster-logging-operator/api/observability v0.0.0-20250409175233-91ac0aefdea7 // release-6.2
 	github.com/operator-framework/api v0.30.0
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.80.1
-	github.com/rhobs/observability-operator v1.0.0
+	github.com/rhobs/observability-operator v1.0.1-0.20250326092328-08ec7ed87e8b
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/pflag v1.0.6
 	github.com/stolostron/cluster-lifecycle-api v0.0.0-20240918064238-a5e71b599118
@@ -125,7 +125,6 @@ require (
 	go.opentelemetry.io/otel/sdk/metric v1.35.0 // indirect
 	go.opentelemetry.io/otel/trace v1.35.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.5.0 // indirect
-	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.27.0 // indirect
 	golang.org/x/crypto v0.36.0 // indirect
 	golang.org/x/exp v0.0.0-20250408133849-7e4ce0ab07d0 // indirect
