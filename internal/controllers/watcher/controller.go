@@ -126,7 +126,7 @@ func (r *WatcherReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(&corev1.Secret{}, r.enqueueForConfigResource(), builder.OnlyMetadata).
 		Watches(&corev1.ConfigMap{}, r.enqueueForConfigResource(), builder.OnlyMetadata).
 		Watches(&hyperv1.HostedCluster{}, r.enqueueForLocalCluster(), hostedClusterPredicate, builder.OnlyMetadata).
-		Watches(&prometheusv1.ServiceMonitor{}, r.enqueueForLocalCluster(), hypershiftServiceMonitorsPredicate, builder.OnlyMetadata).
+		Watches(&prometheusv1.ServiceMonitor{}, r.enqueueForLocalCluster(), hypershiftServiceMonitorsPredicate(r.Log), builder.OnlyMetadata).
 		Complete(r)
 }
 
@@ -242,18 +242,23 @@ var hostedClusterPredicate = builder.WithPredicates(predicate.Funcs{
 	GenericFunc: func(e event.GenericEvent) bool { return false },
 })
 
-var hypershiftServiceMonitorsPredicate = builder.WithPredicates(predicate.Funcs{
-	UpdateFunc:  func(e event.UpdateEvent) bool { return isHypershiftServiceMonitor(e.ObjectNew) },
-	CreateFunc:  func(e event.CreateEvent) bool { return isHypershiftServiceMonitor(e.Object) },
-	DeleteFunc:  func(e event.DeleteEvent) bool { return isHypershiftServiceMonitor(e.Object) },
-	GenericFunc: func(e event.GenericEvent) bool { return false },
-})
+func hypershiftServiceMonitorsPredicate(logger logr.Logger) builder.Predicates {
+	return builder.WithPredicates(predicate.Funcs{
+		UpdateFunc:  func(e event.UpdateEvent) bool { return isHypershiftServiceMonitor(logger, e.ObjectNew) },
+		CreateFunc:  func(e event.CreateEvent) bool { return isHypershiftServiceMonitor(logger, e.Object) },
+		DeleteFunc:  func(e event.DeleteEvent) bool { return isHypershiftServiceMonitor(logger, e.Object) },
+		GenericFunc: func(e event.GenericEvent) bool { return false },
+	})
+}
 
-func isHypershiftServiceMonitor(obj client.Object) bool {
+// isHypershiftServiceMonitor reuturns true when the serviceMonitor is deployed by hypershift for etcd or the apiserver
+// This is used for metrics to ensure our own serviceMonitor, based on the original one deployed by hypershift remains in sync.
+func isHypershiftServiceMonitor(logger logr.Logger, obj client.Object) bool {
 	if obj.GetName() == mconfig.HypershiftEtcdServiceMonitorName || obj.GetName() == mconfig.HypershiftApiServerServiceMonitorName {
 		for _, owner := range obj.GetOwnerReferences() {
 			gv, err := schema.ParseGroupVersion(owner.APIVersion)
 			if err != nil {
+				logger.V(1).Info("failed to parse groupVersion", "error", err.Error())
 				continue
 			}
 
