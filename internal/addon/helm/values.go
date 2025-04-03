@@ -148,7 +148,7 @@ func getLoggingValues(ctx context.Context, k8s client.Client, cluster *clusterv1
 
 func getMonitoringValues(ctx context.Context, k8s client.Client, logger logr.Logger, cluster *clusterv1.ManagedCluster, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, opts addon.Options) (*mmanifests.MetricsValues, error) {
 	if opts.Platform.Metrics.CollectionEnabled || opts.UserWorkloads.Metrics.CollectionEnabled {
-		if opts.Platform.Metrics.HubEndpoint == "" {
+		if opts.Platform.Metrics.HubEndpoint == nil || opts.Platform.Metrics.HubEndpoint.Host == "" {
 			return nil, errMissingHubEndpoint
 		}
 
