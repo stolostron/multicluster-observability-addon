@@ -40,8 +40,8 @@ type ConfigValue struct {
 	Labels    map[string]string `json:"labels"`
 }
 
-func BuildValues(opts handlers.Options) (MetricsValues, error) {
-	ret := MetricsValues{
+func BuildValues(opts handlers.Options) (*MetricsValues, error) {
+	ret := &MetricsValues{
 		PrometheusControllerID:    config.PrometheusControllerID,
 		PrometheusCAConfigMapName: config.PrometheusCAConfigMapName,
 		Platform: Collector{
