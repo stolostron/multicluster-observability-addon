@@ -128,6 +128,7 @@ func getTracingValues(ctx context.Context, k8s client.Client, cluster *clusterv1
 
 	return nil, nil
 }
+
 func getLoggingValues(ctx context.Context, k8s client.Client, cluster *clusterv1.ManagedCluster, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, opts addon.Options) (*lmanifests.LoggingValues, error) {
 	if isHubCluster(cluster) {
 		return nil, nil
