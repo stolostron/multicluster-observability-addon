@@ -16,12 +16,17 @@ const (
 	TracingChartDir = "manifests/charts/mcoa/charts/tracing"
 
 	AddonDeploymentConfigResource = "addondeploymentconfigs"
-	ClusterLogForwardersResource  = "clusterlogforwarders"
-	SpokeCLFName                  = "mcoa-instance"
-	SpokeCLFNamespace             = "openshift-logging"
-	clfProbeKey                   = "isReady"
-	// TODO @JoaoBraveCoding this most likely needs to be updated to reflect the new path
-	clfProbePath = ".status.conditions[?(@.type==\"Ready\")].status"
+
+	PrometheusAgentResource = "prometheusagents"
+	PPAName                 = "acm-platform-metrics-collector-config"
+	paProbeKey              = "isAvailable"
+	paProbePath             = ".status.conditions[?(@.type==\"Available\")].status"
+
+	ClusterLogForwardersResource = "clusterlogforwarders"
+	SpokeCLFName                 = "mcoa-instance"
+	SpokeCLFNamespace            = "openshift-logging"
+	clfProbeKey                  = "isReady"
+	clfProbePath                 = ".status.conditions[?(@.type==\"Ready\")].status"
 
 	OpenTelemetryCollectorsResource = "opentelemetrycollectors"
 	InstrumentationResource         = "instrumentations"
