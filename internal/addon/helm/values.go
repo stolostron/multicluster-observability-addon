@@ -5,21 +5,21 @@ import (
 	"errors"
 
 	"github.com/go-logr/logr"
-	"github.com/rhobs/multicluster-observability-addon/internal/addon"
-	ihandlers "github.com/rhobs/multicluster-observability-addon/internal/incident-detection/handlers"
-	imanifests "github.com/rhobs/multicluster-observability-addon/internal/incident-detection/manifests"
-	lhandlers "github.com/rhobs/multicluster-observability-addon/internal/logging/handlers"
-	lmanifests "github.com/rhobs/multicluster-observability-addon/internal/logging/manifests"
-	mconfig "github.com/rhobs/multicluster-observability-addon/internal/metrics/config"
-	mhandlers "github.com/rhobs/multicluster-observability-addon/internal/metrics/handlers"
-	mmanifests "github.com/rhobs/multicluster-observability-addon/internal/metrics/manifests"
-	mresource "github.com/rhobs/multicluster-observability-addon/internal/metrics/resource"
-	thandlers "github.com/rhobs/multicluster-observability-addon/internal/tracing/handlers"
-	tmanifests "github.com/rhobs/multicluster-observability-addon/internal/tracing/manifests"
 	clusterinfov1beta1 "github.com/stolostron/cluster-lifecycle-api/clusterinfo/v1beta1"
 	clusterlifecycleconstants "github.com/stolostron/cluster-lifecycle-api/constants"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
+	analytics "github.com/stolostron/multicluster-observability-addon/internal/analytics"
+	ihandlers "github.com/stolostron/multicluster-observability-addon/internal/analytics/incident-detection/handlers"
+	imanifests "github.com/stolostron/multicluster-observability-addon/internal/analytics/incident-detection/manifests"
+	lhandlers "github.com/stolostron/multicluster-observability-addon/internal/logging/handlers"
+	lmanifests "github.com/stolostron/multicluster-observability-addon/internal/logging/manifests"
+	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
+	mhandlers "github.com/stolostron/multicluster-observability-addon/internal/metrics/handlers"
+	mmanifests "github.com/stolostron/multicluster-observability-addon/internal/metrics/manifests"
+	mresource "github.com/stolostron/multicluster-observability-addon/internal/metrics/resource"
+	thandlers "github.com/stolostron/multicluster-observability-addon/internal/tracing/handlers"
+	tmanifests "github.com/stolostron/multicluster-observability-addon/internal/tracing/manifests"
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 	addonutils "open-cluster-management.io/addon-framework/pkg/utils"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
@@ -34,11 +34,11 @@ var (
 )
 
 type HelmChartValues struct {
-	Enabled   bool                       `json:"enabled"`
-	Metrics   mmanifests.MetricsValues   `json:"metrics"`
-	Logging   lmanifests.LoggingValues   `json:"logging"`
-	Tracing   tmanifests.TracingValues   `json:"tracing"`
-	Analytics imanifests.AnalyticsValues `json:"analytics"`
+	Enabled   bool                      `json:"enabled"`
+	Metrics   mmanifests.MetricsValues  `json:"metrics"`
+	Logging   lmanifests.LoggingValues  `json:"logging"`
+	Tracing   tmanifests.TracingValues  `json:"tracing"`
+	Analytics analytics.AnalyticsValues `json:"analytics"`
 }
 
 func GetValuesFunc(ctx context.Context, k8s client.Client, logger logr.Logger) addonfactory.GetValuesFunc {
@@ -124,7 +124,7 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, logger logr.Logger) a
 
 		if opts.Platform.AnalyticsOptions.IncidentDetection.Enabled {
 			incDecOptions := ihandlers.BuildOptions(ctx, k8s, mcAddon, opts.Platform.AnalyticsOptions.IncidentDetection)
-			userValues.Analytics = *imanifests.BuildValues(incDecOptions)
+			userValues.Analytics.IncidentDetectionValues = *imanifests.BuildValues(incDecOptions)
 		}
 
 		return addonfactory.JsonStructToValues(userValues)

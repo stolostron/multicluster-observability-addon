@@ -6,10 +6,12 @@ import (
 
 	operatorsv1 "github.com/operator-framework/api/pkg/operators/v1"
 	operatorsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
-	"github.com/rhobs/multicluster-observability-addon/internal/addon"
-	"github.com/rhobs/multicluster-observability-addon/internal/incident-detection/handlers"
-	"github.com/rhobs/multicluster-observability-addon/internal/incident-detection/manifests"
 	uiplugin "github.com/rhobs/observability-operator/pkg/apis/uiplugin/v1alpha1"
+	"github.com/stolostron/multicluster-observability-addon/internal/addon"
+	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
+	"github.com/stolostron/multicluster-observability-addon/internal/analytics"
+	"github.com/stolostron/multicluster-observability-addon/internal/analytics/incident-detection/handlers"
+	"github.com/stolostron/multicluster-observability-addon/internal/analytics/incident-detection/manifests"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -38,7 +40,7 @@ func fakeGetValues(ctx context.Context, k8s client.Client) addonfactory.GetValue
 		mcAddon *addonapiv1alpha1.ManagedClusterAddOn,
 	) (addonfactory.Values, error) {
 		aodc := &addonapiv1alpha1.AddOnDeploymentConfig{}
-		keys := addon.GetObjectKeys(mcAddon.Status.ConfigReferences, addonutils.AddOnDeploymentConfigGVR.Group, addon.AddonDeploymentConfigResource)
+		keys := common.GetObjectKeys(mcAddon.Status.ConfigReferences, addonutils.AddOnDeploymentConfigGVR.Group, addon.AddonDeploymentConfigResource)
 		if err := k8s.Get(ctx, keys[0], aodc, &client.GetOptions{}); err != nil {
 			return nil, err
 		}
@@ -48,7 +50,10 @@ func fakeGetValues(ctx context.Context, k8s client.Client) addonfactory.GetValue
 		}
 
 		opts := handlers.BuildOptions(ctx, k8s, mcAddon, addonOpts.Platform.AnalyticsOptions.IncidentDetection)
-		analyticsValues := manifests.BuildValues(opts)
+		incidentDetectionValues := manifests.BuildValues(opts)
+		analyticsValues := &analytics.AnalyticsValues{
+			IncidentDetectionValues: *incidentDetectionValues,
+		}
 
 		return addonfactory.JsonStructToValues(analyticsValues)
 	}
@@ -133,7 +138,7 @@ func Test_IncidentDetection_AllConfigsTogether_AllResources(t *testing.T) {
 	// Render manifests and return them as k8s runtime objects
 	objects, err := oboAgentAddon.Manifests(managedCluster, managedClusterAddOn)
 	require.NoError(t, err)
-	require.Equal(t, 4, len(objects))
+	require.Equal(t, 1, len(objects))
 
 	for _, o := range objects {
 		switch o := o.(type) {
