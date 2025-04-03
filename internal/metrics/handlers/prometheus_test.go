@@ -7,7 +7,7 @@ import (
 
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	prometheusalpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
-	handler "github.com/rhobs/multicluster-observability-addon/internal/metrics/handlers"
+	handler "github.com/stolostron/multicluster-observability-addon/internal/metrics/handlers"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -60,15 +60,15 @@ func TestPrometheusAgentBuilder_EnforcedFields(t *testing.T) {
 
 	result := builder.Build()
 
-	assert.Equal(t, int32(1), *result.Spec.CommonPrometheusFields.Replicas)
-	assert.True(t, builder.Agent.Spec.CommonPrometheusFields.ArbitraryFSAccessThroughSMs.Deny)
+	assert.Equal(t, int32(1), *result.Spec.Replicas)
+	assert.True(t, builder.Agent.Spec.ArbitraryFSAccessThroughSMs.Deny)
 
 	// Remote write
-	assert.Len(t, result.Spec.CommonPrometheusFields.Secrets, 2)
+	assert.Len(t, result.Spec.Secrets, 2)
 	assert.Equal(t, "https://example.com/write", result.Spec.CommonPrometheusFields.RemoteWrite[0].URL)
-	assert.Contains(t, builder.Agent.Spec.CommonPrometheusFields.RemoteWrite[0].TLSConfig.CAFile, "ca.crt")
-	assert.Contains(t, builder.Agent.Spec.CommonPrometheusFields.RemoteWrite[0].TLSConfig.CertFile, "tls.crt")
-	assert.Contains(t, builder.Agent.Spec.CommonPrometheusFields.RemoteWrite[0].TLSConfig.KeyFile, "tls.key")
+	assert.Contains(t, builder.Agent.Spec.RemoteWrite[0].TLSConfig.CAFile, "ca.crt")
+	assert.Contains(t, builder.Agent.Spec.RemoteWrite[0].TLSConfig.CertFile, "tls.crt")
+	assert.Contains(t, builder.Agent.Spec.RemoteWrite[0].TLSConfig.KeyFile, "tls.key")
 	// Check that relabelling is added to the remote write config
 	assert.Equal(t, *result.Spec.CommonPrometheusFields.RemoteWrite[0].WriteRelabelConfigs[0].Replacement, "test-cluster")
 	assert.Equal(t, result.Spec.CommonPrometheusFields.RemoteWrite[0].WriteRelabelConfigs[0].TargetLabel, "cluster")
@@ -76,25 +76,25 @@ func TestPrometheusAgentBuilder_EnforcedFields(t *testing.T) {
 	assert.Equal(t, result.Spec.CommonPrometheusFields.RemoteWrite[0].WriteRelabelConfigs[1].TargetLabel, "clusterID")
 
 	// Version and Image
-	assert.Equal(t, "", result.Spec.CommonPrometheusFields.Version)
-	assert.Equal(t, "prometheus:latest", *result.Spec.CommonPrometheusFields.Image)
+	assert.Equal(t, "", result.Spec.Version)
+	assert.Equal(t, "prometheus:latest", *result.Spec.Image)
 
 	// Resources selectors, only ScrapeConfigNamespaceSelector is not enforced by the builder
-	assert.Equal(t, builder.MatchLabels, builder.Agent.Spec.CommonPrometheusFields.ScrapeConfigSelector.MatchLabels)
-	assert.Nil(t, builder.Agent.Spec.CommonPrometheusFields.ServiceMonitorNamespaceSelector)
-	assert.Nil(t, builder.Agent.Spec.CommonPrometheusFields.ServiceMonitorSelector)
-	assert.Nil(t, builder.Agent.Spec.CommonPrometheusFields.PodMonitorNamespaceSelector)
-	assert.Nil(t, builder.Agent.Spec.CommonPrometheusFields.PodMonitorSelector)
-	assert.Nil(t, builder.Agent.Spec.CommonPrometheusFields.ProbeNamespaceSelector)
-	assert.Nil(t, builder.Agent.Spec.CommonPrometheusFields.ProbeSelector)
+	assert.Equal(t, builder.MatchLabels, builder.Agent.Spec.ScrapeConfigSelector.MatchLabels)
+	assert.Nil(t, builder.Agent.Spec.ServiceMonitorNamespaceSelector)
+	assert.Nil(t, builder.Agent.Spec.ServiceMonitorSelector)
+	assert.Nil(t, builder.Agent.Spec.PodMonitorNamespaceSelector)
+	assert.Nil(t, builder.Agent.Spec.PodMonitorSelector)
+	assert.Nil(t, builder.Agent.Spec.ProbeNamespaceSelector)
+	assert.Nil(t, builder.Agent.Spec.ProbeSelector)
 
 	// Envoy sidecar
-	containers := builder.Agent.Spec.CommonPrometheusFields.Containers
+	containers := builder.Agent.Spec.Containers
 	assert.Len(t, containers, 1)
 	assert.Equal(t, "envoy", containers[0].Name)
 	assert.Equal(t, "envoy:latest", containers[0].Image)
-	assert.Len(t, builder.Agent.Spec.CommonPrometheusFields.Volumes, 2)
-	assert.Len(t, builder.Agent.Spec.CommonPrometheusFields.VolumeMounts, 0)
+	assert.Len(t, builder.Agent.Spec.Volumes, 2)
+	assert.Len(t, builder.Agent.Spec.VolumeMounts, 0)
 }
 
 func TestPrometheusAgentBuilder_ConfigurableFields(t *testing.T) {

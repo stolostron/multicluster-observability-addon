@@ -6,7 +6,7 @@ import (
 
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	prometheusalpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
-	"github.com/rhobs/multicluster-observability-addon/internal/metrics/config"
+	"github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -59,16 +59,16 @@ func DefaultUserWorkloadAgentResources(ns string) []client.Object {
 // newPrometheusAgent is a helper function to create a PrometheusAgent resource with given parameters
 func newPrometheusAgent(ns, appName string, labels map[string]string, namespaceSelector *metav1.LabelSelector) *prometheusalpha1.PrometheusAgent {
 	agent := newDefaultPrometheusAgent()
-	agent.ObjectMeta.Name = appName
-	agent.ObjectMeta.Namespace = ns
-	if agent.ObjectMeta.Labels == nil {
-		agent.ObjectMeta.Labels = labels
+	agent.Name = appName
+	agent.Namespace = ns
+	if agent.Labels == nil {
+		agent.Labels = labels
 	} else {
 		for k, v := range labels {
-			agent.ObjectMeta.Labels[k] = v
+			agent.Labels[k] = v
 		}
 	}
-	agent.Spec.CommonPrometheusFields.ScrapeConfigNamespaceSelector = namespaceSelector
+	agent.Spec.ScrapeConfigNamespaceSelector = namespaceSelector
 
 	return agent
 }

@@ -7,7 +7,7 @@ import (
 
 	"github.com/ViaQ/logerr/v2/log"
 	"github.com/go-logr/logr"
-	"github.com/rhobs/multicluster-observability-addon/internal/addon"
+	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -130,7 +130,7 @@ func (r *WatcherReconciler) enqueueForConfigResource() handler.EventHandler {
 			Version: addonv1alpha1.GroupVersion.Version,
 			Kind:    managedClusterAddonKind,
 		})
-		if err := r.Client.Get(ctx, key, mcaddon); err != nil {
+		if err := r.Get(ctx, key, mcaddon); err != nil {
 			if apierrors.IsNotFound(err) {
 				return r.getReconcileRequestsFromManifestWorks(ctx, obj)
 			}
@@ -159,7 +159,7 @@ func (r *WatcherReconciler) getReconcileRequestsFromManifestWorks(ctx context.Co
 	labelSelector := labels.SelectorFromSet(labels.Set{
 		addon.LabelOCMAddonName: addon.Name,
 	})
-	if err := r.Client.List(ctx, mws, &client.ListOptions{LabelSelector: labelSelector}); err != nil {
+	if err := r.List(ctx, mws, &client.ListOptions{LabelSelector: labelSelector}); err != nil {
 		r.Log.Error(err, errMessageListingManifestWorkResources)
 		return nil
 	}
@@ -195,7 +195,7 @@ func (r *WatcherReconciler) getReconcileRequestsFromManifestWorks(ctx context.Co
 func (r *WatcherReconciler) manifestToObject(m workv1.Manifest) (client.Object, error) {
 	decode := serializer.NewCodecFactory(r.Scheme).UniversalDeserializer().Decode
 
-	obj, _, err := decode(m.RawExtension.Raw, nil, nil)
+	obj, _, err := decode(m.Raw, nil, nil)
 	if err != nil {
 		return nil, err
 	}

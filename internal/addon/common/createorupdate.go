@@ -8,7 +8,7 @@ import (
 	"github.com/go-logr/logr"
 	prometheus "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	prometheusalpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
-	"github.com/rhobs/multicluster-observability-addon/internal/addon"
+	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
