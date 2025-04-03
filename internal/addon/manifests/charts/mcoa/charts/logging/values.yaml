@@ -2,6 +2,8 @@ nameOverride: null
 
 enabled: true
 
+clfAnnotations: {}
+
 # Expects json format
 clfSpec: {}
 
@@ -18,4 +20,4 @@ configmaps:
     # Expects json format
     data: {}
 
-loggingSubscriptionChannel: channelName
+openshiftLoggingChannel: channelName

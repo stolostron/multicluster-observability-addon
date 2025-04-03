@@ -10,6 +10,7 @@ default: all
 VERSION ?= v0.0.1
 
 CRD_DIR := $(shell pwd)/deploy/crds
+BIN_DIR := $(CURDIR)/bin
 
 # REGISTRY_BASE
 # defines the container registry and organization for the bundle and operator container images.
@@ -37,8 +38,16 @@ $(CRD_DIR)/opentelemetry.io_instrumentations.yaml:
 	@mkdir -p $(CRD_DIR)
 	@curl https://raw.githubusercontent.com/open-telemetry/opentelemetry-operator/v0.100.1/bundle/manifests/opentelemetry.io_instrumentations.yaml > $(CRD_DIR)/opentelemetry.io_instrumentations.yaml
 
-.PHONY: install-crds
-install-crds: $(CRD_DIR)/observability.openshift.io_clusterlogforwarders.yaml $(CRD_DIR)/opentelemetry.io_opentelemetrycollectors.yaml $(CRD_DIR)/opentelemetry.io_instrumentations.yaml
+$(CRD_DIR)/monitoring.coreos.com_prometheusagents.yaml:
+	@mkdir -p $(CRD_DIR)
+	@curl https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/refs/heads/release-0.77/example/prometheus-operator-crd/monitoring.coreos.com_prometheusagents.yaml  > $(CRD_DIR)/monitoring.coreos.com_prometheusagents.yaml
+
+$(CRD_DIR)/monitoring.coreos.com_scrapeconfigs.yaml:
+	@mkdir -p $(CRD_DIR)
+	@curl https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/refs/heads/release-0.77/example/prometheus-operator-crd/monitoring.coreos.com_scrapeconfigs.yaml  > $(CRD_DIR)/monitoring.coreos.com_scrapeconfigs.yaml
+
+.PHONY: download-crds
+download-crds: $(CRD_DIR)/observability.openshift.io_clusterlogforwarders.yaml $(CRD_DIR)/opentelemetry.io_opentelemetrycollectors.yaml $(CRD_DIR)/opentelemetry.io_instrumentations.yaml $(CRD_DIR)/monitoring.coreos.com_prometheusagents.yaml $(CRD_DIR)/monitoring.coreos.com_scrapeconfigs.yaml
 
 .PHONY: fmt
 fmt: $(GOFUMPT) ## Run gofumpt on source code.
@@ -46,6 +55,7 @@ fmt: $(GOFUMPT) ## Run gofumpt on source code.
 
 .PHONY: lint
 lint: $(GOLANGCI_LINT) ## Run golangci-lint on source code.
+	$(GOLANGCI_LINT) config verify
 	$(GOLANGCI_LINT) run --timeout=5m ./...
 
 .PHONY: lint-fix
@@ -54,7 +64,11 @@ lint-fix: $(GOLANGCI_LINT) ## Attempt to automatically fix lint issues in source
 
 .PHONY: test
 test:
-	go test -v ./internal/...
+	go test ./internal/...
+
+.PHONY: prepare-bin
+prepare-bin:
+	@mkdir -p $(BIN_DIR)
 
 .PHONY: addon
 addon: deps fmt ## Build addon binary
@@ -71,11 +85,15 @@ oci-push: ## Push the image
 .PHONY: oci
 oci: oci-build oci-push
 
+.PHONY: install-crds
+install-crds: download-crds
+	kubectl apply --server-side -f $(CRD_DIR)
+
 .PHONY: addon-deploy
-addon-deploy: $(KUSTOMIZE) install-crds
+addon-deploy: download-crds
 	cd deploy && $(KUSTOMIZE) edit set image controller=${IMG}
-	$(KUSTOMIZE) build ./deploy | kubectl apply -f -
+	$(KUSTOMIZE) build ./deploy | kubectl apply --server-side -f -
 
 .PHONY: addon-undeploy
-addon-undeploy: $(KUSTOMIZE) install-crds
+addon-undeploy: download-crds
 	$(KUSTOMIZE) build ./deploy | kubectl delete -f -

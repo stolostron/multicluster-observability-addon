@@ -5,12 +5,13 @@ import (
 )
 
 type LoggingValues struct {
-	Enabled                    bool            `json:"enabled"`
-	CLFSpec                    string          `json:"clfSpec"`
-	ServiceAccountName         string          `json:"serviceAccountName"`
-	LoggingSubscriptionChannel string          `json:"loggingSubscriptionChannel"`
-	Secrets                    []ResourceValue `json:"secrets"`
-	ConfigMaps                 []ResourceValue `json:"configmaps"`
+	Enabled                 bool            `json:"enabled"`
+	CLFAnnotations          string          `json:"clfAnnotations"`
+	CLFSpec                 string          `json:"clfSpec"`
+	ServiceAccountName      string          `json:"serviceAccountName"`
+	OpenshiftLoggingChannel string          `json:"openshiftLoggingChannel"`
+	Secrets                 []ResourceValue `json:"secrets"`
+	ConfigMaps              []ResourceValue `json:"configmaps"`
 }
 type ResourceValue struct {
 	Name string `json:"name"`
@@ -22,7 +23,7 @@ func BuildValues(opts Options) (*LoggingValues, error) {
 		Enabled: true,
 	}
 
-	values.LoggingSubscriptionChannel = buildSubscriptionChannel(opts)
+	values.OpenshiftLoggingChannel = buildSubscriptionChannel(opts)
 
 	configmaps, err := buildConfigMaps(opts)
 	if err != nil {
@@ -35,6 +36,15 @@ func BuildValues(opts Options) (*LoggingValues, error) {
 		return nil, err
 	}
 	values.Secrets = secrets
+
+	// CLO uses annotations to signal feature flags so users must be able to set
+	// them
+	clfAnnotations := opts.ClusterLogForwarder.GetAnnotations()
+	clfAnnotationsJson, err := json.Marshal(clfAnnotations)
+	if err != nil {
+		return nil, err
+	}
+	values.CLFAnnotations = string(clfAnnotationsJson)
 
 	clfSpec, err := buildClusterLogForwarderSpec(opts)
 	if err != nil {

@@ -9,19 +9,15 @@ jobs:
   lint:
     name: lint
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        go: ['1.22']
     steps:
     - name: Install make
       run: sudo apt-get install make
+    - uses: actions/checkout@v4
     - name: Set up Go 1.x
       uses: actions/setup-go@v5
       with:
-        go-version: ${{ matrix.go }}
-      id: go
-    - uses: actions/checkout@v4
+        go-version-file: 'go.mod'
+      id: go  
     - name: Lint
       uses: golangci/golangci-lint-action@v6
       with:
@@ -31,24 +27,20 @@ jobs:
   test:
     name: test
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        go: ['1.22']
     steps:
     - name: Install make
       run: sudo apt-get install make
+    - uses: actions/checkout@v4
     - name: Set up Go 1.x
       uses: actions/setup-go@v5
       with:
-        go-version: ${{ matrix.go }}
+        go-version-file: 'go.mod'
       id: go
-    - uses: actions/checkout@v4
     - name: Run tests
       run: go test -coverprofile=profile.cov ./...
     - name: Send coverage
       uses: shogo82148/actions-goveralls@v1
       with:
         path-to-profile: profile.cov
-        flag-name: Go-${{ matrix.go }}
+        flag-name: Go-1.23
         shallow: true

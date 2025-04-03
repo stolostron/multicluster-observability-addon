@@ -8,6 +8,7 @@ import (
 
 	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
 	"github.com/rhobs/multicluster-observability-addon/internal/addon"
+	"github.com/rhobs/multicluster-observability-addon/internal/addon/common"
 	"github.com/rhobs/multicluster-observability-addon/internal/logging/manifests"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -37,7 +38,7 @@ func BuildOptions(ctx context.Context, k8s client.Client, mcAddon *addonapiv1alp
 		opts.SubscriptionChannel = userWorkloads.SubscriptionChannel
 	}
 
-	keys := addon.GetObjectKeys(mcAddon.Status.ConfigReferences, loggingv1.GroupVersion.Group, addon.ClusterLogForwardersResource)
+	keys := common.GetObjectKeys(mcAddon.Status.ConfigReferences, loggingv1.GroupVersion.Group, addon.ClusterLogForwardersResource)
 	switch {
 	case len(keys) == 0:
 		return opts, errMissingCLFRef
@@ -61,13 +62,13 @@ func BuildOptions(ctx context.Context, k8s client.Client, mcAddon *addonapiv1alp
 		configmapNames = append(configmapNames, extracedConfigmapNames...)
 	}
 
-	secrets, err := addon.GetSecrets(ctx, k8s, clf.Namespace, mcAddon.Namespace, secretNames)
+	secrets, err := common.GetSecrets(ctx, k8s, clf.Namespace, mcAddon.Namespace, secretNames)
 	if err != nil {
 		return opts, err
 	}
 	opts.Secrets = secrets
 
-	configMaps, err := addon.GetConfigMaps(ctx, k8s, clf.Namespace, mcAddon.Namespace, configmapNames)
+	configMaps, err := common.GetConfigMaps(ctx, k8s, clf.Namespace, mcAddon.Namespace, configmapNames)
 	if err != nil {
 		return opts, err
 	}

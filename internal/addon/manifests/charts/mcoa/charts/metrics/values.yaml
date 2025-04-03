@@ -1,0 +1,12 @@
+platform:
+  appName: "platform-app"
+  prometheusAgentSpec: "some-agent-spec"
+  scrapeConfigs:
+    - name: "scrape-config-1"
+      value: "value-1"
+userWorkload:
+  appName: "platform-app"
+  prometheusAgentSpec: "some-agent-spec"
+  scrapeConfigs:
+    - name: "scrape-config-1"
+      value: "value-1"

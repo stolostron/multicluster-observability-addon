@@ -2,6 +2,7 @@ package addon
 
 import (
 	"embed"
+	"errors"
 )
 
 const (
@@ -10,6 +11,7 @@ const (
 	InstallNamespace  = "open-cluster-management-observability"
 
 	McoaChartDir    = "manifests/charts/mcoa"
+	MetricsChartDir = "manifests/charts/mcoa/charts/metrics"
 	LoggingChartDir = "manifests/charts/mcoa/charts/logging"
 	TracingChartDir = "manifests/charts/mcoa/charts/tracing"
 
@@ -30,9 +32,12 @@ const (
 	otelColProbePath                = ".spec.replicas"
 )
 
+var errInvalidMetricsHubHostname = errors.New("invalid metrics hub hostname")
+
 //go:embed manifests
 //go:embed manifests/charts/mcoa
 //go:embed manifests/charts/mcoa/templates/_helpers.tpl
 //go:embed manifests/charts/mcoa/charts/logging/templates/_helpers.tpl
+//go:embed manifests/charts/mcoa/charts/metrics/templates/_helpers.tpl
 //go:embed manifests/charts/mcoa/charts/tracing/templates/_helpers.tpl
 var FS embed.FS

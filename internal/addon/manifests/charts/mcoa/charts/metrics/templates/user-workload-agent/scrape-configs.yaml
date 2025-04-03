@@ -1,0 +1,21 @@
+{{- range $_, $scrapeconfig := .Values.userWorkload.scrapeConfigs }}
+apiVersion: monitoring.coreos.com/v1alpha1
+kind: ScrapeConfig
+metadata:
+  name: {{ $scrapeconfig.name }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- $incomingLabels := $scrapeconfig.labels }}
+    {{- $metricsHelmLabels := fromYaml (include "metricshelm.labels" $) }}
+    {{- $customLabel := dict "app.kubernetes.io/component" "user-workload-metrics-collector" }}
+    {{- $mergedLabels := merge $incomingLabels $metricsHelmLabels $customLabel }}
+    {{- toYaml $mergedLabels | nindent 4 }}
+  annotations:
+    {{- $incomingAnnotations := $scrapeconfig.annotations }}
+    {{- $stdAnnotations := dict "operator.prometheus.io/controller-id" $.Values.prometheusControllerID }}
+    {{- $mergedAnnotations := merge $stdAnnotations $incomingAnnotations }}
+    {{- toYaml $mergedAnnotations | nindent 4 }}
+spec:
+{{ fromJson $scrapeconfig.data | toYaml | nindent 2 }}
+---
+{{- end }}

@@ -4,11 +4,19 @@ import (
 	"context"
 	"errors"
 
+	"github.com/go-logr/logr"
 	"github.com/rhobs/multicluster-observability-addon/internal/addon"
+	"github.com/rhobs/multicluster-observability-addon/internal/addon/common"
 	lhandlers "github.com/rhobs/multicluster-observability-addon/internal/logging/handlers"
 	lmanifests "github.com/rhobs/multicluster-observability-addon/internal/logging/manifests"
+	mconfig "github.com/rhobs/multicluster-observability-addon/internal/metrics/config"
+	mhandlers "github.com/rhobs/multicluster-observability-addon/internal/metrics/handlers"
+	mmanifests "github.com/rhobs/multicluster-observability-addon/internal/metrics/manifests"
+	mresource "github.com/rhobs/multicluster-observability-addon/internal/metrics/resource"
 	thandlers "github.com/rhobs/multicluster-observability-addon/internal/tracing/handlers"
 	tmanifests "github.com/rhobs/multicluster-observability-addon/internal/tracing/manifests"
+	clusterinfov1beta1 "github.com/stolostron/cluster-lifecycle-api/clusterinfo/v1beta1"
+	clusterlifecycleconstants "github.com/stolostron/cluster-lifecycle-api/constants"
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 	addonutils "open-cluster-management.io/addon-framework/pkg/utils"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
@@ -16,26 +24,27 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-const annotationLocalCluster = "local-cluster"
-
 var (
-	errMissingAODCRef  = errors.New("missing AddOnDeploymentConfig reference on addon installation")
-	errMultipleAODCRef = errors.New("multiple AddOnDeploymentConfig references on addon installation")
+	errMissingAODCRef     = errors.New("missing required AddOnDeploymentConfig reference in addon configuration")
+	errMultipleAODCRef    = errors.New("addonmultiple AddOnDeploymentConfig references found - only one is supported")
+	errMissingHubEndpoint = errors.New("metricsHubHostname key is missing but it's required when either platformMetricsCollection or userWorkloadMetricsCollection are present")
 )
 
 type HelmChartValues struct {
 	Enabled bool                     `json:"enabled"`
+	Metrics mmanifests.MetricsValues `json:"metrics"`
 	Logging lmanifests.LoggingValues `json:"logging"`
 	Tracing tmanifests.TracingValues `json:"tracing"`
 }
 
-func GetValuesFunc(ctx context.Context, k8s client.Client) addonfactory.GetValuesFunc {
+func GetValuesFunc(ctx context.Context, k8s client.Client, logger logr.Logger) addonfactory.GetValuesFunc {
 	return func(
 		cluster *clusterv1.ManagedCluster,
 		mcAddon *addonapiv1alpha1.ManagedClusterAddOn,
 	) (addonfactory.Values, error) {
-		// if hub cluster, then don't install anything
-		if isHubCluster(cluster) {
+		// if hub cluster, then don't install anything.
+		// some kube flavors are also currently not supported
+		if isHubCluster(cluster) || !supportedKubeVendors(cluster) {
 			return addonfactory.JsonStructToValues(HelmChartValues{})
 		}
 
@@ -54,6 +63,33 @@ func GetValuesFunc(ctx context.Context, k8s client.Client) addonfactory.GetValue
 
 		userValues := HelmChartValues{
 			Enabled: true,
+		}
+
+		if opts.Platform.Metrics.CollectionEnabled || opts.UserWorkloads.Metrics.CollectionEnabled {
+			if opts.Platform.Metrics.HubEndpoint == nil {
+				return nil, errMissingHubEndpoint
+			}
+
+			if err := mresource.DeployDefaultResourcesOnce(ctx, k8s, logger, mconfig.HubInstallNamespace); err != nil {
+				return nil, err
+			}
+
+			optsBuilder := mhandlers.OptionsBuilder{
+				Client:          k8s,
+				ImagesConfigMap: mconfig.ImagesConfigMap,
+				RemoteWriteURL:  opts.Platform.Metrics.HubEndpoint.JoinPath("/api/metrics/v1/default/api/v1/receive").String(),
+				Logger:          logger,
+			}
+			metricsOpts, err := optsBuilder.Build(ctx, mcAddon, cluster, opts.Platform.Metrics, opts.UserWorkloads.Metrics)
+			if err != nil {
+				return nil, err
+			}
+
+			metrics, err := mmanifests.BuildValues(metricsOpts)
+			if err != nil {
+				return nil, err
+			}
+			userValues.Metrics = metrics
 		}
 
 		if opts.Platform.Logs.CollectionEnabled || opts.UserWorkloads.Logs.CollectionEnabled {
@@ -88,7 +124,7 @@ func GetValuesFunc(ctx context.Context, k8s client.Client) addonfactory.GetValue
 
 func getAddOnDeploymentConfig(ctx context.Context, k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAddOn) (*addonapiv1alpha1.AddOnDeploymentConfig, error) {
 	aodc := &addonapiv1alpha1.AddOnDeploymentConfig{}
-	keys := addon.GetObjectKeys(mcAddon.Status.ConfigReferences, addonutils.AddOnDeploymentConfigGVR.Group, addon.AddonDeploymentConfigResource)
+	keys := common.GetObjectKeys(mcAddon.Status.ConfigReferences, addonutils.AddOnDeploymentConfigGVR.Group, addon.AddonDeploymentConfigResource)
 	switch {
 	case len(keys) == 0:
 		return aodc, errMissingAODCRef
@@ -103,9 +139,17 @@ func getAddOnDeploymentConfig(ctx context.Context, k8s client.Client, mcAddon *a
 }
 
 func isHubCluster(cluster *clusterv1.ManagedCluster) bool {
-	val, ok := cluster.Labels[annotationLocalCluster]
+	val, ok := cluster.Labels[clusterlifecycleconstants.SelfManagedClusterLabelKey]
 	if !ok {
 		return false
 	}
 	return val == "true"
+}
+
+func supportedKubeVendors(cluster *clusterv1.ManagedCluster) bool {
+	val, ok := cluster.Labels[clusterinfov1beta1.LabelKubeVendor]
+	if !ok {
+		return false
+	}
+	return val == string(clusterinfov1beta1.KubeVendorOpenShift)
 }

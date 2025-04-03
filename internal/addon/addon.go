@@ -8,9 +8,9 @@ import (
 	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	"open-cluster-management.io/addon-framework/pkg/utils"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	"open-cluster-management.io/api/addon/v1alpha1"
+	v1 "open-cluster-management.io/api/cluster/v1"
 	workv1 "open-cluster-management.io/api/work/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 var (
@@ -26,24 +26,6 @@ func NewRegistrationOption(agentName string) *agent.RegistrationOption {
 		CSRConfigurations: agent.KubeClientSignerConfigurations(Name, agentName),
 		CSRApproveCheck:   utils.DefaultCSRApprover(agentName),
 	}
-}
-
-func GetObjectKeys(configRef []addonapiv1alpha1.ConfigReference, group, resource string) []client.ObjectKey {
-	var keys []client.ObjectKey
-	for _, config := range configRef {
-		if config.ConfigGroupResource.Group != group {
-			continue
-		}
-		if config.ConfigGroupResource.Resource != resource {
-			continue
-		}
-
-		keys = append(keys, client.ObjectKey{
-			Name:      config.Name,
-			Namespace: config.Namespace,
-		})
-	}
-	return keys
 }
 
 // AgentHealthProber returns a HealthProber struct that contains the necessary
@@ -92,7 +74,7 @@ func AgentHealthProber() *agent.HealthProber {
 					},
 				},
 			},
-			HealthChecker: func(fields []agent.ResultField) error {
+			HealthChecker: func(fields []agent.FieldResult, mc *v1.ManagedCluster, mcao *v1alpha1.ManagedClusterAddOn) error {
 				if len(fields) == 0 {
 					return errMissingFields
 				}
