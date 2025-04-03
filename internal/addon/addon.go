@@ -84,8 +84,8 @@ func AgentHealthProber() *agent.HealthProber {
 						continue
 					}
 					identifier := field.ResourceIdentifier
-					switch {
-					case identifier.Resource == ClusterLogForwardersResource:
+					switch identifier.Resource {
+					case ClusterLogForwardersResource:
 						for _, value := range field.FeedbackResult.Values {
 							if value.Name != clfProbeKey {
 								return fmt.Errorf("%w: %s with key %s/%s unknown probe keys %s", errUnknownProbeKey, identifier.Resource, identifier.Namespace, identifier.Name, value.Name)
@@ -100,7 +100,7 @@ func AgentHealthProber() *agent.HealthProber {
 							}
 							// everything checks we should skip to the next field
 						}
-					case identifier.Resource == OpenTelemetryCollectorsResource:
+					case OpenTelemetryCollectorsResource:
 						for _, value := range field.FeedbackResult.Values {
 							if value.Name != otelColProbeKey {
 								return fmt.Errorf("%w: %s with key %s/%s unknown probe keys %s", errUnknownProbeKey, identifier.Resource, identifier.Namespace, identifier.Name, value.Name)

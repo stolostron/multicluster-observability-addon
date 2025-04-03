@@ -7,9 +7,9 @@ import (
 	"slices"
 
 	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
-	"github.com/rhobs/multicluster-observability-addon/internal/addon"
-	"github.com/rhobs/multicluster-observability-addon/internal/addon/common"
-	"github.com/rhobs/multicluster-observability-addon/internal/logging/manifests"
+	"github.com/stolostron/multicluster-observability-addon/internal/addon"
+	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
+	"github.com/stolostron/multicluster-observability-addon/internal/logging/manifests"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )

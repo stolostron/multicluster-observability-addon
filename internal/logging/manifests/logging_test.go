@@ -29,7 +29,6 @@ func Test_BuildSubscriptionChannel(t *testing.T) {
 			subChannel: "stable-5.7",
 		},
 	} {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			resources := Options{
 				SubscriptionChannel: tc.value,
