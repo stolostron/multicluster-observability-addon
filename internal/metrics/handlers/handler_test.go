@@ -482,7 +482,8 @@ func TestBuildOptions(t *testing.T) {
 				for _, sm := range opts.UserWorkloads.ServiceMonitors {
 					if sm.Name == config.AcmEtcdServiceMonitorName {
 						etcdMetrics = extractMetricsFilterFromServiceMonitor(sm)
-					} else if sm.Name == config.AcmApiServerServiceMonitorName {
+					}
+					if sm.Name == config.AcmApiServerServiceMonitorName {
 						apiserverMetrics = extractMetricsFilterFromServiceMonitor(sm)
 					}
 				}

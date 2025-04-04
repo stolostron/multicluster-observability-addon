@@ -96,10 +96,10 @@ func (h *Hypershift) GenerateResources(ctx context.Context, etcdConfig, apiServe
 
 	ret.ServiceMonitors = make([]*prometheusv1.ServiceMonitor, 0, len(hostedClusters.Items))
 	for _, hostedCluster := range hostedClusters.Items {
-		namespace := fmt.Sprintf("%s-%s", hostedCluster.ObjectMeta.Namespace, hostedCluster.ObjectMeta.Name)
+		namespace := fmt.Sprintf("%s-%s", hostedCluster.Namespace, hostedCluster.Name)
 		hostedClusterIdentity := clusterIdentity{
 			ID:   hostedCluster.Spec.ClusterID,
-			Name: hostedCluster.ObjectMeta.Name,
+			Name: hostedCluster.Name,
 		}
 
 		if len(hostedClusterIdentity.ID) == 0 {

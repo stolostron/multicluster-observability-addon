@@ -460,7 +460,6 @@ func TestHelmBuild_Metrics_HCP(t *testing.T) {
 	assert.Equal(t, "clusters-a", serviceMonitors[0].Namespace)
 	assert.Len(t, serviceMonitors[0].Spec.Endpoints, 1)
 	assert.Len(t, serviceMonitors[1].Spec.Endpoints, 1)
-
 }
 
 func newAddonDeploymentConfig() *addonapiv1alpha1.AddOnDeploymentConfig {
