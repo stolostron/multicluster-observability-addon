@@ -9,6 +9,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 )
 
 // PrometheusAgentBuilder applies configuration and invariants to an existing PrometheusAgent
@@ -61,7 +62,7 @@ func (p *PrometheusAgentBuilder) setPrometheusRemoteWriteConfig() *PrometheusAge
 func (p *PrometheusAgentBuilder) createRemoteWriteSpec() prometheusv1.RemoteWriteSpec {
 	return prometheusv1.RemoteWriteSpec{
 		URL:           p.RemoteWriteEndpoint,
-		RemoteTimeout: prometheusv1.Duration("30s"),
+		RemoteTimeout: ptr.To(prometheusv1.Duration("30s")),
 		TLSConfig: &prometheusv1.TLSConfig{
 			CAFile:   p.formatSecretPath(config.HubCASecretName, "ca.crt"),
 			CertFile: p.formatSecretPath(config.ClientCertSecretName, "tls.crt"),
