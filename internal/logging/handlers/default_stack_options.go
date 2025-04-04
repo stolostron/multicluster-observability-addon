@@ -8,9 +8,10 @@ import (
 	certmanagerv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	lokiv1 "github.com/grafana/loki/operator/api/loki/v1"
 	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
-	"github.com/rhobs/multicluster-observability-addon/internal/addon"
-	"github.com/rhobs/multicluster-observability-addon/internal/logging/manifests"
-	addonmanifests "github.com/rhobs/multicluster-observability-addon/internal/manifests"
+	"github.com/stolostron/multicluster-observability-addon/internal/addon"
+	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
+	"github.com/stolostron/multicluster-observability-addon/internal/logging/manifests"
+	addonmanifests "github.com/stolostron/multicluster-observability-addon/internal/manifests"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -156,7 +157,7 @@ func buildDefaultStackOptions(ctx context.Context, k8s client.Client, mcAddon *a
 
 	if !opts.IsHubCluster {
 		// Get CLF from ManagedClusterAddOn
-		keys := addon.GetObjectKeys(mcAddon.Status.ConfigReferences, loggingv1.GroupVersion.Group, addon.ClusterLogForwardersResource)
+		keys := common.GetObjectKeys(mcAddon.Status.ConfigReferences, loggingv1.GroupVersion.Group, addon.ClusterLogForwardersResource)
 		if len(keys) == 0 {
 			return errMissingDefaultCLFRef
 		}
@@ -177,7 +178,7 @@ func buildDefaultStackOptions(ctx context.Context, k8s client.Client, mcAddon *a
 		}
 		opts.DefaultStack.Collection.ClusterLogForwarder = clf
 
-		mTLSSecret, err := addon.GetSecret(ctx, k8s, clf.Namespace, mcAddon.Namespace, manifests.DefaultCollectionMTLSSecretName)
+		mTLSSecret, err := common.GetSecret(ctx, k8s, clf.Namespace, mcAddon.Namespace, manifests.DefaultCollectionMTLSSecretName)
 		if err != nil {
 			// Even for not found we probably just want to return and wait for the next
 			// reconciliation loop to try again.
@@ -194,7 +195,7 @@ func buildDefaultStackOptions(ctx context.Context, k8s client.Client, mcAddon *a
 
 	if opts.IsHubCluster {
 		// Get LS from ManagedClusterAddOn
-		keys := addon.GetObjectKeys(mcAddon.Status.ConfigReferences, lokiv1.GroupVersion.Group, addon.LokiStacksResource)
+		keys := common.GetObjectKeys(mcAddon.Status.ConfigReferences, lokiv1.GroupVersion.Group, addon.LokiStacksResource)
 		if len(keys) == 0 {
 			return errMissingDefaultLSRef
 		}
@@ -216,7 +217,7 @@ func buildDefaultStackOptions(ctx context.Context, k8s client.Client, mcAddon *a
 		opts.DefaultStack.Storage.LokiStack = ls
 
 		// Get objstorage secret
-		objStorageSecret, err := addon.GetSecret(ctx, k8s, ls.Namespace, mcAddon.Namespace, ls.Spec.Storage.Secret.Name)
+		objStorageSecret, err := common.GetSecret(ctx, k8s, ls.Namespace, mcAddon.Namespace, ls.Spec.Storage.Secret.Name)
 		if err != nil {
 			// Even for not found we probably just want to return and wait for the next
 			// reconciliation loop to try again.
@@ -225,7 +226,7 @@ func buildDefaultStackOptions(ctx context.Context, k8s client.Client, mcAddon *a
 		opts.DefaultStack.Storage.ObjStorageSecret = *objStorageSecret
 
 		// Get mTLS secret
-		mTLSSecret, err := addon.GetSecret(ctx, k8s, ls.Namespace, mcAddon.Namespace, manifests.DefaultStorageMTLSSecretName)
+		mTLSSecret, err := common.GetSecret(ctx, k8s, ls.Namespace, mcAddon.Namespace, manifests.DefaultStorageMTLSSecretName)
 		if err != nil {
 			// Even for not found we probably just want to return and wait for the next
 			// reconciliation loop to try again.

@@ -6,8 +6,8 @@ import (
 
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	prometheusalpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
-	"github.com/rhobs/multicluster-observability-addon/internal/addon"
-	"github.com/rhobs/multicluster-observability-addon/internal/metrics/config"
+	"github.com/stolostron/multicluster-observability-addon/internal/addon"
+	"github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -269,7 +269,7 @@ func TestBuildOptions(t *testing.T) {
 			},
 			expects: func(t *testing.T, opts Options, err error) {
 				assert.Error(t, err)
-				assert.ErrorIs(t, err, ErrMissingImageOverride)
+				assert.ErrorIs(t, err, errMissingImageOverride)
 			},
 		},
 		"missing config reference": {
@@ -283,7 +283,7 @@ func TestBuildOptions(t *testing.T) {
 			resources:       createResources,
 			expects: func(t *testing.T, opts Options, err error) {
 				assert.Error(t, err)
-				assert.ErrorIs(t, err, ErrInvalidConfigResourcesCount)
+				assert.ErrorIs(t, err, errInvalidConfigResourcesCount)
 			},
 		},
 

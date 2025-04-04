@@ -9,8 +9,9 @@ import (
 	"github.com/go-logr/logr"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	prometheusalpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
-	"github.com/rhobs/multicluster-observability-addon/internal/addon"
-	"github.com/rhobs/multicluster-observability-addon/internal/metrics/config"
+	"github.com/stolostron/multicluster-observability-addon/internal/addon"
+	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
+	"github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -24,11 +25,11 @@ const (
 )
 
 var (
-	ErrInvalidConfigResourcesCount = errors.New("invalid number of configuration resources")
-	ErrUnsupportedAppName          = errors.New("unsupported app name")
-	ErrMissingImageOverride        = errors.New("missing image override")
-	ErrMissingDesiredConfig        = errors.New("missing desiredConfig in managedClusterAddon.Status.ConfigReferences")
-	ErrMissingProxyConfig          = errors.New("missing envoy proxy config in the prometheus agent configmaps")
+	errInvalidConfigResourcesCount = errors.New("invalid number of configuration resources")
+	errUnsupportedAppName          = errors.New("unsupported app name")
+	errMissingImageOverride        = errors.New("missing image override")
+	errMissingDesiredConfig        = errors.New("missing desiredConfig in managedClusterAddon.Status.ConfigReferences")
+	errMissingProxyConfig          = errors.New("missing envoy proxy config in the prometheus agent configmaps")
 )
 
 type OptionsBuilder struct {
@@ -46,7 +47,7 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 	}
 
 	ret.ClusterName = managedCluster.Name
-	ret.ClusterID = managedCluster.ObjectMeta.Labels[clusterIDLabel]
+	ret.ClusterID = managedCluster.Labels[clusterIDLabel]
 	if ret.ClusterID == "" {
 		ret.ClusterID = managedCluster.Name
 	}
@@ -71,11 +72,11 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 		}
 
 		// Fetch rules and scrape configs
-		ret.Platform.ScrapeConfigs = addon.FilterResourcesByLabelSelector[*prometheusalpha1.ScrapeConfig](configResources, config.PlatformPrometheusMatchLabels)
+		ret.Platform.ScrapeConfigs = common.FilterResourcesByLabelSelector[*prometheusalpha1.ScrapeConfig](configResources, config.PlatformPrometheusMatchLabels)
 		if len(ret.Platform.ScrapeConfigs) == 0 {
 			o.Logger.V(1).Info("No scrape configs found for platform metrics")
 		}
-		ret.Platform.Rules = addon.FilterResourcesByLabelSelector[*prometheusv1.PrometheusRule](configResources, config.PlatformPrometheusMatchLabels)
+		ret.Platform.Rules = common.FilterResourcesByLabelSelector[*prometheusv1.PrometheusRule](configResources, config.PlatformPrometheusMatchLabels)
 		if len(ret.Platform.Rules) == 0 {
 			o.Logger.V(1).Info("No rules found for platform metrics")
 		}
@@ -87,11 +88,11 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 		}
 
 		// Fetch rules and scrape configs
-		ret.UserWorkloads.ScrapeConfigs = addon.FilterResourcesByLabelSelector[*prometheusalpha1.ScrapeConfig](configResources, config.UserWorkloadPrometheusMatchLabels)
+		ret.UserWorkloads.ScrapeConfigs = common.FilterResourcesByLabelSelector[*prometheusalpha1.ScrapeConfig](configResources, config.UserWorkloadPrometheusMatchLabels)
 		if len(ret.UserWorkloads.ScrapeConfigs) == 0 {
 			o.Logger.V(1).Info("No scrape configs found for user workloads")
 		}
-		ret.UserWorkloads.Rules = addon.FilterResourcesByLabelSelector[*prometheusv1.PrometheusRule](configResources, config.UserWorkloadPrometheusMatchLabels)
+		ret.UserWorkloads.Rules = common.FilterResourcesByLabelSelector[*prometheusv1.PrometheusRule](configResources, config.UserWorkloadPrometheusMatchLabels)
 		if len(ret.UserWorkloads.Rules) == 0 {
 			o.Logger.V(1).Info("No rules found for user workloads")
 		}
@@ -107,14 +108,14 @@ func (o *OptionsBuilder) buildPrometheusAgent(ctx context.Context, opts *Options
 	if appName == config.UserWorkloadMetricsCollectorApp {
 		labelsMatcher = config.UserWorkloadPrometheusMatchLabels
 	}
-	platformAgents := addon.FilterResourcesByLabelSelector[*prometheusalpha1.PrometheusAgent](configResources, labelsMatcher)
+	platformAgents := common.FilterResourcesByLabelSelector[*prometheusalpha1.PrometheusAgent](configResources, labelsMatcher)
 	if len(platformAgents) != 1 {
-		return fmt.Errorf("%w: for application %s, found %d agents with labels %+v", ErrInvalidConfigResourcesCount, appName, len(platformAgents), labelsMatcher)
+		return fmt.Errorf("%w: for application %s, found %d agents with labels %+v", errInvalidConfigResourcesCount, appName, len(platformAgents), labelsMatcher)
 	}
 
 	// Fetch the envoy config
 	if len(platformAgents[0].Spec.ConfigMaps) == 0 {
-		return fmt.Errorf("%w: %s", ErrMissingProxyConfig, appName)
+		return fmt.Errorf("%w: %s", errMissingProxyConfig, appName)
 	}
 	envoyProxyConfigMap := &corev1.ConfigMap{}
 	err := o.Client.Get(ctx, types.NamespacedName{Name: platformAgents[0].Spec.ConfigMaps[0], Namespace: platformAgents[0].Namespace}, envoyProxyConfigMap)
@@ -151,11 +152,11 @@ func (o *OptionsBuilder) buildPrometheusAgent(ctx context.Context, opts *Options
 		opts.UserWorkloads.PrometheusAgent = agent
 		opts.UserWorkloads.ConfigMaps = append(opts.UserWorkloads.ConfigMaps, envoyProxyConfigMap)
 	default:
-		return fmt.Errorf("%w: %s", ErrUnsupportedAppName, appName)
+		return fmt.Errorf("%w: %s", errUnsupportedAppName, appName)
 	}
 
 	// Fetch related secrets
-	for _, secretName := range agent.Spec.CommonPrometheusFields.Secrets {
+	for _, secretName := range agent.Spec.Secrets {
 		if err := o.addSecret(ctx, &opts.Secrets, secretName, agent.Namespace); err != nil {
 			return err
 		}
@@ -202,7 +203,7 @@ func (o *OptionsBuilder) getImageOverrides(ctx context.Context) (ImagesOptions, 
 	ret.Envoy = config.EnvoyImage
 
 	if ret.PrometheusOperator == "" || ret.PrometheusConfigReloader == "" || ret.KubeRBACProxy == "" {
-		return ret, fmt.Errorf("%w: %+v", ErrMissingImageOverride, ret)
+		return ret, fmt.Errorf("%w: %+v", errMissingImageOverride, ret)
 	}
 
 	return ret, nil
@@ -212,7 +213,7 @@ func (o *OptionsBuilder) getAvailableConfigResources(ctx context.Context, mcAddo
 	ret := []client.Object{}
 	for _, cfg := range mcAddon.Status.ConfigReferences {
 		var obj client.Object
-		switch cfg.ConfigGroupResource.Resource {
+		switch cfg.Resource {
 		case prometheusalpha1.PrometheusAgentName:
 			obj = &prometheusalpha1.PrometheusAgent{}
 		case prometheusalpha1.ScrapeConfigName:
@@ -226,7 +227,7 @@ func (o *OptionsBuilder) getAvailableConfigResources(ctx context.Context, mcAddo
 		}
 
 		if cfg.DesiredConfig == nil {
-			return ret, fmt.Errorf("%w: %s from %s/%s", ErrMissingDesiredConfig, cfg.ConfigGroupResource.Resource, mcAddon.Namespace, mcAddon.Name)
+			return ret, fmt.Errorf("%w: %s from %s/%s", errMissingDesiredConfig, cfg.Resource, mcAddon.Namespace, mcAddon.Name)
 		}
 
 		if err := o.Client.Get(ctx, types.NamespacedName{Name: cfg.DesiredConfig.Name, Namespace: cfg.DesiredConfig.Namespace}, obj); err != nil {

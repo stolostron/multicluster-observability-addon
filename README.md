@@ -9,7 +9,7 @@ which automates the collection and forwarding of observability signals to centra
 
 This is achieved through the installation of the spoke clusters of dedicated operators for each observability signal:
 
-- Metrics are not supported by this addon. To manage metrics, use the [multicluster-observability-operator](https://github.com/stolostron/multicluster-observability-operator).
+- For Metrics it's required that the [multicluster-observability-operator](https://github.com/stolostron/multicluster-observability-operator) is installed. Once enalbed the addon will create the necessary resources to configure metrics collection.
 
 - For Logs the operator installed will be [cluster-logging-operator](https://docs.openshift.com/container-platform/latest/logging/cluster-logging.html). The addon will also configure an instance of [ClusterLogForwarder](https://docs.openshift.com/container-platform/latest/logging/log_collection_forwarding/configuring-log-forwarding.html) to forward logs to a configured store.
 

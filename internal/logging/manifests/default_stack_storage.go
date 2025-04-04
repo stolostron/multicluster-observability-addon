@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	lokiv1 "github.com/grafana/loki/operator/api/loki/v1"
-	"github.com/rhobs/multicluster-observability-addon/internal/addon"
+	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 

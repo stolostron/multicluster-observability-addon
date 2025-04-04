@@ -8,9 +8,9 @@ import (
 	"github.com/go-logr/logr"
 	lokiv1 "github.com/grafana/loki/operator/api/loki/v1"
 	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
-	"github.com/rhobs/multicluster-observability-addon/internal/addon"
-	lhandlers "github.com/rhobs/multicluster-observability-addon/internal/logging/handlers"
-	lmanifests "github.com/rhobs/multicluster-observability-addon/internal/logging/manifests"
+	"github.com/stolostron/multicluster-observability-addon/internal/addon"
+	lhandlers "github.com/stolostron/multicluster-observability-addon/internal/logging/handlers"
+	lmanifests "github.com/stolostron/multicluster-observability-addon/internal/logging/manifests"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
@@ -144,7 +144,7 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 	// SSA the objects rendered
 	for _, obj := range objects {
-		if err := r.Client.Patch(ctx, obj, client.Apply, client.ForceOwnership, client.FieldOwner(addon.Name)); err != nil {
+		if err := r.Patch(ctx, obj, client.Apply, client.ForceOwnership, client.FieldOwner(addon.Name)); err != nil {
 			klog.Error(err, "failed to configure resource")
 			continue
 		}

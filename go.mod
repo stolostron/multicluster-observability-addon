@@ -1,4 +1,4 @@
-module github.com/rhobs/multicluster-observability-addon
+module github.com/stolostron/multicluster-observability-addon
 
 go 1.23
 
@@ -11,7 +11,7 @@ require (
 	github.com/grafana/loki/operator/api/loki v0.0.0-20241126095010-949bfb9e074b
 	github.com/imdario/mergo v0.3.16
 	github.com/open-telemetry/opentelemetry-operator v0.107.0
-	github.com/openshift/cluster-logging-operator/api/observability v0.0.0-20250228165433-3665fb550c08
+	github.com/openshift/cluster-logging-operator/api/observability v0.0.0-20250313233210-073925e39f17
 	github.com/operator-framework/api v0.26.0
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.76.2
 	github.com/spf13/cobra v1.9.1
@@ -25,9 +25,9 @@ require (
 	k8s.io/client-go v0.30.3
 	k8s.io/component-base v0.30.3
 	k8s.io/klog/v2 v2.130.1
-	k8s.io/utils v0.0.0-20240902221715-702e33fdd3c3
-	open-cluster-management.io/addon-framework v0.11.0
-	open-cluster-management.io/api v0.15.0
+	k8s.io/utils v0.0.0-20241210054802-24370beab758
+	open-cluster-management.io/addon-framework v0.12.0
+	open-cluster-management.io/api v0.16.0
 	sigs.k8s.io/controller-runtime v0.18.5
 )
 
@@ -59,13 +59,13 @@ require (
 	github.com/go-openapi/swag v0.23.0 // indirect
 	github.com/gobwas/glob v0.2.3 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
-	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
+	github.com/golang/groupcache v0.0.0-20241129210726-2c02b8208cf8 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/cel-go v0.17.8 // indirect
 	github.com/google/gnostic-models v0.6.8 // indirect
 	github.com/google/go-cmp v0.6.0 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
-	github.com/google/pprof v0.0.0-20240711041743-f6c9dda6c6da // indirect
+	github.com/google/pprof v0.0.0-20250317173921-a4b03ec1a45e // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.20.0 // indirect
@@ -134,7 +134,7 @@ require (
 	helm.sh/helm/v3 v3.14.2 // indirect
 	k8s.io/kms v0.30.3 // indirect
 	k8s.io/kube-openapi v0.0.0-20240620174524-b456828f718b // indirect
-	open-cluster-management.io/sdk-go v0.15.0 // indirect
+	open-cluster-management.io/sdk-go v0.16.0 // indirect
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.30.3 // indirect
 	sigs.k8s.io/gateway-api v1.1.0 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect

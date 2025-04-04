@@ -5,7 +5,7 @@ import (
 
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	prometheusalpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
-	"github.com/rhobs/multicluster-observability-addon/internal/metrics/config"
+	"github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -115,12 +115,12 @@ func (p *PrometheusAgentBuilder) createQueueConfig() *prometheusv1.QueueConfig {
 }
 
 func (p *PrometheusAgentBuilder) setWatchedResources() *PrometheusAgentBuilder {
-	p.Agent.Spec.CommonPrometheusFields.ScrapeConfigSelector = &metav1.LabelSelector{
+	p.Agent.Spec.ScrapeConfigSelector = &metav1.LabelSelector{
 		MatchLabels: p.MatchLabels,
 	}
 	if p.Name == config.UserWorkloadMetricsCollectorApp {
 		// Listen to all namespaces
-		p.Agent.Spec.CommonPrometheusFields.ScrapeConfigNamespaceSelector = &metav1.LabelSelector{}
+		p.Agent.Spec.ScrapeConfigNamespaceSelector = &metav1.LabelSelector{}
 	}
 	p.clearSelectors()
 	return p
@@ -151,8 +151,8 @@ func (p *PrometheusAgentBuilder) setEnvoyProxySidecar() *PrometheusAgentBuilder 
 	}
 
 	p.Agent.Spec.Volumes = append(p.Agent.Spec.Volumes, envoyVolumes...)
-	p.Agent.Spec.CommonPrometheusFields.Containers = append(
-		p.Agent.Spec.CommonPrometheusFields.Containers,
+	p.Agent.Spec.Containers = append(
+		p.Agent.Spec.Containers,
 		p.createEnvoyContainer(),
 	)
 	return p

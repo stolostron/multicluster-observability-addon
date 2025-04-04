@@ -5,8 +5,8 @@ import (
 
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	prometheusalpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
-	"github.com/rhobs/multicluster-observability-addon/internal/metrics/handlers"
-	"github.com/rhobs/multicluster-observability-addon/internal/metrics/manifests"
+	"github.com/stolostron/multicluster-observability-addon/internal/metrics/handlers"
+	"github.com/stolostron/multicluster-observability-addon/internal/metrics/manifests"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

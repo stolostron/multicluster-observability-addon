@@ -117,7 +117,7 @@ func TestGetReconcileRequestsFromManifestWorks(t *testing.T) {
 			},
 		},
 		{
-			name:   "dont reconcile if the resouce doesn't have updates",
+			name:   "dont reconcile if the resource doesn't have updates",
 			object: existingConfigmap,
 			manifests: []workv1.Manifest{
 				{

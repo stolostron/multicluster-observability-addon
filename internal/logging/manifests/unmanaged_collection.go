@@ -9,7 +9,7 @@ import (
 
 var (
 	errPlatformLogsNotDefined     = errors.New("platform logs not defined")
-	errUserWorkloadLogsNotDefined = errors.New("user Workloads logs not defined")
+	errUserWorkloadLogsNotDefined = errors.New("user workloads logs not defined")
 )
 
 func buildSubscriptionChannel(resources Options) string {

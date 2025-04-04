@@ -2,12 +2,13 @@ package resource
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/go-logr/logr"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	prometheusalpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
-	"github.com/rhobs/multicluster-observability-addon/internal/addon"
+	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -31,7 +32,7 @@ func TestDeployDefaultResourcesOnce(t *testing.T) {
 	cmAddon := &addonapiv1alpha1.ClusterManagementAddOn{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      addon.Name,
-			Namespace: "test-ns",
+			Namespace: addon.InstallNamespace,
 		},
 	}
 
@@ -45,7 +46,7 @@ func TestDeployDefaultResourcesOnce(t *testing.T) {
 	}{
 		{
 			name:      "Successfully deploy resources first time",
-			namespace: "test-ns",
+			namespace: addon.InstallNamespace,
 			existingObjs: []client.Object{
 				cmAddon,
 			},
@@ -72,7 +73,7 @@ func TestDeployDefaultResourcesOnce(t *testing.T) {
 		},
 		{
 			name:      "Skip deployment when already initialized",
-			namespace: "test-ns",
+			namespace: addon.InstallNamespace,
 			existingObjs: []client.Object{
 				cmAddon,
 			},
@@ -96,9 +97,9 @@ func TestDeployDefaultResourcesOnce(t *testing.T) {
 		},
 		{
 			name:          "Fail when owner resource not found",
-			namespace:     "test-ns",
-			existingObjs:  []client.Object{}, // No existing objects
-			expectedError: &errors.StatusError{},
+			namespace:     addon.InstallNamespace,
+			existingObjs:  []client.Object{},                                                                                                                                                          // No existing objects
+			expectedError: fmt.Errorf("failed to deploy default monitoring resources: %s", "clustermanagementaddons.addon.open-cluster-management.io \"multicluster-observability-addon\" not found"), //nolint:err113
 			validate: func(t *testing.T, c client.Client, ns string) {
 				assert.False(t, initialized)
 			},
@@ -122,7 +123,7 @@ func TestDeployDefaultResourcesOnce(t *testing.T) {
 			// Verify error matches expected
 			if tc.expectedError != nil {
 				assert.Error(t, err)
-				assert.IsType(t, tc.expectedError, err)
+				assert.Equal(t, tc.expectedError.Error(), err.Error())
 			} else {
 				assert.NoError(t, err)
 			}
