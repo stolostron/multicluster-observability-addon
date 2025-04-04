@@ -1,4 +1,4 @@
-//nolint:gci
+//nolint:gci,gofumpt
 package handlers
 
 import (
