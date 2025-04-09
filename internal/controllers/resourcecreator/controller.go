@@ -124,10 +124,6 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 				return ctrl.Result{}, err
 			}
 
-			// Currently there is no difference between the necessary fields to create a
-			// CLF instance and the fields that we want to enforce on the default-stack CLF
-			// so there is no need to customize BuildSSAClusterLogForwarder to return a
-			// slightly different CLF if there is already an instance on the cluster
 			clf, err := lmanifests.BuildSSAClusterLogForwarder(loggingOpts, resourceName)
 			if err != nil {
 				return ctrl.Result{}, err

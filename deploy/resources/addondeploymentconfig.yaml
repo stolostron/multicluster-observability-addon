@@ -7,9 +7,9 @@ spec:
   customizedVariables:
   # Operator Subscription Channels
   - name: openshiftLoggingChannel
-    value: stable-6.1
+    value: stable-6.2
   - name: hubHostname
-    value: jmarcalaws2501299.devcluster.openshift.com
+    value: jmarcalaws25040947.devcluster.openshift.com
   # Platform Observability
   - name: platformLogsDefault
     value: "true"

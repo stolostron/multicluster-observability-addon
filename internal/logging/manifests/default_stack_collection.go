@@ -98,6 +98,10 @@ func BuildSSAClusterLogForwarder(opts Options, clfName string) (*loggingv1.Clust
 	}
 	clfSpec.ManagementState = loggingv1.ManagementStateUnmanaged
 
+	// Currently there is no difference between the necessary fields to create a
+	// CLF instance and the fields that we want to enforce on the default-stack CLF
+	// so there is no need to customize BuildSSAClusterLogForwarder to return a
+	// slightly different CLF if there is already an instance on the cluster
 	return &loggingv1.ClusterLogForwarder{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "ClusterLogForwarder",
