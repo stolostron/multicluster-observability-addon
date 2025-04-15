@@ -251,7 +251,7 @@ func hypershiftServiceMonitorsPredicate(logger logr.Logger) builder.Predicates {
 	})
 }
 
-// isHypershiftServiceMonitor reuturns true when the serviceMonitor is deployed by hypershift for etcd or the apiserver
+// isHypershiftServiceMonitor returns true when the serviceMonitor is deployed by hypershift for etcd or the apiserver
 // This is used for metrics to ensure our own serviceMonitor, based on the original one deployed by hypershift remains in sync.
 func isHypershiftServiceMonitor(logger logr.Logger, obj client.Object) bool {
 	if obj.GetName() == mconfig.HypershiftEtcdServiceMonitorName || obj.GetName() == mconfig.HypershiftApiServerServiceMonitorName {
