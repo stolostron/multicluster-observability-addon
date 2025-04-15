@@ -382,7 +382,3 @@ func IsHypershiftEnabled(managedCluster *clusterv1.ManagedCluster) bool {
 func isRuleMetricName(name string) bool {
 	return strings.Contains(name, ":")
 }
-
-func stringPtr(s string) *string {
-	return &s
-}
