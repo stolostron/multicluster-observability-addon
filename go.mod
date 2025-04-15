@@ -9,7 +9,7 @@ require (
 	github.com/openshift/cluster-logging-operator/api/observability v0.0.0-20250409175233-91ac0aefdea7 // release-6.2
 	github.com/operator-framework/api v0.30.0
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.80.1
-	github.com/rhobs/observability-operator v1.0.1-0.20250326092328-08ec7ed87e8b
+	github.com/rhobs/observability-operator v1.0.1-0.20250414131549-04d4da885443
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/pflag v1.0.6
 	github.com/stolostron/cluster-lifecycle-api v0.0.0-20240918064238-a5e71b599118
