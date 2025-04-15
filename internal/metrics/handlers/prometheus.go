@@ -9,6 +9,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 )
 
 // PrometheusAgentBuilder applies configuration and invariants to an existing PrometheusAgent
@@ -36,14 +37,14 @@ func (p *PrometheusAgentBuilder) Build() *prometheusalpha1.PrometheusAgent {
 func (p *PrometheusAgentBuilder) setCommonFields() *PrometheusAgentBuilder {
 	spec := &p.Agent.Spec.CommonPrometheusFields
 
-	spec.Replicas = toPtr(int32(1))
+	spec.Replicas = ptr.To(int32(1))
 	spec.ArbitraryFSAccessThroughSMs = prometheusv1.ArbitraryFSAccessThroughSMsConfig{
 		Deny: true,
 	}
 	spec.Image = &p.PrometheusImage
 	spec.Version = ""
 	spec.ServiceAccountName = p.Name
-	spec.WALCompression = toPtr(true)
+	spec.WALCompression = ptr.To(true)
 
 	return p
 }
@@ -61,7 +62,7 @@ func (p *PrometheusAgentBuilder) setPrometheusRemoteWriteConfig() *PrometheusAge
 func (p *PrometheusAgentBuilder) createRemoteWriteSpec() prometheusv1.RemoteWriteSpec {
 	return prometheusv1.RemoteWriteSpec{
 		URL:           p.RemoteWriteEndpoint,
-		RemoteTimeout: prometheusv1.Duration("30s"),
+		RemoteTimeout: ptr.To(prometheusv1.Duration("30s")),
 		TLSConfig: &prometheusv1.TLSConfig{
 			CAFile:   p.formatSecretPath(config.HubCASecretName, "ca.crt"),
 			CertFile: p.formatSecretPath(config.ClientCertSecretName, "tls.crt"),
@@ -75,12 +76,12 @@ func (p *PrometheusAgentBuilder) createRemoteWriteSpec() prometheusv1.RemoteWrit
 func (p *PrometheusAgentBuilder) createWriteRelabelConfigs() []prometheusv1.RelabelConfig {
 	return []prometheusv1.RelabelConfig{
 		{
-			Replacement: toPtr(p.ClusterName),
+			Replacement: ptr.To(p.ClusterName),
 			TargetLabel: "cluster",
 			Action:      "replace",
 		},
 		{
-			Replacement: toPtr(p.ClusterID),
+			Replacement: ptr.To(p.ClusterID),
 			TargetLabel: "clusterID",
 			Action:      "replace",
 		},
@@ -103,13 +104,13 @@ func (p *PrometheusAgentBuilder) createWriteRelabelConfigs() []prometheusv1.Rela
 
 func (p *PrometheusAgentBuilder) createQueueConfig() *prometheusv1.QueueConfig {
 	return &prometheusv1.QueueConfig{
-		BatchSendDeadline: toPtr(prometheusv1.Duration("15s")),
+		BatchSendDeadline: ptr.To(prometheusv1.Duration("15s")),
 		Capacity:          12000,
 		MaxShards:         3,
 		MinShards:         1,
 		MaxSamplesPerSend: 4000,
-		MinBackoff:        toPtr(prometheusv1.Duration("1s")),
-		MaxBackoff:        toPtr(prometheusv1.Duration("30s")),
+		MinBackoff:        ptr.To(prometheusv1.Duration("1s")),
+		MaxBackoff:        ptr.To(prometheusv1.Duration("30s")),
 		RetryOnRateLimit:  true,
 	}
 }
@@ -183,10 +184,10 @@ func (p *PrometheusAgentBuilder) createEnvoyContainer() corev1.Container {
 			},
 		},
 		SecurityContext: &corev1.SecurityContext{
-			RunAsNonRoot:             toPtr(true),
-			Privileged:               toPtr(false),
-			AllowPrivilegeEscalation: toPtr(false),
-			ReadOnlyRootFilesystem:   toPtr(true),
+			RunAsNonRoot:             ptr.To(true),
+			Privileged:               ptr.To(false),
+			AllowPrivilegeEscalation: ptr.To(false),
+			ReadOnlyRootFilesystem:   ptr.To(true),
 			Capabilities: &corev1.Capabilities{
 				Drop: []corev1.Capability{"ALL"},
 			},
@@ -206,8 +207,4 @@ func (b *PrometheusAgentBuilder) clearSelectors() {
 	spec.PodMonitorSelector = nil
 	spec.ProbeNamespaceSelector = nil
 	spec.ProbeSelector = nil
-}
-
-func toPtr[T any](v T) *T {
-	return &v
 }
