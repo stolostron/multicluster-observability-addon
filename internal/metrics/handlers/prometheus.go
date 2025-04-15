@@ -101,7 +101,7 @@ func (p *PrometheusAgentBuilder) createWriteRelabelConfigs() []prometheusv1.Rela
 				Regex:        p.ClusterID,
 				TargetLabel:  string(isNotHcpTmpLabel),
 				Action:       "replace",
-				Replacement:  stringPtr("true"),
+				Replacement:  ptr.To("true"),
 			},
 			prometheusv1.RelabelConfig{
 				SourceLabels: []prometheusv1.LabelName{isNotHcpTmpLabel},

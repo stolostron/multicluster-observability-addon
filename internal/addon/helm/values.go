@@ -107,45 +107,6 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, logger logr.Logger) a
 	}
 }
 
-func getTracingValues(ctx context.Context, k8s client.Client, cluster *clusterv1.ManagedCluster, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, opts addon.Options) (*tmanifests.TracingValues, error) {
-	if opts.UserWorkloads.Traces.CollectionEnabled {
-		if isHubCluster(cluster) {
-			return nil, nil
-		}
-
-		tracingOpts, err := thandlers.BuildOptions(ctx, k8s, mcAddon, opts.UserWorkloads.Traces)
-		if err != nil {
-			return nil, err
-		}
-
-		tracing, err := tmanifests.BuildValues(tracingOpts)
-		if err != nil {
-			return nil, err
-		}
-
-		return &tracing, nil
-	}
-
-	return nil, nil
-}
-
-func getLoggingValues(ctx context.Context, k8s client.Client, cluster *clusterv1.ManagedCluster, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, opts addon.Options) (*lmanifests.LoggingValues, error) {
-	if isHubCluster(cluster) {
-		return nil, nil
-	}
-
-	if opts.Platform.Logs.CollectionEnabled || opts.UserWorkloads.Logs.CollectionEnabled {
-		loggingOpts, err := lhandlers.BuildOptions(ctx, k8s, mcAddon, opts.Platform.Logs, opts.UserWorkloads.Logs)
-		if err != nil {
-			return nil, err
-		}
-
-		return lmanifests.BuildValues(loggingOpts)
-	}
-
-	return nil, nil
-}
-
 func getMonitoringValues(ctx context.Context, k8s client.Client, logger logr.Logger, cluster *clusterv1.ManagedCluster, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, opts addon.Options) (*mmanifests.MetricsValues, error) {
 	if opts.Platform.Metrics.CollectionEnabled || opts.UserWorkloads.Metrics.CollectionEnabled {
 		if opts.Platform.Metrics.HubEndpoint == nil || opts.Platform.Metrics.HubEndpoint.Host == "" {
@@ -168,6 +129,45 @@ func getMonitoringValues(ctx context.Context, k8s client.Client, logger logr.Log
 		}
 
 		return mmanifests.BuildValues(metricsOpts)
+	}
+
+	return nil, nil
+}
+
+func getLoggingValues(ctx context.Context, k8s client.Client, cluster *clusterv1.ManagedCluster, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, opts addon.Options) (*lmanifests.LoggingValues, error) {
+	if isHubCluster(cluster) {
+		return nil, nil
+	}
+
+	if opts.Platform.Logs.CollectionEnabled || opts.UserWorkloads.Logs.CollectionEnabled {
+		loggingOpts, err := lhandlers.BuildOptions(ctx, k8s, mcAddon, opts.Platform.Logs, opts.UserWorkloads.Logs)
+		if err != nil {
+			return nil, err
+		}
+
+		return lmanifests.BuildValues(loggingOpts)
+	}
+
+	return nil, nil
+}
+
+func getTracingValues(ctx context.Context, k8s client.Client, cluster *clusterv1.ManagedCluster, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, opts addon.Options) (*tmanifests.TracingValues, error) {
+	if opts.UserWorkloads.Traces.CollectionEnabled {
+		if isHubCluster(cluster) {
+			return nil, nil
+		}
+
+		tracingOpts, err := thandlers.BuildOptions(ctx, k8s, mcAddon, opts.UserWorkloads.Traces)
+		if err != nil {
+			return nil, err
+		}
+
+		tracing, err := tmanifests.BuildValues(tracingOpts)
+		if err != nil {
+			return nil, err
+		}
+
+		return &tracing, nil
 	}
 
 	return nil, nil

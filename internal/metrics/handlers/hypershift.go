@@ -18,6 +18,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -168,7 +169,7 @@ func (h *Hypershift) generateEtcdServiceMonitor(ctx context.Context, namespace s
 				{
 					TargetLabel: "job",
 					Action:      "replace",
-					Replacement: stringPtr("etcd"),
+					Replacement: ptr.To("etcd"),
 				},
 			},
 		})
@@ -218,7 +219,7 @@ func (h *Hypershift) generateApiServerServiceMonitor(ctx context.Context, namesp
 				{
 					TargetLabel: "job",
 					Action:      "replace",
-					Replacement: stringPtr("apiserver"),
+					Replacement: ptr.To("apiserver"),
 				},
 			},
 		})
@@ -348,7 +349,7 @@ func (h *Hypershift) generateMetricsRelabelConfigs(hostedCluster clusterIdentity
 		{
 			TargetLabel: config.ManagementClusterIDMetricLabel,
 			Action:      "replace",
-			Replacement: stringPtr(h.ManagedCluster.Labels[config.ManagedClusterLabelClusterID]),
+			Replacement: ptr.To(h.ManagedCluster.Labels[config.ManagedClusterLabelClusterID]),
 		},
 		{
 			TargetLabel: config.ManagementClusterNameMetricLabel,

@@ -235,7 +235,7 @@ var hostedClusterPredicate = builder.WithPredicates(predicate.Funcs{
 	UpdateFunc: func(e event.UpdateEvent) bool {
 		newHC := e.ObjectNew.(*hyperv1.HostedCluster)
 		oldHC := e.ObjectOld.(*hyperv1.HostedCluster)
-		return newHC.Spec.ClusterID == oldHC.Spec.ClusterID
+		return newHC.Spec.ClusterID != oldHC.Spec.ClusterID
 	},
 	CreateFunc:  func(e event.CreateEvent) bool { return true },
 	DeleteFunc:  func(e event.DeleteEvent) bool { return true },
