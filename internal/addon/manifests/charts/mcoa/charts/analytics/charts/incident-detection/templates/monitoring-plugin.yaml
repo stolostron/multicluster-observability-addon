@@ -8,4 +8,4 @@ spec:
     incidents:
       enabled: true
   type: Monitoring
-  {{- end }}
+{{- end }}
