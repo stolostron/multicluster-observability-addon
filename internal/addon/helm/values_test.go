@@ -41,7 +41,7 @@ func Test_Mcoa_Disabled(t *testing.T) {
 		expectedObjects       bool
 	}{
 		{
-			name: "ManagedCluster with correct labels but no configuration",
+			name: "ManagedCluster with correct labels and logging enabled",
 			managedClusterLabels: map[string]string{
 				"vendor": "OpenShift",
 			},
@@ -73,7 +73,7 @@ func Test_Mcoa_Disabled(t *testing.T) {
 					Value: string(addon.ClusterLogForwarderV1),
 				},
 			},
-			expectedObjects: false,
+			expectedObjects: true,
 		},
 		{
 			name: "ManagedCluster with unsupported kube vendor",

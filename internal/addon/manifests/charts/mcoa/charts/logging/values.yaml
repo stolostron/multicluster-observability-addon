@@ -2,6 +2,8 @@ nameOverride: null
 
 enabled: true
 
+skipOperatorInstall: false
+
 clfAnnotations: {}
 
 # Expects json format

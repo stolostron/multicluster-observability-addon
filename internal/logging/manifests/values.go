@@ -6,6 +6,7 @@ import (
 
 type LoggingValues struct {
 	Enabled                 bool            `json:"enabled"`
+	SkipOperatorInstall     bool            `json:"skipOperatorInstall"`
 	CLFAnnotations          string          `json:"clfAnnotations"`
 	CLFSpec                 string          `json:"clfSpec"`
 	ServiceAccountName      string          `json:"serviceAccountName"`
@@ -24,6 +25,13 @@ func BuildValues(opts Options) (*LoggingValues, error) {
 	}
 
 	values.OpenshiftLoggingChannel = buildSubscriptionChannel(opts)
+
+	if opts.ClusterLoggingSubscription != nil && opts.ClusterLoggingSubscription.Name != "" {
+		if opts.ClusterLoggingSubscription.Spec.Channel != values.OpenshiftLoggingChannel {
+			return nil, errInvalidSubscriptionChannel
+		}
+		values.SkipOperatorInstall = true
+	}
 
 	configmaps, err := buildConfigMaps(opts)
 	if err != nil {
