@@ -20,16 +20,20 @@ const (
 )
 
 var (
+	errMissingDefaultLSRef   = errors.New("missing LokiStack reference on addon installation for default stack")
+	errMissingDefaultCLFRef  = errors.New("missing ClusterLogForwarder reference on addon installation for default stack")
 	errMissingCLFRef         = errors.New("missing ClusterLogForwarder reference on addon installation")
 	errMultipleCLFRef        = errors.New("multiple ClusterLogForwarder references on addon installation")
 	errMissingImplementation = errors.New("missing secret implementation for output type")
 	errMissingField          = errors.New("missing field needed by output type")
 )
 
-func BuildOptions(ctx context.Context, k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, platform, userWorkloads addon.LogsOptions) (manifests.Options, error) {
+func BuildOptions(ctx context.Context, k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, platform, userWorkloads addon.LogsOptions, isHubCluster bool, hubHostname string) (manifests.Options, error) {
 	opts := manifests.Options{
 		Platform:      platform,
 		UserWorkloads: userWorkloads,
+		IsHubCluster:  isHubCluster,
+		HubHostname:   hubHostname,
 	}
 
 	if platform.SubscriptionChannel != "" {
@@ -38,25 +42,45 @@ func BuildOptions(ctx context.Context, k8s client.Client, mcAddon *addonapiv1alp
 		opts.SubscriptionChannel = userWorkloads.SubscriptionChannel
 	}
 
+	if err := createDefaultStackCertificates(ctx, k8s, mcAddon, opts); err != nil {
+		return opts, err
+	}
+
+	if err := buildUnmagedOptions(ctx, k8s, mcAddon, &opts); err != nil {
+		return opts, err
+	}
+
+	if err := buildDefaultStackOptions(ctx, k8s, mcAddon, &opts); err != nil {
+		return opts, err
+	}
+
+	return opts, nil
+}
+
+func buildUnmagedOptions(ctx context.Context, k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, opts *manifests.Options) error {
+	if !opts.UnmanagedCollectionEnabled() {
+		return nil
+	}
+
 	keys := common.GetObjectKeys(mcAddon.Status.ConfigReferences, loggingv1.GroupVersion.Group, addon.ClusterLogForwardersResource)
 	switch {
 	case len(keys) == 0:
-		return opts, errMissingCLFRef
+		return errMissingCLFRef
 	case len(keys) > 1:
-		return opts, errMultipleCLFRef
+		return errMultipleCLFRef
 	}
 	clf := &loggingv1.ClusterLogForwarder{}
 	if err := k8s.Get(ctx, keys[0], clf, &client.GetOptions{}); err != nil {
-		return opts, err
+		return err
 	}
-	opts.ClusterLogForwarder = clf
+	opts.Unmanaged.Collection.ClusterLogForwarder = clf
 
 	secretNames := []string{}
 	configmapNames := []string{}
 	for _, output := range clf.Spec.Outputs {
 		extractedSecretsNames, extracedConfigmapNames, err := getOutputResourcesNames(output)
 		if err != nil {
-			return opts, err
+			return err
 		}
 		secretNames = append(secretNames, extractedSecretsNames...)
 		configmapNames = append(configmapNames, extracedConfigmapNames...)
@@ -64,17 +88,17 @@ func BuildOptions(ctx context.Context, k8s client.Client, mcAddon *addonapiv1alp
 
 	secrets, err := common.GetSecrets(ctx, k8s, clf.Namespace, mcAddon.Namespace, secretNames)
 	if err != nil {
-		return opts, err
+		return err
 	}
-	opts.Secrets = secrets
+	opts.Unmanaged.Collection.Secrets = secrets
 
 	configMaps, err := common.GetConfigMaps(ctx, k8s, clf.Namespace, mcAddon.Namespace, configmapNames)
 	if err != nil {
-		return opts, err
+		return err
 	}
-	opts.ConfigMaps = configMaps
+	opts.Unmanaged.Collection.ConfigMaps = configMaps
 
-	return opts, nil
+	return nil
 }
 
 func getOutputResourcesNames(output loggingv1.OutputSpec) ([]string, []string, error) {

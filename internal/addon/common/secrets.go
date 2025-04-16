@@ -17,21 +17,29 @@ import (
 func GetSecrets(ctx context.Context, k8s client.Client, configResourceNamespace string, addonNamespace string, secretNames []string) ([]corev1.Secret, error) {
 	secrets := []corev1.Secret{}
 	for _, secretName := range secretNames {
-		secret := &corev1.Secret{}
-		key := client.ObjectKey{Name: secretName, Namespace: addonNamespace}
-		err := k8s.Get(ctx, key, secret, &client.GetOptions{})
-		switch {
-		case apierrors.IsNotFound(err):
-			key = client.ObjectKey{Name: secretName, Namespace: configResourceNamespace}
-			err = k8s.Get(ctx, key, secret, &client.GetOptions{})
-			if err != nil {
-				return nil, fmt.Errorf("failed to get existing secret with key %s/%s: %w", key.Namespace, key.Name, err)
-			}
-		case err != nil:
-			return nil, fmt.Errorf("failed to get existing secret with key %s/%s: %w", key.Namespace, key.Name, err)
+		secret, err := GetSecret(ctx, k8s, configResourceNamespace, addonNamespace, secretName)
+		if err != nil {
+			return nil, err
 		}
 		secrets = append(secrets, *secret)
 	}
 
 	return secrets, nil
+}
+
+func GetSecret(ctx context.Context, k8s client.Client, configResourceNamespace string, addonNamespace string, secretName string) (*corev1.Secret, error) {
+	secret := &corev1.Secret{}
+	key := client.ObjectKey{Name: secretName, Namespace: addonNamespace}
+	err := k8s.Get(ctx, key, secret, &client.GetOptions{})
+	switch {
+	case apierrors.IsNotFound(err):
+		key = client.ObjectKey{Name: secretName, Namespace: configResourceNamespace}
+		err = k8s.Get(ctx, key, secret, &client.GetOptions{})
+		if err != nil {
+			return nil, fmt.Errorf("failed to get existing secret with key %s/%s: %w", key.Namespace, key.Name, err)
+		}
+	case err != nil:
+		return nil, fmt.Errorf("failed to get existing secret with key %s/%s: %w", key.Namespace, key.Name, err)
+	}
+	return secret, nil
 }

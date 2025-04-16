@@ -21,7 +21,7 @@ func buildSubscriptionChannel(resources Options) string {
 
 func buildConfigMaps(resources Options) ([]ResourceValue, error) {
 	configmapsValue := []ResourceValue{}
-	for _, configmap := range resources.ConfigMaps {
+	for _, configmap := range resources.Unmanaged.Collection.ConfigMaps {
 		dataJSON, err := json.Marshal(configmap.Data)
 		if err != nil {
 			return configmapsValue, err
@@ -37,7 +37,7 @@ func buildConfigMaps(resources Options) ([]ResourceValue, error) {
 
 func buildSecrets(resources Options) ([]ResourceValue, error) {
 	secretsValue := []ResourceValue{}
-	for _, secret := range resources.Secrets {
+	for _, secret := range resources.Unmanaged.Collection.Secrets {
 		dataJSON, err := json.Marshal(secret.Data)
 		if err != nil {
 			return secretsValue, err
@@ -52,7 +52,7 @@ func buildSecrets(resources Options) ([]ResourceValue, error) {
 }
 
 func buildClusterLogForwarderSpec(opts Options) (*loggingv1.ClusterLogForwarderSpec, error) {
-	clf := opts.ClusterLogForwarder
+	clf := opts.Unmanaged.Collection.ClusterLogForwarder
 	clf.Spec.ManagementState = loggingv1.ManagementStateManaged
 
 	// Validate Platform Logs enabled
