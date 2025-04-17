@@ -1,0 +1,10 @@
+apiVersion: v2
+description: A Helm chart for installing observability analytics features
+name: analytics
+version: 1.0.0
+appVersion: "1.0.0"
+
+dependencies:
+- name: incidentDetection
+  repository: 'file://./charts/incident-detection'
+  condition: incidentDetection.enabled

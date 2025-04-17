@@ -9,6 +9,9 @@ import (
 	clusterlifecycleconstants "github.com/stolostron/cluster-lifecycle-api/constants"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
+	analytics "github.com/stolostron/multicluster-observability-addon/internal/analytics"
+	ihandlers "github.com/stolostron/multicluster-observability-addon/internal/analytics/incident-detection/handlers"
+	imanifests "github.com/stolostron/multicluster-observability-addon/internal/analytics/incident-detection/manifests"
 	lhandlers "github.com/stolostron/multicluster-observability-addon/internal/logging/handlers"
 	lmanifests "github.com/stolostron/multicluster-observability-addon/internal/logging/manifests"
 	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
@@ -31,11 +34,12 @@ var (
 )
 
 type HelmChartValues struct {
-	Enabled bool                     `json:"enabled"`
-	Metrics mmanifests.MetricsValues `json:"metrics"`
-	Logging lmanifests.LoggingValues `json:"logging"`
-	Tracing tmanifests.TracingValues `json:"tracing"`
-	ObsUI   uimanifests.UIValues     `json:"obsUI"`
+	Enabled   bool                      `json:"enabled"`
+	Metrics   mmanifests.MetricsValues  `json:"metrics"`
+	Logging   lmanifests.LoggingValues  `json:"logging"`
+	Tracing   tmanifests.TracingValues  `json:"tracing"`
+	Analytics analytics.AnalyticsValues `json:"analytics"`
+	ObsUI     uimanifests.UIValues      `json:"obsUI"`
 }
 
 func GetValuesFunc(ctx context.Context, k8s client.Client, logger logr.Logger) addonfactory.GetValuesFunc {
@@ -129,6 +133,11 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, logger logr.Logger) a
 				return nil, err
 			}
 			userValues.ObsUI = obsUI
+		}
+		if opts.Platform.AnalyticsOptions.IncidentDetection.Enabled {
+			incDecOptions := ihandlers.BuildOptions(ctx, k8s, mcAddon, opts.Platform.AnalyticsOptions.IncidentDetection)
+			userValues.Analytics.IncidentDetectionValues = *imanifests.BuildValues(incDecOptions)
+
 		}
 
 		return addonfactory.JsonStructToValues(userValues)
