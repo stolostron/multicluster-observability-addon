@@ -11,6 +11,7 @@ VERSION ?= v0.0.1
 
 CRD_DIR := $(shell pwd)/deploy/crds
 BIN_DIR := $(CURDIR)/bin
+CONTAINER_ENGINE ?= $(shell which podman 2>/dev/null || which docker 2>/dev/null)
 
 # REGISTRY_BASE
 # defines the container registry and organization for the bundle and operator container images.
@@ -76,11 +77,11 @@ addon: deps fmt ## Build addon binary
 
 .PHONY: oci-build
 oci-build: ## Build the image
-	podman build -t ${IMG} .
+	$(CONTAINER_ENGINE) build -t ${IMG} .
 
 .PHONY: oci-push
 oci-push: ## Push the image
-	podman push ${IMG}
+	$(CONTAINER_ENGINE) push ${IMG}
 
 .PHONY: oci
 oci: oci-build oci-push

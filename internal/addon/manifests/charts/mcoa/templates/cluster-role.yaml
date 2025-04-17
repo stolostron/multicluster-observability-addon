@@ -16,6 +16,6 @@ rules:
     resources: ["operatorgroups"]
     verbs: ["get", "list", "watch", "create", "update", "delete", "patch"]
   - apiGroups: ["monitoring.coreos.com"]
-    resources: ["prometheusagents", "prometheusrules", "scrapeconfigs"]
+    resources: ["prometheusagents", "prometheusrules", "scrapeconfigs", "servicemonitors"]
     verbs: ["get", "list", "watch", "create", "update", "delete", "patch"]
 {{- end }}
