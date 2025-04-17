@@ -1,4 +1,4 @@
-# Note if your name is commented out, please make sure you firt request to be 
+# Note if your name is commented out, please make sure you first request to be 
 # added to the members of the stolostron org.
 aliases:
   multicluster-observability:
@@ -6,7 +6,6 @@ aliases:
     - moadz
     - philipgough
     - saswatamcode
-    - douglascamata
     - jacobbaungard
     - thibaultmg
     - coleenquadros
@@ -18,7 +17,6 @@ aliases:
     # - vparfonov
     # - Clee2691
     # Storage team members
-    - periklis
     - xperimental
     - JoaoBraveCoding
     - btaani
@@ -26,6 +24,7 @@ aliases:
   team-tracing:
     - pavolloffay
   #   - frzifus
-    - iblancasa
   #   - rubenvp8510
   #   - andreasgerstmayr
+  observability-intelligence:
+    - tremes 
