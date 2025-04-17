@@ -3,14 +3,13 @@ package resourcecreator
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/go-logr/logr"
 	lokiv1 "github.com/grafana/loki/operator/api/loki/v1"
 	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	lhandlers "github.com/stolostron/multicluster-observability-addon/internal/logging/handlers"
-	lmanifests "github.com/stolostron/multicluster-observability-addon/internal/logging/manifests"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
@@ -18,6 +17,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
@@ -115,31 +115,20 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 
 	objects := []client.Object{}
-	for _, placement := range cmao.Spec.InstallStrategy.Placements {
-		resourceName := fmt.Sprintf("%s-%s", addon.DefaultStackPrefix, placement.Name)
-		switch {
-		case opts.Platform.Logs.DefaultStack:
-			loggingOpts, err := lhandlers.DefaultStackOptions(ctx, r.Client, opts.Platform.Logs, opts.UserWorkloads.Logs, opts.HubHostname, resourceName)
-			if err != nil {
-				return ctrl.Result{}, err
-			}
-
-			clf, err := lmanifests.BuildSSAClusterLogForwarder(loggingOpts, resourceName)
-			if err != nil {
-				return ctrl.Result{}, err
-			}
-			objects = append(objects, clf)
-
-			ls, err := lmanifests.BuildSSALokiStack(loggingOpts, resourceName)
-			if err != nil {
-				return ctrl.Result{}, err
-			}
-			objects = append(objects, ls)
-		}
+	objs, err := lhandlers.BuildDefaultStackResources(ctx, r.Client, cmao, opts.Platform.Logs, opts.UserWorkloads.Logs, opts.HubHostname)
+	if err != nil {
+		return ctrl.Result{}, err
 	}
+	objects = append(objects, objs...)
 
 	// SSA the objects rendered
 	for _, obj := range objects {
+		err := controllerutil.SetControllerReference(cmao, obj, r.Scheme)
+		if err != nil {
+			klog.Error(err, "failed to set owner reference")
+			continue
+		}
+
 		if err := r.Patch(ctx, obj, client.Apply, client.ForceOwnership, client.FieldOwner(addon.Name)); err != nil {
 			klog.Error(err, "failed to configure resource")
 			continue
@@ -160,16 +149,32 @@ func (r *ResourceCreatorReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 func (r *ResourceCreatorReconciler) enqueueDefaultResources() handler.EventHandler {
 	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
-		if strings.HasPrefix(obj.GetName(), addon.DefaultStackPrefix) {
-			return []reconcile.Request{
-				{
-					NamespacedName: types.NamespacedName{
-						Name:      addon.Name,
-						Namespace: addon.InstallNamespace,
-					},
-				},
-			}
+		cmao := &addonv1alpha1.ClusterManagementAddOn{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "ClusterManagementAddOn",
+				APIVersion: addonv1alpha1.GroupVersion.String(),
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name: addon.Name,
+			},
 		}
-		return []reconcile.Request{}
+		hasOwnerRef, err := controllerutil.HasOwnerReference(obj.GetOwnerReferences(), cmao, r.Client.Scheme())
+		if err != nil {
+			r.Log.Error(err, "failed to check owner reference")
+			return []reconcile.Request{}
+		}
+
+		if !hasOwnerRef {
+			return []reconcile.Request{}
+		}
+
+		return []reconcile.Request{
+			{
+				NamespacedName: types.NamespacedName{
+					Name:      addon.Name,
+					Namespace: addon.InstallNamespace,
+				},
+			},
+		}
 	})
 }

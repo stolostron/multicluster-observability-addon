@@ -129,7 +129,7 @@ func BuildSSALokiStack(opts Options, lsName string) (*lokiv1.LokiStack, error) {
 	// we default otherwise we use the existing resource, since we are using SSA we only need to
 	// copy the required fields
 	if existingLS.Name == "" {
-		lokistackSpec.Size = lokiv1.SizeOneXDemo
+		lokistackSpec.Size = lokiv1.SizeOneXPico
 		lokistackSpec.StorageClassName = "gp3-csi"
 		lokistackSpec.Storage = lokiv1.ObjectStorageSpec{
 			Secret: lokiv1.ObjectStorageSecretSpec{
