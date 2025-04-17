@@ -14,6 +14,7 @@ const (
 	// Platform Observability Keys
 	KeyPlatformMetricsCollection = "platformMetricsCollection"
 	KeyPlatformLogsCollection    = "platformLogsCollection"
+	KeyPlatformIncidentDetection = "platformIncidentDetection"
 	KeyMetricsHubHostname        = "metricsHubHostname"
 
 	// User Workloads Observability Keys
@@ -21,7 +22,6 @@ const (
 	KeyUserWorkloadLogsCollection    = "userWorkloadLogsCollection"
 	KeyUserWorkloadTracesCollection  = "userWorkloadTracesCollection"
 	KeyUserWorkloadInstrumentation   = "userWorkloadInstrumentation"
-	KeyIncidentDetection             = "incidentDetection"
 )
 
 type CollectionKind string
@@ -36,6 +36,12 @@ type InstrumentationKind string
 
 const (
 	InstrumentationV1alpha1 InstrumentationKind = "instrumentations.v1alpha1.opentelemetry.io"
+)
+
+type UIKind string
+
+const (
+	UIPluginV1alpha1 UIKind = "uiplugins.v1alpha1.observability.openshift.io"
 )
 
 type MetricsOptions struct {
@@ -117,6 +123,11 @@ func BuildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Opti
 				opts.Platform.Enabled = true
 				opts.Platform.Logs.CollectionEnabled = true
 			}
+		case KeyPlatformIncidentDetection:
+			if keyvalue.Value == string(UIPluginV1alpha1) {
+				opts.Platform.Enabled = true
+				opts.Platform.AnalyticsOptions.IncidentDetection.Enabled = true
+			}
 		// User Workload Observability Options
 		case KeyUserWorkloadMetricsCollection:
 			if keyvalue.Value == string(PrometheusAgentV1alpha1) {
@@ -138,9 +149,6 @@ func BuildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Opti
 				opts.UserWorkloads.Enabled = true
 				opts.UserWorkloads.Traces.InstrumentationEnabled = true
 			}
-		case KeyIncidentDetection:
-			opts.Platform.Enabled = true
-			opts.Platform.AnalyticsOptions.IncidentDetection.Enabled = true
 		}
 	}
 	return opts, nil

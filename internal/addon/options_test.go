@@ -127,6 +127,26 @@ func TestBuildOptions(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "valid incident detection",
+			addOnDeploy: &addonapiv1alpha1.AddOnDeploymentConfig{
+				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
+					CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
+						{Name: KeyPlatformIncidentDetection, Value: string(UIPluginV1alpha1)},
+					},
+				},
+			},
+			expectedOpts: Options{
+				Platform: PlatformOptions{
+					Enabled: true,
+					AnalyticsOptions: AnalyticsOptions{
+						IncidentDetection: IncidentDetection{
+							Enabled: true,
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for _, tc := range testCases {
