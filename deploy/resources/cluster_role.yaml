@@ -66,6 +66,10 @@
       verbs: ["get", "list", "watch"]
     # Role for addon to perform metrics specific actions
     - apiGroups: ["monitoring.coreos.com"]
-      resources: ["scrapeconfigs", "prometheusagents", "prometheusrules"]
+      resources: ["scrapeconfigs", "prometheusagents", "prometheusrules", "servicemonitors"]
       verbs: ["get", "list", "watch"]
+    - apiGroups: ["hypershift.openshift.io"]
+      resources: ["hostedclusters"]
+      verbs: ["get", "list", "watch"]
+
 
