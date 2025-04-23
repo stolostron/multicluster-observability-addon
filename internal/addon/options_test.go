@@ -103,11 +103,11 @@ func TestBuildOptions(t *testing.T) {
 			addOnDeploy: &addonapiv1alpha1.AddOnDeploymentConfig{
 				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
 					CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
-						{Name: KeyMetricsHubHostname, Value: ":invalid-url"},
+						{Name: KeyMetricsHubHostname, Value: "://invalid-url"},
 					},
 				},
 			},
-			expectedErrMsg: "invalid metrics hub hostname: parse \"https://:invalid-url\": invalid port \":invalid-url\" after host",
+			expectedErrMsg: "invalid metrics hub hostname: invalid hostname format ':'",
 		},
 		{
 			name: "valid logs",
