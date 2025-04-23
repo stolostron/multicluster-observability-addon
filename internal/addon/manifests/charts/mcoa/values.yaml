@@ -12,4 +12,5 @@ tracing:
   enabled: true
 
 analytics:
-  enabled: true
+  incidentDetection:
+    enabled: true
