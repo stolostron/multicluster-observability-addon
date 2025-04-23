@@ -114,12 +114,11 @@ func BuildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Opti
 			if err != nil {
 				return opts, fmt.Errorf("%w: %s", errInvalidMetricsHubHostname, err.Error())
 			}
-			
+
 			// Hostname validation:
 			// - Check if host is empty
 			// - Check for invalid hostname formats like ":"
-			if strings.TrimSpace(url.Host) == "" || url.Host == ":" ||
-				strings.HasPrefix(url.Host, ":") {
+			if strings.TrimSpace(url.Host) == "" || url.Host == ":" || strings.HasPrefix(url.Host, ":") {
 				return opts, fmt.Errorf("%w: invalid hostname format '%s'", errInvalidMetricsHubHostname, url.Host)
 			}
 
