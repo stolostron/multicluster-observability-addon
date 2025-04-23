@@ -98,7 +98,7 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, logger logr.Logger) a
 		if incidentDetectionValues != nil {
 			userValues.Analytics.IncidentDetectionValues = *incidentDetectionValues
 		}
-		
+
 		return addonfactory.JsonStructToValues(userValues)
 	}
 }
@@ -159,7 +159,6 @@ func getTracingValues(ctx context.Context, k8s client.Client, cluster *clusterv1
 	}
 
 	return &tracing, nil
-
 }
 
 func getIncidentDetectionValues(ctx context.Context, k8s client.Client, cluster *clusterv1.ManagedCluster, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, opts addon.Options) *imanifests.IncidentDetectionValues {
