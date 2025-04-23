@@ -94,17 +94,28 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, logger logr.Logger) a
 			userValues.Tracing = *tracingValues
 		}
 
-		if metricsValues == nil && loggingValues == nil && tracingValues == nil {
-			return addonfactory.JsonStructToValues(HelmChartValues{})
+		analyticsValues := getAnalyticsValues(ctx, k8s, mcAddon, opts)
+		if analyticsValues != nil {
+			userValues.Analytics = *analyticsValues
 		}
 
-		if opts.Platform.AnalyticsOptions.IncidentDetection.Enabled {
-			incDecOptions := ihandlers.BuildOptions(ctx, k8s, mcAddon, opts.Platform.AnalyticsOptions.IncidentDetection)
-			userValues.Analytics.IncidentDetectionValues = *imanifests.BuildValues(incDecOptions)
+		if metricsValues == nil && loggingValues == nil && tracingValues == nil && analyticsValues == nil {
+			return addonfactory.JsonStructToValues(HelmChartValues{})
 		}
 
 		return addonfactory.JsonStructToValues(userValues)
 	}
+}
+
+func getAnalyticsValues(ctx context.Context, k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, opts addon.Options) *analytics.AnalyticsValues {
+	if opts.Platform.AnalyticsOptions.IncidentDetection.Enabled {
+		incDecOptions := ihandlers.BuildOptions(ctx, k8s, mcAddon, opts.Platform.AnalyticsOptions.IncidentDetection)
+		incidentDetectionValues := *imanifests.BuildValues(incDecOptions)
+		return &analytics.AnalyticsValues{
+			IncidentDetectionValues: incidentDetectionValues,
+		}
+	}
+	return nil
 }
 
 func getMonitoringValues(ctx context.Context, k8s client.Client, logger logr.Logger, cluster *clusterv1.ManagedCluster, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, opts addon.Options) (*mmanifests.MetricsValues, error) {
