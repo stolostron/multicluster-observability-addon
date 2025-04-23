@@ -3,6 +3,7 @@ package addon
 import (
 	"fmt"
 	"net/url"
+	"strings"
 
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 )
@@ -105,12 +106,13 @@ func BuildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Opti
 			opts.UserWorkloads.Logs.SubscriptionChannel = keyvalue.Value
 		// Platform Observability Options
 		case KeyMetricsHubHostname:
-			url, err := url.Parse(keyvalue.Value)
+			val := keyvalue.Value
+			if !strings.HasPrefix(keyvalue.Value, "http") {
+				val = "https://" + keyvalue.Value
+			}
+			url, err := url.Parse(val)
 			if err != nil {
 				return opts, fmt.Errorf("%w: %s", errInvalidMetricsHubHostname, err.Error())
-			}
-			if url.Scheme == "" {
-				url.Scheme = "https"
 			}
 			opts.Platform.Metrics.HubEndpoint = url
 		case KeyPlatformMetricsCollection:

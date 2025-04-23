@@ -45,7 +45,7 @@ func TestBuildOptions(t *testing.T) {
 					CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
 						{Name: KeyPlatformMetricsCollection, Value: string(PrometheusAgentV1alpha1)},
 						{Name: KeyUserWorkloadMetricsCollection, Value: string(PrometheusAgentV1alpha1)},
-						{Name: KeyMetricsHubHostname, Value: "https://metrics.example.com"},
+						{Name: KeyMetricsHubHostname, Value: "metrics.example.com"},
 					},
 				},
 			},
@@ -73,11 +73,11 @@ func TestBuildOptions(t *testing.T) {
 			addOnDeploy: &addonapiv1alpha1.AddOnDeploymentConfig{
 				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
 					CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
-						{Name: KeyMetricsHubHostname, Value: "://invalid-url"},
+						{Name: KeyMetricsHubHostname, Value: ":invalid-url"},
 					},
 				},
 			},
-			expectedErrMsg: "invalid metrics hub hostname: parse \"://invalid-url\": missing protocol scheme",
+			expectedErrMsg: "invalid metrics hub hostname: parse \"https://:invalid-url\": invalid port \":invalid-url\" after host",
 		},
 		{
 			name: "valid logs",
