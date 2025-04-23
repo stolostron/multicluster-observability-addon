@@ -3,6 +3,7 @@ package addon
 import (
 	"fmt"
 	"net/url"
+	"strings"
 
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 )
@@ -105,13 +106,22 @@ func BuildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Opti
 			opts.UserWorkloads.Logs.SubscriptionChannel = keyvalue.Value
 		// Platform Observability Options
 		case KeyMetricsHubHostname:
-			url, err := url.Parse(keyvalue.Value)
+			val := keyvalue.Value
+			if !strings.HasPrefix(val, "http") {
+				val = "https://" + val
+			}
+			url, err := url.Parse(val)
 			if err != nil {
 				return opts, fmt.Errorf("%w: %s", errInvalidMetricsHubHostname, err.Error())
 			}
-			if url.Scheme == "" {
-				url.Scheme = "https"
+
+			// Hostname validation:
+			// - Check if host is empty
+			// - Check for invalid hostname formats like ":"
+			if strings.TrimSpace(url.Host) == "" || url.Host == ":" || strings.HasPrefix(url.Host, ":") {
+				return opts, fmt.Errorf("%w: invalid hostname format '%s'", errInvalidMetricsHubHostname, url.Host)
 			}
+
 			opts.Platform.Metrics.HubEndpoint = url
 		case KeyPlatformMetricsCollection:
 			if keyvalue.Value == string(PrometheusAgentV1alpha1) {

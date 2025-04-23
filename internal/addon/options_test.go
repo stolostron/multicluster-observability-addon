@@ -39,6 +39,36 @@ func TestBuildOptions(t *testing.T) {
 			expectedOpts: Options{},
 		},
 		{
+			name: "valid metrics without scheme for hub",
+			addOnDeploy: &addonapiv1alpha1.AddOnDeploymentConfig{
+				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
+					CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
+						{Name: KeyPlatformMetricsCollection, Value: string(PrometheusAgentV1alpha1)},
+						{Name: KeyUserWorkloadMetricsCollection, Value: string(PrometheusAgentV1alpha1)},
+						{Name: KeyMetricsHubHostname, Value: "metrics.example.com"},
+					},
+				},
+			},
+			expectedOpts: Options{
+				Platform: PlatformOptions{
+					Enabled: true,
+					Metrics: MetricsOptions{
+						CollectionEnabled: true,
+						HubEndpoint: &url.URL{
+							Scheme: "https",
+							Host:   "metrics.example.com",
+						},
+					},
+				},
+				UserWorkloads: UserWorkloadOptions{
+					Enabled: true,
+					Metrics: MetricsOptions{
+						CollectionEnabled: true,
+					},
+				},
+			},
+		},
+		{
 			name: "valid metrics",
 			addOnDeploy: &addonapiv1alpha1.AddOnDeploymentConfig{
 				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
@@ -77,7 +107,7 @@ func TestBuildOptions(t *testing.T) {
 					},
 				},
 			},
-			expectedErrMsg: "invalid metrics hub hostname: parse \"://invalid-url\": missing protocol scheme",
+			expectedErrMsg: "invalid metrics hub hostname: invalid hostname format ':'",
 		},
 		{
 			name: "valid logs",
