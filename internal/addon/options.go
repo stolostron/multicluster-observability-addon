@@ -107,8 +107,8 @@ func BuildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Opti
 		// Platform Observability Options
 		case KeyMetricsHubHostname:
 			val := keyvalue.Value
-			if !strings.HasPrefix(keyvalue.Value, "http") {
-				val = "https://" + keyvalue.Value
+			if !strings.HasPrefix(val, "http") {
+				val = "https://" + val
 			}
 			url, err := url.Parse(val)
 			if err != nil {
