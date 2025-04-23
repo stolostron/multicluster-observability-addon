@@ -20,6 +20,7 @@ type Collector struct {
 	PrometheusAgent *prometheusalpha1.PrometheusAgent
 	ScrapeConfigs   []*prometheusalpha1.ScrapeConfig
 	Rules           []*prometheusv1.PrometheusRule
+	ServiceMonitors []*prometheusv1.ServiceMonitor // For deploying HCPs service monitor (user workloads)
 }
 
 type ImagesOptions struct {

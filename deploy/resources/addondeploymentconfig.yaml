@@ -31,3 +31,6 @@ spec:
   # Enables Opentelemetry Instrumentation
   - name: userWorkloadInstrumentation
     value: instrumentations.v1alpha1.opentelemetry.io
+  # Enables Incident Detection
+  - name: platformIncidentDetection
+    value: uiplugins.v1alpha1.observability.openshift.io

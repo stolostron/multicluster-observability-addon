@@ -1,0 +1,11 @@
+{{- if eq (include "mcoahelm.installCOO" .) "true" }}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: openshift-cluster-observability-operator
+  labels:
+    app: {{ template "mcoahelm.name" . }}
+    chart: {{ template "mcoahelm.chart" . }}
+    release: {{ .Release.Name }}
+    openshift.io/cluster-monitoring: "true"
+{{- end }}

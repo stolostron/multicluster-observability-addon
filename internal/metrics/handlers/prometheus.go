@@ -14,15 +14,16 @@ import (
 
 // PrometheusAgentBuilder applies configuration and invariants to an existing PrometheusAgent
 type PrometheusAgentBuilder struct {
-	Agent               *prometheusalpha1.PrometheusAgent
-	Name                string
-	RemoteWriteEndpoint string
-	ClusterName         string
-	ClusterID           string
-	EnvoyConfigMapName  string
-	EnvoyProxyImage     string
-	PrometheusImage     string
-	MatchLabels         map[string]string
+	Agent                    *prometheusalpha1.PrometheusAgent
+	Name                     string
+	RemoteWriteEndpoint      string
+	ClusterName              string
+	ClusterID                string
+	EnvoyConfigMapName       string
+	EnvoyProxyImage          string
+	PrometheusImage          string
+	MatchLabels              map[string]string
+	IsHypershiftLocalCluster bool
 }
 
 // Build applies all configurations and invariants to the existing PrometheusAgent
@@ -74,32 +75,79 @@ func (p *PrometheusAgentBuilder) createRemoteWriteSpec() prometheusv1.RemoteWrit
 }
 
 func (p *PrometheusAgentBuilder) createWriteRelabelConfigs() []prometheusv1.RelabelConfig {
-	return []prometheusv1.RelabelConfig{
-		{
-			Replacement: ptr.To(p.ClusterName),
-			TargetLabel: "cluster",
-			Action:      "replace",
-		},
-		{
-			Replacement: ptr.To(p.ClusterID),
-			TargetLabel: "clusterID",
-			Action:      "replace",
-		},
-		{
+	ret := make([]prometheusv1.RelabelConfig, 0, 7)
+	if p.IsHypershiftLocalCluster {
+		// Don't overwrite the clusterID label as some are set to the hosted cluster ID (for hosted etcd and apiserver)
+		// These rules ensure that the correct management cluster labels are set if the clusterID label differs from the current cluster one.
+		// If the clusterID it the current cluster one, nothing is done.
+		var isNotHcpTmpLabel prometheusv1.LabelName = "__tmp_is_not_hcp"
+		ret = append(ret,
+			prometheusv1.RelabelConfig{
+				SourceLabels: []prometheusv1.LabelName{config.ClusterIDMetricLabel},
+				Regex:        "^$", // Is empty
+				TargetLabel:  config.ClusterNameMetricLabel,
+				Action:       "replace",
+				Replacement:  &p.ClusterName,
+			},
+			prometheusv1.RelabelConfig{
+				SourceLabels: []prometheusv1.LabelName{config.ClusterIDMetricLabel},
+				Regex:        "^$", // Is empty
+				TargetLabel:  config.ClusterIDMetricLabel,
+				Action:       "replace",
+				Replacement:  &p.ClusterID,
+			},
+			prometheusv1.RelabelConfig{
+				SourceLabels: []prometheusv1.LabelName{config.ClusterIDMetricLabel},
+				Regex:        p.ClusterID,
+				TargetLabel:  string(isNotHcpTmpLabel),
+				Action:       "replace",
+				Replacement:  ptr.To("true"),
+			},
+			prometheusv1.RelabelConfig{
+				SourceLabels: []prometheusv1.LabelName{isNotHcpTmpLabel},
+				Regex:        "^$", // Is not the current clusterID and is not empty
+				TargetLabel:  config.ManagementClusterIDMetricLabel,
+				Action:       "replace",
+				Replacement:  &p.ClusterID,
+			},
+			prometheusv1.RelabelConfig{
+				SourceLabels: []prometheusv1.LabelName{isNotHcpTmpLabel},
+				Regex:        "^$", // Is not the current clusterID and is not empty
+				TargetLabel:  config.ManagementClusterNameMetricLabel,
+				Action:       "replace",
+				Replacement:  &p.ClusterName,
+			},
+		)
+	} else {
+		// If not hypershift hub, enforce the clusterID and Name on all metrics
+		ret = append(ret,
+			prometheusv1.RelabelConfig{
+				Replacement: ptr.To(p.ClusterName),
+				TargetLabel: config.ClusterNameMetricLabel,
+				Action:      "replace",
+			},
+			prometheusv1.RelabelConfig{
+				Replacement: ptr.To(p.ClusterID),
+				TargetLabel: config.ClusterIDMetricLabel,
+				Action:      "replace",
+			})
+	}
+
+	return append(ret,
+		prometheusv1.RelabelConfig{
 			SourceLabels: []prometheusv1.LabelName{"exported_job"},
 			TargetLabel:  "job",
 			Action:       "replace",
 		},
-		{
+		prometheusv1.RelabelConfig{
 			SourceLabels: []prometheusv1.LabelName{"exported_instance"},
 			TargetLabel:  "instance",
 			Action:       "replace",
 		},
-		{
+		prometheusv1.RelabelConfig{
 			Regex:  "exported_job|exported_instance",
 			Action: "labeldrop",
-		},
-	}
+		})
 }
 
 func (p *PrometheusAgentBuilder) createQueueConfig() *prometheusv1.QueueConfig {

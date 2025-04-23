@@ -3,6 +3,7 @@ package addon
 import (
 	"fmt"
 	"net/url"
+	"strings"
 
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 )
@@ -14,6 +15,7 @@ const (
 	// Platform Observability Keys
 	KeyPlatformMetricsCollection = "platformMetricsCollection"
 	KeyPlatformLogsCollection    = "platformLogsCollection"
+	KeyPlatformIncidentDetection = "platformIncidentDetection"
 	KeyMetricsHubHostname        = "metricsHubHostname"
 
 	// User Workloads Observability Keys
@@ -37,9 +39,19 @@ const (
 	InstrumentationV1alpha1 InstrumentationKind = "instrumentations.v1alpha1.opentelemetry.io"
 )
 
+type UIKind string
+
+const (
+	UIPluginV1alpha1 UIKind = "uiplugins.v1alpha1.observability.openshift.io"
+)
+
 type MetricsOptions struct {
 	CollectionEnabled bool
 	HubEndpoint       *url.URL
+}
+
+type IncidentDetection struct {
+	Enabled bool
 }
 
 type LogsOptions struct {
@@ -54,9 +66,14 @@ type TracesOptions struct {
 }
 
 type PlatformOptions struct {
-	Enabled bool
-	Metrics MetricsOptions
-	Logs    LogsOptions
+	Enabled          bool
+	Metrics          MetricsOptions
+	Logs             LogsOptions
+	AnalyticsOptions AnalyticsOptions
+}
+
+type AnalyticsOptions struct {
+	IncidentDetection IncidentDetection
 }
 
 type UserWorkloadOptions struct {
@@ -89,13 +106,22 @@ func BuildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Opti
 			opts.UserWorkloads.Logs.SubscriptionChannel = keyvalue.Value
 		// Platform Observability Options
 		case KeyMetricsHubHostname:
-			url, err := url.Parse(keyvalue.Value)
+			val := keyvalue.Value
+			if !strings.HasPrefix(val, "http") {
+				val = "https://" + val
+			}
+			url, err := url.Parse(val)
 			if err != nil {
 				return opts, fmt.Errorf("%w: %s", errInvalidMetricsHubHostname, err.Error())
 			}
-			if url.Scheme == "" {
-				url.Scheme = "https"
+
+			// Hostname validation:
+			// - Check if host is empty
+			// - Check for invalid hostname formats like ":"
+			if strings.TrimSpace(url.Host) == "" || url.Host == ":" || strings.HasPrefix(url.Host, ":") {
+				return opts, fmt.Errorf("%w: invalid hostname format '%s'", errInvalidMetricsHubHostname, url.Host)
 			}
+
 			opts.Platform.Metrics.HubEndpoint = url
 		case KeyPlatformMetricsCollection:
 			if keyvalue.Value == string(PrometheusAgentV1alpha1) {
@@ -106,6 +132,11 @@ func BuildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Opti
 			if keyvalue.Value == string(ClusterLogForwarderV1) {
 				opts.Platform.Enabled = true
 				opts.Platform.Logs.CollectionEnabled = true
+			}
+		case KeyPlatformIncidentDetection:
+			if keyvalue.Value == string(UIPluginV1alpha1) {
+				opts.Platform.Enabled = true
+				opts.Platform.AnalyticsOptions.IncidentDetection.Enabled = true
 			}
 		// User Workload Observability Options
 		case KeyUserWorkloadMetricsCollection:

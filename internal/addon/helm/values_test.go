@@ -8,6 +8,7 @@ import (
 	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
 	operatorsv1 "github.com/operator-framework/api/pkg/operators/v1"
 	operatorsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
+	uiplugin "github.com/rhobs/observability-operator/pkg/apis/uiplugin/v1alpha1"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -31,6 +32,7 @@ var (
 	_ = operatorsv1alpha1.AddToScheme(scheme.Scheme)
 	_ = addonapiv1alpha1.AddToScheme(scheme.Scheme)
 	_ = apiextensionsv1.AddToScheme(scheme.Scheme)
+	_ = uiplugin.AddToScheme(scheme.Scheme)
 )
 
 func Test_Mcoa_Disabled(t *testing.T) {
@@ -41,7 +43,7 @@ func Test_Mcoa_Disabled(t *testing.T) {
 		expectedObjects       bool
 	}{
 		{
-			name: "ManagedCluster with correct labels and logging enabled",
+			name: "ManagedCluster with correct labels and platform log configuration",
 			managedClusterLabels: map[string]string{
 				"vendor": "OpenShift",
 			},
