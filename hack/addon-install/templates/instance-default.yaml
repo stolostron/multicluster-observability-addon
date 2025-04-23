@@ -15,10 +15,10 @@ spec:
           type: awsAccessKey
           awsAccessKey:
             keyId:
-              secretName: aws-credentials-default
+              secretName: aws-credentials
               key: aws_access_key_id
             keySecret:
-              secretName: aws-credentials-default
+              secretName: aws-credentials
               key: aws_secret_access_key
      type: cloudwatch
      name: cw
