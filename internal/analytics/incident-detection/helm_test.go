@@ -50,9 +50,8 @@ func fakeGetValues(ctx context.Context, k8s client.Client) addonfactory.GetValue
 		}
 
 		opts := handlers.BuildOptions(ctx, k8s, mcAddon, addonOpts.Platform.AnalyticsOptions.IncidentDetection)
-		incidentDetectionValues := manifests.BuildValues(opts)
 		analyticsValues := &analytics.AnalyticsValues{
-			IncidentDetectionValues: *incidentDetectionValues,
+			IncidentDetectionValues: manifests.BuildValues(opts),
 		}
 
 		return addonfactory.JsonStructToValues(analyticsValues)

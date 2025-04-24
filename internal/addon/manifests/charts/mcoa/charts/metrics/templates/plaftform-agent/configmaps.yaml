@@ -1,3 +1,4 @@
+{{- if .Values.platformEnabled }}
 {{- range $_, $configmap := .Values.platform.configMaps }}
 apiVersion: v1
 kind: ConfigMap
@@ -12,4 +13,5 @@ metadata:
     {{- toYaml $mergedLabels | nindent 4 }}
 data: {{ fromJson $configmap.data | toYaml | nindent 2 }}
 ---
+{{- end }}
 {{- end }}
