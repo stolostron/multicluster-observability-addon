@@ -7,9 +7,11 @@ import (
 	"slices"
 
 	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
+	operatorv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
 	"github.com/stolostron/multicluster-observability-addon/internal/logging/manifests"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -26,7 +28,7 @@ var (
 	errMissingField          = errors.New("missing field needed by output type")
 )
 
-func BuildOptions(ctx context.Context, k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, platform, userWorkloads addon.LogsOptions) (manifests.Options, error) {
+func BuildOptions(ctx context.Context, k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, platform, userWorkloads addon.LogsOptions, isHub bool) (manifests.Options, error) {
 	opts := manifests.Options{
 		Platform:      platform,
 		UserWorkloads: userWorkloads,
@@ -73,6 +75,17 @@ func BuildOptions(ctx context.Context, k8s client.Client, mcAddon *addonapiv1alp
 		return opts, err
 	}
 	opts.ConfigMaps = configMaps
+
+	// Currently we are only able to access the cluster-logging subscription in the hub
+	// since we don't have k8s clients for the spokes
+	if isHub {
+		subscription := &operatorv1alpha1.Subscription{}
+		key := client.ObjectKey{Name: manifests.CloSubscriptionInstallName, Namespace: manifests.CloSubscriptionInstallNamespace}
+		if err := k8s.Get(ctx, key, subscription, &client.GetOptions{}); err != nil && !k8serrors.IsNotFound(err) {
+			return opts, fmt.Errorf("failed to get cluster-logging subscription: %w", err)
+		}
+		opts.ClusterLoggingSubscription = subscription
+	}
 
 	return opts, nil
 }
