@@ -41,7 +41,7 @@ type HelmChartValues struct {
 	Logging   *lmanifests.LoggingValues `json:"logging,omitempty"`
 	Tracing   *tmanifests.TracingValues `json:"tracing,omitempty"`
 	Analytics analytics.AnalyticsValues `json:"analytics"`
-	ObsUI     uimanifests.UIValues      `json:"obsUI"`
+	ObsUI     *uimanifests.UIValues     `json:"obsUI"`
 }
 
 func GetValuesFunc(ctx context.Context, k8s client.Client, logger logr.Logger) addonfactory.GetValuesFunc {
@@ -87,11 +87,8 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, logger logr.Logger) a
 		if err != nil {
 			return nil, err
 		}
-    
-		obsUIValues := getObservabilityUIValues(ctx, k8s, cluster, mcAddon, opts)
-		if obsUIValues != nil {
-			userValues.ObsUI = *obsUIValues
-		}
+
+		userValues.ObsUI = getObservabilityUIValues(ctx, k8s, cluster, mcAddon, opts)
 
 		userValues.Analytics.IncidentDetectionValues = getIncidentDetectionValues(ctx, k8s, cluster, mcAddon, opts)
 
