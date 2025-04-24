@@ -65,9 +65,14 @@ type UserWorkloadOptions struct {
 	Traces  TracesOptions
 }
 
+type ObsUIOptions struct {
+	Enabled bool
+}
+
 type Options struct {
 	Platform      PlatformOptions
 	UserWorkloads UserWorkloadOptions
+	ObsUI         ObsUIOptions
 }
 
 func BuildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Options, error) {

@@ -1,0 +1,2 @@
+# enable UI plugin only when logging UI is enabled
+if

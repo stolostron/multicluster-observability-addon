@@ -18,6 +18,7 @@ import (
 	prometheusv1alpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	addonctrl "github.com/rhobs/multicluster-observability-addon/internal/controllers/addon"
 	"github.com/rhobs/multicluster-observability-addon/internal/controllers/watcher"
+	uiplugin "github.com/rhobs/observability-operator/pkg/apis/uiplugin/v1alpha1"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -47,7 +48,7 @@ func init() {
 	utilruntime.Must(clusterv1.AddToScheme(scheme))
 	utilruntime.Must(prometheusv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(prometheusv1.AddToScheme(scheme))
-
+	utilruntime.Must(uiplugin.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 }
 

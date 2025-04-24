@@ -13,6 +13,8 @@ import (
 	mhandlers "github.com/rhobs/multicluster-observability-addon/internal/metrics/handlers"
 	mmanifests "github.com/rhobs/multicluster-observability-addon/internal/metrics/manifests"
 	mresource "github.com/rhobs/multicluster-observability-addon/internal/metrics/resource"
+	uihandlers "github.com/rhobs/multicluster-observability-addon/internal/observability_ui/handlers"
+	uimanifests "github.com/rhobs/multicluster-observability-addon/internal/observability_ui/manifests"
 	thandlers "github.com/rhobs/multicluster-observability-addon/internal/tracing/handlers"
 	tmanifests "github.com/rhobs/multicluster-observability-addon/internal/tracing/manifests"
 	clusterinfov1beta1 "github.com/stolostron/cluster-lifecycle-api/clusterinfo/v1beta1"
@@ -35,6 +37,7 @@ type HelmChartValues struct {
 	Metrics mmanifests.MetricsValues `json:"metrics"`
 	Logging lmanifests.LoggingValues `json:"logging"`
 	Tracing tmanifests.TracingValues `json:"tracing"`
+	ObsUI   uimanifests.UIValues     `json:"obsUI"`
 }
 
 func GetValuesFunc(ctx context.Context, k8s client.Client, logger logr.Logger) addonfactory.GetValuesFunc {
@@ -120,6 +123,18 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, logger logr.Logger) a
 				return nil, err
 			}
 			userValues.Tracing = tracing
+		}
+
+		if opts.ObsUI.Enabled {
+			uiOpts, err := uihandlers.BuildOptions(ctx, k8s, mcAddon, opts.ObsUI)
+			if err != nil {
+				return nil, err
+			}
+			obsUI, err := uimanifests.BuildValues(uiOpts)
+			if err != nil {
+				return nil, err
+			}
+			userValues.ObsUI = obsUI
 		}
 
 		return addonfactory.JsonStructToValues(userValues)
