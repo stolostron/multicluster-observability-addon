@@ -1,7 +1,7 @@
 package manifests
 
 import (
-	"github.com/rhobs/multicluster-observability-addon/internal/addon"
+	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 )
 
 type UIValues struct {

@@ -1,7 +1,8 @@
 package handlers
 
 import (
-	"github.com/rhobs/multicluster-observability-addon/internal/addon"
+	"context"
+	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/observability_ui/manifests"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 )
