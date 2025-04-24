@@ -21,11 +21,17 @@ const (
 
 	ManagedClusterLabelClusterID = "clusterID"
 
+	// Monitoring resources (meta monitoring)
+	PlatformRBACProxyTLSSecret = "prometheus-agent-kube-rbac-proxy-tls"
+	RBACProxyPort              = 9092
+
+	// Standard metrics label names
 	ClusterNameMetricLabel           = "cluster"
 	ClusterIDMetricLabel             = "clusterID"
 	ManagementClusterNameMetricLabel = "managementcluster"
 	ManagementClusterIDMetricLabel   = "managementclusterID"
 
+	// Hypershift
 	LocalManagedClusterLabel              = "local-cluster"
 	HypershiftAddonStateLabel             = "feature.open-cluster-management.io/addon-hypershift-addon"
 	HypershiftEtcdServiceMonitorName      = "etcd"

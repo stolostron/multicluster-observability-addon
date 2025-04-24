@@ -1,0 +1,20 @@
+{{- if .Values.platformEnabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.platform.appName }}
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    service.beta.openshift.io/serving-cert-secret-name: {{ .Values.platform.rbacProxyTlsSecret }}
+  labels:
+    app.kubernetes.io/component: platform-metrics-collector
+    app.kubernetes.io/name: {{ .Values.platform.appName }}
+    {{ include "metricshelm.labels" . | nindent 4 }}
+spec:
+  ports:
+  - name: metrics
+    port: {{ .Values.platform.rbacProxyPort }}
+    targetPort: metrics
+  selector:
+    app.kubernetes.io/instance: acm-platform-metrics-collector
+{{- end }}
