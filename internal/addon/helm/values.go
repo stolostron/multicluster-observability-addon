@@ -18,6 +18,8 @@ import (
 	mhandlers "github.com/stolostron/multicluster-observability-addon/internal/metrics/handlers"
 	mmanifests "github.com/stolostron/multicluster-observability-addon/internal/metrics/manifests"
 	mresource "github.com/stolostron/multicluster-observability-addon/internal/metrics/resource"
+	uihandlers "github.com/stolostron/multicluster-observability-addon/internal/observability_ui/handlers"
+	uimanifests "github.com/stolostron/multicluster-observability-addon/internal/observability_ui/manifests"
 	thandlers "github.com/stolostron/multicluster-observability-addon/internal/tracing/handlers"
 	tmanifests "github.com/stolostron/multicluster-observability-addon/internal/tracing/manifests"
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
@@ -94,16 +96,9 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, logger logr.Logger) a
 		if tracingValues != nil {
 			userValues.Tracing = *tracingValues
 
-		if opts.ObsUI.Enabled {
-			uiOpts, err := uihandlers.BuildOptions(ctx, k8s, mcAddon, opts.ObsUI)
-			if err != nil {
-				return nil, err
-			}
-			obsUI, err := uimanifests.BuildValues(uiOpts)
-			if err != nil {
-				return nil, err
-			}
-			userValues.ObsUI = obsUI
+		obsUIValues := getObservabilityUIValues(ctx, k8s, cluster, mcAddon, opts)
+		if obsUIValues != nil {
+			userValues.ObsUI = *obsUIValues
 		}
 
 		incidentDetectionValues := getIncidentDetectionValues(ctx, k8s, cluster, mcAddon, opts)
@@ -180,6 +175,18 @@ func getIncidentDetectionValues(ctx context.Context, k8s client.Client, cluster 
 
 	incDecOptions := ihandlers.BuildOptions(ctx, k8s, mcAddon, opts.Platform.AnalyticsOptions.IncidentDetection)
 	return imanifests.BuildValues(incDecOptions)
+}
+
+func getObservabilityUIValues(ctx context.Context, k8s client.Client, cluster *clusterv1.ManagedCluster, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, opts addon.Options) *uimanifests.UIValues {
+	if !opts.ObsUI.Enabled {
+		return nil
+	}
+	if !isHubCluster(cluster) {
+		return nil
+	}
+
+	uiOpts := uihandlers.BuildOptions(ctx, k8s, mcAddon, opts.ObsUI)
+	return uimanifests.BuildValues(uiOpts)
 }
 
 func getAddOnDeploymentConfig(ctx context.Context, k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAddOn) (*addonapiv1alpha1.AddOnDeploymentConfig, error) {

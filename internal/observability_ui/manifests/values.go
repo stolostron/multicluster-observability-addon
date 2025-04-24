@@ -1,13 +1,9 @@
 package manifests
 
-import (
-	"github.com/stolostron/multicluster-observability-addon/internal/addon"
-)
-
 type UIValues struct {
 	Enabled bool `json:"enabled"`
 }
 
-func BuildValues(obsUI addon.ObsUIOptions) (UIValues, error) {
-	return UIValues{obsUI.Enabled}, nil
+func BuildValues(opts Options) *UIValues {
+	return &UIValues{opts.Enabled}
 }
