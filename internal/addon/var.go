@@ -18,6 +18,10 @@ const (
 
 	AddonDeploymentConfigResource = "addondeploymentconfigs"
 
+	COOSubscriptionName      = "cluster-observability-operator"
+	COOSubscriptionNamespace = "openshift-cluster-observability-operator"
+	cooSubscriptionChannel   = "stable"
+
 	PrometheusAgentResource = "prometheusagents"
 	PPAName                 = "acm-platform-metrics-collector-config"
 	paProbeKey              = "isAvailable"
@@ -38,7 +42,10 @@ const (
 	otelColProbePath                = ".spec.replicas"
 )
 
-var errInvalidMetricsHubHostname = errors.New("invalid metrics hub hostname")
+var (
+	errInvalidMetricsHubHostname  = errors.New("invalid metrics hub hostname")
+	errInvalidSubscriptionChannel = errors.New("current version of the cluster-observability-operator installed doesn't match the supported MCOA version")
+)
 
 //go:embed manifests
 //go:embed manifests/charts/mcoa
