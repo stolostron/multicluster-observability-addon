@@ -78,7 +78,8 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 		}
 	}
 
-	isHypershiftCluster := IsHypershiftEnabled(managedCluster)
+	// Check both if hypershift is enabled and has hosted clusters to limit noisy logs when uwl monitoring is disabled while there is no hostedCluster
+	isHypershiftCluster := IsHypershiftEnabled(managedCluster) && HasHostedCLusters(ctx, o.Client, o.Logger)
 
 	if userWorkloads.CollectionEnabled {
 		if err := o.buildPrometheusAgent(ctx, &ret, configResources, config.UserWorkloadMetricsCollectorApp, isHypershiftCluster); err != nil {
@@ -136,14 +137,14 @@ func (o *OptionsBuilder) buildPrometheusAgent(ctx context.Context, opts *Options
 	// Build the agent
 	promBuilder := PrometheusAgentBuilder{
 		Agent:                    platformAgents[0].DeepCopy(),
-		Name:                     appName,
-		ClusterName:              opts.ClusterName,
 		ClusterID:                opts.ClusterID,
+		ClusterName:              opts.ClusterName,
 		EnvoyConfigMapName:       platformAgents[0].Spec.ConfigMaps[0],
 		EnvoyProxyImage:          opts.Images.Envoy,
-		MatchLabels:              map[string]string{"app": appName},
-		RemoteWriteEndpoint:      o.RemoteWriteURL,
 		IsHypershiftLocalCluster: isHypershift,
+		KubeRBACProxyImage:       opts.Images.KubeRBACProxy,
+		Name:                     appName,
+		RemoteWriteEndpoint:      o.RemoteWriteURL,
 	}
 
 	var agent *prometheusalpha1.PrometheusAgent
@@ -152,6 +153,8 @@ func (o *OptionsBuilder) buildPrometheusAgent(ctx context.Context, opts *Options
 	switch appName {
 	case config.PlatformMetricsCollectorApp:
 		promBuilder.MatchLabels = config.PlatformPrometheusMatchLabels
+		promBuilder.RBACProxyTLSSecret = config.PlatformRBACProxyTLSSecret
+		// promBuilder.RBACProxyConfig = config.PlatformRBACProxyConfig
 		agent = promBuilder.Build()
 		opts.Platform.PrometheusAgent = agent
 		opts.Platform.ConfigMaps = append(opts.Platform.ConfigMaps, envoyProxyConfigMap)

@@ -2,6 +2,7 @@ package manifests
 
 import (
 	"encoding/json"
+	"strconv"
 
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/handlers"
@@ -26,6 +27,8 @@ type Collector struct {
 	ScrapeConfigs       []ConfigValue `json:"scrapeConfigs"`
 	Rules               []ConfigValue `json:"rules"`
 	ServiceMonitors     []ConfigValue `json:"serviceMonitors"` // For HCPs custom user workload serviceMonitors
+	RBACProxyTLSSecret  string        `json:"rbacProxyTlsSecret"`
+	RBACProxyPort       string        `json:"rbacProxyPort"`
 }
 
 type ImagesValues struct {
@@ -45,7 +48,9 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 		PrometheusControllerID:    config.PrometheusControllerID,
 		PrometheusCAConfigMapName: config.PrometheusCAConfigMapName,
 		Platform: Collector{
-			AppName: config.PlatformMetricsCollectorApp,
+			AppName:            config.PlatformMetricsCollectorApp,
+			RBACProxyTLSSecret: config.PlatformRBACProxyTLSSecret,
+			RBACProxyPort:      strconv.Itoa(config.RBACProxyPort),
 		},
 		UserWorkload: Collector{
 			AppName: config.UserWorkloadMetricsCollectorApp,

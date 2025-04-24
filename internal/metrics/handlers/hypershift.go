@@ -379,6 +379,16 @@ func IsHypershiftEnabled(managedCluster *clusterv1.ManagedCluster) bool {
 	return true
 }
 
+func HasHostedCLusters(ctx context.Context, c client.Client, logger logr.Logger) bool {
+	hostedClusters := &hyperv1.HostedClusterList{}
+	if err := c.List(ctx, hostedClusters, &client.ListOptions{}); err != nil {
+		logger.Error(err, "failed to list HostedClusterList")
+		return false
+	}
+
+	return len(hostedClusters.Items) != 0
+}
+
 func isRuleMetricName(name string) bool {
 	return strings.Contains(name, ":")
 }
