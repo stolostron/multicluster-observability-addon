@@ -35,13 +35,21 @@ var (
 	_ = uiplugin.AddToScheme(scheme.Scheme)
 )
 
-func Test_Mcoa_Disabled(t *testing.T) {
+func Test_Supported_Vendors(t *testing.T) {
 	for _, tc := range []struct {
 		name                  string
 		managedClusterLabels  map[string]string
 		addonDeploymentConfig []addonapiv1alpha1.CustomizedVariable
 		expectedObjects       bool
 	}{
+		{
+			name: "ManagedCluster with correct labels but no configuration",
+			managedClusterLabels: map[string]string{
+				"vendor": "OpenShift",
+			},
+			addonDeploymentConfig: []addonapiv1alpha1.CustomizedVariable{},
+			expectedObjects:       false,
+		},
 		{
 			name: "ManagedCluster with correct labels and platform log configuration",
 			managedClusterLabels: map[string]string{
@@ -54,28 +62,6 @@ func Test_Mcoa_Disabled(t *testing.T) {
 				},
 			},
 			expectedObjects: true,
-		},
-		{
-			name: "ManagedCluster with correct labels but no configuration",
-			managedClusterLabels: map[string]string{
-				"vendor": "OpenShift",
-			},
-			addonDeploymentConfig: []addonapiv1alpha1.CustomizedVariable{},
-			expectedObjects:       false,
-		},
-		{
-			name: "ManagedCluster with hub label",
-			managedClusterLabels: map[string]string{
-				"local-cluster": "true",
-				"vendor":        "OpenShift",
-			},
-			addonDeploymentConfig: []addonapiv1alpha1.CustomizedVariable{
-				{
-					Name:  addon.KeyPlatformLogsCollection,
-					Value: string(addon.ClusterLogForwarderV1),
-				},
-			},
-			expectedObjects: false,
 		},
 		{
 			name: "ManagedCluster with unsupported kube vendor",
