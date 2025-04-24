@@ -93,12 +93,6 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, logger logr.Logger) a
 		}
 		if tracingValues != nil {
 			userValues.Tracing = *tracingValues
-		}
-
-		incidentDetectionValues := getIncidentDetectionValues(ctx, k8s, cluster, mcAddon, opts)
-		if incidentDetectionValues != nil {
-			userValues.Analytics.IncidentDetectionValues = *incidentDetectionValues
-		}
 
 		if opts.ObsUI.Enabled {
 			uiOpts, err := uihandlers.BuildOptions(ctx, k8s, mcAddon, opts.ObsUI)
@@ -110,6 +104,11 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, logger logr.Logger) a
 				return nil, err
 			}
 			userValues.ObsUI = obsUI
+		}
+
+		incidentDetectionValues := getIncidentDetectionValues(ctx, k8s, cluster, mcAddon, opts)
+		if incidentDetectionValues != nil {
+			userValues.Analytics.IncidentDetectionValues = *incidentDetectionValues
 		}
 
 		return addonfactory.JsonStructToValues(userValues)
