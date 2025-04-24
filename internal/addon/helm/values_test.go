@@ -8,6 +8,7 @@ import (
 	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
 	operatorsv1 "github.com/operator-framework/api/pkg/operators/v1"
 	operatorsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
+	uiplugin "github.com/rhobs/observability-operator/pkg/apis/uiplugin/v1alpha1"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -31,9 +32,10 @@ var (
 	_ = operatorsv1alpha1.AddToScheme(scheme.Scheme)
 	_ = addonapiv1alpha1.AddToScheme(scheme.Scheme)
 	_ = apiextensionsv1.AddToScheme(scheme.Scheme)
+	_ = uiplugin.AddToScheme(scheme.Scheme)
 )
 
-func Test_Mcoa_Disabled(t *testing.T) {
+func Test_Supported_Vendors(t *testing.T) {
 	for _, tc := range []struct {
 		name                  string
 		managedClusterLabels  map[string]string
@@ -45,6 +47,14 @@ func Test_Mcoa_Disabled(t *testing.T) {
 			managedClusterLabels: map[string]string{
 				"vendor": "OpenShift",
 			},
+			addonDeploymentConfig: []addonapiv1alpha1.CustomizedVariable{},
+			expectedObjects:       false,
+		},
+		{
+			name: "ManagedCluster with correct labels and platform log configuration",
+			managedClusterLabels: map[string]string{
+				"vendor": "OpenShift",
+			},
 			addonDeploymentConfig: []addonapiv1alpha1.CustomizedVariable{
 				{
 					Name:  addon.KeyPlatformLogsCollection,
@@ -52,28 +62,6 @@ func Test_Mcoa_Disabled(t *testing.T) {
 				},
 			},
 			expectedObjects: true,
-		},
-		{
-			name: "ManagedCluster with correct labels but no configuration",
-			managedClusterLabels: map[string]string{
-				"vendor": "OpenShift",
-			},
-			addonDeploymentConfig: []addonapiv1alpha1.CustomizedVariable{},
-			expectedObjects:       false,
-		},
-		{
-			name: "ManagedCluster with hub label",
-			managedClusterLabels: map[string]string{
-				"local-cluster": "true",
-				"vendor":        "OpenShift",
-			},
-			addonDeploymentConfig: []addonapiv1alpha1.CustomizedVariable{
-				{
-					Name:  addon.KeyPlatformLogsCollection,
-					Value: string(addon.ClusterLogForwarderV1),
-				},
-			},
-			expectedObjects: false,
 		},
 		{
 			name: "ManagedCluster with unsupported kube vendor",

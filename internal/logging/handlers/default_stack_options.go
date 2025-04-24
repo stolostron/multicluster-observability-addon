@@ -25,7 +25,7 @@ func DefaultStackOptions(ctx context.Context, k8s client.Client, platform, userW
 	opts := manifests.Options{
 		Platform:      platform,
 		UserWorkloads: userWorkloads,
-		IsHubCluster:  true,
+		IsHub:         true,
 		HubHostname:   hubHostname,
 		DefaultStack: manifests.DefaultStack{
 			LokiURL: fmt.Sprintf("https://mcoa-managed-instance-openshift-logging.apps.%s/api/logs/v1/%s/otlp/v1/logs", hubHostname, "tenant"),
@@ -98,7 +98,7 @@ func createDefaultStackCertificates(ctx context.Context, k8s client.Client, mcAd
 	}
 
 	objects := []client.Object{}
-	if !opts.IsHubCluster {
+	if !opts.IsHub {
 		certConfig := addonmanifests.CertificateConfig{
 			CommonName: manifests.DefaultCollectionCertCommonName,
 			Subject: &certmanagerv1.X509Subject{
@@ -116,7 +116,7 @@ func createDefaultStackCertificates(ctx context.Context, k8s client.Client, mcAd
 		objects = append(objects, cert)
 	}
 
-	if opts.IsHubCluster {
+	if opts.IsHub {
 		certConfig := addonmanifests.CertificateConfig{
 			CommonName: manifests.DefaultStorageCertCommonName,
 			Subject:    &certmanagerv1.X509Subject{},
@@ -155,7 +155,7 @@ func buildDefaultStackOptions(ctx context.Context, k8s client.Client, mcAddon *a
 		return nil
 	}
 
-	if !opts.IsHubCluster {
+	if !opts.IsHub {
 		// Get CLF from ManagedClusterAddOn
 		keys := common.GetObjectKeys(mcAddon.Status.ConfigReferences, loggingv1.GroupVersion.Group, addon.ClusterLogForwardersResource)
 		if len(keys) == 0 {
@@ -193,7 +193,7 @@ func buildDefaultStackOptions(ctx context.Context, k8s client.Client, mcAddon *a
 		return nil
 	}
 
-	if opts.IsHubCluster {
+	if opts.IsHub {
 		// Get LS from ManagedClusterAddOn
 		keys := common.GetObjectKeys(mcAddon.Status.ConfigReferences, lokiv1.GroupVersion.Group, addon.LokiStacksResource)
 		if len(keys) == 0 {

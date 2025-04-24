@@ -6,6 +6,7 @@ import (
 
 type LoggingValues struct {
 	Enabled                 bool            `json:"enabled"`
+	SkipOperatorInstall     bool            `json:"skipOperatorInstall"`
 	OpenshiftLoggingChannel string          `json:"openshiftLoggingChannel"`
 	Unmanaged               UnmanagedValues `json:"unmanaged"`
 	Managed                 ManagedValues   `json:"managed"`
@@ -44,6 +45,16 @@ type ResourceValue struct {
 }
 
 func BuildValues(opts Options) (*LoggingValues, error) {
+	subChannel := buildSubscriptionChannel(opts)
+
+	skipOperatorInstall := false
+	if opts.ClusterLoggingSubscription != nil && opts.ClusterLoggingSubscription.Name != "" {
+		if opts.ClusterLoggingSubscription.Spec.Channel != subChannel {
+			return nil, errInvalidSubscriptionChannel
+		}
+		skipOperatorInstall = true
+	}
+
 	uValues, err := buildUnmangedValues(opts)
 	if err != nil {
 		return nil, err
@@ -56,7 +67,8 @@ func BuildValues(opts Options) (*LoggingValues, error) {
 
 	return &LoggingValues{
 		Enabled:                 enabledLogging(opts),
-		OpenshiftLoggingChannel: buildSubscriptionChannel(opts),
+		OpenshiftLoggingChannel: subChannel,
+		SkipOperatorInstall:     skipOperatorInstall,
 		Unmanaged:               uValues,
 		Managed:                 mValues,
 	}, nil
@@ -118,7 +130,7 @@ func buildMangedValues(opts Options) (ManagedValues, error) {
 	}
 	mValues := ManagedValues{}
 
-	if !opts.IsHubCluster {
+	if !opts.IsHub {
 		mValues.Collection = CollectionValues{
 			Enabled: true,
 		}
@@ -146,7 +158,7 @@ func buildMangedValues(opts Options) (ManagedValues, error) {
 		mValues.Collection.CLFSpec = string(clfMarshaled)
 	}
 
-	if opts.IsHubCluster {
+	if opts.IsHub {
 		mValues.Storage = StorageValues{
 			Enabled: true,
 		}

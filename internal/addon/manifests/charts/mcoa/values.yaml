@@ -10,3 +10,7 @@ logging:
 
 tracing:
   enabled: true
+
+analytics:
+  incidentDetection:
+    enabled: true

@@ -11,21 +11,27 @@ const (
 	InstallNamespace  = "open-cluster-management-observability"
 	HubNamespace      = "local-cluster"
 
-	McoaChartDir    = "manifests/charts/mcoa"
-	MetricsChartDir = "manifests/charts/mcoa/charts/metrics"
-	LoggingChartDir = "manifests/charts/mcoa/charts/logging"
-	TracingChartDir = "manifests/charts/mcoa/charts/tracing"
+	McoaChartDir              = "manifests/charts/mcoa"
+	MetricsChartDir           = "manifests/charts/mcoa/charts/metrics"
+	LoggingChartDir           = "manifests/charts/mcoa/charts/logging"
+	TracingChartDir           = "manifests/charts/mcoa/charts/tracing"
+	IncidentDetectionChartDir = "manifests/charts/mcoa/charts/analytics/charts/incident-detection"
 
 	AddonDeploymentConfigResource = "addondeploymentconfigs"
-	ClusterLogForwardersResource  = "clusterlogforwarders"
-	LokiStacksResource            = "lokistacks"
-	SpokeUnmanagedCLFName         = "mcoa-instance"
-	SpokeDefaultStackCLFName      = "mcoa-managed-instance"
-	SpokeDefaultStackLSName       = "mcoa-managed-instance"
-	LoggingNamespace              = "openshift-logging"
-	clfProbeKey                   = "isReady"
-	// TODO(JoaoBraveCoding): this most likely needs to be updated to reflect the new path
-	clfProbePath = ".status.conditions[?(@.type==\"Ready\")].status"
+
+	PrometheusAgentResource = "prometheusagents"
+	PPAName                 = "acm-platform-metrics-collector-config"
+	paProbeKey              = "isAvailable"
+	paProbePath             = ".status.conditions[?(@.type==\"Available\")].status"
+
+	ClusterLogForwardersResource = "clusterlogforwarders"
+	LokiStacksResource           = "lokistacks"
+	SpokeUnmanagedCLFName        = "mcoa-instance"
+	SpokeDefaultStackCLFName     = "mcoa-managed-instance"
+	SpokeDefaultStackLSName      = "mcoa-managed-instance"
+	LoggingNamespace             = "openshift-logging"
+	clfProbeKey                  = "isReady"
+	clfProbePath                 = ".status.conditions[?(@.type==\"Ready\")].status"
 
 	OpenTelemetryCollectorsResource = "opentelemetrycollectors"
 	InstrumentationResource         = "instrumentations"
@@ -49,4 +55,5 @@ var errInvalidMetricsHubHostname = errors.New("invalid metrics hub hostname")
 //go:embed manifests/charts/mcoa/charts/logging/charts/managed/charts/storage/templates/_helpers.tpl
 //go:embed manifests/charts/mcoa/charts/metrics/templates/_helpers.tpl
 //go:embed manifests/charts/mcoa/charts/tracing/templates/_helpers.tpl
+//go:embed manifests/charts/mcoa/charts/analytics/charts/incident-detection/templates/_helpers.tpl
 var FS embed.FS

@@ -25,6 +25,7 @@ type Collector struct {
 	PrometheusAgentSpec string        `json:"prometheusAgentSpec"`
 	ScrapeConfigs       []ConfigValue `json:"scrapeConfigs"`
 	Rules               []ConfigValue `json:"rules"`
+	ServiceMonitors     []ConfigValue `json:"serviceMonitors"` // For HCPs custom user workload serviceMonitors
 }
 
 type ImagesValues struct {
@@ -33,13 +34,14 @@ type ImagesValues struct {
 }
 
 type ConfigValue struct {
-	Name   string            `json:"name"`
-	Data   string            `json:"data"`
-	Labels map[string]string `json:"labels"`
+	Name      string            `json:"name"`
+	Namespace string            `json:"namespace"`
+	Data      string            `json:"data"`
+	Labels    map[string]string `json:"labels"`
 }
 
-func BuildValues(opts handlers.Options) (MetricsValues, error) {
-	ret := MetricsValues{
+func BuildValues(opts handlers.Options) (*MetricsValues, error) {
+	ret := &MetricsValues{
 		PrometheusControllerID:    config.PrometheusControllerID,
 		PrometheusCAConfigMapName: config.PrometheusCAConfigMapName,
 		Platform: Collector{
@@ -125,6 +127,21 @@ func BuildValues(opts handlers.Options) (MetricsValues, error) {
 			Name:   rule.Name,
 			Data:   string(ruleJson),
 			Labels: rule.Labels,
+		})
+	}
+
+	// Build HCP's serviceMonitors for userWorkloads
+	for _, sm := range opts.UserWorkloads.ServiceMonitors {
+		specJson, err := json.Marshal(sm.Spec)
+		if err != nil {
+			return ret, err
+		}
+
+		ret.UserWorkload.ServiceMonitors = append(ret.UserWorkload.ServiceMonitors, ConfigValue{
+			Name:      sm.Name,
+			Namespace: sm.Namespace,
+			Labels:    sm.Labels,
+			Data:      string(specJson),
 		})
 	}
 

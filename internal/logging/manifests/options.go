@@ -3,18 +3,20 @@ package manifests
 import (
 	lokiv1 "github.com/grafana/loki/operator/api/loki/v1"
 	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
+	operatorv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	corev1 "k8s.io/api/core/v1"
 )
 
 type Options struct {
-	Unmanaged           Unmanaged
-	DefaultStack        DefaultStack
-	IsHubCluster        bool
-	HubHostname         string
-	Platform            addon.LogsOptions
-	UserWorkloads       addon.LogsOptions
-	SubscriptionChannel string
+	Unmanaged                  Unmanaged
+	DefaultStack               DefaultStack
+	IsHub                      bool
+	HubHostname                string
+	Platform                   addon.LogsOptions
+	UserWorkloads              addon.LogsOptions
+	SubscriptionChannel        string
+	ClusterLoggingSubscription *operatorv1alpha1.Subscription
 }
 
 type Unmanaged struct {
@@ -45,7 +47,7 @@ type Storage struct {
 // have never been designed in the first version of MCOA. This can change but it
 // should be done in its own PR.
 func (opts Options) UnmanagedCollectionEnabled() bool {
-	return (opts.Platform.CollectionEnabled || opts.UserWorkloads.CollectionEnabled) && !opts.IsHubCluster
+	return (opts.Platform.CollectionEnabled || opts.UserWorkloads.CollectionEnabled) && !opts.IsHub
 }
 
 func (opts Options) DefaultStackEnabled() bool {

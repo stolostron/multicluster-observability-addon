@@ -4,8 +4,10 @@ approvers:
 - multicluster-observability # Defined in OWNERS_ALIASES
 - team-logging # Defined in OWNERS_ALIASES
 - team-tracing # Defined in OWNERS_ALIASES
+- observability-intelligence # Defined in OWNERS_ALIASES
 
 reviewers:
 - multicluster-observability # Defined in OWNERS_ALIASES
 - team-logging # Defined in OWNERS_ALIASES
 - team-tracing # Defined in OWNERS_ALIASES
+- observability-intelligence # Defined in OWNERS_ALIASES
