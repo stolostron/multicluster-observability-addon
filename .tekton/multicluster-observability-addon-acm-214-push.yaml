@@ -32,7 +32,7 @@ spec:
   - name: path-context
     value: .
   - name: hermetic
-    value: true
+    value: "true"
   - name: prefetch-input
     value: '{"type": "gomod", "path": "."}'
   - name: build-source-image
@@ -602,7 +602,8 @@ spec:
       optional: true
     - name: netrc
       optional: true
-  taskRunTemplate: {}
+  taskRunTemplate:
+    serviceAccountName: build-pipeline-multicluster-observability-addon-acm-214
   workspaces:
   - name: git-auth
     secret:
