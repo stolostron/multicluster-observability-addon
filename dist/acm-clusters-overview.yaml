@@ -1,0 +1,131 @@
+kind: Dashboard
+metadata:
+    name: acm-clusters-overview
+    createdAt: 0001-01-01T00:00:00Z
+    updatedAt: 0001-01-01T00:00:00Z
+    version: 0
+    project: perses-dev
+spec:
+    display:
+        name: ACM / Clusters / Overview
+    variables:
+        - kind: ListVariable
+          spec:
+            display:
+                name: cluster
+                hidden: false
+            allowAllValue: true
+            allowMultiple: true
+            plugin:
+                kind: PrometheusLabelValuesVariable
+                spec:
+                    datasource:
+                        kind: PrometheusDatasource
+                        name: thanos-query-frontend
+                    labelName: name
+                    matchers:
+                        - acm_managed_cluster_labels{}
+            name: cluster
+    panels:
+        "0_0":
+            kind: Panel
+            spec:
+                display:
+                    name: Top 50 Max Latency API Server
+                    description: Shows the top 50 clusters with highest API server latency, their API server status, and error rates.
+                plugin:
+                    kind: Table
+                    spec:
+                        columnSettings:
+                            - name: cluster
+                              header: Cluster
+                            - name: value
+                              header: Max Latency (99th percentile)
+                            - name: api_up
+                              header: API Server UP
+                            - name: error_rate
+                              header: API Error[1h]
+                queries:
+                    - kind: TimeSeriesQuery
+                      spec:
+                        plugin:
+                            kind: PrometheusTimeSeriesQuery
+                            spec:
+                                datasource:
+                                    kind: PrometheusDatasource
+                                    name: thanos-query-frontend
+                                query: |4-
+                                      topk(
+                                        50,
+                                        max by (cluster) (
+                                          apiserver_request_duration_seconds:histogram_quantile_99{cluster=~"$cluster",clusterType!="ocp3"}
+                                        )
+                                      )
+                                    * on (cluster) group_left (api_up)
+                                      count_values without () (
+                                        "api_up",
+                                        (
+                                            sum by (cluster) (up{cluster=~"$cluster",clusterType!="ocp3",job="apiserver"} == 1)
+                                          /
+                                            count by (cluster) (up{cluster=~"$cluster",clusterType!="ocp3",job="apiserver"})
+                                        )
+                                      )
+                    - kind: TimeSeriesQuery
+                      spec:
+                        plugin:
+                            kind: PrometheusTimeSeriesQuery
+                            spec:
+                                datasource:
+                                    kind: PrometheusDatasource
+                                    name: thanos-query-frontend
+                                query: |-
+                                    sum by (cluster) (
+                                      sum:apiserver_request_total:1h{cluster=~"$cluster",clusterType!="ocp3",code=~"5.."}
+                                    )
+        "0_1":
+            kind: Panel
+            spec:
+                display:
+                    name: etcd Health
+                    description: Shows etcd health metrics including leader status, leader changes, and database size.
+                plugin:
+                    kind: Table
+                    spec:
+                        columnSettings:
+                            - name: cluster
+                              header: Cluster
+                            - name: has_leader
+                              header: Has a leader
+                            - name: value
+                              header: Leader election change
+                            - name: db_size
+                              header: DB size
+                queries:
+                    - kind: TimeSeriesQuery
+                      spec:
+                        plugin:
+                            kind: PrometheusTimeSeriesQuery
+                            spec:
+                                datasource:
+                                    kind: PrometheusDatasource
+                                    name: thanos-query-frontend
+                                query: ""
+    layouts:
+        - kind: Grid
+          spec:
+            display:
+                title: Control Plane Health
+            items:
+                - x: 0
+                  "y": 0
+                  width: 12
+                  height: 6
+                  content:
+                    $ref: '#/spec/panels/0_0'
+                - x: 12
+                  "y": 0
+                  width: 12
+                  height: 6
+                  content:
+                    $ref: '#/spec/panels/0_1'
+    duration: 1h

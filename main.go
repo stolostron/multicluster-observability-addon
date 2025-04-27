@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	goflag "flag"
+	"flag"
 	"fmt"
 	"math/rand"
 	"os"
@@ -15,24 +15,24 @@ import (
 	hyperv1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
 	operatorsv1 "github.com/operator-framework/api/pkg/operators/v1"
 	operatorsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
+	dashboards "github.com/perses/community-dashboards/pkg/dashboards"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	prometheusv1alpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	uiplugin "github.com/rhobs/observability-operator/pkg/apis/uiplugin/v1alpha1"
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 	addonctrl "github.com/stolostron/multicluster-observability-addon/internal/controllers/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/controllers/watcher"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
-	utilflag "k8s.io/component-base/cli/flag"
-	logs "k8s.io/component-base/logs/api/v1"
 	cmdfactory "open-cluster-management.io/addon-framework/pkg/cmd/factory"
 	"open-cluster-management.io/addon-framework/pkg/version"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	workv1 "open-cluster-management.io/api/work/v1"
+
+	acm "github.com/stolostron/multicluster-observability-addon/internal/metrics/perses/dashboards/acm"
 )
 
 var scheme = runtime.NewScheme()
@@ -58,14 +58,28 @@ func init() {
 func main() {
 	rand.Seed(time.Now().UTC().UnixNano()) // nolint:staticcheck
 
-	pflag.CommandLine.SetNormalizeFunc(utilflag.WordSepNormalizeFunc)
-	pflag.CommandLine.AddGoFlagSet(goflag.CommandLine)
+	var (
+		projectName    string
+		datasourceName string
+	)
 
-	logs.AddFlags(logs.NewLoggingConfiguration(), pflag.CommandLine)
+	rootCmd := &cobra.Command{
+		Use:   "dashboard-generator",
+		Short: "Short dashboard generating command",
+		Run: func(cmd *cobra.Command, _ []string) {
+			dashboardWriter := dashboards.NewDashboardWriter()
 
-	command := newCommand()
-	if err := command.Execute(); err != nil {
-		fmt.Fprintf(os.Stderr, "%v\n", err)
+			dashboardWriter.Add(acm.BuildACMClustersOverview(projectName, datasourceName, ""))
+
+			dashboardWriter.Write()
+		},
+	}
+
+	rootCmd.Flags().StringVar(&projectName, "project", "perses-dev", "Project name for the dashboard")
+	rootCmd.Flags().StringVar(&datasourceName, "datasource", "thanos-query-frontend", "Datasource name for the dashboard")
+
+	if err := rootCmd.Execute(); err != nil {
+		fmt.Println(err)
 		os.Exit(1)
 	}
 }
@@ -89,6 +103,36 @@ func newCommand() *cobra.Command {
 	}
 
 	cmd.AddCommand(newControllerCommand())
+	cmd.AddCommand(newPersesGenCommand())
+
+	return cmd
+}
+
+func newPersesGenCommand() *cobra.Command {
+	var (
+		projectName    string
+		datasourceName string
+		outputFormat   string
+		outputDir      string
+	)
+
+	cmd := &cobra.Command{
+		Use:   "perses-gen",
+		Short: "Short dashboard generating command",
+		Run: func(cmd *cobra.Command, _ []string) {
+			flag.Set("output", outputFormat)
+			flag.Set("output-dir", outputDir)
+
+			dashboardWriter := dashboards.NewDashboardWriter()
+			dashboardWriter.Add(acm.BuildACMClustersOverview(projectName, datasourceName, ""))
+			dashboardWriter.Write()
+		},
+	}
+
+	cmd.Flags().StringVar(&projectName, "project", "perses-dev", "Project name for the dashboard")
+	cmd.Flags().StringVar(&datasourceName, "datasource", "thanos-query-frontend", "Datasource name for the dashboard")
+	cmd.Flags().StringVar(&outputFormat, "output", "operator", "Output format (json, yaml, or operator)")
+	cmd.Flags().StringVar(&outputDir, "output-dir", "./dist", "Output directory for the generated dashboards")
 
 	return cmd
 }
