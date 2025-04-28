@@ -11,6 +11,7 @@ import (
 )
 
 const (
+	AddonName                       = "multicluster-observability-addon"
 	PrometheusControllerID          = "acm-observability"
 	PlatformMetricsCollectorApp     = "platform-metrics-collector"
 	UserWorkloadMetricsCollectorApp = "user-workload-metrics-collector"
@@ -22,8 +23,9 @@ const (
 	ManagedClusterLabelClusterID = "clusterID"
 
 	// Monitoring resources (meta monitoring)
-	PlatformRBACProxyTLSSecret = "prometheus-agent-kube-rbac-proxy-tls"
-	RBACProxyPort              = 9092
+	PlatformRBACProxyTLSSecret     = "prometheus-agent-platform-kube-rbac-proxy-tls"
+	UserWorkloadRBACProxyTLSSecret = "prometheus-agent-user-workload-kube-rbac-proxy-tls"
+	RBACProxyPort                  = 9092
 
 	// Standard metrics label names
 	ClusterNameMetricLabel           = "cluster"

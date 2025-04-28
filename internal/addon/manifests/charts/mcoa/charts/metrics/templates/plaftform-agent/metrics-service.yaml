@@ -16,5 +16,5 @@ spec:
     port: {{ .Values.platform.rbacProxyPort }}
     targetPort: metrics
   selector:
-    app.kubernetes.io/instance: acm-platform-metrics-collector
+    app.kubernetes.io/instance: {{ .Values.platform.appName }}
 {{- end }}

@@ -53,7 +53,9 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 			RBACProxyPort:      strconv.Itoa(config.RBACProxyPort),
 		},
 		UserWorkload: Collector{
-			AppName: config.UserWorkloadMetricsCollectorApp,
+			AppName:            config.UserWorkloadMetricsCollectorApp,
+			RBACProxyTLSSecret: config.UserWorkloadRBACProxyTLSSecret,
+			RBACProxyPort:      strconv.Itoa(config.RBACProxyPort),
 		},
 	}
 

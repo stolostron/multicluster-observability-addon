@@ -98,8 +98,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				recordingRules := common.FilterResourcesByLabelSelector[*prometheusv1.PrometheusRule](objects, config.UserWorkloadPrometheusMatchLabels)
 				assert.Len(t, recordingRules, 2)
 				assert.Equal(t, "openshift-user-workload-monitoring/prometheus-operator", recordingRules[0].Annotations["operator.prometheus.io/controller-id"])
-
-				assert.Len(t, objects, 19)
+				assert.Len(t, objects, 23)
 				assert.Len(t, common.FilterResourcesByLabelSelector[*corev1.Secret](objects, nil), 2) // 2 secrets (mTLS to hub)
 			},
 		},
@@ -516,8 +515,10 @@ func TestHelmBuild_Metrics_HCP(t *testing.T) {
 	scrapeConfigs := common.FilterResourcesByLabelSelector[*prometheusalpha1.ScrapeConfig](clientObjs, nil)
 	assert.Len(t, scrapeConfigs, 2)
 	serviceMonitors := common.FilterResourcesByLabelSelector[*prometheusv1.ServiceMonitor](clientObjs, nil)
+	assert.Len(t, serviceMonitors, 3) // 2 for hcps and 1 for meta monitoring
+	// keep only hcps serviceMonitors
+	serviceMonitors = slices.DeleteFunc(serviceMonitors, func(e *prometheusv1.ServiceMonitor) bool { return e.Namespace != "clusters-a" })
 	assert.Len(t, serviceMonitors, 2)
-	assert.Equal(t, "clusters-a", serviceMonitors[0].Namespace)
 	assert.Len(t, serviceMonitors[0].Spec.Endpoints, 1)
 	assert.Len(t, serviceMonitors[1].Spec.Endpoints, 1)
 }
