@@ -3,6 +3,10 @@ kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: {{ .Values.platform.appName }}-metrics
+  abels:
+    app.kubernetes.io/component: {{ .Values.platform.component }}
+    app.kubernetes.io/name: {{ .Values.platform.appName }}-metrics
+    {{ include "metricshelm.labels" . | nindent 4 }}
 subjects:
   - kind: ServiceAccount
     name: {{ .Values.platform.appName }}

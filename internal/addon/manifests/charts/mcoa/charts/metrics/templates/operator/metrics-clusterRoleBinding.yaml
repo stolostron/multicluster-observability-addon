@@ -1,0 +1,18 @@
+{{- if or .Values.platformEnabled .Values.userWorkloadsEnabled }}
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: {{ .Values.prometheusOperator.appName }}-metrics
+  labels:
+    app.kubernetes.io/component: {{ .Values.prometheusOperator.component }}
+    app.kubernetes.io/name: {{ .Values.prometheusOperator.appName }}-metrics
+    {{ include "metricshelm.labels" . | nindent 4 }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Values.prometheusOperator.appName }}
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ .Values.prometheusOperator.appName }}-metrics
+{{- end }}

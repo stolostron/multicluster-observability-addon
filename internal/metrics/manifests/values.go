@@ -10,14 +10,15 @@ import (
 )
 
 type MetricsValues struct {
-	PlatformEnabled           bool          `json:"platformEnabled"`
-	UserWorkloadsEnabled      bool          `json:"userWorkloadsEnabled"`
-	Secrets                   []ConfigValue `json:"secrets"`
-	Images                    ImagesValues  `json:"images"`
-	PrometheusControllerID    string        `json:"prometheusControllerID"`
-	PrometheusCAConfigMapName string        `json:"prometheusCAConfigMapName"`
-	Platform                  Collector     `json:"platform"`
-	UserWorkload              Collector     `json:"userWorkload"`
+	PlatformEnabled           bool               `json:"platformEnabled"`
+	UserWorkloadsEnabled      bool               `json:"userWorkloadsEnabled"`
+	Secrets                   []ConfigValue      `json:"secrets"`
+	Images                    ImagesValues       `json:"images"`
+	PrometheusControllerID    string             `json:"prometheusControllerID"`
+	PrometheusCAConfigMapName string             `json:"prometheusCAConfigMapName"`
+	Platform                  Collector          `json:"platform"`
+	UserWorkload              Collector          `json:"userWorkload"`
+	PrometheusOperator        PrometheusOperator `json:"prometheusOperator"`
 }
 
 type Collector struct {
@@ -29,6 +30,10 @@ type Collector struct {
 	ServiceMonitors     []ConfigValue `json:"serviceMonitors"` // For HCPs custom user workload serviceMonitors
 	RBACProxyTLSSecret  string        `json:"rbacProxyTlsSecret"`
 	RBACProxyPort       string        `json:"rbacProxyPort"`
+}
+
+type PrometheusOperator struct {
+	RBACProxyImage string `json:"rbacProxyImage"`
 }
 
 type ImagesValues struct {
@@ -56,6 +61,9 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 			AppName:            config.UserWorkloadMetricsCollectorApp,
 			RBACProxyTLSSecret: config.UserWorkloadRBACProxyTLSSecret,
 			RBACProxyPort:      strconv.Itoa(config.RBACProxyPort),
+		},
+		PrometheusOperator: PrometheusOperator{
+			RBACProxyImage: opts.Images.KubeRBACProxy,
 		},
 	}
 

@@ -4,6 +4,8 @@ kind: Role
 metadata:
   name: prometheus-k8s
   namespace: {{ .Release.Namespace }}
+  labels:
+    {{ include "metricshelm.labels" . | nindent 4 }}
 rules:
 - apiGroups:
   - ""

@@ -1,11 +1,11 @@
-{{- if .Values.platformEnabled }}
+{{- if or .Values.platformEnabled .Values.userWorkloadsEnabled }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: {{ .Values.platform.appName }}-metrics
-  abels:
-    app.kubernetes.io/component: {{ .Values.platform.component }}
-    app.kubernetes.io/name: {{ .Values.platform.appName }}-metrics
+  name: {{ .Values.prometheusOperator.appName }}-metrics
+  labels:
+    app.kubernetes.io/component: {{ .Values.prometheusOperator.component }}
+    app.kubernetes.io/name: {{ .Values.prometheusOperator.appName }}-metrics
     {{ include "metricshelm.labels" . | nindent 4 }}
 rules:
 - apiGroups: ["authentication.k8s.io"]
