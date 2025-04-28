@@ -7,6 +7,7 @@ import (
 	otelv1alpha1 "github.com/open-telemetry/opentelemetry-operator/apis/v1alpha1"
 	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
 	prometheusalpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
+	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	"open-cluster-management.io/addon-framework/pkg/utils"
 	"open-cluster-management.io/api/addon/v1alpha1"
@@ -39,8 +40,8 @@ func AgentHealthProber() *agent.HealthProber {
 				{
 					ResourceIdentifier: workv1.ResourceIdentifier{
 						Group:     prometheusalpha1.SchemeGroupVersion.Group,
-						Resource:  PrometheusAgentResource,
-						Name:      PPAName,
+						Resource:  prometheusalpha1.PrometheusAgentName,
+						Name:      mconfig.PlatformMetricsCollectorApp,
 						Namespace: InstallNamespace,
 					},
 					ProbeRules: []workv1.FeedbackRule{
@@ -105,7 +106,7 @@ func AgentHealthProber() *agent.HealthProber {
 					}
 					identifier := field.ResourceIdentifier
 					switch identifier.Resource {
-					case PrometheusAgentResource:
+					case prometheusalpha1.PrometheusAgentName:
 						for _, value := range field.FeedbackResult.Values {
 							if value.Name != paProbeKey {
 								return fmt.Errorf("%w: %s with key %s/%s unknown probe keys %s", errUnknownProbeKey, identifier.Resource, identifier.Namespace, identifier.Name, value.Name)
