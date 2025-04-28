@@ -154,12 +154,12 @@ func (o *OptionsBuilder) buildPrometheusAgent(ctx context.Context, opts *Options
 	case config.PlatformMetricsCollectorApp:
 		promBuilder.MatchLabels = config.PlatformPrometheusMatchLabels
 		promBuilder.RBACProxyTLSSecret = config.PlatformRBACProxyTLSSecret
-		// promBuilder.RBACProxyConfig = config.PlatformRBACProxyConfig
 		agent = promBuilder.Build()
 		opts.Platform.PrometheusAgent = agent
 		opts.Platform.ConfigMaps = append(opts.Platform.ConfigMaps, envoyProxyConfigMap)
 	case config.UserWorkloadMetricsCollectorApp:
 		promBuilder.MatchLabels = config.UserWorkloadPrometheusMatchLabels
+		promBuilder.RBACProxyTLSSecret = config.UserWorkloadRBACProxyTLSSecret
 		agent = promBuilder.Build()
 		opts.UserWorkloads.PrometheusAgent = agent
 		opts.UserWorkloads.ConfigMaps = append(opts.UserWorkloads.ConfigMaps, envoyProxyConfigMap)

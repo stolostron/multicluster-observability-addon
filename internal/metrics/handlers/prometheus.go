@@ -52,7 +52,7 @@ func (p *PrometheusAgentBuilder) setCommonFields() *PrometheusAgentBuilder {
 	spec.ServiceName = &p.Name
 	spec.PodMetadata = &prometheusv1.EmbeddedObjectMetadata{
 		Labels: map[string]string{
-			"app.kubernetes.io/part-of": "multicluster-observability-addon",
+			"app.kubernetes.io/part-of": config.AddonName,
 		},
 	}
 
