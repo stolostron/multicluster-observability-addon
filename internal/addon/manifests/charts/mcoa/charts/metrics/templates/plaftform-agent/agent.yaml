@@ -9,7 +9,7 @@ metadata:
   labels:
     {{- $incomingLabels := .Values.platform.prometheusAgent.labels }}
     {{- $metricsHelmLabels := fromYaml (include "metricshelm.labels" $) }}
-    {{- $customLabel := dict "app.kubernetes.io/component" "platform-metrics-collector" }}
+    {{- $customLabel := dict "app.kubernetes.io/component" $.Values.platform.component }}
     {{- $mergedLabels := merge $incomingLabels $metricsHelmLabels $customLabel }}
     {{- toYaml $mergedLabels | nindent 4 }}
 spec:

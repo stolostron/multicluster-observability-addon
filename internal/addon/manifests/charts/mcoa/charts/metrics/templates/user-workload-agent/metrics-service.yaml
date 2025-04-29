@@ -7,7 +7,7 @@ metadata:
   annotations:
     service.beta.openshift.io/serving-cert-secret-name: {{ .Values.userWorkload.rbacProxyTlsSecret }}
   labels:
-    app.kubernetes.io/component: user-workload-metrics-collector
+    app.kubernetes.io/component: {{ .Values.userWorkload.component }}
     app.kubernetes.io/name: {{ .Values.userWorkload.appName }}
     {{ include "metricshelm.labels" . | nindent 4 }}
 spec:
