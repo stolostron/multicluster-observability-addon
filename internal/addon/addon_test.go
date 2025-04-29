@@ -6,6 +6,8 @@ import (
 
 	otelv1alpha1 "github.com/open-telemetry/opentelemetry-operator/apis/v1alpha1"
 	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
+	prometheusalpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
+	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	"github.com/stretchr/testify/require"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
 	"open-cluster-management.io/addon-framework/pkg/agent"
@@ -13,7 +15,7 @@ import (
 )
 
 func Test_AgentHealthProber_PPA(t *testing.T) {
-	unhealthyError := fmt.Errorf("%w: prometheusagents status condition type is %s for %s/%s", errProbeConditionNotSatisfied, "False", InstallNamespace, PPAName)
+	unhealthyError := fmt.Errorf("%w: prometheusagents status condition type is %s for %s/%s", errProbeConditionNotSatisfied, "False", InstallNamespace, mconfig.PlatformMetricsCollectorApp)
 	managedCluster := addontesting.NewManagedCluster("cluster-1")
 	managedClusterAddOn := addontesting.NewAddon("test", "cluster-1")
 	for _, tc := range []struct {
@@ -38,8 +40,8 @@ func Test_AgentHealthProber_PPA(t *testing.T) {
 					{
 						ResourceIdentifier: workv1.ResourceIdentifier{
 							Group:     loggingv1.GroupVersion.Group,
-							Resource:  PrometheusAgentResource,
-							Name:      PPAName,
+							Resource:  prometheusalpha1.PrometheusAgentName,
+							Name:      mconfig.PlatformMetricsCollectorApp,
 							Namespace: InstallNamespace,
 						},
 						FeedbackResult: workv1.StatusFeedbackResult{
