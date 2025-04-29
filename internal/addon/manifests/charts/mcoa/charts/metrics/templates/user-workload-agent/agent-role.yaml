@@ -4,7 +4,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: {{ .Values.userWorkload.appName }}-role
   labels:
-    app.kubernetes.io/component: user-workload-metrics-collector
+    app.kubernetes.io/component: {{ .Values.userWorkload.component }}
     {{ include "metricshelm.labels" . | nindent 4 }}
 rules:
   - verbs:

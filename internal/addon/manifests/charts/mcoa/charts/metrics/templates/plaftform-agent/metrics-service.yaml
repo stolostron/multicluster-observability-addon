@@ -7,7 +7,7 @@ metadata:
   annotations:
     service.beta.openshift.io/serving-cert-secret-name: {{ .Values.platform.rbacProxyTlsSecret }}
   labels:
-    app.kubernetes.io/component: platform-metrics-collector
+    app.kubernetes.io/component: {{ .Values.platform.component }}
     app.kubernetes.io/name: {{ .Values.platform.appName }}
     {{ include "metricshelm.labels" . | nindent 4 }}
 spec:

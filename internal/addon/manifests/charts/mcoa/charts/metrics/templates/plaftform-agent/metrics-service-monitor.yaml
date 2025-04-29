@@ -5,7 +5,7 @@ metadata:
   name: {{ .Values.platform.appName }}
   namespace: {{ .Release.Namespace }}
   labels:
-    app.kubernetes.io/component: platform-metrics-collector
+    app.kubernetes.io/component: {{ .Values.platform.component }}
     {{ include "metricshelm.labels" . | nindent 4 }}
 spec:
   endpoints:
@@ -18,6 +18,6 @@ spec:
       serverName: "{{ .Values.platform.appName }}.{{ .Release.Namespace }}.svc"
   selector:
     matchLabels:
-      app.kubernetes.io/component: platform-metrics-collector
+      app.kubernetes.io/component: {{ .Values.platform.component }}
       app.kubernetes.io/name: {{ .Values.platform.appName }}
 {{- end }}
