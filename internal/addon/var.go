@@ -18,14 +18,12 @@ const (
 
 	AddonDeploymentConfigResource = "addondeploymentconfigs"
 
-	COOSubscriptionName      = "cluster-observability-operator"
-	COOSubscriptionNamespace = "openshift-cluster-observability-operator"
+	cooSubscriptionName      = "cluster-observability-operator"
+	cooSubscriptionNamespace = "openshift-cluster-observability-operator"
 	cooSubscriptionChannel   = "stable"
 
-	PrometheusAgentResource = "prometheusagents"
-	PPAName                 = "acm-platform-metrics-collector-config"
-	paProbeKey              = "isAvailable"
-	paProbePath             = ".status.conditions[?(@.type==\"Available\")].status"
+	paProbeKey  = "isAvailable"
+	paProbePath = ".status.conditions[?(@.type==\"Available\")].status"
 
 	ClusterLogForwardersResource = "clusterlogforwarders"
 	SpokeCLFName                 = "mcoa-instance"

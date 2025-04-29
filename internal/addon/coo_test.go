@@ -80,8 +80,8 @@ func TestSkipInstallCOO(t *testing.T) {
 			},
 			subscription: &operatorv1alpha1.Subscription{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      COOSubscriptionName,
-					Namespace: COOSubscriptionNamespace,
+					Name:      cooSubscriptionName,
+					Namespace: cooSubscriptionNamespace,
 				},
 				Spec: &operatorv1alpha1.SubscriptionSpec{
 					Channel: cooSubscriptionChannel,
@@ -104,8 +104,8 @@ func TestSkipInstallCOO(t *testing.T) {
 			},
 			subscription: &operatorv1alpha1.Subscription{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      COOSubscriptionName,
-					Namespace: COOSubscriptionNamespace,
+					Name:      cooSubscriptionName,
+					Namespace: cooSubscriptionNamespace,
 					Labels: map[string]string{
 						"release": "multicluster-observability-addon",
 					},
@@ -131,8 +131,8 @@ func TestSkipInstallCOO(t *testing.T) {
 			},
 			subscription: &operatorv1alpha1.Subscription{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      COOSubscriptionName,
-					Namespace: COOSubscriptionNamespace,
+					Name:      cooSubscriptionName,
+					Namespace: cooSubscriptionNamespace,
 				},
 				Spec: &operatorv1alpha1.SubscriptionSpec{
 					Channel: "wrong-channel",

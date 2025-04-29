@@ -22,7 +22,7 @@ func InstallCOO(ctx context.Context, k8s client.Client, logger logr.Logger, isHu
 	}
 
 	cooSub := &operatorv1alpha1.Subscription{}
-	key := client.ObjectKey{Name: COOSubscriptionName, Namespace: COOSubscriptionNamespace}
+	key := client.ObjectKey{Name: cooSubscriptionName, Namespace: cooSubscriptionNamespace}
 	if err := k8s.Get(ctx, key, cooSub, &client.GetOptions{}); err != nil && !k8serrors.IsNotFound(err) {
 		return true, fmt.Errorf("failed to get cluster observability operator subscription: %w", err)
 	}
