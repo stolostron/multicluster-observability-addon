@@ -6,7 +6,7 @@ import (
 
 type LoggingValues struct {
 	Enabled                 bool            `json:"enabled"`
-	SkipOperatorInstall     bool            `json:"skipOperatorInstall"`
+	InstallCLO              bool            `json:"installCLO"`
 	CLFAnnotations          string          `json:"clfAnnotations"`
 	CLFSpec                 string          `json:"clfSpec"`
 	ServiceAccountName      string          `json:"serviceAccountName"`
@@ -26,12 +26,11 @@ func BuildValues(opts Options) (*LoggingValues, error) {
 
 	values.OpenshiftLoggingChannel = buildSubscriptionChannel(opts)
 
-	if opts.ClusterLoggingSubscription != nil && opts.ClusterLoggingSubscription.Name != "" {
-		if opts.ClusterLoggingSubscription.Spec.Channel != values.OpenshiftLoggingChannel {
-			return nil, errInvalidSubscriptionChannel
-		}
-		values.SkipOperatorInstall = true
+	installCLO, err := shouldInstallCLO(opts, values.OpenshiftLoggingChannel)
+	if err != nil {
+		return nil, err
 	}
+	values.InstallCLO = installCLO
 
 	configmaps, err := buildConfigMaps(opts)
 	if err != nil {
@@ -67,4 +66,22 @@ func BuildValues(opts Options) (*LoggingValues, error) {
 	values.ServiceAccountName = opts.ClusterLogForwarder.Spec.ServiceAccount.Name
 
 	return values, nil
+}
+
+func shouldInstallCLO(opts Options, channel string) (bool, error) {
+	// If no subscription is provided, want to install CLO
+	if opts.ClusterLoggingSubscription == nil || opts.ClusterLoggingSubscription.Name == "" {
+		return true, nil
+	}
+
+	if opts.ClusterLoggingSubscription.Spec.Channel != channel {
+		return false, errInvalidSubscriptionChannel
+	}
+
+	// If the subscription has our release label, install the operator
+	if value, exists := opts.ClusterLoggingSubscription.Labels["release"]; exists && value == "multicluster-observability-addon" {
+		return true, nil
+	}
+
+	return false, nil
 }
