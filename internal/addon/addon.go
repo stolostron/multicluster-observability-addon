@@ -8,6 +8,7 @@ import (
 	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
 	prometheusalpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
+	uiplugin "github.com/rhobs/observability-operator/pkg/apis/uiplugin/v1alpha1"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	"open-cluster-management.io/addon-framework/pkg/utils"
 	"open-cluster-management.io/api/addon/v1alpha1"
@@ -89,6 +90,24 @@ func AgentHealthProber() *agent.HealthProber {
 								{
 									Name: otelColProbeKey,
 									Path: otelColProbePath,
+								},
+							},
+						},
+					},
+				},
+				{
+					ResourceIdentifier: workv1.ResourceIdentifier{
+						Group:    uiplugin.GroupVersion.Group,
+						Resource: UIPluginsResource,
+						Name:     "monitoring",
+					},
+					ProbeRules: []workv1.FeedbackRule{
+						{
+							Type: workv1.JSONPathsType,
+							JsonPaths: []workv1.JsonPath{
+								{
+									Name: uipProbeKey,
+									Path: uipProbePath,
 								},
 							},
 						},

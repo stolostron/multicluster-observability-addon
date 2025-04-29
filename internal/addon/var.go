@@ -34,6 +34,10 @@ const (
 	SpokeOTELColNamespace           = "mcoa-opentelemetry"
 	otelColProbeKey                 = "replicas"
 	otelColProbePath                = ".spec.replicas"
+
+	UIPluginsResource = "uiplugins"
+	uipProbeKey       = "isAvailable"
+	uipProbePath      = ".status.conditions[?(@.type==\"Available\")].status"
 )
 
 var errInvalidMetricsHubHostname = errors.New("invalid metrics hub hostname")
