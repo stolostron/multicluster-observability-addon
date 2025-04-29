@@ -9,7 +9,7 @@ metadata:
   labels:
     app.kubernetes.io/name: {{ .Values.userWorkload.appName }}
     {{ include "metricshelm.labels" . | nindent 4 }}
-    app.kubernetes.io/component: user-workload-metrics-collector
+    app.kubernetes.io/component: {{ .Values.userWorkload.component }}
 spec:
 {{- fromJson .Values.userWorkload.prometheusAgentSpec | toYaml | nindent 2 }}
 {{- end }}

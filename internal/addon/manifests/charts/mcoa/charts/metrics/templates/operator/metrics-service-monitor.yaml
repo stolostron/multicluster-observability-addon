@@ -1,0 +1,23 @@
+{{- if or .Values.platformEnabled .Values.userWorkloadsEnabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ .Values.prometheusOperator.appName }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/component: {{ .Values.prometheusOperator.component }}
+    app.kubernetes.io/name: {{ .Values.prometheusOperator.appName }}
+    {{ include "metricshelm.labels" . | nindent 4 }}
+spec:
+  endpoints:
+  - interval: 30s
+    port: metrics
+    scheme: https
+    bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+    tlsConfig:
+      caFile: /etc/prometheus/configmaps/serving-certs-ca-bundle/service-ca.crt
+      serverName: "{{ .Values.prometheusOperator.appName }}.{{ .Release.Namespace }}.svc"
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ .Values.prometheusOperator.appName }}
+{{- end }}

@@ -3,6 +3,7 @@ package config
 import "k8s.io/apimachinery/pkg/types"
 
 const (
+	AddonName                       = "multicluster-observability-addon"
 	PrometheusControllerID          = "acm-observability"
 	PlatformMetricsCollectorApp     = "acm-platform-metrics-collector"
 	UserWorkloadMetricsCollectorApp = "acm-user-workload-metrics-collector"
@@ -15,11 +16,18 @@ const (
 
 	ManagedClusterLabelClusterID = "clusterID"
 
+	// Monitoring resources (meta monitoring)
+	PlatformRBACProxyTLSSecret     = "prometheus-agent-platform-kube-rbac-proxy-tls"
+	UserWorkloadRBACProxyTLSSecret = "prometheus-agent-user-workload-kube-rbac-proxy-tls"
+	RBACProxyPort                  = 9092
+
+	// Standard metrics label names
 	ClusterNameMetricLabel           = "cluster"
 	ClusterIDMetricLabel             = "clusterID"
 	ManagementClusterNameMetricLabel = "managementcluster"
 	ManagementClusterIDMetricLabel   = "managementclusterID"
 
+	// Hypershift
 	LocalManagedClusterLabel              = "local-cluster"
 	HypershiftAddonStateLabel             = "feature.open-cluster-management.io/addon-hypershift-addon"
 	HypershiftEtcdServiceMonitorName      = "etcd"

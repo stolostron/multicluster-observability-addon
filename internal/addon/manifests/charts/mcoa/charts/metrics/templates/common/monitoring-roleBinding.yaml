@@ -1,0 +1,17 @@
+{{- if or .Values.platformEnabled .Values.userWorkloadsEnabled }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: prometheus-k8s
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{ include "metricshelm.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: prometheus-k8s
+subjects:
+- kind: ServiceAccount
+  name: prometheus-k8s
+  namespace: openshift-monitoring
+{{- end }}

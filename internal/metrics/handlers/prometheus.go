@@ -21,8 +21,10 @@ type PrometheusAgentBuilder struct {
 	ClusterID                string
 	EnvoyConfigMapName       string
 	EnvoyProxyImage          string
+	KubeRBACProxyImage       string
 	PrometheusImage          string
 	MatchLabels              map[string]string
+	RBACProxyTLSSecret       string
 	IsHypershiftLocalCluster bool
 }
 
@@ -32,6 +34,7 @@ func (p *PrometheusAgentBuilder) Build() *prometheusalpha1.PrometheusAgent {
 		setPrometheusRemoteWriteConfig().
 		setWatchedResources().
 		setEnvoyProxySidecar().
+		setKubeRBACProxySidecar().
 		Agent
 }
 
@@ -46,6 +49,12 @@ func (p *PrometheusAgentBuilder) setCommonFields() *PrometheusAgentBuilder {
 	spec.Version = ""
 	spec.ServiceAccountName = p.Name
 	spec.WALCompression = ptr.To(true)
+	spec.ServiceName = &p.Name
+	spec.PodMetadata = &prometheusv1.EmbeddedObjectMetadata{
+		Labels: map[string]string{
+			"app.kubernetes.io/part-of": config.AddonName,
+		},
+	}
 
 	return p
 }
@@ -229,6 +238,69 @@ func (p *PrometheusAgentBuilder) createEnvoyContainer() corev1.Container {
 			{
 				Name:      "prom-server-ca",
 				MountPath: "/etc/certs",
+			},
+		},
+		SecurityContext: &corev1.SecurityContext{
+			RunAsNonRoot:             ptr.To(true),
+			Privileged:               ptr.To(false),
+			AllowPrivilegeEscalation: ptr.To(false),
+			ReadOnlyRootFilesystem:   ptr.To(true),
+			Capabilities: &corev1.Capabilities{
+				Drop: []corev1.Capability{"ALL"},
+			},
+		},
+	}
+}
+
+func (p *PrometheusAgentBuilder) setKubeRBACProxySidecar() *PrometheusAgentBuilder {
+	newVolumes := []corev1.Volume{
+		{
+			Name: "kube-rbac-proxy-tls",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: p.RBACProxyTLSSecret,
+				},
+			},
+		},
+	}
+
+	p.Agent.Spec.Volumes = append(p.Agent.Spec.Volumes, newVolumes...)
+	p.Agent.Spec.Containers = append(
+		p.Agent.Spec.Containers,
+		p.createKubeRbacProxyContainer(),
+	)
+	return p
+}
+
+func (p PrometheusAgentBuilder) createKubeRbacProxyContainer() corev1.Container {
+	return corev1.Container{
+		Name:  "kube-rbac-proxy",
+		Image: p.KubeRBACProxyImage,
+		Resources: corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("1m"),
+				corev1.ResourceMemory: resource.MustParse("15Mi"),
+			},
+		},
+		Args: []string{
+			fmt.Sprintf("--secure-listen-address=0.0.0.0:%d", config.RBACProxyPort),
+			"--upstream=http://127.0.0.1:9090",
+			"--tls-cert-file=/etc/tls/private/tls.crt",
+			"--tls-private-key-file=/etc/tls/private/tls.key",
+			"--logtostderr=true",
+			"--allow-paths=/metrics",
+		},
+		VolumeMounts: []corev1.VolumeMount{
+			{
+				Name:      "kube-rbac-proxy-tls",
+				MountPath: "/etc/tls/private",
+				ReadOnly:  true,
+			},
+		},
+		Ports: []corev1.ContainerPort{
+			{
+				Name:          "metrics",
+				ContainerPort: int32(config.RBACProxyPort),
 			},
 		},
 		SecurityContext: &corev1.SecurityContext{

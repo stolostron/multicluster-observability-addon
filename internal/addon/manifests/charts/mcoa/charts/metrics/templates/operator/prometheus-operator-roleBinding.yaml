@@ -4,6 +4,8 @@ kind: ClusterRoleBinding
 metadata:
   name: acm-prometheus-operator
   labels:
+    app.kubernetes.io/component: {{ .Values.prometheusOperator.component }}
+    app.kubernetes.io/name: {{ .Values.prometheusOperator.appName }}
     {{ include "metricshelm.labels" . | nindent 4 }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
@@ -11,6 +13,6 @@ roleRef:
   name: acm-prometheus-operator
 subjects:
 - kind: ServiceAccount
-  name: prometheus-operator
+  name: {{ .Values.prometheusOperator.appName }}
   namespace: {{ .Release.Namespace }}
 {{- end }}

@@ -90,10 +90,10 @@ func TestPrometheusAgentBuilder_EnforcedFields(t *testing.T) {
 
 	// Envoy sidecar
 	containers := builder.Agent.Spec.Containers
-	assert.Len(t, containers, 1)
+	assert.Len(t, containers, 2)
 	assert.Equal(t, "envoy", containers[0].Name)
 	assert.Equal(t, "envoy:latest", containers[0].Image)
-	assert.Len(t, builder.Agent.Spec.Volumes, 2)
+	assert.Len(t, builder.Agent.Spec.Volumes, 3)
 	assert.Len(t, builder.Agent.Spec.VolumeMounts, 0)
 }
 
