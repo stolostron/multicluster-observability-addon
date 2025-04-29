@@ -34,12 +34,12 @@ var (
 )
 
 type HelmChartValues struct {
-	Enabled        bool                      `json:"enabled"`
-	SkipInstallCOO bool                      `json:"skipInstallCOO"`
-	Metrics        *mmanifests.MetricsValues `json:"metrics,omitempty"`
-	Logging        *lmanifests.LoggingValues `json:"logging,omitempty"`
-	Tracing        *tmanifests.TracingValues `json:"tracing,omitempty"`
-	Analytics      analytics.AnalyticsValues `json:"analytics"`
+	Enabled    bool                      `json:"enabled"`
+	InstallCOO bool                      `json:"installCOO"`
+	Metrics    *mmanifests.MetricsValues `json:"metrics,omitempty"`
+	Logging    *lmanifests.LoggingValues `json:"logging,omitempty"`
+	Tracing    *tmanifests.TracingValues `json:"tracing,omitempty"`
+	Analytics  analytics.AnalyticsValues `json:"analytics"`
 }
 
 func GetValuesFunc(ctx context.Context, k8s client.Client, logger logr.Logger) addonfactory.GetValuesFunc {
@@ -71,7 +71,7 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, logger logr.Logger) a
 			Enabled: true,
 		}
 
-		userValues.SkipInstallCOO, err = addon.SkipInstallCOO(ctx, k8s, logger, isHubCluster(cluster))
+		userValues.InstallCOO, err = addon.InstallCOO(ctx, k8s, logger, isHubCluster(cluster), opts)
 		if err != nil {
 			return nil, err
 		}
