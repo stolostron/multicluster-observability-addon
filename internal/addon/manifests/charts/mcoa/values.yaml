@@ -3,14 +3,15 @@ nameOverride: null
 enabled: true
 
 metrics:
-  enabled: true
+  platformEnabled: false
+  userWorkloadsEnabled: false
 
 logging:
-  enabled: true
+  enabled: false
 
 tracing:
-  enabled: true
+  enabled: false
 
 analytics:
   incidentDetection:
-    enabled: true
+    enabled: false

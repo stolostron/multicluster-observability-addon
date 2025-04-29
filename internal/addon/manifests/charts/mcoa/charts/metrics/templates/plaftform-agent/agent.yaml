@@ -1,4 +1,4 @@
-{{- if or .Values.platformEnabled }}
+{{- if .Values.platformEnabled }}
 apiVersion: monitoring.coreos.com/v1alpha1
 kind: PrometheusAgent
 metadata:

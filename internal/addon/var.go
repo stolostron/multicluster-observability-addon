@@ -19,10 +19,8 @@ const (
 
 	AddonDeploymentConfigResource = "addondeploymentconfigs"
 
-	PrometheusAgentResource = "prometheusagents"
-	PPAName                 = "acm-platform-metrics-collector-config"
-	paProbeKey              = "isAvailable"
-	paProbePath             = ".status.conditions[?(@.type==\"Available\")].status"
+	paProbeKey  = "isAvailable"
+	paProbePath = ".status.conditions[?(@.type==\"Available\")].status"
 
 	ClusterLogForwardersResource = "clusterlogforwarders"
 	LokiStacksResource           = "lokistacks"

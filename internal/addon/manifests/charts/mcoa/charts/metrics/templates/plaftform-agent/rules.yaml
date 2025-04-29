@@ -1,3 +1,4 @@
+{{- if .Values.platformEnabled }}
 {{- range $_, $rule := .Values.platform.rules }}
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
@@ -18,4 +19,5 @@ metadata:
 spec:
 {{ fromJson $rule.data | toYaml | nindent 2 }}
 ---
+{{- end }}
 {{- end }}

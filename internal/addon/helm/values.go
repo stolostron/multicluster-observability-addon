@@ -35,9 +35,9 @@ var (
 
 type HelmChartValues struct {
 	Enabled   bool                      `json:"enabled"`
-	Metrics   mmanifests.MetricsValues  `json:"metrics"`
-	Logging   lmanifests.LoggingValues  `json:"logging"`
-	Tracing   tmanifests.TracingValues  `json:"tracing"`
+	Metrics   *mmanifests.MetricsValues `json:"metrics,omitempty"`
+	Logging   *lmanifests.LoggingValues `json:"logging,omitempty"`
+	Tracing   *tmanifests.TracingValues `json:"tracing,omitempty"`
 	Analytics analytics.AnalyticsValues `json:"analytics"`
 }
 
@@ -70,34 +70,22 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, logger logr.Logger) a
 			Enabled: true,
 		}
 
-		metricsValues, err := getMonitoringValues(ctx, k8s, logger, cluster, mcAddon, opts)
+		userValues.Metrics, err = getMonitoringValues(ctx, k8s, logger, cluster, mcAddon, opts)
 		if err != nil {
 			return nil, err
 		}
-		if metricsValues != nil {
-			userValues.Metrics = *metricsValues
-		}
 
-		loggingValues, err := getLoggingValues(ctx, k8s, cluster, mcAddon, opts)
+		userValues.Logging, err = getLoggingValues(ctx, k8s, cluster, mcAddon, opts)
 		if err != nil {
 			return nil, err
 		}
-		if loggingValues != nil {
-			userValues.Logging = *loggingValues
-		}
 
-		tracingValues, err := getTracingValues(ctx, k8s, cluster, mcAddon, opts)
+		userValues.Tracing, err = getTracingValues(ctx, k8s, cluster, mcAddon, opts)
 		if err != nil {
 			return nil, err
 		}
-		if tracingValues != nil {
-			userValues.Tracing = *tracingValues
-		}
 
-		incidentDetectionValues := getIncidentDetectionValues(ctx, k8s, cluster, mcAddon, opts)
-		if incidentDetectionValues != nil {
-			userValues.Analytics.IncidentDetectionValues = *incidentDetectionValues
-		}
+		userValues.Analytics.IncidentDetectionValues = getIncidentDetectionValues(ctx, k8s, cluster, mcAddon, opts)
 
 		return addonfactory.JsonStructToValues(userValues)
 	}
@@ -187,17 +175,9 @@ func getAddOnDeploymentConfig(ctx context.Context, k8s client.Client, mcAddon *a
 }
 
 func isHubCluster(cluster *clusterv1.ManagedCluster) bool {
-	val, ok := cluster.Labels[clusterlifecycleconstants.SelfManagedClusterLabelKey]
-	if !ok {
-		return false
-	}
-	return val == "true"
+	return cluster.Labels[clusterlifecycleconstants.SelfManagedClusterLabelKey] == "true"
 }
 
 func supportedKubeVendors(cluster *clusterv1.ManagedCluster) bool {
-	val, ok := cluster.Labels[clusterinfov1beta1.LabelKubeVendor]
-	if !ok {
-		return false
-	}
-	return val == string(clusterinfov1beta1.KubeVendorOpenShift)
+	return cluster.Labels[clusterinfov1beta1.LabelKubeVendor] == string(clusterinfov1beta1.KubeVendorOpenShift)
 }

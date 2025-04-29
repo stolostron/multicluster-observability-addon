@@ -7,7 +7,6 @@ metadata:
     app: {{ template "incidentDetectionhelm.name" . }}
     chart: {{ template "incidentDetectionhelm.chart" . }}
     release: {{ .Release.Name }}
-
 spec:
   monitoring:
     incidents:
