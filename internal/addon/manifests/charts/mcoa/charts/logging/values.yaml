@@ -7,7 +7,7 @@ openshiftLoggingChannel: channelName
 
 managed:
   collection:
-    enabled: true
+    enabled: false
     # Expects json format
     clfAnnotations: []
 
@@ -25,7 +25,7 @@ managed:
         # Expects json format
         data: {}
   storage:
-    enabled: true
+    enabled: false
 
     # Expects json format
     lsSpec: []
@@ -39,7 +39,7 @@ managed:
 
 unmanaged:
   collection:
-    enabled: true
+    enabled: false
     # Expects json format
     clfAnnotations: []
 

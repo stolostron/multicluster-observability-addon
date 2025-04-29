@@ -110,7 +110,7 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 	key = client.ObjectKey{Name: addon.Name}
 	cmao := &addonv1alpha1.ClusterManagementAddOn{}
-	if err := r.Get(ctx, key, cmao); err != nil {
+	if err = r.Get(ctx, key, cmao); err != nil {
 		return ctrl.Result{}, err
 	}
 

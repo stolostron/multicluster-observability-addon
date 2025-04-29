@@ -1000,6 +1000,10 @@ func Test_Logging_HubCluster(t *testing.T) {
 							Name:  "openshiftLoggingChannel",
 							Value: "stable-5.8",
 						},
+						{
+							Name:  "platformLogsCollection",
+							Value: "clusterlogforwarders.v1.observability.openshift.io",
+						},
 					},
 				},
 			}

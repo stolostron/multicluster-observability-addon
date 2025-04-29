@@ -1,5 +1,5 @@
 collection:
-  enabled: true
+  enabled: false
   # Expects json format
   clfSpec: []
 
@@ -16,4 +16,4 @@ collection:
       data: {}
 
 storage:
-  enabled: true
+  enabled: false
