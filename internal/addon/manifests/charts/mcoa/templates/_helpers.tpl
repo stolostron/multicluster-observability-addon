@@ -9,7 +9,7 @@
 {{- end -}}
 
 {{- define "mcoahelm.installCOO" -}}
-{{- if and .Values.enabled .Values.analytics.incidentDetection.enabled -}}
+{{- if and .Values.enabled (or .Values.analytics.incidentDetection.enabled .Values.observability_ui.enabled) -}}
 true
 {{- else -}}
 false

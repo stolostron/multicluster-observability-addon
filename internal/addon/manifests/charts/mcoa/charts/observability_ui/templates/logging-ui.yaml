@@ -1,2 +1,13 @@
 # enable UI plugin only when logging UI is enabled
-if
+{{- if .Values.observability_ui.logging.enabled }}
+apiVersion: observability.openshift.io/v1alpha1
+kind: UIPlugin
+metadata:
+  name: logging
+  labels:
+      app: {{ template "observabilityUIhelm.name" . }}
+      chart: {{ template "observabilityUIhelm.chart" . }}
+      release: {{ .Release.Name }}
+spec:
+  type: Logging
+  {{- end }}

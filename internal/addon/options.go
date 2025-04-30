@@ -17,12 +17,14 @@ const (
 	KeyPlatformLogsCollection    = "platformLogsCollection"
 	KeyPlatformIncidentDetection = "platformIncidentDetection"
 	KeyMetricsHubHostname        = "metricsHubHostname"
+	KeyPlatformObservabilityUI   = "platformObservabilityUI"
 
 	// User Workloads Observability Keys
 	KeyUserWorkloadMetricsCollection = "userWorkloadMetricsCollection"
 	KeyUserWorkloadLogsCollection    = "userWorkloadLogsCollection"
 	KeyUserWorkloadTracesCollection  = "userWorkloadTracesCollection"
 	KeyUserWorkloadInstrumentation   = "userWorkloadInstrumentation"
+	KeyUserWorkloadObservabilityUI   = "userWorkloadObservabilityUI"
 )
 
 type CollectionKind string
@@ -65,11 +67,19 @@ type TracesOptions struct {
 	SubscriptionChannel    string
 }
 
+type ObsUIOptions struct {
+	Enabled bool
+	Metrics MetricsOptions
+	Logs    LogsOptions
+	Traces  TracesOptions
+}
+
 type PlatformOptions struct {
 	Enabled          bool
 	Metrics          MetricsOptions
 	Logs             LogsOptions
 	AnalyticsOptions AnalyticsOptions
+	ObsUI            ObsUIOptions
 }
 
 type AnalyticsOptions struct {
@@ -81,16 +91,12 @@ type UserWorkloadOptions struct {
 	Metrics MetricsOptions
 	Logs    LogsOptions
 	Traces  TracesOptions
-}
-
-type ObsUIOptions struct {
-	Enabled bool
+	ObsUI   ObsUIOptions
 }
 
 type Options struct {
 	Platform      PlatformOptions
 	UserWorkloads UserWorkloadOptions
-	ObsUI         ObsUIOptions
 }
 
 func BuildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Options, error) {
@@ -143,6 +149,11 @@ func BuildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Opti
 				opts.Platform.Enabled = true
 				opts.Platform.AnalyticsOptions.IncidentDetection.Enabled = true
 			}
+		case KeyPlatformObservabilityUI:
+			if keyvalue.Value == string(UIPluginV1alpha1) {
+				opts.Platform.Enabled = true
+				opts.Platform.ObsUI.Enabled = true
+			}
 		// User Workload Observability Options
 		case KeyUserWorkloadMetricsCollection:
 			if keyvalue.Value == string(PrometheusAgentV1alpha1) {
@@ -163,6 +174,11 @@ func BuildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Opti
 			if keyvalue.Value == string(InstrumentationV1alpha1) {
 				opts.UserWorkloads.Enabled = true
 				opts.UserWorkloads.Traces.InstrumentationEnabled = true
+			}
+		case KeyUserWorkloadObservabilityUI:
+			if keyvalue.Value == string(UIPluginV1alpha1) {
+				opts.UserWorkloads.Enabled = true
+				opts.UserWorkloads.ObsUI.Enabled = true
 			}
 		}
 	}

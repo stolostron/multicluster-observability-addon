@@ -1,0 +1,15 @@
+{{- if .Values.enabled}}
+apiVersion: observability.openshift.io/v1alpha1
+kind: UIPlugin
+metadata:
+  name: monitoring
+  labels:
+    app: {{ template "observabilityUIhelm.name" . }}
+    chart: {{ template "observabilityUIhelm.chart" . }}
+    release: {{ .Release.Name }}
+spec:
+  type: Monitoring
+  monitoring:
+    perses:
+      enabled: true
+{{- end }}

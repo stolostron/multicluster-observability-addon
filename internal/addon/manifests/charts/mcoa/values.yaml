@@ -15,3 +15,12 @@ tracing:
 analytics:
   incidentDetection:
     enabled: false
+
+observabilityUI:
+  enabled: false
+  monitoring:
+    enabled: false
+  logging:
+    enabled: false
+  tracing:
+    enabled: false
