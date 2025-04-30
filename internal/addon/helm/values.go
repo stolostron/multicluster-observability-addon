@@ -162,6 +162,7 @@ func getIncidentDetectionValues(ctx context.Context, k8s client.Client, cluster 
 	incDecOptions := ihandlers.BuildOptions(ctx, k8s, mcAddon, opts.Platform.AnalyticsOptions.IncidentDetection)
 	return imanifests.BuildValues(incDecOptions)
 }
+
 func getObservabilityUIValues(ctx context.Context, k8s client.Client, cluster *clusterv1.ManagedCluster, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, opts addon.Options) *uimanifests.UIValues {
 	if !opts.ObsUI.Enabled {
 		return nil
