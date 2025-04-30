@@ -185,8 +185,6 @@ func BuildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Opti
 				opts.ObsUI.Enabled = true
 			}
 		case KeyObservabilityUILogs:
-			if keyvalue.Value == string(UIPluginV1alpha1) {
-				opts.ObsUI.Logs.Enabled = true
 			}
 		}
 	}
