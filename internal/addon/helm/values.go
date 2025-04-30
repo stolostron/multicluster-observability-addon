@@ -41,7 +41,7 @@ type HelmChartValues struct {
 	Logging   *lmanifests.LoggingValues `json:"logging,omitempty"`
 	Tracing   *tmanifests.TracingValues `json:"tracing,omitempty"`
 	Analytics analytics.AnalyticsValues `json:"analytics"`
-	ObsUI     *uimanifests.UIValues     `json:"obsUI"`
+	ObsUI     *uimanifests.UIValues     `json:"observabilityUI,omitempty"`
 }
 
 func GetValuesFunc(ctx context.Context, k8s client.Client, logger logr.Logger) addonfactory.GetValuesFunc {
@@ -163,14 +163,14 @@ func getIncidentDetectionValues(ctx context.Context, k8s client.Client, cluster 
 	return imanifests.BuildValues(incDecOptions)
 }
 func getObservabilityUIValues(ctx context.Context, k8s client.Client, cluster *clusterv1.ManagedCluster, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, opts addon.Options) *uimanifests.UIValues {
-	if !opts.Platform.ObsUI.Enabled && !opts.UserWorkloads.ObsUI.Enabled {
+	if !opts.ObsUI.Enabled {
 		return nil
 	}
 	if !isHubCluster(cluster) {
 		return nil
 	}
 
-	uiOpts := uihandlers.BuildOptions(ctx, k8s, mcAddon, opts.Platform.ObsUI, opts.UserWorkloads.ObsUI)
+	uiOpts := uihandlers.BuildOptions(ctx, k8s, mcAddon, opts.ObsUI)
 	return uimanifests.BuildValues(uiOpts)
 }
 
