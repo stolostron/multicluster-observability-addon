@@ -7,8 +7,8 @@ import (
 	otelv1alpha1 "github.com/open-telemetry/opentelemetry-operator/apis/v1alpha1"
 	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
 	prometheusalpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
-	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	uiplugin "github.com/rhobs/observability-operator/pkg/apis/uiplugin/v1alpha1"
+	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	"open-cluster-management.io/addon-framework/pkg/utils"
 	"open-cluster-management.io/api/addon/v1alpha1"
@@ -169,6 +169,21 @@ func AgentHealthProber() *agent.HealthProber {
 								return fmt.Errorf("%w: %s replicas is %d for %s/%s", errProbeConditionNotSatisfied, identifier.Resource, *value.Value.Integer, identifier.Namespace, identifier.Name)
 							}
 							// otel collector passes the health check
+						}
+					case UIPluginsResource:
+						for _, value := range field.FeedbackResult.Values {
+							if value.Name != uipProbeKey {
+								return fmt.Errorf("%w: %s with key %s unknown probe keys %s", errUnknownProbeKey, identifier.Resource, identifier.Name, value.Name)
+							}
+
+							if value.Value.String == nil {
+								return fmt.Errorf("%w: %s with key %s", errProbeValueIsNil, identifier.Resource, identifier.Name)
+							}
+
+							if *value.Value.String != "True" {
+								return fmt.Errorf("%w: %s status condition type is %s for %s", errProbeConditionNotSatisfied, identifier.Resource, *value.Value.String, identifier.Name)
+							}
+							// uiplugin passes the health check
 						}
 					default:
 						// If a resource is being probed it should have a health check defined
