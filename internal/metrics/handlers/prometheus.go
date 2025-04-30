@@ -6,8 +6,6 @@ import (
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	prometheusalpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 )
@@ -19,8 +17,6 @@ type PrometheusAgentBuilder struct {
 	RemoteWriteEndpoint      string
 	ClusterName              string
 	ClusterID                string
-	EnvoyConfigMapName       string
-	EnvoyProxyImage          string
 	PrometheusImage          string
 	MatchLabels              map[string]string
 	IsHypershiftLocalCluster bool
@@ -31,7 +27,7 @@ func (p *PrometheusAgentBuilder) Build() *prometheusalpha1.PrometheusAgent {
 	return p.setCommonFields().
 		setPrometheusRemoteWriteConfig().
 		setWatchedResources().
-		setEnvoyProxySidecar().
+		setScrapeClasses().
 		Agent
 }
 
@@ -175,72 +171,22 @@ func (p *PrometheusAgentBuilder) setWatchedResources() *PrometheusAgentBuilder {
 	return p
 }
 
-func (p *PrometheusAgentBuilder) setEnvoyProxySidecar() *PrometheusAgentBuilder {
-	envoyVolumes := []corev1.Volume{
+func (p *PrometheusAgentBuilder) setScrapeClasses() *PrometheusAgentBuilder {
+	p.Agent.Spec.ConfigMaps = append(p.Agent.Spec.ConfigMaps, config.PrometheusCAConfigMapName)
+
+	p.Agent.Spec.ScrapeClasses = []prometheusv1.ScrapeClass{
 		{
-			Name: "envoy-config",
-			VolumeSource: corev1.VolumeSource{
-				ConfigMap: &corev1.ConfigMapVolumeSource{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: p.EnvoyConfigMapName,
-					},
-				},
+			Authorization: &prometheusv1.Authorization{
+				CredentialsFile: "/var/run/secrets/kubernetes.io/serviceaccount/token",
 			},
-		},
-		{
-			Name: "prom-server-ca",
-			VolumeSource: corev1.VolumeSource{
-				ConfigMap: &corev1.ConfigMapVolumeSource{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: config.PrometheusCAConfigMapName,
-					},
-				},
+			Name: "ocp-monitoring",
+			TLSConfig: &prometheusv1.TLSConfig{
+				CAFile: fmt.Sprintf("/etc/prometheus/configmaps/%s/service-ca.crt", config.PrometheusCAConfigMapName),
 			},
 		},
 	}
 
-	p.Agent.Spec.Volumes = append(p.Agent.Spec.Volumes, envoyVolumes...)
-	p.Agent.Spec.Containers = append(
-		p.Agent.Spec.Containers,
-		p.createEnvoyContainer(),
-	)
 	return p
-}
-
-func (p *PrometheusAgentBuilder) createEnvoyContainer() corev1.Container {
-	return corev1.Container{
-		Name:  "envoy",
-		Image: p.EnvoyProxyImage,
-		Resources: corev1.ResourceRequirements{
-			Requests: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("3m"),
-				corev1.ResourceMemory: resource.MustParse("60Mi"),
-			},
-		},
-		Command: []string{"/bin/sh", "-c"},
-		Args: []string{
-			"/usr/local/bin/envoy -c /etc/envoy/envoy.yaml",
-		},
-		VolumeMounts: []corev1.VolumeMount{
-			{
-				Name:      "envoy-config",
-				MountPath: "/etc/envoy",
-			},
-			{
-				Name:      "prom-server-ca",
-				MountPath: "/etc/certs",
-			},
-		},
-		SecurityContext: &corev1.SecurityContext{
-			RunAsNonRoot:             ptr.To(true),
-			Privileged:               ptr.To(false),
-			AllowPrivilegeEscalation: ptr.To(false),
-			ReadOnlyRootFilesystem:   ptr.To(true),
-			Capabilities: &corev1.Capabilities{
-				Drop: []corev1.Capability{"ALL"},
-			},
-		},
-	}
 }
 
 func (p *PrometheusAgentBuilder) formatSecretPath(secretName, fileName string) string {
