@@ -43,6 +43,8 @@ const (
 	uiPluginsResource = "uiplugins"
 	uipProbeKey       = "isAvailable"
 	uipProbePath      = ".status.conditions[?(@.type==\"Available\")].status"
+
+	DefaultStackPrefix = "default-stack-instance"
 )
 
 var (
