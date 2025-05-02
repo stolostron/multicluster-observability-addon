@@ -34,6 +34,8 @@ const (
 	SpokeOTELColNamespace           = "mcoa-opentelemetry"
 	otelColProbeKey                 = "replicas"
 	otelColProbePath                = ".spec.replicas"
+
+	DefaultStackPrefix = "default-stack-instance"
 )
 
 var errInvalidMetricsHubHostname = errors.New("invalid metrics hub hostname")

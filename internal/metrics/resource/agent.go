@@ -8,34 +8,14 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	_ "embed"
 )
 
-const (
-	DefaultPlatformMetricsCollectorApp     = config.PlatformMetricsCollectorApp + "-default"
-	defaultUserWorkloadMetricsCollectorApp = config.UserWorkloadMetricsCollectorApp + "-default"
-	scrapeTimeout                          = "30s"
-)
-
-func DefaultPlaftformAgentResources(ns string) []client.Object {
-	ret := []client.Object{}
-
-	// Create platform resources
-	agent := newPrometheusAgent(ns, DefaultPlatformMetricsCollectorApp, config.PlatformPrometheusMatchLabels, &metav1.LabelSelector{})
-	ret = append(ret, agent) // listen only to the same namespace
-	return ret
+func NewDefaultPlatformPrometheusAgent(namespace, name string) *prometheusalpha1.PrometheusAgent {
+	return newPrometheusAgent(namespace, name, config.PlatformPrometheusMatchLabels, &metav1.LabelSelector{}) // listen only to the same namespace
 }
 
-func DefaultUserWorkloadAgentResources(ns string) []client.Object {
-	ret := []client.Object{}
-
-	// Create user workload resources
-	agent := newPrometheusAgent(ns, defaultUserWorkloadMetricsCollectorApp, config.UserWorkloadPrometheusMatchLabels, nil)
-	ret = append(ret, agent) // listen to all namespaces
-
-	return ret
+func NewDefaultUserWorkloadsPrometheusAgent(namespace, name string) *prometheusalpha1.PrometheusAgent {
+	return newPrometheusAgent(namespace, name, config.UserWorkloadPrometheusMatchLabels, nil) // listen to all namespaces
 }
 
 // newPrometheusAgent is a helper function to create a PrometheusAgent resource with given parameters
@@ -83,7 +63,7 @@ func newDefaultPrometheusAgent() *prometheusalpha1.PrometheusAgent {
 				SecurityContext: &corev1.PodSecurityContext{
 					RunAsNonRoot: ptr.To(true),
 				},
-				ScrapeTimeout: scrapeTimeout,
+				ScrapeTimeout: prometheusv1.Duration("30s"),
 				PortName:      "web", // set this value to the default to avoid triggering update when comparing the spec
 			},
 		},

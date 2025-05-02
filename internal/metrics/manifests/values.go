@@ -22,7 +22,7 @@ type MetricsValues struct {
 type Collector struct {
 	AppName             string        `json:"appName"`
 	ConfigMaps          []ConfigValue `json:"configMaps"`
-	PrometheusAgentSpec string        `json:"prometheusAgentSpec"`
+	PrometheusAgentSpec ConfigValue   `json:"prometheusAgent"`
 	ScrapeConfigs       []ConfigValue `json:"scrapeConfigs"`
 	Rules               []ConfigValue `json:"rules"`
 	ServiceMonitors     []ConfigValue `json:"serviceMonitors"` // For HCPs custom user workload serviceMonitors
@@ -61,7 +61,10 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 			return ret, err
 		}
 
-		ret.Platform.PrometheusAgentSpec = string(agentJson)
+		ret.Platform.PrometheusAgentSpec = ConfigValue{
+			Data:   string(agentJson),
+			Labels: opts.Platform.PrometheusAgent.Labels,
+		}
 	}
 
 	// Build Prometheus Agent Spec for User Workloads
@@ -73,7 +76,10 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 			return ret, err
 		}
 
-		ret.UserWorkload.PrometheusAgentSpec = string(agentJson)
+		ret.UserWorkload.PrometheusAgentSpec = ConfigValue{
+			Data:   string(agentJson),
+			Labels: opts.UserWorkloads.PrometheusAgent.Labels,
+		}
 	}
 
 	// Build scrape configs
