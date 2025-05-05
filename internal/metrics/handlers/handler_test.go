@@ -17,6 +17,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	intstr "k8s.io/apimachinery/pkg/util/intstr"
 	kubescheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/utils/ptr"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -49,6 +50,12 @@ func TestBuildOptions(t *testing.T) {
 			CommonPrometheusFields: prometheusv1.CommonPrometheusFields{
 				LogLevel:   "debug",
 				ConfigMaps: []string{"test-haproxy-config"},
+				RemoteWrite: []prometheusv1.RemoteWriteSpec{
+					{
+						Name: ptr.To(config.RemoteWriteCfgName),
+					},
+				},
+				Secrets: []string{config.ClientCertSecretName, config.HubCASecretName},
 			},
 		},
 	}

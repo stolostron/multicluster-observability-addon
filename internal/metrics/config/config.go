@@ -35,6 +35,7 @@ const (
 
 	PlacementRefNameLabelKey      = "placement-ref-name"
 	PlacementRefNamespaceLabelKey = "placement-ref-namespace"
+	RemoteWriteCfgName            = "acm-observability"
 )
 
 var (

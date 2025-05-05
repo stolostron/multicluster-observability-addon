@@ -12,7 +12,6 @@ import (
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
-	"github.com/stolostron/multicluster-observability-addon/internal/metrics/resource"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -120,29 +119,44 @@ func (o *OptionsBuilder) buildPrometheusAgent(ctx context.Context, opts *Options
 	if len(platformAgents) != 1 {
 		return fmt.Errorf("%w: for application %s, found %d agents with labels %+v", errInvalidConfigResourcesCount, appName, len(platformAgents), labelsMatcher)
 	}
+	agent := platformAgents[0]
 
 	// TODO: enforce remote write relabel config
-
-	// Build the agent
-	promBuilder := resource.PrometheusAgentBuilder{
-		Agent:               platformAgents[0].DeepCopy(),
-		SAName:              appName,
-		MatchLabels:         map[string]string{"app": appName},
-		RemoteWriteEndpoint: o.RemoteWriteURL,
+	// get the remote write config from the agent
+	remoteWriteSpec := &prometheusv1.RemoteWriteSpec{}
+	for _, spec := range agent.Spec.RemoteWrite {
+		if spec.Name != nil && *spec.Name == config.RemoteWriteCfgName {
+			remoteWriteSpec = &spec
+			break
+		}
+	}
+	if remoteWriteSpec == nil {
+		return fmt.Errorf("failed to get the %q remote write spec in agent %s/%s", config.RemoteWriteCfgName, agent.Namespace, agent.Name)
 	}
 
-	var agent *prometheusalpha1.PrometheusAgent
+	// add the relabel cfg
+	remoteWriteSpec.WriteRelabelConfigs = createWriteRelabelConfigs(opts.ClusterName, opts.ClusterID, isHypershift)
+
+	// // Build the agent
+	// promBuilder := resource.PrometheusAgentBuilder{
+	// 	Agent:               platformAgents[0].DeepCopy(),
+	// 	SAName:              appName,
+	// 	MatchLabels:         map[string]string{"app": appName},
+	// 	RemoteWriteEndpoint: o.RemoteWriteURL,
+	// }
+
+	// var agent *prometheusalpha1.PrometheusAgent
 
 	// Set the built agent in the appropriate workload option
 	switch appName {
 	case config.PlatformMetricsCollectorApp:
 
-		promBuilder.MatchLabels = config.PlatformPrometheusMatchLabels
-		agent = promBuilder.Build()
+		// promBuilder.MatchLabels = config.PlatformPrometheusMatchLabels
+		// agent = promBuilder.Build()
 		opts.Platform.PrometheusAgent = agent
 	case config.UserWorkloadMetricsCollectorApp:
-		promBuilder.MatchLabels = config.UserWorkloadPrometheusMatchLabels
-		agent = promBuilder.Build()
+		// promBuilder.MatchLabels = config.UserWorkloadPrometheusMatchLabels
+		// agent = promBuilder.Build()
 		opts.UserWorkloads.PrometheusAgent = agent
 	default:
 		return fmt.Errorf("%w: %s", errUnsupportedAppName, appName)

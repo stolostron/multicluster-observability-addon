@@ -49,19 +49,19 @@ func (p *PrometheusAgentBuilder) setCommonFields() *PrometheusAgentBuilder {
 
 func (p *PrometheusAgentBuilder) setPrometheusRemoteWriteConfig() *PrometheusAgentBuilder {
 	spec := &p.Agent.Spec.CommonPrometheusFields
-	spec.Secrets = append(spec.Secrets, config.HubCASecretName, config.ClientCertSecretName) // TODO: keep user secrets, only enforce ours
+	spec.Secrets = append(spec.Secrets, config.HubCASecretName, config.ClientCertSecretName)
 
 	// keep user remote write configs and enforce ours
 	desiredRemoteWriteSpec := prometheusv1.RemoteWriteSpec{
 		URL:           p.RemoteWriteEndpoint,
-		Name:          ptr.To("acm-observability"),
+		Name:          ptr.To(config.RemoteWriteCfgName),
 		RemoteTimeout: ptr.To(prometheusv1.Duration("30s")),
 		TLSConfig: &prometheusv1.TLSConfig{
 			CAFile:   p.formatSecretPath(config.HubCASecretName, "ca.crt"),
 			CertFile: p.formatSecretPath(config.ClientCertSecretName, "tls.crt"),
 			KeyFile:  p.formatSecretPath(config.ClientCertSecretName, "tls.key"),
 		},
-		// WriteRelabelConfigs: [],
+		// WriteRelabelConfigs is set individually for each managed cluster in order to enforce cluster identification labels
 		QueueConfig: p.createQueueConfig(),
 	}
 

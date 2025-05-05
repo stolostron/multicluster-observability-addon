@@ -6,6 +6,7 @@ import (
 
 	"github.com/go-logr/logr"
 	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
+	prometheusalpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	mresources "github.com/stolostron/multicluster-observability-addon/internal/metrics/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -130,6 +131,7 @@ func (r *ResourceCreatorReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&addonv1alpha1.AddOnDeploymentConfig{}, mcoaAODCPredicate, builder.OnlyMetadata).
 		Watches(&loggingv1.ClusterLogForwarder{}, r.enqueueDefaultResources()).
+		Watches(&prometheusalpha1.PrometheusAgent{}, r.enqueueDefaultResources()).
 		// Watches(&lokiv1.LokiStack{}, r.enqueueDefaultResources()).
 		Complete(r)
 }
