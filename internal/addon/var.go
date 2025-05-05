@@ -18,6 +18,10 @@ const (
 
 	AddonDeploymentConfigResource = "addondeploymentconfigs"
 
+	cooSubscriptionName      = "cluster-observability-operator"
+	cooSubscriptionNamespace = "openshift-cluster-observability-operator"
+	cooSubscriptionChannel   = "stable"
+
 	paProbeKey  = "isAvailable"
 	paProbePath = ".status.conditions[?(@.type==\"Available\")].status"
 
@@ -36,7 +40,10 @@ const (
 	otelColProbePath                = ".spec.replicas"
 )
 
-var errInvalidMetricsHubHostname = errors.New("invalid metrics hub hostname")
+var (
+	errInvalidMetricsHubHostname  = errors.New("invalid metrics hub hostname")
+	errInvalidSubscriptionChannel = errors.New("current version of the cluster-observability-operator installed doesn't match the supported MCOA version")
+)
 
 //go:embed manifests
 //go:embed manifests/charts/mcoa
