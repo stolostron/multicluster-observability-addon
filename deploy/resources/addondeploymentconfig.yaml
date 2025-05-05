@@ -40,4 +40,6 @@ spec:
   # Enables Observability UI Logs
   - name: observabilityUILogs
     value: uiplugins.v1alpha1.observability.openshift.io
-    
+  # Enables Observability UI Metrics
+  - name: observabilityUIMetrics
+    value: uiplugins.v1alpha1.observability.openshift.io
