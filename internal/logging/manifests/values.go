@@ -6,7 +6,7 @@ import (
 
 type LoggingValues struct {
 	Enabled                 bool            `json:"enabled"`
-	SkipOperatorInstall     bool            `json:"skipOperatorInstall"`
+	InstallCLO              bool            `json:"installCLO"`
 	OpenshiftLoggingChannel string          `json:"openshiftLoggingChannel"`
 	Unmanaged               UnmanagedValues `json:"unmanaged"`
 	Managed                 ManagedValues   `json:"managed"`
@@ -47,12 +47,9 @@ type ResourceValue struct {
 func BuildValues(opts Options) (*LoggingValues, error) {
 	subChannel := buildSubscriptionChannel(opts)
 
-	skipOperatorInstall := false
-	if opts.ClusterLoggingSubscription != nil && opts.ClusterLoggingSubscription.Name != "" {
-		if opts.ClusterLoggingSubscription.Spec.Channel != subChannel {
-			return nil, errInvalidSubscriptionChannel
-		}
-		skipOperatorInstall = true
+	installCLO, err := shouldInstallCLO(opts, subChannel)
+	if err != nil {
+		return nil, err
 	}
 
 	uValues, err := buildUnmangedValues(opts)
@@ -68,7 +65,7 @@ func BuildValues(opts Options) (*LoggingValues, error) {
 	return &LoggingValues{
 		Enabled:                 enabledLogging(opts),
 		OpenshiftLoggingChannel: subChannel,
-		SkipOperatorInstall:     skipOperatorInstall,
+		InstallCLO:              installCLO,
 		Unmanaged:               uValues,
 		Managed:                 mValues,
 	}, nil
@@ -181,4 +178,22 @@ func buildMangedValues(opts Options) (ManagedValues, error) {
 	}
 
 	return mValues, nil
+}
+
+func shouldInstallCLO(opts Options, channel string) (bool, error) {
+	// If no subscription is provided, want to install CLO
+	if opts.ClusterLoggingSubscription == nil || opts.ClusterLoggingSubscription.Name == "" {
+		return true, nil
+	}
+
+	if opts.ClusterLoggingSubscription.Spec.Channel != channel {
+		return false, errInvalidSubscriptionChannel
+	}
+
+	// If the subscription has our release label, install the operator
+	if value, exists := opts.ClusterLoggingSubscription.Labels["release"]; exists && value == "multicluster-observability-addon" {
+		return true, nil
+	}
+
+	return false, nil
 }

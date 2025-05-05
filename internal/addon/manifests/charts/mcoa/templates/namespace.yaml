@@ -1,4 +1,4 @@
-{{- if eq (include "mcoahelm.installCOO" .) "true" }}
+{{- if .Values.installCOO }}
 apiVersion: v1
 kind: Namespace
 metadata:

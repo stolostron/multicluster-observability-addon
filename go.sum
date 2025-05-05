@@ -326,6 +326,8 @@ github.com/prometheus/prometheus v0.301.0 h1:0z8dgegmILivNomCd79RKvVkIols8vBGPKm
 github.com/prometheus/prometheus v0.301.0/go.mod h1:BJLjWCKNfRfjp7Q48DrAjARnCi7GhfUVvUFEAWTssZM=
 github.com/prometheus/sigv4 v0.1.0 h1:FgxH+m1qf9dGQ4w8Dd6VkthmpFQfGTzUeavMoQeG1LA=
 github.com/prometheus/sigv4 v0.1.0/go.mod h1:doosPW9dOitMzYe2I2BN0jZqUuBrGPbXrNsTScN18iU=
+github.com/rhobs/observability-operator v1.0.1-0.20250402055516-9401247f1632 h1:tUarHlTgrUuSj91n5D8RS0Shj/Yk2kQdQ2bJ551buK8=
+github.com/rhobs/observability-operator v1.0.1-0.20250402055516-9401247f1632/go.mod h1:crKGz6tGQHBjEUocGdtL2d75NIBJDKT3/bhKLxsbcSA=
 github.com/rhobs/observability-operator v1.0.1-0.20250414131549-04d4da885443 h1:/qU/0fvo60PigyjtSsOfOCIUB+OuNEN1OiLU3zPrLXs=
 github.com/rhobs/observability-operator v1.0.1-0.20250414131549-04d4da885443/go.mod h1:crKGz6tGQHBjEUocGdtL2d75NIBJDKT3/bhKLxsbcSA=
 github.com/rogpeppe/go-internal v1.13.1 h1:KvO1DLK/DRN07sQ1LQKScxyZJuNnedQ5/wKSR38lUII=

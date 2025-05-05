@@ -2,7 +2,8 @@ nameOverride: null
 
 enabled: true
 
-skipOperatorInstall: false
+installCLO: false
+
 openshiftLoggingChannel: channelName
 
 managed:
