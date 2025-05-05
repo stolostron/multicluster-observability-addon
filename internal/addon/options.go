@@ -25,9 +25,9 @@ const (
 	KeyUserWorkloadInstrumentation   = "userWorkloadInstrumentation"
 
 	// Observability UI Keys
-	KeyObservabilityUI     = "observabilityUIEnablement"
-	KeyObservabilityUILogs = "observabilityUILogs"
-	// KeyObservabilityUIMetrics = "observabilityUIMetrics"
+	KeyObservabilityUI        = "observabilityUIEnablement"
+	KeyObservabilityUILogs    = "observabilityUILogs"
+	KeyObservabilityUIMetrics = "observabilityUIMetrics"
 	// KeyObservabilityUITraces = "observabilityUITraces"
 	// KeyObservabilityUIAnalytics = "observabilityUIAnalytics"
 )
@@ -94,10 +94,24 @@ type LogsUIOptions struct {
 	Enabled bool
 }
 
+type MetricsUIOptions struct {
+	Enabled bool
+	ACM     ACMOptions
+	Perses  PersesOptions
+}
+
+type ACMOptions struct {
+	Enabled bool
+}
+
+type PersesOptions struct {
+	Enabled bool
+}
+
 type ObsUIOptions struct {
 	Enabled bool
 	Logs    LogsUIOptions
-	// Metrics MetricsUIOptions
+	Metrics MetricsUIOptions
 	// Traces  TracesUIOptions
 	// Analytics AnalyticsUIOptions
 }
@@ -187,6 +201,10 @@ func BuildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Opti
 		case KeyObservabilityUILogs:
 			if keyvalue.Value == string(UIPluginV1alpha1) && opts.ObsUI.Enabled {
 				opts.ObsUI.Logs.Enabled = true
+			}
+		case KeyObservabilityUIMetrics:
+			if keyvalue.Value == string(UIPluginV1alpha1) && opts.ObsUI.Enabled {
+				opts.ObsUI.Metrics.Enabled = true
 			}
 		}
 	}
