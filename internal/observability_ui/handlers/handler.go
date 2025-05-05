@@ -9,8 +9,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func BuildOptions(ctx context.Context, k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, obsUI addon.ObsUIOptions) manifests.Options {
-	return manifests.Options{
-		Enabled: obsUI.Enabled,
+func BuildOptions(ctx context.Context, k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, obs addon.ObsUIOptions) manifests.Options {
+	opts := manifests.Options{
+		Enabled:   obs.Enabled,
+		LogsUI:    obs.Logs,
+		MetricsUI: obs.Metrics,
 	}
+	return opts
 }
