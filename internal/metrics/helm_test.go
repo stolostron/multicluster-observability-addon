@@ -57,9 +57,6 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				assert.Len(t, agent, 1)
 				assert.Equal(t, config.PlatformMetricsCollectorApp, agent[0].GetName())
 				assert.NotEmpty(t, agent[0].Spec.CommonPrometheusFields.RemoteWrite[0].URL)
-				// ensure that the haproxy config is created
-				haProxyConfig := common.FilterResourcesByLabelSelector[*corev1.ConfigMap](objects, config.PlatformPrometheusMatchLabels)
-				assert.Len(t, haProxyConfig, 1)
 				// ensure that scrape config is created and matches the agent
 				scrapeCfgs := common.FilterResourcesByLabelSelector[*prometheusalpha1.ScrapeConfig](objects, config.PlatformPrometheusMatchLabels)
 				assert.Len(t, scrapeCfgs, 2)
@@ -69,8 +66,8 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				assert.Len(t, recordingRules, 2)
 				assert.Equal(t, "openshift-monitoring/prometheus-operator", recordingRules[0].Annotations["operator.prometheus.io/controller-id"])
 				// ensure that the number of objects is correct
-				// 4 (prom operator) + 6 (agent + haproxy config) + 2 secrets (mTLS to hub) + 1 cm (prom ca) + 2 rule + 2 scrape config = 16
-				assert.Len(t, objects, 17)
+				// 4 (prom operator) + 6 (agent) + 2 secrets (mTLS to hub) + 1 cm (prom ca) + 2 rule + 2 scrape config = 16
+				assert.Len(t, objects, 16)
 				assert.Len(t, common.FilterResourcesByLabelSelector[*corev1.Secret](objects, nil), 2) // 2 secrets (mTLS to hub)
 			},
 		},
@@ -83,9 +80,6 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				assert.Len(t, agent, 1)
 				assert.Equal(t, config.UserWorkloadMetricsCollectorApp, agent[0].GetName())
 				assert.NotEmpty(t, agent[0].Spec.CommonPrometheusFields.RemoteWrite[0].URL)
-				// ensure that the haproxy config is created
-				haProxyConfig := common.FilterResourcesByLabelSelector[*corev1.ConfigMap](objects, config.UserWorkloadPrometheusMatchLabels)
-				assert.Len(t, haProxyConfig, 1)
 				// ensure that scrape config is created and matches the agent
 				scrapeCfgs := common.FilterResourcesByLabelSelector[*prometheusalpha1.ScrapeConfig](objects, config.UserWorkloadPrometheusMatchLabels)
 				assert.Len(t, scrapeCfgs, 2)
@@ -95,7 +89,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				assert.Len(t, recordingRules, 2)
 				assert.Equal(t, "openshift-user-workload-monitoring/prometheus-operator", recordingRules[0].Annotations["operator.prometheus.io/controller-id"])
 
-				assert.Len(t, objects, 17)
+				assert.Len(t, objects, 16)
 				assert.Len(t, common.FilterResourcesByLabelSelector[*corev1.Secret](objects, nil), 2) // 2 secrets (mTLS to hub)
 			},
 		},

@@ -311,8 +311,6 @@ func TestBuildOptions(t *testing.T) {
 				assert.NotNil(t, opts.Platform.PrometheusAgent)
 				assert.Equal(t, platformAgent.Spec.LogLevel, opts.Platform.PrometheusAgent.Spec.LogLevel)
 				assert.Len(t, opts.Platform.PrometheusAgent.Spec.RemoteWrite, 1)
-				// Check that the proxy config map is set
-				assert.Len(t, opts.Platform.ConfigMaps, 1)
 				// Check that the secrets are set
 				assert.Len(t, opts.Secrets, 2)
 				// Check that user workloads are not enabled
@@ -365,8 +363,6 @@ func TestBuildOptions(t *testing.T) {
 				assert.NotNil(t, opts.UserWorkloads.PrometheusAgent)
 				assert.Nil(t, opts.Platform.PrometheusAgent)
 				assert.Equal(t, uwlAgent.Spec.LogLevel, opts.UserWorkloads.PrometheusAgent.Spec.LogLevel)
-				// Check that the proxy config map is set
-				assert.Len(t, opts.UserWorkloads.ConfigMaps, 1)
 			},
 		},
 		"user workload is enabled and is hypershift hub": {

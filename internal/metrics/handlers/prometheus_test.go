@@ -52,8 +52,6 @@ func TestPrometheusAgentBuilder_EnforcedFields(t *testing.T) {
 		RemoteWriteEndpoint: "https://example.com/write",
 		ClusterName:         "test-cluster",
 		ClusterID:           "test-cluster-id",
-		EnvoyConfigMapName:  "envoy-config",
-		EnvoyProxyImage:     "envoy:latest",
 		PrometheusImage:     "prometheus:latest",
 		MatchLabels:         map[string]string{"app": "test-app"},
 	}
@@ -87,14 +85,6 @@ func TestPrometheusAgentBuilder_EnforcedFields(t *testing.T) {
 	assert.Nil(t, builder.Agent.Spec.PodMonitorSelector)
 	assert.Nil(t, builder.Agent.Spec.ProbeNamespaceSelector)
 	assert.Nil(t, builder.Agent.Spec.ProbeSelector)
-
-	// Envoy sidecar
-	containers := builder.Agent.Spec.Containers
-	assert.Len(t, containers, 1)
-	assert.Equal(t, "envoy", containers[0].Name)
-	assert.Equal(t, "envoy:latest", containers[0].Image)
-	assert.Len(t, builder.Agent.Spec.Volumes, 2)
-	assert.Len(t, builder.Agent.Spec.VolumeMounts, 0)
 }
 
 func TestPrometheusAgentBuilder_ConfigurableFields(t *testing.T) {
@@ -128,8 +118,6 @@ func TestPrometheusAgentBuilder_ConfigurableFields(t *testing.T) {
 		RemoteWriteEndpoint: "https://example.com/write",
 		ClusterName:         "test-cluster",
 		ClusterID:           "test-cluster-id",
-		EnvoyConfigMapName:  "envoy-config",
-		EnvoyProxyImage:     "envoy:latest",
 		PrometheusImage:     "prometheus:latest",
 		MatchLabels:         map[string]string{"app": "test-app"},
 	}

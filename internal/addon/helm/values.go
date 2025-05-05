@@ -36,12 +36,13 @@ var (
 )
 
 type HelmChartValues struct {
-	Enabled   bool                      `json:"enabled"`
-	Metrics   *mmanifests.MetricsValues `json:"metrics,omitempty"`
-	Logging   *lmanifests.LoggingValues `json:"logging,omitempty"`
-	Tracing   *tmanifests.TracingValues `json:"tracing,omitempty"`
-	Analytics analytics.AnalyticsValues `json:"analytics"`
-	ObsUI     *uimanifests.UIValues     `json:"observabilityUI,omitempty"`
+	Enabled    bool                      `json:"enabled"`
+	InstallCOO bool                      `json:"installCOO"`
+	Metrics    *mmanifests.MetricsValues `json:"metrics,omitempty"`
+	Logging    *lmanifests.LoggingValues `json:"logging,omitempty"`
+	Tracing    *tmanifests.TracingValues `json:"tracing,omitempty"`
+	Analytics  analytics.AnalyticsValues `json:"analytics"`
+	ObsUI      *uimanifests.UIValues     `json:"observabilityUI,omitempty"`
 }
 
 func GetValuesFunc(ctx context.Context, k8s client.Client, logger logr.Logger) addonfactory.GetValuesFunc {
@@ -73,6 +74,11 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, logger logr.Logger) a
 			Enabled: true,
 		}
 
+		userValues.InstallCOO, err = addon.InstallCOO(ctx, k8s, logger, isHubCluster(cluster), opts)
+		if err != nil {
+			return nil, err
+		}
+
 		userValues.Metrics, err = getMonitoringValues(ctx, k8s, logger, cluster, mcAddon, opts)
 		if err != nil {
 			return nil, err
@@ -90,7 +96,7 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, logger logr.Logger) a
 
 		userValues.ObsUI = getObservabilityUIValues(ctx, k8s, cluster, mcAddon, opts)
 
-		userValues.Analytics.IncidentDetectionValues = getIncidentDetectionValues(ctx, k8s, cluster, mcAddon, opts)
+		userValues.Analytics.IncidentDetectionValues = getIncidentDetectionValues(ctx, k8s, mcAddon, opts)
 
 		return addonfactory.JsonStructToValues(userValues)
 	}
@@ -154,8 +160,8 @@ func getTracingValues(ctx context.Context, k8s client.Client, cluster *clusterv1
 	return &tracing, nil
 }
 
-func getIncidentDetectionValues(ctx context.Context, k8s client.Client, cluster *clusterv1.ManagedCluster, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, opts addon.Options) *imanifests.IncidentDetectionValues {
-	if isHubCluster(cluster) || !opts.Platform.AnalyticsOptions.IncidentDetection.Enabled {
+func getIncidentDetectionValues(ctx context.Context, k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, opts addon.Options) *imanifests.IncidentDetectionValues {
+	if !opts.Platform.AnalyticsOptions.IncidentDetection.Enabled {
 		return nil
 	}
 
