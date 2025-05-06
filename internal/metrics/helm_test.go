@@ -21,7 +21,6 @@ import (
 	meta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	kubescheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog/v2"
@@ -105,7 +104,9 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 	hubNamespace := "open-cluster-management-observability"
 
 	// Add platform resources
-	defaultAgentResources := resource.DefaultPlaftformAgentResources(hubNamespace)
+	defaultAgentResources := []client.Object{
+		resource.NewDefaultPlatformPrometheusAgent(hubNamespace, config.PlatformMetricsCollectorApp),
+	}
 	platformScrapeConfig := &prometheusalpha1.ScrapeConfig{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       prometheusalpha1.ScrapeConfigsKind,
@@ -138,7 +139,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 	defaultAgentResources = append(defaultAgentResources, platformRules, platformRulesAdditional)
 
 	// Add user workload resources
-	defaultAgentResources = append(defaultAgentResources, resource.DefaultUserWorkloadAgentResources(hubNamespace)...)
+	defaultAgentResources = append(defaultAgentResources, resource.NewDefaultUserWorkloadsPrometheusAgent(hubNamespace, config.UserWorkloadMetricsCollectorApp))
 
 	configReferences := []addonapiv1alpha1.ConfigReference{}
 	for _, obj := range defaultAgentResources {
@@ -177,8 +178,8 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 	// Images overrides configMap
 	imagesCM := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "images-list",
-			Namespace: hubNamespace,
+			Name:      config.ImagesConfigMapObjKey.Name,
+			Namespace: config.ImagesConfigMapObjKey.Namespace,
 		},
 		Data: map[string]string{
 			"prometheus_operator":        "registry.redhat.io/rhacm2/acm-prometheus-rhel9@sha256:4234bab8666dad7917cfcf10fdaed87b60e549ef6f8fb23d1760881d922e03e9",
@@ -252,7 +253,9 @@ func TestHelmBuild_Metrics_HCP(t *testing.T) {
 	hubNamespace := "open-cluster-management-observability"
 
 	// Add user workload resources
-	defaultAgentResources := resource.DefaultUserWorkloadAgentResources(hubNamespace)
+	defaultAgentResources := []client.Object{
+		resource.NewDefaultUserWorkloadsPrometheusAgent(hubNamespace, config.UserWorkloadMetricsCollectorApp),
+	}
 
 	configReferences := []addonapiv1alpha1.ConfigReference{}
 	for _, obj := range defaultAgentResources {
@@ -492,11 +495,7 @@ func fakeGetValues(k8s client.Client, platformMetrics, userWorkloadMetrics bool)
 		mcAddon *addonapiv1alpha1.ManagedClusterAddOn,
 	) (addonfactory.Values, error) {
 		optionsBuilder := handlers.OptionsBuilder{
-			Client: k8s,
-			ImagesConfigMap: types.NamespacedName{
-				Name:      "images-list",
-				Namespace: "open-cluster-management-observability",
-			},
+			Client:         k8s,
 			RemoteWriteURL: "https://observatorium-api-open-cluster-management-observability.apps.sno-4xlarge-416-lqsr2.dev07.red-chesterfield.com/api/metrics/v1/default/api/v1/receive",
 		}
 

@@ -1,4 +1,4 @@
-package handlers_test
+package resource_test
 
 import (
 	"fmt"
@@ -7,10 +7,10 @@ import (
 
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	prometheusalpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
-	handler "github.com/stolostron/multicluster-observability-addon/internal/metrics/handlers"
+	"github.com/stolostron/multicluster-observability-addon/internal/metrics/resource"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
+	kuberesource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 )
@@ -46,12 +46,10 @@ func TestPrometheusAgentBuilder_EnforcedFields(t *testing.T) {
 		},
 	}
 
-	builder := handler.PrometheusAgentBuilder{
+	builder := resource.PrometheusAgentBuilder{
 		Agent:               promAgent,
-		Name:                "test-agent",
+		SAName:              "test-agent",
 		RemoteWriteEndpoint: "https://example.com/write",
-		ClusterName:         "test-cluster",
-		ClusterID:           "test-cluster-id",
 		PrometheusImage:     "prometheus:latest",
 		MatchLabels:         map[string]string{"app": "test-app"},
 	}
@@ -105,19 +103,17 @@ func TestPrometheusAgentBuilder_ConfigurableFields(t *testing.T) {
 				EnableRemoteWriteReceiver: true,
 				Resources: corev1.ResourceRequirements{
 					Requests: corev1.ResourceList{
-						corev1.ResourceCPU: resource.MustParse("123m"),
+						corev1.ResourceCPU: kuberesource.MustParse("123m"),
 					},
 				},
 				NodeSelector: map[string]string{"node": "selector"},
 			},
 		},
 	}
-	builder := handler.PrometheusAgentBuilder{
+	builder := resource.PrometheusAgentBuilder{
 		Agent:               promAgent.DeepCopy(),
-		Name:                "test-agent",
+		SAName:              "test-agent",
 		RemoteWriteEndpoint: "https://example.com/write",
-		ClusterName:         "test-cluster",
-		ClusterID:           "test-cluster-id",
 		PrometheusImage:     "prometheus:latest",
 		MatchLabels:         map[string]string{"app": "test-app"},
 	}

@@ -15,7 +15,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	intstr "k8s.io/apimachinery/pkg/util/intstr"
 	kubescheme "k8s.io/client-go/kubernetes/scheme"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
@@ -28,7 +27,6 @@ func TestBuildOptions(t *testing.T) {
 	const (
 		hubNamespace = "test-hub-namespace"
 		spokeName    = "test-spoke"
-		imagesCMName = "images-list"
 		clusterID    = "test-cluster-id"
 	)
 
@@ -184,8 +182,8 @@ func TestBuildOptions(t *testing.T) {
 			},
 			&corev1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      imagesCMName,
-					Namespace: hubNamespace,
+					Name:      config.ImagesConfigMapObjKey.Name,
+					Namespace: config.ImagesConfigMapObjKey.Namespace,
 				},
 				Data: map[string]string{
 					"prometheus_operator":        "prom-operator-image",
@@ -258,11 +256,11 @@ func TestBuildOptions(t *testing.T) {
 			addon:           platformManagedClusterAddOn,
 			platformEnabled: true,
 			resources: func() []client.Object {
-				res := filterOutResource[*corev1.ConfigMap](createResources(), imagesCMName)
+				res := filterOutResource[*corev1.ConfigMap](createResources(), config.ImagesConfigMapObjKey.Name)
 				res = append(res, &corev1.ConfigMap{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      imagesCMName,
-						Namespace: hubNamespace,
+						Name:      config.ImagesConfigMapObjKey.Name,
+						Namespace: config.ImagesConfigMapObjKey.Namespace,
 					},
 					Data: map[string]string{ // Missing image overrides for config reloader
 						"prometheus_operator": "prom-operator-image",
@@ -273,7 +271,7 @@ func TestBuildOptions(t *testing.T) {
 			},
 			expects: func(t *testing.T, opts Options, err error) {
 				assert.Error(t, err)
-				assert.ErrorIs(t, err, errMissingImageOverride)
+				assert.ErrorIs(t, err, config.ErrMissingImageOverride)
 			},
 		},
 		"missing config reference": {
@@ -503,9 +501,8 @@ func TestBuildOptions(t *testing.T) {
 			userWorkloads := addon.MetricsOptions{CollectionEnabled: tc.userWorkloadsEnabled}
 
 			optsBuilder := &OptionsBuilder{
-				Client:          fakeClient,
-				ImagesConfigMap: types.NamespacedName{Name: imagesCMName, Namespace: hubNamespace},
-				RemoteWriteURL:  "https://example.com/write",
+				Client:         fakeClient,
+				RemoteWriteURL: "https://example.com/write",
 			}
 			managedClusters := &clusterv1.ManagedClusterList{}
 			err := fakeClient.List(context.Background(), managedClusters)
