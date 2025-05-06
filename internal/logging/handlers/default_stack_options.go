@@ -21,6 +21,166 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+func createDefaultStackCertificates(ctx context.Context, k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, opts manifests.Options) error {
+	if !opts.DefaultStackEnabled() {
+		return nil
+	}
+
+	objects := []client.Object{}
+	certConfig := addonmanifests.CertificateConfig{
+		CommonName: manifests.DefaultCollectionCertCommonName,
+		Subject: &certmanagerv1.X509Subject{
+			// Observatorium API uses OrganizationalUnits to authorize access to
+			// the tenant
+			OrganizationalUnits: []string{mcAddon.Namespace},
+		},
+		DNSNames: []string{manifests.DefaultCollectionCertCommonName},
+	}
+	key := client.ObjectKey{Name: manifests.DefaultCollectionMTLSSecretName, Namespace: mcAddon.Namespace}
+	cert, err := addonmanifests.BuildClientCertificate(key, certConfig)
+	if err != nil {
+		return err
+	}
+	objects = append(objects, cert)
+
+	if opts.IsHub {
+		certConfig := addonmanifests.CertificateConfig{
+			CommonName: manifests.DefaultStorageCertCommonName,
+			Subject:    &certmanagerv1.X509Subject{},
+			DNSNames:   []string{manifests.DefaultStorageCertCommonName},
+		}
+		key := client.ObjectKey{Name: manifests.DefaultStorageMTLSSecretName, Namespace: mcAddon.Namespace}
+		cert, err := addonmanifests.BuildServerCertificate(key, certConfig)
+		if err != nil {
+			return err
+		}
+		objects = append(objects, cert)
+	}
+
+	for _, obj := range objects {
+		desired := obj.DeepCopyObject().(client.Object)
+		mutateFn := addonmanifests.MutateFuncFor(obj, desired, nil)
+
+		op, err := ctrl.CreateOrUpdate(ctx, k8s, obj, mutateFn)
+		if err != nil {
+			klog.Error(err, "failed to configure resource")
+			continue
+		}
+
+		msg := fmt.Sprintf("Resource has been %s", op)
+		switch op {
+		default:
+			klog.Info(msg)
+		}
+	}
+
+	return nil
+}
+
+func buildDefaultStackOptions(ctx context.Context, k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, opts *manifests.Options) error {
+	if !opts.DefaultStackEnabled() {
+		return nil
+	}
+
+	// Get CLF from ManagedClusterAddOn
+	keys := common.GetObjectKeys(mcAddon.Status.ConfigReferences, loggingv1.GroupVersion.Group, addon.ClusterLogForwardersResource)
+	if len(keys) == 0 {
+		return errMissingDefaultCLFRef
+	}
+	clfKey := client.ObjectKey{}
+	// TODO(JoaoBraveCoding): This needs to be changed to use ownerReferences
+	for _, key := range keys {
+		if strings.HasPrefix(key.Name, addon.DefaultStackPrefix) {
+			clfKey = key
+			break
+		}
+	}
+	if clfKey.Name == "" {
+		return errMissingDefaultCLFRef
+	}
+
+	clf := &loggingv1.ClusterLogForwarder{}
+	if err := k8s.Get(ctx, clfKey, clf, &client.GetOptions{}); err != nil {
+		return err
+	}
+	opts.DefaultStack.Collection.ClusterLogForwarder = clf
+
+	mTLSSecret, err := common.GetSecret(ctx, k8s, clf.Namespace, mcAddon.Namespace, manifests.DefaultCollectionMTLSSecretName)
+	if err != nil {
+		// Even for not found we probably just want to return and wait for the next
+		// reconciliation loop to try again.
+		return err
+	}
+	opts.DefaultStack.Collection.Secrets = []corev1.Secret{*mTLSSecret}
+
+	// Get the cluster hostname
+	opts.DefaultStack.LokiURL = fmt.Sprintf("https://mcoa-managed-instance-openshift-logging.apps.%s/api/logs/v1/%s/otlp/v1/logs", opts.HubHostname, mcAddon.Namespace)
+
+	if opts.IsHub {
+		// Get LS from ManagedClusterAddOn
+		keys := common.GetObjectKeys(mcAddon.Status.ConfigReferences, lokiv1.GroupVersion.Group, addon.LokiStacksResource)
+		if len(keys) == 0 {
+			return errMissingDefaultLSRef
+		}
+		lsKey := client.ObjectKey{}
+		// TODO(JoaoBraveCoding): This needs to be changed to use ownerReferences
+		for _, key := range keys {
+			if strings.HasPrefix(key.Name, addon.DefaultStackPrefix) {
+				lsKey = key
+				break
+			}
+		}
+		if lsKey.Name == "" {
+			return errMissingDefaultLSRef
+		}
+
+		ls := &lokiv1.LokiStack{}
+		if err := k8s.Get(ctx, lsKey, ls, &client.GetOptions{}); err != nil {
+			return err
+		}
+		opts.DefaultStack.Storage.LokiStack = ls
+
+		// Get objstorage secret
+		objStorageSecret, err := common.GetSecret(ctx, k8s, ls.Namespace, mcAddon.Namespace, ls.Spec.Storage.Secret.Name)
+		if err != nil {
+			// Even for not found we probably just want to return and wait for the next
+			// reconciliation loop to try again.
+			return err
+		}
+		opts.DefaultStack.Storage.ObjStorageSecret = *objStorageSecret
+
+		// Get mTLS secret
+		mTLSSecret, err := common.GetSecret(ctx, k8s, ls.Namespace, mcAddon.Namespace, manifests.DefaultStorageMTLSSecretName)
+		if err != nil {
+			// Even for not found we probably just want to return and wait for the next
+			// reconciliation loop to try again.
+			return err
+		}
+		opts.DefaultStack.Storage.MTLSSecret = *mTLSSecret
+
+		// TODO(JoaoBraveCoding): This might be rather heavy in big clusters,
+		// this might be a good place to lower memory consumption.
+		mcaoList := &addonapiv1alpha1.ManagedClusterAddOnList{}
+		if err := k8s.List(ctx, mcaoList, &client.ListOptions{}); err != nil {
+			return err
+		}
+
+		tenants := make([]string, 0, len(mcaoList.Items))
+		for _, tenant := range mcaoList.Items {
+			// TODO(JoaoBraveCoding): This is not the best way to match tenants due
+			// to the addon-framework supporting tenantcy, but it will do for now
+			if tenant.Name == addon.Name && tenant.Namespace != mcAddon.Namespace {
+				tenants = append(tenants, tenant.Namespace)
+			}
+		}
+		opts.DefaultStack.Storage.Tenants = tenants
+
+		return nil
+	}
+
+	return nil
+}
+
 func DefaultStackOptions(ctx context.Context, k8s client.Client, platform, userWorkloads addon.LogsOptions, hubHostname, resourceName string) (manifests.Options, error) {
 	opts := manifests.Options{
 		Platform:      platform,
@@ -81,178 +241,11 @@ func DefaultStackOptions(ctx context.Context, k8s client.Client, platform, userW
 
 	tenants := make([]string, 0, len(mcaoList.Items))
 	for _, tenant := range mcaoList.Items {
-		// TODO(JoaoBraveCoding): This is not the best way to match tenants due
-		// to the addon-framework supporting clustersets, but it will do for now
-		if tenant.Name == addon.Name && tenant.Namespace != addon.HubNamespace {
+		if tenant.Name == addon.Name {
 			tenants = append(tenants, tenant.Namespace)
 		}
 	}
 	opts.DefaultStack.Storage.Tenants = tenants
 
 	return opts, nil
-}
-
-func createDefaultStackCertificates(ctx context.Context, k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, opts manifests.Options) error {
-	if !opts.DefaultStackEnabled() {
-		return nil
-	}
-
-	objects := []client.Object{}
-	if !opts.IsHub {
-		certConfig := addonmanifests.CertificateConfig{
-			CommonName: manifests.DefaultCollectionCertCommonName,
-			Subject: &certmanagerv1.X509Subject{
-				// Observatorium API uses OrganizationalUnits to authorize access to
-				// the tenant
-				OrganizationalUnits: []string{mcAddon.Namespace},
-			},
-			DNSNames: []string{manifests.DefaultCollectionCertCommonName},
-		}
-		key := client.ObjectKey{Name: manifests.DefaultCollectionMTLSSecretName, Namespace: mcAddon.Namespace}
-		cert, err := addonmanifests.BuildClientCertificate(key, certConfig)
-		if err != nil {
-			return err
-		}
-		objects = append(objects, cert)
-	}
-
-	if opts.IsHub {
-		certConfig := addonmanifests.CertificateConfig{
-			CommonName: manifests.DefaultStorageCertCommonName,
-			Subject:    &certmanagerv1.X509Subject{},
-			DNSNames:   []string{manifests.DefaultStorageCertCommonName},
-		}
-		key := client.ObjectKey{Name: manifests.DefaultStorageMTLSSecretName, Namespace: mcAddon.Namespace}
-		cert, err := addonmanifests.BuildServerCertificate(key, certConfig)
-		if err != nil {
-			return err
-		}
-		objects = append(objects, cert)
-	}
-
-	for _, obj := range objects {
-		desired := obj.DeepCopyObject().(client.Object)
-		mutateFn := addonmanifests.MutateFuncFor(obj, desired, nil)
-
-		op, err := ctrl.CreateOrUpdate(ctx, k8s, obj, mutateFn)
-		if err != nil {
-			klog.Error(err, "failed to configure resource")
-			continue
-		}
-
-		msg := fmt.Sprintf("Resource has been %s", op)
-		switch op {
-		default:
-			klog.Info(msg)
-		}
-	}
-
-	return nil
-}
-
-func buildDefaultStackOptions(ctx context.Context, k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, opts *manifests.Options) error {
-	if !opts.DefaultStackEnabled() {
-		return nil
-	}
-
-	if !opts.IsHub {
-		// Get CLF from ManagedClusterAddOn
-		keys := common.GetObjectKeys(mcAddon.Status.ConfigReferences, loggingv1.GroupVersion.Group, addon.ClusterLogForwardersResource)
-		if len(keys) == 0 {
-			return errMissingDefaultCLFRef
-		}
-		clfKey := client.ObjectKey{}
-		for _, key := range keys {
-			if strings.HasPrefix(key.Name, addon.DefaultStackPrefix) {
-				clfKey = key
-				break
-			}
-		}
-		if clfKey.Name == "" {
-			return errMissingDefaultCLFRef
-		}
-
-		clf := &loggingv1.ClusterLogForwarder{}
-		if err := k8s.Get(ctx, clfKey, clf, &client.GetOptions{}); err != nil {
-			return err
-		}
-		opts.DefaultStack.Collection.ClusterLogForwarder = clf
-
-		mTLSSecret, err := common.GetSecret(ctx, k8s, clf.Namespace, mcAddon.Namespace, manifests.DefaultCollectionMTLSSecretName)
-		if err != nil {
-			// Even for not found we probably just want to return and wait for the next
-			// reconciliation loop to try again.
-			return err
-		}
-		opts.DefaultStack.Collection.Secrets = []corev1.Secret{*mTLSSecret}
-
-		// Get the cluster hostname
-
-		opts.DefaultStack.LokiURL = fmt.Sprintf("https://mcoa-managed-instance-openshift-logging.apps.%s/api/logs/v1/%s/otlp/v1/logs", opts.HubHostname, mcAddon.Namespace)
-
-		return nil
-	}
-
-	if opts.IsHub {
-		// Get LS from ManagedClusterAddOn
-		keys := common.GetObjectKeys(mcAddon.Status.ConfigReferences, lokiv1.GroupVersion.Group, addon.LokiStacksResource)
-		if len(keys) == 0 {
-			return errMissingDefaultLSRef
-		}
-		lsKey := client.ObjectKey{}
-		for _, key := range keys {
-			if strings.HasPrefix(key.Name, addon.DefaultStackPrefix) {
-				lsKey = key
-				break
-			}
-		}
-		if lsKey.Name == "" {
-			return errMissingDefaultLSRef
-		}
-
-		ls := &lokiv1.LokiStack{}
-		if err := k8s.Get(ctx, lsKey, ls, &client.GetOptions{}); err != nil {
-			return err
-		}
-		opts.DefaultStack.Storage.LokiStack = ls
-
-		// Get objstorage secret
-		objStorageSecret, err := common.GetSecret(ctx, k8s, ls.Namespace, mcAddon.Namespace, ls.Spec.Storage.Secret.Name)
-		if err != nil {
-			// Even for not found we probably just want to return and wait for the next
-			// reconciliation loop to try again.
-			return err
-		}
-		opts.DefaultStack.Storage.ObjStorageSecret = *objStorageSecret
-
-		// Get mTLS secret
-		mTLSSecret, err := common.GetSecret(ctx, k8s, ls.Namespace, mcAddon.Namespace, manifests.DefaultStorageMTLSSecretName)
-		if err != nil {
-			// Even for not found we probably just want to return and wait for the next
-			// reconciliation loop to try again.
-			return err
-		}
-		opts.DefaultStack.Storage.MTLSSecret = *mTLSSecret
-
-		// TODO(JoaoBraveCoding): This might be rather heavy in big clusters,
-		// this might be a good place to lower memory consumption.
-		mcaoList := &addonapiv1alpha1.ManagedClusterAddOnList{}
-		if err := k8s.List(ctx, mcaoList, &client.ListOptions{}); err != nil {
-			return err
-		}
-
-		tenants := make([]string, 0, len(mcaoList.Items))
-		for _, tenant := range mcaoList.Items {
-			// TODO(JoaoBraveCoding): This is not the best way to match tenants due
-			// to the addon-framework supporting tenantcy, but it will do for now
-			if tenant.Name == addon.Name && tenant.Namespace != mcAddon.Namespace {
-				tenants = append(tenants, tenant.Namespace)
-			}
-		}
-		opts.DefaultStack.Storage.Tenants = tenants
-
-		return nil
-	}
-
-	return nil
 }

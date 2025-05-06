@@ -127,33 +127,31 @@ func buildMangedValues(opts Options) (ManagedValues, error) {
 	}
 	mValues := ManagedValues{}
 
-	if !opts.IsHub {
-		mValues.Collection = CollectionValues{
-			Enabled: true,
-		}
-		configmaps, err := buildManagedCollectionConfigMaps(opts)
-		if err != nil {
-			return mValues, err
-		}
-		mValues.Collection.ConfigMaps = configmaps
-
-		secrets, err := buildManagedCollectionSecrets(opts)
-		if err != nil {
-			return mValues, err
-		}
-		mValues.Collection.Secrets = secrets
-
-		clfSpec, err := buildManagedCLFSpec(opts)
-		if err != nil {
-			return mValues, err
-		}
-
-		clfMarshaled, err := json.Marshal(clfSpec)
-		if err != nil {
-			return mValues, err
-		}
-		mValues.Collection.CLFSpec = string(clfMarshaled)
+	mValues.Collection = CollectionValues{
+		Enabled: true,
 	}
+	configmaps, err := buildManagedCollectionConfigMaps(opts)
+	if err != nil {
+		return mValues, err
+	}
+	mValues.Collection.ConfigMaps = configmaps
+
+	secrets, err := buildManagedCollectionSecrets(opts)
+	if err != nil {
+		return mValues, err
+	}
+	mValues.Collection.Secrets = secrets
+
+	clfSpec, err := buildManagedCLFSpec(opts)
+	if err != nil {
+		return mValues, err
+	}
+
+	clfMarshaled, err := json.Marshal(clfSpec)
+	if err != nil {
+		return mValues, err
+	}
+	mValues.Collection.CLFSpec = string(clfMarshaled)
 
 	if opts.IsHub {
 		mValues.Storage = StorageValues{
