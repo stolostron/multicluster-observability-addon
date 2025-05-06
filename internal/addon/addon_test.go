@@ -7,6 +7,7 @@ import (
 	otelv1alpha1 "github.com/open-telemetry/opentelemetry-operator/apis/v1alpha1"
 	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
 	prometheusalpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
+	uiplugin "github.com/rhobs/observability-operator/pkg/apis/uiplugin/v1alpha1"
 	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	"github.com/stretchr/testify/require"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
@@ -154,6 +155,56 @@ func Test_AgentHealthProber_OTELCol(t *testing.T) {
 								Value: workv1.FieldValue{
 									Type:    workv1.Integer,
 									Integer: &tc.replicas,
+								},
+							},
+						},
+					},
+				},
+			}, managedCluster, managedClusterAddOn)
+			if tc.expectedErr != "" {
+				require.EqualError(t, err, tc.expectedErr)
+				return
+			}
+			require.NoError(t, err)
+		})
+	}
+}
+
+func Test_AgentHealthProber_UIPlugin(t *testing.T) {
+	unhealthyError := fmt.Errorf("%w: uiplugins status condition type is %s for %s", errProbeConditionNotSatisfied, "False", IDetectionUIPluginName)
+	managedCluster := addontesting.NewManagedCluster("cluster-1")
+	managedClusterAddOn := addontesting.NewAddon("test", "cluster-1")
+	for _, tc := range []struct {
+		name        string
+		status      string
+		expectedErr string
+	}{
+		{
+			name:   "healthy",
+			status: "True",
+		},
+		{
+			name:        "unhealthy",
+			status:      "False",
+			expectedErr: unhealthyError.Error(),
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			healthProber := AgentHealthProber()
+			err := healthProber.WorkProber.HealthChecker([]agent.FieldResult{
+				{
+					ResourceIdentifier: workv1.ResourceIdentifier{
+						Group:    uiplugin.GroupVersion.Group,
+						Resource: uiPluginsResource,
+						Name:     IDetectionUIPluginName,
+					},
+					FeedbackResult: workv1.StatusFeedbackResult{
+						Values: []workv1.FeedbackValue{
+							{
+								Name: "isAvailable",
+								Value: workv1.FieldValue{
+									Type:   workv1.String,
+									String: &tc.status,
 								},
 							},
 						},
