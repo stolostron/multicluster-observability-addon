@@ -40,7 +40,7 @@ var (
 	_ = lokiv1.AddToScheme(scheme.Scheme)
 )
 
-func fakeGetValues(k8s client.Client, isHub bool) addonfactory.GetValuesFunc {
+func fakeGetValues(k8s client.Client) addonfactory.GetValuesFunc {
 	return func(
 		cluster *clusterv1.ManagedCluster,
 		mcAddon *addonapiv1alpha1.ManagedClusterAddOn,
@@ -53,6 +53,14 @@ func fakeGetValues(k8s client.Client, isHub bool) addonfactory.GetValuesFunc {
 		addonOpts, err := addon.BuildOptions(aodc)
 		if err != nil {
 			return nil, err
+		}
+
+		// Check if this is a hub cluster by looking for the local-cluster label
+		isHub := false
+		if cluster != nil {
+			if val, ok := cluster.Labels["local-cluster"]; ok {
+				isHub = val == "true"
+			}
 		}
 
 		opts, err := handlers.BuildOptions(context.TODO(), k8s, mcAddon, addonOpts.Platform.Logs, addonOpts.UserWorkloads.Logs, isHub, addonOpts.HubHostname)
@@ -69,8 +77,276 @@ func fakeGetValues(k8s client.Client, isHub bool) addonfactory.GetValuesFunc {
 	}
 }
 
-func newUnmanagedScenarioCLF() *loggingv1.ClusterLogForwarder {
+func newLoggingAgentAddon(initObjects []client.Object, addOnDeploymentConfig *addonapiv1alpha1.AddOnDeploymentConfig) agent.AgentAddon {
+	initObjects = append(initObjects, addOnDeploymentConfig)
+	// Setup the fake k8s client with all objects
+	fakeKubeClient := fake.NewClientBuilder().
+		WithScheme(scheme.Scheme).
+		WithObjects(initObjects...).
+		Build()
+
+	// Setup the fake addon client
+	fakeAddonClient := fakeaddon.NewSimpleClientset(addOnDeploymentConfig)
+	addonConfigValuesFn := addonfactory.GetAddOnDeploymentConfigValues(
+		addonfactory.NewAddOnDeploymentConfigGetter(fakeAddonClient),
+		addonfactory.ToAddOnCustomizedVariableValues,
+	)
+
+	// Wire everything together to a fake addon instance
+	loggingAgentAddon, err := addonfactory.NewAgentAddonFactory(addon.Name, addon.FS, addon.LoggingChartDir).
+		WithGetValuesFuncs(addonConfigValuesFn, fakeGetValues(fakeKubeClient)).
+		WithAgentRegistrationOption(&agent.RegistrationOption{}).
+		WithScheme(scheme.Scheme).
+		BuildHelmAgentAddon()
+	if err != nil {
+		klog.Fatalf("failed to build agent %v", err)
+	}
+	return loggingAgentAddon
+}
+
+func newMCAOUnmanagedScenario() *addonapiv1alpha1.ManagedClusterAddOn {
+	managedClusterAddOn := addontesting.NewAddon("test", "cluster-1")
+	managedClusterAddOn.Status.ConfigReferences = []addonapiv1alpha1.ConfigReference{
+		{
+			ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+				Group:    "addon.open-cluster-management.io",
+				Resource: "addondeploymentconfigs",
+			},
+			ConfigReferent: addonapiv1alpha1.ConfigReferent{
+				Namespace: "open-cluster-management-observability",
+				Name:      "multicluster-observability-addon",
+			},
+			DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
+				ConfigReferent: addonapiv1alpha1.ConfigReferent{
+					Namespace: "open-cluster-management-observability",
+					Name:      "multicluster-observability-addon",
+				},
+				SpecHash: "fake-spec-hash",
+			},
+		},
+		{
+			ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+				Group:    "observability.openshift.io",
+				Resource: "clusterlogforwarders",
+			},
+			ConfigReferent: addonapiv1alpha1.ConfigReferent{
+				Namespace: "open-cluster-management-observability",
+				Name:      "mcoa-instance",
+			},
+		},
+	}
+
+	return managedClusterAddOn
+}
+
+func newAODCUnmanagedScenario() *addonapiv1alpha1.AddOnDeploymentConfig {
+	addOnDeploymentConfig := &addonapiv1alpha1.AddOnDeploymentConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "multicluster-observability-addon",
+			Namespace: "open-cluster-management-observability",
+		},
+		Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
+			CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
+				{
+					Name:  "openshiftLoggingChannel",
+					Value: "latest-version",
+				},
+				{
+					Name:  "platformLogsCollection",
+					Value: "clusterlogforwarders.v1.observability.openshift.io",
+				},
+			},
+		},
+	}
+	return addOnDeploymentConfig
+}
+
+func newMCAODefaultScenario() *addonapiv1alpha1.ManagedClusterAddOn {
+	managedClusterAddOn := addontesting.NewAddon("test", "cluster-1")
+	managedClusterAddOn.Status.ConfigReferences = []addonapiv1alpha1.ConfigReference{
+		{
+			ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+				Group:    "addon.open-cluster-management.io",
+				Resource: "addondeploymentconfigs",
+			},
+			ConfigReferent: addonapiv1alpha1.ConfigReferent{
+				Namespace: "open-cluster-management-observability",
+				Name:      "multicluster-observability-addon",
+			},
+			DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
+				ConfigReferent: addonapiv1alpha1.ConfigReferent{
+					Namespace: "open-cluster-management-observability",
+					Name:      "multicluster-observability-addon",
+				},
+				SpecHash: "fake-spec-hash",
+			},
+		},
+		{
+			ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+				Group:    "observability.openshift.io",
+				Resource: "clusterlogforwarders",
+			},
+			ConfigReferent: addonapiv1alpha1.ConfigReferent{
+				Namespace: "local-cluster",
+				Name:      "default-stack-instance-bar",
+			},
+		},
+		{
+			ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+				Group:    "loki.grafana.com",
+				Resource: "lokistacks",
+			},
+			ConfigReferent: addonapiv1alpha1.ConfigReferent{
+				Namespace: "local-cluster",
+				Name:      "default-stack-instance-bar",
+			},
+		},
+	}
+	return managedClusterAddOn
+}
+
+func newAODCDefaultScenario() *addonapiv1alpha1.AddOnDeploymentConfig {
+	return &addonapiv1alpha1.AddOnDeploymentConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "multicluster-observability-addon",
+			Namespace: "open-cluster-management-observability",
+		},
+		Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
+			CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
+				{
+					Name:  "openshiftLoggingChannel",
+					Value: "stable-latest",
+				},
+				{
+					Name:  "hubHostname",
+					Value: "myhub.foo.com",
+				},
+				{
+					Name:  "platformLogsDefault",
+					Value: "true",
+				},
+			},
+		},
+	}
+}
+
+func newCLFUnmanagedScenario() *loggingv1.ClusterLogForwarder {
 	return &loggingv1.ClusterLogForwarder{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "mcoa-instance",
+			Namespace: "open-cluster-management-observability",
+		},
+		Spec: loggingv1.ClusterLogForwarderSpec{
+			Inputs: []loggingv1.InputSpec{
+				{
+					Name:           "infra-logs",
+					Infrastructure: &loggingv1.Infrastructure{},
+				},
+			},
+			Outputs: []loggingv1.OutputSpec{
+				{
+					Name: "cloudwatch-output",
+					Type: loggingv1.OutputTypeCloudwatch,
+					Cloudwatch: &loggingv1.Cloudwatch{
+						Authentication: &loggingv1.CloudwatchAuthentication{
+							Type: loggingv1.CloudwatchAuthTypeAccessKey,
+							AWSAccessKey: &loggingv1.CloudwatchAWSAccessKey{
+								KeyId: loggingv1.SecretReference{
+									SecretName: "static-authentication",
+									Key:        "key",
+								},
+								KeySecret: loggingv1.SecretReference{
+									SecretName: "static-authentication",
+									Key:        "pass",
+								},
+							},
+						},
+					},
+				},
+			},
+			Pipelines: []loggingv1.PipelineSpec{
+				{
+					Name:       "infra-to-cloudwatch",
+					InputRefs:  []string{"infra-logs"},
+					OutputRefs: []string{"cloudwatch-output"},
+				},
+			},
+		},
+	}
+}
+
+func newCLFDefaultScenario() *loggingv1.ClusterLogForwarder {
+	return &loggingv1.ClusterLogForwarder{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "default-stack-instance-bar",
+			Namespace: "local-cluster",
+		},
+		Spec: loggingv1.ClusterLogForwarderSpec{
+			ServiceAccount: loggingv1.ServiceAccount{
+				Name: "mcoa-logging-managed-collector",
+			},
+			ManagementState: loggingv1.ManagementStateUnmanaged,
+			Filters: []loggingv1.FilterSpec{
+				{
+					Name: "filter-1",
+					Type: loggingv1.FilterTypeDrop,
+					KubeAPIAudit: &loggingv1.KubeAPIAudit{
+						Rules: []auditv1.PolicyRule{
+							{
+								Level: auditv1.LevelMetadata,
+							},
+						},
+					},
+				},
+			},
+			Outputs: []loggingv1.OutputSpec{
+				{
+					Name: "hub-lokistack",
+					Type: loggingv1.OutputTypeOTLP,
+					OTLP: &loggingv1.OTLP{
+						URL: "https://not-the-final-url",
+					},
+					TLS: &loggingv1.OutputTLSSpec{
+						InsecureSkipVerify: true,
+						TLSSpec: loggingv1.TLSSpec{
+							CA: &loggingv1.ValueReference{
+								Key:        "ca.crt",
+								SecretName: "mcoa-logging-managed-collection-tls",
+							},
+							Certificate: &loggingv1.ValueReference{
+								Key:        "tls.crt",
+								SecretName: "mcoa-logging-managed-collection-tls",
+							},
+							Key: &loggingv1.SecretReference{
+								Key:        "tls.key",
+								SecretName: "mcoa-logging-managed-collection-tls",
+							},
+						},
+					},
+				},
+			},
+			Pipelines: []loggingv1.PipelineSpec{
+				{
+					Name:       "not-the-correct-name",
+					InputRefs:  []string{"infrastructure"},
+					OutputRefs: []string{"hub-lokistack"},
+				},
+			},
+		},
+	}
+}
+
+// Test_Logging_Unmanaged_CLF mainly tests the creation of the ClusterLogForwarder
+// and the static authentication secrets.
+func Test_Logging_Unmanaged_CLF(t *testing.T) {
+	// Setup a managed cluster
+	managedCluster := addontesting.NewManagedCluster("cluster-1")
+	// Register the addon for the managed cluster
+	managedClusterAddOn := newMCAOUnmanagedScenario()
+	addOnDeploymentConfig := newAODCUnmanagedScenario()
+
+	// Setup configuration resources: ClusterLogForwarder, AddOnDeploymentConfig, Secrets, ConfigMaps
+	clf := &loggingv1.ClusterLogForwarder{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "mcoa-instance",
 			Namespace: "open-cluster-management-observability",
@@ -161,10 +437,8 @@ func newUnmanagedScenarioCLF() *loggingv1.ClusterLogForwarder {
 			},
 		},
 	}
-}
 
-func newUnmanagedScenarioSecret() *corev1.Secret {
-	return &corev1.Secret{
+	staticCred := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "static-authentication",
 			Namespace: "open-cluster-management-observability",
@@ -174,10 +448,8 @@ func newUnmanagedScenarioSecret() *corev1.Secret {
 			"pass": []byte("data"),
 		},
 	}
-}
 
-func newUnmanagedScenarioConfigMap() *corev1.ConfigMap {
-	return &corev1.ConfigMap{
+	caConfigMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo",
 			Namespace: "open-cluster-management-observability",
@@ -186,90 +458,9 @@ func newUnmanagedScenarioConfigMap() *corev1.ConfigMap {
 			"foo": "bar",
 		},
 	}
-}
 
-func Test_Logging_Unmanaged_Collection(t *testing.T) {
-	// Setup a managed cluster
-	managedCluster := addontesting.NewManagedCluster("cluster-1")
-
-	// Register the addon for the managed cluster
-	managedClusterAddOn := addontesting.NewAddon("test", "cluster-1")
-	managedClusterAddOn.Status.ConfigReferences = []addonapiv1alpha1.ConfigReference{
-		{
-			ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
-				Group:    "addon.open-cluster-management.io",
-				Resource: "addondeploymentconfigs",
-			},
-			ConfigReferent: addonapiv1alpha1.ConfigReferent{
-				Namespace: "open-cluster-management-observability",
-				Name:      "multicluster-observability-addon",
-			},
-			DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
-				ConfigReferent: addonapiv1alpha1.ConfigReferent{
-					Namespace: "open-cluster-management-observability",
-					Name:      "multicluster-observability-addon",
-				},
-				SpecHash: "fake-spec-hash",
-			},
-		},
-		{
-			ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
-				Group:    "observability.openshift.io",
-				Resource: "clusterlogforwarders",
-			},
-			ConfigReferent: addonapiv1alpha1.ConfigReferent{
-				Namespace: "open-cluster-management-observability",
-				Name:      "mcoa-instance",
-			},
-		},
-	}
-
-	addOnDeploymentConfig := &addonapiv1alpha1.AddOnDeploymentConfig{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "multicluster-observability-addon",
-			Namespace: "open-cluster-management-observability",
-		},
-		Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
-			CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
-				{
-					Name:  "openshiftLoggingChannel",
-					Value: "latest-version",
-				},
-				{
-					Name:  "platformLogsCollection",
-					Value: "clusterlogforwarders.v1.observability.openshift.io",
-				},
-			},
-		},
-	}
-
-	// Setup configuration resources: ClusterLogForwarder, Secrets, ConfigMaps
-	clf := newUnmanagedScenarioCLF()
-	staticCred := newUnmanagedScenarioSecret()
-	caConfigMap := newUnmanagedScenarioConfigMap()
-
-	// Setup the fake k8s client
-	fakeKubeClient := fake.NewClientBuilder().
-		WithScheme(scheme.Scheme).
-		WithObjects(addOnDeploymentConfig, clf, staticCred, caConfigMap).
-		Build()
-
-	// Setup the fake addon client
-	fakeAddonClient := fakeaddon.NewSimpleClientset(addOnDeploymentConfig)
-	addonConfigValuesFn := addonfactory.GetAddOnDeploymentConfigValues(
-		addonfactory.NewAddOnDeploymentConfigGetter(fakeAddonClient),
-		addonfactory.ToAddOnCustomizedVariableValues,
-	)
-
-	// Wire everything together to a fake addon instance
-	loggingAgentAddon, err := addonfactory.NewAgentAddonFactory(addon.Name, addon.FS, addon.LoggingChartDir).
-		WithGetValuesFuncs(addonConfigValuesFn, fakeGetValues(fakeKubeClient, false)).
-		WithAgentRegistrationOption(&agent.RegistrationOption{}).
-		WithScheme(scheme.Scheme).
-		BuildHelmAgentAddon()
-	if err != nil {
-		klog.Fatalf("failed to build agent %v", err)
-	}
+	// Create the LoggingAgentAddon
+	loggingAgentAddon := newLoggingAgentAddon([]client.Object{managedClusterAddOn, clf, staticCred, caConfigMap}, addOnDeploymentConfig)
 
 	// Render manifests and return them as k8s runtime objects
 	objects, err := loggingAgentAddon.Manifests(managedCluster, managedClusterAddOn)
@@ -304,21 +495,29 @@ func Test_Logging_Unmanaged_Collection(t *testing.T) {
 	}
 }
 
-func Test_Logging_Hub_CLO_Instalation(t *testing.T) {
+// Test_Logging_Unmanaged tests the scenarios fo the Unamanged scenario
+func Test_Logging_Unmanaged(t *testing.T) {
 	testCases := []struct {
 		name                 string
+		isHubCluster         bool
 		existingSubscription bool
 		nbExptedObjects      int
 	}{
 		{
-			name:                 "Hub with existing subscription",
-			existingSubscription: true,
-			nbExptedObjects:      8,
+			name:            "Spoke",
+			nbExptedObjects: 9,
 		},
 		{
 			name:                 "Hub without existing subscription",
+			isHubCluster:         true,
 			existingSubscription: false,
-			nbExptedObjects:      11,
+			nbExptedObjects:      9,
+		},
+		{
+			name:                 "Hub with existing subscription",
+			isHubCluster:         true,
+			existingSubscription: true,
+			nbExptedObjects:      6,
 		},
 	}
 
@@ -326,72 +525,33 @@ func Test_Logging_Hub_CLO_Instalation(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// Setup a managed cluster with local-cluster label to simulate a hub
 			managedCluster := addontesting.NewManagedCluster("cluster-1")
-			managedCluster.Labels = map[string]string{
-				"local-cluster": "true", // This identifies it as a hub cluster
+			if tc.isHubCluster {
+				// This identifies it as a hub cluster
+				managedCluster.Labels = map[string]string{
+					"local-cluster": "true",
+				}
 			}
 
 			// Register the addon for the managed cluster
-			managedClusterAddOn := addontesting.NewAddon("test", "cluster-1")
-			managedClusterAddOn.Status.ConfigReferences = []addonapiv1alpha1.ConfigReference{
-				{
-					ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
-						Group:    "addon.open-cluster-management.io",
-						Resource: "addondeploymentconfigs",
-					},
-					ConfigReferent: addonapiv1alpha1.ConfigReferent{
-						Namespace: "open-cluster-management-observability",
-						Name:      "multicluster-observability-addon",
-					},
-					DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
-						ConfigReferent: addonapiv1alpha1.ConfigReferent{
-							Namespace: "open-cluster-management-observability",
-							Name:      "multicluster-observability-addon",
-						},
-						SpecHash: "fake-spec-hash",
-					},
-				},
-				{
-					ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
-						Group:    "observability.openshift.io",
-						Resource: "clusterlogforwarders",
-					},
-					ConfigReferent: addonapiv1alpha1.ConfigReferent{
-						Namespace: "open-cluster-management-observability",
-						Name:      "mcoa-instance",
-					},
-				},
-			}
+			managedClusterAddOn := newMCAOUnmanagedScenario()
+			addOnDeploymentConfig := newAODCUnmanagedScenario()
 
-			clf := newUnmanagedScenarioCLF()
-			staticCred := newUnmanagedScenarioSecret()
-			caConfigMap := newUnmanagedScenarioConfigMap()
+			// Setup configuration resources
+			clf := newCLFUnmanagedScenario()
 
-			addOnDeploymentConfig := &addonapiv1alpha1.AddOnDeploymentConfig{
+			staticCred := &corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "multicluster-observability-addon",
+					Name:      "static-authentication",
 					Namespace: "open-cluster-management-observability",
 				},
-				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
-					CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
-						{
-							Name:  "openshiftLoggingChannel",
-							Value: "stable-5.8",
-						},
-						{
-							Name:  "platformLogsCollection",
-							Value: "clusterlogforwarders.v1.observability.openshift.io",
-						},
-					},
+				Data: map[string][]byte{
+					"key":  []byte("data"),
+					"pass": []byte("data"),
 				},
 			}
 
 			// Setup test objects
-			testObjects := []client.Object{
-				addOnDeploymentConfig,
-				clf,
-				staticCred,
-				caConfigMap,
-			}
+			initObjects := []client.Object{clf, staticCred}
 
 			// Conditionally add existing subscription based on test case
 			if tc.existingSubscription {
@@ -401,117 +561,32 @@ func Test_Logging_Hub_CLO_Instalation(t *testing.T) {
 						Namespace: "openshift-logging",
 					},
 					Spec: &operatorsv1alpha1.SubscriptionSpec{
-						Channel:                "stable-5.8",
+						Channel:                "latest-version",
 						InstallPlanApproval:    operatorsv1alpha1.ApprovalAutomatic,
 						CatalogSource:          "redhat-operators",
 						CatalogSourceNamespace: "openshift-marketplace",
 					},
 				}
-				testObjects = append(testObjects, existingSubscription)
+				initObjects = append(initObjects, existingSubscription)
 			}
 
-			// Setup the fake k8s client with all objects
-			fakeKubeClient := fake.NewClientBuilder().
-				WithScheme(scheme.Scheme).
-				WithObjects(testObjects...).
-				Build()
-
-			// Setup the fake addon client
-			fakeAddonClient := fakeaddon.NewSimpleClientset(addOnDeploymentConfig)
-			addonConfigValuesFn := addonfactory.GetAddOnDeploymentConfigValues(
-				addonfactory.NewAddOnDeploymentConfigGetter(fakeAddonClient),
-				addonfactory.ToAddOnCustomizedVariableValues,
-			)
-
-			// Wire everything together to a fake addon instance
-			loggingAgentAddon, err := addonfactory.NewAgentAddonFactory(addon.Name, addon.FS, addon.LoggingChartDir).
-				WithGetValuesFuncs(addonConfigValuesFn, fakeGetValues(fakeKubeClient, true)).
-				WithAgentRegistrationOption(&agent.RegistrationOption{}).
-				WithScheme(scheme.Scheme).
-				BuildHelmAgentAddon()
-			if err != nil {
-				klog.Fatalf("failed to build agent %v", err)
-			}
+			logginAgentAddon := newLoggingAgentAddon(initObjects, addOnDeploymentConfig)
 
 			// Render manifests and return them as k8s runtime objects
-			objects, err := loggingAgentAddon.Manifests(managedCluster, managedClusterAddOn)
+			objects, err := logginAgentAddon.Manifests(managedCluster, managedClusterAddOn)
 			require.NoError(t, err)
 			require.Equal(t, tc.nbExptedObjects, len(objects))
 		})
 	}
 }
 
-func Test_Logging_Managed_Collection(t *testing.T) {
-	var (
-		// Addon envinronment and registration
-		managedCluster      *clusterv1.ManagedCluster
-		managedClusterAddOn *addonapiv1alpha1.ManagedClusterAddOn
-
-		// Addon configuration
-		addOnDeploymentConfig *addonapiv1alpha1.AddOnDeploymentConfig
-
-		// Test clients
-		fakeKubeClient  client.Client
-		fakeAddonClient *fakeaddon.Clientset
-	)
-
+func Test_Logging_Managed_Collection_Spoke(t *testing.T) {
 	// Setup a managed cluster
-	managedCluster = addontesting.NewManagedCluster("cluster-1")
+	managedCluster := addontesting.NewManagedCluster("cluster-1")
 
 	// Register the addon for the managed cluster
-	managedClusterAddOn = addontesting.NewAddon("test", "cluster-1")
-	managedClusterAddOn.Status.ConfigReferences = []addonapiv1alpha1.ConfigReference{
-		{
-			ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
-				Group:    "addon.open-cluster-management.io",
-				Resource: "addondeploymentconfigs",
-			},
-			ConfigReferent: addonapiv1alpha1.ConfigReferent{
-				Namespace: "open-cluster-management-observability",
-				Name:      "multicluster-observability-addon",
-			},
-			DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
-				ConfigReferent: addonapiv1alpha1.ConfigReferent{
-					Namespace: "open-cluster-management-observability",
-					Name:      "multicluster-observability-addon",
-				},
-				SpecHash: "fake-spec-hash",
-			},
-		},
-		{
-			ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
-				Group:    "observability.openshift.io",
-				Resource: "clusterlogforwarders",
-			},
-			ConfigReferent: addonapiv1alpha1.ConfigReferent{
-				Namespace: "local-cluster",
-				Name:      "default-stack-instance-bar",
-			},
-		},
-	}
-
-	addOnDeploymentConfig = &addonapiv1alpha1.AddOnDeploymentConfig{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "multicluster-observability-addon",
-			Namespace: "open-cluster-management-observability",
-		},
-		Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
-			CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
-				{
-					Name:  "openshiftLoggingChannel",
-					Value: "stable-latest",
-				},
-				{
-					Name:  "hubHostname",
-					Value: "myhub.foo.com",
-				},
-				{
-					Name:  "platformLogsDefault",
-					Value: "true",
-				},
-			},
-		},
-	}
+	managedClusterAddOn := newMCAODefaultScenario()
+	addOnDeploymentConfig := newAODCDefaultScenario()
 
 	// Emulate the secret that would've been created by the cert-manager
 	mtls := &corev1.Secret{
@@ -526,64 +601,7 @@ func Test_Logging_Managed_Collection(t *testing.T) {
 		},
 	}
 
-	existingCLF := &loggingv1.ClusterLogForwarder{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "default-stack-instance-bar",
-			Namespace: "local-cluster",
-		},
-		Spec: loggingv1.ClusterLogForwarderSpec{
-			ServiceAccount: loggingv1.ServiceAccount{
-				Name: "mcoa-logging-managed-collector",
-			},
-			ManagementState: loggingv1.ManagementStateUnmanaged,
-			Filters: []loggingv1.FilterSpec{
-				{
-					Name: "filter-1",
-					Type: loggingv1.FilterTypeDrop,
-					KubeAPIAudit: &loggingv1.KubeAPIAudit{
-						Rules: []auditv1.PolicyRule{
-							{
-								Level: auditv1.LevelMetadata,
-							},
-						},
-					},
-				},
-			},
-			Outputs: []loggingv1.OutputSpec{
-				{
-					Name: "hub-lokistack",
-					Type: loggingv1.OutputTypeOTLP,
-					OTLP: &loggingv1.OTLP{
-						URL: "https://not-the-final-url",
-					},
-					TLS: &loggingv1.OutputTLSSpec{
-						InsecureSkipVerify: true,
-						TLSSpec: loggingv1.TLSSpec{
-							CA: &loggingv1.ValueReference{
-								Key:        "ca.crt",
-								SecretName: "mcoa-logging-managed-collection-tls",
-							},
-							Certificate: &loggingv1.ValueReference{
-								Key:        "tls.crt",
-								SecretName: "mcoa-logging-managed-collection-tls",
-							},
-							Key: &loggingv1.SecretReference{
-								Key:        "tls.key",
-								SecretName: "mcoa-logging-managed-collection-tls",
-							},
-						},
-					},
-				},
-			},
-			Pipelines: []loggingv1.PipelineSpec{
-				{
-					Name:       "not-the-correct-name",
-					InputRefs:  []string{"infrastructure"},
-					OutputRefs: []string{"hub-lokistack"},
-				},
-			},
-		},
-	}
+	existingCLF := newCLFDefaultScenario()
 
 	expectedCLF := &loggingv1.ClusterLogForwarder{
 		TypeMeta: metav1.TypeMeta{
@@ -656,28 +674,7 @@ func Test_Logging_Managed_Collection(t *testing.T) {
 		},
 	}
 
-	// Setup the fake k8s client
-	fakeKubeClient = fake.NewClientBuilder().
-		WithScheme(scheme.Scheme).
-		WithObjects(addOnDeploymentConfig, existingCLF, mtls).
-		Build()
-
-	// Setup the fake addon client
-	fakeAddonClient = fakeaddon.NewSimpleClientset(addOnDeploymentConfig)
-	addonConfigValuesFn := addonfactory.GetAddOnDeploymentConfigValues(
-		addonfactory.NewAddOnDeploymentConfigGetter(fakeAddonClient),
-		addonfactory.ToAddOnCustomizedVariableValues,
-	)
-
-	// Wire everything together to a fake addon instance
-	loggingAgentAddon, err := addonfactory.NewAgentAddonFactory(addon.Name, addon.FS, addon.LoggingChartDir).
-		WithGetValuesFuncs(addonConfigValuesFn, fakeGetValues(fakeKubeClient, false)).
-		WithAgentRegistrationOption(&agent.RegistrationOption{}).
-		WithScheme(scheme.Scheme).
-		BuildHelmAgentAddon()
-	if err != nil {
-		klog.Fatalf("failed to build agent %v", err)
-	}
+	loggingAgentAddon := newLoggingAgentAddon([]client.Object{managedClusterAddOn, existingCLF, mtls}, addOnDeploymentConfig)
 
 	// Render manifests and return them as k8s runtime objects
 	objects, err := loggingAgentAddon.Manifests(managedCluster, managedClusterAddOn)
@@ -701,286 +698,271 @@ func Test_Logging_Managed_Collection(t *testing.T) {
 }
 
 func Test_Logging_Managed_Storage(t *testing.T) {
-	var (
-		// Addon envinronment and registration
-		managedCluster      *clusterv1.ManagedCluster
-		managedClusterAddOn *addonapiv1alpha1.ManagedClusterAddOn
-
-		// Addon configuration
-		addOnDeploymentConfig *addonapiv1alpha1.AddOnDeploymentConfig
-
-		// Test clients
-		fakeKubeClient  client.Client
-		fakeAddonClient *fakeaddon.Clientset
-	)
-
-	// Setup a managed cluster
-	managedCluster = addontesting.NewManagedCluster("local-cluster")
-
-	// Register the addon for the managed cluster
-	managedClusterAddOn = addontesting.NewAddon("test", "local-cluster")
-	managedClusterAddOn.Status.ConfigReferences = []addonapiv1alpha1.ConfigReference{
+	testCases := []struct {
+		name                 string
+		isHubCluster         bool
+		existingSubscription bool
+		nbExptedObjects      int
+	}{
 		{
-			ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
-				Group:    "addon.open-cluster-management.io",
-				Resource: "addondeploymentconfigs",
-			},
-			ConfigReferent: addonapiv1alpha1.ConfigReferent{
-				Namespace: "open-cluster-management-observability",
-				Name:      "multicluster-observability-addon",
-			},
-			DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
-				ConfigReferent: addonapiv1alpha1.ConfigReferent{
-					Namespace: "open-cluster-management-observability",
-					Name:      "multicluster-observability-addon",
-				},
-				SpecHash: "fake-spec-hash",
-			},
+			name:            "Spoke",
+			nbExptedObjects: 9,
 		},
 		{
-			ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
-				Group:    "loki.grafana.com",
-				Resource: "lokistacks",
-			},
-			ConfigReferent: addonapiv1alpha1.ConfigReferent{
-				Namespace: "local-cluster",
-				Name:      "default-stack-instance-bar",
-			},
+			name:                 "Hub without existing subscription",
+			isHubCluster:         true,
+			existingSubscription: false,
+			nbExptedObjects:      12,
+		},
+		{
+			name:                 "Hub with existing subscription",
+			isHubCluster:         true,
+			existingSubscription: true,
+			nbExptedObjects:      9,
 		},
 	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Setup a managed cluster
+			managedCluster := addontesting.NewManagedCluster("local-cluster")
+			if tc.isHubCluster {
+				managedCluster.Labels = map[string]string{
+					"local-cluster": "true",
+				}
+			}
 
-	addOnDeploymentConfig = &addonapiv1alpha1.AddOnDeploymentConfig{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "multicluster-observability-addon",
-			Namespace: "open-cluster-management-observability",
-		},
-		Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
-			CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
-				{
-					Name:  "openshiftLoggingChannel",
-					Value: "stable-latest",
-				},
-				{
-					Name:  "platformLogsDefault",
-					Value: "true",
-				},
-			},
-		},
-	}
+			// Register the addon for the managed cluster
+			managedClusterAddOn := newMCAODefaultScenario()
+			addOnDeploymentConfig := newAODCDefaultScenario()
 
-	existingLS := &lokiv1.LokiStack{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "default-stack-instance-bar",
-			Namespace: "local-cluster",
-		},
-		Spec: lokiv1.LokiStackSpec{
-			ManagementState:  lokiv1.ManagementStateUnmanaged,
-			Size:             lokiv1.SizeOneXMedium,
-			StorageClassName: "foo-blob",
-			Storage: lokiv1.ObjectStorageSpec{
-				Secret: lokiv1.ObjectStorageSecretSpec{
-					Type: "azure",
-					Name: "mcoa-bar-azure-secret",
+			// Emulate the secret that would've been created by the cert-manager
+			mtlsCollection := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "mcoa-logging-managed-collection-tls",
+					Namespace: "local-cluster",
 				},
-				Schemas: []lokiv1.ObjectStorageSchema{
-					{
-						Version:       lokiv1.ObjectStorageSchemaV13,
-						EffectiveDate: "2025-01-01",
-					},
+				Data: map[string][]byte{
+					"ca.crt":  []byte("data"),
+					"tls.crt": []byte("data"),
+					"tls.key": []byte("data"),
 				},
-			},
-			Limits: &lokiv1.LimitsSpec{
-				Global: &lokiv1.LimitsTemplateSpec{
-					IngestionLimits: &lokiv1.IngestionLimitSpec{
-						IngestionRate: 200,
-					},
-				},
-			},
-		},
-	}
+			}
+			existingCLF := newCLFDefaultScenario()
 
-	// Tenants
-	tenant1 := addontesting.NewAddon("multicluster-observability-addon", "tenant-1")
-	tenant2 := addontesting.NewAddon("multicluster-observability-addon", "tenant-2")
-
-	// Emulate the secret that would've been created by the cert-manager
-	mtls := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "mcoa-logging-managed-storage-tls",
-			Namespace: "local-cluster",
-		},
-		Data: map[string][]byte{
-			"ca.crt":  []byte("data"),
-			"tls.crt": []byte("data"),
-			"tls.key": []byte("data"),
-		},
-	}
-
-	objstorage := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "mcoa-bar-azure-secret",
-			Namespace: "local-cluster",
-		},
-		Data: map[string][]byte{
-			"foo": []byte("bar"),
-		},
-	}
-
-	expectedLS := &lokiv1.LokiStack{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: lokiv1.GroupVersion.String(),
-			Kind:       "LokiStack",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      addon.SpokeDefaultStackLSName,
-			Namespace: "openshift-logging",
-			Labels: map[string]string{
-				"release": "multicluster-observability-addon",
-				"chart":   "storage-1.0.0",
-				"app":     "storage",
-			},
-		},
-		Spec: lokiv1.LokiStackSpec{
-			ManagementState:  lokiv1.ManagementStateManaged,
-			Size:             lokiv1.SizeOneXMedium,
-			StorageClassName: "foo-blob",
-			Storage: lokiv1.ObjectStorageSpec{
-				Secret: lokiv1.ObjectStorageSecretSpec{
-					Type: "azure",
-					Name: "mcoa-bar-azure-secret",
+			existingLS := &lokiv1.LokiStack{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "default-stack-instance-bar",
+					Namespace: "local-cluster",
 				},
-				Schemas: []lokiv1.ObjectStorageSchema{
-					{
-						Version:       lokiv1.ObjectStorageSchemaV13,
-						EffectiveDate: "2025-01-01",
-					},
-				},
-			},
-			Tenants: &lokiv1.TenantsSpec{
-				Mode: lokiv1.Static,
-				Authentication: []lokiv1.AuthenticationSpec{
-					{
-						TenantName: "tenant-1",
-						TenantID:   "tenant-1",
-						MTLS: &lokiv1.MTLSSpec{
-							CA: &lokiv1.CASpec{
-								CAKey: "ca.crt",
-								CA:    "mcoa-logging-managed-storage-tls",
+				Spec: lokiv1.LokiStackSpec{
+					ManagementState:  lokiv1.ManagementStateUnmanaged,
+					Size:             lokiv1.SizeOneXMedium,
+					StorageClassName: "foo-blob",
+					Storage: lokiv1.ObjectStorageSpec{
+						Secret: lokiv1.ObjectStorageSecretSpec{
+							Type: "azure",
+							Name: "mcoa-bar-azure-secret",
+						},
+						Schemas: []lokiv1.ObjectStorageSchema{
+							{
+								Version:       lokiv1.ObjectStorageSchemaV13,
+								EffectiveDate: "2025-01-01",
 							},
 						},
 					},
-					{
-						TenantName: "tenant-2",
-						TenantID:   "tenant-2",
-						MTLS: &lokiv1.MTLSSpec{
-							CA: &lokiv1.CASpec{
-								CAKey: "ca.crt",
-								CA:    "mcoa-logging-managed-storage-tls",
+					Limits: &lokiv1.LimitsSpec{
+						Global: &lokiv1.LimitsTemplateSpec{
+							IngestionLimits: &lokiv1.IngestionLimitSpec{
+								IngestionRate: 200,
 							},
 						},
 					},
 				},
-				Authorization: &lokiv1.AuthorizationSpec{
-					Roles: []lokiv1.RoleSpec{
-						{
-							Name:        "tenant-1-logs",
-							Resources:   []string{"logs"},
-							Permissions: []lokiv1.PermissionType{"read", "write"},
-							Tenants:     []string{"tenant-1"},
+			}
+
+			// Tenants
+			tenant1 := addontesting.NewAddon("multicluster-observability-addon", "tenant-1")
+			tenant2 := addontesting.NewAddon("multicluster-observability-addon", "tenant-2")
+
+			// Emulate the secret that would've been created by the cert-manager
+			mtls := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "mcoa-logging-managed-storage-tls",
+					Namespace: "local-cluster",
+				},
+				Data: map[string][]byte{
+					"ca.crt":  []byte("data"),
+					"tls.crt": []byte("data"),
+					"tls.key": []byte("data"),
+				},
+			}
+
+			objstorage := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "mcoa-bar-azure-secret",
+					Namespace: "local-cluster",
+				},
+				Data: map[string][]byte{
+					"foo": []byte("bar"),
+				},
+			}
+
+			expectedLS := &lokiv1.LokiStack{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: lokiv1.GroupVersion.String(),
+					Kind:       "LokiStack",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      addon.SpokeDefaultStackLSName,
+					Namespace: "openshift-logging",
+					Labels: map[string]string{
+						"release": "multicluster-observability-addon",
+						"chart":   "storage-1.0.0",
+						"app":     "storage",
+					},
+				},
+				Spec: lokiv1.LokiStackSpec{
+					ManagementState:  lokiv1.ManagementStateManaged,
+					Size:             lokiv1.SizeOneXMedium,
+					StorageClassName: "foo-blob",
+					Storage: lokiv1.ObjectStorageSpec{
+						Secret: lokiv1.ObjectStorageSecretSpec{
+							Type: "azure",
+							Name: "mcoa-bar-azure-secret",
 						},
-						{
-							Name:        "tenant-2-logs",
-							Resources:   []string{"logs"},
-							Permissions: []lokiv1.PermissionType{"read", "write"},
-							Tenants:     []string{"tenant-2"},
-						},
-						{
-							Name:        "cluster-reader",
-							Resources:   []string{"logs"},
-							Permissions: []lokiv1.PermissionType{"read"},
-							Tenants:     []string{"tenant-1", "tenant-2"},
+						Schemas: []lokiv1.ObjectStorageSchema{
+							{
+								Version:       lokiv1.ObjectStorageSchemaV13,
+								EffectiveDate: "2025-01-01",
+							},
 						},
 					},
-					RoleBindings: []lokiv1.RoleBindingsSpec{
-						{
-							Name:  "tenant-1-logs",
-							Roles: []string{"tenant-1-logs"},
-							Subjects: []lokiv1.Subject{
-								{
-									Kind: "group",
-									Name: "tenant-1",
+					Tenants: &lokiv1.TenantsSpec{
+						Mode: lokiv1.Static,
+						Authentication: []lokiv1.AuthenticationSpec{
+							{
+								TenantName: "tenant-1",
+								TenantID:   "tenant-1",
+								MTLS: &lokiv1.MTLSSpec{
+									CA: &lokiv1.CASpec{
+										CAKey: "ca.crt",
+										CA:    "mcoa-logging-managed-storage-tls",
+									},
+								},
+							},
+							{
+								TenantName: "tenant-2",
+								TenantID:   "tenant-2",
+								MTLS: &lokiv1.MTLSSpec{
+									CA: &lokiv1.CASpec{
+										CAKey: "ca.crt",
+										CA:    "mcoa-logging-managed-storage-tls",
+									},
 								},
 							},
 						},
-						{
-							Name:  "tenant-2-logs",
-							Roles: []string{"tenant-2-logs"},
-							Subjects: []lokiv1.Subject{
+						Authorization: &lokiv1.AuthorizationSpec{
+							Roles: []lokiv1.RoleSpec{
 								{
-									Kind: "group",
-									Name: "tenant-2",
+									Name:        "tenant-1-logs",
+									Resources:   []string{"logs"},
+									Permissions: []lokiv1.PermissionType{"read", "write"},
+									Tenants:     []string{"tenant-1"},
+								},
+								{
+									Name:        "tenant-2-logs",
+									Resources:   []string{"logs"},
+									Permissions: []lokiv1.PermissionType{"read", "write"},
+									Tenants:     []string{"tenant-2"},
+								},
+								{
+									Name:        "cluster-reader",
+									Resources:   []string{"logs"},
+									Permissions: []lokiv1.PermissionType{"read"},
+									Tenants:     []string{"tenant-1", "tenant-2"},
 								},
 							},
-						},
-						{
-							Name:  "cluster-reader",
-							Roles: []string{"cluster-reader"},
-							Subjects: []lokiv1.Subject{
+							RoleBindings: []lokiv1.RoleBindingsSpec{
 								{
-									Kind: "group",
-									Name: "mcoa-logs-admin",
+									Name:  "tenant-1-logs",
+									Roles: []string{"tenant-1-logs"},
+									Subjects: []lokiv1.Subject{
+										{
+											Kind: "group",
+											Name: "tenant-1",
+										},
+									},
+								},
+								{
+									Name:  "tenant-2-logs",
+									Roles: []string{"tenant-2-logs"},
+									Subjects: []lokiv1.Subject{
+										{
+											Kind: "group",
+											Name: "tenant-2",
+										},
+									},
+								},
+								{
+									Name:  "cluster-reader",
+									Roles: []string{"cluster-reader"},
+									Subjects: []lokiv1.Subject{
+										{
+											Kind: "group",
+											Name: "mcoa-logs-admin",
+										},
+									},
 								},
 							},
 						},
 					},
-				},
-			},
-			Limits: &lokiv1.LimitsSpec{
-				Global: &lokiv1.LimitsTemplateSpec{
-					IngestionLimits: &lokiv1.IngestionLimitSpec{
-						IngestionRate: 200,
+					Limits: &lokiv1.LimitsSpec{
+						Global: &lokiv1.LimitsTemplateSpec{
+							IngestionLimits: &lokiv1.IngestionLimitSpec{
+								IngestionRate: 200,
+							},
+						},
 					},
 				},
-			},
-		},
-	}
+			}
 
-	// Setup the fake k8s client
-	fakeKubeClient = fake.NewClientBuilder().
-		WithScheme(scheme.Scheme).
-		WithObjects(addOnDeploymentConfig, existingLS, mtls, objstorage, tenant1, tenant2).
-		Build()
+			initObjects := []client.Object{managedClusterAddOn, existingCLF, mtlsCollection, existingLS, mtls, objstorage, tenant1, tenant2}
 
-	// Setup the fake addon client
-	fakeAddonClient = fakeaddon.NewSimpleClientset(addOnDeploymentConfig)
-	addonConfigValuesFn := addonfactory.GetAddOnDeploymentConfigValues(
-		addonfactory.NewAddOnDeploymentConfigGetter(fakeAddonClient),
-		addonfactory.ToAddOnCustomizedVariableValues,
-	)
+			// Conditionally add existing subscription based on test case
+			if tc.existingSubscription {
+				existingSubscription := &operatorsv1alpha1.Subscription{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "cluster-logging",
+						Namespace: "openshift-logging",
+					},
+					Spec: &operatorsv1alpha1.SubscriptionSpec{
+						Channel:                "stable-latest",
+						InstallPlanApproval:    operatorsv1alpha1.ApprovalAutomatic,
+						CatalogSource:          "redhat-operators",
+						CatalogSourceNamespace: "openshift-marketplace",
+					},
+				}
+				initObjects = append(initObjects, existingSubscription)
+			}
 
-	// Wire everything together to a fake addon instance
-	loggingAgentAddon, err := addonfactory.NewAgentAddonFactory(addon.Name, addon.FS, addon.LoggingChartDir).
-		WithGetValuesFuncs(addonConfigValuesFn, fakeGetValues(fakeKubeClient, true)).
-		WithAgentRegistrationOption(&agent.RegistrationOption{}).
-		WithScheme(scheme.Scheme).
-		BuildHelmAgentAddon()
-	if err != nil {
-		klog.Fatalf("failed to build agent %v", err)
-	}
+			// Setup the fake k8s client
+			loggingAgentAddon := newLoggingAgentAddon(initObjects, addOnDeploymentConfig)
 
-	// Render manifests and return them as k8s runtime objects
-	objects, err := loggingAgentAddon.Manifests(managedCluster, managedClusterAddOn)
-	require.NoError(t, err)
-	require.Equal(t, 4, len(objects))
+			// Render manifests and return them as k8s runtime objects
+			objects, err := loggingAgentAddon.Manifests(managedCluster, managedClusterAddOn)
+			require.NoError(t, err)
+			require.Equal(t, tc.nbExptedObjects, len(objects))
 
-	for _, obj := range objects {
-		switch obj := obj.(type) {
-		case *lokiv1.LokiStack:
-			require.Equal(t, expectedLS, obj)
-			// Check name and namespace to make sure that if we change the helm
-			// manifests that we don't break the addon probes
-			require.Equal(t, addon.SpokeDefaultStackCLFName, obj.Name)
-			require.Equal(t, addon.LoggingNamespace, obj.Namespace)
-		}
+			for _, obj := range objects {
+				switch obj := obj.(type) {
+				case *lokiv1.LokiStack:
+					require.Equal(t, expectedLS, obj)
+					// Check name and namespace to make sure that if we change the helm
+					// manifests that we don't break the addon probes
+					require.Equal(t, addon.SpokeDefaultStackCLFName, obj.Name)
+					require.Equal(t, addon.LoggingNamespace, obj.Namespace)
+				}
+			}
+		})
 	}
 }
