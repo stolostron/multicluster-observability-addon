@@ -36,7 +36,7 @@ const (
 	otelColProbeKey                 = "replicas"
 	otelColProbePath                = ".spec.replicas"
 
-	UIPluginsResource = "uiplugins"
+	uiPluginsResource = "uiplugins"
 	uipProbeKey       = "isAvailable"
 	uipProbePath      = ".status.conditions[?(@.type==\"Available\")].status"
 )
