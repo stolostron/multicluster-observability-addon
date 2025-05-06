@@ -171,7 +171,7 @@ func Test_AgentHealthProber_OTELCol(t *testing.T) {
 }
 
 func Test_AgentHealthProber_UIPlugin(t *testing.T) {
-	unhealthyError := fmt.Errorf("%w: uiplugins status condition type is %s for %s", errProbeConditionNotSatisfied, "False", SpokeUIPluginName)
+	unhealthyError := fmt.Errorf("%w: uiplugins status condition type is %s for %s", errProbeConditionNotSatisfied, "False", IDetectionUIPluginName)
 	managedCluster := addontesting.NewManagedCluster("cluster-1")
 	managedClusterAddOn := addontesting.NewAddon("test", "cluster-1")
 	for _, tc := range []struct {
@@ -195,8 +195,8 @@ func Test_AgentHealthProber_UIPlugin(t *testing.T) {
 				{
 					ResourceIdentifier: workv1.ResourceIdentifier{
 						Group:    uiplugin.GroupVersion.Group,
-						Resource: UIPluginsResource,
-						Name:     SpokeUIPluginName,
+						Resource: uiPluginsResource,
+						Name:     IDetectionUIPluginName,
 					},
 					FeedbackResult: workv1.StatusFeedbackResult{
 						Values: []workv1.FeedbackValue{

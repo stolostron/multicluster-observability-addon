@@ -31,7 +31,7 @@ const (
 	InstrumentationResource         = "instrumentations"
 	SpokeOTELColName                = "mcoa-instance"
 	SpokeInstrumentationName        = "mcoa-instance"
-	IDetectionUIPluginName               = "monitoring"
+	IDetectionUIPluginName          = "monitoring"
 	SpokeOTELColNamespace           = "mcoa-opentelemetry"
 	otelColProbeKey                 = "replicas"
 	otelColProbePath                = ".spec.replicas"

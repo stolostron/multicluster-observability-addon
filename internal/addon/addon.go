@@ -98,7 +98,7 @@ func AgentHealthProber() *agent.HealthProber {
 				{
 					ResourceIdentifier: workv1.ResourceIdentifier{
 						Group:    uiplugin.GroupVersion.Group,
-						Resource: UIPluginsResource,
+						Resource: uiPluginsResource,
 						Name:     "monitoring",
 					},
 					ProbeRules: []workv1.FeedbackRule{
@@ -170,7 +170,7 @@ func AgentHealthProber() *agent.HealthProber {
 							}
 							// otel collector passes the health check
 						}
-					case UIPluginsResource:
+					case uiPluginsResource:
 						for _, value := range field.FeedbackResult.Values {
 							if value.Name != uipProbeKey {
 								return fmt.Errorf("%w: %s with key %s unknown probe keys %s", errUnknownProbeKey, identifier.Resource, identifier.Name, value.Name)
