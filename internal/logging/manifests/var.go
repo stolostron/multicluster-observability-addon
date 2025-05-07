@@ -4,7 +4,7 @@ import "errors"
 
 const (
 	subscriptionChannelValueKey = "openshiftLoggingChannel"
-	defaultLoggingVersion       = "stable-6.1"
+	defaultLoggingVersion       = "stable-6.2"
 
 	DefaultCollectionCertCommonName = "mcoa-logging-managed-collection"
 	DefaultCollectionMTLSSecretName = "mcoa-logging-managed-collection-tls"
