@@ -64,6 +64,7 @@ type ImageOverrides struct {
 	PrometheusOperator       string
 	PrometheusConfigReloader string
 	KubeRBACProxy            string
+	Prometheus               string
 }
 
 func GetImageOverrides(ctx context.Context, c client.Client) (ImageOverrides, error) {
@@ -82,6 +83,8 @@ func GetImageOverrides(ctx context.Context, c client.Client) (ImageOverrides, er
 			ret.PrometheusConfigReloader = value
 		case "kube_rbac_proxy":
 			ret.KubeRBACProxy = value
+		case "prometheus":
+			ret.Prometheus = value
 		default:
 		}
 	}

@@ -22,10 +22,11 @@ import (
 )
 
 type DefaultStackResources struct {
-	Client       client.Client
-	CMAO         *addonv1alpha1.ClusterManagementAddOn
-	AddonOptions addon.Options
-	Logger       klog.Logger
+	Client          client.Client
+	CMAO            *addonv1alpha1.ClusterManagementAddOn
+	AddonOptions    addon.Options
+	Logger          klog.Logger
+	PrometheusImage string
 }
 
 type defaultConfig struct {
@@ -33,15 +34,13 @@ type defaultConfig struct {
 	config       addonv1alpha1.AddOnConfig
 }
 
-// Reconcile creates resources for the default logging stack
-// based on the provided options and placement information.
 func (d DefaultStackResources) Reconcile(ctx context.Context) error {
 	configs := []defaultConfig{}
 
 	// Reconcile existing placements
 	for _, placement := range d.CMAO.Spec.InstallStrategy.Placements {
 		if d.AddonOptions.Platform.Metrics.CollectionEnabled {
-			agent, err := d.reconcilePlatformAgent(ctx, placement.PlacementRef)
+			agent, err := d.reconcileAgent(ctx, placement.PlacementRef, false)
 			if err != nil {
 				return fmt.Errorf("failed to reconcile platform prometheusAgent for placement %s: %w", placement.Name, err)
 			}
@@ -52,9 +51,14 @@ func (d DefaultStackResources) Reconcile(ctx context.Context) error {
 		}
 
 		if d.AddonOptions.UserWorkloads.Metrics.CollectionEnabled {
-			if err := d.reconcileUWLAgent(ctx, placement.PlacementRef); err != nil {
+			agent, err := d.reconcileAgent(ctx, placement.PlacementRef, true)
+			if err != nil {
 				return fmt.Errorf("failed to reconcile user workloads prometheusAgent for placement %s: %w", placement.Name, err)
 			}
+			configs = append(configs, defaultConfig{
+				placementRef: placement.PlacementRef,
+				config:       promAgentToAddonConfig(agent),
+			})
 		}
 	}
 
@@ -87,8 +91,9 @@ func (d DefaultStackResources) cleanOrphanResources(ctx context.Context) error {
 	// list prometheus agents owned by cmao
 	// remove the ones having a non existing placement
 	items := prometheusalpha1.PrometheusAgentList{}
+	// TODO: restrict list to a namespace
 	if err := d.Client.List(ctx, &items); err != nil {
-		return fmt.Errorf("")
+		return fmt.Errorf("failed to list PrometheusAgents: %w", err)
 	}
 
 	makePlacementKey := func(namespace, name string) string {
@@ -132,11 +137,17 @@ func (d DefaultStackResources) ensureAddonConfig(ctx context.Context, configs []
 			return fmt.Errorf("failed to get ClusterManagementAddOn: %w", err)
 		}
 
-		if updated := ensureConfigsInAddon(cmao, configs); !updated {
+		desiredCmao := cmao.DeepCopy()
+		ensureConfigsInAddon(desiredCmao, configs)
+		if equality.Semantic.DeepEqual(cmao, desiredCmao) {
 			return nil
 		}
 
-		return d.Client.Update(ctx, cmao)
+		err := d.Client.Update(ctx, desiredCmao)
+		if err == nil {
+			d.Logger.Info("addon config updated with default configs")
+		}
+		return err
 	})
 
 	if retryErr != nil {
@@ -146,8 +157,7 @@ func (d DefaultStackResources) ensureAddonConfig(ctx context.Context, configs []
 	return nil
 }
 
-func ensureConfigsInAddon(cmao *addonv1alpha1.ClusterManagementAddOn, configs []defaultConfig) bool {
-	var updated bool
+func ensureConfigsInAddon(cmao *addonv1alpha1.ClusterManagementAddOn, configs []defaultConfig) {
 	// group configs by placement
 	placementConfigs := map[addonv1alpha1.PlacementRef][]addonv1alpha1.AddOnConfig{}
 	for _, cfg := range configs {
@@ -155,7 +165,7 @@ func ensureConfigsInAddon(cmao *addonv1alpha1.ClusterManagementAddOn, configs []
 	}
 
 	// for each placement in cmao, ensure configs are present
-	for _, placement := range cmao.Spec.InstallStrategy.Placements {
+	for i, placement := range cmao.Spec.InstallStrategy.Placements {
 		desiredConfigs := placementConfigs[placement.PlacementRef]
 		for _, cfg := range desiredConfigs {
 			idx := slices.IndexFunc(placement.Configs, func(e addonv1alpha1.AddOnConfig) bool {
@@ -166,36 +176,36 @@ func ensureConfigsInAddon(cmao *addonv1alpha1.ClusterManagementAddOn, configs []
 				continue
 			}
 
-			updated = true
 			placement.Configs = append(placement.Configs, cfg)
+			cmao.Spec.InstallStrategy.Placements[i] = placement
 		}
 	}
-
-	return updated
 }
 
-// type defaultAgentReconciler struct {
-// 	Client client.Client
+func (d DefaultStackResources) reconcileAgent(ctx context.Context, placementRef addonv1alpha1.PlacementRef, isUWL bool) (*prometheusalpha1.PrometheusAgent, error) {
+	appName := config.PlatformMetricsCollectorApp
+	if isUWL {
+		appName = config.UserWorkloadMetricsCollectorApp
+	}
 
-// }
-
-func (d DefaultStackResources) reconcilePlatformAgent(ctx context.Context, placementRef addonv1alpha1.PlacementRef) (*prometheusalpha1.PrometheusAgent, error) {
 	// Get or create default
-	platformAgent, err := d.getOrCreateDefaultPlatformAgent(ctx, placementRef.Name)
+	agent, err := d.getOrCreateDefaultAgent(ctx, placementRef.Name, appName, isUWL)
 	if err != nil {
-		return platformAgent, fmt.Errorf("failed to get or create platform agent for placement %s: %w", placementRef.Name, err)
+		return agent, fmt.Errorf("failed to get or create agent for placement %s: %w", placementRef.Name, err)
 	}
 
 	// SSA mendatory field values
 	promBuilder := PrometheusAgentBuilder{
 		Agent: &prometheusalpha1.PrometheusAgent{ObjectMeta: metav1.ObjectMeta{
-			Name:      platformAgent.Name,
-			Namespace: platformAgent.Namespace,
-			Labels:    maps.Clone(platformAgent.Labels),
+			Name:      agent.Name,
+			Namespace: agent.Namespace,
+			Labels:    maps.Clone(agent.Labels),
 		}},
-		SAName:              config.PlatformMetricsCollectorApp,
-		MatchLabels:         map[string]string{"app": config.PlatformMetricsCollectorApp},
+		IsUwl:               isUWL,
+		SAName:              appName,
+		MatchLabels:         map[string]string{"app": appName},
 		RemoteWriteEndpoint: d.AddonOptions.Platform.Metrics.HubEndpoint.String(),
+		PrometheusImage:     d.PrometheusImage,
 	}
 	promSSA := promBuilder.Build()
 	if promSSA.Labels == nil {
@@ -205,90 +215,44 @@ func (d DefaultStackResources) reconcilePlatformAgent(ctx context.Context, place
 	promSSA.Labels[config.PlacementRefNamespaceLabelKey] = placementRef.Namespace
 
 	//SSA the objects rendered
-	if !equality.Semantic.DeepDerivative(promSSA, platformAgent) {
+	if !equality.Semantic.DeepDerivative(promSSA, agent) {
 		if err := common.ServerSideApply(ctx, d.Client, promSSA, d.CMAO); err != nil {
-			return platformAgent, fmt.Errorf("failed to server-side apply for %s/%s: %w", promSSA.Namespace, promSSA.Name, err)
+			return agent, fmt.Errorf("failed to server-side apply for %s/%s: %w", promSSA.Namespace, promSSA.Name, err)
 		}
-		d.Logger.Info("updated prometheus agent %s/%s with server-side apply", promSSA.Namespace, promSSA.Name)
+		d.Logger.Info("updated prometheus agent with server-side apply", "namespace", promSSA.Namespace, "name", promSSA.Name)
 	}
 
-	return platformAgent, nil
+	return agent, nil
 }
 
-func (d DefaultStackResources) getOrCreateDefaultPlatformAgent(ctx context.Context, placementName string) (*prometheusalpha1.PrometheusAgent, error) {
-	platformAgent := &prometheusalpha1.PrometheusAgent{
+func (d DefaultStackResources) getOrCreateDefaultAgent(ctx context.Context, placementName, appName string, isUWL bool) (*prometheusalpha1.PrometheusAgent, error) {
+	agent := &prometheusalpha1.PrometheusAgent{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-%s-%s", addon.DefaultStackPrefix, config.PlatformMetricsCollectorApp, placementName),
+			Name:      makeAgentName(appName, placementName),
 			Namespace: config.HubInstallNamespace,
 		},
 	}
-	if err := d.Client.Get(ctx, client.ObjectKeyFromObject(platformAgent), platformAgent); err != nil {
+	if err := d.Client.Get(ctx, client.ObjectKeyFromObject(agent), agent); err != nil {
 		if !apierrors.IsNotFound(err) {
-			return nil, fmt.Errorf("failed to get default platform agent for placement %q: %w", placementName, err)
+			return nil, fmt.Errorf("failed to get default agent for placement %q: %w", placementName, err)
 		}
 
 		// Create default resource
-		platformAgent = NewDefaultPlatformPrometheusAgent(platformAgent.Namespace, platformAgent.Name)
-		if err := d.Client.Create(ctx, platformAgent); err != nil {
-			return nil, fmt.Errorf("failed to create the default platform agent for placement %q: %w", placementName, err)
+		agent = NewDefaultPrometheusAgent(agent.Namespace, agent.Name, isUWL)
+
+		if err := controllerutil.SetControllerReference(d.CMAO, agent, d.Client.Scheme()); err != nil {
+			return nil, fmt.Errorf("failed to set owner reference on default agent for placement %q: %w", placementName, err)
 		}
-		d.Logger.Info("created default prometheus agent %s/%s for placement %s", platformAgent.Namespace, platformAgent.Name, placementName)
+
+		if err := d.Client.Create(ctx, agent); err != nil {
+			return nil, fmt.Errorf("failed to create the default agent for placement %q: %w", placementName, err)
+		}
+		d.Logger.Info("created default prometheus agent for placement", "agentNamespace", agent.Namespace, "agentName", agent.Name, "placementName", placementName)
 	}
 
-	return platformAgent, nil
+	return agent, nil
 }
 
-func (d DefaultStackResources) reconcileUWLAgent(ctx context.Context, placementRef addonv1alpha1.PlacementRef) error {
-	// Get or create default
-	platformAgent, err := d.getOrCreateDefaultUWLAgent(ctx, placementRef.Name)
-	if err != nil {
-		return fmt.Errorf("failed to get or create user workloads agent for placement %s: %w", placementRef.Name, err)
-	}
-
-	// SSA mendatory field values
-	promBuilder := PrometheusAgentBuilder{
-		Agent: &prometheusalpha1.PrometheusAgent{ObjectMeta: metav1.ObjectMeta{
-			Name:      platformAgent.Name,
-			Namespace: platformAgent.Namespace,
-		}},
-		SAName:              config.UserWorkloadMetricsCollectorApp,
-		IsUwl:               true,
-		MatchLabels:         map[string]string{"app": config.UserWorkloadMetricsCollectorApp},
-		RemoteWriteEndpoint: d.AddonOptions.Platform.Metrics.HubEndpoint.String(),
-	}
-	promSSA := promBuilder.Build()
-	if promSSA.Labels == nil {
-		promSSA.Labels = map[string]string{}
-	}
-	promSSA.Labels[config.PlacementRefNameLabelKey] = placementRef.Name
-	promSSA.Labels[config.PlacementRefNamespaceLabelKey] = placementRef.Namespace
-
-	//SSA the objects rendered
-	if err := common.ServerSideApply(ctx, d.Client, promSSA, d.CMAO); err != nil {
-		return fmt.Errorf("failed to server-side apply for %s/%s: %w", promSSA.Namespace, promSSA.Name, err)
-	}
-
-	return nil
-}
-
-func (d DefaultStackResources) getOrCreateDefaultUWLAgent(ctx context.Context, placementName string) (*prometheusalpha1.PrometheusAgent, error) {
-	platformAgent := &prometheusalpha1.PrometheusAgent{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-%s-%s", addon.DefaultStackPrefix, config.UserWorkloadMetricsCollectorApp, placementName),
-			Namespace: config.HubInstallNamespace,
-		},
-	}
-	if err := d.Client.Get(ctx, client.ObjectKeyFromObject(platformAgent), platformAgent); err != nil {
-		if !apierrors.IsNotFound(err) {
-			return nil, fmt.Errorf("failed to get default user workloads agent for placement %q: %w", placementName, err)
-		}
-
-		// Create default resource
-		platformAgent = NewDefaultUserWorkloadsPrometheusAgent(platformAgent.Namespace, platformAgent.Name)
-		if err := d.Client.Create(ctx, platformAgent); err != nil {
-			return nil, fmt.Errorf("failed to create the default user workloads agent for placement %q: %w", placementName, err)
-		}
-	}
-
-	return platformAgent, nil
+func makeAgentName(app, placement string) string {
+	return fmt.Sprintf("%s-%s-%s", addon.DefaultStackPrefix, app, placement)
 }

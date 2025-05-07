@@ -35,7 +35,6 @@ func (p *PrometheusAgentBuilder) setCommonFields() *PrometheusAgentBuilder {
 	p.Agent.TypeMeta.APIVersion = prometheusalpha1.SchemeGroupVersion.String()
 	spec := &p.Agent.Spec.CommonPrometheusFields
 
-	spec.Replicas = ptr.To(int32(1))
 	spec.ArbitraryFSAccessThroughSMs = prometheusv1.ArbitraryFSAccessThroughSMsConfig{
 		Deny: true,
 	}

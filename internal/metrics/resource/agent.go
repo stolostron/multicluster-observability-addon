@@ -10,32 +10,28 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-func NewDefaultPlatformPrometheusAgent(namespace, name string) *prometheusalpha1.PrometheusAgent {
-	return newPrometheusAgent(namespace, name, config.PlatformPrometheusMatchLabels, &metav1.LabelSelector{}) // listen only to the same namespace
-}
-
-func NewDefaultUserWorkloadsPrometheusAgent(namespace, name string) *prometheusalpha1.PrometheusAgent {
-	return newPrometheusAgent(namespace, name, config.UserWorkloadPrometheusMatchLabels, nil) // listen to all namespaces
-}
-
 // newPrometheusAgent is a helper function to create a PrometheusAgent resource with given parameters
-func newPrometheusAgent(ns, appName string, labels map[string]string, namespaceSelector *metav1.LabelSelector) *prometheusalpha1.PrometheusAgent {
-	agent := newDefaultPrometheusAgent()
+func NewDefaultPrometheusAgent(ns, appName string, isUWL bool) *prometheusalpha1.PrometheusAgent {
+	agent := newBasePrometheusAgent()
 	agent.Name = appName
 	agent.Namespace = ns
 	if agent.Labels == nil {
-		agent.Labels = labels
-	} else {
-		for k, v := range labels {
-			agent.Labels[k] = v
-		}
+		agent.Labels = map[string]string{}
 	}
-	agent.Spec.ScrapeConfigNamespaceSelector = namespaceSelector
+
+	labels := config.PlatformPrometheusMatchLabels
+	if isUWL {
+		labels = config.UserWorkloadPrometheusMatchLabels
+	}
+
+	for k, v := range labels {
+		agent.Labels[k] = v
+	}
 
 	return agent
 }
 
-func newDefaultPrometheusAgent() *prometheusalpha1.PrometheusAgent {
+func newBasePrometheusAgent() *prometheusalpha1.PrometheusAgent {
 	intPtr := func(i int32) *int32 {
 		return &i
 	}
