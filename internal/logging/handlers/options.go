@@ -41,10 +41,6 @@ func BuildOptions(ctx context.Context, k8s client.Client, mcAddon *addonapiv1alp
 		opts.SubscriptionChannel = userWorkloads.SubscriptionChannel
 	}
 
-	if err := createDefaultStackCertificates(ctx, k8s, mcAddon, opts); err != nil {
-		return opts, err
-	}
-
 	if err := buildUnmagedOptions(ctx, k8s, mcAddon, &opts); err != nil {
 		return opts, err
 	}
