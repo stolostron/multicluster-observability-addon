@@ -2,6 +2,7 @@ package resource
 
 import (
 	"fmt"
+	"maps"
 	"slices"
 
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
@@ -12,28 +13,45 @@ import (
 )
 
 // PrometheusAgentBuilder applies configuration and invariants to an existing PrometheusAgent
+// It is used to enforce mandatory fields with server-side apply
 type PrometheusAgentBuilder struct {
-	Agent               *prometheusalpha1.PrometheusAgent
+	ExistingAgent       *prometheusalpha1.PrometheusAgent
 	IsUwl               bool
 	SAName              string
 	RemoteWriteEndpoint string
 	PrometheusImage     string
-	MatchLabels         map[string]string
+	// MatchLabels         map[string]string
+	Labels map[string]string
+
+	desiredAgent *prometheusalpha1.PrometheusAgent
 }
 
 // Build applies all configurations and invariants to the existing PrometheusAgent
 func (p *PrometheusAgentBuilder) Build() *prometheusalpha1.PrometheusAgent {
+	p.desiredAgent = &prometheusalpha1.PrometheusAgent{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      p.ExistingAgent.Name,
+			Namespace: p.ExistingAgent.Namespace,
+		},
+	}
 	return p.setCommonFields().
 		setPrometheusRemoteWriteConfig().
 		setWatchedResources().
 		setScrapeClasses().
-		Agent
+		desiredAgent
 }
 
 func (p *PrometheusAgentBuilder) setCommonFields() *PrometheusAgentBuilder {
-	p.Agent.TypeMeta.Kind = prometheusalpha1.PrometheusAgentsKind
-	p.Agent.TypeMeta.APIVersion = prometheusalpha1.SchemeGroupVersion.String()
-	spec := &p.Agent.Spec.CommonPrometheusFields
+	p.desiredAgent.TypeMeta.Kind = prometheusalpha1.PrometheusAgentsKind
+	p.desiredAgent.TypeMeta.APIVersion = prometheusalpha1.SchemeGroupVersion.String()
+	if len(p.Labels) > 0 {
+		p.desiredAgent.Labels = maps.Clone(p.ExistingAgent.Labels)
+		if p.desiredAgent.Labels == nil {
+			p.desiredAgent.Labels = map[string]string{}
+		}
+		maps.Copy(p.desiredAgent.Labels, p.Labels)
+	}
+	spec := &p.desiredAgent.Spec.CommonPrometheusFields
 
 	spec.ArbitraryFSAccessThroughSMs = prometheusv1.ArbitraryFSAccessThroughSMsConfig{
 		Deny: true,
@@ -47,7 +65,7 @@ func (p *PrometheusAgentBuilder) setCommonFields() *PrometheusAgentBuilder {
 }
 
 func (p *PrometheusAgentBuilder) setPrometheusRemoteWriteConfig() *PrometheusAgentBuilder {
-	spec := &p.Agent.Spec.CommonPrometheusFields
+	spec := &p.desiredAgent.Spec.CommonPrometheusFields
 	spec.Secrets = append(spec.Secrets, config.HubCASecretName, config.ClientCertSecretName)
 
 	// keep user remote write configs and enforce ours
@@ -65,7 +83,7 @@ func (p *PrometheusAgentBuilder) setPrometheusRemoteWriteConfig() *PrometheusAge
 	}
 
 	var found bool
-	p.Agent.Spec.RemoteWrite = slices.DeleteFunc(p.Agent.Spec.RemoteWrite, func(e prometheusv1.RemoteWriteSpec) bool {
+	p.desiredAgent.Spec.RemoteWrite = slices.DeleteFunc(p.desiredAgent.Spec.RemoteWrite, func(e prometheusv1.RemoteWriteSpec) bool {
 		if e.Name != desiredRemoteWriteSpec.Name {
 			return false
 		}
@@ -76,11 +94,11 @@ func (p *PrometheusAgentBuilder) setPrometheusRemoteWriteConfig() *PrometheusAge
 		return true
 	})
 
-	index := slices.IndexFunc(p.Agent.Spec.RemoteWrite, func(e prometheusv1.RemoteWriteSpec) bool { return e.Name == desiredRemoteWriteSpec.Name })
+	index := slices.IndexFunc(p.desiredAgent.Spec.RemoteWrite, func(e prometheusv1.RemoteWriteSpec) bool { return e.Name == desiredRemoteWriteSpec.Name })
 	if index >= 0 {
-		p.Agent.Spec.RemoteWrite[index] = desiredRemoteWriteSpec
+		p.desiredAgent.Spec.RemoteWrite[index] = desiredRemoteWriteSpec
 	} else {
-		p.Agent.Spec.RemoteWrite = append(p.Agent.Spec.RemoteWrite, desiredRemoteWriteSpec)
+		p.desiredAgent.Spec.RemoteWrite = append(p.desiredAgent.Spec.RemoteWrite, desiredRemoteWriteSpec)
 	}
 
 	return p
@@ -100,19 +118,23 @@ func (p *PrometheusAgentBuilder) createQueueConfig() *prometheusv1.QueueConfig {
 }
 
 func (p *PrometheusAgentBuilder) setWatchedResources() *PrometheusAgentBuilder {
-	p.Agent.Spec.ScrapeConfigSelector = &metav1.LabelSelector{
-		MatchLabels: p.MatchLabels,
-	}
 	if p.IsUwl {
+		p.desiredAgent.Spec.ScrapeConfigSelector = &metav1.LabelSelector{
+			MatchLabels: config.UserWorkloadPrometheusMatchLabels,
+		}
 		// Listen to all namespaces
-		p.Agent.Spec.ScrapeConfigNamespaceSelector = &metav1.LabelSelector{}
+		p.desiredAgent.Spec.ScrapeConfigNamespaceSelector = &metav1.LabelSelector{}
+	} else {
+		p.desiredAgent.Spec.ScrapeConfigSelector = &metav1.LabelSelector{
+			MatchLabels: config.PlatformPrometheusMatchLabels,
+		}
 	}
 	p.clearSelectors()
 	return p
 }
 
 func (p *PrometheusAgentBuilder) setScrapeClasses() *PrometheusAgentBuilder {
-	p.Agent.Spec.ConfigMaps = append(p.Agent.Spec.ConfigMaps, config.PrometheusCAConfigMapName)
+	p.desiredAgent.Spec.ConfigMaps = append(p.desiredAgent.Spec.ConfigMaps, config.PrometheusCAConfigMapName)
 	desiredScrapeClass := prometheusv1.ScrapeClass{
 		Authorization: &prometheusv1.Authorization{
 			CredentialsFile: "/var/run/secrets/kubernetes.io/serviceaccount/token",
@@ -125,7 +147,7 @@ func (p *PrometheusAgentBuilder) setScrapeClasses() *PrometheusAgentBuilder {
 
 	// Ensure there is a single ocp-monitring class
 	var found bool
-	p.Agent.Spec.ScrapeClasses = slices.DeleteFunc(p.Agent.Spec.ScrapeClasses, func(e prometheusv1.ScrapeClass) bool {
+	p.desiredAgent.Spec.ScrapeClasses = slices.DeleteFunc(p.desiredAgent.Spec.ScrapeClasses, func(e prometheusv1.ScrapeClass) bool {
 		if e.Name != desiredScrapeClass.Name {
 			return false
 		}
@@ -136,11 +158,11 @@ func (p *PrometheusAgentBuilder) setScrapeClasses() *PrometheusAgentBuilder {
 		return true
 	})
 
-	index := slices.IndexFunc(p.Agent.Spec.ScrapeClasses, func(e prometheusv1.ScrapeClass) bool { return e.Name == desiredScrapeClass.Name })
+	index := slices.IndexFunc(p.desiredAgent.Spec.ScrapeClasses, func(e prometheusv1.ScrapeClass) bool { return e.Name == desiredScrapeClass.Name })
 	if index >= 0 {
-		p.Agent.Spec.ScrapeClasses[index] = desiredScrapeClass
+		p.desiredAgent.Spec.ScrapeClasses[index] = desiredScrapeClass
 	} else {
-		p.Agent.Spec.ScrapeClasses = append(p.Agent.Spec.ScrapeClasses, desiredScrapeClass)
+		p.desiredAgent.Spec.ScrapeClasses = append(p.desiredAgent.Spec.ScrapeClasses, desiredScrapeClass)
 	}
 
 	return p
@@ -151,7 +173,7 @@ func (p *PrometheusAgentBuilder) formatSecretPath(secretName, fileName string) s
 }
 
 func (b *PrometheusAgentBuilder) clearSelectors() {
-	spec := &b.Agent.Spec.CommonPrometheusFields
+	spec := &b.desiredAgent.Spec.CommonPrometheusFields
 	spec.ServiceMonitorNamespaceSelector = nil
 	spec.ServiceMonitorSelector = nil
 	spec.PodMonitorNamespaceSelector = nil

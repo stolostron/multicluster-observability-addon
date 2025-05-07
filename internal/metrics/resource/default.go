@@ -155,10 +155,10 @@ func (d DefaultStackResources) reconcileAgent(ctx context.Context, placementRef 
 
 	// SSA mendatory field values
 	promBuilder := PrometheusAgentBuilder{
-		ExistingAgent:       agent,
-		IsUwl:               isUWL,
-		SAName:              appName,
-		MatchLabels:         map[string]string{"app": appName},
+		ExistingAgent: agent,
+		IsUwl:         isUWL,
+		SAName:        appName,
+		// MatchLabels:         map[string]string{"app": appName},
 		RemoteWriteEndpoint: d.AddonOptions.Platform.Metrics.HubEndpoint.String(),
 		PrometheusImage:     d.PrometheusImage,
 		Labels: map[string]string{
