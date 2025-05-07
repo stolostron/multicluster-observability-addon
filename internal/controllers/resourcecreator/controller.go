@@ -8,7 +8,9 @@ import (
 	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
 	prometheusalpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
+	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	mresources "github.com/stolostron/multicluster-observability-addon/internal/metrics/resource"
+	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -36,6 +38,21 @@ var mcoaAODCPredicate = builder.WithPredicates(predicate.Funcs{
 	UpdateFunc:  func(e event.UpdateEvent) bool { return validateAODC(e.ObjectOld.GetNamespace(), e.ObjectOld.GetName()) },
 	DeleteFunc:  func(e event.DeleteEvent) bool { return validateAODC(e.Object.GetNamespace(), e.Object.GetName()) },
 	GenericFunc: func(e event.GenericEvent) bool { return validateAODC(e.Object.GetNamespace(), e.Object.GetName()) },
+})
+
+func cmaoPlacementsChanged(old, new client.Object) bool {
+	oldCMAO := old.(*addonv1alpha1.ClusterManagementAddOn)
+	newCMAO := new.(*addonv1alpha1.ClusterManagementAddOn)
+	return !equality.Semantic.DeepEqual(oldCMAO.Spec.InstallStrategy.Placements, newCMAO.Spec.InstallStrategy.Placements)
+}
+
+var cmaoPredicate = builder.WithPredicates(predicate.Funcs{
+	CreateFunc: func(e event.CreateEvent) bool { return e.Object.GetName() == addon.Name },
+	UpdateFunc: func(e event.UpdateEvent) bool {
+		return e.ObjectNew.GetName() == addon.Name && cmaoPlacementsChanged(e.ObjectOld, e.ObjectNew)
+	},
+	DeleteFunc:  func(e event.DeleteEvent) bool { return false },
+	GenericFunc: func(e event.GenericEvent) bool { return false },
 })
 
 type ResourceCreatorManager struct {
@@ -113,11 +130,17 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, err
 	}
 
+	images, err := mconfig.GetImageOverrides(ctx, r.Client)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to get image overrides: %w", err)
+	}
+
 	mdefault := mresources.DefaultStackResources{
-		Client:       r.Client,
-		CMAO:         cmao,
-		AddonOptions: opts,
-		Logger:       r.Log,
+		Client:          r.Client,
+		CMAO:            cmao,
+		AddonOptions:    opts,
+		Logger:          r.Log,
+		PrometheusImage: images.Prometheus,
 	}
 	if err := mdefault.Reconcile(ctx); err != nil {
 		return ctrl.Result{}, err
@@ -130,6 +153,7 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 func (r *ResourceCreatorReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&addonv1alpha1.AddOnDeploymentConfig{}, mcoaAODCPredicate, builder.OnlyMetadata).
+		Watches(&addonv1alpha1.ClusterManagementAddOn{}, &handler.EnqueueRequestForObject{}, cmaoPredicate).
 		Watches(&loggingv1.ClusterLogForwarder{}, r.enqueueDefaultResources()).
 		Watches(&prometheusalpha1.PrometheusAgent{}, r.enqueueDefaultResources()).
 		// Watches(&lokiv1.LokiStack{}, r.enqueueDefaultResources()).
