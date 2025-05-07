@@ -11,6 +11,7 @@ import (
 )
 
 // newPrometheusAgent is a helper function to create a PrometheusAgent resource with given parameters
+// It is used to create a base prometheus agent with sensible defaults that can be overridden by the user.
 func NewDefaultPrometheusAgent(ns, appName string, isUWL bool) *prometheusalpha1.PrometheusAgent {
 	agent := newBasePrometheusAgent()
 	agent.Name = appName
@@ -55,7 +56,7 @@ func newBasePrometheusAgent() *prometheusalpha1.PrometheusAgent {
 						corev1.ResourceMemory: resource.MustParse("150Mi"),
 					},
 				},
-				ScrapeInterval: "300s",
+				ScrapeInterval: "60s",
 				SecurityContext: &corev1.PodSecurityContext{
 					RunAsNonRoot: ptr.To(true),
 				},

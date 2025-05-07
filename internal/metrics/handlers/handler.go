@@ -121,42 +121,20 @@ func (o *OptionsBuilder) buildPrometheusAgent(ctx context.Context, opts *Options
 	}
 	agent := platformAgents[0]
 
-	// TODO: enforce remote write relabel config
-	// get the remote write config from the agent
-	remoteWriteSpec := &prometheusv1.RemoteWriteSpec{}
-	for _, spec := range agent.Spec.RemoteWrite {
-		if spec.Name != nil && *spec.Name == config.RemoteWriteCfgName {
-			remoteWriteSpec = &spec
-			break
-		}
-	}
-	if remoteWriteSpec == nil {
+	// add the relabel cfg
+	remoteWriteSpecIdx := slices.IndexFunc(agent.Spec.RemoteWrite, func(e prometheusv1.RemoteWriteSpec) bool {
+		return e.Name != nil && *e.Name == config.RemoteWriteCfgName
+	})
+	if remoteWriteSpecIdx == -1 {
 		return fmt.Errorf("failed to get the %q remote write spec in agent %s/%s", config.RemoteWriteCfgName, agent.Namespace, agent.Name)
 	}
-
-	// add the relabel cfg
-	remoteWriteSpec.WriteRelabelConfigs = createWriteRelabelConfigs(opts.ClusterName, opts.ClusterID, isHypershift)
-
-	// // Build the agent
-	// promBuilder := resource.PrometheusAgentBuilder{
-	// 	Agent:               platformAgents[0].DeepCopy(),
-	// 	SAName:              appName,
-	// 	MatchLabels:         map[string]string{"app": appName},
-	// 	RemoteWriteEndpoint: o.RemoteWriteURL,
-	// }
-
-	// var agent *prometheusalpha1.PrometheusAgent
+	agent.Spec.RemoteWrite[remoteWriteSpecIdx].WriteRelabelConfigs = createWriteRelabelConfigs(opts.ClusterName, opts.ClusterID, isHypershift)
 
 	// Set the built agent in the appropriate workload option
 	switch appName {
 	case config.PlatformMetricsCollectorApp:
-
-		// promBuilder.MatchLabels = config.PlatformPrometheusMatchLabels
-		// agent = promBuilder.Build()
 		opts.Platform.PrometheusAgent = agent
 	case config.UserWorkloadMetricsCollectorApp:
-		// promBuilder.MatchLabels = config.UserWorkloadPrometheusMatchLabels
-		// agent = promBuilder.Build()
 		opts.UserWorkloads.PrometheusAgent = agent
 	default:
 		return fmt.Errorf("%w: %s", errUnsupportedAppName, appName)
@@ -257,7 +235,7 @@ func (o *OptionsBuilder) getAvailableConfigResources(ctx context.Context, mcAddo
 }
 
 func createWriteRelabelConfigs(clusterName, clusterID string, isHypershiftLocalCluster bool) []prometheusv1.RelabelConfig {
-	ret := make([]prometheusv1.RelabelConfig, 0, 7)
+	ret := []prometheusv1.RelabelConfig{}
 	if isHypershiftLocalCluster {
 		// Don't overwrite the clusterID label as some are set to the hosted cluster ID (for hosted etcd and apiserver)
 		// These rules ensure that the correct management cluster labels are set if the clusterID label differs from the current cluster one.

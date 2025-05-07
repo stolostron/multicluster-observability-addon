@@ -95,6 +95,11 @@ func TestBuildOptions(t *testing.T) {
 			CommonPrometheusFields: prometheusv1.CommonPrometheusFields{
 				LogLevel:   "warn",
 				ConfigMaps: []string{"test-haproxy-config-uwl"},
+				RemoteWrite: []prometheusv1.RemoteWriteSpec{
+					{
+						Name: ptr.To(config.RemoteWriteCfgName),
+					},
+				},
 			},
 		},
 	}
@@ -316,6 +321,10 @@ func TestBuildOptions(t *testing.T) {
 				assert.NotNil(t, opts.Platform.PrometheusAgent)
 				assert.Equal(t, platformAgent.Spec.LogLevel, opts.Platform.PrometheusAgent.Spec.LogLevel)
 				assert.Len(t, opts.Platform.PrometheusAgent.Spec.RemoteWrite, 1)
+				// Check that relabelling is added to the remote write config
+				assert.Equal(t, spokeName, *opts.Platform.PrometheusAgent.Spec.CommonPrometheusFields.RemoteWrite[0].WriteRelabelConfigs[0].Replacement)
+				assert.Equal(t, config.ClusterNameMetricLabel, opts.Platform.PrometheusAgent.Spec.CommonPrometheusFields.RemoteWrite[0].WriteRelabelConfigs[0].TargetLabel)
+				assert.Len(t, opts.Platform.PrometheusAgent.Spec.CommonPrometheusFields.RemoteWrite[0].WriteRelabelConfigs, 5)
 				// Check that the secrets are set
 				assert.Len(t, opts.Secrets, 2)
 				// Check that user workloads are not enabled
@@ -368,6 +377,10 @@ func TestBuildOptions(t *testing.T) {
 				assert.NotNil(t, opts.UserWorkloads.PrometheusAgent)
 				assert.Nil(t, opts.Platform.PrometheusAgent)
 				assert.Equal(t, uwlAgent.Spec.LogLevel, opts.UserWorkloads.PrometheusAgent.Spec.LogLevel)
+				// Check that relabelling is added to the remote write config
+				assert.Equal(t, spokeName, *opts.UserWorkloads.PrometheusAgent.Spec.CommonPrometheusFields.RemoteWrite[0].WriteRelabelConfigs[0].Replacement)
+				assert.Equal(t, config.ClusterNameMetricLabel, opts.UserWorkloads.PrometheusAgent.Spec.CommonPrometheusFields.RemoteWrite[0].WriteRelabelConfigs[0].TargetLabel)
+				assert.Len(t, opts.UserWorkloads.PrometheusAgent.Spec.CommonPrometheusFields.RemoteWrite[0].WriteRelabelConfigs, 5)
 			},
 		},
 		"user workload is enabled and is hypershift hub": {
@@ -491,6 +504,8 @@ func TestBuildOptions(t *testing.T) {
 
 				assert.Equal(t, []string{"etcd_metric", "etcd_rule_dependent_metric"}, etcdMetrics)
 				assert.Equal(t, []string{"apiserver_metric", "apiserver_rule_dependent_metric"}, apiserverMetrics)
+
+				assert.Len(t, opts.UserWorkloads.PrometheusAgent.Spec.CommonPrometheusFields.RemoteWrite[0].WriteRelabelConfigs, 8)
 			},
 		},
 	}

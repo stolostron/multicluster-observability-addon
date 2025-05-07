@@ -3,7 +3,6 @@ package resource
 import (
 	"context"
 	"fmt"
-	"maps"
 	"slices"
 
 	prometheusalpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
@@ -74,25 +73,11 @@ func (d DefaultStackResources) Reconcile(ctx context.Context) error {
 	return nil
 }
 
-func promAgentToAddonConfig(agent *prometheusalpha1.PrometheusAgent) addonv1alpha1.AddOnConfig {
-	return addonv1alpha1.AddOnConfig{
-		ConfigReferent: addonv1alpha1.ConfigReferent{
-			Namespace: agent.Namespace,
-			Name:      agent.Name,
-		},
-		ConfigGroupResource: addonv1alpha1.ConfigGroupResource{
-			Group:    prometheusalpha1.SchemeGroupVersion.Group,
-			Resource: prometheusalpha1.PrometheusAgentName,
-		},
-	}
-}
-
 func (d DefaultStackResources) cleanOrphanResources(ctx context.Context) error {
 	// list prometheus agents owned by cmao
 	// remove the ones having a non existing placement
 	items := prometheusalpha1.PrometheusAgentList{}
-	// TODO: restrict list to a namespace
-	if err := d.Client.List(ctx, &items); err != nil {
+	if err := d.Client.List(ctx, &items, client.InNamespace(config.HubInstallNamespace)); err != nil {
 		return fmt.Errorf("failed to list PrometheusAgents: %w", err)
 	}
 
@@ -129,8 +114,7 @@ func (d DefaultStackResources) cleanOrphanResources(ctx context.Context) error {
 }
 
 func (d DefaultStackResources) ensureAddonConfig(ctx context.Context, configs []defaultConfig) error {
-	// with retry
-	// get and check/add config
+	// CMAO is a shared object, using retry
 	retryErr := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		cmao := &addonv1alpha1.ClusterManagementAddOn{}
 		if err := d.Client.Get(ctx, types.NamespacedName{Name: d.CMAO.Name}, cmao); err != nil {
@@ -157,31 +141,6 @@ func (d DefaultStackResources) ensureAddonConfig(ctx context.Context, configs []
 	return nil
 }
 
-func ensureConfigsInAddon(cmao *addonv1alpha1.ClusterManagementAddOn, configs []defaultConfig) {
-	// group configs by placement
-	placementConfigs := map[addonv1alpha1.PlacementRef][]addonv1alpha1.AddOnConfig{}
-	for _, cfg := range configs {
-		placementConfigs[cfg.placementRef] = append(placementConfigs[cfg.placementRef], cfg.config)
-	}
-
-	// for each placement in cmao, ensure configs are present
-	for i, placement := range cmao.Spec.InstallStrategy.Placements {
-		desiredConfigs := placementConfigs[placement.PlacementRef]
-		for _, cfg := range desiredConfigs {
-			idx := slices.IndexFunc(placement.Configs, func(e addonv1alpha1.AddOnConfig) bool {
-				return e == cfg
-			})
-
-			if idx >= 0 {
-				continue
-			}
-
-			placement.Configs = append(placement.Configs, cfg)
-			cmao.Spec.InstallStrategy.Placements[i] = placement
-		}
-	}
-}
-
 func (d DefaultStackResources) reconcileAgent(ctx context.Context, placementRef addonv1alpha1.PlacementRef, isUWL bool) (*prometheusalpha1.PrometheusAgent, error) {
 	appName := config.PlatformMetricsCollectorApp
 	if isUWL {
@@ -196,23 +155,18 @@ func (d DefaultStackResources) reconcileAgent(ctx context.Context, placementRef 
 
 	// SSA mendatory field values
 	promBuilder := PrometheusAgentBuilder{
-		Agent: &prometheusalpha1.PrometheusAgent{ObjectMeta: metav1.ObjectMeta{
-			Name:      agent.Name,
-			Namespace: agent.Namespace,
-			Labels:    maps.Clone(agent.Labels),
-		}},
+		ExistingAgent:       agent,
 		IsUwl:               isUWL,
 		SAName:              appName,
 		MatchLabels:         map[string]string{"app": appName},
 		RemoteWriteEndpoint: d.AddonOptions.Platform.Metrics.HubEndpoint.String(),
 		PrometheusImage:     d.PrometheusImage,
+		Labels: map[string]string{
+			config.PlacementRefNameLabelKey:      placementRef.Name,
+			config.PlacementRefNamespaceLabelKey: placementRef.Namespace,
+		},
 	}
 	promSSA := promBuilder.Build()
-	if promSSA.Labels == nil {
-		promSSA.Labels = map[string]string{}
-	}
-	promSSA.Labels[config.PlacementRefNameLabelKey] = placementRef.Name
-	promSSA.Labels[config.PlacementRefNamespaceLabelKey] = placementRef.Namespace
 
 	//SSA the objects rendered
 	if !equality.Semantic.DeepDerivative(promSSA, agent) {
@@ -255,4 +209,42 @@ func (d DefaultStackResources) getOrCreateDefaultAgent(ctx context.Context, plac
 
 func makeAgentName(app, placement string) string {
 	return fmt.Sprintf("%s-%s-%s", addon.DefaultStackPrefix, app, placement)
+}
+
+func promAgentToAddonConfig(agent *prometheusalpha1.PrometheusAgent) addonv1alpha1.AddOnConfig {
+	return addonv1alpha1.AddOnConfig{
+		ConfigReferent: addonv1alpha1.ConfigReferent{
+			Namespace: agent.Namespace,
+			Name:      agent.Name,
+		},
+		ConfigGroupResource: addonv1alpha1.ConfigGroupResource{
+			Group:    prometheusalpha1.SchemeGroupVersion.Group,
+			Resource: prometheusalpha1.PrometheusAgentName,
+		},
+	}
+}
+
+func ensureConfigsInAddon(cmao *addonv1alpha1.ClusterManagementAddOn, configs []defaultConfig) {
+	// group configs by placement
+	placementConfigs := map[addonv1alpha1.PlacementRef][]addonv1alpha1.AddOnConfig{}
+	for _, cfg := range configs {
+		placementConfigs[cfg.placementRef] = append(placementConfigs[cfg.placementRef], cfg.config)
+	}
+
+	// for each placement in cmao, ensure configs are present
+	for i, placement := range cmao.Spec.InstallStrategy.Placements {
+		desiredConfigs := placementConfigs[placement.PlacementRef]
+		for _, cfg := range desiredConfigs {
+			idx := slices.IndexFunc(placement.Configs, func(e addonv1alpha1.AddOnConfig) bool {
+				return e == cfg
+			})
+
+			if idx >= 0 {
+				continue
+			}
+
+			placement.Configs = append(placement.Configs, cfg)
+			cmao.Spec.InstallStrategy.Placements[i] = placement
+		}
+	}
 }
