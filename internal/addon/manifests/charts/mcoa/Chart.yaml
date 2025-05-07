@@ -17,3 +17,7 @@ dependencies:
 - name: analytics
   repository: 'file://./charts/analytics'
   condition: analytics.enabled
+- name: observabilityUI
+  repository: 'file://./charts/observability_ui'
+  condition: observability_ui.enabled
+
