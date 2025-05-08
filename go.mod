@@ -6,6 +6,7 @@ require (
 	github.com/ViaQ/logerr/v2 v2.1.0
 	github.com/cert-manager/cert-manager v1.17.1
 	github.com/go-logr/logr v1.4.2
+	github.com/grafana/loki/operator/api/loki v0.0.0-20250416091028-f691cdf0e499
 	github.com/open-telemetry/opentelemetry-operator v0.122.0
 	github.com/openshift/cluster-logging-operator/api/observability v0.0.0-20250409175233-91ac0aefdea7 // release-6.2
 	github.com/openshift/hypershift/api v0.0.0-20250109044749-1986ca3ae9f7
@@ -20,6 +21,7 @@ require (
 	k8s.io/api v0.32.3
 	k8s.io/apiextensions-apiserver v0.32.3
 	k8s.io/apimachinery v0.32.3
+	k8s.io/apiserver v0.32.3
 	k8s.io/client-go v0.32.3
 	k8s.io/component-base v0.32.3
 	k8s.io/klog/v2 v2.130.1
@@ -27,12 +29,6 @@ require (
 	open-cluster-management.io/addon-framework v0.12.1-0.20250407131028-9d436ffc2da7 // main to pull in updates to k/k apis
 	open-cluster-management.io/api v0.16.2-0.20250409021335-2458a27a0686 // main to pull in updates to k/k apis
 	sigs.k8s.io/controller-runtime v0.20.4
-)
-
-require (
-	github.com/grafana/loki/operator/api/loki v0.0.0-20250416091028-f691cdf0e499
-	github.com/imdario/mergo v0.3.16
-	k8s.io/apiserver v0.32.3
 )
 
 require (
@@ -80,6 +76,7 @@ require (
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.26.1 // indirect
 	github.com/hashicorp/go-version v1.7.0 // indirect
 	github.com/huandu/xstrings v1.4.0 // indirect
+	github.com/imdario/mergo v0.3.16 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect

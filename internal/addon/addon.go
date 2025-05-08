@@ -195,7 +195,3 @@ func AgentHealthProber() *agent.HealthProber {
 		},
 	}
 }
-
-func GenerateDefaultStackName(placementName string) string {
-	return fmt.Sprintf("%s-%s", DefaultStackPrefix, placementName)
-}

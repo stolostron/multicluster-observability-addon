@@ -19,6 +19,7 @@ import (
 	auditv1 "k8s.io/apiserver/pkg/apis/audit/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/ptr"
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
 	"open-cluster-management.io/addon-framework/pkg/agent"
@@ -161,6 +162,19 @@ func newAODCUnmanagedScenario() *addonapiv1alpha1.AddOnDeploymentConfig {
 	return addOnDeploymentConfig
 }
 
+func newCMAODefaultSenario() *addonapiv1alpha1.ClusterManagementAddOn {
+	return &addonapiv1alpha1.ClusterManagementAddOn{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "ClusterManagementAddOn",
+			APIVersion: addonapiv1alpha1.GroupVersion.String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: addon.Name,
+			UID:  "test-uid-12345",
+		},
+	}
+}
+
 func newMCAODefaultScenario() *addonapiv1alpha1.ManagedClusterAddOn {
 	managedClusterAddOn := addontesting.NewAddon("test", "cluster-1")
 	managedClusterAddOn.Status.ConfigReferences = []addonapiv1alpha1.ConfigReference{
@@ -280,6 +294,15 @@ func newCLFDefaultScenario() *loggingv1.ClusterLogForwarder {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "default-stack-instance-bar",
 			Namespace: "local-cluster",
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: addonapiv1alpha1.GroupVersion.String(),
+					Kind:       "ClusterManagementAddOn",
+					Name:       addon.Name,
+					UID:        "test-uid-12345",
+					Controller: ptr.To(true),
+				},
+			},
 		},
 		Spec: loggingv1.ClusterLogForwarderSpec{
 			ServiceAccount: loggingv1.ServiceAccount{
@@ -587,6 +610,8 @@ func Test_Logging_Managed_Collection_Spoke(t *testing.T) {
 	// Register the addon for the managed cluster
 	managedClusterAddOn := newMCAODefaultScenario()
 	addOnDeploymentConfig := newAODCDefaultScenario()
+	// Needed to validate the controller reference
+	cmao := newCMAODefaultSenario()
 
 	// Emulate the secret that would've been created by the cert-manager
 	mtls := &corev1.Secret{
@@ -674,7 +699,7 @@ func Test_Logging_Managed_Collection_Spoke(t *testing.T) {
 		},
 	}
 
-	loggingAgentAddon := newLoggingAgentAddon([]client.Object{managedClusterAddOn, existingCLF, mtls}, addOnDeploymentConfig)
+	loggingAgentAddon := newLoggingAgentAddon([]client.Object{cmao, managedClusterAddOn, existingCLF, mtls}, addOnDeploymentConfig)
 
 	// Render manifests and return them as k8s runtime objects
 	objects, err := loggingAgentAddon.Manifests(managedCluster, managedClusterAddOn)
@@ -734,6 +759,8 @@ func Test_Logging_Managed_Storage(t *testing.T) {
 			// Register the addon for the managed cluster
 			managedClusterAddOn := newMCAODefaultScenario()
 			addOnDeploymentConfig := newAODCDefaultScenario()
+			// Needed to validate the controller reference
+			cmao := newCMAODefaultSenario()
 
 			// Emulate the secret that would've been created by the cert-manager
 			mtlsCollection := &corev1.Secret{
@@ -748,11 +775,19 @@ func Test_Logging_Managed_Storage(t *testing.T) {
 				},
 			}
 			existingCLF := newCLFDefaultScenario()
-
 			existingLS := &lokiv1.LokiStack{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "default-stack-instance-bar",
 					Namespace: "local-cluster",
+					OwnerReferences: []metav1.OwnerReference{
+						{
+							APIVersion: addonapiv1alpha1.GroupVersion.String(),
+							Kind:       "ClusterManagementAddOn",
+							Name:       addon.Name,
+							UID:        "test-uid-12345",
+							Controller: ptr.To(true),
+						},
+					},
 				},
 				Spec: lokiv1.LokiStackSpec{
 					ManagementState:  lokiv1.ManagementStateUnmanaged,
@@ -767,6 +802,85 @@ func Test_Logging_Managed_Storage(t *testing.T) {
 							{
 								Version:       lokiv1.ObjectStorageSchemaV13,
 								EffectiveDate: "2025-01-01",
+							},
+						},
+					},
+					Tenants: &lokiv1.TenantsSpec{
+						Mode: lokiv1.Static,
+						Authentication: []lokiv1.AuthenticationSpec{
+							{
+								TenantName: "tenant-1",
+								TenantID:   "tenant-1",
+								MTLS: &lokiv1.MTLSSpec{
+									CA: &lokiv1.CASpec{
+										CAKey: "ca.crt",
+										CA:    "mcoa-logging-managed-storage-tls",
+									},
+								},
+							},
+							{
+								TenantName: "tenant-2",
+								TenantID:   "tenant-2",
+								MTLS: &lokiv1.MTLSSpec{
+									CA: &lokiv1.CASpec{
+										CAKey: "ca.crt",
+										CA:    "mcoa-logging-managed-storage-tls",
+									},
+								},
+							},
+						},
+						Authorization: &lokiv1.AuthorizationSpec{
+							Roles: []lokiv1.RoleSpec{
+								{
+									Name:        "tenant-1-logs",
+									Resources:   []string{"logs"},
+									Permissions: []lokiv1.PermissionType{"read", "write"},
+									Tenants:     []string{"tenant-1"},
+								},
+								{
+									Name:        "tenant-2-logs",
+									Resources:   []string{"logs"},
+									Permissions: []lokiv1.PermissionType{"read", "write"},
+									Tenants:     []string{"tenant-2"},
+								},
+								{
+									Name:        "cluster-reader",
+									Resources:   []string{"logs"},
+									Permissions: []lokiv1.PermissionType{"read"},
+									Tenants:     []string{"tenant-1", "tenant-2"},
+								},
+							},
+							RoleBindings: []lokiv1.RoleBindingsSpec{
+								{
+									Name:  "tenant-1-logs",
+									Roles: []string{"tenant-1-logs"},
+									Subjects: []lokiv1.Subject{
+										{
+											Kind: "group",
+											Name: "tenant-1",
+										},
+									},
+								},
+								{
+									Name:  "tenant-2-logs",
+									Roles: []string{"tenant-2-logs"},
+									Subjects: []lokiv1.Subject{
+										{
+											Kind: "group",
+											Name: "tenant-2",
+										},
+									},
+								},
+								{
+									Name:  "cluster-reader",
+									Roles: []string{"cluster-reader"},
+									Subjects: []lokiv1.Subject{
+										{
+											Kind: "group",
+											Name: "mcoa-logs-admin",
+										},
+									},
+								},
 							},
 						},
 					},
@@ -926,7 +1040,7 @@ func Test_Logging_Managed_Storage(t *testing.T) {
 				},
 			}
 
-			initObjects := []client.Object{managedClusterAddOn, existingCLF, mtlsCollection, existingLS, mtls, objstorage, tenant1, tenant2}
+			initObjects := []client.Object{cmao, managedClusterAddOn, existingCLF, mtlsCollection, existingLS, mtls, objstorage, tenant1, tenant2}
 
 			// Conditionally add existing subscription based on test case
 			if tc.existingSubscription {

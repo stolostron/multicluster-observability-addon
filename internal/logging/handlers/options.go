@@ -19,8 +19,6 @@ const (
 )
 
 var (
-	errMissingDefaultLSRef   = errors.New("missing LokiStack reference on addon installation for default stack")
-	errMissingDefaultCLFRef  = errors.New("missing ClusterLogForwarder reference on addon installation for default stack")
 	errMissingCLFRef         = errors.New("missing ClusterLogForwarder reference on addon installation")
 	errMultipleCLFRef        = errors.New("multiple ClusterLogForwarder references on addon installation")
 	errMissingImplementation = errors.New("missing secret implementation for output type")

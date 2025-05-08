@@ -52,7 +52,7 @@ func BuildDefaultStackResources(
 
 	// Build tenants for LokiStack
 	// TODO(JoaoBraveCoding): In the future we might want to do this based on
-	// placements and have seperate LokiStacks for each placement
+	// placements and have separate LokiStacks for each placement
 	// since this will require the hub to reconcile multiple LokiStacks we will
 	// first focus on a single one
 	managedClusters := &clusterv1.ManagedClusterList{}
