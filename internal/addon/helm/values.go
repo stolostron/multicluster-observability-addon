@@ -47,13 +47,12 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, logger logr.Logger) a
 		cluster *clusterv1.ManagedCluster,
 		mcAddon *addonapiv1alpha1.ManagedClusterAddOn,
 	) (addonfactory.Values, error) {
-		logger.V(2).Info("reconciliation triggered", "cluster", cluster.Name)
-		// if hub cluster, then don't install anything.
-		// some kube flavors are also currently not supported
+		// Skip unsupported kube vendors
 		if !supportedKubeVendors(cluster) {
 			return addonfactory.JsonStructToValues(HelmChartValues{})
 		}
 
+		// Build options from AddOnDeploymentConfig
 		aodc, err := getAddOnDeploymentConfig(ctx, k8s, mcAddon)
 		if err != nil {
 			return nil, err
@@ -63,6 +62,7 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, logger logr.Logger) a
 			return nil, err
 		}
 
+		// Skip if no configuration was provided
 		if !opts.Platform.Enabled && !opts.UserWorkloads.Enabled {
 			return addonfactory.JsonStructToValues(HelmChartValues{})
 		}
@@ -125,11 +125,11 @@ func getMonitoringValues(ctx context.Context, k8s client.Client, logger logr.Log
 }
 
 func getLoggingValues(ctx context.Context, k8s client.Client, cluster *clusterv1.ManagedCluster, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, opts addon.Options) (*lmanifests.LoggingValues, error) {
-	if !opts.Platform.Logs.CollectionEnabled && !opts.UserWorkloads.Logs.CollectionEnabled {
+	if !opts.Platform.Logs.CollectionEnabled && !opts.UserWorkloads.Logs.CollectionEnabled && !opts.Platform.Logs.DefaultStack {
 		return nil, nil
 	}
 
-	loggingOpts, err := lhandlers.BuildOptions(ctx, k8s, mcAddon, opts.Platform.Logs, opts.UserWorkloads.Logs, isHubCluster(cluster))
+	loggingOpts, err := lhandlers.BuildOptions(ctx, k8s, mcAddon, opts.Platform.Logs, opts.UserWorkloads.Logs, isHubCluster(cluster), opts.HubHostname)
 	if err != nil {
 		return nil, err
 	}
@@ -174,7 +174,7 @@ func getAddOnDeploymentConfig(ctx context.Context, k8s client.Client, mcAddon *a
 		return aodc, errMultipleAODCRef
 	}
 	if err := k8s.Get(ctx, keys[0], aodc, &client.GetOptions{}); err != nil {
-		// TODO(JoaoBraveCoding) Add proper error handling
+		// TODO(JoaoBraveCoding): Add proper error handling
 		return aodc, err
 	}
 	return aodc, nil

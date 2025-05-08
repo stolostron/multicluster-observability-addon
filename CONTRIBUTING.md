@@ -137,8 +137,7 @@ oc -n spoke-1 get manifestworks addon-multicluster-observability-addon-deploy-0
 
 Currently MCOA supports deploying a single instance of `ClusterLogForwarder`
 templated with the stanza created in the hub cluster. The instance deployed in
-the spoke cluster will have an exact copy of the `Spec` from the stanza. Except
-for the `serviceAccountName` field that's set by MCOA.
+the spoke cluster will have an exact copy of the `Spec` from the stanza.
 
 This MCOA supports all outputs defined in [OpenShift Documentation](https://docs.openshift.com/container-platform/latest/observability/logging/log_collection_forwarding/configuring-log-forwarding.html)([API Ref](https://github.com/openshift/cluster-logging-operator/blob/master/api/logging/v1/output_types.go#L22-L43)). Furthermore, since MCOA will simply ship the specified secrets together with `ClusterLogForwarder` MCOA is also able to support all authentication methods supported by `ClusterLogForwarder`.
 
