@@ -28,9 +28,7 @@ const (
 
 	ClusterLogForwardersResource = "clusterlogforwarders"
 	LokiStacksResource           = "lokistacks"
-	SpokeUnmanagedCLFName        = "mcoa-instance"
-	SpokeDefaultStackCLFName     = "mcoa-managed-instance"
-	SpokeDefaultStackLSName      = "mcoa-managed-instance"
+	UnmanagedCLFName             = "mcoa-instance"
 	LoggingNamespace             = "openshift-logging"
 	clfProbeKey                  = "isReady"
 	clfProbePath                 = ".status.conditions[?(@.type==\"Ready\")].status"

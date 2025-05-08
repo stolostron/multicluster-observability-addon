@@ -2,7 +2,7 @@
 apiVersion: observability.openshift.io/v1
 kind: ClusterLogForwarder
 metadata:
-  name: mcoa-managed-instance
+  name: mcoa-logging-managed-collection
   namespace: openshift-logging
   annotations:
     observability.openshift.io/tech-preview-otlp-output: enabled

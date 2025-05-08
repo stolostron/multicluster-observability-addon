@@ -18,6 +18,10 @@ type CertificateConfig struct {
 // BuildClientCertificate builds a client certificate with the given key and mTLSConfig
 func BuildClientCertificate(key client.ObjectKey, mTLSConfig CertificateConfig) (*certmanagerv1.Certificate, error) {
 	certManagerCert := &certmanagerv1.Certificate{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Certificate",
+			APIVersion: certmanagerv1.SchemeGroupVersion.String(),
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      key.Name,
 			Namespace: key.Namespace,
@@ -49,6 +53,10 @@ func BuildClientCertificate(key client.ObjectKey, mTLSConfig CertificateConfig) 
 // BuildServerCertificate builds a server certificate with the given key and mTLSConfig
 func BuildServerCertificate(key client.ObjectKey, mTLSConfig CertificateConfig) (*certmanagerv1.Certificate, error) {
 	certManagerCert := &certmanagerv1.Certificate{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Certificate",
+			APIVersion: certmanagerv1.SchemeGroupVersion.String(),
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      key.Name,
 			Namespace: key.Namespace,

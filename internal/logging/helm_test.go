@@ -504,8 +504,8 @@ func Test_Logging_Unmanaged_CLF(t *testing.T) {
 			require.Equal(t, "static-authentication", obj.Spec.Outputs[1].Cloudwatch.Authentication.AWSAccessKey.KeySecret.SecretName)
 			// Check name and namespace to make sure that if we change the helm
 			// manifests that we don't break the addon probes
-			require.Equal(t, addon.SpokeUnmanagedCLFName, obj.Name)
-			require.Equal(t, addon.LoggingNamespace, obj.Namespace)
+			require.Equal(t, addon.UnmanagedCLFName, obj.Name)
+			require.Equal(t, manifests.LoggingNamespace, obj.Namespace)
 		case *corev1.Secret:
 			if obj.Name == "static-authentication" {
 				require.Equal(t, staticCred.Data, obj.Data)
@@ -634,7 +634,7 @@ func Test_Logging_Managed_Collection_Spoke(t *testing.T) {
 			Kind:       "ClusterLogForwarder",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      addon.SpokeDefaultStackCLFName,
+			Name:      manifests.DefaultCollectionCLFName,
 			Namespace: "openshift-logging",
 			Annotations: map[string]string{
 				"observability.openshift.io/tech-preview-otlp-output": "enabled",
@@ -668,7 +668,7 @@ func Test_Logging_Managed_Collection_Spoke(t *testing.T) {
 					Name: "hub-lokistack",
 					Type: loggingv1.OutputTypeOTLP,
 					OTLP: &loggingv1.OTLP{
-						URL: "https://mcoa-managed-instance-openshift-logging.apps.myhub.foo.com/api/logs/v1/cluster-1/otlp/v1/logs",
+						URL: "https://mcoa-logging-managed-storage-openshift-logging.apps.myhub.foo.com/api/logs/v1/cluster-1/otlp/v1/logs",
 					},
 					TLS: &loggingv1.OutputTLSSpec{
 						InsecureSkipVerify: true,
@@ -716,8 +716,8 @@ func Test_Logging_Managed_Collection_Spoke(t *testing.T) {
 			require.Equal(t, expectedCLF, obj)
 			// Check name and namespace to make sure that if we change the helm
 			// manifests that we don't break the addon probes
-			require.Equal(t, addon.SpokeDefaultStackCLFName, obj.Name)
-			require.Equal(t, addon.LoggingNamespace, obj.Namespace)
+			require.Equal(t, manifests.DefaultCollectionCLFName, obj.Name)
+			require.Equal(t, manifests.LoggingNamespace, obj.Namespace)
 		}
 	}
 }
@@ -927,7 +927,7 @@ func Test_Logging_Managed_Storage(t *testing.T) {
 					Kind:       "LokiStack",
 				},
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      addon.SpokeDefaultStackLSName,
+					Name:      manifests.DefaultStorageLSName,
 					Namespace: "openshift-logging",
 					Labels: map[string]string{
 						"release": "multicluster-observability-addon",
@@ -1073,8 +1073,8 @@ func Test_Logging_Managed_Storage(t *testing.T) {
 					require.Equal(t, expectedLS, obj)
 					// Check name and namespace to make sure that if we change the helm
 					// manifests that we don't break the addon probes
-					require.Equal(t, addon.SpokeDefaultStackCLFName, obj.Name)
-					require.Equal(t, addon.LoggingNamespace, obj.Namespace)
+					require.Equal(t, manifests.DefaultStorageLSName, obj.Name)
+					require.Equal(t, manifests.LoggingNamespace, obj.Namespace)
 				}
 			}
 		})

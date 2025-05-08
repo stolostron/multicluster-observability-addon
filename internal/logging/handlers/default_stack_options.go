@@ -36,7 +36,7 @@ func buildDefaultStackOptions(ctx context.Context, k8s client.Client, mcAddon *a
 	opts.DefaultStack.Collection.Secrets = []corev1.Secret{*mTLSSecret}
 
 	// Get the cluster hostname
-	opts.DefaultStack.LokiURL = fmt.Sprintf("https://mcoa-managed-instance-openshift-logging.apps.%s/api/logs/v1/%s/otlp/v1/logs", opts.HubHostname, mcAddon.Namespace)
+	opts.DefaultStack.LokiURL = fmt.Sprintf("https://%s-%s.apps.%s/api/logs/v1/%s/otlp/v1/logs", manifests.DefaultStorageLSName, manifests.LoggingNamespace, opts.HubHostname, mcAddon.Namespace)
 
 	if opts.IsHub {
 		// Get LS from ManagedClusterAddOn

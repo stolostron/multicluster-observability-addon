@@ -51,7 +51,7 @@ func BuildOptions(ctx context.Context, k8s client.Client, mcAddon *addonapiv1alp
 	// since we don't have k8s clients for the spokes
 	if isHub {
 		subscription := &operatorv1alpha1.Subscription{}
-		key := client.ObjectKey{Name: manifests.CloSubscriptionInstallName, Namespace: manifests.CloSubscriptionInstallNamespace}
+		key := client.ObjectKey{Name: manifests.CloSubscriptionInstallName, Namespace: manifests.LoggingNamespace}
 		if err := k8s.Get(ctx, key, subscription, &client.GetOptions{}); err != nil && !k8serrors.IsNotFound(err) {
 			return opts, fmt.Errorf("failed to get cluster-logging subscription: %w", err)
 		}
