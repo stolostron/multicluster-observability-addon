@@ -155,12 +155,12 @@ func (d DefaultStackResources) reconcileAgent(ctx context.Context, placementRef 
 
 	// SSA mendatory field values
 	promBuilder := PrometheusAgentBuilder{
-		ExistingAgent: agent,
-		IsUwl:         isUWL,
-		SAName:        appName,
-		// MatchLabels:         map[string]string{"app": appName},
+		ExistingAgent:       agent,
+		IsUwl:               isUWL,
+		SAName:              appName,
 		RemoteWriteEndpoint: d.AddonOptions.Platform.Metrics.HubEndpoint.String(),
-		PrometheusImage:     d.PrometheusImage,
+		// Commented while the stolostron build of prometheus is not based on v3 as it requires support for the --agent flag.
+		// PrometheusImage:     d.PrometheusImage,
 		Labels: map[string]string{
 			config.PlacementRefNameLabelKey:      placementRef.Name,
 			config.PlacementRefNamespaceLabelKey: placementRef.Namespace,

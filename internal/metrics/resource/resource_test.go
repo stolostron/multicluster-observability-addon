@@ -137,7 +137,10 @@ func TestReconcileAgent(t *testing.T) {
 	// Check default fields
 	assert.EqualValues(t, 1, *foundAgent.Spec.Replicas)
 	// Check ssa fields
-	assert.Equal(t, prmetheusImage, *foundAgent.Spec.Image)
+	// Commented while the stolostron build of prometheus is not based on v3 as it requires support for the --agent flag.
+	// assert.Equal(t, prmetheusImage, *foundAgent.Spec.Image)
+	assert.Nil(t, foundAgent.Spec.Image)
+	assert.Equal(t, config.PlatformMetricsCollectorApp, foundAgent.Spec.ServiceAccountName)
 	// Check placement labels
 	assert.Equal(t, foundAgent.Labels[config.PlacementRefNameLabelKey], placementRef.Name)
 	// Check platform specific values: appName and ScrapeConfigNamespaceSelector

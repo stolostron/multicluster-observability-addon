@@ -39,12 +39,14 @@ func (p *PrometheusAgentBuilder) Build() *prometheusalpha1.PrometheusAgent {
 				ArbitraryFSAccessThroughSMs: prometheusv1.ArbitraryFSAccessThroughSMsConfig{
 					Deny: true,
 				},
-				Image:              &p.PrometheusImage,
 				Version:            "",
 				ServiceAccountName: p.SAName,
 				WALCompression:     ptr.To(true),
 			},
 		},
+	}
+	if len(p.PrometheusImage) > 0 {
+		p.desiredAgent.Spec.Image = &p.PrometheusImage
 	}
 	p.setObjectLabels()
 	p.setPrometheusRemoteWriteConfig()
