@@ -8,13 +8,14 @@ import (
 	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
 	prometheusalpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
+	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
 	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	mresources "github.com/stolostron/multicluster-observability-addon/internal/metrics/resource"
 	"k8s.io/apimachinery/pkg/api/equality"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -153,23 +154,28 @@ func (r *ResourceCreatorReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&addonv1alpha1.AddOnDeploymentConfig{}, mcoaAODCPredicate, builder.OnlyMetadata).
 		Watches(&addonv1alpha1.ClusterManagementAddOn{}, handler.EnqueueRequestsFromMapFunc(enqueueAddon), cmaoPredicate).
+		Watches(&clusterv1.ManagedCluster{}, r.enqueueAODC()).
 		Watches(&loggingv1.ClusterLogForwarder{}, r.enqueueDefaultResources()).
 		Watches(&prometheusalpha1.PrometheusAgent{}, r.enqueueDefaultResources()).
 		Complete(r)
 }
 
-func (r *ResourceCreatorReconciler) enqueueDefaultResources() handler.EventHandler {
+func (r *ResourceCreatorReconciler) enqueueAODC() handler.EventHandler {
 	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
-		cmao := &addonv1alpha1.ClusterManagementAddOn{
-			TypeMeta: metav1.TypeMeta{
-				Kind:       "ClusterManagementAddOn",
-				APIVersion: addonv1alpha1.GroupVersion.String(),
-			},
-			ObjectMeta: metav1.ObjectMeta{
-				Name: addon.Name,
+		return []reconcile.Request{
+			{
+				NamespacedName: types.NamespacedName{
+					Name:      addon.Name,
+					Namespace: addon.InstallNamespace,
+				},
 			},
 		}
-		hasOwnerRef, err := controllerutil.HasOwnerReference(obj.GetOwnerReferences(), cmao, r.Client.Scheme())
+	})
+}
+
+func (r *ResourceCreatorReconciler) enqueueDefaultResources() handler.EventHandler {
+	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
+		hasOwnerRef, err := controllerutil.HasOwnerReference(obj.GetOwnerReferences(), common.NewMCOAClusterManagementAddOn(), r.Client.Scheme())
 		if err != nil {
 			r.Log.Error(err, "failed to check owner reference")
 			return []reconcile.Request{}
