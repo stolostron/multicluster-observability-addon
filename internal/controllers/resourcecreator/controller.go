@@ -14,6 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -142,12 +143,26 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 func (r *ResourceCreatorReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&addonv1alpha1.AddOnDeploymentConfig{}, mcoaAODCPredicate, builder.OnlyMetadata).
-		Watches(&loggingv1.ClusterLogForwarder{}, r.enqueueDefaultResources()).
-		Watches(&lokiv1.LokiStack{}, r.enqueueDefaultResources()).
+		Watches(&clusterv1.ManagedCluster{}, r.enqueueAODC()).
+		Watches(&loggingv1.ClusterLogForwarder{}, r.enqueueAODCIfResourceOwned()).
+		Watches(&lokiv1.LokiStack{}, r.enqueueAODCIfResourceOwned()).
 		Complete(r)
 }
 
-func (r *ResourceCreatorReconciler) enqueueDefaultResources() handler.EventHandler {
+func (r *ResourceCreatorReconciler) enqueueAODC() handler.EventHandler {
+	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
+		return []reconcile.Request{
+			{
+				NamespacedName: types.NamespacedName{
+					Name:      addon.Name,
+					Namespace: addon.InstallNamespace,
+				},
+			},
+		}
+	})
+}
+
+func (r *ResourceCreatorReconciler) enqueueAODCIfResourceOwned() handler.EventHandler {
 	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
 		cmao := &addonv1alpha1.ClusterManagementAddOn{
 			TypeMeta: metav1.TypeMeta{
