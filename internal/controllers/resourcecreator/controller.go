@@ -153,7 +153,7 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 func (r *ResourceCreatorReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&addonv1alpha1.AddOnDeploymentConfig{}, mcoaAODCPredicate, builder.OnlyMetadata).
-		Watches(&addonv1alpha1.ClusterManagementAddOn{}, handler.EnqueueRequestsFromMapFunc(enqueueAddon), cmaoPredicate).
+		Watches(&addonv1alpha1.ClusterManagementAddOn{}, r.enqueueAODC(), cmaoPredicate).
 		Watches(&clusterv1.ManagedCluster{}, r.enqueueAODC()).
 		Watches(&loggingv1.ClusterLogForwarder{}, r.enqueueDefaultResources()).
 		Watches(&prometheusalpha1.PrometheusAgent{}, r.enqueueDefaultResources()).
@@ -194,15 +194,4 @@ func (r *ResourceCreatorReconciler) enqueueDefaultResources() handler.EventHandl
 			},
 		}
 	})
-}
-
-func enqueueAddon(ctx context.Context, obj client.Object) []reconcile.Request {
-	return []reconcile.Request{
-		{
-			NamespacedName: types.NamespacedName{
-				Name:      addon.Name,
-				Namespace: addon.InstallNamespace,
-			},
-		},
-	}
 }
