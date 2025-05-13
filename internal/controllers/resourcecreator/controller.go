@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/go-logr/logr"
-	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
 	prometheusalpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
@@ -130,6 +129,7 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 
 	// Reconcile metrics resources
+	objs := []common.DefaultConfig{}
 	images, err := mconfig.GetImageOverrides(ctx, r.Client)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to get image overrides: %w", err)
@@ -142,8 +142,15 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		Logger:          r.Log,
 		PrometheusImage: images.Prometheus,
 	}
-	if err := mdefault.Reconcile(ctx); err != nil {
+
+	mDefaultConfig, err := mdefault.Reconcile(ctx)
+	if err != nil {
 		return ctrl.Result{}, err
+	}
+	objs = append(objs, mDefaultConfig...)
+
+	if err := common.EnsureAddonConfig(ctx, r.Log, r.Client, objs); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to patching default config to clustermanageraddon: %w", err)
 	}
 
 	return ctrl.Result{}, nil
@@ -153,9 +160,11 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 func (r *ResourceCreatorReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&addonv1alpha1.AddOnDeploymentConfig{}, mcoaAODCPredicate, builder.OnlyMetadata).
+		// Trigger reconciliations due to changes in Placements
 		Watches(&addonv1alpha1.ClusterManagementAddOn{}, r.enqueueAODC(), cmaoPredicate).
+		// Trigger reconciliations if the pool of ManagedClusters changes
 		Watches(&clusterv1.ManagedCluster{}, r.enqueueAODC()).
-		Watches(&loggingv1.ClusterLogForwarder{}, r.enqueueDefaultResources()).
+		// Trigger reconciliations if user change a PrometheusAgent instance
 		Watches(&prometheusalpha1.PrometheusAgent{}, r.enqueueDefaultResources()).
 		Complete(r)
 }

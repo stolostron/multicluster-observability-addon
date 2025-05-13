@@ -7,6 +7,7 @@ import (
 
 	prometheusalpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
+	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -291,7 +292,9 @@ func TestReconcile(t *testing.T) {
 				PrometheusImage: "dummy",
 			}
 
-			err := d.Reconcile(context.Background())
+			dc, err := d.Reconcile(context.Background())
+			assert.NoError(t, err)
+			err = common.EnsureAddonConfig(context.Background(), klog.Background(), fakeClient, dc)
 			assert.NoError(t, err)
 
 			foundAgents := prometheusalpha1.PrometheusAgentList{}

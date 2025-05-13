@@ -227,7 +227,10 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 		AddonOptions: newAddonOptions(true, true),
 		Logger:       klog.Background(),
 	}
-	err := defaultStack.Reconcile(context.Background())
+
+	dc, err := defaultStack.Reconcile(context.Background())
+	require.NoError(t, err)
+	err = common.EnsureAddonConfig(context.Background(), klog.Background(), client, dc)
 	require.NoError(t, err)
 
 	promAgents := prometheusalpha1.PrometheusAgentList{}
@@ -476,7 +479,9 @@ func TestHelmBuild_Metrics_HCP(t *testing.T) {
 		AddonOptions: newAddonOptions(true, true),
 		Logger:       klog.Background(),
 	}
-	err := defaultStack.Reconcile(context.Background())
+	dc, err := defaultStack.Reconcile(context.Background())
+	require.NoError(t, err)
+	err = common.EnsureAddonConfig(context.Background(), klog.Background(), client, dc)
 	require.NoError(t, err)
 
 	promAgents := prometheusalpha1.PrometheusAgentList{}
