@@ -2,6 +2,7 @@ package common
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/go-logr/logr"
@@ -11,6 +12,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
+
+var errNotClientObjectType = errors.New("object is not a client.Object")
 
 // CleanOrphanResources lists resources of type T owned by CMOA and removes the ones having no existing placement.
 func CleanOrphanResources[T client.ObjectList](ctx context.Context, logger logr.Logger, k8s client.Client, cmao *addonapiv1alpha1.ClusterManagementAddOn, items T) error {
@@ -35,7 +38,7 @@ func CleanOrphanResources[T client.ObjectList](ctx context.Context, logger logr.
 	for _, rawObj := range objs {
 		obj, ok := rawObj.(client.Object)
 		if !ok {
-			return fmt.Errorf("object is not a client.Object")
+			return errNotClientObjectType
 		}
 
 		hasOwnerRef, err := controllerutil.HasOwnerReference(obj.GetOwnerReferences(), cmao, k8s.Scheme())

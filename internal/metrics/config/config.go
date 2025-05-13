@@ -33,8 +33,8 @@ const (
 	AcmEtcdServiceMonitorName             = "acm-etcd"
 	AcmApiServerServiceMonitorName        = "acm-kube-apiserver"
 
-	RemoteWriteCfgName            = "acm-observability"
-	ScrapeClassCfgName            = "ocp-monitoring"
+	RemoteWriteCfgName = "acm-observability"
+	ScrapeClassCfgName = "ocp-monitoring"
 )
 
 var (
