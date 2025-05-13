@@ -46,8 +46,13 @@ func InstallCOO(ctx context.Context, k8s client.Client, logger logr.Logger, isHu
 }
 
 func cooDependantEnabled(opts Options) bool {
-	if opts.Platform.Enabled && opts.Platform.AnalyticsOptions.IncidentDetection.Enabled {
-		return true
+	if opts.Platform.Enabled {
+		if opts.Platform.AnalyticsOptions.IncidentDetection.Enabled {
+			return true
+		}
+		if opts.Platform.Metrics.UI {
+			return true
+		}
 	}
 	return false
 }

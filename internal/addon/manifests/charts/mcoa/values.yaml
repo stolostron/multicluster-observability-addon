@@ -7,6 +7,7 @@ installCOO: false
 metrics:
   platformEnabled: false
   userWorkloadsEnabled: false
+  uiEnabled: false
 
 logging:
   enabled: false
@@ -18,11 +19,3 @@ analytics:
   incidentDetection:
     enabled: false
 
-observabilityUI:
-  enabled: false
-  monitoring:
-    enabled: false
-  logging:
-    enabled: false
-  tracing:
-    enabled: false

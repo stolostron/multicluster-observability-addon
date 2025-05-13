@@ -55,6 +55,7 @@ const (
 type MetricsOptions struct {
 	CollectionEnabled bool
 	HubEndpoint       *url.URL
+	UI                bool
 }
 
 type IncidentDetection struct {
@@ -108,18 +109,9 @@ type PersesOptions struct {
 	Enabled bool
 }
 
-type ObsUIOptions struct {
-	Enabled bool
-	Logs    LogsUIOptions
-	Metrics MetricsUIOptions
-	// Traces  TracesUIOptions
-	// Analytics AnalyticsUIOptions
-}
-
 type Options struct {
 	Platform      PlatformOptions
 	UserWorkloads UserWorkloadOptions
-	ObsUI         ObsUIOptions
 }
 
 func BuildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Options, error) {
@@ -194,17 +186,9 @@ func BuildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Opti
 				opts.UserWorkloads.Traces.InstrumentationEnabled = true
 			}
 		// Observability UI Options
-		case KeyObservabilityUI:
-			if keyvalue.Value == string(UIPluginV1alpha1) {
-				opts.ObsUI.Enabled = true
-			}
-		case KeyObservabilityUILogs:
-			if keyvalue.Value == string(UIPluginV1alpha1) && opts.ObsUI.Enabled {
-				opts.ObsUI.Logs.Enabled = true
-			}
 		case KeyObservabilityUIMetrics:
-			if keyvalue.Value == string(UIPluginV1alpha1) && opts.ObsUI.Enabled {
-				opts.ObsUI.Metrics.Enabled = true
+			if keyvalue.Value == string(UIPluginV1alpha1) && opts.Platform.Metrics.CollectionEnabled {
+				opts.Platform.Metrics.UI = true
 			}
 		}
 	}

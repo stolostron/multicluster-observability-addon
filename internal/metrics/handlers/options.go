@@ -13,6 +13,7 @@ type Options struct {
 	ClusterName   string
 	ClusterID     string
 	Images        ImagesOptions
+	UI            *UIOptions
 }
 
 type Collector struct {
@@ -27,4 +28,8 @@ type ImagesOptions struct {
 	PrometheusOperator       string
 	PrometheusConfigReloader string
 	KubeRBACProxy            string
+}
+
+type UIOptions struct {
+	Enabled bool
 }

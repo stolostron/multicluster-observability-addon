@@ -75,6 +75,10 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 		if len(ret.Platform.Rules) == 0 {
 			o.Logger.V(1).Info("No rules found for platform metrics")
 		}
+
+		if platform.UI {
+			ret.UI.Enabled = true
+		}
 	}
 
 	isHypershiftCluster := IsHypershiftEnabled(managedCluster)
