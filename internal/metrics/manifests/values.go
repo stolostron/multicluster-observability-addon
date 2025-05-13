@@ -17,7 +17,7 @@ type MetricsValues struct {
 	PrometheusCAConfigMapName string        `json:"prometheusCAConfigMapName"`
 	Platform                  Collector     `json:"platform"`
 	UserWorkload              Collector     `json:"userWorkload"`
-	UI                        *UIValues     `json:"uiEnabled,omitempty"`
+	UI                        UIValues      `json:"uiEnabled,omitempty"`
 }
 
 type Collector struct {
@@ -185,7 +185,7 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 	}
 
 	if opts.UI.Enabled {
-		ret.UI = &UIValues{
+		ret.UI = UIValues{
 			Enabled: opts.UI.Enabled,
 			ACM:     ACMValues{Enabled: opts.UI.Enabled},
 			Perses:  PersesValues{Enabled: opts.UI.Enabled},

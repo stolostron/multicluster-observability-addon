@@ -13,7 +13,7 @@ type Options struct {
 	ClusterName   string
 	ClusterID     string
 	Images        ImagesOptions
-	UI            *UIOptions
+	UI            UIOptions
 }
 
 type Collector struct {
