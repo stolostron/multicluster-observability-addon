@@ -4,17 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"slices"
 
+	"github.com/go-logr/logr"
 	prometheusalpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/util/retry"
-	"k8s.io/klog/v2"
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -27,20 +24,15 @@ type DefaultStackResources struct {
 	AddonOptions    addon.Options
 	Client          client.Client
 	CMAO            *addonv1alpha1.ClusterManagementAddOn
-	Logger          klog.Logger
+	Logger          logr.Logger
 	PrometheusImage string
-}
-
-type defaultConfig struct {
-	placementRef addonv1alpha1.PlacementRef
-	config       addonv1alpha1.AddOnConfig
 }
 
 // Reconcile ensures the state of the configuration resources for metrics collection.
 // For each placement found in the ClusterManagementAddon resource, it generates a default PrometheusAgent
 // if not found and then applies configuration invariants using server-side apply.
 func (d DefaultStackResources) Reconcile(ctx context.Context) error {
-	configs := []defaultConfig{}
+	configs := []common.DefaultConfig{}
 
 	// Reconcile existing placements.
 	for _, placement := range d.CMAO.Spec.InstallStrategy.Placements {
@@ -49,9 +41,9 @@ func (d DefaultStackResources) Reconcile(ctx context.Context) error {
 			if err != nil {
 				return fmt.Errorf("failed to reconcile platform prometheusAgent for placement %s: %w", placement.Name, err)
 			}
-			configs = append(configs, defaultConfig{
-				placementRef: placement.PlacementRef,
-				config:       promAgentToAddonConfig(agent),
+			configs = append(configs, common.DefaultConfig{
+				PlacementRef: placement.PlacementRef,
+				Config:       promAgentToAddonConfig(agent),
 			})
 		}
 
@@ -60,52 +52,22 @@ func (d DefaultStackResources) Reconcile(ctx context.Context) error {
 			if err != nil {
 				return fmt.Errorf("failed to reconcile user workloads prometheusAgent for placement %s: %w", placement.Name, err)
 			}
-			configs = append(configs, defaultConfig{
-				placementRef: placement.PlacementRef,
-				config:       promAgentToAddonConfig(agent),
+			configs = append(configs, common.DefaultConfig{
+				PlacementRef: placement.PlacementRef,
+				Config:       promAgentToAddonConfig(agent),
 			})
 		}
 	}
 
 	// Ensure that configs are referenced in the ClusterManagementAddon.
-	if err := d.ensureAddonConfig(ctx, configs); err != nil {
+	if err := common.EnsureAddonConfig(ctx, d.Logger, d.Client, configs); err != nil {
 		return fmt.Errorf("failed to ensure addon configs: %w", err)
 	}
 
 	// Clean default configs from removed placements.
-	if err := common.CleanOrphanResources(ctx, d.Client, d.CMAO, &prometheusalpha1.PrometheusAgentList{}); err != nil {
+	if err := common.CleanOrphanResources(ctx, d.Logger, d.Client, d.CMAO, &prometheusalpha1.PrometheusAgentList{}); err != nil {
 		return fmt.Errorf("failed to clean orphan resources: %w", err)
 	}
-	return nil
-}
-
-// ensureAddonConfig ensures that the provided configuration are present in the CMAO
-// for each placement.
-func (d DefaultStackResources) ensureAddonConfig(ctx context.Context, configs []defaultConfig) error {
-	// CMAO is a shared object, using retry
-	retryErr := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		cmao := &addonv1alpha1.ClusterManagementAddOn{}
-		if err := d.Client.Get(ctx, types.NamespacedName{Name: d.CMAO.Name}, cmao); err != nil {
-			return fmt.Errorf("failed to get ClusterManagementAddOn: %w", err)
-		}
-
-		desiredCmao := cmao.DeepCopy()
-		ensureConfigsInAddon(desiredCmao, configs)
-		if equality.Semantic.DeepEqual(cmao, desiredCmao) {
-			return nil
-		}
-
-		err := d.Client.Update(ctx, desiredCmao)
-		if err == nil {
-			d.Logger.Info("addon config updated with default configs")
-		}
-		return err
-	})
-
-	if retryErr != nil {
-		return fmt.Errorf("failed to update CMAO with default configs: %w", retryErr)
-	}
-
 	return nil
 }
 
@@ -194,29 +156,5 @@ func promAgentToAddonConfig(agent *prometheusalpha1.PrometheusAgent) addonv1alph
 			Group:    prometheusalpha1.SchemeGroupVersion.Group,
 			Resource: prometheusalpha1.PrometheusAgentName,
 		},
-	}
-}
-
-func ensureConfigsInAddon(cmao *addonv1alpha1.ClusterManagementAddOn, configs []defaultConfig) {
-	// Group configs by placement.
-	placementConfigs := map[addonv1alpha1.PlacementRef][]addonv1alpha1.AddOnConfig{}
-	for _, cfg := range configs {
-		placementConfigs[cfg.placementRef] = append(placementConfigs[cfg.placementRef], cfg.config)
-	}
-
-	// For each placement in CMAO, ensure configs are present.
-	for i, placement := range cmao.Spec.InstallStrategy.Placements {
-		desiredConfigs := placementConfigs[placement.PlacementRef]
-		for _, cfg := range desiredConfigs {
-			isPresent := slices.ContainsFunc(placement.Configs, func(e addonv1alpha1.AddOnConfig) bool {
-				return e == cfg
-			})
-
-			if isPresent {
-				continue
-			}
-
-			cmao.Spec.InstallStrategy.Placements[i].Configs = append(cmao.Spec.InstallStrategy.Placements[i].Configs, cfg)
-		}
 	}
 }
