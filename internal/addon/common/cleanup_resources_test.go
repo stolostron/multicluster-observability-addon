@@ -11,6 +11,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/klog/v2"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -211,7 +212,7 @@ func TestCleanOrphanResources(t *testing.T) {
 			}
 
 			// Run the function under test
-			err := CleanOrphanResources(context.Background(), fakeClient, tc.cmao, &prometheusalpha1.PrometheusAgentList{})
+			err := CleanOrphanResources(context.Background(), klog.Background(), fakeClient, tc.cmao, &prometheusalpha1.PrometheusAgentList{})
 			require.NoError(t, err, "CleanOrphanResources should not return an error")
 
 			// Check that resources were deleted or not as expected

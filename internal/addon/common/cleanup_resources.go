@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/go-logr/logr"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"k8s.io/apimachinery/pkg/api/meta"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
@@ -11,8 +12,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-// CleanOrphanResources lists PrometheusAgents owned by CMOA and removes the ones having no existing placement.
-func CleanOrphanResources[T client.ObjectList](ctx context.Context, k8s client.Client, cmao *addonapiv1alpha1.ClusterManagementAddOn, items T) error {
+// CleanOrphanResources lists resources of type T owned by CMOA and removes the ones having no existing placement.
+func CleanOrphanResources[T client.ObjectList](ctx context.Context, logger logr.Logger, k8s client.Client, cmao *addonapiv1alpha1.ClusterManagementAddOn, items T) error {
 	if err := k8s.List(ctx, items, client.InNamespace(addon.InstallNamespace)); err != nil {
 		return fmt.Errorf("failed to list PrometheusAgents: %w", err)
 	}
@@ -56,6 +57,7 @@ func CleanOrphanResources[T client.ObjectList](ctx context.Context, k8s client.C
 		if err := k8s.Delete(ctx, obj); err != nil {
 			return fmt.Errorf("failed to delete owned agent: %w", err)
 		}
+		logger.Info("default configuration deleted", "name", obj.GetName(), "namespace", obj.GetNamespace(), "kind", obj.GetObjectKind().GroupVersionKind().Kind)
 	}
 
 	return nil
