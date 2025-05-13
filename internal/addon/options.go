@@ -25,11 +25,7 @@ const (
 	KeyUserWorkloadInstrumentation   = "userWorkloadInstrumentation"
 
 	// Observability UI Keys
-	KeyObservabilityUI        = "observabilityUIEnablement"
-	KeyObservabilityUILogs    = "observabilityUILogs"
 	KeyObservabilityUIMetrics = "observabilityUIMetrics"
-	// KeyObservabilityUITraces = "observabilityUITraces"
-	// KeyObservabilityUIAnalytics = "observabilityUIAnalytics"
 )
 
 type CollectionKind string
