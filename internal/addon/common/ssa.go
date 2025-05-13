@@ -10,8 +10,11 @@ import (
 )
 
 func ServerSideApply(ctx context.Context, c client.Client, obj client.Object, owner client.Object) error {
-	if err := controllerutil.SetControllerReference(owner, obj, c.Scheme()); err != nil {
-		return fmt.Errorf("failed to set controller reference: %w", err)
+	// Only set controller reference if an owner is provided
+	if owner != nil {
+		if err := controllerutil.SetControllerReference(owner, obj, c.Scheme()); err != nil {
+			return fmt.Errorf("failed to set controller reference: %w", err)
+		}
 	}
 
 	if err := c.Patch(ctx, obj, client.Apply, client.ForceOwnership, client.FieldOwner(addon.Name)); err != nil {
