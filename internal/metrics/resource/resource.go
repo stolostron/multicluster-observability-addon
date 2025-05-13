@@ -73,48 +73,9 @@ func (d DefaultStackResources) Reconcile(ctx context.Context) error {
 	}
 
 	// Clean default configs from removed placements.
-	if err := d.cleanOrphanResources(ctx); err != nil {
+	if err := common.CleanOrphanResources(ctx, d.Client, d.CMAO, &prometheusalpha1.PrometheusAgentList{}); err != nil {
 		return fmt.Errorf("failed to clean orphan resources: %w", err)
 	}
-	return nil
-}
-
-// cleanOrphanResources lists PrometheusAgents owned by CMOA and removes the ones having no existing placement.
-func (d DefaultStackResources) cleanOrphanResources(ctx context.Context) error {
-	items := prometheusalpha1.PrometheusAgentList{}
-	if err := d.Client.List(ctx, &items, client.InNamespace(config.HubInstallNamespace)); err != nil {
-		return fmt.Errorf("failed to list PrometheusAgents: %w", err)
-	}
-
-	makePlacementKey := func(namespace, name string) string {
-		return fmt.Sprintf("%s/%s", namespace, name)
-	}
-	placementsDict := map[string]struct{}{}
-	for _, placement := range d.CMAO.Spec.InstallStrategy.Placements {
-		placementsDict[makePlacementKey(placement.Namespace, placement.Name)] = struct{}{}
-	}
-
-	for _, agent := range items.Items {
-		hasOwnerRef, err := controllerutil.HasOwnerReference(agent.GetOwnerReferences(), d.CMAO, d.Client.Scheme())
-		if err != nil {
-			return fmt.Errorf("failed to check owner references: %w", err)
-		}
-
-		if !hasOwnerRef {
-			continue
-		}
-
-		placementNs := agent.Labels[config.PlacementRefNamespaceLabelKey]
-		placementName := agent.Labels[config.PlacementRefNameLabelKey]
-		if _, ok := placementsDict[makePlacementKey(placementNs, placementName)]; ok {
-			continue
-		}
-
-		if err := d.Client.Delete(ctx, &agent); err != nil {
-			return fmt.Errorf("failed to delete owned agent: %w", err)
-		}
-	}
-
 	return nil
 }
 
@@ -163,8 +124,8 @@ func (d DefaultStackResources) reconcileAgent(ctx context.Context, placementRef 
 		// Commented while the stolostron build of prometheus is not based on v3 as it requires support for the --agent flag.
 		// PrometheusImage:     d.PrometheusImage,
 		Labels: map[string]string{
-			config.PlacementRefNameLabelKey:      placementRef.Name,
-			config.PlacementRefNamespaceLabelKey: placementRef.Namespace,
+			addon.PlacementRefNameLabelKey:      placementRef.Name,
+			addon.PlacementRefNamespaceLabelKey: placementRef.Namespace,
 		},
 	}
 	promSSA := promBuilder.Build()

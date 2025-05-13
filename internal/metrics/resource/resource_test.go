@@ -146,7 +146,7 @@ func TestReconcileAgent(t *testing.T) {
 	assert.Nil(t, foundAgent.Spec.Image)
 	assert.Equal(t, config.PlatformMetricsCollectorApp, foundAgent.Spec.ServiceAccountName)
 	// Check placement labels
-	assert.Equal(t, foundAgent.Labels[config.PlacementRefNameLabelKey], placementRef.Name)
+	assert.Equal(t, foundAgent.Labels[addon.PlacementRefNameLabelKey], placementRef.Name)
 	// Check platform specific values: appName and ScrapeConfigNamespaceSelector
 	assert.Equal(t, foundAgent.Spec.ServiceAccountName, config.PlatformMetricsCollectorApp)
 	assert.Nil(t, foundAgent.Spec.ScrapeConfigNamespaceSelector)
@@ -323,119 +323,6 @@ func TestEnsureAddonConfig(t *testing.T) {
 	}
 }
 
-func TestCleanOrphanResources(t *testing.T) {
-	placementRefA := addonv1alpha1.PlacementRef{
-		Namespace: "ns",
-		Name:      "a",
-	}
-	cmao := newCMAO()
-
-	platformAppName := "platform-app"
-	platformAgent := NewDefaultPrometheusAgent(config.HubInstallNamespace, makeAgentName(platformAppName, placementRefA.Name), false, placementRefA)
-	platformAgent.Labels = map[string]string{
-		config.PlacementRefNamespaceLabelKey: placementRefA.Namespace,
-		config.PlacementRefNameLabelKey:      placementRefA.Name,
-	}
-	err := controllerutil.SetControllerReference(cmao, platformAgent, newTestScheme())
-	require.NoError(t, err)
-
-	otherNsAgent := platformAgent.DeepCopy()
-	otherNsAgent.Namespace = "other-ns"
-
-	notOwnedAgent := platformAgent.DeepCopy()
-	notOwnedAgent.OwnerReferences = []metav1.OwnerReference{}
-
-	testCases := []struct {
-		name              string
-		initialPlacements []addonv1alpha1.PlacementStrategy
-		initObjs          []client.Object
-		expect            func(*testing.T, []prometheusalpha1.PrometheusAgent)
-	}{
-		{
-			name: "no agents exist",
-			initialPlacements: []addonv1alpha1.PlacementStrategy{
-				{
-					Configs:      []addonv1alpha1.AddOnConfig{},
-					PlacementRef: placementRefA,
-				},
-			},
-			initObjs: []client.Object{},
-			expect: func(t *testing.T, foundAgents []prometheusalpha1.PrometheusAgent) {
-				assert.Len(t, foundAgents, 0) // other ns agent is kept
-			},
-		},
-		{
-			name: "agent in another ns is left",
-			initialPlacements: []addonv1alpha1.PlacementStrategy{
-				{
-					Configs:      []addonv1alpha1.AddOnConfig{},
-					PlacementRef: placementRefA,
-				},
-			},
-			initObjs: []client.Object{otherNsAgent},
-			expect: func(t *testing.T, foundAgents []prometheusalpha1.PrometheusAgent) {
-				assert.Len(t, foundAgents, 1)
-			},
-		},
-		{
-			name: "agent not owned by cmao is left",
-			initialPlacements: []addonv1alpha1.PlacementStrategy{
-				{
-					Configs:      []addonv1alpha1.AddOnConfig{},
-					PlacementRef: placementRefA,
-				},
-			},
-			initObjs: []client.Object{notOwnedAgent},
-			expect: func(t *testing.T, foundAgents []prometheusalpha1.PrometheusAgent) {
-				assert.Len(t, foundAgents, 1)
-			},
-		},
-		{
-			name: "agent attached to an existing placement",
-			initialPlacements: []addonv1alpha1.PlacementStrategy{
-				{
-					Configs:      []addonv1alpha1.AddOnConfig{},
-					PlacementRef: placementRefA,
-				},
-			},
-			initObjs: []client.Object{platformAgent},
-			expect: func(t *testing.T, foundAgents []prometheusalpha1.PrometheusAgent) {
-				assert.Len(t, foundAgents, 1)
-			},
-		},
-		{
-			name:              "agent to delete",
-			initialPlacements: []addonv1alpha1.PlacementStrategy{},
-			initObjs:          []client.Object{platformAgent},
-			expect: func(t *testing.T, foundAgents []prometheusalpha1.PrometheusAgent) {
-				assert.Len(t, foundAgents, 0)
-			},
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			cmaoWithPlacements := newCMAO(tc.initialPlacements...)
-			initObjs := []client.Object{cmaoWithPlacements}
-			initObjs = append(initObjs, tc.initObjs...)
-			fakeClient := fake.NewClientBuilder().WithScheme(newTestScheme()).WithObjects(initObjs...).Build()
-			d := DefaultStackResources{
-				Client: fakeClient,
-				CMAO:   cmaoWithPlacements,
-				Logger: klog.Background(),
-			}
-
-			err := d.cleanOrphanResources(context.Background())
-			assert.NoError(t, err)
-
-			foundAgents := prometheusalpha1.PrometheusAgentList{}
-			err = fakeClient.List(context.Background(), &foundAgents)
-			assert.NoError(t, err)
-			tc.expect(t, foundAgents.Items)
-		})
-	}
-}
-
 func TestReconcile(t *testing.T) {
 	// variables: placements, agents, addonOptions
 	placementRefA := addonv1alpha1.PlacementRef{
@@ -452,8 +339,8 @@ func TestReconcile(t *testing.T) {
 	platformAppName := "platform-app"
 	platformAgent := NewDefaultPrometheusAgent(config.HubInstallNamespace, makeAgentName(platformAppName, placementRefA.Name), false, placementRefA)
 	platformAgent.Labels = map[string]string{
-		config.PlacementRefNamespaceLabelKey: placementRefA.Namespace,
-		config.PlacementRefNameLabelKey:      placementRefA.Name,
+		addon.PlacementRefNamespaceLabelKey: placementRefA.Namespace,
+		addon.PlacementRefNameLabelKey:      placementRefA.Name,
 	}
 
 	testCases := []struct {
