@@ -59,11 +59,6 @@ func (d DefaultStackResources) Reconcile(ctx context.Context) ([]common.DefaultC
 		}
 	}
 
-	// Clean default configs from removed placements.
-	if err := common.CleanOrphanResources(ctx, d.Logger, d.Client, d.CMAO, &prometheusalpha1.PrometheusAgentList{}); err != nil {
-		return configs, fmt.Errorf("failed to clean orphan resources: %w", err)
-	}
-
 	return configs, nil
 }
 

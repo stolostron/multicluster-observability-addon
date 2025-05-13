@@ -212,7 +212,7 @@ func TestCleanOrphanResources(t *testing.T) {
 			}
 
 			// Run the function under test
-			err := CleanOrphanResources(context.Background(), klog.Background(), fakeClient, tc.cmao, &prometheusalpha1.PrometheusAgentList{})
+			err := DeleteOrphanResources(context.Background(), klog.Background(), fakeClient, tc.cmao, &prometheusalpha1.PrometheusAgentList{})
 			require.NoError(t, err, "CleanOrphanResources should not return an error")
 
 			// Check that resources were deleted or not as expected

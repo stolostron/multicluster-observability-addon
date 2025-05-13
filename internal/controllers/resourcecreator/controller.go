@@ -153,6 +153,14 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, fmt.Errorf("failed to patching default config to clustermanageraddon: %w", err)
 	}
 
+	cmao = &addonv1alpha1.ClusterManagementAddOn{}
+	if err := r.Get(ctx, types.NamespacedName{Name: addon.Name}, cmao); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to get ClusterManagementAddOn: %w", err)
+	}
+	if err := common.DeleteOrphanResources(ctx, r.Log, r.Client, cmao, &prometheusalpha1.PrometheusAgentList{}); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to clean orphan resources: %w", err)
+	}
+
 	return ctrl.Result{}, nil
 }
 

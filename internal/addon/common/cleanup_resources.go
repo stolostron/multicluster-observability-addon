@@ -15,8 +15,8 @@ import (
 
 var errNotClientObjectType = errors.New("object is not a client.Object")
 
-// CleanOrphanResources lists resources of type T owned by CMOA and removes the ones having no existing placement.
-func CleanOrphanResources[T client.ObjectList](ctx context.Context, logger logr.Logger, k8s client.Client, cmao *addonapiv1alpha1.ClusterManagementAddOn, items T) error {
+// DeleteOrphanResources lists resources of type T owned by CMOA and removes the ones having no existing placement.
+func DeleteOrphanResources[T client.ObjectList](ctx context.Context, logger logr.Logger, k8s client.Client, cmao *addonapiv1alpha1.ClusterManagementAddOn, items T) error {
 	if err := k8s.List(ctx, items, client.InNamespace(addon.InstallNamespace)); err != nil {
 		return fmt.Errorf("failed to list PrometheusAgents: %w", err)
 	}
