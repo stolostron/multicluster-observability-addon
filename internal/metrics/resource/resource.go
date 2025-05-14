@@ -31,7 +31,7 @@ type DefaultStackResources struct {
 // Reconcile ensures the state of the configuration resources for metrics collection.
 // For each placement found in the ClusterManagementAddon resource, it generates a default PrometheusAgent
 // if not found and then applies configuration invariants using server-side apply.
-func (d DefaultStackResources) Reconcile(ctx context.Context) error {
+func (d DefaultStackResources) Reconcile(ctx context.Context) ([]common.DefaultConfig, error) {
 	configs := []common.DefaultConfig{}
 
 	// Reconcile existing placements.
@@ -39,7 +39,7 @@ func (d DefaultStackResources) Reconcile(ctx context.Context) error {
 		if d.AddonOptions.Platform.Metrics.CollectionEnabled {
 			agent, err := d.reconcileAgent(ctx, placement.PlacementRef, false)
 			if err != nil {
-				return fmt.Errorf("failed to reconcile platform prometheusAgent for placement %s: %w", placement.Name, err)
+				return configs, fmt.Errorf("failed to reconcile platform prometheusAgent for placement %s: %w", placement.Name, err)
 			}
 			configs = append(configs, common.DefaultConfig{
 				PlacementRef: placement.PlacementRef,
@@ -50,7 +50,7 @@ func (d DefaultStackResources) Reconcile(ctx context.Context) error {
 		if d.AddonOptions.UserWorkloads.Metrics.CollectionEnabled {
 			agent, err := d.reconcileAgent(ctx, placement.PlacementRef, true)
 			if err != nil {
-				return fmt.Errorf("failed to reconcile user workloads prometheusAgent for placement %s: %w", placement.Name, err)
+				return configs, fmt.Errorf("failed to reconcile user workloads prometheusAgent for placement %s: %w", placement.Name, err)
 			}
 			configs = append(configs, common.DefaultConfig{
 				PlacementRef: placement.PlacementRef,
@@ -59,16 +59,7 @@ func (d DefaultStackResources) Reconcile(ctx context.Context) error {
 		}
 	}
 
-	// Ensure that configs are referenced in the ClusterManagementAddon.
-	if err := common.EnsureAddonConfig(ctx, d.Logger, d.Client, configs); err != nil {
-		return fmt.Errorf("failed to ensure addon configs: %w", err)
-	}
-
-	// Clean default configs from removed placements.
-	if err := common.CleanOrphanResources(ctx, d.Logger, d.Client, d.CMAO, &prometheusalpha1.PrometheusAgentList{}); err != nil {
-		return fmt.Errorf("failed to clean orphan resources: %w", err)
-	}
-	return nil
+	return configs, nil
 }
 
 func (d DefaultStackResources) reconcileAgent(ctx context.Context, placementRef addonv1alpha1.PlacementRef, isUWL bool) (*prometheusalpha1.PrometheusAgent, error) {
