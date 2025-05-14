@@ -2,7 +2,6 @@ package manifests
 
 import (
 	"encoding/json"
-
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/handlers"
 	corev1 "k8s.io/api/core/v1"
@@ -17,7 +16,8 @@ type MetricsValues struct {
 	PrometheusCAConfigMapName string        `json:"prometheusCAConfigMapName"`
 	Platform                  Collector     `json:"platform"`
 	UserWorkload              Collector     `json:"userWorkload"`
-	UI                        UIValues      `json:"uiEnabled,omitempty"`
+	UIEnabled                 bool          `json:"uiEnabled,omitempty"`
+	UISpec                    UIValues      `json:"ui,omitempty"`
 }
 
 type Collector struct {
@@ -42,9 +42,9 @@ type ConfigValue struct {
 }
 
 type UIValues struct {
-	Enabled bool         `json:"ui"`
-	ACM     ACMValues    `json:"acm"`
-	Perses  PersesValues `json:"perses"`
+	Enabled bool         `json:"enabled"`
+	ACM     ACMValues    `json:"acm,omitempty"`
+	Perses  PersesValues `json:"promes,omitempty"`
 }
 
 type ACMValues struct {
@@ -185,7 +185,8 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 	}
 
 	if opts.UI.Enabled {
-		ret.UI = UIValues{
+		ret.UIEnabled = opts.UI.Enabled
+		ret.UISpec = UIValues{
 			Enabled: opts.UI.Enabled,
 			ACM:     ACMValues{Enabled: opts.UI.Enabled},
 			Perses:  PersesValues{Enabled: opts.UI.Enabled},
