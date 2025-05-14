@@ -71,7 +71,7 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, logger logr.Logger) a
 			Enabled: true,
 		}
 
-		userValues.InstallCOO, err = addon.InstallCOO(ctx, k8s, logger, isHubCluster(cluster), opts)
+		userValues.InstallCOO, err = addon.InstallCOO(ctx, k8s, logger, IsHubCluster(cluster), opts)
 		if err != nil {
 			return nil, err
 		}
@@ -129,7 +129,7 @@ func getLoggingValues(ctx context.Context, k8s client.Client, cluster *clusterv1
 		return nil, nil
 	}
 
-	loggingOpts, err := lhandlers.BuildOptions(ctx, k8s, mcAddon, opts.Platform.Logs, opts.UserWorkloads.Logs, isHubCluster(cluster))
+	loggingOpts, err := lhandlers.BuildOptions(ctx, k8s, mcAddon, opts.Platform.Logs, opts.UserWorkloads.Logs, IsHubCluster(cluster))
 	if err != nil {
 		return nil, err
 	}
@@ -138,7 +138,7 @@ func getLoggingValues(ctx context.Context, k8s client.Client, cluster *clusterv1
 }
 
 func getTracingValues(ctx context.Context, k8s client.Client, cluster *clusterv1.ManagedCluster, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, opts addon.Options) (*tmanifests.TracingValues, error) {
-	if isHubCluster(cluster) || !opts.UserWorkloads.Traces.CollectionEnabled {
+	if IsHubCluster(cluster) || !opts.UserWorkloads.Traces.CollectionEnabled {
 		return nil, nil
 	}
 
@@ -192,7 +192,7 @@ func getAddOnDeploymentConfig(ctx context.Context, k8s client.Client, mcAddon *a
 	return aodc, nil
 }
 
-func isHubCluster(cluster *clusterv1.ManagedCluster) bool {
+func IsHubCluster(cluster *clusterv1.ManagedCluster) bool {
 	return cluster.Labels[clusterlifecycleconstants.SelfManagedClusterLabelKey] == "true"
 }
 

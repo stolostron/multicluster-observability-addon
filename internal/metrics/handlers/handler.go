@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/stolostron/multicluster-observability-addon/internal/addon/helm"
 	"slices"
 
 	"github.com/go-logr/logr"
@@ -76,7 +77,7 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 			o.Logger.V(1).Info("No rules found for platform metrics")
 		}
 
-		if platform.UI {
+		if platform.UI && helm.IsHubCluster(managedCluster) {
 			ret.UI.Enabled = true
 		}
 	}
