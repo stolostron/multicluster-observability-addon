@@ -9,6 +9,7 @@ const (
 	Name              = "multicluster-observability-addon"
 	LabelOCMAddonName = "open-cluster-management.io/addon-name"
 	InstallNamespace  = "open-cluster-management-observability"
+	HubNamespace      = "local-cluster"
 
 	McoaChartDir              = "manifests/charts/mcoa"
 	MetricsChartDir           = "manifests/charts/mcoa/charts/metrics"
@@ -26,8 +27,9 @@ const (
 	paProbePath = ".status.conditions[?(@.type==\"Available\")].status"
 
 	ClusterLogForwardersResource = "clusterlogforwarders"
-	SpokeCLFName                 = "mcoa-instance"
-	SpokeCLFNamespace            = "openshift-logging"
+	LokiStacksResource           = "lokistacks"
+	UnmanagedCLFName             = "mcoa-instance"
+	LoggingNamespace             = "openshift-logging"
 	clfProbeKey                  = "isReady"
 	clfProbePath                 = ".status.conditions[?(@.type==\"Ready\")].status"
 
@@ -43,6 +45,8 @@ const (
 	uiPluginsResource = "uiplugins"
 	uipProbeKey       = "isAvailable"
 	uipProbePath      = ".status.conditions[?(@.type==\"Available\")].status"
+
+	DefaultStackPrefix = "default-stack-instance"
 )
 
 var (
@@ -54,6 +58,9 @@ var (
 //go:embed manifests/charts/mcoa
 //go:embed manifests/charts/mcoa/templates/_helpers.tpl
 //go:embed manifests/charts/mcoa/charts/logging/templates/_helpers.tpl
+//go:embed manifests/charts/mcoa/charts/logging/charts/unmanaged/charts/collection/templates/_helpers.tpl
+//go:embed manifests/charts/mcoa/charts/logging/charts/managed/charts/collection/templates/_helpers.tpl
+//go:embed manifests/charts/mcoa/charts/logging/charts/managed/charts/storage/templates/_helpers.tpl
 //go:embed manifests/charts/mcoa/charts/metrics/templates/_helpers.tpl
 //go:embed manifests/charts/mcoa/charts/tracing/templates/_helpers.tpl
 //go:embed manifests/charts/mcoa/charts/analytics/charts/incident-detection/templates/_helpers.tpl
