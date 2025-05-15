@@ -15,13 +15,16 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	intstr "k8s.io/apimachinery/pkg/util/intstr"
 	kubescheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/utils/ptr"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 func TestBuildOptions(t *testing.T) {
@@ -172,6 +175,15 @@ func TestBuildOptions(t *testing.T) {
 		},
 	}
 
+	cmao := &addonv1alpha1.ClusterManagementAddOn{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: addon.Name,
+			UID:  types.UID("test-cmao-uid"),
+		},
+	}
+	require.NoError(t, controllerutil.SetOwnerReference(cmao, platformAgent, scheme))
+	require.NoError(t, controllerutil.SetOwnerReference(cmao, uwlAgent, scheme))
+
 	createResources := func() []client.Object {
 		return []client.Object{
 			&corev1.Namespace{
@@ -210,6 +222,7 @@ func TestBuildOptions(t *testing.T) {
 			platformRule,
 			uwlAgent,
 			uwlHAProxyCM,
+			cmao,
 			&corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      config.ClientCertSecretName,

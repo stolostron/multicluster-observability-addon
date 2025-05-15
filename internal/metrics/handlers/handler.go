@@ -26,6 +26,7 @@ var (
 	errUnsupportedAppName          = errors.New("unsupported app name")
 	errMissingDesiredConfig        = errors.New("missing desiredConfig in managedClusterAddon.Status.ConfigReferences")
 	errMissingRemoteWriteConfig    = errors.New("missing expected remote write spec in the prometheusAgent")
+	errMissingCMAOOwnership        = errors.New("object is not owned by the ClusterManagementAddOn")
 )
 
 type OptionsBuilder struct {
@@ -120,6 +121,14 @@ func (o *OptionsBuilder) buildPrometheusAgent(ctx context.Context, opts *Options
 		return fmt.Errorf("%w: for application %s, found %d agents with labels %+v", errInvalidConfigResourcesCount, appName, len(platformAgents), labelsMatcher)
 	}
 	agent := platformAgents[0]
+
+	isOwned, err := common.HasCMAOOwnerReference(ctx, o.Client, agent)
+	if err != nil {
+		return fmt.Errorf("failed to check owner reference of the Prometheus Agent %s/%s: %w", agent.Namespace, agent.Name, err)
+	}
+	if !isOwned {
+		return fmt.Errorf("%w: kind %s %s/%s", errMissingCMAOOwnership, agent.Kind, agent.Namespace, agent.Name)
+	}
 
 	// add the relabel cfg
 	remoteWriteSpecIdx := slices.IndexFunc(agent.Spec.RemoteWrite, func(e prometheusv1.RemoteWriteSpec) bool {
