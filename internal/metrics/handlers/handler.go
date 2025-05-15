@@ -4,12 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	clusterlifecycleconstants "github.com/stolostron/cluster-lifecycle-api/constants"
 	"slices"
 
 	"github.com/go-logr/logr"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	prometheusalpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
+	clusterlifecycleconstants "github.com/stolostron/cluster-lifecycle-api/constants"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
