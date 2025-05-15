@@ -20,7 +20,6 @@ import (
 	kubescheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/utils/ptr"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
-	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -175,7 +174,7 @@ func TestBuildOptions(t *testing.T) {
 		},
 	}
 
-	cmao := &addonv1alpha1.ClusterManagementAddOn{
+	cmao := &addonapiv1alpha1.ClusterManagementAddOn{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: addon.Name,
 			UID:  types.UID("test-cmao-uid"),

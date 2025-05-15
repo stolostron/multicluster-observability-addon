@@ -43,7 +43,6 @@ func HasCMAOOwnerReference(ctx context.Context, k8s client.Client, obj client.Ob
 		return false, fmt.Errorf("failed to check owner reference: %w", err)
 	}
 	return isOwned, nil
-
 }
 
 // EnsureAddonConfig ensures that the provided configurations are present in the CMAO
