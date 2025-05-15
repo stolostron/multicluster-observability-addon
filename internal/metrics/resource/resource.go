@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 
 	"github.com/go-logr/logr"
 	prometheusalpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
@@ -84,7 +85,7 @@ func (d DefaultStackResources) reconcileAgent(ctx context.Context, placementRef 
 	promSSA := promBuilder.Build()
 
 	// SSA the objects rendered
-	if !equality.Semantic.DeepDerivative(promSSA, agent) {
+	if !equality.Semantic.DeepDerivative(promSSA.Spec, agent.Spec) || !maps.Equal(promSSA.Labels, agent.Labels) {
 		if err := common.ServerSideApply(ctx, d.Client, promSSA, d.CMAO); err != nil {
 			return agent, fmt.Errorf("failed to server-side apply for %s/%s: %w", promSSA.Namespace, promSSA.Name, err)
 		}
