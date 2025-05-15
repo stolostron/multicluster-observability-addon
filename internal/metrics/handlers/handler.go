@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/stolostron/multicluster-observability-addon/internal/addon/helm"
+	clusterlifecycleconstants "github.com/stolostron/cluster-lifecycle-api/constants"
 	"slices"
 
 	"github.com/go-logr/logr"
@@ -77,7 +77,8 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 			o.Logger.V(1).Info("No rules found for platform metrics")
 		}
 
-		if platform.UI && helm.IsHubCluster(managedCluster) {
+		// UI is enabled only with platform workload and if it is a hub cluster
+		if platform.UI && isHubCluster(managedCluster) {
 			ret.UI.Enabled = true
 		}
 	}
@@ -271,4 +272,8 @@ func (o *OptionsBuilder) getAvailableConfigResources(ctx context.Context, mcAddo
 	}
 
 	return ret, nil
+}
+
+func isHubCluster(cluster *clusterv1.ManagedCluster) bool {
+	return cluster.Labels[clusterlifecycleconstants.SelfManagedClusterLabelKey] == "true"
 }
