@@ -164,6 +164,18 @@ func getIncidentDetectionValues(ctx context.Context, k8s client.Client, mcAddon 
 	return imanifests.BuildValues(incDecOptions)
 }
 
+//func getObservabilityUIValues(ctx context.Context, k8s client.Client, cluster *clusterv1.ManagedCluster, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, opts addon.Options) *uimanifests.UIValues {
+//	if !opts.ObsUI.Enabled {
+//		return nil
+//	}
+//	if !isHubCluster(cluster) {
+//		return nil
+//	}
+//
+//	uiOpts := uihandlers.BuildOptions(ctx, k8s, mcAddon, opts.ObsUI)
+//	return uimanifests.BuildValues(uiOpts)
+//}
+
 func getAddOnDeploymentConfig(ctx context.Context, k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAddOn) (*addonapiv1alpha1.AddOnDeploymentConfig, error) {
 	aodc := &addonapiv1alpha1.AddOnDeploymentConfig{}
 	keys := common.GetObjectKeys(mcAddon.Status.ConfigReferences, addonutils.AddOnDeploymentConfigGVR.Group, addon.AddonDeploymentConfigResource)

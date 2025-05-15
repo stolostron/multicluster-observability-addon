@@ -23,6 +23,9 @@ const (
 	KeyUserWorkloadLogsCollection    = "userWorkloadLogsCollection"
 	KeyUserWorkloadTracesCollection  = "userWorkloadTracesCollection"
 	KeyUserWorkloadInstrumentation   = "userWorkloadInstrumentation"
+
+	// Observability UI Keys
+	KeyObservabilityUIMetrics = "observabilityUIMetrics"
 )
 
 type CollectionKind string
@@ -48,6 +51,7 @@ const (
 type MetricsOptions struct {
 	CollectionEnabled bool
 	HubEndpoint       *url.URL
+	UI                bool
 }
 
 type IncidentDetection struct {
@@ -81,6 +85,24 @@ type UserWorkloadOptions struct {
 	Metrics MetricsOptions
 	Logs    LogsOptions
 	Traces  TracesOptions
+}
+
+type LogsUIOptions struct {
+	Enabled bool
+}
+
+type MetricsUIOptions struct {
+	Enabled bool
+	ACM     ACMOptions
+	Perses  PersesOptions
+}
+
+type ACMOptions struct {
+	Enabled bool
+}
+
+type PersesOptions struct {
+	Enabled bool
 }
 
 type Options struct {
@@ -158,6 +180,11 @@ func BuildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Opti
 			if keyvalue.Value == string(InstrumentationV1alpha1) {
 				opts.UserWorkloads.Enabled = true
 				opts.UserWorkloads.Traces.InstrumentationEnabled = true
+			}
+		// Observability UI Options
+		case KeyObservabilityUIMetrics:
+			if keyvalue.Value == string(UIPluginV1alpha1) && opts.Platform.Metrics.CollectionEnabled {
+				opts.Platform.Metrics.UI = true
 			}
 		}
 	}
