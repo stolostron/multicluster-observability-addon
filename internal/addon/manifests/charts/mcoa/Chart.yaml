@@ -3,18 +3,3 @@ description: A Helm chart for installing the different observability signals for
 name: mcoa
 version: 1.0.0
 appVersion: "1.0.0"
-
-dependencies:
-- name: metrics
-  repository: 'file://./charts/metrics'
-  condition: metrics.enabled
-- name: logging
-  repository: 'file://./charts/logging'
-  condition: logging.enabled
-- name: tracing
-  repository: 'file://./charts/tracing'
-  condition: tracing.enabled
-- name: analytics
-  repository: 'file://./charts/analytics'
-  condition: analytics.enabled
-

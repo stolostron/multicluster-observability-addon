@@ -2,7 +2,7 @@ nameOverride: null
 
 enabled: true
 
-skipOperatorInstall: false
+installCLO: false
 
 clfAnnotations: {}
 
