@@ -41,7 +41,7 @@ func EnsureAddonConfig(ctx context.Context, logger logr.Logger, k8s client.Clien
 	}
 
 	desiredCmao := cmao.DeepCopy()
-	desiredCmao.ObjectMeta.ManagedFields = nil // required for patching with ssa
+	desiredCmao.ManagedFields = nil // required for patching with ssa
 	ensureConfigsInAddon(desiredCmao, configs)
 
 	// If there are no changes, nothing to do
