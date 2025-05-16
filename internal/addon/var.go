@@ -43,6 +43,10 @@ const (
 	uiPluginsResource = "uiplugins"
 	uipProbeKey       = "isAvailable"
 	uipProbePath      = ".status.conditions[?(@.type==\"Available\")].status"
+
+	DefaultStackPrefix            = "default-stack-instance"
+	PlacementRefNameLabelKey      = "placement-ref-name"
+	PlacementRefNamespaceLabelKey = "placement-ref-namespace"
 )
 
 var (

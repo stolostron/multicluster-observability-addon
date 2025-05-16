@@ -18,17 +18,18 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	intstr "k8s.io/apimachinery/pkg/util/intstr"
 	kubescheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/utils/ptr"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 func TestBuildOptions(t *testing.T) {
 	const (
 		hubNamespace = "test-hub-namespace"
 		spokeName    = "test-spoke"
-		imagesCMName = "images-list"
 		clusterID    = "test-cluster-id"
 	)
 
@@ -51,6 +52,12 @@ func TestBuildOptions(t *testing.T) {
 			CommonPrometheusFields: prometheusv1.CommonPrometheusFields{
 				LogLevel:   "debug",
 				ConfigMaps: []string{"test-haproxy-config"},
+				RemoteWrite: []prometheusv1.RemoteWriteSpec{
+					{
+						Name: ptr.To(config.RemoteWriteCfgName),
+					},
+				},
+				Secrets: []string{config.ClientCertSecretName, config.HubCASecretName},
 			},
 		},
 	}
@@ -90,6 +97,11 @@ func TestBuildOptions(t *testing.T) {
 			CommonPrometheusFields: prometheusv1.CommonPrometheusFields{
 				LogLevel:   "warn",
 				ConfigMaps: []string{"test-haproxy-config-uwl"},
+				RemoteWrite: []prometheusv1.RemoteWriteSpec{
+					{
+						Name: ptr.To(config.RemoteWriteCfgName),
+					},
+				},
 			},
 		},
 	}
@@ -162,6 +174,15 @@ func TestBuildOptions(t *testing.T) {
 		},
 	}
 
+	cmao := &addonapiv1alpha1.ClusterManagementAddOn{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: addon.Name,
+			UID:  types.UID("test-cmao-uid"),
+		},
+	}
+	require.NoError(t, controllerutil.SetOwnerReference(cmao, platformAgent, scheme))
+	require.NoError(t, controllerutil.SetOwnerReference(cmao, uwlAgent, scheme))
+
 	createResources := func() []client.Object {
 		return []client.Object{
 			&corev1.Namespace{
@@ -184,13 +205,14 @@ func TestBuildOptions(t *testing.T) {
 			},
 			&corev1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      imagesCMName,
-					Namespace: hubNamespace,
+					Name:      config.ImagesConfigMapObjKey.Name,
+					Namespace: config.ImagesConfigMapObjKey.Namespace,
 				},
 				Data: map[string]string{
 					"prometheus_operator":        "prom-operator-image",
 					"kube_rbac_proxy":            "kube-rbac-proxy-image",
 					"prometheus_config_reloader": "prometheus-config-reload-image",
+					"prometheus":                 "prometheus-image",
 				},
 			},
 			platformAgent,
@@ -199,6 +221,7 @@ func TestBuildOptions(t *testing.T) {
 			platformRule,
 			uwlAgent,
 			uwlHAProxyCM,
+			cmao,
 			&corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      config.ClientCertSecretName,
@@ -258,11 +281,11 @@ func TestBuildOptions(t *testing.T) {
 			addon:           platformManagedClusterAddOn,
 			platformEnabled: true,
 			resources: func() []client.Object {
-				res := filterOutResource[*corev1.ConfigMap](createResources(), imagesCMName)
+				res := filterOutResource[*corev1.ConfigMap](createResources(), config.ImagesConfigMapObjKey.Name)
 				res = append(res, &corev1.ConfigMap{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      imagesCMName,
-						Namespace: hubNamespace,
+						Name:      config.ImagesConfigMapObjKey.Name,
+						Namespace: config.ImagesConfigMapObjKey.Namespace,
 					},
 					Data: map[string]string{ // Missing image overrides for config reloader
 						"prometheus_operator": "prom-operator-image",
@@ -273,7 +296,7 @@ func TestBuildOptions(t *testing.T) {
 			},
 			expects: func(t *testing.T, opts Options, err error) {
 				assert.Error(t, err)
-				assert.ErrorIs(t, err, errMissingImageOverride)
+				assert.ErrorIs(t, err, config.ErrMissingImageOverride)
 			},
 		},
 		"missing config reference": {
@@ -311,6 +334,10 @@ func TestBuildOptions(t *testing.T) {
 				assert.NotNil(t, opts.Platform.PrometheusAgent)
 				assert.Equal(t, platformAgent.Spec.LogLevel, opts.Platform.PrometheusAgent.Spec.LogLevel)
 				assert.Len(t, opts.Platform.PrometheusAgent.Spec.RemoteWrite, 1)
+				// Check that relabelling is added to the remote write config
+				assert.Equal(t, spokeName, *opts.Platform.PrometheusAgent.Spec.CommonPrometheusFields.RemoteWrite[0].WriteRelabelConfigs[0].Replacement)
+				assert.Equal(t, config.ClusterNameMetricLabel, opts.Platform.PrometheusAgent.Spec.CommonPrometheusFields.RemoteWrite[0].WriteRelabelConfigs[0].TargetLabel)
+				assert.Len(t, opts.Platform.PrometheusAgent.Spec.CommonPrometheusFields.RemoteWrite[0].WriteRelabelConfigs, 5)
 				// Check that the secrets are set
 				assert.Len(t, opts.Secrets, 2)
 				// Check that user workloads are not enabled
@@ -363,6 +390,10 @@ func TestBuildOptions(t *testing.T) {
 				assert.NotNil(t, opts.UserWorkloads.PrometheusAgent)
 				assert.Nil(t, opts.Platform.PrometheusAgent)
 				assert.Equal(t, uwlAgent.Spec.LogLevel, opts.UserWorkloads.PrometheusAgent.Spec.LogLevel)
+				// Check that relabelling is added to the remote write config
+				assert.Equal(t, spokeName, *opts.UserWorkloads.PrometheusAgent.Spec.CommonPrometheusFields.RemoteWrite[0].WriteRelabelConfigs[0].Replacement)
+				assert.Equal(t, config.ClusterNameMetricLabel, opts.UserWorkloads.PrometheusAgent.Spec.CommonPrometheusFields.RemoteWrite[0].WriteRelabelConfigs[0].TargetLabel)
+				assert.Len(t, opts.UserWorkloads.PrometheusAgent.Spec.CommonPrometheusFields.RemoteWrite[0].WriteRelabelConfigs, 5)
 			},
 		},
 		"user workload is enabled and is hypershift hub": {
@@ -486,6 +517,8 @@ func TestBuildOptions(t *testing.T) {
 
 				assert.Equal(t, []string{"etcd_metric", "etcd_rule_dependent_metric"}, etcdMetrics)
 				assert.Equal(t, []string{"apiserver_metric", "apiserver_rule_dependent_metric"}, apiserverMetrics)
+
+				assert.Len(t, opts.UserWorkloads.PrometheusAgent.Spec.CommonPrometheusFields.RemoteWrite[0].WriteRelabelConfigs, 8)
 			},
 		},
 	}
@@ -503,9 +536,8 @@ func TestBuildOptions(t *testing.T) {
 			userWorkloads := addon.MetricsOptions{CollectionEnabled: tc.userWorkloadsEnabled}
 
 			optsBuilder := &OptionsBuilder{
-				Client:          fakeClient,
-				ImagesConfigMap: types.NamespacedName{Name: imagesCMName, Namespace: hubNamespace},
-				RemoteWriteURL:  "https://example.com/write",
+				Client:         fakeClient,
+				RemoteWriteURL: "https://example.com/write",
 			}
 			managedClusters := &clusterv1.ManagedClusterList{}
 			err := fakeClient.List(context.Background(), managedClusters)

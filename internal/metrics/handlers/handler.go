@@ -15,6 +15,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -23,15 +24,15 @@ import (
 var (
 	errInvalidConfigResourcesCount = errors.New("invalid number of configuration resources")
 	errUnsupportedAppName          = errors.New("unsupported app name")
-	errMissingImageOverride        = errors.New("missing image override")
 	errMissingDesiredConfig        = errors.New("missing desiredConfig in managedClusterAddon.Status.ConfigReferences")
+	errMissingRemoteWriteConfig    = errors.New("missing expected remote write spec in the prometheusAgent")
+	errMissingCMAOOwnership        = errors.New("object is not owned by the ClusterManagementAddOn")
 )
 
 type OptionsBuilder struct {
-	Client          client.Client
-	ImagesConfigMap types.NamespacedName
-	RemoteWriteURL  string
-	Logger          logr.Logger
+	Client         client.Client
+	RemoteWriteURL string
+	Logger         logr.Logger
 }
 
 func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, managedCluster *clusterv1.ManagedCluster, platform, userWorkloads addon.MetricsOptions) (Options, error) {
@@ -49,7 +50,7 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 
 	// Fetch image overrides
 	var err error
-	ret.Images, err = o.getImageOverrides(ctx)
+	ret.Images, err = config.GetImageOverrides(ctx, o.Client)
 	if err != nil {
 		return ret, fmt.Errorf("failed to get image overrides: %w", err)
 	}
@@ -119,29 +120,30 @@ func (o *OptionsBuilder) buildPrometheusAgent(ctx context.Context, opts *Options
 	if len(platformAgents) != 1 {
 		return fmt.Errorf("%w: for application %s, found %d agents with labels %+v", errInvalidConfigResourcesCount, appName, len(platformAgents), labelsMatcher)
 	}
+	agent := platformAgents[0]
 
-	// Build the agent
-	promBuilder := PrometheusAgentBuilder{
-		Agent:                    platformAgents[0].DeepCopy(),
-		Name:                     appName,
-		ClusterName:              opts.ClusterName,
-		ClusterID:                opts.ClusterID,
-		MatchLabels:              map[string]string{"app": appName},
-		RemoteWriteEndpoint:      o.RemoteWriteURL,
-		IsHypershiftLocalCluster: isHypershift,
+	isOwned, err := common.HasCMAOOwnerReference(ctx, o.Client, agent)
+	if err != nil {
+		return fmt.Errorf("failed to check owner reference of the Prometheus Agent %s/%s: %w", agent.Namespace, agent.Name, err)
+	}
+	if !isOwned {
+		return fmt.Errorf("%w: kind %s %s/%s", errMissingCMAOOwnership, agent.Kind, agent.Namespace, agent.Name)
 	}
 
-	var agent *prometheusalpha1.PrometheusAgent
+	// add the relabel cfg
+	remoteWriteSpecIdx := slices.IndexFunc(agent.Spec.RemoteWrite, func(e prometheusv1.RemoteWriteSpec) bool {
+		return e.Name != nil && *e.Name == config.RemoteWriteCfgName
+	})
+	if remoteWriteSpecIdx == -1 {
+		return fmt.Errorf("%w: failed to get the %q remote write spec in agent %s/%s", errMissingRemoteWriteConfig, config.RemoteWriteCfgName, agent.Namespace, agent.Name)
+	}
+	agent.Spec.RemoteWrite[remoteWriteSpecIdx].WriteRelabelConfigs = createWriteRelabelConfigs(opts.ClusterName, opts.ClusterID, isHypershift)
 
 	// Set the built agent in the appropriate workload option
 	switch appName {
 	case config.PlatformMetricsCollectorApp:
-		promBuilder.MatchLabels = config.PlatformPrometheusMatchLabels
-		agent = promBuilder.Build()
 		opts.Platform.PrometheusAgent = agent
 	case config.UserWorkloadMetricsCollectorApp:
-		promBuilder.MatchLabels = config.UserWorkloadPrometheusMatchLabels
-		agent = promBuilder.Build()
 		opts.UserWorkloads.PrometheusAgent = agent
 	default:
 		return fmt.Errorf("%w: %s", errUnsupportedAppName, appName)
@@ -206,33 +208,6 @@ func (o *OptionsBuilder) addSecret(ctx context.Context, secrets *[]*corev1.Secre
 	return nil
 }
 
-func (o *OptionsBuilder) getImageOverrides(ctx context.Context) (ImagesOptions, error) {
-	ret := ImagesOptions{}
-	// Get the ACM images overrides
-	imagesList := corev1.ConfigMap{}
-	if err := o.Client.Get(ctx, o.ImagesConfigMap, &imagesList); err != nil {
-		return ret, err
-	}
-
-	for key, value := range imagesList.Data {
-		switch key {
-		case "prometheus_operator":
-			ret.PrometheusOperator = value
-		case "prometheus_config_reloader":
-			ret.PrometheusConfigReloader = value
-		case "kube_rbac_proxy":
-			ret.KubeRBACProxy = value
-		default:
-		}
-	}
-
-	if ret.PrometheusOperator == "" || ret.PrometheusConfigReloader == "" || ret.KubeRBACProxy == "" {
-		return ret, fmt.Errorf("%w: %+v", errMissingImageOverride, ret)
-	}
-
-	return ret, nil
-}
-
 func (o *OptionsBuilder) getAvailableConfigResources(ctx context.Context, mcAddon *addonapiv1alpha1.ManagedClusterAddOn) ([]client.Object, error) {
 	ret := []client.Object{}
 
@@ -266,4 +241,80 @@ func (o *OptionsBuilder) getAvailableConfigResources(ctx context.Context, mcAddo
 	}
 
 	return ret, nil
+}
+
+func createWriteRelabelConfigs(clusterName, clusterID string, isHypershiftLocalCluster bool) []prometheusv1.RelabelConfig {
+	ret := []prometheusv1.RelabelConfig{}
+	if isHypershiftLocalCluster {
+		// Don't overwrite the clusterID label as some are set to the hosted cluster ID (for hosted etcd and apiserver)
+		// These rules ensure that the correct management cluster labels are set if the clusterID label differs from the current cluster one.
+		// If the clusterID it the current cluster one, nothing is done.
+		var isNotHcpTmpLabel prometheusv1.LabelName = "__tmp_is_not_hcp"
+		ret = append(ret,
+			prometheusv1.RelabelConfig{
+				SourceLabels: []prometheusv1.LabelName{config.ClusterIDMetricLabel},
+				Regex:        "^$", // Is empty
+				TargetLabel:  config.ClusterNameMetricLabel,
+				Action:       "replace",
+				Replacement:  &clusterName,
+			},
+			prometheusv1.RelabelConfig{
+				SourceLabels: []prometheusv1.LabelName{config.ClusterIDMetricLabel},
+				Regex:        "^$", // Is empty
+				TargetLabel:  config.ClusterIDMetricLabel,
+				Action:       "replace",
+				Replacement:  &clusterID,
+			},
+			prometheusv1.RelabelConfig{
+				SourceLabels: []prometheusv1.LabelName{config.ClusterIDMetricLabel},
+				Regex:        clusterID,
+				TargetLabel:  string(isNotHcpTmpLabel),
+				Action:       "replace",
+				Replacement:  ptr.To("true"),
+			},
+			prometheusv1.RelabelConfig{
+				SourceLabels: []prometheusv1.LabelName{isNotHcpTmpLabel},
+				Regex:        "^$", // Is not the current clusterID and is not empty
+				TargetLabel:  config.ManagementClusterIDMetricLabel,
+				Action:       "replace",
+				Replacement:  &clusterID,
+			},
+			prometheusv1.RelabelConfig{
+				SourceLabels: []prometheusv1.LabelName{isNotHcpTmpLabel},
+				Regex:        "^$", // Is not the current clusterID and is not empty
+				TargetLabel:  config.ManagementClusterNameMetricLabel,
+				Action:       "replace",
+				Replacement:  &clusterName,
+			},
+		)
+	} else {
+		// If not hypershift hub, enforce the clusterID and Name on all metrics
+		ret = append(ret,
+			prometheusv1.RelabelConfig{
+				Replacement: &clusterName,
+				TargetLabel: config.ClusterNameMetricLabel,
+				Action:      "replace",
+			},
+			prometheusv1.RelabelConfig{
+				Replacement: &clusterID,
+				TargetLabel: config.ClusterIDMetricLabel,
+				Action:      "replace",
+			})
+	}
+
+	return append(ret,
+		prometheusv1.RelabelConfig{
+			SourceLabels: []prometheusv1.LabelName{"exported_job"},
+			TargetLabel:  "job",
+			Action:       "replace",
+		},
+		prometheusv1.RelabelConfig{
+			SourceLabels: []prometheusv1.LabelName{"exported_instance"},
+			TargetLabel:  "instance",
+			Action:       "replace",
+		},
+		prometheusv1.RelabelConfig{
+			Regex:  "exported_job|exported_instance",
+			Action: "labeldrop",
+		})
 }
