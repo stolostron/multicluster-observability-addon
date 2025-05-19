@@ -1,0 +1,21 @@
+{{- if and .Values.platformEnabled .Values.uiEnabled}}
+apiVersion: observability.openshift.io/v1alpha1
+kind: UIPlugin
+metadata:
+  name: monitoring
+  labels:
+    app: {{ template "observabilityUIhelm.name" . }}
+    chart: {{ template "observabilityUIhelm.chart" . }}
+    release: {{ .Release.Name }}
+spec:
+  type: Monitoring
+  monitoring:
+    acm:
+      enabled: {{ .Values.ui.acm.enabled }}
+      alertmanager:
+        url: 'https://alertmanager.open-cluster-management-observability.svc:9095'
+      thanosQuerier:
+        url: 'https://rbac-query-proxy.open-cluster-management-observability.svc:8443'
+    perses:
+      enabled: {{ .Values.ui.perses.enabled }}
+{{- end }}

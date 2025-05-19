@@ -1,13 +1,11 @@
 platform:
   appName: "platform-app"
-  component: platform-metrics-collector
   prometheusAgentSpec: "some-agent-spec"
   scrapeConfigs:
     - name: "scrape-config-1"
       value: "value-1"
 userWorkload:
   appName: "platform-app"
-  component: user-workload-metrics-collector
   prometheusAgentSpec: "some-agent-spec"
   scrapeConfigs:
     - name: "scrape-config-1"
@@ -17,3 +15,9 @@ prometheusOperator:
   component: controller
   rbacProxyTlsSecret: prometheus-operator-kube-rbac-proxy-tls
   rbacProxyPort: 9092
+ui:
+  enabled: false
+  acm:
+    enabled: true
+  perses:
+    enabled: true
