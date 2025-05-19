@@ -10,14 +10,16 @@ import (
 )
 
 type MetricsValues struct {
-	PlatformEnabled           bool               `json:"platformEnabled"`
-	UserWorkloadsEnabled      bool               `json:"userWorkloadsEnabled"`
-	Secrets                   []ConfigValue      `json:"secrets"`
-	Images                    ImagesValues       `json:"images"`
-	PrometheusControllerID    string             `json:"prometheusControllerID"`
-	PrometheusCAConfigMapName string             `json:"prometheusCAConfigMapName"`
-	Platform                  Collector          `json:"platform"`
-	UserWorkload              Collector          `json:"userWorkload"`
+	PlatformEnabled           bool          `json:"platformEnabled"`
+	UserWorkloadsEnabled      bool          `json:"userWorkloadsEnabled"`
+	Secrets                   []ConfigValue `json:"secrets"`
+	Images                    ImagesValues  `json:"images"`
+	PrometheusControllerID    string        `json:"prometheusControllerID"`
+	PrometheusCAConfigMapName string        `json:"prometheusCAConfigMapName"`
+	Platform                  Collector     `json:"platform"`
+	UserWorkload              Collector     `json:"userWorkload"`
+	UIEnabled                 bool          `json:"uiEnabled,omitempty"`
+	UISpec                    UIValues      `json:"ui,omitempty"`
 	PrometheusOperator        PrometheusOperator `json:"prometheusOperator"`
 }
 
@@ -46,6 +48,20 @@ type ConfigValue struct {
 	Namespace string            `json:"namespace"`
 	Data      string            `json:"data"`
 	Labels    map[string]string `json:"labels"`
+}
+
+type UIValues struct {
+	Enabled bool         `json:"enabled"`
+	ACM     ACMValues    `json:"acm,omitempty"`
+	Perses  PersesValues `json:"promes,omitempty"`
+}
+
+type ACMValues struct {
+	Enabled bool `json:"enabled"`
+}
+
+type PersesValues struct {
+	Enabled bool `json:"enabled"`
 }
 
 func BuildValues(opts handlers.Options) (*MetricsValues, error) {

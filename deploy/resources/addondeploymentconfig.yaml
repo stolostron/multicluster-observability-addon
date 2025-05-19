@@ -34,3 +34,6 @@ spec:
   # Enables Incident Detection
   - name: platformIncidentDetection
     value: uiplugins.v1alpha1.observability.openshift.io
+  # Enables Observability UI Metrics
+  - name: observabilityUIMetrics
+    value: uiplugins.v1alpha1.observability.openshift.io
