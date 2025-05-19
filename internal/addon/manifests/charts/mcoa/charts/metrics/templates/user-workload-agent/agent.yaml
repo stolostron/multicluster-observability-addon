@@ -8,8 +8,12 @@ metadata:
     operator.prometheus.io/controller-id: {{ .Values.prometheusControllerID }}
   labels:
     app.kubernetes.io/name: {{ .Values.userWorkload.appName }}
-    {{ include "metricshelm.labels" . | nindent 4 }}
-    app.kubernetes.io/component: user-workload-metrics-collector
+    {{- $incomingLabels := .Values.userWorkload.prometheusAgent.labels }}
+    {{- $metricsHelmLabels := fromYaml (include "metricshelm.labels" $) }}
+    {{- $customLabel := dict "app.kubernetes.io/component" "user-workload-metrics-collector" }}
+    {{- $customLabel := dict "app.kubernetes.io/name" .Values.userWorkload.appName }}
+    {{- $mergedLabels := merge $incomingLabels $metricsHelmLabels $customLabel }}
+    {{- toYaml $mergedLabels | nindent 4 }}
 spec:
-{{- fromJson .Values.userWorkload.prometheusAgentSpec | toYaml | nindent 2 }}
+{{- fromJson .Values.userWorkload.prometheusAgent.data | toYaml | nindent 2 }}
 {{- end }}

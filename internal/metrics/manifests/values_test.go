@@ -5,6 +5,7 @@ import (
 
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	prometheusalpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
+	"github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/handlers"
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/manifests"
 	"github.com/stretchr/testify/assert"
@@ -58,7 +59,7 @@ func TestBuildValues(t *testing.T) {
 		},
 		"image overrides": {
 			Options: handlers.Options{
-				Images: handlers.ImagesOptions{
+				Images: config.ImageOverrides{
 					PrometheusOperator:       "prometheus-operator:latest",
 					PrometheusConfigReloader: "prometheus-config-reloader:latest",
 				},

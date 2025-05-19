@@ -21,6 +21,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	addonctrl "github.com/stolostron/multicluster-observability-addon/internal/controllers/addon"
+	"github.com/stolostron/multicluster-observability-addon/internal/controllers/resourcecreator"
 	"github.com/stolostron/multicluster-observability-addon/internal/controllers/watcher"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -120,6 +121,14 @@ func runControllers(ctx context.Context, kubeConfig *rest.Config) error {
 
 		wm.Start(ctx)
 	}
+
+	var rcm *resourcecreator.ResourceCreatorManager
+	rcm, err = resourcecreator.NewResourceCreatorManager(logger, scheme)
+	if err != nil {
+		logger.Error(err, "unable to create resource creator manager")
+		return err
+	}
+	rcm.Start(ctx)
 
 	err = mgr.Start(ctx)
 	if err != nil {
