@@ -77,6 +77,7 @@ func makeConfigResourceLabels(isUWL bool, placementRef addonv1alpha1.PlacementRe
 type PrometheusAgentSSA struct {
 	ExistingAgent       *prometheusalpha1.PrometheusAgent
 	IsUwl               bool
+	KubeRBACProxyImage  string
 	Labels              map[string]string
 	PrometheusImage     string
 	RemoteWriteEndpoint string
@@ -97,8 +98,14 @@ func (p *PrometheusAgentSSA) Build() *prometheusalpha1.PrometheusAgent {
 				ArbitraryFSAccessThroughSMs: prometheusv1.ArbitraryFSAccessThroughSMsConfig{
 					Deny: true,
 				},
+				PodMetadata: &prometheusv1.EmbeddedObjectMetadata{
+					Labels: map[string]string{
+						"app.kubernetes.io/part-of": config.AddonName,
+					},
+				},
 				Version:            "",
 				ServiceAccountName: config.PlatformMetricsCollectorApp,
+				ServiceName:        ptr.To(config.PlatformMetricsCollectorApp),
 				WALCompression:     ptr.To(true),
 			},
 		},
@@ -106,6 +113,7 @@ func (p *PrometheusAgentSSA) Build() *prometheusalpha1.PrometheusAgent {
 
 	if p.IsUwl {
 		p.desiredAgent.Spec.ServiceAccountName = config.UserWorkloadMetricsCollectorApp
+		p.desiredAgent.Spec.ServiceName = ptr.To(config.UserWorkloadMetricsCollectorApp)
 	}
 
 	if len(p.PrometheusImage) > 0 {
@@ -123,6 +131,7 @@ func (p *PrometheusAgentSSA) Build() *prometheusalpha1.PrometheusAgent {
 	p.setPrometheusRemoteWriteConfig()
 	p.setWatchedResources()
 	p.setScrapeClasses()
+	p.setKubeRBACProxySidecar()
 
 	return p.desiredAgent
 }
@@ -257,6 +266,72 @@ func (p *PrometheusAgentSSA) setScrapeClasses() {
 		p.desiredAgent.Spec.ScrapeClasses[index] = desiredScrapeClass
 	} else {
 		p.desiredAgent.Spec.ScrapeClasses = append(p.desiredAgent.Spec.ScrapeClasses, desiredScrapeClass)
+	}
+}
+
+func (p *PrometheusAgentSSA) setKubeRBACProxySidecar() {
+	tlsSecret := config.PlatformRBACProxyTLSSecret
+	if p.IsUwl {
+		tlsSecret = config.UserWorkloadRBACProxyTLSSecret
+	}
+	newVolumes := []corev1.Volume{
+		{
+			Name: "kube-rbac-proxy-tls",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: tlsSecret,
+				},
+			},
+		},
+	}
+
+	p.desiredAgent.Spec.Volumes = append(p.desiredAgent.Spec.Volumes, newVolumes...)
+	p.desiredAgent.Spec.Containers = append(
+		p.desiredAgent.Spec.Containers,
+		p.createKubeRbacProxyContainer(),
+	)
+}
+
+func (p PrometheusAgentSSA) createKubeRbacProxyContainer() corev1.Container {
+	return corev1.Container{
+		Name:  "kube-rbac-proxy",
+		Image: p.KubeRBACProxyImage,
+		Resources: corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("1m"),
+				corev1.ResourceMemory: resource.MustParse("15Mi"),
+			},
+		},
+		Args: []string{
+			fmt.Sprintf("--secure-listen-address=0.0.0.0:%d", config.RBACProxyPort),
+			"--upstream=http://127.0.0.1:9090",
+			"--tls-cert-file=/etc/tls/private/tls.crt",
+			"--tls-private-key-file=/etc/tls/private/tls.key",
+			"--logtostderr=true",
+			"--allow-paths=/metrics",
+		},
+		VolumeMounts: []corev1.VolumeMount{
+			{
+				Name:      "kube-rbac-proxy-tls",
+				MountPath: "/etc/tls/private",
+				ReadOnly:  true,
+			},
+		},
+		Ports: []corev1.ContainerPort{
+			{
+				Name:          "metrics",
+				ContainerPort: int32(config.RBACProxyPort),
+			},
+		},
+		SecurityContext: &corev1.SecurityContext{
+			RunAsNonRoot:             ptr.To(true),
+			Privileged:               ptr.To(false),
+			AllowPrivilegeEscalation: ptr.To(false),
+			ReadOnlyRootFilesystem:   ptr.To(true),
+			Capabilities: &corev1.Capabilities{
+				Drop: []corev1.Capability{"ALL"},
+			},
+		},
 	}
 }
 
