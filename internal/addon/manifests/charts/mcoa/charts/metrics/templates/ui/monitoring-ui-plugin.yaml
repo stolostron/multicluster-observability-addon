@@ -4,8 +4,8 @@ kind: UIPlugin
 metadata:
   name: monitoring
   labels:
-    app: {{ template "observabilityUIhelm.name" . }}
-    chart: {{ template "observabilityUIhelm.chart" . }}
+    app: {{ template "metricshelm.name" . }}
+    chart: {{ template "metricshelm.chart" . }}
     release: {{ .Release.Name }}
 spec:
   type: Monitoring
