@@ -9,6 +9,7 @@ import (
 	"github.com/go-logr/logr"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	prometheusalpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
+	clusterlifecycleconstants "github.com/stolostron/cluster-lifecycle-api/constants"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
@@ -75,6 +76,10 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 		ret.Platform.Rules = common.FilterResourcesByLabelSelector[*prometheusv1.PrometheusRule](configResources, config.PlatformPrometheusMatchLabels)
 		if len(ret.Platform.Rules) == 0 {
 			o.Logger.V(1).Info("No rules found for platform metrics")
+		}
+		// UI is enabled only with platform workload and if it is a hub cluster
+		if platform.UI && isHubCluster(managedCluster) {
+			ret.UI.Enabled = true
 		}
 	}
 
@@ -317,4 +322,8 @@ func createWriteRelabelConfigs(clusterName, clusterID string, isHypershiftLocalC
 			Regex:  "exported_job|exported_instance",
 			Action: "labeldrop",
 		})
+}
+
+func isHubCluster(cluster *clusterv1.ManagedCluster) bool {
+	return cluster.Labels[clusterlifecycleconstants.SelfManagedClusterLabelKey] == "true"
 }

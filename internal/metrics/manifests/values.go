@@ -17,6 +17,8 @@ type MetricsValues struct {
 	PrometheusCAConfigMapName string        `json:"prometheusCAConfigMapName"`
 	Platform                  Collector     `json:"platform"`
 	UserWorkload              Collector     `json:"userWorkload"`
+	UIEnabled                 bool          `json:"uiEnabled,omitempty"`
+	UISpec                    UIValues      `json:"ui,omitempty"`
 }
 
 type Collector struct {
@@ -38,6 +40,20 @@ type ConfigValue struct {
 	Namespace string            `json:"namespace"`
 	Data      string            `json:"data"`
 	Labels    map[string]string `json:"labels"`
+}
+
+type UIValues struct {
+	Enabled bool         `json:"enabled"`
+	ACM     ACMValues    `json:"acm,omitempty"`
+	Perses  PersesValues `json:"promes,omitempty"`
+}
+
+type ACMValues struct {
+	Enabled bool `json:"enabled"`
+}
+
+type PersesValues struct {
+	Enabled bool `json:"enabled"`
 }
 
 func BuildValues(opts handlers.Options) (*MetricsValues, error) {
@@ -173,6 +189,15 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 	ret.Images = ImagesValues{
 		PrometheusOperator:       opts.Images.PrometheusOperator,
 		PrometheusConfigReloader: opts.Images.PrometheusConfigReloader,
+	}
+
+	if opts.UI.Enabled {
+		ret.UIEnabled = opts.UI.Enabled
+		ret.UISpec = UIValues{
+			Enabled: opts.UI.Enabled,
+			ACM:     ACMValues{Enabled: opts.UI.Enabled},
+			Perses:  PersesValues{Enabled: opts.UI.Enabled},
+		}
 	}
 
 	return ret, nil

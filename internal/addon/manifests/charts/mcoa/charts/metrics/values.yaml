@@ -10,3 +10,10 @@ userWorkload:
   scrapeConfigs:
     - name: "scrape-config-1"
       value: "value-1"
+
+ui:
+  enabled: false
+  acm:
+    enabled: true
+  perses:
+    enabled: true
