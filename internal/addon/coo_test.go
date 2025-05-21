@@ -16,68 +16,25 @@ var _ = operatorv1alpha1.AddToScheme(scheme.Scheme)
 
 func TestSkipInstallCOO(t *testing.T) {
 	tests := []struct {
-		name                string
-		isHub               bool
-		options             Options
-		subscription        *operatorv1alpha1.Subscription
-		expectedSkipInstall bool
-		expectedErrMsg      string
+		name           string
+		isHub          bool
+		subscription   *operatorv1alpha1.Subscription
+		expectedResult bool
+		expectedErrMsg string
 	}{
 		{
-			name:                "Non-hub cluster with no features enabled",
-			isHub:               false,
-			options:             Options{},
-			expectedSkipInstall: false,
+			name:           "Non-hub cluster",
+			isHub:          false,
+			expectedResult: true,
 		},
 		{
-			name:  "Non-hub cluster with incident detection enabled",
-			isHub: false,
-			options: Options{
-				Platform: PlatformOptions{
-					Enabled: true,
-					AnalyticsOptions: AnalyticsOptions{
-						IncidentDetection: IncidentDetection{
-							Enabled: true,
-						},
-					},
-				},
-			},
-			expectedSkipInstall: true,
+			name:           "Hub cluster",
+			isHub:          true,
+			expectedResult: true,
 		},
 		{
-			name:  "Hub cluster with incident detection enabled but no COO installed",
+			name:  "Hub cluster with COO installed",
 			isHub: true,
-			options: Options{
-				Platform: PlatformOptions{
-					Enabled: true,
-					AnalyticsOptions: AnalyticsOptions{
-						IncidentDetection: IncidentDetection{
-							Enabled: true,
-						},
-					},
-				},
-			},
-			expectedSkipInstall: true,
-		},
-		{
-			name:                "Hub cluster with no features enabled",
-			isHub:               true,
-			options:             Options{},
-			expectedSkipInstall: false,
-		},
-		{
-			name:  "Hub cluster with COO installed and incident detection enabled",
-			isHub: true,
-			options: Options{
-				Platform: PlatformOptions{
-					Enabled: true,
-					AnalyticsOptions: AnalyticsOptions{
-						IncidentDetection: IncidentDetection{
-							Enabled: true,
-						},
-					},
-				},
-			},
 			subscription: &operatorv1alpha1.Subscription{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      cooSubscriptionName,
@@ -87,21 +44,11 @@ func TestSkipInstallCOO(t *testing.T) {
 					Channel: cooSubscriptionChannel,
 				},
 			},
-			expectedSkipInstall: false,
+			expectedResult: false,
 		},
 		{
 			name:  "Hub cluster with COO installed with multicluster-observability-addon release label",
 			isHub: true,
-			options: Options{
-				Platform: PlatformOptions{
-					Enabled: true,
-					AnalyticsOptions: AnalyticsOptions{
-						IncidentDetection: IncidentDetection{
-							Enabled: true,
-						},
-					},
-				},
-			},
 			subscription: &operatorv1alpha1.Subscription{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      cooSubscriptionName,
@@ -114,21 +61,11 @@ func TestSkipInstallCOO(t *testing.T) {
 					Channel: cooSubscriptionChannel,
 				},
 			},
-			expectedSkipInstall: true,
+			expectedResult: true,
 		},
 		{
 			name:  "Hub cluster with wrong version of COO installed and incident detection enabled",
 			isHub: true,
-			options: Options{
-				Platform: PlatformOptions{
-					Enabled: true,
-					AnalyticsOptions: AnalyticsOptions{
-						IncidentDetection: IncidentDetection{
-							Enabled: true,
-						},
-					},
-				},
-			},
 			subscription: &operatorv1alpha1.Subscription{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      cooSubscriptionName,
@@ -138,21 +75,8 @@ func TestSkipInstallCOO(t *testing.T) {
 					Channel: "wrong-channel",
 				},
 			},
-			expectedSkipInstall: false,
-			expectedErrMsg:      errInvalidSubscriptionChannel.Error(),
-		},
-		{
-			name:  "Hub cluster with metrics enabled but not incident detection",
-			isHub: true,
-			options: Options{
-				Platform: PlatformOptions{
-					Enabled: true,
-					Metrics: MetricsOptions{
-						CollectionEnabled: true,
-					},
-				},
-			},
-			expectedSkipInstall: false,
+			expectedResult: false,
+			expectedErrMsg: errInvalidSubscriptionChannel.Error(),
 		},
 	}
 
@@ -165,14 +89,14 @@ func TestSkipInstallCOO(t *testing.T) {
 				k8sClientBuilder = k8sClientBuilder.WithObjects(tc.subscription)
 			}
 
-			result, err := InstallCOO(context.Background(), k8sClientBuilder.Build(), logr.Discard(), tc.isHub, tc.options)
+			result, err := InstallCOO(context.Background(), k8sClientBuilder.Build(), logr.Discard(), tc.isHub)
 
 			if tc.expectedErrMsg != "" {
 				assert.EqualError(t, err, tc.expectedErrMsg)
 				return
 			}
 			assert.NoError(t, err)
-			assert.Equal(t, tc.expectedSkipInstall, result)
+			assert.Equal(t, tc.expectedResult, result)
 		})
 	}
 }

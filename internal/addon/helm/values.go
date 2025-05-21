@@ -10,7 +10,6 @@ import (
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
 	analytics "github.com/stolostron/multicluster-observability-addon/internal/analytics"
-	ihandlers "github.com/stolostron/multicluster-observability-addon/internal/analytics/incident-detection/handlers"
 	imanifests "github.com/stolostron/multicluster-observability-addon/internal/analytics/incident-detection/manifests"
 	lhandlers "github.com/stolostron/multicluster-observability-addon/internal/logging/handlers"
 	lmanifests "github.com/stolostron/multicluster-observability-addon/internal/logging/manifests"
@@ -32,12 +31,19 @@ var (
 )
 
 type HelmChartValues struct {
-	Enabled    bool                      `json:"enabled"`
-	InstallCOO bool                      `json:"installCOO"`
-	Metrics    *mmanifests.MetricsValues `json:"metrics,omitempty"`
-	Logging    *lmanifests.LoggingValues `json:"logging,omitempty"`
-	Tracing    *tmanifests.TracingValues `json:"tracing,omitempty"`
-	Analytics  analytics.AnalyticsValues `json:"analytics"`
+	Enabled   bool                      `json:"enabled"`
+	Metrics   *mmanifests.MetricsValues `json:"metrics,omitempty"`
+	Logging   *lmanifests.LoggingValues `json:"logging,omitempty"`
+	Tracing   *tmanifests.TracingValues `json:"tracing,omitempty"`
+	Analytics analytics.AnalyticsValues `json:"analytics"`
+	COO       *COOValues                `json:"coo,omitempty"`
+}
+
+type COOValues struct {
+	Enabled           bool                                `json:"enabled"`
+	InstallCOO        bool                                `json:"installCOO"`
+	Metrics           *mmanifests.UIValues                `json:"metrics,omitempty"`
+	IncidentDetection *imanifests.IncidentDetectionValues `json:"incidentDetection,omitempty"`
 }
 
 func GetValuesFunc(ctx context.Context, k8s client.Client, logger logr.Logger) addonfactory.GetValuesFunc {
@@ -69,7 +75,7 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, logger logr.Logger) a
 			Enabled: true,
 		}
 
-		userValues.InstallCOO, err = addon.InstallCOO(ctx, k8s, logger, isHubCluster(cluster), opts)
+		userValues.COO, err = getCOOValues(ctx, k8s, logger, cluster, opts)
 		if err != nil {
 			return nil, err
 		}
@@ -88,8 +94,6 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, logger logr.Logger) a
 		if err != nil {
 			return nil, err
 		}
-
-		userValues.Analytics.IncidentDetectionValues = getIncidentDetectionValues(ctx, k8s, mcAddon, opts)
 
 		return addonfactory.JsonStructToValues(userValues)
 	}
@@ -148,15 +152,6 @@ func getTracingValues(ctx context.Context, k8s client.Client, cluster *clusterv1
 	return &tracing, nil
 }
 
-func getIncidentDetectionValues(ctx context.Context, k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, opts addon.Options) *imanifests.IncidentDetectionValues {
-	if !opts.Platform.AnalyticsOptions.IncidentDetection.Enabled {
-		return nil
-	}
-
-	incDecOptions := ihandlers.BuildOptions(ctx, k8s, mcAddon, opts.Platform.AnalyticsOptions.IncidentDetection)
-	return imanifests.BuildValues(incDecOptions)
-}
-
 func getAddOnDeploymentConfig(ctx context.Context, k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAddOn) (*addonapiv1alpha1.AddOnDeploymentConfig, error) {
 	aodc := &addonapiv1alpha1.AddOnDeploymentConfig{}
 	keys := common.GetObjectKeys(mcAddon.Status.ConfigReferences, addonutils.AddOnDeploymentConfigGVR.Group, addon.AddonDeploymentConfigResource)
@@ -179,4 +174,30 @@ func isHubCluster(cluster *clusterv1.ManagedCluster) bool {
 
 func supportedKubeVendors(cluster *clusterv1.ManagedCluster) bool {
 	return cluster.Labels[clusterinfov1beta1.LabelKubeVendor] == string(clusterinfov1beta1.KubeVendorOpenShift)
+}
+
+func getCOOValues(ctx context.Context, k8s client.Client, logger logr.Logger, cluster *clusterv1.ManagedCluster, opts addon.Options) (*COOValues, error) {
+	installCOO, err := addon.InstallCOO(ctx, k8s, logger, isHubCluster(cluster))
+	if err != nil {
+		return nil, err
+	}
+
+	metrics := mmanifests.EnableUI(opts.Platform.Metrics, isHubCluster(cluster))
+
+	incidentDetection := imanifests.EnableUI(opts.Platform.AnalyticsOptions.IncidentDetection)
+
+	enabled := false
+	if metrics != nil {
+		enabled = enabled || metrics.Enabled
+	}
+	if incidentDetection != nil {
+		enabled = enabled || incidentDetection.Enabled
+	}
+
+	return &COOValues{
+		Enabled:           enabled,
+		InstallCOO:        installCOO,
+		Metrics:           metrics,
+		IncidentDetection: incidentDetection,
+	}, nil
 }

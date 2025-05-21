@@ -1,4 +1,4 @@
-{{- if .Values.installCOO }}
+{{- if .Values.enabled }}
 apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
 metadata:
@@ -6,8 +6,8 @@ metadata:
   namespace: openshift-cluster-observability-operator
   labels:
     operators.coreos.com/cluster-observability-operator.openshift-cluster-observability: ''
-    app: {{ template "mcoahelm.name" . }}
-    chart: {{ template "mcoahelm.chart" . }}
+    app: {{ template "coohelm.name" . }}
+    chart: {{ template "coohelm.chart" . }}
     release: {{ .Release.Name }}
 spec:
   channel: stable

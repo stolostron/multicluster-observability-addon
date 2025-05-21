@@ -1,0 +1,14 @@
+
+nameOverride: null
+
+installCOO: false
+
+metrics:
+  acm:
+    enabled: true
+  perses:
+    enabled: true
+
+
+incidentDetection:
+  enabled: true
