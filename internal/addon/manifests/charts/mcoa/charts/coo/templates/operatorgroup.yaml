@@ -1,4 +1,4 @@
-{{- if .Values.installCOO }}
+{{- if .Values.enabled }}
 apiVersion: operators.coreos.com/v1
 kind: OperatorGroup
 metadata:
@@ -7,8 +7,8 @@ metadata:
   annotations:
     olm.providedAPIs: Alertmanager.v1.monitoring.rhobs,AlertmanagerConfig.v1alpha1.monitoring.rhobs,MonitoringStack.v1alpha1.monitoring.rhobs,PodMonitor.v1.monitoring.rhobs,Probe.v1.monitoring.rhobs,Prometheus.v1.monitoring.rhobs,PrometheusAgent.v1alpha1.monitoring.rhobs,PrometheusRule.v1.monitoring.rhobs,ScrapeConfig.v1alpha1.monitoring.rhobs,ServiceMonitor.v1.monitoring.rhobs,ThanosQuerier.v1alpha1.monitoring.rhobs,ThanosRuler.v1.monitoring.rhobs,UIPlugin.v1alpha1.observability.openshift.io
   labels:
-    app: {{ template "mcoahelm.name" . }}
-    chart: {{ template "mcoahelm.chart" . }}
+    app: {{ template "coohelm.name" . }}
+    chart: {{ template "coohelm.chart" . }}
     release: {{ .Release.Name }}
 spec:
   upgradeStrategy: Default

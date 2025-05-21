@@ -51,7 +51,7 @@ const (
 type MetricsOptions struct {
 	CollectionEnabled bool
 	HubEndpoint       *url.URL
-	UI                bool
+	UI                MetricsUIOptions
 }
 
 type IncidentDetection struct {
@@ -181,7 +181,9 @@ func BuildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Opti
 			// Observability UI Options
 		case KeyObservabilityUIMetrics:
 			if keyvalue.Value == string(UIPluginV1alpha1) && opts.Platform.Metrics.CollectionEnabled {
-				opts.Platform.Metrics.UI = true
+				opts.Platform.Metrics.UI.Enabled = true
+				opts.Platform.Metrics.UI.ACM.Enabled = true
+				opts.Platform.Metrics.UI.Perses.Enabled = true
 			}
 		}
 	}

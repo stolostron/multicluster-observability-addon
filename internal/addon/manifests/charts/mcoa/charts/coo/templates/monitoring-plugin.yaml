@@ -1,21 +1,27 @@
-{{- if and .Values.platformEnabled .Values.uiEnabled}}
+{{- if .Values.enabled }}
 apiVersion: observability.openshift.io/v1alpha1
 kind: UIPlugin
 metadata:
   name: monitoring
   labels:
-    app: {{ template "metricshelm.name" . }}
-    chart: {{ template "metricshelm.chart" . }}
+    app: {{ template "coohelm.name" . }}
+    chart: {{ template "coohelm.chart" . }}
     release: {{ .Release.Name }}
 spec:
-  type: Monitoring
   monitoring:
+{{- if .Values.metrics.enabled }}
     acm:
-      enabled: {{ .Values.ui.acm.enabled }}
+      enabled: {{ .Values.metrics.acm.enabled }}
       alertmanager:
         url: 'https://alertmanager.open-cluster-management-observability.svc:9095'
       thanosQuerier:
         url: 'https://rbac-query-proxy.open-cluster-management-observability.svc:8443'
     perses:
-      enabled: {{ .Values.ui.perses.enabled }}
+      enabled: {{ .Values.metrics.perses.enabled }}
+{{- end }}
+{{- if .Values.incidentDetection.enabled }}
+    incidents:
+      enabled: true
+{{- end }}
+  type: Monitoring
 {{- end }}
