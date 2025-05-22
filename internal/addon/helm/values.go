@@ -10,8 +10,8 @@ import (
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
-	analytics "github.com/stolostron/multicluster-observability-addon/internal/analytics"
-	imanifests "github.com/stolostron/multicluster-observability-addon/internal/analytics/incident-detection/manifests"
+	chandlers "github.com/stolostron/multicluster-observability-addon/internal/coo/handlers"
+	cmanifests "github.com/stolostron/multicluster-observability-addon/internal/coo/manifests"
 	lhandlers "github.com/stolostron/multicluster-observability-addon/internal/logging/handlers"
 	lmanifests "github.com/stolostron/multicluster-observability-addon/internal/logging/manifests"
 	mhandlers "github.com/stolostron/multicluster-observability-addon/internal/metrics/handlers"
@@ -32,19 +32,11 @@ var (
 )
 
 type HelmChartValues struct {
-	Enabled   bool                      `json:"enabled"`
-	Metrics   *mmanifests.MetricsValues `json:"metrics,omitempty"`
-	Logging   *lmanifests.LoggingValues `json:"logging,omitempty"`
-	Tracing   *tmanifests.TracingValues `json:"tracing,omitempty"`
-	Analytics analytics.AnalyticsValues `json:"analytics"`
-	COO       *COOValues                `json:"coo,omitempty"`
-}
-
-type COOValues struct {
-	Enabled           bool                                `json:"enabled"`
-	InstallCOO        bool                                `json:"installCOO"`
-	Metrics           *mmanifests.UIValues                `json:"metrics,omitempty"`
-	IncidentDetection *imanifests.IncidentDetectionValues `json:"incidentDetection,omitempty"`
+	Enabled bool                      `json:"enabled"`
+	Metrics *mmanifests.MetricsValues `json:"metrics,omitempty"`
+	Logging *lmanifests.LoggingValues `json:"logging,omitempty"`
+	Tracing *tmanifests.TracingValues `json:"tracing,omitempty"`
+	COO     *cmanifests.COOValues     `json:"coo,omitempty"`
 }
 
 func GetValuesFunc(ctx context.Context, k8s client.Client, logger logr.Logger) addonfactory.GetValuesFunc {
@@ -76,11 +68,6 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, logger logr.Logger) a
 			Enabled: true,
 		}
 
-		userValues.COO, err = getCOOValues(ctx, k8s, logger, cluster, opts)
-		if err != nil {
-			return nil, err
-		}
-
 		userValues.Metrics, err = getMonitoringValues(ctx, k8s, logger, cluster, mcAddon, opts)
 		if err != nil {
 			return nil, err
@@ -92,6 +79,11 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, logger logr.Logger) a
 		}
 
 		userValues.Tracing, err = getTracingValues(ctx, k8s, cluster, mcAddon, opts)
+		if err != nil {
+			return nil, err
+		}
+
+		userValues.COO, err = getCOOValues(ctx, k8s, logger, cluster, opts)
 		if err != nil {
 			return nil, err
 		}
@@ -153,6 +145,15 @@ func getTracingValues(ctx context.Context, k8s client.Client, cluster *clusterv1
 	return &tracing, nil
 }
 
+func getCOOValues(ctx context.Context, k8s client.Client, logger logr.Logger, cluster *clusterv1.ManagedCluster, opts addon.Options) (*cmanifests.COOValues, error) {
+	installCOO, err := chandlers.InstallCOO(ctx, k8s, logger, isHubCluster(cluster))
+	if err != nil {
+		return nil, err
+	}
+
+	return cmanifests.BuildValues(opts, installCOO, isHubCluster(cluster)), nil
+}
+
 func getAddOnDeploymentConfig(ctx context.Context, k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAddOn) (*addonapiv1alpha1.AddOnDeploymentConfig, error) {
 	aodc := &addonapiv1alpha1.AddOnDeploymentConfig{}
 	keys := common.GetObjectKeys(mcAddon.Status.ConfigReferences, addonutils.AddOnDeploymentConfigGVR.Group, addoncfg.AddonDeploymentConfigResource)
@@ -175,30 +176,4 @@ func isHubCluster(cluster *clusterv1.ManagedCluster) bool {
 
 func supportedKubeVendors(cluster *clusterv1.ManagedCluster) bool {
 	return cluster.Labels[clusterinfov1beta1.LabelKubeVendor] == string(clusterinfov1beta1.KubeVendorOpenShift)
-}
-
-func getCOOValues(ctx context.Context, k8s client.Client, logger logr.Logger, cluster *clusterv1.ManagedCluster, opts addon.Options) (*COOValues, error) {
-	installCOO, err := addon.InstallCOO(ctx, k8s, logger, isHubCluster(cluster))
-	if err != nil {
-		return nil, err
-	}
-
-	metrics := mmanifests.EnableUI(opts.Platform.Metrics, isHubCluster(cluster))
-
-	incidentDetection := imanifests.EnableUI(opts.Platform.AnalyticsOptions.IncidentDetection)
-
-	enabled := false
-	if metrics != nil {
-		enabled = enabled || metrics.Enabled
-	}
-	if incidentDetection != nil {
-		enabled = enabled || incidentDetection.Enabled
-	}
-
-	return &COOValues{
-		Enabled:           enabled,
-		InstallCOO:        installCOO,
-		Metrics:           metrics,
-		IncidentDetection: incidentDetection,
-	}, nil
 }
