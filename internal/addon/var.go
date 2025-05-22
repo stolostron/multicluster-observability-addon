@@ -46,7 +46,9 @@ const (
 	uipProbeKey       = "isAvailable"
 	uipProbePath      = ".status.conditions[?(@.type==\"Available\")].status"
 
-	DefaultStackPrefix = "default-stack-instance"
+	DefaultStackPrefix            = "default-stack-instance"
+	PlacementRefNameLabelKey      = "placement-ref-name"
+	PlacementRefNamespaceLabelKey = "placement-ref-namespace"
 )
 
 var (

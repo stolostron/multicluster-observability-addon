@@ -7,9 +7,13 @@ import (
 	"github.com/go-logr/logr"
 	lokiv1 "github.com/grafana/loki/operator/api/loki/v1"
 	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
+	prometheusalpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
+	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
 	lhandlers "github.com/stolostron/multicluster-observability-addon/internal/logging/handlers"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
+	mresources "github.com/stolostron/multicluster-observability-addon/internal/metrics/resource"
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
@@ -38,6 +42,21 @@ var mcoaAODCPredicate = builder.WithPredicates(predicate.Funcs{
 	UpdateFunc:  func(e event.UpdateEvent) bool { return validateAODC(e.ObjectOld.GetNamespace(), e.ObjectOld.GetName()) },
 	DeleteFunc:  func(e event.DeleteEvent) bool { return validateAODC(e.Object.GetNamespace(), e.Object.GetName()) },
 	GenericFunc: func(e event.GenericEvent) bool { return validateAODC(e.Object.GetNamespace(), e.Object.GetName()) },
+})
+
+func cmaoPlacementsChanged(old, new client.Object) bool {
+	oldCMAO := old.(*addonv1alpha1.ClusterManagementAddOn)
+	newCMAO := new.(*addonv1alpha1.ClusterManagementAddOn)
+	return !equality.Semantic.DeepEqual(oldCMAO.Spec.InstallStrategy.Placements, newCMAO.Spec.InstallStrategy.Placements)
+}
+
+var cmaoPredicate = builder.WithPredicates(predicate.Funcs{
+	CreateFunc: func(e event.CreateEvent) bool { return e.Object.GetName() == addon.Name },
+	UpdateFunc: func(e event.UpdateEvent) bool {
+		return e.ObjectNew.GetName() == addon.Name && cmaoPlacementsChanged(e.ObjectOld, e.ObjectNew)
+	},
+	DeleteFunc:  func(e event.DeleteEvent) bool { return false },
+	GenericFunc: func(e event.GenericEvent) bool { return false },
 })
 
 type ResourceCreatorManager struct {
@@ -107,8 +126,6 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, err
 	}
 
-	// TODO(JoaoBraveCoding): Delete flow for when a placement is removed
-
 	key = client.ObjectKey{Name: addon.Name}
 	cmao := &addonv1alpha1.ClusterManagementAddOn{}
 	if err = r.Get(ctx, key, cmao); err != nil {
@@ -116,11 +133,34 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 
 	objects := []client.Object{}
-	objs, err := lhandlers.BuildDefaultStackResources(ctx, r.Client, cmao, opts.Platform.Logs, opts.UserWorkloads.Logs, opts.HubHostname)
+
+	// Reconcile metrics resources
+	objs := []common.DefaultConfig{}
+	images, err := mconfig.GetImageOverrides(ctx, r.Client)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to get image overrides: %w", err)
+	}
+
+	mdefault := mresources.DefaultStackResources{
+		Client:             r.Client,
+		CMAO:               cmao,
+		AddonOptions:       opts,
+		Logger:             r.Log,
+		PrometheusImage:    images.Prometheus,
+		KubeRBACProxyImage: images.KubeRBACProxy,
+	}
+
+	mDefaultConfig, err := mdefault.Reconcile(ctx)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
-	objects = append(objects, objs...)
+	objs = append(objs, mDefaultConfig...)
+
+	lObjs, err := lhandlers.BuildDefaultStackResources(ctx, r.Client, cmao, opts.Platform.Logs, opts.UserWorkloads.Logs, opts.HubHostname)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	objects = append(objects, lObjs...)
 
 	// SSA the objects rendered
 	for _, obj := range objects {
@@ -136,6 +176,18 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		}
 	}
 
+	if err := common.EnsureAddonConfig(ctx, r.Log, r.Client, objs); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to patching default config to clustermanageraddon: %w", err)
+	}
+
+	cmao = &addonv1alpha1.ClusterManagementAddOn{}
+	if err := r.Get(ctx, types.NamespacedName{Name: addon.Name}, cmao); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to get ClusterManagementAddOn: %w", err)
+	}
+	if err := common.DeleteOrphanResources(ctx, r.Log, r.Client, cmao, &prometheusalpha1.PrometheusAgentList{}); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to clean orphan resources: %w", err)
+	}
+
 	return ctrl.Result{}, nil
 }
 
@@ -143,9 +195,14 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 func (r *ResourceCreatorReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&addonv1alpha1.AddOnDeploymentConfig{}, mcoaAODCPredicate, builder.OnlyMetadata).
+		// Trigger reconciliations due to changes in Placements
+		Watches(&addonv1alpha1.ClusterManagementAddOn{}, r.enqueueAODC(), cmaoPredicate).
+		// Trigger reconciliations if the pool of ManagedClusters changes
 		Watches(&clusterv1.ManagedCluster{}, r.enqueueAODC()).
-		Watches(&loggingv1.ClusterLogForwarder{}, r.enqueueAODCIfResourceOwned()).
-		Watches(&lokiv1.LokiStack{}, r.enqueueAODCIfResourceOwned()).
+		// Trigger reconciliations if user change a PrometheusAgent instance
+		Watches(&prometheusalpha1.PrometheusAgent{}, r.enqueueDefaultResources()).
+		Watches(&loggingv1.ClusterLogForwarder{}, r.enqueueDefaultResources()).
+		Watches(&lokiv1.LokiStack{}, r.enqueueDefaultResources()).
 		Complete(r)
 }
 
@@ -162,18 +219,9 @@ func (r *ResourceCreatorReconciler) enqueueAODC() handler.EventHandler {
 	})
 }
 
-func (r *ResourceCreatorReconciler) enqueueAODCIfResourceOwned() handler.EventHandler {
+func (r *ResourceCreatorReconciler) enqueueDefaultResources() handler.EventHandler {
 	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
-		cmao := &addonv1alpha1.ClusterManagementAddOn{
-			TypeMeta: metav1.TypeMeta{
-				Kind:       "ClusterManagementAddOn",
-				APIVersion: addonv1alpha1.GroupVersion.String(),
-			},
-			ObjectMeta: metav1.ObjectMeta{
-				Name: addon.Name,
-			},
-		}
-		hasOwnerRef, err := controllerutil.HasOwnerReference(obj.GetOwnerReferences(), cmao, r.Client.Scheme())
+		hasOwnerRef, err := controllerutil.HasOwnerReference(obj.GetOwnerReferences(), common.NewMCOAClusterManagementAddOn(), r.Client.Scheme())
 		if err != nil {
 			r.Log.Error(err, "failed to check owner reference")
 			return []reconcile.Request{}

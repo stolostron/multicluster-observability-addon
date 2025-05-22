@@ -7,8 +7,11 @@ metadata:
   annotations:
     operator.prometheus.io/controller-id: {{ .Values.prometheusControllerID }}
   labels:
-    app.kubernetes.io/component: platform-metrics-collector
-    {{ include "metricshelm.labels" . | nindent 4 }}
+    {{- $incomingLabels := .Values.platform.prometheusAgent.labels }}
+    {{- $metricsHelmLabels := fromYaml (include "metricshelm.labels" $) }}
+    {{- $customLabel := dict "app.kubernetes.io/component" $.Values.platform.component }}
+    {{- $mergedLabels := merge $incomingLabels $metricsHelmLabels $customLabel }}
+    {{- toYaml $mergedLabels | nindent 4 }}
 spec:
-{{- fromJson .Values.platform.prometheusAgentSpec | toYaml | nindent 2 }}
+{{- fromJson .Values.platform.prometheusAgent.data | toYaml | nindent 2 }}
 {{- end }}

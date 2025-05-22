@@ -1,11 +1,20 @@
 package config
 
-import "k8s.io/apimachinery/pkg/types"
+import (
+	"context"
+	"errors"
+	"fmt"
+
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+)
 
 const (
+	AddonName                       = "multicluster-observability-addon"
 	PrometheusControllerID          = "acm-observability"
-	PlatformMetricsCollectorApp     = "acm-platform-metrics-collector"
-	UserWorkloadMetricsCollectorApp = "acm-user-workload-metrics-collector"
+	PlatformMetricsCollectorApp     = "platform-metrics-collector"
+	UserWorkloadMetricsCollectorApp = "user-workload-metrics-collector"
 	HubCASecretName                 = "observability-managed-cluster-certs"
 	ClientCertSecretName            = "observability-controller-open-cluster-management.io-observability-signer-client-cert"
 	PrometheusCAConfigMapName       = "prometheus-server-ca"
@@ -13,17 +22,27 @@ const (
 
 	ManagedClusterLabelClusterID = "clusterID"
 
+	// Monitoring resources (meta monitoring)
+	PlatformRBACProxyTLSSecret     = "prometheus-agent-platform-kube-rbac-proxy-tls"
+	UserWorkloadRBACProxyTLSSecret = "prometheus-agent-user-workload-kube-rbac-proxy-tls"
+	RBACProxyPort                  = 9092
+
+	// Standard metrics label names
 	ClusterNameMetricLabel           = "cluster"
 	ClusterIDMetricLabel             = "clusterID"
 	ManagementClusterNameMetricLabel = "managementcluster"
 	ManagementClusterIDMetricLabel   = "managementclusterID"
 
+	// Hypershift
 	LocalManagedClusterLabel              = "local-cluster"
 	HypershiftAddonStateLabel             = "feature.open-cluster-management.io/addon-hypershift-addon"
 	HypershiftEtcdServiceMonitorName      = "etcd"
 	HypershiftApiServerServiceMonitorName = "kube-apiserver"
 	AcmEtcdServiceMonitorName             = "acm-etcd"
 	AcmApiServerServiceMonitorName        = "acm-kube-apiserver"
+
+	RemoteWriteCfgName = "acm-observability"
+	ScrapeClassCfgName = "ocp-monitoring"
 )
 
 var (
@@ -39,8 +58,47 @@ var (
 	ApiserverHcpUserWorkloadPrometheusMatchLabels = map[string]string{
 		"app.kubernetes.io/component": "apiserver-hcp-user-workload-metrics-collector",
 	}
-	ImagesConfigMap = types.NamespacedName{
+
+	ImagesConfigMapObjKey = types.NamespacedName{
 		Name:      "images-list",
 		Namespace: "open-cluster-management-observability",
 	}
+
+	ErrMissingImageOverride = errors.New("missing image override")
 )
+
+type ImageOverrides struct {
+	PrometheusOperator       string
+	PrometheusConfigReloader string
+	KubeRBACProxy            string
+	Prometheus               string
+}
+
+func GetImageOverrides(ctx context.Context, c client.Client) (ImageOverrides, error) {
+	ret := ImageOverrides{}
+	// Get the ACM images overrides
+	imagesList := &corev1.ConfigMap{}
+	if err := c.Get(ctx, ImagesConfigMapObjKey, imagesList); err != nil {
+		return ret, err
+	}
+
+	for key, value := range imagesList.Data {
+		switch key {
+		case "prometheus_operator":
+			ret.PrometheusOperator = value
+		case "prometheus_config_reloader":
+			ret.PrometheusConfigReloader = value
+		case "kube_rbac_proxy":
+			ret.KubeRBACProxy = value
+		case "prometheus":
+			ret.Prometheus = value
+		default:
+		}
+	}
+
+	if ret.PrometheusOperator == "" || ret.PrometheusConfigReloader == "" || ret.KubeRBACProxy == "" || ret.Prometheus == "" {
+		return ret, fmt.Errorf("%w: %+v", ErrMissingImageOverride, ret)
+	}
+
+	return ret, nil
+}

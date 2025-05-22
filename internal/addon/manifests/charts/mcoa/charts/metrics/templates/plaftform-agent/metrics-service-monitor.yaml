@@ -1,0 +1,23 @@
+{{- if .Values.platformEnabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ .Values.platform.appName }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/component: {{ .Values.platform.component }}
+    {{ include "metricshelm.labels" . | nindent 4 }}
+spec:
+  endpoints:
+  - interval: 30s
+    port: metrics
+    scheme: https
+    bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+    tlsConfig:
+      caFile: /etc/prometheus/configmaps/serving-certs-ca-bundle/service-ca.crt
+      serverName: "{{ .Values.platform.appName }}.{{ .Release.Namespace }}.svc"
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: {{ .Values.platform.component }}
+      app.kubernetes.io/name: {{ .Values.platform.appName }}
+{{- end }}

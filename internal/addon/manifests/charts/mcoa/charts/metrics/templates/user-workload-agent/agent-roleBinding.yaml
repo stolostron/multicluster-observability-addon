@@ -4,7 +4,7 @@ kind: ClusterRoleBinding
 metadata:
   name: {{ .Values.userWorkload.appName }}-rolebinding
   labels:
-    app.kubernetes.io/component: user-workload-metrics-collector
+    app.kubernetes.io/component: {{ .Values.userWorkload.component }}
     {{ include "metricshelm.labels" . | nindent 4 }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io

@@ -3,6 +3,7 @@ package metrics_test
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"slices"
 	"strings"
 	"testing"
@@ -17,9 +18,11 @@ import (
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/manifests"
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/resource"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -33,6 +36,7 @@ import (
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	fakeclient "sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 )
 
 func TestHelmBuild_Metrics_All(t *testing.T) {
@@ -61,13 +65,16 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				scrapeCfgs := common.FilterResourcesByLabelSelector[*prometheusalpha1.ScrapeConfig](objects, config.PlatformPrometheusMatchLabels)
 				assert.Len(t, scrapeCfgs, 2)
 				assert.Equal(t, config.PrometheusControllerID, scrapeCfgs[0].Annotations["operator.prometheus.io/controller-id"])
+				assert.GreaterOrEqual(t, len(agent[0].Spec.ScrapeConfigSelector.MatchLabels), 0)
+				scrapeConfigsSelector := labels.SelectorFromSet(labels.Set(agent[0].Spec.ScrapeConfigSelector.MatchLabels))
+				assert.True(t, scrapeConfigsSelector.Matches(labels.Set(scrapeCfgs[0].Labels)))
 				// ensure that recording rules are created
 				recordingRules := common.FilterResourcesByLabelSelector[*prometheusv1.PrometheusRule](objects, config.PlatformPrometheusMatchLabels)
 				assert.Len(t, recordingRules, 2)
 				assert.Equal(t, "openshift-monitoring/prometheus-operator", recordingRules[0].Annotations["operator.prometheus.io/controller-id"])
 				// ensure that the number of objects is correct
-				// 4 (prom operator) + 6 (agent) + 2 secrets (mTLS to hub) + 1 cm (prom ca) + 2 rule + 2 scrape config = 16
-				assert.Len(t, objects, 16)
+				// 4 (prom operator) + 5 (agent) + 2 secrets (mTLS to hub) + 1 cm (prom ca) + 2 rule + 2 scrape config = 16
+				assert.Len(t, objects, 26)
 				assert.Len(t, common.FilterResourcesByLabelSelector[*corev1.Secret](objects, nil), 2) // 2 secrets (mTLS to hub)
 			},
 		},
@@ -84,12 +91,14 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				scrapeCfgs := common.FilterResourcesByLabelSelector[*prometheusalpha1.ScrapeConfig](objects, config.UserWorkloadPrometheusMatchLabels)
 				assert.Len(t, scrapeCfgs, 2)
 				assert.Equal(t, config.PrometheusControllerID, scrapeCfgs[0].Annotations["operator.prometheus.io/controller-id"])
+				assert.GreaterOrEqual(t, len(agent[0].Spec.ScrapeConfigSelector.MatchLabels), 0)
+				scrapeConfigsSelector := labels.SelectorFromSet(labels.Set(agent[0].Spec.ScrapeConfigSelector.MatchLabels))
+				assert.True(t, scrapeConfigsSelector.Matches(labels.Set(scrapeCfgs[0].Labels)))
 				// ensure that recording rules are created
 				recordingRules := common.FilterResourcesByLabelSelector[*prometheusv1.PrometheusRule](objects, config.UserWorkloadPrometheusMatchLabels)
 				assert.Len(t, recordingRules, 2)
 				assert.Equal(t, "openshift-user-workload-monitoring/prometheus-operator", recordingRules[0].Annotations["operator.prometheus.io/controller-id"])
-
-				assert.Len(t, objects, 16)
+				assert.Len(t, objects, 26)
 				assert.Len(t, common.FilterResourcesByLabelSelector[*corev1.Secret](objects, nil), 2) // 2 secrets (mTLS to hub)
 			},
 		},
@@ -100,12 +109,13 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 	assert.NoError(t, prometheusalpha1.AddToScheme(scheme))
 	assert.NoError(t, prometheusv1.AddToScheme(scheme))
 	assert.NoError(t, clusterv1.AddToScheme(scheme))
+	assert.NoError(t, addonapiv1alpha1.AddToScheme(scheme))
 
 	installNamespace := "open-cluster-management-addon-observability"
 	hubNamespace := "open-cluster-management-observability"
 
 	// Add platform resources
-	defaultAgentResources := resource.DefaultPlaftformAgentResources(hubNamespace)
+	defaultAgentResources := []client.Object{}
 	platformScrapeConfig := &prometheusalpha1.ScrapeConfig{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       prometheusalpha1.ScrapeConfigsKind,
@@ -138,8 +148,6 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 	defaultAgentResources = append(defaultAgentResources, platformRules, platformRulesAdditional)
 
 	// Add user workload resources
-	defaultAgentResources = append(defaultAgentResources, resource.DefaultUserWorkloadAgentResources(hubNamespace)...)
-
 	configReferences := []addonapiv1alpha1.ConfigReference{}
 	for _, obj := range defaultAgentResources {
 		configReferences = append(configReferences, newConfigReference(obj))
@@ -174,22 +182,32 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 	managedCluster := addontesting.NewManagedCluster("cluster-1")
 	clientObjects = append(clientObjects, managedCluster)
 
+	// Setup the ClusterManagementAddon (needed to generate default resources)
+	cmao := newCMOA()
+	clientObjects = append(clientObjects, cmao)
+
 	// Images overrides configMap
 	imagesCM := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "images-list",
-			Namespace: hubNamespace,
+			Name:      config.ImagesConfigMapObjKey.Name,
+			Namespace: config.ImagesConfigMapObjKey.Namespace,
 		},
 		Data: map[string]string{
-			"prometheus_operator":        "registry.redhat.io/rhacm2/acm-prometheus-rhel9@sha256:4234bab8666dad7917cfcf10fdaed87b60e549ef6f8fb23d1760881d922e03e9",
-			"prometheus_config_reloader": "registry.redhat.io/rhacm2/acm-prometheus-config-reloader-rhel9@sha256:ab1632ec7aca478cf368e80ac9d98da3f2306a0cae8a4e9d29f95e149fd47ced",
-			"kube_rbac_proxy":            "registry.redhat.io/rhacm2/kube-rbac-proxy-rhel9@sha256:c60a1d52359493a41b2b6f820d11716d67290e9b83dc18c16039dbc6f120e5f2",
+			"prometheus_operator":        "quay.io/prometheus/operator",
+			"prometheus_config_reloader": "quay.io/prometheus/config-reloader",
+			"kube_rbac_proxy":            "quay.io/kube/rbac-proxy",
+			"prometheus":                 "quay.io/prometheus/prometheus",
 		},
 	}
 	clientObjects = append(clientObjects, imagesCM)
 
 	// Setup the fake k8s client
 	client := fakeclient.NewClientBuilder().
+		WithInterceptorFuncs(interceptor.Funcs{
+			Patch: func(ctx context.Context, clientww client.WithWatch, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
+				return clientww.Patch(ctx, obj, client.Merge, opts...)
+			},
+		}).
 		WithScheme(scheme).
 		WithObjects(clientObjects...).
 		Build()
@@ -200,6 +218,25 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 		addonfactory.NewAddOnDeploymentConfigGetter(addonClient),
 		addonfactory.ToAddOnCustomizedVariableValues,
 	)
+
+	// generate default agent resources
+	defaultStack := resource.DefaultStackResources{
+		Client:       client,
+		CMAO:         cmao,
+		AddonOptions: newAddonOptions(true, true),
+		Logger:       klog.Background(),
+	}
+
+	dc, err := defaultStack.Reconcile(context.Background())
+	require.NoError(t, err)
+	err = common.EnsureAddonConfig(context.Background(), klog.Background(), client, dc)
+	require.NoError(t, err)
+
+	promAgents := prometheusalpha1.PrometheusAgentList{}
+	err = client.List(context.Background(), &promAgents)
+	require.NoError(t, err)
+	require.Len(t, promAgents.Items, 2)
+	configReferences = append(configReferences, newConfigReference(&promAgents.Items[0]), newConfigReference(&promAgents.Items[1]))
 
 	// Register the addon for the managed cluster
 	managedClusterAddOn := addontesting.NewAddon("test", "cluster-1")
@@ -247,12 +284,13 @@ func TestHelmBuild_Metrics_HCP(t *testing.T) {
 	assert.NoError(t, prometheusv1.AddToScheme(scheme))
 	assert.NoError(t, clusterv1.AddToScheme(scheme))
 	assert.NoError(t, hyperv1.AddToScheme(scheme))
+	assert.NoError(t, addonapiv1alpha1.AddToScheme(scheme))
 
 	installNamespace := "open-cluster-management-addon-observability"
 	hubNamespace := "open-cluster-management-observability"
 
 	// Add user workload resources
-	defaultAgentResources := resource.DefaultUserWorkloadAgentResources(hubNamespace)
+	defaultAgentResources := []client.Object{}
 
 	configReferences := []addonapiv1alpha1.ConfigReference{}
 	for _, obj := range defaultAgentResources {
@@ -404,15 +442,24 @@ func TestHelmBuild_Metrics_HCP(t *testing.T) {
 			Namespace: hubNamespace,
 		},
 		Data: map[string]string{
-			"prometheus_operator":        "registry.redhat.io/rhacm2/acm-prometheus-rhel9@sha256:4234bab8666dad7917cfcf10fdaed87b60e549ef6f8fb23d1760881d922e03e9",
-			"prometheus_config_reloader": "registry.redhat.io/rhacm2/acm-prometheus-config-reloader-rhel9@sha256:ab1632ec7aca478cf368e80ac9d98da3f2306a0cae8a4e9d29f95e149fd47ced",
-			"kube_rbac_proxy":            "registry.redhat.io/rhacm2/kube-rbac-proxy-rhel9@sha256:c60a1d52359493a41b2b6f820d11716d67290e9b83dc18c16039dbc6f120e5f2",
+			"prometheus_operator":        "quay.io/prometheus/operator",
+			"prometheus_config_reloader": "quay.io/prometheus/config-reloader",
+			"kube_rbac_proxy":            "quay.io/kube/rbac-proxy",
+			"prometheus":                 "quay.io/prometheus/prometheus",
 		},
 	}
 	clientObjects = append(clientObjects, imagesCM)
 
+	cmao := newCMOA()
+	clientObjects = append(clientObjects, cmao)
+
 	// Setup the fake k8s client
 	client := fakeclient.NewClientBuilder().
+		WithInterceptorFuncs(interceptor.Funcs{
+			Patch: func(ctx context.Context, clientww client.WithWatch, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
+				return clientww.Patch(ctx, obj, client.Merge, opts...)
+			},
+		}).
 		WithScheme(scheme).
 		WithObjects(clientObjects...).
 		Build()
@@ -423,6 +470,24 @@ func TestHelmBuild_Metrics_HCP(t *testing.T) {
 		addonfactory.NewAddOnDeploymentConfigGetter(addonClient),
 		addonfactory.ToAddOnCustomizedVariableValues,
 	)
+
+	// generate default agent resources
+	defaultStack := resource.DefaultStackResources{
+		Client:       client,
+		CMAO:         cmao,
+		AddonOptions: newAddonOptions(true, true),
+		Logger:       klog.Background(),
+	}
+	dc, err := defaultStack.Reconcile(context.Background())
+	require.NoError(t, err)
+	err = common.EnsureAddonConfig(context.Background(), klog.Background(), client, dc)
+	require.NoError(t, err)
+
+	promAgents := prometheusalpha1.PrometheusAgentList{}
+	err = client.List(context.Background(), &promAgents)
+	require.NoError(t, err)
+	require.Len(t, promAgents.Items, 2)
+	configReferences = append(configReferences, newConfigReference(&promAgents.Items[0]), newConfigReference(&promAgents.Items[1]))
 
 	// Register the addon for the managed cluster
 	managedClusterAddOn := addontesting.NewAddon("test", "cluster-1")
@@ -450,8 +515,10 @@ func TestHelmBuild_Metrics_HCP(t *testing.T) {
 	scrapeConfigs := common.FilterResourcesByLabelSelector[*prometheusalpha1.ScrapeConfig](clientObjs, nil)
 	assert.Len(t, scrapeConfigs, 2)
 	serviceMonitors := common.FilterResourcesByLabelSelector[*prometheusv1.ServiceMonitor](clientObjs, nil)
+	assert.Len(t, serviceMonitors, 4) // 2 for hcps and 1 for meta monitoring
+	// keep only hcps serviceMonitors
+	serviceMonitors = slices.DeleteFunc(serviceMonitors, func(e *prometheusv1.ServiceMonitor) bool { return e.Namespace != "clusters-a" })
 	assert.Len(t, serviceMonitors, 2)
-	assert.Equal(t, "clusters-a", serviceMonitors[0].Namespace)
 	assert.Len(t, serviceMonitors[0].Spec.Endpoints, 1)
 	assert.Len(t, serviceMonitors[1].Spec.Endpoints, 1)
 }
@@ -492,11 +559,7 @@ func fakeGetValues(k8s client.Client, platformMetrics, userWorkloadMetrics bool)
 		mcAddon *addonapiv1alpha1.ManagedClusterAddOn,
 	) (addonfactory.Values, error) {
 		optionsBuilder := handlers.OptionsBuilder{
-			Client: k8s,
-			ImagesConfigMap: types.NamespacedName{
-				Name:      "images-list",
-				Namespace: "open-cluster-management-observability",
-			},
+			Client:         k8s,
 			RemoteWriteURL: "https://observatorium-api-open-cluster-management-observability.apps.sno-4xlarge-416-lqsr2.dev07.red-chesterfield.com/api/metrics/v1/default/api/v1/receive",
 		}
 
@@ -542,4 +605,42 @@ func runtimeToClientObjects(t *testing.T, objs []runtime.Object) []client.Object
 
 	}
 	return clientObjs
+}
+
+func newAddonOptions(platformEnabled, uwlEnabled bool) addon.Options {
+	hubEp, _ := url.Parse("http://remote-write.example.com")
+	return addon.Options{
+		Platform: addon.PlatformOptions{
+			Metrics: addon.MetricsOptions{
+				CollectionEnabled: platformEnabled,
+				HubEndpoint:       hubEp,
+			},
+		},
+		UserWorkloads: addon.UserWorkloadOptions{
+			Metrics: addon.MetricsOptions{
+				CollectionEnabled: uwlEnabled,
+			},
+		},
+	}
+}
+
+func newCMOA() *addonapiv1alpha1.ClusterManagementAddOn {
+	return &addonapiv1alpha1.ClusterManagementAddOn{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: addon.Name,
+			UID:  types.UID("test-cmao-uid"),
+		},
+		Spec: addonapiv1alpha1.ClusterManagementAddOnSpec{
+			InstallStrategy: addonapiv1alpha1.InstallStrategy{
+				Placements: []addonapiv1alpha1.PlacementStrategy{
+					{
+						PlacementRef: addonapiv1alpha1.PlacementRef{
+							Namespace: "placement-ns",
+							Name:      "placement-name",
+						},
+					},
+				},
+			},
+		},
+	}
 }

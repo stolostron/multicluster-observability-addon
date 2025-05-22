@@ -14,10 +14,8 @@ import (
 	imanifests "github.com/stolostron/multicluster-observability-addon/internal/analytics/incident-detection/manifests"
 	lhandlers "github.com/stolostron/multicluster-observability-addon/internal/logging/handlers"
 	lmanifests "github.com/stolostron/multicluster-observability-addon/internal/logging/manifests"
-	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	mhandlers "github.com/stolostron/multicluster-observability-addon/internal/metrics/handlers"
 	mmanifests "github.com/stolostron/multicluster-observability-addon/internal/metrics/manifests"
-	mresource "github.com/stolostron/multicluster-observability-addon/internal/metrics/resource"
 	thandlers "github.com/stolostron/multicluster-observability-addon/internal/tracing/handlers"
 	tmanifests "github.com/stolostron/multicluster-observability-addon/internal/tracing/manifests"
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
@@ -106,15 +104,10 @@ func getMonitoringValues(ctx context.Context, k8s client.Client, logger logr.Log
 		return nil, errMissingHubEndpoint
 	}
 
-	if err := mresource.DeployDefaultResourcesOnce(ctx, k8s, logger, mconfig.HubInstallNamespace); err != nil {
-		return nil, err
-	}
-
 	optsBuilder := mhandlers.OptionsBuilder{
-		Client:          k8s,
-		ImagesConfigMap: mconfig.ImagesConfigMap,
-		RemoteWriteURL:  opts.Platform.Metrics.HubEndpoint.JoinPath("/api/metrics/v1/default/api/v1/receive").String(),
-		Logger:          logger,
+		Client:         k8s,
+		RemoteWriteURL: opts.Platform.Metrics.HubEndpoint.String(),
+		Logger:         logger,
 	}
 	metricsOpts, err := optsBuilder.Build(ctx, mcAddon, cluster, opts.Platform.Metrics, opts.UserWorkloads.Metrics)
 	if err != nil {
