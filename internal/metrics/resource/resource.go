@@ -7,12 +7,17 @@ import (
 	"maps"
 
 	"github.com/go-logr/logr"
+	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	prometheusalpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	"k8s.io/apimachinery/pkg/api/equality"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/selection"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -36,39 +41,183 @@ type DefaultStackResources struct {
 func (d DefaultStackResources) Reconcile(ctx context.Context) ([]common.DefaultConfig, error) {
 	configs := []common.DefaultConfig{}
 
-	// Reconcile existing placements.
-	for _, placement := range d.CMAO.Spec.InstallStrategy.Placements {
-		if d.AddonOptions.Platform.Metrics.CollectionEnabled {
-			agent, err := d.reconcileAgent(ctx, placement.PlacementRef, false)
+	var mcoUID types.UID
+	for _, owner := range d.CMAO.OwnerReferences {
+		if owner.Controller != nil && *owner.Controller {
+			mcoUID = owner.UID
+			break
+		}
+	}
+
+	hasHostedClusters := config.HasHostedCLusters(ctx, d.Client, d.Logger)
+	if d.AddonOptions.Platform.Metrics.CollectionEnabled {
+		// Generate a specific agent config for each placement
+		for _, placement := range d.CMAO.Spec.InstallStrategy.Placements {
+			agentConfig, err := d.reconcileAgentForPlacement(ctx, placement.PlacementRef, false)
 			if err != nil {
-				return configs, fmt.Errorf("failed to reconcile platform prometheusAgent for placement %s: %w", placement.Name, err)
+				return configs, fmt.Errorf("failed to reconcile prometheusAgent %s for placement %s: %w", agentConfig.Config.Name, placement.Name, err)
 			}
-			configs = append(configs, common.DefaultConfig{
-				PlacementRef: placement.PlacementRef,
-				Config:       promAgentToAddonConfig(agent),
-			})
+			configs = append(configs, agentConfig)
 		}
 
-		if d.AddonOptions.UserWorkloads.Metrics.CollectionEnabled {
-			agent, err := d.reconcileAgent(ctx, placement.PlacementRef, true)
-			if err != nil {
-				return configs, fmt.Errorf("failed to reconcile user workloads prometheusAgent for placement %s: %w", placement.Name, err)
-			}
-			configs = append(configs, common.DefaultConfig{
-				PlacementRef: placement.PlacementRef,
-				Config:       promAgentToAddonConfig(agent),
-			})
+		// ScrapeConfigs are common to all placements
+		scConfigs, err := d.reconcileScrapeConfigs(ctx, mcoUID, false, hasHostedClusters)
+		if err != nil {
+			return configs, fmt.Errorf("failed to reconcile scrapeConfigs: %w", err)
 		}
+		configs = append(configs, scConfigs...)
+	}
+
+	if d.AddonOptions.UserWorkloads.Metrics.CollectionEnabled {
+		// Generate a specific agent config for each placement
+		for _, placement := range d.CMAO.Spec.InstallStrategy.Placements {
+			agentConfig, err := d.reconcileAgentForPlacement(ctx, placement.PlacementRef, true)
+			if err != nil {
+				return configs, fmt.Errorf("failed to reconcile prometheusAgent %s for placement %s: %w", agentConfig.Config.Name, placement.Name, err)
+			}
+			configs = append(configs, agentConfig)
+		}
+
+		// ScrapeConfigs are common to all placements
+		scConfigs, err := d.reconcileScrapeConfigs(ctx, mcoUID, true, hasHostedClusters)
+		if err != nil {
+			return configs, fmt.Errorf("failed to reconcile scrapeConfigs: %w", err)
+		}
+		configs = append(configs, scConfigs...)
+	}
+
+	if d.AddonOptions.Platform.Metrics.CollectionEnabled || d.AddonOptions.UserWorkloads.Metrics.CollectionEnabled {
+		// Platforn and uwl rules are processed the same way. They are common to all placements.
+		ruleConfigs, err := d.getPrometheusRules(ctx, mcoUID, hasHostedClusters)
+		if err != nil {
+			return configs, fmt.Errorf("failed to get prometheusRules: %w", err)
+		}
+		configs = append(configs, ruleConfigs...)
 	}
 
 	return configs, nil
 }
 
-func (d DefaultStackResources) reconcileAgent(ctx context.Context, placementRef addonv1alpha1.PlacementRef, isUWL bool) (*prometheusalpha1.PrometheusAgent, error) {
+func (d DefaultStackResources) reconcileScrapeConfigs(ctx context.Context, mcoUID types.UID, isUWL, hasHostedClusters bool) ([]common.DefaultConfig, error) {
+	labelVals := []string{}
+
+	if isUWL {
+		labelVals = append(labelVals, config.UserWorkloadPrometheusMatchLabels[config.ComponentK8sLabelKey])
+		// Avoid adding HCP's specific confs when not needed
+		if hasHostedClusters {
+			labelVals = append(labelVals, config.EtcdHcpUserWorkloadPrometheusMatchLabels[config.ComponentK8sLabelKey], config.ApiserverHcpUserWorkloadPrometheusMatchLabels[config.ComponentK8sLabelKey])
+		}
+	} else {
+		labelVals = append(labelVals, config.PlatformPrometheusMatchLabels[config.ComponentK8sLabelKey])
+	}
+
+	req, err := labels.NewRequirement(config.ComponentK8sLabelKey, selection.In, labelVals)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create labels requirement for scrapeConfigs: %w", err)
+	}
+	labelsSelector := labels.NewSelector().Add(*req)
+
+	scrapeConfigsList := &prometheusalpha1.ScrapeConfigList{}
+	if err = d.Client.List(ctx, scrapeConfigsList, client.InNamespace(addon.InstallNamespace), client.MatchingLabelsSelector{Selector: labelsSelector}); err != nil {
+		return nil, fmt.Errorf("failed to list scrapeConfigs: %w", err)
+	}
+
+	scrapeConfigs := []client.Object{}
+	for _, existingSC := range scrapeConfigsList.Items {
+		if !hasControllerUID(existingSC.OwnerReferences, mcoUID) {
+			continue
+		}
+
+		desiredSC := existingSC.DeepCopy()
+		desiredSC.ManagedFields = nil // required for patching with ssa
+
+		target := config.ScrapeClassPlatformTarget
+		if isUWL {
+			target = config.ScrapeClassUWLTarget
+		}
+
+		if !isUWL || (isUWL && len(desiredSC.Spec.StaticConfigs) == 0) {
+			// If a scrape class is already set for a uwl, don't override
+			desiredSC.Spec.ScrapeClassName = ptr.To(config.ScrapeClassCfgName)
+			desiredSC.Spec.Scheme = ptr.To("HTTPS")
+			desiredSC.Spec.StaticConfigs = []prometheusalpha1.StaticConfig{
+				{
+					Targets: []prometheusalpha1.Target{
+						prometheusalpha1.Target(target),
+					},
+				},
+			}
+		}
+
+		// SSA the objects rendered
+		if !equality.Semantic.DeepDerivative(desiredSC.Spec, existingSC.Spec) {
+			if err = common.ServerSideApply(ctx, d.Client, desiredSC, nil); err != nil { // object is controlled by MCO, no owner
+				return nil, fmt.Errorf("failed to patch with with server-side apply: %w", err)
+			}
+			d.Logger.Info("updated scrapeConfig with server-side apply", "namespace", desiredSC.Namespace, "name", desiredSC.Name)
+		}
+
+		scrapeConfigs = append(scrapeConfigs, desiredSC)
+	}
+
+	configs, err := d.generateConfigsForAllPlacements(scrapeConfigs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate default configs: %w", err)
+	}
+
+	return configs, nil
+}
+
+func (d DefaultStackResources) getPrometheusRules(ctx context.Context, mcoUID types.UID, hasHostedClusters bool) ([]common.DefaultConfig, error) {
+	if !d.AddonOptions.Platform.Metrics.CollectionEnabled && !d.AddonOptions.UserWorkloads.Metrics.CollectionEnabled {
+		return []common.DefaultConfig{}, nil
+	}
+	labelVals := []string{}
+	if d.AddonOptions.Platform.Metrics.CollectionEnabled {
+		labelVals = append(labelVals, config.PlatformPrometheusMatchLabels[config.ComponentK8sLabelKey])
+	}
+	if d.AddonOptions.UserWorkloads.Metrics.CollectionEnabled {
+		labelVals = append(labelVals, config.UserWorkloadPrometheusMatchLabels[config.ComponentK8sLabelKey])
+
+		// Avoid adding HCP's specific confs when not needed
+		if hasHostedClusters {
+			labelVals = append(labelVals, config.EtcdHcpUserWorkloadPrometheusMatchLabels[config.ComponentK8sLabelKey], config.ApiserverHcpUserWorkloadPrometheusMatchLabels[config.ComponentK8sLabelKey])
+		}
+	}
+
+	req, err := labels.NewRequirement(config.ComponentK8sLabelKey, selection.In, labelVals)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create labels requirement: %w", err)
+	}
+	labelSelector := labels.NewSelector().Add(*req)
+
+	promRuleList := &prometheusv1.PrometheusRuleList{}
+	if err = d.Client.List(ctx, promRuleList, client.InNamespace(addon.InstallNamespace), client.MatchingLabelsSelector{Selector: labelSelector}); err != nil {
+		return nil, fmt.Errorf("failed to list scrapeConfigs: %w", err)
+	}
+
+	promRules := []client.Object{}
+	for _, sc := range promRuleList.Items {
+		if !hasControllerUID(sc.OwnerReferences, mcoUID) {
+			continue
+		}
+
+		promRules = append(promRules, &sc)
+	}
+
+	configs, err := d.generateConfigsForAllPlacements(promRules)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate default configs for prometheusRules: %w", err)
+	}
+
+	return configs, nil
+}
+
+func (d DefaultStackResources) reconcileAgentForPlacement(ctx context.Context, placementRef addonv1alpha1.PlacementRef, isUWL bool) (common.DefaultConfig, error) {
 	// Get or create default
 	agent, err := d.getOrCreateDefaultAgent(ctx, placementRef, isUWL)
 	if err != nil {
-		return agent, fmt.Errorf("failed to get or create agent for placement %s: %w", placementRef.Name, err)
+		return common.DefaultConfig{}, fmt.Errorf("failed to get or create agent for placement %s: %w", placementRef.Name, err)
 	}
 
 	// SSA mendatory field values
@@ -88,13 +237,21 @@ func (d DefaultStackResources) reconcileAgent(ctx context.Context, placementRef 
 
 	// SSA the objects rendered
 	if !equality.Semantic.DeepDerivative(promSSA.Spec, agent.Spec) || !maps.Equal(promSSA.Labels, agent.Labels) {
-		if err := common.ServerSideApply(ctx, d.Client, promSSA, d.CMAO); err != nil {
-			return agent, fmt.Errorf("failed to server-side apply for %s/%s: %w", promSSA.Namespace, promSSA.Name, err)
+		if err = common.ServerSideApply(ctx, d.Client, promSSA, d.CMAO); err != nil {
+			return common.DefaultConfig{}, fmt.Errorf("failed to server-side apply for %s/%s: %w", promSSA.Namespace, promSSA.Name, err)
 		}
 		d.Logger.Info("updated prometheus agent with server-side apply", "namespace", promSSA.Namespace, "name", promSSA.Name)
 	}
 
-	return agent, nil
+	cfg, err := common.ObjectToAddonConfig(agent)
+	if err != nil {
+		return common.DefaultConfig{}, fmt.Errorf("failed to generate addon config for %s: %w", agent.Name, err)
+	}
+
+	return common.DefaultConfig{
+		PlacementRef: placementRef,
+		Config:       cfg,
+	}, nil
 }
 
 func (d DefaultStackResources) getOrCreateDefaultAgent(ctx context.Context, placementRef addonv1alpha1.PlacementRef, isUWL bool) (*prometheusalpha1.PrometheusAgent, error) {
@@ -136,19 +293,39 @@ func (d DefaultStackResources) getOrCreateDefaultAgent(ctx context.Context, plac
 	return agent, nil
 }
 
+func (d DefaultStackResources) generateConfigsForAllPlacements(object []client.Object) ([]common.DefaultConfig, error) {
+	// Compute configs to add to each placement
+	addonConfigs := []addonv1alpha1.AddOnConfig{}
+	for _, obj := range object {
+		cfg, err := common.ObjectToAddonConfig(obj)
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate addon config from object %s/%s: %w", obj.GetNamespace(), obj.GetName(), err)
+		}
+		addonConfigs = append(addonConfigs, cfg)
+	}
+
+	defaultConfigs := []common.DefaultConfig{}
+	for _, placement := range d.CMAO.Spec.InstallStrategy.Placements {
+		for _, cfg := range addonConfigs {
+			defaultConfigs = append(defaultConfigs, common.DefaultConfig{
+				PlacementRef: placement.PlacementRef,
+				Config:       cfg,
+			})
+		}
+	}
+
+	return defaultConfigs, nil
+}
+
 func makeAgentName(app, placement string) string {
 	return fmt.Sprintf("%s-%s-%s", addon.DefaultStackPrefix, app, placement)
 }
 
-func promAgentToAddonConfig(agent *prometheusalpha1.PrometheusAgent) addonv1alpha1.AddOnConfig {
-	return addonv1alpha1.AddOnConfig{
-		ConfigReferent: addonv1alpha1.ConfigReferent{
-			Namespace: agent.Namespace,
-			Name:      agent.Name,
-		},
-		ConfigGroupResource: addonv1alpha1.ConfigGroupResource{
-			Group:    prometheusalpha1.SchemeGroupVersion.Group,
-			Resource: prometheusalpha1.PrometheusAgentName,
-		},
+func hasControllerUID(ownerRefs []metav1.OwnerReference, uid types.UID) bool {
+	for _, owner := range ownerRefs {
+		if owner.Controller != nil && *owner.Controller && owner.UID == uid {
+			return true
+		}
 	}
+	return false
 }

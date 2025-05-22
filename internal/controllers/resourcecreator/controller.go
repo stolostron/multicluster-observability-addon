@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/go-logr/logr"
+	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	prometheusalpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
@@ -12,6 +13,7 @@ import (
 	mresources "github.com/stolostron/multicluster-observability-addon/internal/metrics/resource"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
@@ -55,6 +57,14 @@ var cmaoPredicate = builder.WithPredicates(predicate.Funcs{
 	DeleteFunc:  func(e event.DeleteEvent) bool { return false },
 	GenericFunc: func(e event.GenericEvent) bool { return false },
 })
+
+var partOfMCOALabelSelector = labels.SelectorFromSet(labels.Set{
+	"app.kubernetes.io/part-of": "multicluster-observability-addon",
+})
+
+var partOfMCOAPredicate = builder.WithPredicates(predicate.NewPredicateFuncs(func(obj client.Object) bool {
+	return partOfMCOALabelSelector.Matches(labels.Set(obj.GetLabels()))
+}))
 
 type ResourceCreatorManager struct {
 	mgr    *ctrl.Manager
@@ -176,6 +186,8 @@ func (r *ResourceCreatorReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(&clusterv1.ManagedCluster{}, r.enqueueAODC()).
 		// Trigger reconciliations if user change a PrometheusAgent instance
 		Watches(&prometheusalpha1.PrometheusAgent{}, r.enqueueDefaultResources()).
+		Watches(&prometheusalpha1.ScrapeConfig{}, r.enqueueDefaultResources(), partOfMCOAPredicate).
+		Watches(&prometheusv1.PrometheusRule{}, r.enqueueDefaultResources(), partOfMCOAPredicate).
 		Complete(r)
 }
 

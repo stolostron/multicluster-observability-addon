@@ -65,8 +65,8 @@ func makeConfigResourceLabels(isUWL bool, placementRef addonv1alpha1.PlacementRe
 		appName = config.UserWorkloadMetricsCollectorApp
 	}
 	return map[string]string{
-		"app.kubernetes.io/managed-by":      addon.Name,
-		"app.kubernetes.io/component":       appName,
+		config.ManagedByK8sLabelKey:         addon.Name,
+		config.ComponentK8sLabelKey:         appName,
 		addon.PlacementRefNameLabelKey:      placementRef.Name,
 		addon.PlacementRefNamespaceLabelKey: placementRef.Namespace,
 	}

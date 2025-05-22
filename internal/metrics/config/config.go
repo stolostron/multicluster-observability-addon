@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/go-logr/logr"
+	hyperv1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -41,22 +43,27 @@ const (
 	AcmEtcdServiceMonitorName             = "acm-etcd"
 	AcmApiServerServiceMonitorName        = "acm-kube-apiserver"
 
-	RemoteWriteCfgName = "acm-observability"
-	ScrapeClassCfgName = "ocp-monitoring"
+	RemoteWriteCfgName        = "acm-observability"
+	ScrapeClassCfgName        = "ocp-monitoring"
+	ScrapeClassPlatformTarget = "prometheus-k8s.openshift-monitoring.svc:9091"
+	ScrapeClassUWLTarget      = "prometheus-user-workload.openshift-user-workload-monitoring.svc:9092"
+
+	ComponentK8sLabelKey = "app.kubernetes.io/component"
+	ManagedByK8sLabelKey = "app.kubernetes.io/managed-by"
 )
 
 var (
 	PlatformPrometheusMatchLabels = map[string]string{
-		"app.kubernetes.io/component": "platform-metrics-collector",
+		ComponentK8sLabelKey: "platform-metrics-collector",
 	}
 	UserWorkloadPrometheusMatchLabels = map[string]string{
-		"app.kubernetes.io/component": "user-workload-metrics-collector",
+		ComponentK8sLabelKey: "user-workload-metrics-collector",
 	}
 	EtcdHcpUserWorkloadPrometheusMatchLabels = map[string]string{
-		"app.kubernetes.io/component": "etcd-hcp-user-workload-metrics-collector",
+		ComponentK8sLabelKey: "etcd-hcp-user-workload-metrics-collector",
 	}
 	ApiserverHcpUserWorkloadPrometheusMatchLabels = map[string]string{
-		"app.kubernetes.io/component": "apiserver-hcp-user-workload-metrics-collector",
+		ComponentK8sLabelKey: "apiserver-hcp-user-workload-metrics-collector",
 	}
 
 	ImagesConfigMapObjKey = types.NamespacedName{
@@ -101,4 +108,14 @@ func GetImageOverrides(ctx context.Context, c client.Client) (ImageOverrides, er
 	}
 
 	return ret, nil
+}
+
+func HasHostedCLusters(ctx context.Context, c client.Client, logger logr.Logger) bool {
+	hostedClusters := &hyperv1.HostedClusterList{}
+	if err := c.List(ctx, hostedClusters, &client.ListOptions{}); err != nil {
+		logger.Error(err, "failed to list HostedClusterList")
+		return false
+	}
+
+	return len(hostedClusters.Items) != 0
 }
