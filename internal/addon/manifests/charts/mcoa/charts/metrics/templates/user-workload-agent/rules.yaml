@@ -8,7 +8,7 @@ metadata:
   labels:
     {{- $incomingLabels := $rule.labels }}
     {{- $metricsHelmLabels := fromYaml (include "metricshelm.labels" $) }}
-    {{- $customLabel := dict "app.kubernetes.io/component" "user-workload-metrics-collector" }}
+    {{- $customLabel := dict "app.kubernetes.io/component" $.Values.userWorkload.component }}
     {{- $mergedLabels := merge $incomingLabels $metricsHelmLabels $customLabel }}
     {{- toYaml $mergedLabels | nindent 4 }}
   annotations:

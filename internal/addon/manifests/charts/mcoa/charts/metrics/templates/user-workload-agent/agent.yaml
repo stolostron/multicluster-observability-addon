@@ -10,7 +10,7 @@ metadata:
     app.kubernetes.io/name: {{ .Values.userWorkload.appName }}
     {{- $incomingLabels := .Values.userWorkload.prometheusAgent.labels }}
     {{- $metricsHelmLabels := fromYaml (include "metricshelm.labels" $) }}
-    {{- $customLabel := dict "app.kubernetes.io/component" "user-workload-metrics-collector" }}
+    {{- $customLabel := dict "app.kubernetes.io/component" $.Values.userWorkload.component }}
     {{- $customLabel := dict "app.kubernetes.io/name" .Values.userWorkload.appName }}
     {{- $mergedLabels := merge $incomingLabels $metricsHelmLabels $customLabel }}
     {{- toYaml $mergedLabels | nindent 4 }}

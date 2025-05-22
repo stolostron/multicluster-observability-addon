@@ -1,11 +1,20 @@
 {{- if or .Values.platformEnabled .Values.userWorkloadsEnabled }}
 apiVersion: v1
-kind: ServiceAccount
+kind: Service
 metadata:
   name: {{ .Values.prometheusOperator.appName }}
   namespace: {{ .Release.Namespace }}
+  annotations:
+    service.beta.openshift.io/serving-cert-secret-name: {{ .Values.prometheusOperator.rbacProxyTlsSecret }}
   labels:
     app.kubernetes.io/component: {{ .Values.prometheusOperator.component }}
     app.kubernetes.io/name: {{ .Values.prometheusOperator.appName }}
     {{ include "metricshelm.labels" . | nindent 4 }}
+spec:
+  ports:
+  - name: metrics
+    port: {{ .Values.prometheusOperator.rbacProxyPort }}
+    targetPort: metrics
+  selector:
+    app.kubernetes.io/name: {{ .Values.prometheusOperator.appName }}
 {{- end }}

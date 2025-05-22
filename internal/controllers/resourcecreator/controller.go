@@ -136,11 +136,12 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 
 	mdefault := mresources.DefaultStackResources{
-		Client:          r.Client,
-		CMAO:            cmao,
-		AddonOptions:    opts,
-		Logger:          r.Log,
-		PrometheusImage: images.Prometheus,
+		Client:             r.Client,
+		CMAO:               cmao,
+		AddonOptions:       opts,
+		Logger:             r.Log,
+		PrometheusImage:    images.Prometheus,
+		KubeRBACProxyImage: images.KubeRBACProxy,
 	}
 
 	mDefaultConfig, err := mdefault.Reconcile(ctx)

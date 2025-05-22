@@ -3,26 +3,25 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
-    app.kubernetes.io/component: controller
-    app.kubernetes.io/name: prometheus-operator
-    app.kubernetes.io/part-of: multicluster-observability-addon
-    app.kubernetes.io/managed-by: {{ .Release.Name }}
-  name: prometheus-operator
+    app.kubernetes.io/component: {{ .Values.prometheusOperator.component }}
+    app.kubernetes.io/name: {{ .Values.prometheusOperator.appName }}
+    {{ include "metricshelm.labels" . | nindent 4 }}
+  name: {{ .Values.prometheusOperator.appName }}
   namespace: {{ .Release.Namespace }}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app.kubernetes.io/component: controller
-      app.kubernetes.io/name: prometheus-operator
+      app.kubernetes.io/component: {{ .Values.prometheusOperator.component }}
+      app.kubernetes.io/name: {{ .Values.prometheusOperator.appName }}
       app.kubernetes.io/part-of: multicluster-observability-addon
   template:
     metadata:
       annotations:
         kubectl.kubernetes.io/default-container: prometheus-operator
       labels:
-        app.kubernetes.io/component: controller
-        app.kubernetes.io/name: prometheus-operator
+        app.kubernetes.io/component: {{ .Values.prometheusOperator.component }}
+        app.kubernetes.io/name: {{ .Values.prometheusOperator.appName }}
         app.kubernetes.io/part-of: multicluster-observability-addon
     spec:
       containers:
@@ -40,10 +39,10 @@ spec:
           - '--controller-id={{ .Values.prometheusControllerID }}'
         imagePullPolicy: IfNotPresent
         name: prometheus-operator
-        ports:
-          - name: http
-            containerPort: 8080
-            protocol: TCP
+        # ports:
+        #   - name: http
+        #     containerPort: 8080
+        #     protocol: TCP
         securityContext: 
           readOnlyRootFilesystem: true
           runAsNonRoot: true
@@ -56,12 +55,49 @@ spec:
           requests:
             cpu: 5m
             memory: 100Mi
+      - resources:
+          requests:
+            cpu: 1m
+            memory: 15Mi
+        terminationMessagePath: /dev/termination-log
+        name: kube-rbac-proxy
+        securityContext:
+          capabilities:
+            drop:
+              - ALL
+          privileged: false
+          runAsNonRoot: true
+          readOnlyRootFilesystem: true
+          allowPrivilegeEscalation: false
+        ports:
+          - name: metrics
+            containerPort: 9092
+            protocol: TCP
+        imagePullPolicy: IfNotPresent
+        volumeMounts:
+          - name: kube-rbac-proxy-tls
+            readOnly: true
+            mountPath: /etc/tls/private
+        terminationMessagePolicy: File
+        image: {{ .Values.prometheusOperator.rbacProxyImage }}
+        args:
+          - '--secure-listen-address=0.0.0.0:{{ .Values.prometheusOperator.rbacProxyPort }}'
+          - '--upstream=http://127.0.0.1:8080'
+          - '--tls-cert-file=/etc/tls/private/tls.crt'
+          - '--tls-private-key-file=/etc/tls/private/tls.key'
+          - '--logtostderr=true'
+          - '--allow-paths=/metrics'
       dnsPolicy: ClusterFirst
       nodeSelector:
         kubernetes.io/os: linux
       restartPolicy: Always
       schedulerName: default-scheduler
       serviceAccount: prometheus-operator
-      serviceAccountName: prometheus-operator
+      serviceAccountName:  {{ .Values.prometheusOperator.appName }}
       terminationGracePeriodSeconds: 600
+      volumes:
+        - name: kube-rbac-proxy-tls
+          secret:
+            secretName: {{ .Values.prometheusOperator.rbacProxyTlsSecret }}
+            defaultMode: 420
 {{- end }}

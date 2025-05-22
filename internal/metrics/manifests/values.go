@@ -2,6 +2,7 @@ package manifests
 
 import (
 	"encoding/json"
+	"strconv"
 
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/handlers"
@@ -9,14 +10,15 @@ import (
 )
 
 type MetricsValues struct {
-	PlatformEnabled           bool          `json:"platformEnabled"`
-	UserWorkloadsEnabled      bool          `json:"userWorkloadsEnabled"`
-	Secrets                   []ConfigValue `json:"secrets"`
-	Images                    ImagesValues  `json:"images"`
-	PrometheusControllerID    string        `json:"prometheusControllerID"`
-	PrometheusCAConfigMapName string        `json:"prometheusCAConfigMapName"`
-	Platform                  Collector     `json:"platform"`
-	UserWorkload              Collector     `json:"userWorkload"`
+	PlatformEnabled           bool               `json:"platformEnabled"`
+	UserWorkloadsEnabled      bool               `json:"userWorkloadsEnabled"`
+	Secrets                   []ConfigValue      `json:"secrets"`
+	Images                    ImagesValues       `json:"images"`
+	PrometheusControllerID    string             `json:"prometheusControllerID"`
+	PrometheusCAConfigMapName string             `json:"prometheusCAConfigMapName"`
+	Platform                  Collector          `json:"platform"`
+	UserWorkload              Collector          `json:"userWorkload"`
+	PrometheusOperator        PrometheusOperator `json:"prometheusOperator"`
 }
 
 type Collector struct {
@@ -26,6 +28,12 @@ type Collector struct {
 	ScrapeConfigs       []ConfigValue `json:"scrapeConfigs"`
 	Rules               []ConfigValue `json:"rules"`
 	ServiceMonitors     []ConfigValue `json:"serviceMonitors"` // For HCPs custom user workload serviceMonitors
+	RBACProxyTLSSecret  string        `json:"rbacProxyTlsSecret"`
+	RBACProxyPort       string        `json:"rbacProxyPort"`
+}
+
+type PrometheusOperator struct {
+	RBACProxyImage string `json:"rbacProxyImage"`
 }
 
 type ImagesValues struct {
@@ -45,10 +53,17 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 		PrometheusControllerID:    config.PrometheusControllerID,
 		PrometheusCAConfigMapName: config.PrometheusCAConfigMapName,
 		Platform: Collector{
-			AppName: config.PlatformMetricsCollectorApp,
+			AppName:            config.PlatformMetricsCollectorApp,
+			RBACProxyTLSSecret: config.PlatformRBACProxyTLSSecret,
+			RBACProxyPort:      strconv.Itoa(config.RBACProxyPort),
 		},
 		UserWorkload: Collector{
-			AppName: config.UserWorkloadMetricsCollectorApp,
+			AppName:            config.UserWorkloadMetricsCollectorApp,
+			RBACProxyTLSSecret: config.UserWorkloadRBACProxyTLSSecret,
+			RBACProxyPort:      strconv.Itoa(config.RBACProxyPort),
+		},
+		PrometheusOperator: PrometheusOperator{
+			RBACProxyImage: opts.Images.KubeRBACProxy,
 		},
 	}
 

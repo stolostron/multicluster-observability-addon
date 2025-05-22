@@ -22,11 +22,12 @@ var errTooManyConfigResources = errors.New("too many configuration resources")
 
 // DefaultStackResources reconciles the configuration resources needed for metrics collection
 type DefaultStackResources struct {
-	AddonOptions    addon.Options
-	Client          client.Client
-	CMAO            *addonv1alpha1.ClusterManagementAddOn
-	Logger          logr.Logger
-	PrometheusImage string
+	AddonOptions       addon.Options
+	Client             client.Client
+	CMAO               *addonv1alpha1.ClusterManagementAddOn
+	Logger             logr.Logger
+	KubeRBACProxyImage string
+	PrometheusImage    string
 }
 
 // Reconcile ensures the state of the configuration resources for metrics collection.
@@ -77,6 +78,7 @@ func (d DefaultStackResources) reconcileAgent(ctx context.Context, placementRef 
 		RemoteWriteEndpoint: d.AddonOptions.Platform.Metrics.HubEndpoint.String(),
 		// Commented while the stolostron build of prometheus is not based on v3 as it requires support for the --agent flag.
 		// PrometheusImage:     d.PrometheusImage,
+		KubeRBACProxyImage: d.KubeRBACProxyImage,
 		Labels: map[string]string{
 			addon.PlacementRefNameLabelKey:      placementRef.Name,
 			addon.PlacementRefNamespaceLabelKey: placementRef.Namespace,
