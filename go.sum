@@ -328,6 +328,8 @@ github.com/rhobs/observability-operator v1.0.1-0.20250402055516-9401247f1632 h1:
 github.com/rhobs/observability-operator v1.0.1-0.20250402055516-9401247f1632/go.mod h1:crKGz6tGQHBjEUocGdtL2d75NIBJDKT3/bhKLxsbcSA=
 github.com/rhobs/observability-operator v1.0.1-0.20250414131549-04d4da885443 h1:/qU/0fvo60PigyjtSsOfOCIUB+OuNEN1OiLU3zPrLXs=
 github.com/rhobs/observability-operator v1.0.1-0.20250414131549-04d4da885443/go.mod h1:crKGz6tGQHBjEUocGdtL2d75NIBJDKT3/bhKLxsbcSA=
+github.com/rhobs/observability-operator v1.2.1-0.20250522062404-a3d2d4754de1 h1:vZfDZglOJvxcTLn/ie6DBQFRhzQFGUUzGocciB4w6sw=
+github.com/rhobs/observability-operator v1.2.1-0.20250522062404-a3d2d4754de1/go.mod h1:crKGz6tGQHBjEUocGdtL2d75NIBJDKT3/bhKLxsbcSA=
 github.com/rogpeppe/go-internal v1.13.1 h1:KvO1DLK/DRN07sQ1LQKScxyZJuNnedQ5/wKSR38lUII=
 github.com/rogpeppe/go-internal v1.13.1/go.mod h1:uMEvuHeurkdAXX61udpOXGD/AzZDWNMNyH2VO9fmH0o=
 github.com/russross/blackfriday/v2 v2.1.0/go.mod h1:+Rmxgy9KzJVeS9/2gXHxylqXiyQDYRxCVz55jmeOWTM=
