@@ -1,4 +1,4 @@
-{{- if .Values.enabled }}
+{{- if and .Values.enabled .Values.installCOO }}
 apiVersion: v1
 kind: Namespace
 metadata:

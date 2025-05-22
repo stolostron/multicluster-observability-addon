@@ -1,4 +1,4 @@
-{{- if .Values.enabled }}
+{{- if and .Values.enabled .Values.installCOO }}
 apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
 metadata:

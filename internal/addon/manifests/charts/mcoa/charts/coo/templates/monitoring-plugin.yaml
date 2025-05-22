@@ -1,4 +1,4 @@
-{{- if .Values.enabled }}
+{{- if and .Values.enabled .Values.monitoringUIPlugin }}
 apiVersion: observability.openshift.io/v1alpha1
 kind: UIPlugin
 metadata:
