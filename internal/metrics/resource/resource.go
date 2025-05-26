@@ -23,7 +23,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-var errTooManyConfigResources = errors.New("too many configuration resources")
+var (
+	errTooManyConfigResources = errors.New("too many configuration resources")
+)
 
 // DefaultStackResources reconciles the configuration resources needed for metrics collection
 type DefaultStackResources struct {
@@ -101,6 +103,10 @@ func (d DefaultStackResources) Reconcile(ctx context.Context) ([]common.DefaultC
 func (d DefaultStackResources) reconcileScrapeConfigs(ctx context.Context, mcoUID types.UID, isUWL, hasHostedClusters bool) ([]common.DefaultConfig, error) {
 	labelVals := []string{}
 
+	if len(mcoUID) == 0 {
+		return []common.DefaultConfig{}, nil
+	}
+
 	if isUWL {
 		labelVals = append(labelVals, config.UserWorkloadPrometheusMatchLabels[config.ComponentK8sLabelKey])
 		// Avoid adding HCP's specific confs when not needed
@@ -172,6 +178,11 @@ func (d DefaultStackResources) getPrometheusRules(ctx context.Context, mcoUID ty
 	if !d.AddonOptions.Platform.Metrics.CollectionEnabled && !d.AddonOptions.UserWorkloads.Metrics.CollectionEnabled {
 		return []common.DefaultConfig{}, nil
 	}
+
+	if len(mcoUID) == 0 {
+		return []common.DefaultConfig{}, nil
+	}
+
 	labelVals := []string{}
 	if d.AddonOptions.Platform.Metrics.CollectionEnabled {
 		labelVals = append(labelVals, config.PlatformPrometheusMatchLabels[config.ComponentK8sLabelKey])
