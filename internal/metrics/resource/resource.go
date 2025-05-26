@@ -23,9 +23,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-var (
-	errTooManyConfigResources = errors.New("too many configuration resources")
-)
+var errTooManyConfigResources = errors.New("too many configuration resources")
 
 // DefaultStackResources reconciles the configuration resources needed for metrics collection
 type DefaultStackResources struct {
