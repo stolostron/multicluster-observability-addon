@@ -59,7 +59,7 @@ var cmaoPredicate = builder.WithPredicates(predicate.Funcs{
 })
 
 var partOfMCOALabelSelector = labels.SelectorFromSet(labels.Set{
-	"app.kubernetes.io/part-of": "multicluster-observability-addon",
+	mconfig.PartOfK8sLabelKey: addon.Name,
 })
 
 var partOfMCOAPredicate = builder.WithPredicates(predicate.NewPredicateFuncs(func(obj client.Object) bool {
