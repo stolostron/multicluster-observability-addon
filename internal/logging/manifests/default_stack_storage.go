@@ -116,7 +116,7 @@ func buildManagedStorageSecrets(resources Options) ([]ResourceValue, error) {
 	return secretsValue, nil
 }
 
-func BuildSSALokiStack(opts Options, lsName string) (*lokiv1.LokiStack, error) {
+func BuildSSALokiStack(opts Options, lsName, placementNamespace, placementName string) (*lokiv1.LokiStack, error) {
 	existingLS := opts.DefaultStack.Storage.LokiStack
 
 	lokistackSpec, err := buildManagedLokistackSpec(opts)
@@ -159,6 +159,10 @@ func BuildSSALokiStack(opts Options, lsName string) (*lokiv1.LokiStack, error) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      lsName,
 			Namespace: addon.InstallNamespace,
+			Labels: map[string]string{
+				addon.PlacementRefNameLabelKey:      placementName,
+				addon.PlacementRefNamespaceLabelKey: placementNamespace,
+			},
 		},
 		Spec: lokistackSpec,
 	}, nil

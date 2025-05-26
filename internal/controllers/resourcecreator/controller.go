@@ -132,10 +132,10 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, err
 	}
 
-	objects := []client.Object{}
+	objsToCreate := []client.Object{}
+	defaultConfigs := []common.DefaultConfig{}
 
 	// Reconcile metrics resources
-	objs := []common.DefaultConfig{}
 	images, err := mconfig.GetImageOverrides(ctx, r.Client)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to get image overrides: %w", err)
@@ -154,16 +154,17 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	if err != nil {
 		return ctrl.Result{}, err
 	}
-	objs = append(objs, mDefaultConfig...)
+	defaultConfigs = append(defaultConfigs, mDefaultConfig...)
 
-	lObjs, err := lhandlers.BuildDefaultStackResources(ctx, r.Client, cmao, opts.Platform.Logs, opts.UserWorkloads.Logs, opts.HubHostname)
+	lObjs, lDefaultConfig, err := lhandlers.BuildDefaultStackResources(ctx, r.Client, cmao, opts.Platform.Logs, opts.UserWorkloads.Logs, opts.HubHostname)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
-	objects = append(objects, lObjs...)
+	objsToCreate = append(objsToCreate, lObjs...)
+	defaultConfigs = append(defaultConfigs, lDefaultConfig...)
 
 	// SSA the objects rendered
-	for _, obj := range objects {
+	for _, obj := range objsToCreate {
 		err := controllerutil.SetControllerReference(cmao, obj, r.Scheme)
 		if err != nil {
 			klog.Error(err, "failed to set owner reference")
@@ -176,7 +177,7 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		}
 	}
 
-	if err := common.EnsureAddonConfig(ctx, r.Log, r.Client, objs); err != nil {
+	if err := common.EnsureAddonConfig(ctx, r.Log, r.Client, defaultConfigs); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to patching default config to clustermanageraddon: %w", err)
 	}
 
@@ -185,6 +186,12 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, fmt.Errorf("failed to get ClusterManagementAddOn: %w", err)
 	}
 	if err := common.DeleteOrphanResources(ctx, r.Log, r.Client, cmao, &prometheusalpha1.PrometheusAgentList{}); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to clean orphan resources: %w", err)
+	}
+	if err := common.DeleteOrphanResources(ctx, r.Log, r.Client, cmao, &loggingv1.ClusterLogForwarderList{}); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to clean orphan resources: %w", err)
+	}
+	if err := common.DeleteOrphanResources(ctx, r.Log, r.Client, cmao, &lokiv1.LokiStackList{}); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to clean orphan resources: %w", err)
 	}
 

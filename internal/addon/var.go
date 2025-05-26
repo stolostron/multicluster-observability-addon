@@ -3,6 +3,8 @@ package addon
 import (
 	"embed"
 	"errors"
+
+	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 )
 
 const (
@@ -49,11 +51,19 @@ const (
 	DefaultStackPrefix            = "default-stack-instance"
 	PlacementRefNameLabelKey      = "placement-ref-name"
 	PlacementRefNamespaceLabelKey = "placement-ref-namespace"
+
+	GlobalPlacementName      = "global"
+	GlobalPlacementNamespace = "open-cluster-management-global-set"
 )
 
 var (
 	errInvalidMetricsHubHostname  = errors.New("invalid metrics hub hostname")
 	errInvalidSubscriptionChannel = errors.New("current version of the cluster-observability-operator installed doesn't match the supported MCOA version")
+
+	GlobalPlacementRef = addonv1alpha1.PlacementRef{
+		Name:      GlobalPlacementName,
+		Namespace: GlobalPlacementNamespace,
+	}
 )
 
 //go:embed manifests

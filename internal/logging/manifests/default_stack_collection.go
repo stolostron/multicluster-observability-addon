@@ -91,7 +91,7 @@ func buildManagedCollectionConfigMaps(resources Options) ([]ResourceValue, error
 	return configmapsValue, nil
 }
 
-func BuildSSAClusterLogForwarder(opts Options, clfName string) (*loggingv1.ClusterLogForwarder, error) {
+func BuildSSAClusterLogForwarder(opts Options, clfName, placementNamespace, placementName string) (*loggingv1.ClusterLogForwarder, error) {
 	clfSpec, err := buildManagedCLFSpec(opts)
 	if err != nil {
 		return nil, err
@@ -110,6 +110,10 @@ func BuildSSAClusterLogForwarder(opts Options, clfName string) (*loggingv1.Clust
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      clfName,
 			Namespace: addon.InstallNamespace,
+			Labels: map[string]string{
+				addon.PlacementRefNameLabelKey:      placementName,
+				addon.PlacementRefNamespaceLabelKey: placementNamespace,
+			},
 		},
 		Spec: clfSpec,
 	}, nil
