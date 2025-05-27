@@ -7,7 +7,7 @@ import (
 
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	prometheusalpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
-	"github.com/stolostron/multicluster-observability-addon/internal/addon"
+	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -65,10 +65,10 @@ func makeConfigResourceLabels(isUWL bool, placementRef addonv1alpha1.PlacementRe
 		appName = config.UserWorkloadMetricsCollectorApp
 	}
 	return map[string]string{
-		config.ManagedByK8sLabelKey:         addon.Name,
-		config.ComponentK8sLabelKey:         appName,
-		addon.PlacementRefNameLabelKey:      placementRef.Name,
-		addon.PlacementRefNamespaceLabelKey: placementRef.Namespace,
+		addoncfg.ManagedByK8sLabelKey:          addoncfg.Name,
+		addoncfg.ComponentK8sLabelKey:          appName,
+		addoncfg.PlacementRefNameLabelKey:      placementRef.Name,
+		addoncfg.PlacementRefNamespaceLabelKey: placementRef.Namespace,
 	}
 }
 

@@ -8,7 +8,7 @@ import (
 	"github.com/go-logr/logr"
 	prometheus "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	prometheusalpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
-	"github.com/stolostron/multicluster-observability-addon/internal/addon"
+	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
@@ -25,7 +25,7 @@ var (
 func CreateOrUpdateWithAddOnOwner(ctx context.Context, logger logr.Logger, k8s client.Client, objs []client.Object) error {
 	// ClusterManagementAddOn as owner
 	owner := &addonapiv1alpha1.ClusterManagementAddOn{}
-	if err := k8s.Get(ctx, types.NamespacedName{Name: addon.Name, Namespace: addon.InstallNamespace}, owner); err != nil {
+	if err := k8s.Get(ctx, types.NamespacedName{Name: addoncfg.Name, Namespace: addoncfg.InstallNamespace}, owner); err != nil {
 		return err
 	}
 

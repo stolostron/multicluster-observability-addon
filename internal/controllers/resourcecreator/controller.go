@@ -9,6 +9,7 @@ import (
 	prometheusalpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
+	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	mresources "github.com/stolostron/multicluster-observability-addon/internal/metrics/resource"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -30,7 +31,7 @@ import (
 )
 
 func validateAODC(namespace, name string) bool {
-	if namespace != addon.InstallNamespace || name != addon.Name {
+	if namespace != addoncfg.InstallNamespace || name != addoncfg.Name {
 		return false
 	}
 	return true
@@ -50,16 +51,16 @@ func cmaoPlacementsChanged(old, new client.Object) bool {
 }
 
 var cmaoPredicate = builder.WithPredicates(predicate.Funcs{
-	CreateFunc: func(e event.CreateEvent) bool { return e.Object.GetName() == addon.Name },
+	CreateFunc: func(e event.CreateEvent) bool { return e.Object.GetName() == addoncfg.Name },
 	UpdateFunc: func(e event.UpdateEvent) bool {
-		return e.ObjectNew.GetName() == addon.Name && cmaoPlacementsChanged(e.ObjectOld, e.ObjectNew)
+		return e.ObjectNew.GetName() == addoncfg.Name && cmaoPlacementsChanged(e.ObjectOld, e.ObjectNew)
 	},
 	DeleteFunc:  func(e event.DeleteEvent) bool { return false },
 	GenericFunc: func(e event.GenericEvent) bool { return false },
 })
 
 var partOfMCOALabelSelector = labels.SelectorFromSet(labels.Set{
-	mconfig.PartOfK8sLabelKey: addon.Name,
+	addoncfg.PartOfK8sLabelKey: addoncfg.Name,
 })
 
 var partOfMCOAPredicate = builder.WithPredicates(predicate.NewPredicateFuncs(func(obj client.Object) bool {
@@ -133,7 +134,7 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, err
 	}
 
-	key = client.ObjectKey{Name: addon.Name}
+	key = client.ObjectKey{Name: addoncfg.Name}
 	cmao := &addonv1alpha1.ClusterManagementAddOn{}
 	if err = r.Get(ctx, key, cmao); err != nil {
 		return ctrl.Result{}, err
@@ -166,7 +167,7 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 
 	cmao = &addonv1alpha1.ClusterManagementAddOn{}
-	if err := r.Get(ctx, types.NamespacedName{Name: addon.Name}, cmao); err != nil {
+	if err := r.Get(ctx, types.NamespacedName{Name: addoncfg.Name}, cmao); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to get ClusterManagementAddOn: %w", err)
 	}
 	if err := common.DeleteOrphanResources(ctx, r.Log, r.Client, cmao, &prometheusalpha1.PrometheusAgentList{}); err != nil {
@@ -196,8 +197,8 @@ func (r *ResourceCreatorReconciler) enqueueAODC() handler.EventHandler {
 		return []reconcile.Request{
 			{
 				NamespacedName: types.NamespacedName{
-					Name:      addon.Name,
-					Namespace: addon.InstallNamespace,
+					Name:      addoncfg.Name,
+					Namespace: addoncfg.InstallNamespace,
 				},
 			},
 		}
@@ -219,8 +220,8 @@ func (r *ResourceCreatorReconciler) enqueueDefaultResources() handler.EventHandl
 		return []reconcile.Request{
 			{
 				NamespacedName: types.NamespacedName{
-					Name:      addon.Name,
-					Namespace: addon.InstallNamespace,
+					Name:      addoncfg.Name,
+					Namespace: addoncfg.InstallNamespace,
 				},
 			},
 		}

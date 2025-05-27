@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-logr/logr"
 	hyperv1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
+	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -47,24 +48,20 @@ const (
 	ScrapeClassCfgName        = "ocp-monitoring"
 	ScrapeClassPlatformTarget = "prometheus-k8s.openshift-monitoring.svc:9091"
 	ScrapeClassUWLTarget      = "prometheus-user-workload.openshift-user-workload-monitoring.svc:9092"
-
-	ComponentK8sLabelKey = "app.kubernetes.io/component"
-	ManagedByK8sLabelKey = "app.kubernetes.io/managed-by"
-	PartOfK8sLabelKey    = "app.kubernetes.io/part-of"
 )
 
 var (
 	PlatformPrometheusMatchLabels = map[string]string{
-		ComponentK8sLabelKey: "platform-metrics-collector",
+		addoncfg.ComponentK8sLabelKey: "platform-metrics-collector",
 	}
 	UserWorkloadPrometheusMatchLabels = map[string]string{
-		ComponentK8sLabelKey: "user-workload-metrics-collector",
+		addoncfg.ComponentK8sLabelKey: "user-workload-metrics-collector",
 	}
 	EtcdHcpUserWorkloadPrometheusMatchLabels = map[string]string{
-		ComponentK8sLabelKey: "etcd-hcp-user-workload-metrics-collector",
+		addoncfg.ComponentK8sLabelKey: "etcd-hcp-user-workload-metrics-collector",
 	}
 	ApiserverHcpUserWorkloadPrometheusMatchLabels = map[string]string{
-		ComponentK8sLabelKey: "apiserver-hcp-user-workload-metrics-collector",
+		addoncfg.ComponentK8sLabelKey: "apiserver-hcp-user-workload-metrics-collector",
 	}
 
 	ImagesConfigMapObjKey = types.NamespacedName{

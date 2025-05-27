@@ -10,6 +10,7 @@ import (
 	prometheusalpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
+	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -103,9 +104,9 @@ func TestGetOrCreateDefaultAgent(t *testing.T) {
 
 			// ensure correct labels are set on the agent
 			if tc.isUWL {
-				assert.Equal(t, gotAgent.Labels[config.ComponentK8sLabelKey], config.UserWorkloadPrometheusMatchLabels[config.ComponentK8sLabelKey])
+				assert.Equal(t, gotAgent.Labels[addoncfg.ComponentK8sLabelKey], config.UserWorkloadPrometheusMatchLabels[addoncfg.ComponentK8sLabelKey])
 			} else {
-				assert.Equal(t, gotAgent.Labels[config.ComponentK8sLabelKey], config.PlatformPrometheusMatchLabels[config.ComponentK8sLabelKey])
+				assert.Equal(t, gotAgent.Labels[addoncfg.ComponentK8sLabelKey], config.PlatformPrometheusMatchLabels[addoncfg.ComponentK8sLabelKey])
 			}
 		})
 	}
@@ -150,7 +151,7 @@ func TestReconcileAgent(t *testing.T) {
 	assert.Nil(t, foundAgent.Spec.Image)
 	assert.Equal(t, config.PlatformMetricsCollectorApp, foundAgent.Spec.ServiceAccountName)
 	// Check placement labels
-	assert.Equal(t, foundAgent.Labels[addon.PlacementRefNameLabelKey], placementRef.Name)
+	assert.Equal(t, foundAgent.Labels[addoncfg.PlacementRefNameLabelKey], placementRef.Name)
 	// Check platform specific values: appName and ScrapeConfigNamespaceSelector
 	assert.Equal(t, foundAgent.Spec.ServiceAccountName, config.PlatformMetricsCollectorApp)
 	assert.Nil(t, foundAgent.Spec.ScrapeConfigNamespaceSelector)
@@ -189,10 +190,10 @@ func TestReconcile(t *testing.T) {
 	platformAppName := "platform-app"
 	platformAgent := NewDefaultPrometheusAgent(config.HubInstallNamespace, makeAgentName(platformAppName, placementRefA.Name), false, placementRefA)
 	platformAgent.Labels = map[string]string{ // expected labels for identifying an agent configuration
-		addon.PlacementRefNamespaceLabelKey: placementRefA.Namespace,
-		addon.PlacementRefNameLabelKey:      placementRefA.Name,
-		config.ManagedByK8sLabelKey:         addon.Name,
-		config.ComponentK8sLabelKey:         config.PlatformMetricsCollectorApp,
+		addoncfg.PlacementRefNamespaceLabelKey: placementRefA.Namespace,
+		addoncfg.PlacementRefNameLabelKey:      placementRefA.Name,
+		addoncfg.ManagedByK8sLabelKey:          addoncfg.Name,
+		addoncfg.ComponentK8sLabelKey:          config.PlatformMetricsCollectorApp,
 	}
 
 	platformSC := &prometheusalpha1.ScrapeConfig{
@@ -810,7 +811,7 @@ func newTestScheme() *runtime.Scheme {
 func newCMAO(placements ...addonv1alpha1.PlacementStrategy) *addonv1alpha1.ClusterManagementAddOn {
 	return &addonv1alpha1.ClusterManagementAddOn{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: addon.Name,
+			Name: addoncfg.Name,
 			UID:  types.UID("test-cmao-uid"),
 			OwnerReferences: []metav1.OwnerReference{
 				{

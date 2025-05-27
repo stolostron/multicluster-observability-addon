@@ -11,6 +11,7 @@ import (
 	prometheusalpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
+	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -109,23 +110,23 @@ func (d DefaultStackResources) reconcileScrapeConfigs(ctx context.Context, mcoUI
 	}
 
 	if isUWL {
-		labelVals = append(labelVals, config.UserWorkloadPrometheusMatchLabels[config.ComponentK8sLabelKey])
+		labelVals = append(labelVals, config.UserWorkloadPrometheusMatchLabels[addoncfg.ComponentK8sLabelKey])
 		// Avoid adding HCP's specific confs when not needed
 		if hasHostedClusters {
-			labelVals = append(labelVals, config.EtcdHcpUserWorkloadPrometheusMatchLabels[config.ComponentK8sLabelKey], config.ApiserverHcpUserWorkloadPrometheusMatchLabels[config.ComponentK8sLabelKey])
+			labelVals = append(labelVals, config.EtcdHcpUserWorkloadPrometheusMatchLabels[addoncfg.ComponentK8sLabelKey], config.ApiserverHcpUserWorkloadPrometheusMatchLabels[addoncfg.ComponentK8sLabelKey])
 		}
 	} else {
-		labelVals = append(labelVals, config.PlatformPrometheusMatchLabels[config.ComponentK8sLabelKey])
+		labelVals = append(labelVals, config.PlatformPrometheusMatchLabels[addoncfg.ComponentK8sLabelKey])
 	}
 
-	req, err := labels.NewRequirement(config.ComponentK8sLabelKey, selection.In, labelVals)
+	req, err := labels.NewRequirement(addoncfg.ComponentK8sLabelKey, selection.In, labelVals)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create labels requirement for scrapeConfigs: %w", err)
 	}
 	labelsSelector := labels.NewSelector().Add(*req)
 
 	scrapeConfigsList := &prometheusalpha1.ScrapeConfigList{}
-	if err = d.Client.List(ctx, scrapeConfigsList, client.InNamespace(addon.InstallNamespace), client.MatchingLabelsSelector{Selector: labelsSelector}); err != nil {
+	if err = d.Client.List(ctx, scrapeConfigsList, client.InNamespace(addoncfg.InstallNamespace), client.MatchingLabelsSelector{Selector: labelsSelector}); err != nil {
 		return nil, fmt.Errorf("failed to list scrapeConfigs: %w", err)
 	}
 
@@ -187,25 +188,25 @@ func (d DefaultStackResources) getPrometheusRules(ctx context.Context, mcoUID ty
 
 	labelVals := []string{}
 	if d.AddonOptions.Platform.Metrics.CollectionEnabled {
-		labelVals = append(labelVals, config.PlatformPrometheusMatchLabels[config.ComponentK8sLabelKey])
+		labelVals = append(labelVals, config.PlatformPrometheusMatchLabels[addoncfg.ComponentK8sLabelKey])
 	}
 	if d.AddonOptions.UserWorkloads.Metrics.CollectionEnabled {
-		labelVals = append(labelVals, config.UserWorkloadPrometheusMatchLabels[config.ComponentK8sLabelKey])
+		labelVals = append(labelVals, config.UserWorkloadPrometheusMatchLabels[addoncfg.ComponentK8sLabelKey])
 
 		// Avoid adding HCP's specific confs when not needed
 		if hasHostedClusters {
-			labelVals = append(labelVals, config.EtcdHcpUserWorkloadPrometheusMatchLabels[config.ComponentK8sLabelKey], config.ApiserverHcpUserWorkloadPrometheusMatchLabels[config.ComponentK8sLabelKey])
+			labelVals = append(labelVals, config.EtcdHcpUserWorkloadPrometheusMatchLabels[addoncfg.ComponentK8sLabelKey], config.ApiserverHcpUserWorkloadPrometheusMatchLabels[addoncfg.ComponentK8sLabelKey])
 		}
 	}
 
-	req, err := labels.NewRequirement(config.ComponentK8sLabelKey, selection.In, labelVals)
+	req, err := labels.NewRequirement(addoncfg.ComponentK8sLabelKey, selection.In, labelVals)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create labels requirement: %w", err)
 	}
 	labelSelector := labels.NewSelector().Add(*req)
 
 	promRuleList := &prometheusv1.PrometheusRuleList{}
-	if err = d.Client.List(ctx, promRuleList, client.InNamespace(addon.InstallNamespace), client.MatchingLabelsSelector{Selector: labelSelector}); err != nil {
+	if err = d.Client.List(ctx, promRuleList, client.InNamespace(addoncfg.InstallNamespace), client.MatchingLabelsSelector{Selector: labelSelector}); err != nil {
 		return nil, fmt.Errorf("failed to list scrapeConfigs: %w", err)
 	}
 
@@ -242,8 +243,8 @@ func (d DefaultStackResources) reconcileAgentForPlacement(ctx context.Context, p
 		// PrometheusImage:     d.PrometheusImage,
 		KubeRBACProxyImage: d.KubeRBACProxyImage,
 		Labels: map[string]string{
-			addon.PlacementRefNameLabelKey:      placementRef.Name,
-			addon.PlacementRefNamespaceLabelKey: placementRef.Namespace,
+			addoncfg.PlacementRefNameLabelKey:      placementRef.Name,
+			addoncfg.PlacementRefNamespaceLabelKey: placementRef.Namespace,
 		},
 	}
 	promSSA := promBuilder.Build()
@@ -331,7 +332,7 @@ func (d DefaultStackResources) generateConfigsForAllPlacements(object []client.O
 }
 
 func makeAgentName(app, placement string) string {
-	return fmt.Sprintf("%s-%s-%s", addon.DefaultStackPrefix, app, placement)
+	return fmt.Sprintf("%s-%s-%s", addoncfg.DefaultStackPrefix, app, placement)
 }
 
 func hasControllerUID(ownerRefs []metav1.OwnerReference, uid types.UID) bool {

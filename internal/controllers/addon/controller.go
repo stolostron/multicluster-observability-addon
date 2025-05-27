@@ -10,6 +10,7 @@ import (
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	monitoringv1alpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
+	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	addonhelm "github.com/stolostron/multicluster-observability-addon/internal/addon/helm"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -66,11 +67,11 @@ func NewAddonManager(ctx context.Context, kubeConfig *rest.Config, scheme *runti
 		addonfactory.ToAddOnCustomizedVariableValues,
 	)
 
-	mcoaAgentAddon, err := addonfactory.NewAgentAddonFactory(addon.Name, addon.FS, "manifests/charts/mcoa").
+	mcoaAgentAddon, err := addonfactory.NewAgentAddonFactory(addoncfg.Name, addon.FS, "manifests/charts/mcoa").
 		WithConfigGVRs(
-			schema.GroupVersionResource{Version: loggingv1.GroupVersion.Version, Group: loggingv1.GroupVersion.Group, Resource: addon.ClusterLogForwardersResource},
-			schema.GroupVersionResource{Version: otelv1beta1.GroupVersion.Version, Group: otelv1beta1.GroupVersion.Group, Resource: addon.OpenTelemetryCollectorsResource},
-			schema.GroupVersionResource{Version: otelv1alpha1.GroupVersion.Version, Group: otelv1alpha1.GroupVersion.Group, Resource: addon.InstrumentationResource},
+			schema.GroupVersionResource{Version: loggingv1.GroupVersion.Version, Group: loggingv1.GroupVersion.Group, Resource: addoncfg.ClusterLogForwardersResource},
+			schema.GroupVersionResource{Version: otelv1beta1.GroupVersion.Version, Group: otelv1beta1.GroupVersion.Group, Resource: addoncfg.OpenTelemetryCollectorsResource},
+			schema.GroupVersionResource{Version: otelv1alpha1.GroupVersion.Version, Group: otelv1alpha1.GroupVersion.Group, Resource: addoncfg.InstrumentationResource},
 			schema.GroupVersionResource{Version: monitoringv1alpha1.SchemeGroupVersion.Version, Group: monitoringv1alpha1.SchemeGroupVersion.Group, Resource: monitoringv1alpha1.PrometheusAgentName},
 			schema.GroupVersionResource{Version: monitoringv1alpha1.SchemeGroupVersion.Version, Group: monitoringv1alpha1.SchemeGroupVersion.Group, Resource: monitoringv1alpha1.ScrapeConfigName},
 			schema.GroupVersionResource{Version: monitoringv1.SchemeGroupVersion.Version, Group: monitoringv1.SchemeGroupVersion.Group, Resource: monitoringv1.PrometheusRuleName},

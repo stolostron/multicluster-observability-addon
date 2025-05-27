@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/stolostron/multicluster-observability-addon/internal/addon"
+	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
@@ -17,7 +17,7 @@ func ServerSideApply(ctx context.Context, c client.Client, obj client.Object, ow
 		}
 	}
 
-	if err := c.Patch(ctx, obj, client.Apply, client.ForceOwnership, client.FieldOwner(addon.Name)); err != nil {
+	if err := c.Patch(ctx, obj, client.Apply, client.ForceOwnership, client.FieldOwner(addoncfg.Name)); err != nil {
 		return fmt.Errorf("failed to patch with SSA: %w", err)
 	}
 
