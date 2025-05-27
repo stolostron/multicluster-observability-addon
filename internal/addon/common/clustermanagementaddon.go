@@ -25,31 +25,6 @@ type DefaultConfig struct {
 	Config       addonv1alpha1.AddOnConfig
 }
 
-func ObjectToAddonConfig(obj client.Object) (addonv1alpha1.AddOnConfig, error) {
-	ret := addonv1alpha1.AddOnConfig{
-		ConfigGroupResource: addonv1alpha1.ConfigGroupResource{
-			Group: obj.GetObjectKind().GroupVersionKind().Group,
-		},
-		ConfigReferent: addonv1alpha1.ConfigReferent{
-			Namespace: obj.GetNamespace(),
-			Name:      obj.GetName(),
-		},
-	}
-
-	switch obj.GetObjectKind().GroupVersionKind().Kind {
-	case prometheusalpha1.ScrapeConfigsKind:
-		ret.Resource = prometheusalpha1.ScrapeConfigName
-	case prometheusv1.PrometheusRuleKind:
-		ret.Resource = prometheusv1.PrometheusRuleName
-	case prometheusalpha1.PrometheusAgentsKind:
-		ret.Resource = prometheusalpha1.PrometheusAgentName
-	default:
-		return ret, fmt.Errorf("%w: %s", errUnsupportedKind, obj.GetObjectKind().GroupVersionKind().Kind)
-	}
-
-	return ret, nil
-}
-
 func NewMCOAClusterManagementAddOn() *addonv1alpha1.ClusterManagementAddOn {
 	return &addonv1alpha1.ClusterManagementAddOn{
 		TypeMeta: metav1.TypeMeta{
@@ -134,4 +109,29 @@ func ensureConfigsInAddon(cmao *addonv1alpha1.ClusterManagementAddOn, configs []
 
 		cmao.Spec.InstallStrategy.Placements[i].Configs = append(cmao.Spec.InstallStrategy.Placements[i].Configs, dedupConfigs...)
 	}
+}
+
+func ObjectToAddonConfig(obj client.Object) (addonv1alpha1.AddOnConfig, error) {
+	ret := addonv1alpha1.AddOnConfig{
+		ConfigGroupResource: addonv1alpha1.ConfigGroupResource{
+			Group: obj.GetObjectKind().GroupVersionKind().Group,
+		},
+		ConfigReferent: addonv1alpha1.ConfigReferent{
+			Namespace: obj.GetNamespace(),
+			Name:      obj.GetName(),
+		},
+	}
+
+	switch obj.GetObjectKind().GroupVersionKind().Kind {
+	case prometheusalpha1.ScrapeConfigsKind:
+		ret.Resource = prometheusalpha1.ScrapeConfigName
+	case prometheusv1.PrometheusRuleKind:
+		ret.Resource = prometheusv1.PrometheusRuleName
+	case prometheusalpha1.PrometheusAgentsKind:
+		ret.Resource = prometheusalpha1.PrometheusAgentName
+	default:
+		return ret, fmt.Errorf("%w: %s %s/%s", errUnsupportedKind, obj.GetObjectKind().GroupVersionKind().Kind, obj.GetNamespace(), obj.GetName())
+	}
+
+	return ret, nil
 }
