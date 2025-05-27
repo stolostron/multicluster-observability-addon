@@ -39,6 +39,8 @@ type DefaultStackResources struct {
 // For each placement found in the ClusterManagementAddon resource, it generates a default PrometheusAgent
 // if not found and then applies configuration invariants using server-side apply.
 func (d DefaultStackResources) Reconcile(ctx context.Context) ([]common.DefaultConfig, error) {
+	d.Logger.V(1).Info("reconciling DefaultStackResources for metrics", "platformMetricsCollectionEnabled", d.AddonOptions.Platform.Metrics.CollectionEnabled,
+		"userWorkloadsMetricsCollectionEnabled", d.AddonOptions.UserWorkloads.Metrics.CollectionEnabled)
 	configs := []common.DefaultConfig{}
 
 	var mcoUID types.UID
@@ -100,6 +102,7 @@ func (d DefaultStackResources) Reconcile(ctx context.Context) ([]common.DefaultC
 
 func (d DefaultStackResources) reconcileScrapeConfigs(ctx context.Context, mcoUID types.UID, isUWL, hasHostedClusters bool) ([]common.DefaultConfig, error) {
 	labelVals := []string{}
+	d.Logger.V(1).Info("reconciling ScrapeConfigs", "mcoUID", mcoUID, "isUWL", isUWL, "hasHostedClusters", hasHostedClusters)
 
 	if len(mcoUID) == 0 {
 		return []common.DefaultConfig{}, nil
@@ -176,6 +179,7 @@ func (d DefaultStackResources) getPrometheusRules(ctx context.Context, mcoUID ty
 	if !d.AddonOptions.Platform.Metrics.CollectionEnabled && !d.AddonOptions.UserWorkloads.Metrics.CollectionEnabled {
 		return []common.DefaultConfig{}, nil
 	}
+	d.Logger.V(1).Info("reconciling PrometheusRules", "mcoUID", mcoUID, "hasHostedClusters", hasHostedClusters)
 
 	if len(mcoUID) == 0 {
 		return []common.DefaultConfig{}, nil
