@@ -25,7 +25,7 @@ const (
 	KeyUserWorkloadTracesCollection  = "userWorkloadTracesCollection"
 	KeyUserWorkloadInstrumentation   = "userWorkloadInstrumentation"
 
-	KeyObservabilityUIMetrics = "observabilityUIMetrics"
+	KeyPlatformMetricsUI = "platformMetricsUI"
 )
 
 type CollectionKind string
@@ -179,7 +179,7 @@ func BuildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Opti
 				opts.UserWorkloads.Traces.InstrumentationEnabled = true
 			}
 			// Observability UI Options
-		case KeyObservabilityUIMetrics:
+		case KeyPlatformMetricsUI:
 			if keyvalue.Value == string(UIPluginV1alpha1) && opts.Platform.Metrics.CollectionEnabled {
 				opts.Platform.Metrics.UI.Enabled = true
 				opts.Platform.Metrics.UI.ACM.Enabled = true

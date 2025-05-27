@@ -11,16 +11,16 @@ import (
 )
 
 type MetricsValues struct {
-	PlatformEnabled           bool          `json:"platformEnabled"`
-	UserWorkloadsEnabled      bool          `json:"userWorkloadsEnabled"`
-	Secrets                   []ConfigValue `json:"secrets"`
-	Images                    ImagesValues  `json:"images"`
-	PrometheusControllerID    string        `json:"prometheusControllerID"`
-	PrometheusCAConfigMapName string        `json:"prometheusCAConfigMapName"`
-	Platform                  Collector     `json:"platform"`
-	UserWorkload              Collector     `json:"userWorkload"`
-	UIEnabled                 bool          `json:"uiEnabled,omitempty"`
-	UISpec                    UIValues      `json:"ui,omitempty"`
+	PlatformEnabled           bool               `json:"platformEnabled"`
+	UserWorkloadsEnabled      bool               `json:"userWorkloadsEnabled"`
+	Secrets                   []ConfigValue      `json:"secrets"`
+	Images                    ImagesValues       `json:"images"`
+	PrometheusControllerID    string             `json:"prometheusControllerID"`
+	PrometheusCAConfigMapName string             `json:"prometheusCAConfigMapName"`
+	Platform                  Collector          `json:"platform"`
+	UserWorkload              Collector          `json:"userWorkload"`
+	UIEnabled                 bool               `json:"uiEnabled,omitempty"`
+	UISpec                    UIValues           `json:"ui,omitempty"`
 	PrometheusOperator        PrometheusOperator `json:"prometheusOperator"`
 }
 

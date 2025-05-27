@@ -15,9 +15,3 @@ prometheusOperator:
   component: controller
   rbacProxyTlsSecret: prometheus-operator-kube-rbac-proxy-tls
   rbacProxyPort: 9092
-ui:
-  enabled: false
-  acm:
-    enabled: true
-  perses:
-    enabled: true

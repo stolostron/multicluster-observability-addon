@@ -5,7 +5,6 @@ enabled: true
 metrics:
   platformEnabled: false
   userWorkloadsEnabled: false
-  uiEnabled: false
 
 logging:
   enabled: false
