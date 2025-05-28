@@ -85,7 +85,7 @@ func BuildDefaultStackResources(
 	defaultOpts.DefaultStack.Storage.LokiStack = existingLS
 	defaultOpts.DefaultStack.Storage.Tenants = tenants
 
-	ls, err := manifests.BuildSSALokiStack(defaultOpts, resourceName, addon.GlobalPlacementName, addon.GlobalPlacementNamespace)
+	ls, err := manifests.BuildSSALokiStack(defaultOpts, resourceName, addon.GlobalPlacementNamespace, addon.GlobalPlacementName)
 	if err != nil {
 		return nil, nil, err
 	}
