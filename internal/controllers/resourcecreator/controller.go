@@ -16,6 +16,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
@@ -184,11 +185,11 @@ func (r *ResourceCreatorReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		// Trigger reconciliations due to changes in Placements
 		Watches(&addonv1alpha1.ClusterManagementAddOn{}, r.enqueueAODC(), cmaoPredicate).
 		// Trigger reconciliations if the pool of ManagedClusters changes
-		Watches(&clusterv1.ManagedCluster{}, r.enqueueAODC()).
-		// Trigger reconciliations if user change a PrometheusAgent instance
-		Watches(&prometheusalpha1.PrometheusAgent{}, r.enqueueDefaultResources()).
-		Watches(&prometheusalpha1.ScrapeConfig{}, r.enqueueDefaultResources(), partOfMCOAPredicate).
-		Watches(&prometheusv1.PrometheusRule{}, r.enqueueDefaultResources(), partOfMCOAPredicate).
+		Watches(&clusterv1.ManagedCluster{}, r.enqueueAODC(), builder.OnlyMetadata).
+		// Trigger reconciliations if the metrics configuration resources change
+		Watches(&prometheusalpha1.PrometheusAgent{}, r.enqueueForMCOAOwnedResources(), partOfMCOAPredicate).
+		Watches(&prometheusalpha1.ScrapeConfig{}, r.enqueueForMCOControlledResources(), partOfMCOAPredicate).
+		Watches(&prometheusv1.PrometheusRule{}, r.enqueueForMCOControlledResources(), partOfMCOAPredicate).
 		Complete(r)
 }
 
@@ -205,7 +206,7 @@ func (r *ResourceCreatorReconciler) enqueueAODC() handler.EventHandler {
 	})
 }
 
-func (r *ResourceCreatorReconciler) enqueueDefaultResources() handler.EventHandler {
+func (r *ResourceCreatorReconciler) enqueueForMCOAOwnedResources() handler.EventHandler {
 	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
 		hasOwnerRef, err := controllerutil.HasOwnerReference(obj.GetOwnerReferences(), common.NewMCOAClusterManagementAddOn(), r.Client.Scheme())
 		if err != nil {
@@ -215,6 +216,41 @@ func (r *ResourceCreatorReconciler) enqueueDefaultResources() handler.EventHandl
 
 		if !hasOwnerRef {
 			return []reconcile.Request{}
+		}
+
+		return []reconcile.Request{
+			{
+				NamespacedName: types.NamespacedName{
+					Name:      addoncfg.Name,
+					Namespace: addoncfg.InstallNamespace,
+				},
+			},
+		}
+	})
+}
+
+func (r *ResourceCreatorReconciler) enqueueForMCOControlledResources() handler.EventHandler {
+	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
+		var isControlledByMCO bool
+		for _, owner := range obj.GetOwnerReferences() {
+			if owner.Controller == nil || !*owner.Controller {
+				continue
+			}
+			gv, err := schema.ParseGroupVersion(owner.APIVersion)
+			if err != nil {
+				r.Log.V(1).Info("failed to parse groupd version: %s", err.Error())
+				continue
+			}
+			if owner.Kind != "MultiClusterObservability" || gv.Group != "observability.open-cluster-management.io" {
+				continue
+			}
+			isControlledByMCO = true
+			break
+		}
+
+		if !isControlledByMCO {
+			return []reconcile.Request{}
+
 		}
 
 		return []reconcile.Request{
