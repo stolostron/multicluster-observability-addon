@@ -250,7 +250,6 @@ func (r *ResourceCreatorReconciler) enqueueForMCOControlledResources() handler.E
 
 		if !isControlledByMCO {
 			return []reconcile.Request{}
-
 		}
 
 		return []reconcile.Request{
