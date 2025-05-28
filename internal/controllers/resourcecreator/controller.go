@@ -14,6 +14,7 @@ import (
 	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	mresources "github.com/stolostron/multicluster-observability-addon/internal/metrics/resource"
 	"k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
@@ -137,7 +138,7 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 	// Reconcile metrics resources
 	images, err := mconfig.GetImageOverrides(ctx, r.Client)
-	if err != nil {
+	if err != nil && !errors.IsNotFound(err) {
 		return ctrl.Result{}, fmt.Errorf("failed to get image overrides: %w", err)
 	}
 
