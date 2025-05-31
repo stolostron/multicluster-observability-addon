@@ -13,6 +13,7 @@ import (
 	prometheusalpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
+	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/handlers"
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/manifests"
@@ -247,7 +248,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			// Wire everything together to a fake addon instance
-			agentAddon, err := addonfactory.NewAgentAddonFactory(addon.Name, addon.FS, addon.MetricsChartDir).
+			agentAddon, err := addonfactory.NewAgentAddonFactory(addoncfg.Name, addon.FS, addoncfg.MetricsChartDir).
 				WithGetValuesFuncs(addonConfigValuesFn, fakeGetValues(client, tc.PlatformMetrics, tc.UserMetrics)).
 				WithAgentRegistrationOption(&agent.RegistrationOption{}).
 				WithScheme(scheme).
@@ -496,7 +497,7 @@ func TestHelmBuild_Metrics_HCP(t *testing.T) {
 	managedClusterAddOn.Status.ConfigReferences = append(managedClusterAddOn.Status.ConfigReferences, configReferences...)
 
 	// Wire everything together to a fake addon instance
-	agentAddon, err := addonfactory.NewAgentAddonFactory(addon.Name, addon.FS, addon.MetricsChartDir).
+	agentAddon, err := addonfactory.NewAgentAddonFactory(addoncfg.Name, addon.FS, addoncfg.MetricsChartDir).
 		WithGetValuesFuncs(addonConfigValuesFn, fakeGetValues(client, false, true)).
 		WithAgentRegistrationOption(&agent.RegistrationOption{}).
 		WithScheme(scheme).
@@ -627,7 +628,7 @@ func newAddonOptions(platformEnabled, uwlEnabled bool) addon.Options {
 func newCMOA() *addonapiv1alpha1.ClusterManagementAddOn {
 	return &addonapiv1alpha1.ClusterManagementAddOn{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: addon.Name,
+			Name: addoncfg.Name,
 			UID:  types.UID("test-cmao-uid"),
 		},
 		Spec: addonapiv1alpha1.ClusterManagementAddOnSpec{

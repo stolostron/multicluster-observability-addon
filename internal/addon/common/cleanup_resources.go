@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"github.com/go-logr/logr"
-	"github.com/stolostron/multicluster-observability-addon/internal/addon"
+	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"k8s.io/apimachinery/pkg/api/meta"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -17,7 +17,7 @@ var errNotClientObjectType = errors.New("object is not a client.Object")
 
 // DeleteOrphanResources lists resources of type T owned by CMOA and removes the ones having no existing placement.
 func DeleteOrphanResources[T client.ObjectList](ctx context.Context, logger logr.Logger, k8s client.Client, cmao *addonapiv1alpha1.ClusterManagementAddOn, items T) error {
-	if err := k8s.List(ctx, items, client.InNamespace(addon.InstallNamespace)); err != nil {
+	if err := k8s.List(ctx, items, client.InNamespace(addoncfg.InstallNamespace)); err != nil {
 		return fmt.Errorf("failed to list PrometheusAgents: %w", err)
 	}
 
@@ -51,8 +51,8 @@ func DeleteOrphanResources[T client.ObjectList](ctx context.Context, logger logr
 		}
 
 		labels := obj.GetLabels()
-		placementNs := labels[addon.PlacementRefNamespaceLabelKey]
-		placementName := labels[addon.PlacementRefNameLabelKey]
+		placementNs := labels[addoncfg.PlacementRefNamespaceLabelKey]
+		placementName := labels[addoncfg.PlacementRefNameLabelKey]
 		if _, ok := placementsDict[makePlacementKey(placementNs, placementName)]; ok {
 			continue
 		}

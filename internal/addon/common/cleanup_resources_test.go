@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	prometheusalpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
-	"github.com/stolostron/multicluster-observability-addon/internal/addon"
+	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -20,7 +20,7 @@ import (
 
 func TestCleanOrphanResources(t *testing.T) {
 	// Setup common test variables
-	testNamespace := addon.InstallNamespace
+	testNamespace := addoncfg.InstallNamespace
 	placementName := "test-placement"
 	placementNs := testNamespace
 	cmaoName := "test-cmao"
@@ -53,8 +53,8 @@ func TestCleanOrphanResources(t *testing.T) {
 						Name:      "agent-1",
 						Namespace: testNamespace,
 						Labels: map[string]string{
-							addon.PlacementRefNameLabelKey:      placementName,
-							addon.PlacementRefNamespaceLabelKey: placementNs,
+							addoncfg.PlacementRefNameLabelKey:      placementName,
+							addoncfg.PlacementRefNamespaceLabelKey: placementNs,
 						},
 						// Not owned by CMAO
 					},
@@ -81,8 +81,8 @@ func TestCleanOrphanResources(t *testing.T) {
 						Name:      "agent-2",
 						Namespace: testNamespace,
 						Labels: map[string]string{
-							addon.PlacementRefNameLabelKey:      placementName,
-							addon.PlacementRefNamespaceLabelKey: placementNs,
+							addoncfg.PlacementRefNameLabelKey:      placementName,
+							addoncfg.PlacementRefNamespaceLabelKey: placementNs,
 						},
 						// Will be set as owned by CMAO in the test
 					},
@@ -117,8 +117,8 @@ func TestCleanOrphanResources(t *testing.T) {
 						Name:      "agent-3",
 						Namespace: testNamespace,
 						Labels: map[string]string{
-							addon.PlacementRefNameLabelKey:      placementName,
-							addon.PlacementRefNamespaceLabelKey: placementNs,
+							addoncfg.PlacementRefNameLabelKey:      placementName,
+							addoncfg.PlacementRefNamespaceLabelKey: placementNs,
 						},
 						// Not owned by CMAO
 					},
@@ -130,8 +130,8 @@ func TestCleanOrphanResources(t *testing.T) {
 						Name:      "agent-4",
 						Namespace: testNamespace,
 						Labels: map[string]string{
-							addon.PlacementRefNameLabelKey:      placementName,
-							addon.PlacementRefNamespaceLabelKey: placementNs,
+							addoncfg.PlacementRefNameLabelKey:      placementName,
+							addoncfg.PlacementRefNamespaceLabelKey: placementNs,
 						},
 						// Not owned by CMAO
 					},
@@ -168,8 +168,8 @@ func TestCleanOrphanResources(t *testing.T) {
 						Name:      "agent-5",
 						Namespace: testNamespace,
 						Labels: map[string]string{
-							addon.PlacementRefNameLabelKey:      placementName,
-							addon.PlacementRefNamespaceLabelKey: placementNs,
+							addoncfg.PlacementRefNameLabelKey:      placementName,
+							addoncfg.PlacementRefNamespaceLabelKey: placementNs,
 						},
 						// Will be set as owned by CMAO in the test
 					},
@@ -180,8 +180,8 @@ func TestCleanOrphanResources(t *testing.T) {
 						Name:      "agent-6",
 						Namespace: testNamespace,
 						Labels: map[string]string{
-							addon.PlacementRefNameLabelKey:      "other-placement",
-							addon.PlacementRefNamespaceLabelKey: placementNs,
+							addoncfg.PlacementRefNameLabelKey:      "other-placement",
+							addoncfg.PlacementRefNamespaceLabelKey: placementNs,
 						},
 						// Will be set as owned by CMAO in the test
 					},

@@ -10,6 +10,7 @@ import (
 	operatorv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
+	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"github.com/stolostron/multicluster-observability-addon/internal/logging/manifests"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
@@ -40,7 +41,7 @@ func BuildOptions(ctx context.Context, k8s client.Client, mcAddon *addonapiv1alp
 		opts.SubscriptionChannel = userWorkloads.SubscriptionChannel
 	}
 
-	keys := common.GetObjectKeys(mcAddon.Status.ConfigReferences, loggingv1.GroupVersion.Group, addon.ClusterLogForwardersResource)
+	keys := common.GetObjectKeys(mcAddon.Status.ConfigReferences, loggingv1.GroupVersion.Group, addoncfg.ClusterLogForwardersResource)
 	switch {
 	case len(keys) == 0:
 		return opts, errMissingCLFRef

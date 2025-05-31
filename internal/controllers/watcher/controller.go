@@ -9,7 +9,7 @@ import (
 	"github.com/go-logr/logr"
 	hyperv1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
-	"github.com/stolostron/multicluster-observability-addon/internal/addon"
+	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -136,7 +136,7 @@ func (r *WatcherReconciler) enqueueForLocalCluster() handler.EventHandler {
 		return []reconcile.Request{
 			{
 				NamespacedName: types.NamespacedName{
-					Name:      addon.Name,
+					Name:      addoncfg.Name,
 					Namespace: localClusterNamespace,
 				},
 			},
@@ -146,7 +146,7 @@ func (r *WatcherReconciler) enqueueForLocalCluster() handler.EventHandler {
 
 func (r *WatcherReconciler) enqueueForConfigResource() handler.EventHandler {
 	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
-		key := client.ObjectKey{Name: addon.Name, Namespace: obj.GetNamespace()}
+		key := client.ObjectKey{Name: addoncfg.Name, Namespace: obj.GetNamespace()}
 		mcaddon := &metav1.PartialObjectMetadata{}
 		mcaddon.SetGroupVersionKind(schema.GroupVersionKind{
 			Group:   addonv1alpha1.GroupVersion.Group,
@@ -180,7 +180,7 @@ func (r *WatcherReconciler) getReconcileRequestsFromManifestWorks(ctx context.Co
 
 	mws := &workv1.ManifestWorkList{}
 	labelSelector := labels.SelectorFromSet(labels.Set{
-		addon.LabelOCMAddonName: addon.Name,
+		addoncfg.LabelOCMAddonName: addoncfg.Name,
 	})
 	if err := r.List(ctx, mws, &client.ListOptions{LabelSelector: labelSelector}); err != nil {
 		r.Log.Error(err, errMessageListingManifestWorkResources)
@@ -203,7 +203,7 @@ func (r *WatcherReconciler) getReconcileRequestsFromManifestWorks(ctx context.Co
 						// Trigger a reconcile request for the addon in the ManifestWork namespace
 						reconcile.Request{
 							NamespacedName: types.NamespacedName{
-								Name:      addon.Name,
+								Name:      addoncfg.Name,
 								Namespace: mw.Namespace,
 							},
 						},

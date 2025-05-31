@@ -8,6 +8,7 @@ import (
 	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
 	prometheusalpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	uiplugin "github.com/rhobs/observability-operator/pkg/apis/uiplugin/v1alpha1"
+	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	"github.com/stretchr/testify/require"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
@@ -16,7 +17,7 @@ import (
 )
 
 func Test_AgentHealthProber_PPA(t *testing.T) {
-	unhealthyError := fmt.Errorf("%w: prometheusagents status condition type is %s for %s/%s", errProbeConditionNotSatisfied, "False", InstallNamespace, mconfig.PlatformMetricsCollectorApp)
+	unhealthyError := fmt.Errorf("%w: prometheusagents status condition type is %s for %s/%s", errProbeConditionNotSatisfied, "False", addoncfg.InstallNamespace, mconfig.PlatformMetricsCollectorApp)
 	managedCluster := addontesting.NewManagedCluster("cluster-1")
 	managedClusterAddOn := addontesting.NewAddon("test", "cluster-1")
 	for _, tc := range []struct {
@@ -43,7 +44,7 @@ func Test_AgentHealthProber_PPA(t *testing.T) {
 							Group:     loggingv1.GroupVersion.Group,
 							Resource:  prometheusalpha1.PrometheusAgentName,
 							Name:      mconfig.PlatformMetricsCollectorApp,
-							Namespace: InstallNamespace,
+							Namespace: addoncfg.InstallNamespace,
 						},
 						FeedbackResult: workv1.StatusFeedbackResult{
 							Values: []workv1.FeedbackValue{
@@ -68,7 +69,7 @@ func Test_AgentHealthProber_PPA(t *testing.T) {
 }
 
 func Test_AgentHealthProber_CLF(t *testing.T) {
-	unhealthyError := fmt.Errorf("%w: clusterlogforwarders status condition type is %s for %s/%s", errProbeConditionNotSatisfied, "False", SpokeCLFNamespace, SpokeCLFName)
+	unhealthyError := fmt.Errorf("%w: clusterlogforwarders status condition type is %s for %s/%s", errProbeConditionNotSatisfied, "False", addoncfg.SpokeCLFNamespace, addoncfg.SpokeCLFName)
 	managedCluster := addontesting.NewManagedCluster("cluster-1")
 	managedClusterAddOn := addontesting.NewAddon("test", "cluster-1")
 	for _, tc := range []struct {
@@ -93,9 +94,9 @@ func Test_AgentHealthProber_CLF(t *testing.T) {
 					{
 						ResourceIdentifier: workv1.ResourceIdentifier{
 							Group:     loggingv1.GroupVersion.Group,
-							Resource:  ClusterLogForwardersResource,
-							Name:      SpokeCLFName,
-							Namespace: SpokeCLFNamespace,
+							Resource:  addoncfg.ClusterLogForwardersResource,
+							Name:      addoncfg.SpokeCLFName,
+							Namespace: addoncfg.SpokeCLFNamespace,
 						},
 						FeedbackResult: workv1.StatusFeedbackResult{
 							Values: []workv1.FeedbackValue{
@@ -120,7 +121,7 @@ func Test_AgentHealthProber_CLF(t *testing.T) {
 }
 
 func Test_AgentHealthProber_OTELCol(t *testing.T) {
-	unhealthyError := fmt.Errorf("%w: opentelemetrycollectors replicas is %d for %s/%s", errProbeConditionNotSatisfied, 0, SpokeOTELColNamespace, SpokeOTELColName)
+	unhealthyError := fmt.Errorf("%w: opentelemetrycollectors replicas is %d for %s/%s", errProbeConditionNotSatisfied, 0, addoncfg.SpokeOTELColNamespace, addoncfg.SpokeOTELColName)
 	managedCluster := addontesting.NewManagedCluster("cluster-1")
 	managedClusterAddOn := addontesting.NewAddon("test", "cluster-1")
 	for _, tc := range []struct {
@@ -144,9 +145,9 @@ func Test_AgentHealthProber_OTELCol(t *testing.T) {
 				{
 					ResourceIdentifier: workv1.ResourceIdentifier{
 						Group:     otelv1alpha1.GroupVersion.Group,
-						Resource:  OpenTelemetryCollectorsResource,
-						Name:      SpokeOTELColName,
-						Namespace: SpokeOTELColNamespace,
+						Resource:  addoncfg.OpenTelemetryCollectorsResource,
+						Name:      addoncfg.SpokeOTELColName,
+						Namespace: addoncfg.SpokeOTELColNamespace,
 					},
 					FeedbackResult: workv1.StatusFeedbackResult{
 						Values: []workv1.FeedbackValue{
@@ -171,7 +172,7 @@ func Test_AgentHealthProber_OTELCol(t *testing.T) {
 }
 
 func Test_AgentHealthProber_UIPlugin(t *testing.T) {
-	unhealthyError := fmt.Errorf("%w: uiplugins status condition type is %s for %s", errProbeConditionNotSatisfied, "False", IDetectionUIPluginName)
+	unhealthyError := fmt.Errorf("%w: uiplugins status condition type is %s for %s", errProbeConditionNotSatisfied, "False", addoncfg.IDetectionUIPluginName)
 	managedCluster := addontesting.NewManagedCluster("cluster-1")
 	managedClusterAddOn := addontesting.NewAddon("test", "cluster-1")
 	for _, tc := range []struct {
@@ -195,8 +196,8 @@ func Test_AgentHealthProber_UIPlugin(t *testing.T) {
 				{
 					ResourceIdentifier: workv1.ResourceIdentifier{
 						Group:    uiplugin.GroupVersion.Group,
-						Resource: uiPluginsResource,
-						Name:     IDetectionUIPluginName,
+						Resource: addoncfg.UiPluginsResource,
+						Name:     addoncfg.IDetectionUIPluginName,
 					},
 					FeedbackResult: workv1.StatusFeedbackResult{
 						Values: []workv1.FeedbackValue{

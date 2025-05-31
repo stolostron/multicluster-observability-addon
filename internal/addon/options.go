@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"strings"
 
+	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 )
 
@@ -112,7 +113,7 @@ func BuildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Opti
 			}
 			url, err := url.Parse(val)
 			if err != nil {
-				return opts, fmt.Errorf("%w: %s", errInvalidMetricsHubHostname, err.Error())
+				return opts, fmt.Errorf("%w: %s", addoncfg.ErrInvalidMetricsHubHostname, err.Error())
 			}
 			url = url.JoinPath("/api/metrics/v1/default/api/v1/receive")
 
@@ -120,7 +121,7 @@ func BuildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Opti
 			// - Check if host is empty
 			// - Check for invalid hostname formats like ":"
 			if strings.TrimSpace(url.Host) == "" || url.Host == ":" || strings.HasPrefix(url.Host, ":") {
-				return opts, fmt.Errorf("%w: invalid hostname format '%s'", errInvalidMetricsHubHostname, url.Host)
+				return opts, fmt.Errorf("%w: invalid hostname format '%s'", addoncfg.ErrInvalidMetricsHubHostname, url.Host)
 			}
 
 			opts.Platform.Metrics.HubEndpoint = url

@@ -2,11 +2,14 @@ package common
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 
 	"github.com/go-logr/logr"
-	"github.com/stolostron/multicluster-observability-addon/internal/addon"
+	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	prometheusv1alpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
+	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -14,6 +17,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
+
+var errUnsupportedKind = errors.New("unsupported resource kind")
 
 type DefaultConfig struct {
 	PlacementRef addonv1alpha1.PlacementRef
@@ -27,7 +32,7 @@ func NewMCOAClusterManagementAddOn() *addonv1alpha1.ClusterManagementAddOn {
 			APIVersion: addonv1alpha1.GroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: addon.Name,
+			Name: addoncfg.Name,
 		},
 	}
 }
@@ -50,7 +55,7 @@ func HasCMAOOwnerReference(ctx context.Context, k8s client.Client, obj client.Ob
 func EnsureAddonConfig(ctx context.Context, logger logr.Logger, k8s client.Client, configs []DefaultConfig) error {
 	// Get the current CMAO
 	cmao := &addonv1alpha1.ClusterManagementAddOn{}
-	if err := k8s.Get(ctx, types.NamespacedName{Name: addon.Name}, cmao); err != nil {
+	if err := k8s.Get(ctx, types.NamespacedName{Name: addoncfg.Name}, cmao); err != nil {
 		return fmt.Errorf("failed to get ClusterManagementAddOn: %w", err)
 	}
 
@@ -104,4 +109,29 @@ func ensureConfigsInAddon(cmao *addonv1alpha1.ClusterManagementAddOn, configs []
 
 		cmao.Spec.InstallStrategy.Placements[i].Configs = append(cmao.Spec.InstallStrategy.Placements[i].Configs, dedupConfigs...)
 	}
+}
+
+func ObjectToAddonConfig(obj client.Object) (addonv1alpha1.AddOnConfig, error) {
+	ret := addonv1alpha1.AddOnConfig{
+		ConfigGroupResource: addonv1alpha1.ConfigGroupResource{
+			Group: obj.GetObjectKind().GroupVersionKind().Group,
+		},
+		ConfigReferent: addonv1alpha1.ConfigReferent{
+			Namespace: obj.GetNamespace(),
+			Name:      obj.GetName(),
+		},
+	}
+
+	switch obj.GetObjectKind().GroupVersionKind().Kind {
+	case prometheusv1alpha1.ScrapeConfigsKind:
+		ret.Resource = prometheusv1alpha1.ScrapeConfigName
+	case prometheusv1.PrometheusRuleKind:
+		ret.Resource = prometheusv1.PrometheusRuleName
+	case prometheusv1alpha1.PrometheusAgentsKind:
+		ret.Resource = prometheusv1alpha1.PrometheusAgentName
+	default:
+		return ret, fmt.Errorf("%w: %s %s/%s", errUnsupportedKind, obj.GetObjectKind().GroupVersionKind().Kind, obj.GetNamespace(), obj.GetName())
+	}
+
+	return ret, nil
 }

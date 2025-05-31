@@ -9,6 +9,7 @@ import (
 	operatorsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
+	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"github.com/stolostron/multicluster-observability-addon/internal/logging/handlers"
 	"github.com/stolostron/multicluster-observability-addon/internal/logging/manifests"
 	"github.com/stretchr/testify/require"
@@ -40,7 +41,7 @@ func fakeGetValues(k8s client.Client) addonfactory.GetValuesFunc {
 		mcAddon *addonapiv1alpha1.ManagedClusterAddOn,
 	) (addonfactory.Values, error) {
 		aodc := &addonapiv1alpha1.AddOnDeploymentConfig{}
-		keys := common.GetObjectKeys(mcAddon.Status.ConfigReferences, addonutils.AddOnDeploymentConfigGVR.Group, addon.AddonDeploymentConfigResource)
+		keys := common.GetObjectKeys(mcAddon.Status.ConfigReferences, addonutils.AddOnDeploymentConfigGVR.Group, addoncfg.AddonDeploymentConfigResource)
 		if err := k8s.Get(context.TODO(), keys[0], aodc, &client.GetOptions{}); err != nil {
 			return nil, err
 		}
@@ -87,7 +88,7 @@ func newLoggingAgentAddon(initObjects []client.Object, addOnDeploymentConfig *ad
 	)
 
 	// Wire everything together to a fake addon instance
-	loggingAgentAddon, err := addonfactory.NewAgentAddonFactory(addon.Name, addon.FS, addon.LoggingChartDir).
+	loggingAgentAddon, err := addonfactory.NewAgentAddonFactory(addoncfg.Name, addon.FS, addoncfg.LoggingChartDir).
 		WithGetValuesFuncs(addonConfigValuesFn, fakeGetValues(fakeKubeClient)).
 		WithAgentRegistrationOption(&agent.RegistrationOption{}).
 		WithScheme(scheme.Scheme).
@@ -340,8 +341,8 @@ func Test_Logging_Unmanaged_CLF(t *testing.T) {
 			require.Equal(t, "static-authentication", obj.Spec.Outputs[1].Cloudwatch.Authentication.AWSAccessKey.KeySecret.SecretName)
 			// Check name and namespace to make sure that if we change the helm
 			// manifests that we don't break the addon probes
-			require.Equal(t, addon.SpokeCLFName, obj.Name)
-			require.Equal(t, addon.SpokeCLFNamespace, obj.Namespace)
+			require.Equal(t, addoncfg.SpokeCLFName, obj.Name)
+			require.Equal(t, addoncfg.SpokeCLFNamespace, obj.Namespace)
 		case *corev1.Secret:
 			if obj.Name == "static-authentication" {
 				require.Equal(t, staticCred.Data, obj.Data)
