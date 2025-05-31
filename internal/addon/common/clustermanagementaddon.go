@@ -2,10 +2,13 @@ package common
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 
 	"github.com/go-logr/logr"
+	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	prometheusv1alpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -14,6 +17,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
+
+var errUnsupportedKind = errors.New("unsupported resource kind")
 
 type DefaultConfig struct {
 	PlacementRef addonv1alpha1.PlacementRef
@@ -104,4 +109,33 @@ func ensureConfigsInAddon(cmao *addonv1alpha1.ClusterManagementAddOn, configs []
 
 		cmao.Spec.InstallStrategy.Placements[i].Configs = append(cmao.Spec.InstallStrategy.Placements[i].Configs, dedupConfigs...)
 	}
+}
+
+func ObjectToAddonConfig(obj client.Object) (addonv1alpha1.AddOnConfig, error) {
+	ret := addonv1alpha1.AddOnConfig{
+		ConfigGroupResource: addonv1alpha1.ConfigGroupResource{
+			Group: obj.GetObjectKind().GroupVersionKind().Group,
+		},
+		ConfigReferent: addonv1alpha1.ConfigReferent{
+			Namespace: obj.GetNamespace(),
+			Name:      obj.GetName(),
+		},
+	}
+
+	switch obj.GetObjectKind().GroupVersionKind().Kind {
+	case prometheusv1alpha1.ScrapeConfigsKind:
+		ret.Resource = prometheusv1alpha1.ScrapeConfigName
+	case prometheusv1.PrometheusRuleKind:
+		ret.Resource = prometheusv1.PrometheusRuleName
+	case prometheusv1alpha1.PrometheusAgentsKind:
+		ret.Resource = prometheusv1alpha1.PrometheusAgentName
+	case "LokiStack":
+		ret.Resource = addon.LokiStacksResource
+	case "ClusterLogForwarder":
+		ret.Resource = addon.ClusterLogForwardersResource
+	default:
+		return ret, fmt.Errorf("%w: %s", errUnsupportedKind, obj.GetObjectKind().GroupVersionKind().Kind)
+	}
+
+	return ret, nil
 }

@@ -1,0 +1,53 @@
+{{- if .Values.enabled }}
+{{- $clfSpec := fromJson .Values.clfSpec }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: openshift-logging:mcoa-managed-logcollector:application-logs
+  labels:
+    app: {{ template "loggingCollection.name" . }}
+    chart: {{ template "loggingCollection.chart" . }}
+    release: {{ .Release.Name }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: collect-application-logs
+subjects:
+  - kind: ServiceAccount
+    name: {{ $clfSpec.serviceAccount.name }}
+    namespace: openshift-logging
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: openshift-logging:mcoa-managed-logcollector:audit-logs
+  labels:
+    app: {{ template "loggingCollection.name" . }}
+    chart: {{ template "loggingCollection.chart" . }}
+    release: {{ .Release.Name }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: collect-audit-logs
+subjects:
+  - kind: ServiceAccount
+    name: {{ $clfSpec.serviceAccount.name }}
+    namespace: openshift-logging
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: openshift-logging:mcoa-managed-logcollector:infrastructure-logs
+  labels:
+    app: {{ template "loggingCollection.name" . }}
+    chart: {{ template "loggingCollection.chart" . }}
+    release: {{ .Release.Name }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: collect-infrastructure-logs
+subjects:
+  - kind: ServiceAccount
+    name: {{ $clfSpec.serviceAccount.name }}
+    namespace: openshift-logging
+{{- end }}
