@@ -2,8 +2,6 @@ nameOverride: null
 
 enabled: true
 
-installCOO: false
-
 metrics:
   platformEnabled: false
   userWorkloadsEnabled: false
