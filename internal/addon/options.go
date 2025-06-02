@@ -89,16 +89,6 @@ type UserWorkloadOptions struct {
 
 type MetricsUIOptions struct {
 	Enabled bool
-	ACM     ACMOptions
-	Perses  PersesOptions
-}
-
-type ACMOptions struct {
-	Enabled bool
-}
-
-type PersesOptions struct {
-	Enabled bool
 }
 
 type Options struct {
@@ -182,8 +172,6 @@ func BuildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Opti
 		case KeyPlatformMetricsUI:
 			if keyvalue.Value == string(UIPluginV1alpha1) && opts.Platform.Metrics.CollectionEnabled {
 				opts.Platform.Metrics.UI.Enabled = true
-				opts.Platform.Metrics.UI.ACM.Enabled = true
-				opts.Platform.Metrics.UI.Perses.Enabled = true
 			}
 		}
 	}

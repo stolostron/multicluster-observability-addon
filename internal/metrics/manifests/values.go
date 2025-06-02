@@ -251,7 +251,7 @@ func EnableUI(opts addon.MetricsOptions, isHub bool) *UIValues {
 
 	return &UIValues{
 		Enabled: true,
-		ACM:     ACMValues{Enabled: opts.UI.ACM.Enabled},
-		Perses:  PersesValues{Enabled: opts.UI.Perses.Enabled},
+		ACM:     ACMValues{Enabled: opts.UI.Enabled},
+		Perses:  PersesValues{Enabled: opts.UI.Enabled},
 	}
 }

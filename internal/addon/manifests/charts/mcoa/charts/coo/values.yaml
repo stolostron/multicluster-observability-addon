@@ -14,3 +14,5 @@ metrics:
 
 incidentDetection:
   enabled: false
+
+monitoringUIPlugin: false
