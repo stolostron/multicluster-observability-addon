@@ -187,7 +187,7 @@ func (r *ResourceCreatorReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		// Trigger reconciliations if the pool of ManagedClusters changes
 		Watches(&clusterv1.ManagedCluster{}, r.enqueueAODC(), builder.OnlyMetadata).
 		// Trigger reconciliations if the metrics configuration resources change
-		Watches(&prometheusalpha1.PrometheusAgent{}, r.enqueueForMCOAOwnedResources(), partOfMCOAPredicate).
+		Watches(&prometheusalpha1.PrometheusAgent{}, r.enqueueForMCOAOwnedResources()).
 		Watches(&prometheusalpha1.ScrapeConfig{}, r.enqueueForMCOControlledResources(), partOfMCOAPredicate).
 		Watches(&prometheusv1.PrometheusRule{}, r.enqueueForMCOControlledResources(), partOfMCOAPredicate).
 		Complete(r)
