@@ -19,8 +19,6 @@ type MetricsValues struct {
 	PrometheusCAConfigMapName string             `json:"prometheusCAConfigMapName"`
 	Platform                  Collector          `json:"platform"`
 	UserWorkload              Collector          `json:"userWorkload"`
-	UIEnabled                 bool               `json:"uiEnabled,omitempty"`
-	UISpec                    UIValues           `json:"ui,omitempty"`
 	PrometheusOperator        PrometheusOperator `json:"prometheusOperator"`
 }
 
