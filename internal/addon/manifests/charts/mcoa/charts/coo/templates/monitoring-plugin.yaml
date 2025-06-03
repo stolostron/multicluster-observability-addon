@@ -11,13 +11,13 @@ spec:
   monitoring:
 {{- if .Values.metrics.enabled }}
     acm:
-      enabled: {{ .Values.metrics.acm.enabled }}
+      enabled: true
       alertmanager:
         url: 'https://alertmanager.open-cluster-management-observability.svc:9095'
       thanosQuerier:
         url: 'https://rbac-query-proxy.open-cluster-management-observability.svc:8443'
     perses:
-      enabled: {{ .Values.metrics.perses.enabled }}
+      enabled: true
 {{- end }}
 {{- if .Values.incidentDetection.enabled }}
     incidents:
