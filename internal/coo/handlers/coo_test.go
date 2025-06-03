@@ -6,6 +6,7 @@ import (
 
 	"github.com/go-logr/logr"
 	operatorv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
+	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -19,7 +20,7 @@ func TestSkipInstallCOO(t *testing.T) {
 	tests := []struct {
 		name                string
 		isHub               bool
-		options             Options
+		options             addon.Options
 		subscription        *operatorv1alpha1.Subscription
 		expectedSkipInstall bool
 		expectedErrMsg      string
@@ -27,17 +28,17 @@ func TestSkipInstallCOO(t *testing.T) {
 		{
 			name:                "Non-hub cluster with no features enabled",
 			isHub:               false,
-			options:             Options{},
+			options:             addon.Options{},
 			expectedSkipInstall: false,
 		},
 		{
 			name:  "Non-hub cluster with incident detection enabled",
 			isHub: false,
-			options: Options{
-				Platform: PlatformOptions{
+			options: addon.Options{
+				Platform: addon.PlatformOptions{
 					Enabled: true,
-					AnalyticsOptions: AnalyticsOptions{
-						IncidentDetection: IncidentDetection{
+					AnalyticsOptions: addon.AnalyticsOptions{
+						IncidentDetection: addon.IncidentDetection{
 							Enabled: true,
 						},
 					},
@@ -48,11 +49,11 @@ func TestSkipInstallCOO(t *testing.T) {
 		{
 			name:  "Hub cluster with incident detection enabled but no COO installed",
 			isHub: true,
-			options: Options{
-				Platform: PlatformOptions{
+			options: addon.Options{
+				Platform: addon.PlatformOptions{
 					Enabled: true,
-					AnalyticsOptions: AnalyticsOptions{
-						IncidentDetection: IncidentDetection{
+					AnalyticsOptions: addon.AnalyticsOptions{
+						IncidentDetection: addon.IncidentDetection{
 							Enabled: true,
 						},
 					},
@@ -63,17 +64,17 @@ func TestSkipInstallCOO(t *testing.T) {
 		{
 			name:                "Hub cluster with no features enabled",
 			isHub:               true,
-			options:             Options{},
+			options:             addon.Options{},
 			expectedSkipInstall: false,
 		},
 		{
 			name:  "Hub cluster with COO installed and incident detection enabled",
 			isHub: true,
-			options: Options{
-				Platform: PlatformOptions{
+			options: addon.Options{
+				Platform: addon.PlatformOptions{
 					Enabled: true,
-					AnalyticsOptions: AnalyticsOptions{
-						IncidentDetection: IncidentDetection{
+					AnalyticsOptions: addon.AnalyticsOptions{
+						IncidentDetection: addon.IncidentDetection{
 							Enabled: true,
 						},
 					},
@@ -93,11 +94,11 @@ func TestSkipInstallCOO(t *testing.T) {
 		{
 			name:  "Hub cluster with COO installed with multicluster-observability-addon release label",
 			isHub: true,
-			options: Options{
-				Platform: PlatformOptions{
+			options: addon.Options{
+				Platform: addon.PlatformOptions{
 					Enabled: true,
-					AnalyticsOptions: AnalyticsOptions{
-						IncidentDetection: IncidentDetection{
+					AnalyticsOptions: addon.AnalyticsOptions{
+						IncidentDetection: addon.IncidentDetection{
 							Enabled: true,
 						},
 					},
@@ -120,11 +121,11 @@ func TestSkipInstallCOO(t *testing.T) {
 		{
 			name:  "Hub cluster with wrong version of COO installed and incident detection enabled",
 			isHub: true,
-			options: Options{
-				Platform: PlatformOptions{
+			options: addon.Options{
+				Platform: addon.PlatformOptions{
 					Enabled: true,
-					AnalyticsOptions: AnalyticsOptions{
-						IncidentDetection: IncidentDetection{
+					AnalyticsOptions: addon.AnalyticsOptions{
+						IncidentDetection: addon.IncidentDetection{
 							Enabled: true,
 						},
 					},
@@ -145,10 +146,10 @@ func TestSkipInstallCOO(t *testing.T) {
 		{
 			name:  "Hub cluster with metrics enabled but not incident detection",
 			isHub: true,
-			options: Options{
-				Platform: PlatformOptions{
+			options: addon.Options{
+				Platform: addon.PlatformOptions{
 					Enabled: true,
-					Metrics: MetricsOptions{
+					Metrics: addon.MetricsOptions{
 						CollectionEnabled: true,
 					},
 				},
@@ -166,7 +167,7 @@ func TestSkipInstallCOO(t *testing.T) {
 				k8sClientBuilder = k8sClientBuilder.WithObjects(tc.subscription)
 			}
 
-			result, err := InstallCOO(context.Background(), k8sClientBuilder.Build(), logr.Discard(), tc.isHub, tc.options)
+			result, err := InstallCOO(context.Background(), k8sClientBuilder.Build(), logr.Discard(), tc.isHub)
 
 			if tc.expectedErrMsg != "" {
 				assert.EqualError(t, err, tc.expectedErrMsg)

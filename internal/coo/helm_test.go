@@ -10,6 +10,7 @@ import (
 	uiplugin "github.com/rhobs/observability-operator/pkg/apis/uiplugin/v1alpha1"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
+	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"github.com/stolostron/multicluster-observability-addon/internal/coo/handlers"
 	"github.com/stolostron/multicluster-observability-addon/internal/coo/manifests"
 	"github.com/stretchr/testify/require"
@@ -41,7 +42,7 @@ func fakeGetValues(ctx context.Context, k8s client.Client) addonfactory.GetValue
 		mcAddon *addonapiv1alpha1.ManagedClusterAddOn,
 	) (addonfactory.Values, error) {
 		aodc := &addonapiv1alpha1.AddOnDeploymentConfig{}
-		keys := common.GetObjectKeys(mcAddon.Status.ConfigReferences, addonutils.AddOnDeploymentConfigGVR.Group, addon.AddonDeploymentConfigResource)
+		keys := common.GetObjectKeys(mcAddon.Status.ConfigReferences, addonutils.AddOnDeploymentConfigGVR.Group, addoncfg.AddonDeploymentConfigResource)
 		if err := k8s.Get(ctx, keys[0], aodc, &client.GetOptions{}); err != nil {
 			return nil, err
 		}
@@ -85,7 +86,7 @@ func newCOOAgentAddon(initObjects []client.Object, addOnDeploymentConfig *addona
 	ctx := context.Background()
 
 	// Wire everything together to a fake addon instance
-	oboAgentAddon, err := addonfactory.NewAgentAddonFactory(addon.Name, addon.FS, addon.COOChartDir).
+	oboAgentAddon, err := addonfactory.NewAgentAddonFactory(addoncfg.Name, addon.FS, addoncfg.COOChartDir).
 		WithGetValuesFuncs(addonConfigValuesFn, fakeGetValues(ctx, fakeKubeClient)).
 		WithAgentRegistrationOption(&agent.RegistrationOption{}).
 		WithScheme(scheme.Scheme).
