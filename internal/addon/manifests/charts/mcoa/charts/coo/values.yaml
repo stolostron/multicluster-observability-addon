@@ -6,10 +6,7 @@ enabled: false
 installCOO: false
 
 metrics:
-  acm:
-    enabled: true
-  perses:
-    enabled: true
+    enabled: false
 
 
 incidentDetection:
