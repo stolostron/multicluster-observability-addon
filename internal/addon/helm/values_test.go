@@ -10,6 +10,7 @@ import (
 	operatorsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	uiplugin "github.com/rhobs/observability-operator/pkg/apis/uiplugin/v1alpha1"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
+	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -180,7 +181,7 @@ func Test_Supported_Vendors(t *testing.T) {
 				WithObjects(addOnDeploymentConfig, clf, staticCred).
 				Build()
 
-			loggingAgentAddon, err := addonfactory.NewAgentAddonFactory(addon.Name, addon.FS, addon.McoaChartDir).
+			loggingAgentAddon, err := addonfactory.NewAgentAddonFactory(addoncfg.Name, addon.FS, addoncfg.McoaChartDir).
 				WithGetValuesFuncs(GetValuesFunc(context.TODO(), fakeKubeClient, logr.Discard())).
 				WithAgentRegistrationOption(&agent.RegistrationOption{}).
 				WithScheme(scheme.Scheme).
@@ -224,7 +225,7 @@ func TestGetAddOnDeploymentConfig(t *testing.T) {
 						{
 							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
 								Group:    addonutils.AddOnDeploymentConfigGVR.Group,
-								Resource: addon.AddonDeploymentConfigResource,
+								Resource: addoncfg.AddonDeploymentConfigResource,
 							},
 							ConfigReferent: addonapiv1alpha1.ConfigReferent{
 								Name:      "foo",
@@ -234,7 +235,7 @@ func TestGetAddOnDeploymentConfig(t *testing.T) {
 						{
 							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
 								Group:    addonutils.AddOnDeploymentConfigGVR.Group,
-								Resource: addon.AddonDeploymentConfigResource,
+								Resource: addoncfg.AddonDeploymentConfigResource,
 							},
 							ConfigReferent: addonapiv1alpha1.ConfigReferent{
 								Name:      "bar",
@@ -254,7 +255,7 @@ func TestGetAddOnDeploymentConfig(t *testing.T) {
 						{
 							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
 								Group:    addonutils.AddOnDeploymentConfigGVR.Group,
-								Resource: addon.AddonDeploymentConfigResource,
+								Resource: addoncfg.AddonDeploymentConfigResource,
 							},
 							ConfigReferent: addonapiv1alpha1.ConfigReferent{
 								Name:      "foo",

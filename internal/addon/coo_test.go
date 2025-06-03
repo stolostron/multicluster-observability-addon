@@ -6,6 +6,7 @@ import (
 
 	"github.com/go-logr/logr"
 	operatorv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
+	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -80,11 +81,11 @@ func TestSkipInstallCOO(t *testing.T) {
 			},
 			subscription: &operatorv1alpha1.Subscription{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      cooSubscriptionName,
-					Namespace: cooSubscriptionNamespace,
+					Name:      addoncfg.CooSubscriptionName,
+					Namespace: addoncfg.CooSubscriptionNamespace,
 				},
 				Spec: &operatorv1alpha1.SubscriptionSpec{
-					Channel: cooSubscriptionChannel,
+					Channel: addoncfg.CooSubscriptionChannel,
 				},
 			},
 			expectedSkipInstall: false,
@@ -104,14 +105,14 @@ func TestSkipInstallCOO(t *testing.T) {
 			},
 			subscription: &operatorv1alpha1.Subscription{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      cooSubscriptionName,
-					Namespace: cooSubscriptionNamespace,
+					Name:      addoncfg.CooSubscriptionName,
+					Namespace: addoncfg.CooSubscriptionNamespace,
 					Labels: map[string]string{
 						"release": "multicluster-observability-addon",
 					},
 				},
 				Spec: &operatorv1alpha1.SubscriptionSpec{
-					Channel: cooSubscriptionChannel,
+					Channel: addoncfg.CooSubscriptionChannel,
 				},
 			},
 			expectedSkipInstall: true,
@@ -131,15 +132,15 @@ func TestSkipInstallCOO(t *testing.T) {
 			},
 			subscription: &operatorv1alpha1.Subscription{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      cooSubscriptionName,
-					Namespace: cooSubscriptionNamespace,
+					Name:      addoncfg.CooSubscriptionName,
+					Namespace: addoncfg.CooSubscriptionNamespace,
 				},
 				Spec: &operatorv1alpha1.SubscriptionSpec{
 					Channel: "wrong-channel",
 				},
 			},
 			expectedSkipInstall: false,
-			expectedErrMsg:      errInvalidSubscriptionChannel.Error(),
+			expectedErrMsg:      addoncfg.ErrInvalidSubscriptionChannel.Error(),
 		},
 		{
 			name:  "Hub cluster with metrics enabled but not incident detection",

@@ -9,6 +9,7 @@ import (
 	clusterlifecycleconstants "github.com/stolostron/cluster-lifecycle-api/constants"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
+	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	analytics "github.com/stolostron/multicluster-observability-addon/internal/analytics"
 	ihandlers "github.com/stolostron/multicluster-observability-addon/internal/analytics/incident-detection/handlers"
 	imanifests "github.com/stolostron/multicluster-observability-addon/internal/analytics/incident-detection/manifests"
@@ -159,7 +160,7 @@ func getIncidentDetectionValues(ctx context.Context, k8s client.Client, mcAddon 
 
 func getAddOnDeploymentConfig(ctx context.Context, k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAddOn) (*addonapiv1alpha1.AddOnDeploymentConfig, error) {
 	aodc := &addonapiv1alpha1.AddOnDeploymentConfig{}
-	keys := common.GetObjectKeys(mcAddon.Status.ConfigReferences, addonutils.AddOnDeploymentConfigGVR.Group, addon.AddonDeploymentConfigResource)
+	keys := common.GetObjectKeys(mcAddon.Status.ConfigReferences, addonutils.AddOnDeploymentConfigGVR.Group, addoncfg.AddonDeploymentConfigResource)
 	switch {
 	case len(keys) == 0:
 		return aodc, errMissingAODCRef

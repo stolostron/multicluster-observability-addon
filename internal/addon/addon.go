@@ -8,6 +8,7 @@ import (
 	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
 	prometheusalpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	uiplugin "github.com/rhobs/observability-operator/pkg/apis/uiplugin/v1alpha1"
+	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	"open-cluster-management.io/addon-framework/pkg/utils"
@@ -26,7 +27,7 @@ var (
 
 func NewRegistrationOption(agentName string) *agent.RegistrationOption {
 	return &agent.RegistrationOption{
-		CSRConfigurations: agent.KubeClientSignerConfigurations(Name, agentName),
+		CSRConfigurations: agent.KubeClientSignerConfigurations(addoncfg.Name, agentName),
 		CSRApproveCheck:   utils.DefaultCSRApprover(agentName),
 	}
 }
@@ -43,15 +44,15 @@ func AgentHealthProber() *agent.HealthProber {
 						Group:     prometheusalpha1.SchemeGroupVersion.Group,
 						Resource:  prometheusalpha1.PrometheusAgentName,
 						Name:      mconfig.PlatformMetricsCollectorApp,
-						Namespace: InstallNamespace,
+						Namespace: addoncfg.InstallNamespace,
 					},
 					ProbeRules: []workv1.FeedbackRule{
 						{
 							Type: workv1.JSONPathsType,
 							JsonPaths: []workv1.JsonPath{
 								{
-									Name: paProbeKey,
-									Path: paProbePath,
+									Name: addoncfg.PaProbeKey,
+									Path: addoncfg.PaProbePath,
 								},
 							},
 						},
@@ -60,17 +61,17 @@ func AgentHealthProber() *agent.HealthProber {
 				{
 					ResourceIdentifier: workv1.ResourceIdentifier{
 						Group:     loggingv1.GroupVersion.Group,
-						Resource:  ClusterLogForwardersResource,
-						Name:      SpokeCLFName,
-						Namespace: SpokeCLFNamespace,
+						Resource:  addoncfg.ClusterLogForwardersResource,
+						Name:      addoncfg.SpokeCLFName,
+						Namespace: addoncfg.SpokeCLFNamespace,
 					},
 					ProbeRules: []workv1.FeedbackRule{
 						{
 							Type: workv1.JSONPathsType,
 							JsonPaths: []workv1.JsonPath{
 								{
-									Name: clfProbeKey,
-									Path: clfProbePath,
+									Name: addoncfg.ClfProbeKey,
+									Path: addoncfg.ClfProbePath,
 								},
 							},
 						},
@@ -79,17 +80,17 @@ func AgentHealthProber() *agent.HealthProber {
 				{
 					ResourceIdentifier: workv1.ResourceIdentifier{
 						Group:     otelv1alpha1.GroupVersion.Group,
-						Resource:  OpenTelemetryCollectorsResource,
-						Name:      SpokeOTELColName,
-						Namespace: SpokeOTELColNamespace,
+						Resource:  addoncfg.OpenTelemetryCollectorsResource,
+						Name:      addoncfg.SpokeOTELColName,
+						Namespace: addoncfg.SpokeOTELColNamespace,
 					},
 					ProbeRules: []workv1.FeedbackRule{
 						{
 							Type: workv1.JSONPathsType,
 							JsonPaths: []workv1.JsonPath{
 								{
-									Name: otelColProbeKey,
-									Path: otelColProbePath,
+									Name: addoncfg.OtelColProbeKey,
+									Path: addoncfg.OtelColProbePath,
 								},
 							},
 						},
@@ -98,7 +99,7 @@ func AgentHealthProber() *agent.HealthProber {
 				{
 					ResourceIdentifier: workv1.ResourceIdentifier{
 						Group:    uiplugin.GroupVersion.Group,
-						Resource: uiPluginsResource,
+						Resource: addoncfg.UiPluginsResource,
 						Name:     "monitoring",
 					},
 					ProbeRules: []workv1.FeedbackRule{
@@ -106,8 +107,8 @@ func AgentHealthProber() *agent.HealthProber {
 							Type: workv1.JSONPathsType,
 							JsonPaths: []workv1.JsonPath{
 								{
-									Name: uipProbeKey,
-									Path: uipProbePath,
+									Name: addoncfg.UipProbeKey,
+									Path: addoncfg.UipProbePath,
 								},
 							},
 						},
@@ -127,7 +128,7 @@ func AgentHealthProber() *agent.HealthProber {
 					switch identifier.Resource {
 					case prometheusalpha1.PrometheusAgentName:
 						for _, value := range field.FeedbackResult.Values {
-							if value.Name != paProbeKey {
+							if value.Name != addoncfg.PaProbeKey {
 								return fmt.Errorf("%w: %s with key %s/%s unknown probe keys %s", errUnknownProbeKey, identifier.Resource, identifier.Namespace, identifier.Name, value.Name)
 							}
 
@@ -140,9 +141,9 @@ func AgentHealthProber() *agent.HealthProber {
 							}
 							// pa passes the health check
 						}
-					case ClusterLogForwardersResource:
+					case addoncfg.ClusterLogForwardersResource:
 						for _, value := range field.FeedbackResult.Values {
-							if value.Name != clfProbeKey {
+							if value.Name != addoncfg.ClfProbeKey {
 								return fmt.Errorf("%w: %s with key %s/%s unknown probe keys %s", errUnknownProbeKey, identifier.Resource, identifier.Namespace, identifier.Name, value.Name)
 							}
 
@@ -155,9 +156,9 @@ func AgentHealthProber() *agent.HealthProber {
 							}
 							// clf passes the health check
 						}
-					case OpenTelemetryCollectorsResource:
+					case addoncfg.OpenTelemetryCollectorsResource:
 						for _, value := range field.FeedbackResult.Values {
-							if value.Name != otelColProbeKey {
+							if value.Name != addoncfg.OtelColProbeKey {
 								return fmt.Errorf("%w: %s with key %s/%s unknown probe keys %s", errUnknownProbeKey, identifier.Resource, identifier.Namespace, identifier.Name, value.Name)
 							}
 
@@ -170,9 +171,9 @@ func AgentHealthProber() *agent.HealthProber {
 							}
 							// otel collector passes the health check
 						}
-					case uiPluginsResource:
+					case addoncfg.UiPluginsResource:
 						for _, value := range field.FeedbackResult.Values {
-							if value.Name != uipProbeKey {
+							if value.Name != addoncfg.UipProbeKey {
 								return fmt.Errorf("%w: %s with key %s unknown probe keys %s", errUnknownProbeKey, identifier.Resource, identifier.Name, value.Name)
 							}
 
