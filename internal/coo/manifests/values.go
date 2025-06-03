@@ -15,14 +15,14 @@ type COOValues struct {
 }
 
 func BuildValues(opts addon.Options, installCOO bool, isHubCluster bool) *COOValues {
-	metrics := mmanifests.EnableUI(opts.Platform.Metrics, isHubCluster)
+	metricsUI := mmanifests.EnableUI(opts.Platform.Metrics, isHubCluster)
 
 	incidentDetection := imanifests.EnableUI(opts.Platform.AnalyticsOptions.IncidentDetection)
 
 	// Decide if we need to create a monitoring UI plugin
 	monitoringUIPlugin := false
-	if metrics != nil {
-		monitoringUIPlugin = monitoringUIPlugin || metrics.ACM.Enabled
+	if metricsUI != nil {
+		monitoringUIPlugin = metricsUI.Enabled
 	}
 	if incidentDetection != nil {
 		monitoringUIPlugin = monitoringUIPlugin || incidentDetection.Enabled
@@ -33,7 +33,7 @@ func BuildValues(opts addon.Options, installCOO bool, isHubCluster bool) *COOVal
 		Enabled:            monitoringUIPlugin,
 		InstallCOO:         installCOO,
 		MonitoringUIPlugin: monitoringUIPlugin,
-		Metrics:            metrics,
+		Metrics:            metricsUI,
 		IncidentDetection:  incidentDetection,
 	}
 }

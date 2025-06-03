@@ -7,9 +7,9 @@ installCOO: false
 
 metrics:
   acm:
-    enabled: false
+    enabled: true
   perses:
-    enabled: false
+    enabled: true
 
 
 incidentDetection:

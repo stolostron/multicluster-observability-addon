@@ -50,16 +50,6 @@ type ConfigValue struct {
 }
 
 type UIValues struct {
-	Enabled bool         `json:"enabled"`
-	ACM     ACMValues    `json:"acm,omitempty"`
-	Perses  PersesValues `json:"perses,omitempty"`
-}
-
-type ACMValues struct {
-	Enabled bool `json:"enabled"`
-}
-
-type PersesValues struct {
 	Enabled bool `json:"enabled"`
 }
 
@@ -249,7 +239,5 @@ func EnableUI(opts addon.MetricsOptions, isHub bool) *UIValues {
 
 	return &UIValues{
 		Enabled: true,
-		ACM:     ACMValues{Enabled: opts.UI.Enabled},
-		Perses:  PersesValues{Enabled: opts.UI.Enabled},
 	}
 }
