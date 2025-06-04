@@ -74,15 +74,14 @@ type ResourceCreatorManager struct {
 }
 
 func NewResourceCreatorManager(logger logr.Logger, scheme *runtime.Scheme) (*ResourceCreatorManager, error) {
-	l := logger.WithName("mcoa-resourcecreator")
-
-	ctrl.SetLogger(l)
+	l := logger.WithName("resourcecreator")
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme: scheme,
 		Metrics: server.Options{
 			BindAddress: ":8084",
 		},
+		Logger: l.WithName("manager"),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("unable to start manager: %w", err)
@@ -90,7 +89,7 @@ func NewResourceCreatorManager(logger logr.Logger, scheme *runtime.Scheme) (*Res
 
 	if err = (&ResourceCreatorReconciler{
 		Client: mgr.GetClient(),
-		Log:    l,
+		Log:    l.WithName("controller"),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		return nil, fmt.Errorf("unable to create mcoa-resourcecreator controller: %w", err)
@@ -124,21 +123,23 @@ type ResourceCreatorReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.11.0/pkg/reconcile
 func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	r.Log.V(2).Info("reconciliation triggered", "request", req.String())
+
 	// Fetch the AddOnDeploymentConfig instance and transform it into the Options struct
 	key := client.ObjectKey{Namespace: req.Namespace, Name: req.Name}
 	aodc := &addonv1alpha1.AddOnDeploymentConfig{}
 	if err := r.Get(ctx, key, aodc); err != nil {
-		return ctrl.Result{}, err
+		return ctrl.Result{}, fmt.Errorf("failed to get the AddOnDeploymentConfig: %w", err)
 	}
 	opts, err := addon.BuildOptions(aodc)
 	if err != nil {
-		return ctrl.Result{}, err
+		return ctrl.Result{}, fmt.Errorf("failed to build addon options: %w", err)
 	}
 
 	key = client.ObjectKey{Name: addoncfg.Name}
 	cmao := &addonv1alpha1.ClusterManagementAddOn{}
 	if err = r.Get(ctx, key, cmao); err != nil {
-		return ctrl.Result{}, err
+		return ctrl.Result{}, fmt.Errorf("failed to get the ClusterManagementAddOn: %w", err)
 	}
 
 	// Reconcile metrics resources
@@ -159,14 +160,15 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 	mDefaultConfig, err := mdefault.Reconcile(ctx)
 	if err != nil {
-		return ctrl.Result{}, err
+		return ctrl.Result{}, fmt.Errorf("failed to reconcile metrics resources: %w", err)
 	}
 	objs = append(objs, mDefaultConfig...)
 
 	if err := common.EnsureAddonConfig(ctx, r.Log, r.Client, objs); err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to patching default config to clustermanageraddon: %w", err)
+		return ctrl.Result{}, fmt.Errorf("failed to patch default configs of the clustermanageraddon: %w", err)
 	}
 
+	// Retrieve the updated ClusterManagementAddOn with current default configs
 	cmao = &addonv1alpha1.ClusterManagementAddOn{}
 	if err := r.Get(ctx, types.NamespacedName{Name: addoncfg.Name}, cmao); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to get ClusterManagementAddOn: %w", err)
