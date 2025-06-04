@@ -19,18 +19,20 @@ var _ = operatorv1alpha1.AddToScheme(scheme.Scheme)
 
 func TestInstallCOO(t *testing.T) {
 	tests := []struct {
-		name            string
-		isHub           bool
-		options         addon.Options
-		subscription    *operatorv1alpha1.Subscription
-		expectedInstall bool
-		expectedErrMsg  string
+		name                    string
+		isHub                   bool
+		options                 addon.Options
+		subscription            *operatorv1alpha1.Subscription
+		expectedUIPluginInstall bool
+		expectedCOOInstall      bool
+		expectedErrMsg          string
 	}{
 		{
-			name:            "Non-hub cluster with no features enabled",
-			isHub:           false,
-			options:         addon.Options{},
-			expectedInstall: false,
+			name:                    "Non-hub cluster with no features enabled",
+			isHub:                   false,
+			options:                 addon.Options{},
+			expectedUIPluginInstall: false,
+			expectedCOOInstall:      true,
 		},
 		{
 			name:  "Non-hub cluster with incident detection enabled",
@@ -45,7 +47,8 @@ func TestInstallCOO(t *testing.T) {
 					},
 				},
 			},
-			expectedInstall: true,
+			expectedUIPluginInstall: true,
+			expectedCOOInstall:      true,
 		},
 		{
 			name:  "Hub cluster with incident detection enabled but no COO installed",
@@ -60,13 +63,15 @@ func TestInstallCOO(t *testing.T) {
 					},
 				},
 			},
-			expectedInstall: true,
+			expectedUIPluginInstall: true,
+			expectedCOOInstall:      true,
 		},
 		{
-			name:            "Hub cluster with no features enabled",
-			isHub:           true,
-			options:         addon.Options{},
-			expectedInstall: false,
+			name:                    "Hub cluster with no features enabled",
+			isHub:                   true,
+			options:                 addon.Options{},
+			expectedUIPluginInstall: false,
+			expectedCOOInstall:      true,
 		},
 		{
 			name:  "Hub cluster with COO installed and incident detection enabled",
@@ -90,7 +95,8 @@ func TestInstallCOO(t *testing.T) {
 					Channel: addoncfg.CooSubscriptionChannel,
 				},
 			},
-			expectedInstall: true,
+			expectedUIPluginInstall: true,
+			expectedCOOInstall:      false,
 		},
 		{
 			name:  "Hub cluster with COO installed with multicluster-observability-addon release label",
@@ -117,7 +123,8 @@ func TestInstallCOO(t *testing.T) {
 					Channel: addoncfg.CooSubscriptionChannel,
 				},
 			},
-			expectedInstall: true,
+			expectedUIPluginInstall: true,
+			expectedCOOInstall:      true,
 		},
 		{
 			name:  "Hub cluster with wrong version of COO installed and incident detection enabled",
@@ -141,8 +148,9 @@ func TestInstallCOO(t *testing.T) {
 					Channel: "wrong-channel",
 				},
 			},
-			expectedInstall: false,
-			expectedErrMsg:  addoncfg.ErrInvalidSubscriptionChannel.Error(),
+			expectedUIPluginInstall: false,
+			expectedCOOInstall:      false,
+			expectedErrMsg:          addoncfg.ErrInvalidSubscriptionChannel.Error(),
 		},
 		{
 			name:  "Hub cluster with metrics enabled but not incident detection",
@@ -155,7 +163,8 @@ func TestInstallCOO(t *testing.T) {
 					},
 				},
 			},
-			expectedInstall: true,
+			expectedUIPluginInstall: true,
+			expectedCOOInstall:      true,
 		},
 	}
 
@@ -176,7 +185,8 @@ func TestInstallCOO(t *testing.T) {
 				return
 			}
 			assert.NoError(t, err)
-			assert.Equal(t, tc.expectedInstall, cooValues.Enabled)
+			assert.Equal(t, tc.expectedUIPluginInstall, cooValues.Enabled)
+			assert.Equal(t, tc.expectedCOOInstall, cooValues.InstallCOO)
 		})
 	}
 }
