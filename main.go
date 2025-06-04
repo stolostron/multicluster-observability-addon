@@ -34,6 +34,7 @@ import (
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	workv1 "open-cluster-management.io/api/work/v1"
+	ctrl "sigs.k8s.io/controller-runtime"
 )
 
 var scheme = runtime.NewScheme()
@@ -55,6 +56,8 @@ func init() {
 
 	// +kubebuilder:scaffold:scheme
 }
+
+var logVerbosity int
 
 func main() {
 	rand.Seed(time.Now().UTC().UnixNano()) // nolint:staticcheck
@@ -100,24 +103,26 @@ func newControllerCommand() *cobra.Command {
 		NewCommand()
 	cmd.Use = "controller"
 	cmd.Short = "Start the addon controller"
+	cmd.Flags().IntVar(&logVerbosity, "log-verbosity", 0, "Log verbosity level. The higher the level, the noisier the logs.")
 
 	return cmd
 }
 
 func runControllers(ctx context.Context, kubeConfig *rest.Config) error {
-	logger := log.NewLogger("mcoa")
-	mgr, err := addonctrl.NewAddonManager(ctx, kubeConfig, scheme)
+	logger := log.NewLogger("mcoa", log.WithVerbosity(logVerbosity))
+	ctrl.SetLogger(logger)
+
+	mgr, err := addonctrl.NewAddonManager(ctx, kubeConfig, scheme, logger)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create addon manager: %w", err)
 	}
 
 	disableReconciliation := os.Getenv("DISABLE_WATCHER_CONTROLLER")
 	if disableReconciliation == "" {
 		var wm *watcher.WatcherManager
-		wm, err = watcher.NewWatcherManager(&mgr, scheme)
+		wm, err = watcher.NewWatcherManager(&mgr, scheme, logger)
 		if err != nil {
-			logger.Error(err, "unable to create watcher manager")
-			return err
+			return fmt.Errorf("unable to create watcher manager: %w", err)
 		}
 
 		wm.Start(ctx)
@@ -126,14 +131,13 @@ func runControllers(ctx context.Context, kubeConfig *rest.Config) error {
 	var rcm *resourcecreator.ResourceCreatorManager
 	rcm, err = resourcecreator.NewResourceCreatorManager(logger, scheme)
 	if err != nil {
-		logger.Error(err, "unable to create resource creator manager")
-		return err
+		return fmt.Errorf("unable to create resource creator manager: %w", err)
 	}
 	rcm.Start(ctx)
 
 	err = mgr.Start(ctx)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to start addon manager: %w", err)
 	}
 
 	<-ctx.Done()
