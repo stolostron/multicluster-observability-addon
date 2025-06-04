@@ -1,0 +1,15 @@
+
+nameOverride: null
+
+enabled: false
+
+installCOO: false
+
+metrics:
+    enabled: false
+
+
+incidentDetection:
+  enabled: false
+
+monitoringUIPlugin: false

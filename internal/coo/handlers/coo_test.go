@@ -1,4 +1,4 @@
-package addon
+package handlers
 
 import (
 	"context"
@@ -6,7 +6,9 @@ import (
 
 	"github.com/go-logr/logr"
 	operatorv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
+	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
+	"github.com/stolostron/multicluster-observability-addon/internal/coo/manifests"
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -15,65 +17,70 @@ import (
 
 var _ = operatorv1alpha1.AddToScheme(scheme.Scheme)
 
-func TestSkipInstallCOO(t *testing.T) {
+func TestInstallCOO(t *testing.T) {
 	tests := []struct {
-		name                string
-		isHub               bool
-		options             Options
-		subscription        *operatorv1alpha1.Subscription
-		expectedSkipInstall bool
-		expectedErrMsg      string
+		name                    string
+		isHub                   bool
+		options                 addon.Options
+		subscription            *operatorv1alpha1.Subscription
+		expectedUIPluginInstall bool
+		expectedCOOInstall      bool
+		expectedErrMsg          string
 	}{
 		{
-			name:                "Non-hub cluster with no features enabled",
-			isHub:               false,
-			options:             Options{},
-			expectedSkipInstall: false,
+			name:                    "Non-hub cluster with no features enabled",
+			isHub:                   false,
+			options:                 addon.Options{},
+			expectedUIPluginInstall: false,
+			expectedCOOInstall:      true,
 		},
 		{
 			name:  "Non-hub cluster with incident detection enabled",
 			isHub: false,
-			options: Options{
-				Platform: PlatformOptions{
+			options: addon.Options{
+				Platform: addon.PlatformOptions{
 					Enabled: true,
-					AnalyticsOptions: AnalyticsOptions{
-						IncidentDetection: IncidentDetection{
+					AnalyticsOptions: addon.AnalyticsOptions{
+						IncidentDetection: addon.IncidentDetection{
 							Enabled: true,
 						},
 					},
 				},
 			},
-			expectedSkipInstall: true,
+			expectedUIPluginInstall: true,
+			expectedCOOInstall:      true,
 		},
 		{
 			name:  "Hub cluster with incident detection enabled but no COO installed",
 			isHub: true,
-			options: Options{
-				Platform: PlatformOptions{
+			options: addon.Options{
+				Platform: addon.PlatformOptions{
 					Enabled: true,
-					AnalyticsOptions: AnalyticsOptions{
-						IncidentDetection: IncidentDetection{
+					AnalyticsOptions: addon.AnalyticsOptions{
+						IncidentDetection: addon.IncidentDetection{
 							Enabled: true,
 						},
 					},
 				},
 			},
-			expectedSkipInstall: true,
+			expectedUIPluginInstall: true,
+			expectedCOOInstall:      true,
 		},
 		{
-			name:                "Hub cluster with no features enabled",
-			isHub:               true,
-			options:             Options{},
-			expectedSkipInstall: false,
+			name:                    "Hub cluster with no features enabled",
+			isHub:                   true,
+			options:                 addon.Options{},
+			expectedUIPluginInstall: false,
+			expectedCOOInstall:      true,
 		},
 		{
 			name:  "Hub cluster with COO installed and incident detection enabled",
 			isHub: true,
-			options: Options{
-				Platform: PlatformOptions{
+			options: addon.Options{
+				Platform: addon.PlatformOptions{
 					Enabled: true,
-					AnalyticsOptions: AnalyticsOptions{
-						IncidentDetection: IncidentDetection{
+					AnalyticsOptions: addon.AnalyticsOptions{
+						IncidentDetection: addon.IncidentDetection{
 							Enabled: true,
 						},
 					},
@@ -88,16 +95,17 @@ func TestSkipInstallCOO(t *testing.T) {
 					Channel: addoncfg.CooSubscriptionChannel,
 				},
 			},
-			expectedSkipInstall: false,
+			expectedUIPluginInstall: true,
+			expectedCOOInstall:      false,
 		},
 		{
 			name:  "Hub cluster with COO installed with multicluster-observability-addon release label",
 			isHub: true,
-			options: Options{
-				Platform: PlatformOptions{
+			options: addon.Options{
+				Platform: addon.PlatformOptions{
 					Enabled: true,
-					AnalyticsOptions: AnalyticsOptions{
-						IncidentDetection: IncidentDetection{
+					AnalyticsOptions: addon.AnalyticsOptions{
+						IncidentDetection: addon.IncidentDetection{
 							Enabled: true,
 						},
 					},
@@ -115,16 +123,17 @@ func TestSkipInstallCOO(t *testing.T) {
 					Channel: addoncfg.CooSubscriptionChannel,
 				},
 			},
-			expectedSkipInstall: true,
+			expectedUIPluginInstall: true,
+			expectedCOOInstall:      true,
 		},
 		{
 			name:  "Hub cluster with wrong version of COO installed and incident detection enabled",
 			isHub: true,
-			options: Options{
-				Platform: PlatformOptions{
+			options: addon.Options{
+				Platform: addon.PlatformOptions{
 					Enabled: true,
-					AnalyticsOptions: AnalyticsOptions{
-						IncidentDetection: IncidentDetection{
+					AnalyticsOptions: addon.AnalyticsOptions{
+						IncidentDetection: addon.IncidentDetection{
 							Enabled: true,
 						},
 					},
@@ -139,21 +148,23 @@ func TestSkipInstallCOO(t *testing.T) {
 					Channel: "wrong-channel",
 				},
 			},
-			expectedSkipInstall: false,
-			expectedErrMsg:      addoncfg.ErrInvalidSubscriptionChannel.Error(),
+			expectedUIPluginInstall: false,
+			expectedCOOInstall:      false,
+			expectedErrMsg:          addoncfg.ErrInvalidSubscriptionChannel.Error(),
 		},
 		{
 			name:  "Hub cluster with metrics enabled but not incident detection",
 			isHub: true,
-			options: Options{
-				Platform: PlatformOptions{
+			options: addon.Options{
+				Platform: addon.PlatformOptions{
 					Enabled: true,
-					Metrics: MetricsOptions{
+					Metrics: addon.MetricsOptions{
 						CollectionEnabled: true,
 					},
 				},
 			},
-			expectedSkipInstall: false,
+			expectedUIPluginInstall: true,
+			expectedCOOInstall:      true,
 		},
 	}
 
@@ -166,14 +177,16 @@ func TestSkipInstallCOO(t *testing.T) {
 				k8sClientBuilder = k8sClientBuilder.WithObjects(tc.subscription)
 			}
 
-			result, err := InstallCOO(context.Background(), k8sClientBuilder.Build(), logr.Discard(), tc.isHub, tc.options)
+			result, err := InstallCOO(context.Background(), k8sClientBuilder.Build(), logr.Discard(), tc.isHub)
+			cooValues := manifests.BuildValues(tc.options, result, tc.isHub)
 
 			if tc.expectedErrMsg != "" {
 				assert.EqualError(t, err, tc.expectedErrMsg)
 				return
 			}
 			assert.NoError(t, err)
-			assert.Equal(t, tc.expectedSkipInstall, result)
+			assert.Equal(t, tc.expectedUIPluginInstall, cooValues.Enabled)
+			assert.Equal(t, tc.expectedCOOInstall, cooValues.InstallCOO)
 		})
 	}
 }
