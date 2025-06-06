@@ -38,7 +38,7 @@ func NewDefaultPrometheusAgent(ns, name string, isUWL bool, placementRef addonv1
 						corev1.ResourceMemory: resource.MustParse("150Mi"),
 					},
 				},
-				ScrapeInterval: "60s",
+				ScrapeInterval: "120s",
 				SecurityContext: &corev1.PodSecurityContext{
 					RunAsNonRoot: ptr.To(true),
 				},
