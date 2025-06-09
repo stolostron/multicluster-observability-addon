@@ -9,6 +9,7 @@ import (
 	otelv1beta1 "github.com/open-telemetry/opentelemetry-operator/apis/v1beta1"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
+	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"github.com/stolostron/multicluster-observability-addon/internal/tracing/manifests"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
@@ -33,7 +34,7 @@ func BuildOptions(ctx context.Context, k8s client.Client, mcAddon *addonapiv1alp
 	}
 
 	klog.Info("Retrieving OpenTelemetry Collector template")
-	keys := common.GetObjectKeys(mcAddon.Status.ConfigReferences, otelv1beta1.GroupVersion.Group, addon.OpenTelemetryCollectorsResource)
+	keys := common.GetObjectKeys(mcAddon.Status.ConfigReferences, otelv1beta1.GroupVersion.Group, addoncfg.OpenTelemetryCollectorsResource)
 	switch {
 	case len(keys) == 0:
 		return opts, errMissingOTELColRef
@@ -49,7 +50,7 @@ func BuildOptions(ctx context.Context, k8s client.Client, mcAddon *addonapiv1alp
 
 	if userWorkloads.InstrumentationEnabled {
 		klog.Info("Retrieving Instrumentation template")
-		keys := common.GetObjectKeys(mcAddon.Status.ConfigReferences, otelv1beta1.GroupVersion.Group, addon.OpenTelemetryCollectorsResource)
+		keys := common.GetObjectKeys(mcAddon.Status.ConfigReferences, otelv1beta1.GroupVersion.Group, addoncfg.OpenTelemetryCollectorsResource)
 		switch {
 		case len(keys) == 0:
 			return opts, errMissingOTELInstrRef

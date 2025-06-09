@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"strconv"
 
+	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/handlers"
 	corev1 "k8s.io/api/core/v1"
@@ -46,6 +47,10 @@ type ConfigValue struct {
 	Namespace string            `json:"namespace"`
 	Data      string            `json:"data"`
 	Labels    map[string]string `json:"labels"`
+}
+
+type UIValues struct {
+	Enabled bool `json:"enabled"`
 }
 
 func BuildValues(opts handlers.Options) (*MetricsValues, error) {
@@ -225,4 +230,14 @@ func buildConfigMaps(configMaps []*corev1.ConfigMap) ([]ConfigValue, error) {
 		configMapsValue = append(configMapsValue, configMapValue)
 	}
 	return configMapsValue, nil
+}
+
+func EnableUI(opts addon.MetricsOptions, isHub bool) *UIValues {
+	if !opts.CollectionEnabled && !opts.UI.Enabled || !isHub {
+		return nil
+	}
+
+	return &UIValues{
+		Enabled: true,
+	}
 }

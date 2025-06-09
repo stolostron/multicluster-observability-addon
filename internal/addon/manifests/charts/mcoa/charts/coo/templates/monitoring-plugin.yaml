@@ -1,0 +1,27 @@
+{{- if and .Values.enabled .Values.monitoringUIPlugin }}
+apiVersion: observability.openshift.io/v1alpha1
+kind: UIPlugin
+metadata:
+  name: monitoring
+  labels:
+    app: {{ template "coohelm.name" . }}
+    chart: {{ template "coohelm.chart" . }}
+    release: {{ .Release.Name }}
+spec:
+  monitoring:
+{{- if .Values.metrics.enabled }}
+    acm:
+      enabled: true
+      alertmanager:
+        url: 'https://alertmanager.open-cluster-management-observability.svc:9095'
+      thanosQuerier:
+        url: 'https://rbac-query-proxy.open-cluster-management-observability.svc:8443'
+    perses:
+      enabled: true
+{{- end }}
+{{- if .Values.incidentDetection.enabled }}
+    incidents:
+      enabled: true
+{{- end }}
+  type: Monitoring
+{{- end }}

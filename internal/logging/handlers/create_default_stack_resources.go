@@ -8,6 +8,7 @@ import (
 	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
+	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"github.com/stolostron/multicluster-observability-addon/internal/logging/manifests"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
@@ -37,8 +38,8 @@ func BuildDefaultStackResources(
 	for _, placement := range cmao.Spec.InstallStrategy.Placements {
 
 		existingCLF := &loggingv1.ClusterLogForwarder{}
-		resourceName := fmt.Sprintf("%s-%s", addon.DefaultStackPrefix, placement.Name)
-		key := client.ObjectKey{Namespace: addon.InstallNamespace, Name: resourceName}
+		resourceName := fmt.Sprintf("%s-%s", addoncfg.DefaultStackPrefix, placement.Name)
+		key := client.ObjectKey{Namespace: addoncfg.InstallNamespace, Name: resourceName}
 		if err := k8s.Get(ctx, key, existingCLF); err != nil && !apierrors.IsNotFound(err) {
 			return nil, nil, err
 		}
@@ -76,8 +77,8 @@ func BuildDefaultStackResources(
 	}
 
 	existingLS := &lokiv1.LokiStack{}
-	resourceName := fmt.Sprintf("%s-%s", addon.DefaultStackPrefix, addon.GlobalPlacementName)
-	key := client.ObjectKey{Namespace: addon.InstallNamespace, Name: resourceName}
+	resourceName := fmt.Sprintf("%s-%s", addoncfg.DefaultStackPrefix, addoncfg.GlobalPlacementName)
+	key := client.ObjectKey{Namespace: addoncfg.InstallNamespace, Name: resourceName}
 	if err := k8s.Get(ctx, key, existingLS); err != nil && !apierrors.IsNotFound(err) {
 		return nil, nil, err
 	}
@@ -85,7 +86,7 @@ func BuildDefaultStackResources(
 	defaultOpts.DefaultStack.Storage.LokiStack = existingLS
 	defaultOpts.DefaultStack.Storage.Tenants = tenants
 
-	ls, err := manifests.BuildSSALokiStack(defaultOpts, resourceName, addon.GlobalPlacementNamespace, addon.GlobalPlacementName)
+	ls, err := manifests.BuildSSALokiStack(defaultOpts, resourceName, addoncfg.GlobalPlacementNamespace, addoncfg.GlobalPlacementName)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -97,7 +98,7 @@ func BuildDefaultStackResources(
 	}
 
 	defaultConfig = append(defaultConfig, common.DefaultConfig{
-		PlacementRef: addon.GlobalPlacementRef,
+		PlacementRef: addoncfg.GlobalPlacementRef,
 		Config:       addonConfig,
 	})
 

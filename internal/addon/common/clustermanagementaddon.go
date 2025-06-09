@@ -9,7 +9,7 @@ import (
 	"github.com/go-logr/logr"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	prometheusv1alpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
-	"github.com/stolostron/multicluster-observability-addon/internal/addon"
+	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -32,7 +32,7 @@ func NewMCOAClusterManagementAddOn() *addonv1alpha1.ClusterManagementAddOn {
 			APIVersion: addonv1alpha1.GroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: addon.Name,
+			Name: addoncfg.Name,
 		},
 	}
 }
@@ -55,7 +55,7 @@ func HasCMAOOwnerReference(ctx context.Context, k8s client.Client, obj client.Ob
 func EnsureAddonConfig(ctx context.Context, logger logr.Logger, k8s client.Client, configs []DefaultConfig) error {
 	// Get the current CMAO
 	cmao := &addonv1alpha1.ClusterManagementAddOn{}
-	if err := k8s.Get(ctx, types.NamespacedName{Name: addon.Name}, cmao); err != nil {
+	if err := k8s.Get(ctx, types.NamespacedName{Name: addoncfg.Name}, cmao); err != nil {
 		return fmt.Errorf("failed to get ClusterManagementAddOn: %w", err)
 	}
 
@@ -130,11 +130,11 @@ func ObjectToAddonConfig(obj client.Object) (addonv1alpha1.AddOnConfig, error) {
 	case prometheusv1alpha1.PrometheusAgentsKind:
 		ret.Resource = prometheusv1alpha1.PrometheusAgentName
 	case "LokiStack":
-		ret.Resource = addon.LokiStacksResource
+		ret.Resource = addoncfg.LokiStacksResource
 	case "ClusterLogForwarder":
-		ret.Resource = addon.ClusterLogForwardersResource
+		ret.Resource = addoncfg.ClusterLogForwardersResource
 	default:
-		return ret, fmt.Errorf("%w: %s", errUnsupportedKind, obj.GetObjectKind().GroupVersionKind().Kind)
+		return ret, fmt.Errorf("%w: %s %s/%s", errUnsupportedKind, obj.GetObjectKind().GroupVersionKind().Kind, obj.GetNamespace(), obj.GetName())
 	}
 
 	return ret, nil

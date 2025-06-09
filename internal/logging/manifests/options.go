@@ -7,6 +7,7 @@ import (
 	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
 	operatorv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
+	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -67,7 +68,7 @@ func BuildDefaultStackOptions(platform, userWorkloads addon.LogsOptions, hubHost
 					{
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      DefaultCollectionMTLSSecretName,
-							Namespace: addon.InstallNamespace,
+							Namespace: addoncfg.InstallNamespace,
 						},
 					},
 				},
@@ -76,13 +77,13 @@ func BuildDefaultStackOptions(platform, userWorkloads addon.LogsOptions, hubHost
 				ObjStorageSecret: corev1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      DefaultStorageMTLSSecretName,
-						Namespace: addon.InstallNamespace,
+						Namespace: addoncfg.InstallNamespace,
 					},
 				},
 				MTLSSecret: corev1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      DefaultStorageMTLSSecretName,
-						Namespace: addon.HubNamespace,
+						Namespace: addoncfg.HubNamespace,
 					},
 				},
 			},

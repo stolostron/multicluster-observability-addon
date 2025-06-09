@@ -9,6 +9,7 @@ import (
 	operatorsv1 "github.com/operator-framework/api/pkg/operators/v1"
 	operatorsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
+	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"github.com/stolostron/multicluster-observability-addon/internal/tracing/handlers"
 	"github.com/stolostron/multicluster-observability-addon/internal/tracing/manifests"
 	"github.com/stretchr/testify/require"
@@ -203,7 +204,7 @@ func Test_Tracing_AllConfigsTogether_AllResources(t *testing.T) {
 	)
 
 	// Wire everything together to a fake addon instance
-	tracingAgentAddon, err := addonfactory.NewAgentAddonFactory(addon.Name, addon.FS, addon.TracingChartDir).
+	tracingAgentAddon, err := addonfactory.NewAgentAddonFactory(addoncfg.Name, addon.FS, addoncfg.TracingChartDir).
 		WithGetValuesFuncs(addonConfigValuesFn, fakeGetValues(fakeKubeClient)).
 		WithAgentRegistrationOption(&agent.RegistrationOption{}).
 		WithScheme(scheme.Scheme).
@@ -220,12 +221,12 @@ func Test_Tracing_AllConfigsTogether_AllResources(t *testing.T) {
 		case *otelv1beta1.OpenTelemetryCollector:
 			// Check name and namespace to make sure that if we change the helm
 			// manifests that we don't break the addon probes
-			require.Equal(t, addon.SpokeOTELColName, obj.Name)
-			require.Equal(t, addon.SpokeOTELColNamespace, obj.Namespace)
+			require.Equal(t, addoncfg.SpokeOTELColName, obj.Name)
+			require.Equal(t, addoncfg.SpokeOTELColNamespace, obj.Namespace)
 			require.NotEmpty(t, obj.Spec.Config)
 		case *otelv1alpha1.Instrumentation:
-			require.Equal(t, addon.SpokeInstrumentationName, obj.Name)
-			require.Equal(t, addon.SpokeOTELColNamespace, obj.Namespace)
+			require.Equal(t, addoncfg.SpokeInstrumentationName, obj.Name)
+			require.Equal(t, addoncfg.SpokeOTELColNamespace, obj.Namespace)
 		case *corev1.Secret:
 			if obj.Name == "tracing-otlphttp-auth" {
 				require.Equal(t, generatedSecret.Data, obj.Data)

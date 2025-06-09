@@ -6,8 +6,8 @@ import (
 
 	lokiv1 "github.com/grafana/loki/operator/api/loki/v1"
 	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
-	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
+	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"github.com/stolostron/multicluster-observability-addon/internal/logging/manifests"
 	corev1 "k8s.io/api/core/v1"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
@@ -21,7 +21,7 @@ func buildDefaultStackOptions(ctx context.Context, k8s client.Client, mcAddon *a
 	}
 
 	// Get CLF from ManagedClusterAddOn
-	clf, err := common.GetResourceWithOwnerRef(ctx, k8s, mcAddon, loggingv1.GroupVersion.Group, addon.ClusterLogForwardersResource, &loggingv1.ClusterLogForwarder{})
+	clf, err := common.GetResourceWithOwnerRef(ctx, k8s, mcAddon, loggingv1.GroupVersion.Group, addoncfg.ClusterLogForwardersResource, &loggingv1.ClusterLogForwarder{})
 	if err != nil {
 		return err
 	}
@@ -40,7 +40,7 @@ func buildDefaultStackOptions(ctx context.Context, k8s client.Client, mcAddon *a
 
 	if opts.IsHub {
 		// Get LS from ManagedClusterAddOn
-		ls, err := common.GetResourceWithOwnerRef(ctx, k8s, mcAddon, lokiv1.GroupVersion.Group, addon.LokiStacksResource, &lokiv1.LokiStack{})
+		ls, err := common.GetResourceWithOwnerRef(ctx, k8s, mcAddon, lokiv1.GroupVersion.Group, addoncfg.LokiStacksResource, &lokiv1.LokiStack{})
 		if err != nil {
 			return err
 		}

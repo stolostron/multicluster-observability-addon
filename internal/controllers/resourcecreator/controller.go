@@ -7,15 +7,19 @@ import (
 	"github.com/go-logr/logr"
 	lokiv1 "github.com/grafana/loki/operator/api/loki/v1"
 	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
+	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	prometheusalpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
+	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	lhandlers "github.com/stolostron/multicluster-observability-addon/internal/logging/handlers"
 	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	mresources "github.com/stolostron/multicluster-observability-addon/internal/metrics/resource"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
@@ -32,7 +36,7 @@ import (
 )
 
 func validateAODC(namespace, name string) bool {
-	if namespace != addon.InstallNamespace || name != addon.Name {
+	if namespace != addoncfg.InstallNamespace || name != addoncfg.Name {
 		return false
 	}
 	return true
@@ -52,13 +56,21 @@ func cmaoPlacementsChanged(old, new client.Object) bool {
 }
 
 var cmaoPredicate = builder.WithPredicates(predicate.Funcs{
-	CreateFunc: func(e event.CreateEvent) bool { return e.Object.GetName() == addon.Name },
+	CreateFunc: func(e event.CreateEvent) bool { return e.Object.GetName() == addoncfg.Name },
 	UpdateFunc: func(e event.UpdateEvent) bool {
-		return e.ObjectNew.GetName() == addon.Name && cmaoPlacementsChanged(e.ObjectOld, e.ObjectNew)
+		return e.ObjectNew.GetName() == addoncfg.Name && cmaoPlacementsChanged(e.ObjectOld, e.ObjectNew)
 	},
 	DeleteFunc:  func(e event.DeleteEvent) bool { return false },
 	GenericFunc: func(e event.GenericEvent) bool { return false },
 })
+
+var partOfMCOALabelSelector = labels.SelectorFromSet(labels.Set{
+	addoncfg.PartOfK8sLabelKey: addoncfg.Name,
+})
+
+var partOfMCOAPredicate = builder.WithPredicates(predicate.NewPredicateFuncs(func(obj client.Object) bool {
+	return partOfMCOALabelSelector.Matches(labels.Set(obj.GetLabels()))
+}))
 
 type ResourceCreatorManager struct {
 	mgr    *ctrl.Manager
@@ -127,7 +139,7 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, err
 	}
 
-	key = client.ObjectKey{Name: addon.Name}
+	key = client.ObjectKey{Name: addoncfg.Name}
 	cmao := &addonv1alpha1.ClusterManagementAddOn{}
 	if err = r.Get(ctx, key, cmao); err != nil {
 		return ctrl.Result{}, err
@@ -172,7 +184,7 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 			continue
 		}
 
-		if err := r.Patch(ctx, obj, client.Apply, client.ForceOwnership, client.FieldOwner(addon.Name)); err != nil {
+		if err := r.Patch(ctx, obj, client.Apply, client.ForceOwnership, client.FieldOwner(addoncfg.Name)); err != nil {
 			klog.Error(err, "failed to configure resource")
 			continue
 		}
@@ -183,7 +195,7 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 
 	cmao = &addonv1alpha1.ClusterManagementAddOn{}
-	if err := r.Get(ctx, types.NamespacedName{Name: addon.Name}, cmao); err != nil {
+	if err := r.Get(ctx, types.NamespacedName{Name: addoncfg.Name}, cmao); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to get ClusterManagementAddOn: %w", err)
 	}
 	if err := common.DeleteOrphanResources(ctx, r.Log, r.Client, cmao, &prometheusalpha1.PrometheusAgentList{}); err != nil {
@@ -207,10 +219,13 @@ func (r *ResourceCreatorReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(&addonv1alpha1.ClusterManagementAddOn{}, r.enqueueAODC(), cmaoPredicate).
 		// Trigger reconciliations if the pool of ManagedClusters changes
 		Watches(&clusterv1.ManagedCluster{}, r.enqueueAODC()).
-		// Trigger reconciliations if user change a PrometheusAgent instance
-		Watches(&prometheusalpha1.PrometheusAgent{}, r.enqueueDefaultResources()).
-		Watches(&loggingv1.ClusterLogForwarder{}, r.enqueueDefaultResources()).
-		Watches(&lokiv1.LokiStack{}, r.enqueueDefaultResources()).
+		// Trigger reconciliations if the metrics configuration resources change
+		Watches(&prometheusalpha1.PrometheusAgent{}, r.enqueueForMCOAOwnedResources()).
+		Watches(&prometheusalpha1.ScrapeConfig{}, r.enqueueForMCOControlledResources(), partOfMCOAPredicate).
+		Watches(&prometheusv1.PrometheusRule{}, r.enqueueForMCOControlledResources(), partOfMCOAPredicate).
+		// Trigger reconciliations if the log configuration resources change
+		Watches(&loggingv1.ClusterLogForwarder{}, r.enqueueForMCOAOwnedResources()).
+		Watches(&lokiv1.LokiStack{}, r.enqueueForMCOAOwnedResources()).
 		Complete(r)
 }
 
@@ -219,15 +234,15 @@ func (r *ResourceCreatorReconciler) enqueueAODC() handler.EventHandler {
 		return []reconcile.Request{
 			{
 				NamespacedName: types.NamespacedName{
-					Name:      addon.Name,
-					Namespace: addon.InstallNamespace,
+					Name:      addoncfg.Name,
+					Namespace: addoncfg.InstallNamespace,
 				},
 			},
 		}
 	})
 }
 
-func (r *ResourceCreatorReconciler) enqueueDefaultResources() handler.EventHandler {
+func (r *ResourceCreatorReconciler) enqueueForMCOAOwnedResources() handler.EventHandler {
 	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
 		hasOwnerRef, err := controllerutil.HasOwnerReference(obj.GetOwnerReferences(), common.NewMCOAClusterManagementAddOn(), r.Client.Scheme())
 		if err != nil {
@@ -242,8 +257,42 @@ func (r *ResourceCreatorReconciler) enqueueDefaultResources() handler.EventHandl
 		return []reconcile.Request{
 			{
 				NamespacedName: types.NamespacedName{
-					Name:      addon.Name,
-					Namespace: addon.InstallNamespace,
+					Name:      addoncfg.Name,
+					Namespace: addoncfg.InstallNamespace,
+				},
+			},
+		}
+	})
+}
+
+func (r *ResourceCreatorReconciler) enqueueForMCOControlledResources() handler.EventHandler {
+	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
+		var isControlledByMCO bool
+		for _, owner := range obj.GetOwnerReferences() {
+			if owner.Controller == nil || !*owner.Controller {
+				continue
+			}
+			gv, err := schema.ParseGroupVersion(owner.APIVersion)
+			if err != nil {
+				r.Log.V(1).Info("failed to parse groupd version: %s", err.Error())
+				continue
+			}
+			if owner.Kind != "MultiClusterObservability" || gv.Group != "observability.open-cluster-management.io" {
+				continue
+			}
+			isControlledByMCO = true
+			break
+		}
+
+		if !isControlledByMCO {
+			return []reconcile.Request{}
+		}
+
+		return []reconcile.Request{
+			{
+				NamespacedName: types.NamespacedName{
+					Name:      addoncfg.Name,
+					Namespace: addoncfg.InstallNamespace,
 				},
 			},
 		}

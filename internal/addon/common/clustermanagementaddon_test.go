@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	prometheusalpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
-	"github.com/stolostron/multicluster-observability-addon/internal/addon"
+	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
@@ -195,7 +195,7 @@ func TestEnsureConfigsInAddon(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			cmao := &addonv1alpha1.ClusterManagementAddOn{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: addon.Name,
+					Name: addoncfg.Name,
 				},
 				Spec: addonv1alpha1.ClusterManagementAddOnSpec{
 					InstallStrategy: addonv1alpha1.InstallStrategy{

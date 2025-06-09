@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	lokiv1 "github.com/grafana/loki/operator/api/loki/v1"
-	"github.com/stolostron/multicluster-observability-addon/internal/addon"
+	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -158,10 +158,10 @@ func BuildSSALokiStack(opts Options, lsName, placementNamespace, placementName s
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      lsName,
-			Namespace: addon.InstallNamespace,
+			Namespace: addoncfg.InstallNamespace,
 			Labels: map[string]string{
-				addon.PlacementRefNameLabelKey:      placementName,
-				addon.PlacementRefNamespaceLabelKey: placementNamespace,
+				addoncfg.PlacementRefNameLabelKey:      placementName,
+				addoncfg.PlacementRefNamespaceLabelKey: placementNamespace,
 			},
 		},
 		Spec: lokistackSpec,

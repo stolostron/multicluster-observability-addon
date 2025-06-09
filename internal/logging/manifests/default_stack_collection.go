@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 
 	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
-	"github.com/stolostron/multicluster-observability-addon/internal/addon"
+	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -109,10 +109,10 @@ func BuildSSAClusterLogForwarder(opts Options, clfName, placementNamespace, plac
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      clfName,
-			Namespace: addon.InstallNamespace,
+			Namespace: addoncfg.InstallNamespace,
 			Labels: map[string]string{
-				addon.PlacementRefNameLabelKey:      placementName,
-				addon.PlacementRefNamespaceLabelKey: placementNamespace,
+				addoncfg.PlacementRefNameLabelKey:      placementName,
+				addoncfg.PlacementRefNamespaceLabelKey: placementNamespace,
 			},
 		},
 		Spec: clfSpec,

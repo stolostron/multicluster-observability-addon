@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"strings"
 
+	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 )
 
@@ -26,6 +27,8 @@ const (
 	KeyUserWorkloadLogsCollection    = "userWorkloadLogsCollection"
 	KeyUserWorkloadTracesCollection  = "userWorkloadTracesCollection"
 	KeyUserWorkloadInstrumentation   = "userWorkloadInstrumentation"
+
+	KeyPlatformMetricsUI = "platformMetricsUI"
 )
 
 type CollectionKind string
@@ -51,6 +54,7 @@ const (
 type MetricsOptions struct {
 	CollectionEnabled bool
 	HubEndpoint       *url.URL
+	UI                MetricsUIOptions
 }
 
 type IncidentDetection struct {
@@ -87,6 +91,10 @@ type UserWorkloadOptions struct {
 	Traces  TracesOptions
 }
 
+type MetricsUIOptions struct {
+	Enabled bool
+}
+
 type Options struct {
 	HubHostname   string
 	Platform      PlatformOptions
@@ -119,7 +127,7 @@ func BuildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Opti
 			}
 			url, err := url.Parse(val)
 			if err != nil {
-				return opts, fmt.Errorf("%w: %s", errInvalidMetricsHubHostname, err.Error())
+				return opts, fmt.Errorf("%w: %s", addoncfg.ErrInvalidMetricsHubHostname, err.Error())
 			}
 			url = url.JoinPath("/api/metrics/v1/default/api/v1/receive")
 
@@ -127,7 +135,7 @@ func BuildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Opti
 			// - Check if host is empty
 			// - Check for invalid hostname formats like ":"
 			if strings.TrimSpace(url.Host) == "" || url.Host == ":" || strings.HasPrefix(url.Host, ":") {
-				return opts, fmt.Errorf("%w: invalid hostname format '%s'", errInvalidMetricsHubHostname, url.Host)
+				return opts, fmt.Errorf("%w: invalid hostname format '%s'", addoncfg.ErrInvalidMetricsHubHostname, url.Host)
 			}
 
 			opts.Platform.Metrics.HubEndpoint = url
@@ -172,6 +180,11 @@ func BuildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Opti
 			if keyvalue.Value == string(InstrumentationV1alpha1) {
 				opts.UserWorkloads.Enabled = true
 				opts.UserWorkloads.Traces.InstrumentationEnabled = true
+			}
+			// Observability UI Options
+		case KeyPlatformMetricsUI:
+			if keyvalue.Value == string(UIPluginV1alpha1) && opts.Platform.Metrics.CollectionEnabled {
+				opts.Platform.Metrics.UI.Enabled = true
 			}
 		}
 	}

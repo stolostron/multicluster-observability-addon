@@ -6,8 +6,8 @@ import (
 	"slices"
 
 	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
-	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
+	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"github.com/stolostron/multicluster-observability-addon/internal/logging/manifests"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -18,7 +18,7 @@ func buildUnmagedOptions(ctx context.Context, k8s client.Client, mcAddon *addona
 		return nil
 	}
 
-	keys := common.GetObjectKeys(mcAddon.Status.ConfigReferences, loggingv1.GroupVersion.Group, addon.ClusterLogForwardersResource)
+	keys := common.GetObjectKeys(mcAddon.Status.ConfigReferences, loggingv1.GroupVersion.Group, addoncfg.ClusterLogForwardersResource)
 	switch {
 	case len(keys) == 0:
 		return errMissingCLFRef

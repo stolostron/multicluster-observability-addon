@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/stolostron/multicluster-observability-addon/internal/addon"
+	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -26,7 +26,7 @@ func TestGetOwnedResource(t *testing.T) {
 	const (
 		testGroup     = ""
 		testResource  = "configmaps"
-		cmaoName      = addon.Name
+		cmaoName      = addoncfg.Name
 		testName      = "test-resource"
 		testNamespace = "test-namespace"
 	)

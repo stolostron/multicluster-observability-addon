@@ -14,6 +14,7 @@ type Options struct {
 	ClusterName   string
 	ClusterID     string
 	Images        mconfig.ImageOverrides
+	UI            UIOptions
 }
 
 type Collector struct {
@@ -22,4 +23,8 @@ type Collector struct {
 	ScrapeConfigs   []*prometheusalpha1.ScrapeConfig
 	Rules           []*prometheusv1.PrometheusRule
 	ServiceMonitors []*prometheusv1.ServiceMonitor // For deploying HCPs service monitor (user workloads)
+}
+
+type UIOptions struct {
+	Enabled bool
 }
