@@ -38,7 +38,7 @@ func NewDefaultPrometheusAgent(ns, name string, isUWL bool, placementRef addonv1
 						corev1.ResourceMemory: resource.MustParse("150Mi"),
 					},
 				},
-				ScrapeInterval: "60s",
+				ScrapeInterval: "120s",
 				SecurityContext: &corev1.PodSecurityContext{
 					RunAsNonRoot: ptr.To(true),
 				},
@@ -157,16 +157,6 @@ func (p *PrometheusAgentSSA) setPrometheusRemoteWriteConfig() {
 			KeyFile:  p.formatSecretPath(config.ClientCertSecretName, "tls.key"),
 		},
 		// WriteRelabelConfigs is set individually for each managed cluster in order to enforce cluster identification labels
-		QueueConfig: &prometheusv1.QueueConfig{
-			BatchSendDeadline: ptr.To(prometheusv1.Duration("15s")),
-			Capacity:          12000,
-			MaxShards:         3,
-			MinShards:         1,
-			MaxSamplesPerSend: 4000,
-			MinBackoff:        ptr.To(prometheusv1.Duration("1s")),
-			MaxBackoff:        ptr.To(prometheusv1.Duration("30s")),
-			RetryOnRateLimit:  true,
-		},
 	}
 
 	// Ensure there is a single instance of our config
