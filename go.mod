@@ -8,7 +8,7 @@ require (
 	github.com/open-telemetry/opentelemetry-operator v0.122.0
 	github.com/openshift/cluster-logging-operator/api/observability v0.0.0-20250409175233-91ac0aefdea7 // release-6.2
 	github.com/openshift/hypershift/api v0.0.0-20250109044749-1986ca3ae9f7
-	github.com/operator-framework/api v0.30.0
+	github.com/operator-framework/api v0.31.0
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.80.1
 	github.com/prometheus/prometheus v0.301.0
 	github.com/rhobs/observability-operator v1.0.1-0.20250402055516-9401247f1632 // release-1.1
@@ -133,7 +133,7 @@ require (
 	go.uber.org/zap v1.27.0 // indirect
 	golang.org/x/crypto v0.36.0 // indirect
 	golang.org/x/exp v0.0.0-20250408133849-7e4ce0ab07d0 // indirect
-	golang.org/x/net v0.37.0 // indirect
+	golang.org/x/net v0.38.0 // indirect
 	golang.org/x/oauth2 v0.28.0 // indirect
 	golang.org/x/sync v0.13.0 // indirect
 	golang.org/x/sys v0.31.0 // indirect
