@@ -14,7 +14,7 @@ require (
 	github.com/rhobs/observability-operator v1.0.1-0.20250402055516-9401247f1632 // release-1.1
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/pflag v1.0.6
-	github.com/stolostron/cluster-lifecycle-api v0.0.0-20240918064238-a5e71b599118
+	github.com/stolostron/cluster-lifecycle-api v0.0.0-20250521101300-d1731ad54b6d
 	github.com/stretchr/testify v1.10.0
 	k8s.io/api v0.32.3
 	k8s.io/apiextensions-apiserver v0.32.3
@@ -24,7 +24,7 @@ require (
 	k8s.io/klog/v2 v2.130.1
 	k8s.io/utils v0.0.0-20241210054802-24370beab758
 	open-cluster-management.io/addon-framework v0.12.1-0.20250407131028-9d436ffc2da7 // main to pull in updates to k/k apis
-	open-cluster-management.io/api v0.16.2-0.20250409021335-2458a27a0686 // main to pull in updates to k/k apis
+	open-cluster-management.io/api v0.16.2-0.20250422072120-cadf714c3055 // main to pull in updates to k/k apis
 	sigs.k8s.io/controller-runtime v0.20.4
 )
 
