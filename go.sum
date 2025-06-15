@@ -291,8 +291,8 @@ github.com/opencontainers/image-spec v1.1.0-rc5 h1:Ygwkfw9bpDvs+c9E34SdgGOj41dX/
 github.com/opencontainers/image-spec v1.1.0-rc5/go.mod h1:X4pATf0uXsnn3g5aiGIsVnJBR4mxhKzfwmvK/B2NTm8=
 github.com/openshift/api v0.0.0-20240524162738-d899f8877d22 h1:AW8KUN4k7qR2egrCCe3x95URHQ3N188+a/b0qpRyAHg=
 github.com/openshift/api v0.0.0-20240524162738-d899f8877d22/go.mod h1:7Hm1kLJGxWT6eysOpD2zUztdn+w91eiERn6KtI5o9aw=
-github.com/openshift/cluster-logging-operator/api/observability v0.0.0-20250409175233-91ac0aefdea7 h1:fl8pGrQzzev876WCqs2f52jFn7L33tMXE2XWIFnYz1c=
-github.com/openshift/cluster-logging-operator/api/observability v0.0.0-20250409175233-91ac0aefdea7/go.mod h1:iYbyyrn/zt46Tl9lEr30u4ZPRQpDSGjqKrerALwSBXs=
+github.com/openshift/cluster-logging-operator/api/observability v0.0.0-20250611154204-a70f4315cbbc h1:skvA5QWe+rgD5qDkClRnPCfkUjSNp5C0DvNopy5M4Dw=
+github.com/openshift/cluster-logging-operator/api/observability v0.0.0-20250611154204-a70f4315cbbc/go.mod h1:iYbyyrn/zt46Tl9lEr30u4ZPRQpDSGjqKrerALwSBXs=
 github.com/openshift/hypershift/api v0.0.0-20250109044749-1986ca3ae9f7 h1:pR21SWmRDHvr6DvbzFt8k4hXRN4UVOI60QnN64p3Axg=
 github.com/openshift/hypershift/api v0.0.0-20250109044749-1986ca3ae9f7/go.mod h1:K1e56UPfFQaO8BYXbVS1TbNqb6rmPo+fc6Jxjv+w0Xo=
 github.com/operator-framework/api v0.30.0 h1:44hCmGnEnZk/Miol5o44dhSldNH0EToQUG7vZTl29kk=
