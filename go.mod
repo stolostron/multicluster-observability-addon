@@ -22,7 +22,7 @@ require (
 	k8s.io/client-go v0.32.3
 	k8s.io/component-base v0.32.3
 	k8s.io/klog/v2 v2.130.1
-	k8s.io/utils v0.0.0-20241210054802-24370beab758
+	k8s.io/utils v0.0.0-20250604170112-4c0f3b243397
 	open-cluster-management.io/addon-framework v0.12.1-0.20250407131028-9d436ffc2da7 // main to pull in updates to k/k apis
 	open-cluster-management.io/api v0.16.2-0.20250409021335-2458a27a0686 // main to pull in updates to k/k apis
 	sigs.k8s.io/controller-runtime v0.20.4
