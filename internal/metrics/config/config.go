@@ -84,7 +84,7 @@ func GetImageOverrides(ctx context.Context, c client.Client) (ImageOverrides, er
 	// Get the ACM images overrides
 	imagesList := &corev1.ConfigMap{}
 	if err := c.Get(ctx, ImagesConfigMapObjKey, imagesList); err != nil {
-		return ret, err
+		return ret, fmt.Errorf("failed to get image overrides configmap: %w", err)
 	}
 
 	for key, value := range imagesList.Data {

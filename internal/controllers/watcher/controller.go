@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ViaQ/logerr/v2/log"
 	"github.com/go-logr/logr"
 	hyperv1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
@@ -57,19 +56,17 @@ type WatcherManager struct {
 	logger logr.Logger
 }
 
-func NewWatcherManager(addonManager *addonmanager.AddonManager, scheme *runtime.Scheme) (*WatcherManager, error) {
-	l := log.NewLogger("mcoa-watcher")
+func NewWatcherManager(addonManager *addonmanager.AddonManager, scheme *runtime.Scheme, logger logr.Logger) (*WatcherManager, error) {
+	l := logger.WithName("watcher")
 
-	ctrl.SetLogger(l)
-
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{Scheme: scheme})
+	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{Scheme: scheme, Logger: l.WithName("manager")})
 	if err != nil {
 		return nil, fmt.Errorf("unable to start manager: %w", err)
 	}
 
 	if err = (&WatcherReconciler{
 		Client:        mgr.GetClient(),
-		Log:           l.WithName("controllers").WithName("mcoa-watcher"),
+		Log:           l.WithName("controller"),
 		Scheme:        mgr.GetScheme(),
 		addonnManager: addonManager,
 	}).SetupWithManager(mgr); err != nil {
@@ -112,9 +109,8 @@ type WatcherReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.11.0/pkg/reconcile
 func (r *WatcherReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	r.Log.V(2).Info("reconciliation triggered", "request", req.String())
 	(*r.addonnManager).Trigger(req.Namespace, req.Name)
-
-	r.Log.V(2).Info("reconciliation triggered", "cluster", req.Namespace)
 
 	return ctrl.Result{}, nil
 }

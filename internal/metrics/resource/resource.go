@@ -103,7 +103,7 @@ func (d DefaultStackResources) Reconcile(ctx context.Context) ([]common.DefaultC
 
 func (d DefaultStackResources) reconcileScrapeConfigs(ctx context.Context, mcoUID types.UID, isUWL, hasHostedClusters bool) ([]common.DefaultConfig, error) {
 	labelVals := []string{}
-	d.Logger.V(1).Info("reconciling ScrapeConfigs", "mcoUID", mcoUID, "isUWL", isUWL, "hasHostedClusters", hasHostedClusters)
+	d.Logger.V(2).Info("reconciling ScrapeConfigs", "mcoUID", mcoUID, "isUWL", isUWL, "hasHostedClusters", hasHostedClusters)
 
 	if len(mcoUID) == 0 {
 		return []common.DefaultConfig{}, nil
@@ -180,7 +180,7 @@ func (d DefaultStackResources) getPrometheusRules(ctx context.Context, mcoUID ty
 	if !d.AddonOptions.Platform.Metrics.CollectionEnabled && !d.AddonOptions.UserWorkloads.Metrics.CollectionEnabled {
 		return []common.DefaultConfig{}, nil
 	}
-	d.Logger.V(1).Info("reconciling PrometheusRules", "mcoUID", mcoUID, "hasHostedClusters", hasHostedClusters)
+	d.Logger.V(2).Info("reconciling PrometheusRules", "mcoUID", mcoUID, "hasHostedClusters", hasHostedClusters)
 
 	if len(mcoUID) == 0 {
 		return []common.DefaultConfig{}, nil
@@ -228,6 +228,7 @@ func (d DefaultStackResources) getPrometheusRules(ctx context.Context, mcoUID ty
 }
 
 func (d DefaultStackResources) reconcileAgentForPlacement(ctx context.Context, placementRef addonv1alpha1.PlacementRef, isUWL bool) (common.DefaultConfig, error) {
+	d.Logger.V(2).Info("reconciling prometheus agent", "placementName", placementRef.Name, "placementNamespace", placementRef.Namespace, "isUWL", isUWL)
 	// Get or create default
 	agent, err := d.getOrCreateDefaultAgent(ctx, placementRef, isUWL)
 	if err != nil {

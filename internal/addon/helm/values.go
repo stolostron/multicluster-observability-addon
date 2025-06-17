@@ -3,6 +3,7 @@ package helm
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/go-logr/logr"
 	clusterinfov1beta1 "github.com/stolostron/cluster-lifecycle-api/clusterinfo/v1beta1"
@@ -44,23 +45,28 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, logger logr.Logger) a
 		cluster *clusterv1.ManagedCluster,
 		mcAddon *addonapiv1alpha1.ManagedClusterAddOn,
 	) (addonfactory.Values, error) {
-		// Skip unsupported kube vendors
+		logger = logger.WithValues("cluster", cluster.Name)
+		logger.V(2).Info("reconciliation triggered")
+		// if hub cluster, then don't install anything.
+		// some kube flavors are also currently not supported
 		if !supportedKubeVendors(cluster) {
+			logger.V(2).Info("unsupported kubernetes vendor, ignoring cluster")
 			return addonfactory.JsonStructToValues(HelmChartValues{})
 		}
 
 		// Build options from AddOnDeploymentConfig
 		aodc, err := getAddOnDeploymentConfig(ctx, k8s, mcAddon)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to get AddOnDeploymentConfig: %w", err)
 		}
 		opts, err := addon.BuildOptions(aodc)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to build addon options: %w", err)
 		}
 
 		// Skip if no configuration was provided
 		if !opts.Platform.Enabled && !opts.UserWorkloads.Enabled {
+			logger.V(2).Info("both platform and userWorkloads are disabled, ignoring cluster")
 			return addonfactory.JsonStructToValues(HelmChartValues{})
 		}
 
@@ -70,17 +76,17 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, logger logr.Logger) a
 
 		userValues.Metrics, err = getMonitoringValues(ctx, k8s, logger, cluster, mcAddon, opts)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to get monitoring values: %w", err)
 		}
 
 		userValues.Logging, err = getLoggingValues(ctx, k8s, cluster, mcAddon, opts)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to get logging values: %w", err)
 		}
 
 		userValues.Tracing, err = getTracingValues(ctx, k8s, cluster, mcAddon, opts)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to get tracing values: %w", err)
 		}
 
 		userValues.COO, err = getCOOValues(ctx, k8s, logger, cluster, opts)
@@ -94,6 +100,7 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, logger logr.Logger) a
 
 func getMonitoringValues(ctx context.Context, k8s client.Client, logger logr.Logger, cluster *clusterv1.ManagedCluster, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, opts addon.Options) (*mmanifests.MetricsValues, error) {
 	if !opts.Platform.Metrics.CollectionEnabled && !opts.UserWorkloads.Metrics.CollectionEnabled {
+		logger.V(2).Info("both platform and userWorkloads metrics are disabled, ignoring cluster")
 		return nil, nil
 	}
 
