@@ -54,6 +54,11 @@ func NewDefaultPrometheusAgent(ns, name string, isUWL bool, placementRef addonv1
 		agent.Labels = map[string]string{}
 	}
 
+	if isUWL {
+		// Listen to all namespaces by default. Can be overridden by the user.
+		agent.Spec.ScrapeConfigNamespaceSelector = &metav1.LabelSelector{}
+	}
+
 	maps.Copy(agent.Labels, makeConfigResourceLabels(isUWL, placementRef))
 
 	return agent
@@ -199,8 +204,6 @@ func (p *PrometheusAgentSSA) setWatchedResources() {
 		p.desiredAgent.Spec.ScrapeConfigSelector = &metav1.LabelSelector{
 			MatchLabels: config.UserWorkloadPrometheusMatchLabels,
 		}
-		// Listen to all namespaces
-		p.desiredAgent.Spec.ScrapeConfigNamespaceSelector = &metav1.LabelSelector{}
 	} else {
 		p.desiredAgent.Spec.ScrapeConfigSelector = &metav1.LabelSelector{
 			MatchLabels: config.PlatformPrometheusMatchLabels,
