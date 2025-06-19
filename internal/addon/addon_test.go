@@ -69,7 +69,7 @@ func Test_AgentHealthProber_PPA(t *testing.T) {
 }
 
 func Test_AgentHealthProber_CLF(t *testing.T) {
-	unhealthyError := fmt.Errorf("%w: clusterlogforwarders status condition type is %s for %s/%s", errProbeConditionNotSatisfied, "False", addoncfg.SpokeCLFNamespace, addoncfg.SpokeCLFName)
+	unhealthyError := fmt.Errorf("%w: clusterlogforwarders status condition type is %s for %s/%s", errProbeConditionNotSatisfied, "False", addoncfg.LoggingNamespace, addoncfg.UnmanagedCLFName)
 	managedCluster := addontesting.NewManagedCluster("cluster-1")
 	managedClusterAddOn := addontesting.NewAddon("test", "cluster-1")
 	for _, tc := range []struct {
@@ -95,8 +95,8 @@ func Test_AgentHealthProber_CLF(t *testing.T) {
 						ResourceIdentifier: workv1.ResourceIdentifier{
 							Group:     loggingv1.GroupVersion.Group,
 							Resource:  addoncfg.ClusterLogForwardersResource,
-							Name:      addoncfg.SpokeCLFName,
-							Namespace: addoncfg.SpokeCLFNamespace,
+							Name:      addoncfg.UnmanagedCLFName,
+							Namespace: addoncfg.LoggingNamespace,
 						},
 						FeedbackResult: workv1.StatusFeedbackResult{
 							Values: []workv1.FeedbackValue{

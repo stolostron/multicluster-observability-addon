@@ -62,8 +62,8 @@ func AgentHealthProber() *agent.HealthProber {
 					ResourceIdentifier: workv1.ResourceIdentifier{
 						Group:     loggingv1.GroupVersion.Group,
 						Resource:  addoncfg.ClusterLogForwardersResource,
-						Name:      addoncfg.SpokeCLFName,
-						Namespace: addoncfg.SpokeCLFNamespace,
+						Name:      addoncfg.UnmanagedCLFName,
+						Namespace: addoncfg.LoggingNamespace,
 					},
 					ProbeRules: []workv1.FeedbackRule{
 						{

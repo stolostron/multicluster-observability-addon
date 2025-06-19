@@ -5,11 +5,14 @@ import (
 	"fmt"
 
 	"github.com/go-logr/logr"
+	lokiv1 "github.com/grafana/loki/operator/api/loki/v1"
+	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	prometheusalpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
+	lhandlers "github.com/stolostron/multicluster-observability-addon/internal/logging/handlers"
 	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	mresources "github.com/stolostron/multicluster-observability-addon/internal/metrics/resource"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -18,6 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/klog/v2"
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -142,8 +146,10 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, fmt.Errorf("failed to get the ClusterManagementAddOn: %w", err)
 	}
 
+	objsToCreate := []client.Object{}
+	defaultConfigs := []common.DefaultConfig{}
+
 	// Reconcile metrics resources
-	objs := []common.DefaultConfig{}
 	images, err := mconfig.GetImageOverrides(ctx, r.Client)
 	if err != nil && !errors.IsNotFound(err) {
 		return ctrl.Result{}, fmt.Errorf("failed to get image overrides: %w", err)
@@ -162,9 +168,30 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to reconcile metrics resources: %w", err)
 	}
-	objs = append(objs, mDefaultConfig...)
+	defaultConfigs = append(defaultConfigs, mDefaultConfig...)
 
-	if err := common.EnsureAddonConfig(ctx, r.Log, r.Client, objs); err != nil {
+	lObjs, lDefaultConfig, err := lhandlers.BuildDefaultStackResources(ctx, r.Client, cmao, opts.Platform.Logs, opts.UserWorkloads.Logs, opts.HubHostname)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	objsToCreate = append(objsToCreate, lObjs...)
+	defaultConfigs = append(defaultConfigs, lDefaultConfig...)
+
+	// SSA the objects rendered
+	for _, obj := range objsToCreate {
+		err := controllerutil.SetControllerReference(cmao, obj, r.Scheme)
+		if err != nil {
+			klog.Error(err, "failed to set owner reference")
+			continue
+		}
+
+		if err := r.Patch(ctx, obj, client.Apply, client.ForceOwnership, client.FieldOwner(addoncfg.Name)); err != nil {
+			klog.Error(err, "failed to configure resource")
+			continue
+		}
+	}
+
+	if err := common.EnsureAddonConfig(ctx, r.Log, r.Client, defaultConfigs); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to patch default configs of the clustermanageraddon: %w", err)
 	}
 
@@ -174,6 +201,12 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, fmt.Errorf("failed to get ClusterManagementAddOn: %w", err)
 	}
 	if err := common.DeleteOrphanResources(ctx, r.Log, r.Client, cmao, &prometheusalpha1.PrometheusAgentList{}); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to clean orphan resources: %w", err)
+	}
+	if err := common.DeleteOrphanResources(ctx, r.Log, r.Client, cmao, &loggingv1.ClusterLogForwarderList{}); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to clean orphan resources: %w", err)
+	}
+	if err := common.DeleteOrphanResources(ctx, r.Log, r.Client, cmao, &lokiv1.LokiStackList{}); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to clean orphan resources: %w", err)
 	}
 
@@ -187,11 +220,14 @@ func (r *ResourceCreatorReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		// Trigger reconciliations due to changes in Placements
 		Watches(&addonv1alpha1.ClusterManagementAddOn{}, r.enqueueAODC(), cmaoPredicate).
 		// Trigger reconciliations if the pool of ManagedClusters changes
-		Watches(&clusterv1.ManagedCluster{}, r.enqueueAODC(), builder.OnlyMetadata).
+		Watches(&clusterv1.ManagedCluster{}, r.enqueueAODC()).
 		// Trigger reconciliations if the metrics configuration resources change
 		Watches(&prometheusalpha1.PrometheusAgent{}, r.enqueueForMCOAOwnedResources()).
 		Watches(&prometheusalpha1.ScrapeConfig{}, r.enqueueForMCOControlledResources(), partOfMCOAPredicate).
 		Watches(&prometheusv1.PrometheusRule{}, r.enqueueForMCOControlledResources(), partOfMCOAPredicate).
+		// Trigger reconciliations if the log configuration resources change
+		Watches(&loggingv1.ClusterLogForwarder{}, r.enqueueForMCOAOwnedResources()).
+		Watches(&lokiv1.LokiStack{}, r.enqueueForMCOAOwnedResources()).
 		Complete(r)
 }
 
