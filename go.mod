@@ -23,8 +23,8 @@ require (
 	k8s.io/component-base v0.32.3
 	k8s.io/klog/v2 v2.130.1
 	k8s.io/utils v0.0.0-20241210054802-24370beab758
-	open-cluster-management.io/addon-framework v1.0.0 
-	open-cluster-management.io/api v1.0.0 
+	open-cluster-management.io/addon-framework v1.0.0
+	open-cluster-management.io/api v1.0.0
 	sigs.k8s.io/controller-runtime v0.20.4
 )
 
@@ -142,7 +142,7 @@ require (
 	gomodules.xyz/jsonpatch/v2 v2.4.0 // indirect
 	google.golang.org/genproto v0.0.0-20240708141625-4ad9e859172b // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20250303144028-a0af3efb3deb // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20250227231956-55c901821b1e // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20250603155806-513f23925822 // indirect
 	google.golang.org/grpc v1.71.0 // indirect
 	google.golang.org/protobuf v1.36.6 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.12.0 // indirect
