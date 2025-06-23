@@ -2,64 +2,41 @@ package handlers
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"slices"
 
 	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
-	operatorv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
-	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"github.com/stolostron/multicluster-observability-addon/internal/logging/manifests"
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-const (
-	fieldAuthentication = "authentication"
-	fieldSASL           = "sasl"
-)
-
-var (
-	errMissingCLFRef         = errors.New("missing ClusterLogForwarder reference on addon installation")
-	errMultipleCLFRef        = errors.New("multiple ClusterLogForwarder references on addon installation")
-	errMissingImplementation = errors.New("missing secret implementation for output type")
-	errMissingField          = errors.New("missing field needed by output type")
-)
-
-func BuildOptions(ctx context.Context, k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, platform, userWorkloads addon.LogsOptions, isHub bool) (manifests.Options, error) {
-	opts := manifests.Options{
-		Platform:      platform,
-		UserWorkloads: userWorkloads,
-	}
-
-	if platform.SubscriptionChannel != "" {
-		opts.SubscriptionChannel = platform.SubscriptionChannel
-	} else {
-		opts.SubscriptionChannel = userWorkloads.SubscriptionChannel
+func buildUnmagedOptions(ctx context.Context, k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, opts *manifests.Options) error {
+	if !opts.UnmanagedCollectionEnabled() {
+		return nil
 	}
 
 	keys := common.GetObjectKeys(mcAddon.Status.ConfigReferences, loggingv1.GroupVersion.Group, addoncfg.ClusterLogForwardersResource)
 	switch {
 	case len(keys) == 0:
-		return opts, errMissingCLFRef
+		return errMissingCLFRef
 	case len(keys) > 1:
-		return opts, errMultipleCLFRef
+		return errMultipleCLFRef
 	}
 	clf := &loggingv1.ClusterLogForwarder{}
 	if err := k8s.Get(ctx, keys[0], clf, &client.GetOptions{}); err != nil {
-		return opts, err
+		return err
 	}
-	opts.ClusterLogForwarder = clf
+	opts.Unmanaged.Collection.ClusterLogForwarder = clf
 
 	secretNames := []string{}
 	configmapNames := []string{}
 	for _, output := range clf.Spec.Outputs {
 		extractedSecretsNames, extracedConfigmapNames, err := getOutputResourcesNames(output)
 		if err != nil {
-			return opts, err
+			return err
 		}
 		secretNames = append(secretNames, extractedSecretsNames...)
 		configmapNames = append(configmapNames, extracedConfigmapNames...)
@@ -67,28 +44,17 @@ func BuildOptions(ctx context.Context, k8s client.Client, mcAddon *addonapiv1alp
 
 	secrets, err := common.GetSecrets(ctx, k8s, clf.Namespace, mcAddon.Namespace, secretNames)
 	if err != nil {
-		return opts, err
+		return err
 	}
-	opts.Secrets = secrets
+	opts.Unmanaged.Collection.Secrets = secrets
 
 	configMaps, err := common.GetConfigMaps(ctx, k8s, clf.Namespace, mcAddon.Namespace, configmapNames)
 	if err != nil {
-		return opts, err
+		return err
 	}
-	opts.ConfigMaps = configMaps
+	opts.Unmanaged.Collection.ConfigMaps = configMaps
 
-	// Currently we are only able to access the cluster-logging subscription in the hub
-	// since we don't have k8s clients for the spokes
-	if isHub {
-		subscription := &operatorv1alpha1.Subscription{}
-		key := client.ObjectKey{Name: manifests.CloSubscriptionInstallName, Namespace: manifests.CloSubscriptionInstallNamespace}
-		if err := k8s.Get(ctx, key, subscription, &client.GetOptions{}); err != nil && !k8serrors.IsNotFound(err) {
-			return opts, fmt.Errorf("failed to get cluster-logging subscription: %w", err)
-		}
-		opts.ClusterLoggingSubscription = subscription
-	}
-
-	return opts, nil
+	return nil
 }
 
 func getOutputResourcesNames(output loggingv1.OutputSpec) ([]string, []string, error) {

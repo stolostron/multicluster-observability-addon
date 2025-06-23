@@ -129,6 +129,10 @@ func ObjectToAddonConfig(obj client.Object) (addonv1alpha1.AddOnConfig, error) {
 		ret.Resource = prometheusv1.PrometheusRuleName
 	case prometheusv1alpha1.PrometheusAgentsKind:
 		ret.Resource = prometheusv1alpha1.PrometheusAgentName
+	case "LokiStack":
+		ret.Resource = addoncfg.LokiStacksResource
+	case "ClusterLogForwarder":
+		ret.Resource = addoncfg.ClusterLogForwardersResource
 	default:
 		return ret, fmt.Errorf("%w: %s %s/%s", errUnsupportedKind, obj.GetObjectKind().GroupVersionKind().Kind, obj.GetNamespace(), obj.GetName())
 	}

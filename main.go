@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/ViaQ/logerr/v2/log"
+	certmanagerv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
+	lokiv1 "github.com/grafana/loki/operator/api/loki/v1"
 	otelv1alpha1 "github.com/open-telemetry/opentelemetry-operator/apis/v1alpha1"
 	otelv1beta1 "github.com/open-telemetry/opentelemetry-operator/apis/v1beta1"
 	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
@@ -53,6 +55,8 @@ func init() {
 	utilruntime.Must(prometheusv1.AddToScheme(scheme))
 	utilruntime.Must(uiplugin.AddToScheme(scheme))
 	utilruntime.Must(hyperv1.AddToScheme(scheme))
+	utilruntime.Must(certmanagerv1.AddToScheme(scheme))
+	utilruntime.Must(lokiv1.AddToScheme(scheme))
 
 	// +kubebuilder:scaffold:scheme
 }

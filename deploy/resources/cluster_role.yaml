@@ -64,7 +64,10 @@
     # Roles for addon to perform logging specific actions
     - apiGroups: ["observability.openshift.io"]
       resources: ["clusterlogforwarders"]
-      verbs: ["get", "list", "watch"]
+      verbs: ["get", "list", "watch", "create", "update", "delete", "patch"]
+    - apiGroups: ["loki.grafana.com"]
+      resources: ["lokistacks"]
+      verbs: ["get", "list", "watch", "create", "update", "delete", "patch"]
     # Role for addon to perform opentelemetry specific actions
     - apiGroups: ["opentelemetry.io"]
       resources: ["opentelemetrycollectors", "instrumentations"]
@@ -76,5 +79,13 @@
     - apiGroups: ["hypershift.openshift.io"]
       resources: ["hostedclusters"]
       verbs: ["get", "list", "watch"]
+    # Roles for addon to manage certificates managed logging
+    - apiGroups: ["cert-manager.io"]
+      resources: ["certificates"]
+      verbs: ["get", "list", "watch", "create", "update", "delete", "patch"]
+    # Roles for addon to manage certificates managed logging
+    - apiGroups: ["cert-manager.io"]
+      resources: ["certificates/status"]
+      verbs: ["get", "update"]
 
 
