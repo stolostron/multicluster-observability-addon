@@ -17,6 +17,7 @@ func withIncidentsGroup(datasource string, labelMatcher promql.LabelMatcher) das
 		panels.IncidentCount(datasource, labelMatcher),
 	)
 }
+
 func BuildACMIncidentsOverview(project string, datasource string, clusterLabelName string) dashboards.DashboardResult {
 	clusterLabelMatcher := dashboards.GetClusterLabelMatcher(clusterLabelName)
 	return dashboards.NewDashboardResult(

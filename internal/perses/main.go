@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+
 	"github.com/perses/community-dashboards/pkg/dashboards"
 	"github.com/stolostron/multicluster-observability-addon/internal/perses/dashboards/acm"
 )
@@ -13,11 +14,10 @@ func main() {
 	flag.Parse()
 
 	dashboardWriter := dashboards.NewDashboardWriter()
-	//dashboardWriter.Add(acm.BuildACMClustersOverview(*project, *datasource, clusterLabelName))
-	//dashboardWriter.Add(acm.BuildACMIncidentsOverview(*project, *datasource, clusterLabelName))
-	//dashboardWriter.Add(acm.BuildACMOptimizationOverview(*project, *datasource, clusterLabelName))
+	// dashboardWriter.Add(acm.BuildACMClustersOverview(*project, *datasource, clusterLabelName))
+	// dashboardWriter.Add(acm.BuildACMIncidentsOverview(*project, *datasource, clusterLabelName))
+	// dashboardWriter.Add(acm.BuildACMOptimizationOverview(*project, *datasource, clusterLabelName))
 	dashboardWriter.Add(acm.BuildClusterResourceUse(*project, *datasource, clusterLabelName))
 	dashboardWriter.Add(acm.BuildNodeResourceUse(*project, *datasource, clusterLabelName))
 	dashboardWriter.Write()
-
 }

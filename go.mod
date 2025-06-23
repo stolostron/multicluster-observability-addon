@@ -13,7 +13,7 @@ require (
 	github.com/operator-framework/api v0.30.0
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.80.1
 	github.com/prometheus/prometheus v0.304.1
-	github.com/rhobs/observability-operator v1.0.0 // release-1.1
+	github.com/rhobs/observability-operator v1.0.1-0.20250402055516-9401247f1632 // release-1.1
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/pflag v1.0.6
 	github.com/stolostron/cluster-lifecycle-api v0.0.0-20240918064238-a5e71b599118
@@ -28,10 +28,10 @@ require (
 	open-cluster-management.io/addon-framework v1.0.0
 	open-cluster-management.io/api v1.0.0
 	sigs.k8s.io/controller-runtime v0.20.4
-) // indirect
+)
 
 require (
-	github.com/perses/community-dashboards v0.0.0-20250616152857-8212e8429f86
+	github.com/perses/community-dashboards v0.0.0-20250620122938-dc04a3e69aa5
 	github.com/perses/perses v0.51.0
 	github.com/perses/plugins/prometheus v0.51.0-rc.3.0.20250606141117-4e2a0887698f
 	github.com/perses/plugins/statchart v0.8.0
