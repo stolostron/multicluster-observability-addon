@@ -1,0 +1,7 @@
+{{- if and .Values.enabled .Values.monitoringUIPlugin }}
+{{- $files := .Files.Glob "dashboards/acm/*.yaml" }}
+{{- range $path, $file := $files }}
+{{ $file | nindent 0 }}
+---
+{{- end }}
+{{- end }} 
