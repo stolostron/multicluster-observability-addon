@@ -14,7 +14,7 @@ require (
 	github.com/rhobs/observability-operator v1.0.1-0.20250402055516-9401247f1632 // release-1.1
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/pflag v1.0.6
-	github.com/stolostron/cluster-lifecycle-api v0.0.0-20240918064238-a5e71b599118
+	github.com/stolostron/cluster-lifecycle-api v0.0.0-20250625062343-7394aeb3186c
 	github.com/stretchr/testify v1.10.0
 	k8s.io/api v0.32.3
 	k8s.io/apiextensions-apiserver v0.32.3
