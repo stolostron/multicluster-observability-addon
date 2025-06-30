@@ -7,35 +7,35 @@ toolchain go1.24.2
 require (
 	github.com/ViaQ/logerr/v2 v2.1.0
 	github.com/go-logr/logr v1.4.2
-	github.com/open-telemetry/opentelemetry-operator v0.122.0
+	github.com/open-telemetry/opentelemetry-operator v0.120.0
 	github.com/openshift/cluster-logging-operator/api/observability v0.0.0-20250409175233-91ac0aefdea7 // release-6.2
 	github.com/openshift/hypershift/api v0.0.0-20250109044749-1986ca3ae9f7
 	github.com/operator-framework/api v0.30.0
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.80.1
 	github.com/prometheus/prometheus v0.304.1
-	github.com/rhobs/observability-operator v1.0.1-0.20250402055516-9401247f1632 // release-1.1
+	github.com/rhobs/observability-operator v1.0.0 // release-1.1
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/pflag v1.0.6
 	github.com/stolostron/cluster-lifecycle-api v0.0.0-20240918064238-a5e71b599118
 	github.com/stretchr/testify v1.10.0
-	k8s.io/api v0.33.1
-	k8s.io/apiextensions-apiserver v0.32.3
-	k8s.io/apimachinery v0.33.1
-	k8s.io/client-go v0.33.1
-	k8s.io/component-base v0.32.3
+	k8s.io/api v0.33.2
+	k8s.io/apiextensions-apiserver v0.33.2
+	k8s.io/apimachinery v0.33.2
+	k8s.io/client-go v0.33.2
+	k8s.io/component-base v0.33.2
 	k8s.io/klog/v2 v2.130.1
 	k8s.io/utils v0.0.0-20241210054802-24370beab758
-	open-cluster-management.io/addon-framework v1.0.0
+	open-cluster-management.io/addon-framework v0.12.0
 	open-cluster-management.io/api v1.0.0
 	sigs.k8s.io/controller-runtime v0.20.4
 )
 
 require (
-	github.com/perses/community-dashboards v0.0.0-20250620122938-dc04a3e69aa5
+	github.com/perses/community-dashboards v0.0.0-20250623155444-bd20e6208bda
 	github.com/perses/perses v0.51.0
 	github.com/perses/plugins/prometheus v0.51.0-rc.3.0.20250606141117-4e2a0887698f
 	github.com/perses/plugins/statchart v0.8.0
-	github.com/perses/plugins/table v0.7.1-0.20250606141117-4e2a0887698f
+	github.com/perses/plugins/table v0.7.1
 	github.com/perses/plugins/timeserieschart v0.9.1
 )
 
@@ -49,8 +49,7 @@ require (
 	github.com/NYTimes/gziphandler v1.1.1 // indirect
 	github.com/PaesslerAG/gval v1.2.4 // indirect
 	github.com/PaesslerAG/jsonpath v0.1.2-0.20240726212847-3a740cf7976f // indirect
-	github.com/antlr4-go/antlr/v4 v4.13.0 // indirect
-	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
+	github.com/antlr4-go/antlr/v4 v4.13.1 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
 	github.com/brunoga/deep v1.2.5 // indirect
@@ -127,30 +126,19 @@ require (
 	github.com/xeipuuv/gojsonschema v1.2.0 // indirect
 	github.com/zitadel/oidc/v3 v3.38.1 // indirect
 	github.com/zitadel/schema v1.3.1 // indirect
-	go.etcd.io/etcd/api/v3 v3.5.16 // indirect
-	go.etcd.io/etcd/client/pkg/v3 v3.5.16 // indirect
-	go.etcd.io/etcd/client/v3 v3.5.16 // indirect
+	go.etcd.io/etcd/api/v3 v3.5.21 // indirect
+	go.etcd.io/etcd/client/pkg/v3 v3.5.21 // indirect
+	go.etcd.io/etcd/client/v3 v3.5.21 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
 	go.opentelemetry.io/collector/featuregate v1.30.0 // indirect
-	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.53.0 // indirect
+	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.60.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.60.0 // indirect
-	go.opentelemetry.io/contrib/otelconf v0.15.0 // indirect
 	go.opentelemetry.io/otel v1.35.0 // indirect
-	go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc v0.11.0 // indirect
-	go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp v0.11.0 // indirect
-	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc v1.35.0 // indirect
-	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp v1.35.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.35.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.35.0 // indirect
-	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.35.0 // indirect
 	go.opentelemetry.io/otel/exporters/prometheus v0.57.0 // indirect
-	go.opentelemetry.io/otel/exporters/stdout/stdoutlog v0.11.0 // indirect
-	go.opentelemetry.io/otel/exporters/stdout/stdoutmetric v1.35.0 // indirect
-	go.opentelemetry.io/otel/exporters/stdout/stdouttrace v1.35.0 // indirect
-	go.opentelemetry.io/otel/log v0.11.0 // indirect
 	go.opentelemetry.io/otel/metric v1.35.0 // indirect
 	go.opentelemetry.io/otel/sdk v1.35.0 // indirect
-	go.opentelemetry.io/otel/sdk/log v0.11.0 // indirect
 	go.opentelemetry.io/otel/sdk/metric v1.35.0 // indirect
 	go.opentelemetry.io/otel/trace v1.35.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.5.0 // indirect
@@ -178,11 +166,11 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	helm.sh/helm/v3 v3.17.3 // indirect
-	k8s.io/apiserver v0.32.3 // indirect
-	k8s.io/kms v0.32.3 // indirect
+	k8s.io/apiserver v0.33.2 // indirect
+	k8s.io/kms v0.33.2 // indirect
 	k8s.io/kube-openapi v0.0.0-20250610211856-8b98d1ed966a // indirect
 	open-cluster-management.io/sdk-go v1.0.0 // indirect
-	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.31.0 // indirect
+	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.31.2 // indirect
 	sigs.k8s.io/json v0.0.0-20241014173422-cfa47c3a1cc8 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.6.0 // indirect
