@@ -13,29 +13,29 @@ require (
 	github.com/operator-framework/api v0.30.0
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.80.1
 	github.com/prometheus/prometheus v0.304.1
-	github.com/rhobs/observability-operator v1.0.1-0.20250402055516-9401247f1632 // release-1.1
+	github.com/rhobs/observability-operator v1.0.0 // release-1.1
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/pflag v1.0.6
 	github.com/stolostron/cluster-lifecycle-api v0.0.0-20250625062343-7394aeb3186c
 	github.com/stretchr/testify v1.10.0
 	k8s.io/api v0.33.2
-	k8s.io/apiextensions-apiserver v0.33.1
+	k8s.io/apiextensions-apiserver v0.33.2
 	k8s.io/apimachinery v0.33.2
-	k8s.io/client-go v0.33.1
-	k8s.io/component-base v0.33.1
+	k8s.io/client-go v0.33.2
+	k8s.io/component-base v0.33.2
 	k8s.io/klog/v2 v2.130.1
 	k8s.io/utils v0.0.0-20241210054802-24370beab758
-	open-cluster-management.io/addon-framework v1.0.1-0.20250703064333-314995d48ace
+	open-cluster-management.io/addon-framework v0.12.0
 	open-cluster-management.io/api v1.0.0
 	sigs.k8s.io/controller-runtime v0.20.4
 )
 
 require (
-	github.com/perses/community-dashboards v0.0.0-20250620122938-dc04a3e69aa5
+	github.com/perses/community-dashboards v0.0.0-20250623155444-bd20e6208bda
 	github.com/perses/perses v0.51.0
 	github.com/perses/plugins/prometheus v0.51.0-rc.3.0.20250606141117-4e2a0887698f
 	github.com/perses/plugins/statchart v0.8.0
-	github.com/perses/plugins/table v0.7.1-0.20250606141117-4e2a0887698f
+	github.com/perses/plugins/table v0.7.1
 	github.com/perses/plugins/timeserieschart v0.9.1
 )
 
@@ -131,7 +131,7 @@ require (
 	go.etcd.io/etcd/client/v3 v3.5.21 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
 	go.opentelemetry.io/collector/featuregate v1.30.0 // indirect
-	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.58.0 // indirect
+	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.60.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.60.0 // indirect
 	go.opentelemetry.io/contrib/otelconf v0.15.0 // indirect
 	go.opentelemetry.io/otel v1.35.0 // indirect
@@ -179,7 +179,7 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	helm.sh/helm/v3 v3.17.3 // indirect
-	k8s.io/apiserver v0.33.1 // indirect
+	k8s.io/apiserver v0.33.2 // indirect
 	k8s.io/kms v0.33.2 // indirect
 	k8s.io/kube-openapi v0.0.0-20250701173324-9bd5c66d9911 // indirect
 	open-cluster-management.io/sdk-go v1.0.1-0.20250702112448-f9c049f2a96d // indirect
