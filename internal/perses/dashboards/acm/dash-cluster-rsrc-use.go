@@ -8,7 +8,6 @@ import (
 	"github.com/perses/perses/go-sdk/dashboard"
 	panelgroup "github.com/perses/perses/go-sdk/panel-group"
 	listVar "github.com/perses/perses/go-sdk/variable/list-variable"
-	"github.com/perses/perses/pkg/model/api/v1/common"
 	labelValuesVar "github.com/perses/plugins/prometheus/sdk/go/variable/label-values"
 	panels "github.com/stolostron/multicluster-observability-addon/internal/perses/panels/acm"
 )
@@ -50,16 +49,6 @@ func withClusterDiskSpaceResourceGroup(datasource string, labelMatcher promql.La
 		panelgroup.PanelsPerLine(1),
 		panels.DiskSpaceUtilization(datasource, labelMatcher),
 	)
-}
-
-func withClusterDescription(description string) dashboard.Option {
-	return func(builder *dashboard.Builder) error {
-		if builder.Dashboard.Spec.Display == nil {
-			builder.Dashboard.Spec.Display = &common.Display{}
-		}
-		builder.Dashboard.Spec.Display.Description = description
-		return nil
-	}
 }
 
 func BuildClusterResourceUse(project string, datasource string, clusterLabelName string) dashboards.DashboardResult {

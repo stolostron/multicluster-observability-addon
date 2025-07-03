@@ -11,7 +11,7 @@ import (
 )
 
 func CPUUtilization(datasourceName string, labelMatchers ...promql.LabelMatcher) panelgroup.Option {
-	return panelgroup.AddPanel("CPU Utilisation",
+	return panelgroup.AddPanel("CPU Utilization",
 		panel.Description("Shows CPU utilization across all nodes in the cluster"),
 		timeSeriesPanel.Chart(
 			timeSeriesPanel.WithYAxis(timeSeriesPanel.YAxis{
@@ -36,6 +36,7 @@ func CPUUtilization(datasourceName string, labelMatchers ...promql.LabelMatcher)
 		panel.AddQuery(
 			query.PromQL(
 				promql.SetLabelMatchers(
+					//nolint:misspell
 					"(instance:node_cpu_utilisation:rate1m{cluster=\"$cluster\",job=\"node-exporter\"} * instance:node_num_cpu:sum{cluster=\"$cluster\",job=\"node-exporter\"}) / scalar(sum(instance:node_num_cpu:sum{cluster=\"$cluster\",job=\"node-exporter\"}))",
 					labelMatchers,
 				),
@@ -81,7 +82,7 @@ func CPUSaturation(datasourceName string, labelMatchers ...promql.LabelMatcher) 
 }
 
 func MemoryUtilization(datasourceName string, labelMatchers ...promql.LabelMatcher) panelgroup.Option {
-	return panelgroup.AddPanel("Memory Utilisation",
+	return panelgroup.AddPanel("Memory Utilization",
 		panel.Description("Shows memory utilization across all nodes in the cluster"),
 		timeSeriesPanel.Chart(
 			timeSeriesPanel.WithYAxis(timeSeriesPanel.YAxis{
@@ -106,7 +107,7 @@ func MemoryUtilization(datasourceName string, labelMatchers ...promql.LabelMatch
 		panel.AddQuery(
 			query.PromQL(
 				promql.SetLabelMatchers(
-					"instance:node_memory_utilisation:ratio{cluster=\"$cluster\",job=\"node-exporter\"} / scalar(count(instance:node_memory_utilisation:ratio{cluster=\"$cluster\",job=\"node-exporter\"}))",
+					"instance:node_memory_utilization:ratio{cluster=\"$cluster\",job=\"node-exporter\"} / scalar(count(instance:node_memory_utilization:ratio{cluster=\"$cluster\",job=\"node-exporter\"}))",
 					labelMatchers,
 				),
 				dashboards.AddQueryDataSource(datasourceName),
@@ -151,7 +152,7 @@ func MemorySaturation(datasourceName string, labelMatchers ...promql.LabelMatche
 }
 
 func NetworkUtilization(datasourceName string, labelMatchers ...promql.LabelMatcher) panelgroup.Option {
-	return panelgroup.AddPanel("Net Utilisation (Bytes Receive/Transmit)",
+	return panelgroup.AddPanel("Net Utilization (Bytes Receive/Transmit)",
 		panel.Description("Shows network utilization for received and transmitted bytes"),
 		timeSeriesPanel.Chart(
 			timeSeriesPanel.WithYAxis(timeSeriesPanel.YAxis{
@@ -239,7 +240,7 @@ func NetworkSaturation(datasourceName string, labelMatchers ...promql.LabelMatch
 }
 
 func DiskIOUtilization(datasourceName string, labelMatchers ...promql.LabelMatcher) panelgroup.Option {
-	return panelgroup.AddPanel("Disk IO Utilisation",
+	return panelgroup.AddPanel("Disk IO Utilization",
 		panel.Description("Shows disk IO utilization across all devices"),
 		timeSeriesPanel.Chart(
 			timeSeriesPanel.WithYAxis(timeSeriesPanel.YAxis{
@@ -309,7 +310,7 @@ func DiskIOSaturation(datasourceName string, labelMatchers ...promql.LabelMatche
 }
 
 func DiskSpaceUtilization(datasourceName string, labelMatchers ...promql.LabelMatcher) panelgroup.Option {
-	return panelgroup.AddPanel("Disk Space Utilisation",
+	return panelgroup.AddPanel("Disk Space Utilization",
 		panel.Description("Shows disk space utilization across all filesystems"),
 		timeSeriesPanel.Chart(
 			timeSeriesPanel.WithYAxis(timeSeriesPanel.YAxis{

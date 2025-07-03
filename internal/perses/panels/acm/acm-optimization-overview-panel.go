@@ -90,7 +90,7 @@ func CPURequestsCommitmentPanel(datasourceName string, labelMatchers ...promql.L
 }
 
 func CPUUtilizationPanel(datasourceName string, labelMatchers ...promql.LabelMatcher) panelgroup.Option {
-	return panelgroup.AddPanel("CPU Utilisation",
+	return panelgroup.AddPanel("CPU Utilization",
 		statPanel.Chart(
 			statPanel.Format(commonSdk.Format{
 				Unit:          string(commonSdk.PercentUnit),
@@ -258,7 +258,7 @@ func MemoryRequestsCommitmentPanel(datasourceName string, labelMatchers ...promq
 }
 
 func MemoryUtilizationPanel(datasourceName string, labelMatchers ...promql.LabelMatcher) panelgroup.Option {
-	return panelgroup.AddPanel("Memory Utilisation",
+	return panelgroup.AddPanel("Memory Utilization",
 		statPanel.Chart(
 			statPanel.Format(commonSdk.Format{
 				Unit:          string(commonSdk.PercentUnit),

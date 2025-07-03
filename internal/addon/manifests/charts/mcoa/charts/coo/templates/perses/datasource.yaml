@@ -15,3 +15,4 @@ spec:
           spec:
             url: 'http://observability-thanos-query-frontend.open-cluster-management-observability.svc.cluster.local:9090'
 {{- end }}
+

@@ -11,7 +11,7 @@ import (
 )
 
 func NodeCPUUtilization(datasourceName string, labelMatchers ...promql.LabelMatcher) panelgroup.Option {
-	return panelgroup.AddPanel("CPU Utilisation",
+	return panelgroup.AddPanel("CPU Utilization",
 		panel.Description("Shows CPU utilization for each node"),
 		timeSeriesPanel.Chart(
 			timeSeriesPanel.WithYAxis(timeSeriesPanel.YAxis{
@@ -36,6 +36,7 @@ func NodeCPUUtilization(datasourceName string, labelMatchers ...promql.LabelMatc
 		panel.AddQuery(
 			query.PromQL(
 				promql.SetLabelMatchers(
+					//nolint:misspell
 					"instance:node_cpu_utilisation:rate1m{cluster=\"$cluster\", job=\"node-exporter\", instance=~\"$instance\"}",
 					labelMatchers,
 				),
@@ -82,7 +83,7 @@ func NodeCPUSaturation(datasourceName string, labelMatchers ...promql.LabelMatch
 
 // Memory Panels
 func NodeMemoryUtilization(datasourceName string, labelMatchers ...promql.LabelMatcher) panelgroup.Option {
-	return panelgroup.AddPanel("Memory Utilisation",
+	return panelgroup.AddPanel("Memory Utilization",
 		panel.Description("Shows memory utilization for each node"),
 		timeSeriesPanel.Chart(
 			timeSeriesPanel.WithYAxis(timeSeriesPanel.YAxis{
@@ -107,6 +108,7 @@ func NodeMemoryUtilization(datasourceName string, labelMatchers ...promql.LabelM
 		panel.AddQuery(
 			query.PromQL(
 				promql.SetLabelMatchers(
+					//nolint:misspell
 					"instance:node_memory_utilisation:ratio{cluster=\"$cluster\", job=\"node-exporter\", instance=~\"$instance\"}",
 					labelMatchers,
 				),
@@ -152,7 +154,7 @@ func NodeMemorySaturation(datasourceName string, labelMatchers ...promql.LabelMa
 }
 
 func NodeNetworkUtilization(datasourceName string, labelMatchers ...promql.LabelMatcher) panelgroup.Option {
-	return panelgroup.AddPanel("Net Utilisation (Bytes Receive/Transmit)",
+	return panelgroup.AddPanel("Net Utilization (Bytes Receive/Transmit)",
 		panel.Description("Shows network utilization for received and transmitted bytes for each node"),
 		timeSeriesPanel.Chart(
 			timeSeriesPanel.WithYAxis(timeSeriesPanel.YAxis{
@@ -240,7 +242,7 @@ func NodeNetworkSaturation(datasourceName string, labelMatchers ...promql.LabelM
 }
 
 func NodeDiskIOUtilization(datasourceName string, labelMatchers ...promql.LabelMatcher) panelgroup.Option {
-	return panelgroup.AddPanel("Disk IO Utilisation",
+	return panelgroup.AddPanel("Disk IO Utilization",
 		panel.Description("Shows disk IO utilization for each device on each node"),
 		timeSeriesPanel.Chart(
 			timeSeriesPanel.WithYAxis(timeSeriesPanel.YAxis{
@@ -310,7 +312,7 @@ func NodeDiskIOSaturation(datasourceName string, labelMatchers ...promql.LabelMa
 }
 
 func NodeDiskSpaceUtilization(datasourceName string, labelMatchers ...promql.LabelMatcher) panelgroup.Option {
-	return panelgroup.AddPanel("Disk Space Utilisation",
+	return panelgroup.AddPanel("Disk Space Utilization",
 		panel.Description("Shows disk space utilization for each filesystem on each node"),
 		timeSeriesPanel.Chart(
 			timeSeriesPanel.WithYAxis(timeSeriesPanel.YAxis{
