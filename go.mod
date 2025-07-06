@@ -1,6 +1,8 @@
 module github.com/stolostron/multicluster-observability-addon
 
-go 1.23.6
+go 1.24.0
+
+toolchain go1.24.4
 
 require (
 	github.com/ViaQ/logerr/v2 v2.1.0
@@ -152,7 +154,7 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	helm.sh/helm/v3 v3.17.3 // indirect
 	k8s.io/apiserver v0.32.3 // indirect
-	k8s.io/kms v0.32.3 // indirect
+	k8s.io/kms v0.33.2 // indirect
 	k8s.io/kube-openapi v0.0.0-20250610211856-8b98d1ed966a // indirect
 	open-cluster-management.io/sdk-go v1.0.0 // indirect
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.31.0 // indirect
