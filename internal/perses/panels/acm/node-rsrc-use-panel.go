@@ -16,7 +16,7 @@ func NodeCPUUtilization(datasourceName string, labelMatchers ...promql.LabelMatc
 		timeSeriesPanel.Chart(
 			timeSeriesPanel.WithYAxis(timeSeriesPanel.YAxis{
 				Format: &commonSdk.Format{
-					Unit: string(commonSdk.PercentUnit),
+					Unit: string(commonSdk.PercentDecimalUnit),
 				},
 			}),
 			timeSeriesPanel.WithLegend(timeSeriesPanel.Legend{
@@ -52,7 +52,7 @@ func NodeCPUSaturation(datasourceName string, labelMatchers ...promql.LabelMatch
 		timeSeriesPanel.Chart(
 			timeSeriesPanel.WithYAxis(timeSeriesPanel.YAxis{
 				Format: &commonSdk.Format{
-					Unit: string(commonSdk.PercentUnit),
+					Unit: string(commonSdk.PercentDecimalUnit),
 				},
 			}),
 			timeSeriesPanel.WithLegend(timeSeriesPanel.Legend{
@@ -88,7 +88,7 @@ func NodeMemoryUtilization(datasourceName string, labelMatchers ...promql.LabelM
 		timeSeriesPanel.Chart(
 			timeSeriesPanel.WithYAxis(timeSeriesPanel.YAxis{
 				Format: &commonSdk.Format{
-					Unit: string(commonSdk.PercentUnit),
+					Unit: string(commonSdk.PercentDecimalUnit),
 				},
 			}),
 			timeSeriesPanel.WithLegend(timeSeriesPanel.Legend{
@@ -124,7 +124,7 @@ func NodeMemorySaturation(datasourceName string, labelMatchers ...promql.LabelMa
 		timeSeriesPanel.Chart(
 			timeSeriesPanel.WithYAxis(timeSeriesPanel.YAxis{
 				Format: &commonSdk.Format{
-					Unit: string(commonSdk.PercentUnit),
+					Unit: string(commonSdk.PercentDecimalUnit),
 				},
 			}),
 			timeSeriesPanel.WithLegend(timeSeriesPanel.Legend{
@@ -179,7 +179,7 @@ func NodeNetworkUtilization(datasourceName string, labelMatchers ...promql.Label
 		panel.AddQuery(
 			query.PromQL(
 				promql.SetLabelMatchers(
-					`instance:node_network_receive_bytes_excluding_lo:rate1m{cluster="$cluster", job="node-exporter", instance=~"$instance"}`,
+					"instance:node_network_receive_bytes_excluding_lo:rate1m{cluster=\"$cluster\", job=\"node-exporter\", instance=~\"$instance\"}",
 					labelMatchers,
 				),
 				dashboards.AddQueryDataSource(datasourceName),
@@ -188,7 +188,7 @@ func NodeNetworkUtilization(datasourceName string, labelMatchers ...promql.Label
 		panel.AddQuery(
 			query.PromQL(
 				promql.SetLabelMatchers(
-					`instance:node_network_transmit_bytes_excluding_lo:rate1m{cluster="$cluster", job="node-exporter", instance=~"$instance"}`,
+					"instance:node_network_transmit_bytes_excluding_lo:rate1m{cluster=\"$cluster\", job=\"node-exporter\", instance=~\"$instance\"}",
 					labelMatchers,
 				),
 				dashboards.AddQueryDataSource(datasourceName),
@@ -223,7 +223,7 @@ func NodeNetworkSaturation(datasourceName string, labelMatchers ...promql.LabelM
 		panel.AddQuery(
 			query.PromQL(
 				promql.SetLabelMatchers(
-					`instance:node_network_receive_drop_excluding_lo:rate1m{cluster="$cluster", job="node-exporter", instance=~"$instance"}`,
+					"instance:node_network_receive_drop_excluding_lo:rate1m{cluster=\"$cluster\", job=\"node-exporter\", instance=~\"$instance\"}",
 					labelMatchers,
 				),
 				dashboards.AddQueryDataSource(datasourceName),
@@ -232,7 +232,7 @@ func NodeNetworkSaturation(datasourceName string, labelMatchers ...promql.LabelM
 		panel.AddQuery(
 			query.PromQL(
 				promql.SetLabelMatchers(
-					`instance:node_network_transmit_drop_excluding_lo:rate1m{cluster="$cluster", job="node-exporter", instance=~"$instance"}`,
+					"instance:node_network_transmit_drop_excluding_lo:rate1m{cluster=\"$cluster\", job=\"node-exporter\", instance=~\"$instance\"}",
 					labelMatchers,
 				),
 				dashboards.AddQueryDataSource(datasourceName),
@@ -247,7 +247,7 @@ func NodeDiskIOUtilization(datasourceName string, labelMatchers ...promql.LabelM
 		timeSeriesPanel.Chart(
 			timeSeriesPanel.WithYAxis(timeSeriesPanel.YAxis{
 				Format: &commonSdk.Format{
-					Unit: string(commonSdk.PercentUnit),
+					Unit: string(commonSdk.PercentDecimalUnit),
 				},
 			}),
 			timeSeriesPanel.WithLegend(timeSeriesPanel.Legend{
@@ -267,7 +267,7 @@ func NodeDiskIOUtilization(datasourceName string, labelMatchers ...promql.LabelM
 		panel.AddQuery(
 			query.PromQL(
 				promql.SetLabelMatchers(
-					`sum(instance_device:node_disk_io_time_seconds:rate1m{cluster="$cluster", job="node-exporter", instance=~"$instance"}) by (device, instance)`,
+					"sum(instance_device:node_disk_io_time_seconds:rate1m{cluster=\"$cluster\", job=\"node-exporter\", instance=~\"$instance\"}) by (device, instance)",
 					labelMatchers,
 				),
 				dashboards.AddQueryDataSource(datasourceName),
@@ -282,7 +282,7 @@ func NodeDiskIOSaturation(datasourceName string, labelMatchers ...promql.LabelMa
 		timeSeriesPanel.Chart(
 			timeSeriesPanel.WithYAxis(timeSeriesPanel.YAxis{
 				Format: &commonSdk.Format{
-					Unit: string(commonSdk.PercentUnit),
+					Unit: string(commonSdk.PercentDecimalUnit),
 				},
 			}),
 			timeSeriesPanel.WithLegend(timeSeriesPanel.Legend{
@@ -302,7 +302,7 @@ func NodeDiskIOSaturation(datasourceName string, labelMatchers ...promql.LabelMa
 		panel.AddQuery(
 			query.PromQL(
 				promql.SetLabelMatchers(
-					`sum(instance_device:node_disk_io_time_weighted_seconds:rate1m{cluster="$cluster", job="node-exporter", instance=~"$instance"}) by (instance, device)`,
+					"sum(instance_device:node_disk_io_time_weighted_seconds:rate1m{cluster=\"$cluster\", job=\"node-exporter\", instance=~\"$instance\"}) by (instance, device)",
 					labelMatchers,
 				),
 				dashboards.AddQueryDataSource(datasourceName),
@@ -317,7 +317,7 @@ func NodeDiskSpaceUtilization(datasourceName string, labelMatchers ...promql.Lab
 		timeSeriesPanel.Chart(
 			timeSeriesPanel.WithYAxis(timeSeriesPanel.YAxis{
 				Format: &commonSdk.Format{
-					Unit: string(commonSdk.PercentUnit),
+					Unit: string(commonSdk.PercentDecimalUnit),
 				},
 			}),
 			timeSeriesPanel.WithLegend(timeSeriesPanel.Legend{
@@ -337,7 +337,7 @@ func NodeDiskSpaceUtilization(datasourceName string, labelMatchers ...promql.Lab
 		panel.AddQuery(
 			query.PromQL(
 				promql.SetLabelMatchers(
-					`1 - (max without (mountpoint, fstype) (node_filesystem_avail_bytes{cluster="$cluster", job="node-exporter", fstype!="", instance=~"$instance"}) / max without (mountpoint, fstype) (node_filesystem_size_bytes{cluster="$cluster", job="node-exporter", fstype!="", instance=~"$instance"}))`,
+					"1 - (max without (mountpoint, fstype) (node_filesystem_avail_bytes{cluster=\"$cluster\", job=\"node-exporter\", fstype!=\"\", instance=~\"$instance\"}) / max without (mountpoint, fstype) (node_filesystem_size_bytes{cluster=\"$cluster\", job=\"node-exporter\", fstype!=\"\", instance=~\"$instance\"}))",
 					labelMatchers,
 				),
 				dashboards.AddQueryDataSource(datasourceName),

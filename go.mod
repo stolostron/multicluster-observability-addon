@@ -31,6 +31,7 @@ require (
 require (
 	github.com/perses/community-dashboards v0.0.0-20250702070716-95c48c24bc7a
 	github.com/perses/perses v0.51.1
+	github.com/perses/perses-operator v0.2.0
 	github.com/perses/plugins/prometheus v0.51.0-rc.3.0.20250606141117-4e2a0887698f
 	github.com/perses/plugins/statchart v0.8.0
 	github.com/perses/plugins/table v0.7.1
@@ -104,7 +105,6 @@ require (
 	github.com/nexucis/lamenv v0.5.2 // indirect
 	github.com/openshift/api v0.0.0-20250704153732-ad766c4e6d8e // indirect
 	github.com/perses/common v0.27.1-0.20250326140707-96e439b14e0e // indirect
-	github.com/perses/perses-operator v0.2.0 // indirect
 	github.com/perses/promql-builder v0.1.1-0.20250701065948-b9977cb8da59 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
@@ -189,3 +189,6 @@ require (
 )
 
 replace github.com/google/cel-go => github.com/google/cel-go v0.23.2
+
+// remove after latest tag for table plugin is available
+replace github.com/perses/plugins/table => github.com/perses/plugins/table v0.0.0-20250709083656-34e29fed0083

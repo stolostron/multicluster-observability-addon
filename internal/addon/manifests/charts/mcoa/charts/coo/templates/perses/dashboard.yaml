@@ -1,7 +1,19 @@
 {{- if and .Values.enabled .Values.monitoringUIPlugin }}
-{{- $files := .Files.Glob "dashboards/acm/*.yaml" }}
-{{- range $path, $file := $files }}
-{{ $file | nindent 0 }}
+{{- range $_, $dashboard := .Values.dashboards }}
+apiVersion: perses.dev/v1alpha1
+kind: PersesDashboard
+metadata:
+  name: {{ $dashboard.name }}
+  namespace: open-cluster-management-observability
+  labels:
+    app: {{ template "coohelm.name" $ }}
+    chart: {{ template "coohelm.chart" $ }}
+    release: {{ $.Release.Name }}
+    app.kubernetes.io/name: perses-dashboard
+    app.kubernetes.io/part-of: perses-operator
+    app.kubernetes.io/component: dashboard
+spec:
+{{ $dashboard.data | fromJson | toYaml | nindent 2 }}
 ---
 {{- end }}
-{{- end }} 
+{{- end }}

@@ -62,50 +62,48 @@ func withDescription(description string) dashboard.Option {
 	}
 }
 
-func BuildNodeResourceUse(project string, datasource string, clusterLabelName string) dashboards.DashboardResult {
+func BuildNodeResourceUse(project string, datasource string, clusterLabelName string) (dashboard.Builder, error) {
 	clusterLabelMatcher := dashboards.GetClusterLabelMatcher(clusterLabelName)
-	return dashboards.NewDashboardResult(
-		dashboard.New("acm-node-rsrc-use",
-			dashboard.ProjectName(project),
-			dashboard.Name("USE Method / Node"),
-			withDescription("http://www.brendangregg.com/USEmethod/use-linux.html"),
-			dashboard.Duration(time.Hour*3),
-			dashboard.AddVariable("cluster",
-				listVar.List(
-					labelValuesVar.PrometheusLabelValues("name",
-						dashboards.AddVariableDatasource(datasource),
-						labelValuesVar.Matchers(
-							promql.SetLabelMatchers(
-								"acm_managed_cluster_labels{openshiftVersion_major!=\"3\"}",
-								[]promql.LabelMatcher{},
-							)),
-					),
-					listVar.DisplayName("Cluster"),
-					listVar.AllowAllValue(false),
-					listVar.AllowMultiple(false),
+	return dashboard.New("acm-node-rsrc-use",
+		dashboard.ProjectName(project),
+		dashboard.Name("USE Method / Node"),
+		withDescription("http://www.brendangregg.com/USEmethod/use-linux.html"),
+		dashboard.Duration(time.Hour*3),
+		dashboard.AddVariable("cluster",
+			listVar.List(
+				labelValuesVar.PrometheusLabelValues("name",
+					dashboards.AddVariableDatasource(datasource),
+					labelValuesVar.Matchers(
+						promql.SetLabelMatchers(
+							"acm_managed_cluster_labels{openshiftVersion_major!=\"3\"}",
+							[]promql.LabelMatcher{},
+						)),
 				),
+				listVar.DisplayName("Cluster"),
+				listVar.AllowAllValue(false),
+				listVar.AllowMultiple(false),
 			),
-			dashboard.AddVariable("instance",
-				listVar.List(
-					labelValuesVar.PrometheusLabelValues("instance",
-						dashboards.AddVariableDatasource(datasource),
-						labelValuesVar.Matchers(
-							promql.SetLabelMatchers(
-								"up{cluster=\"$cluster\", job=\"node-exporter\"}",
-								[]promql.LabelMatcher{},
-							)),
-					),
-					listVar.DisplayName("Instance"),
-					listVar.AllowAllValue(true),
-					listVar.AllowMultiple(true),
-				),
-			),
-			withCPUResourceGroup(datasource, clusterLabelMatcher),
-			withMemoryResourceGroup(datasource, clusterLabelMatcher),
-			withNetworkResourceGroup(datasource, clusterLabelMatcher),
-			withDiskIOResourceGroup(datasource, clusterLabelMatcher),
-			withDiskSpaceResourceGroup(datasource, clusterLabelMatcher),
-			dashboard.RefreshInterval(time.Minute*5),
 		),
-	).Component("acm")
+		dashboard.AddVariable("instance",
+			listVar.List(
+				labelValuesVar.PrometheusLabelValues("instance",
+					dashboards.AddVariableDatasource(datasource),
+					labelValuesVar.Matchers(
+						promql.SetLabelMatchers(
+							"up{cluster=\"$cluster\", job=\"node-exporter\"}",
+							[]promql.LabelMatcher{},
+						)),
+				),
+				listVar.DisplayName("Instance"),
+				listVar.AllowAllValue(true),
+				listVar.AllowMultiple(true),
+			),
+		),
+		withCPUResourceGroup(datasource, clusterLabelMatcher),
+		withMemoryResourceGroup(datasource, clusterLabelMatcher),
+		withNetworkResourceGroup(datasource, clusterLabelMatcher),
+		withDiskIOResourceGroup(datasource, clusterLabelMatcher),
+		withDiskSpaceResourceGroup(datasource, clusterLabelMatcher),
+		dashboard.RefreshInterval(time.Minute*5),
+	)
 }

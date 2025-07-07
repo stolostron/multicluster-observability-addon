@@ -16,7 +16,7 @@ func CPUUtilization(datasourceName string, labelMatchers ...promql.LabelMatcher)
 		timeSeriesPanel.Chart(
 			timeSeriesPanel.WithYAxis(timeSeriesPanel.YAxis{
 				Format: &commonSdk.Format{
-					Unit: string(commonSdk.PercentUnit),
+					Unit: string(commonSdk.PercentDecimalUnit),
 				},
 			}),
 			timeSeriesPanel.WithLegend(timeSeriesPanel.Legend{
@@ -52,7 +52,7 @@ func CPUSaturation(datasourceName string, labelMatchers ...promql.LabelMatcher) 
 		timeSeriesPanel.Chart(
 			timeSeriesPanel.WithYAxis(timeSeriesPanel.YAxis{
 				Format: &commonSdk.Format{
-					Unit: string(commonSdk.PercentUnit),
+					Unit: string(commonSdk.PercentDecimalUnit),
 				},
 			}),
 			timeSeriesPanel.WithLegend(timeSeriesPanel.Legend{
@@ -87,7 +87,7 @@ func MemoryUtilization(datasourceName string, labelMatchers ...promql.LabelMatch
 		timeSeriesPanel.Chart(
 			timeSeriesPanel.WithYAxis(timeSeriesPanel.YAxis{
 				Format: &commonSdk.Format{
-					Unit: string(commonSdk.PercentUnit),
+					Unit: string(commonSdk.PercentDecimalUnit),
 				},
 			}),
 			timeSeriesPanel.WithLegend(timeSeriesPanel.Legend{
@@ -107,7 +107,7 @@ func MemoryUtilization(datasourceName string, labelMatchers ...promql.LabelMatch
 		panel.AddQuery(
 			query.PromQL(
 				promql.SetLabelMatchers(
-					"instance:node_memory_utilization:ratio{cluster=\"$cluster\",job=\"node-exporter\"} / scalar(count(instance:node_memory_utilization:ratio{cluster=\"$cluster\",job=\"node-exporter\"}))",
+					"instance:node_memory_utilisation:ratio{cluster=\"$cluster\",job=\"node-exporter\"} / scalar(count(instance:node_memory_utilisation:ratio{cluster=\"$cluster\",job=\"node-exporter\"}))",
 					labelMatchers,
 				),
 				dashboards.AddQueryDataSource(datasourceName),
@@ -122,7 +122,7 @@ func MemorySaturation(datasourceName string, labelMatchers ...promql.LabelMatche
 		timeSeriesPanel.Chart(
 			timeSeriesPanel.WithYAxis(timeSeriesPanel.YAxis{
 				Format: &commonSdk.Format{
-					Unit: string(commonSdk.DecimalUnit),
+					Unit: string(commonSdk.PercentDecimalUnit),
 				},
 			}),
 			timeSeriesPanel.WithLegend(timeSeriesPanel.Legend{
@@ -245,7 +245,7 @@ func DiskIOUtilization(datasourceName string, labelMatchers ...promql.LabelMatch
 		timeSeriesPanel.Chart(
 			timeSeriesPanel.WithYAxis(timeSeriesPanel.YAxis{
 				Format: &commonSdk.Format{
-					Unit: string(commonSdk.PercentUnit),
+					Unit: string(commonSdk.PercentDecimalUnit),
 				},
 			}),
 			timeSeriesPanel.WithLegend(timeSeriesPanel.Legend{
@@ -280,7 +280,7 @@ func DiskIOSaturation(datasourceName string, labelMatchers ...promql.LabelMatche
 		timeSeriesPanel.Chart(
 			timeSeriesPanel.WithYAxis(timeSeriesPanel.YAxis{
 				Format: &commonSdk.Format{
-					Unit: string(commonSdk.PercentUnit),
+					Unit: string(commonSdk.PercentDecimalUnit),
 				},
 			}),
 			timeSeriesPanel.WithLegend(timeSeriesPanel.Legend{
@@ -315,7 +315,7 @@ func DiskSpaceUtilization(datasourceName string, labelMatchers ...promql.LabelMa
 		timeSeriesPanel.Chart(
 			timeSeriesPanel.WithYAxis(timeSeriesPanel.YAxis{
 				Format: &commonSdk.Format{
-					Unit: string(commonSdk.PercentUnit),
+					Unit: string(commonSdk.PercentDecimalUnit),
 				},
 			}),
 			timeSeriesPanel.WithLegend(timeSeriesPanel.Legend{

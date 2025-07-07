@@ -1,4 +1,4 @@
-package acm
+package incident_management
 
 import (
 	"github.com/perses/community-dashboards/pkg/dashboards"
@@ -19,25 +19,30 @@ func ActiveIncidents(datasourceName string, labelMatchers ...promql.LabelMatcher
 				{
 					Name:   "cluster",
 					Header: "Cluster",
-					Width:  152,
+					Align:  tablePanel.LeftAlign,
 				},
 				{
 					Name:   "severity",
 					Header: "Severity",
-					Width:  92,
+					Align:  tablePanel.LeftAlign,
 				},
 				{
 					Name:   "components",
 					Header: "Components",
+					Align:  tablePanel.LeftAlign,
 				},
 				{
 					Name:   "alerts",
 					Header: "Alerts",
-					Width:  438,
+					Align:  tablePanel.LeftAlign,
 				},
 				{
 					Name:   "start_time",
 					Header: "Start Time",
+					Align:  tablePanel.LeftAlign,
+					Format: &commonSdk.Format{
+						Unit: string(commonSdk.DaysUnit),
+					},
 				},
 			}),
 		),
@@ -68,8 +73,7 @@ func IncidentCount(datasourceName string, labelMatchers ...promql.LabelMatcher) 
 		timeSeriesPanel.Chart(
 			timeSeriesPanel.WithYAxis(timeSeriesPanel.YAxis{
 				Format: &commonSdk.Format{
-					Unit:          string(commonSdk.DecimalUnit),
-					DecimalPlaces: 0,
+					Unit: string(commonSdk.PercentUnit),
 				},
 			}),
 			timeSeriesPanel.WithLegend(timeSeriesPanel.Legend{

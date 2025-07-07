@@ -1,17 +1,102 @@
 package manifests
 
 import (
+	"encoding/json"
+	"log"
+
+	"github.com/stolostron/multicluster-observability-addon/internal/perses/dashboards/incident-management"
+
+	"github.com/perses/perses/go-sdk/dashboard"
+
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	imanifests "github.com/stolostron/multicluster-observability-addon/internal/analytics/incident-detection/manifests"
 	mmanifests "github.com/stolostron/multicluster-observability-addon/internal/metrics/manifests"
+	"github.com/stolostron/multicluster-observability-addon/internal/perses/dashboards/acm"
 )
+
+type DashboardValue struct {
+	Name string `json:"name"`
+	Data string `json:"data"`
+}
 
 type COOValues struct {
 	Enabled            bool                                `json:"enabled"`
 	InstallCOO         bool                                `json:"installCOO"`
 	MonitoringUIPlugin bool                                `json:"monitoringUIPlugin"`
+	Dashboards         []DashboardValue                    `json:"dashboards,omitempty"`
 	Metrics            *mmanifests.UIValues                `json:"metrics,omitempty"`
 	IncidentDetection  *imanifests.IncidentDetectionValues `json:"incidentDetection,omitempty"`
+}
+
+func buildACMDashboards() []DashboardValue {
+	var dashboards []DashboardValue
+	project := "open-cluster-management-observability"
+	datasource := "thanos-query-frontend"
+	clusterLabelName := ""
+
+	type dashboardBuilderFunc func(string, string, string) (dashboard.Builder, error)
+	builders := []struct {
+		fn   dashboardBuilderFunc
+		name string
+	}{
+		{acm.BuildClusterResourceUse, "ClusterResourceUse"},
+		{acm.BuildNodeResourceUse, "NodeResourceUse"},
+		{acm.BuildACMOptimizationOverview, "ACMOptimizationOverview"},
+		{acm.BuildACMClustersOverview, "ACMClustersOverview"},
+	}
+
+	for _, builder := range builders {
+		db, err := builder.fn(project, datasource, clusterLabelName)
+		if err != nil {
+			log.Printf("Failed to build %s dashboard: %v", builder.name, err)
+			continue
+		}
+		data, err := json.Marshal(db.Dashboard.Spec)
+		if err != nil {
+			log.Printf("Failed to marshal %s dashboard: %v", builder.name, err)
+			continue
+		}
+		dashboards = append(dashboards, DashboardValue{
+			Name: db.Dashboard.Metadata.Name,
+			Data: string(data),
+		})
+	}
+
+	return dashboards
+}
+
+func buildIncidentDetetctionDashboards() []DashboardValue {
+	var dashboards []DashboardValue
+	project := "open-cluster-management-observability"
+	datasource := "thanos-query-frontend"
+	clusterLabelName := ""
+
+	type dashboardBuilderFunc func(string, string, string) (dashboard.Builder, error)
+	builders := []struct {
+		fn   dashboardBuilderFunc
+		name string
+	}{
+		{incident_management.BuildACMIncidentsOverview, "IncidentDetectionOverview"},
+	}
+
+	for _, builder := range builders {
+		db, err := builder.fn(project, datasource, clusterLabelName)
+		if err != nil {
+			log.Printf("Failed to build %s dashboard: %v", builder.name, err)
+			continue
+		}
+		data, err := json.Marshal(db.Dashboard.Spec)
+		if err != nil {
+			log.Printf("Failed to marshal %s dashboard: %v", builder.name, err)
+			continue
+		}
+		dashboards = append(dashboards, DashboardValue{
+			Name: db.Dashboard.Metadata.Name,
+			Data: string(data),
+		})
+	}
+
+	return dashboards
 }
 
 func BuildValues(opts addon.Options, installCOO bool, isHubCluster bool) *COOValues {
@@ -19,20 +104,33 @@ func BuildValues(opts addon.Options, installCOO bool, isHubCluster bool) *COOVal
 
 	incidentDetection := imanifests.EnableUI(opts.Platform.AnalyticsOptions.IncidentDetection)
 
-	// Decide if we need to create a monitoring UI plugin
+	var dashboards []DashboardValue
+
 	monitoringUIPlugin := false
 	if metricsUI != nil {
 		monitoringUIPlugin = metricsUI.Enabled
+		if metricsUI.Enabled {
+			dashboards = append(dashboards, buildACMDashboards()...)
+		}
 	}
+
 	if incidentDetection != nil {
 		monitoringUIPlugin = monitoringUIPlugin || incidentDetection.Enabled
+		if incidentDetection.Enabled {
+			dashboards = append(dashboards, buildIncidentDetetctionDashboards()...)
+		}
 	}
+
+	// add a log here for debug
+	log.Printf("COOValues: Enabled=%v, InstallCOO=%v, MonitoringUIPlugin=%v, Dashboards=%d, Metrics=%v, IncidentDetection=%v",
+		monitoringUIPlugin, installCOO, monitoringUIPlugin, len(dashboards), metricsUI, incidentDetection)
 
 	return &COOValues{
 		// Decide if COO chart is needed
 		Enabled:            monitoringUIPlugin,
 		InstallCOO:         installCOO,
 		MonitoringUIPlugin: monitoringUIPlugin,
+		Dashboards:         dashboards,
 		Metrics:            metricsUI,
 		IncidentDetection:  incidentDetection,
 	}

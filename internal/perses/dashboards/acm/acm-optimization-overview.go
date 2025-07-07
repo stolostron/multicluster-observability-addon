@@ -39,31 +39,29 @@ func withNetworkingGroup(datasource string, labelMatcher promql.LabelMatcher) da
 	)
 }
 
-func BuildACMOptimizationOverview(project string, datasource string, clusterLabelName string) dashboards.DashboardResult {
+func BuildACMOptimizationOverview(project string, datasource string, clusterLabelName string) (dashboard.Builder, error) {
 	clusterLabelMatcher := dashboards.GetClusterLabelMatcher(clusterLabelName)
-	return dashboards.NewDashboardResult(
-		dashboard.New("acm-optimization-overview",
-			dashboard.ProjectName(project),
-			dashboard.Name("ACM Resource Optimization / Cluster"),
+	return dashboard.New("acm-optimization-overview",
+		dashboard.ProjectName(project),
+		dashboard.Name("ACM Resource Optimization / Cluster"),
 
-			dashboard.AddVariable("cluster",
-				listVar.List(
-					labelValuesVar.PrometheusLabelValues("name",
-						dashboards.AddVariableDatasource(datasource),
-						labelValuesVar.Matchers(
-							promql.SetLabelMatchers(
-								"acm_managed_cluster_labels",
-								[]promql.LabelMatcher{},
-							)),
-					),
-					listVar.DisplayName("cluster"),
-					listVar.AllowAllValue(true),
-					listVar.AllowMultiple(true),
+		dashboard.AddVariable("cluster",
+			listVar.List(
+				labelValuesVar.PrometheusLabelValues("name",
+					dashboards.AddVariableDatasource(datasource),
+					labelValuesVar.Matchers(
+						promql.SetLabelMatchers(
+							"acm_managed_cluster_labels{openshiftVersion_major!=\"3\"}",
+							[]promql.LabelMatcher{},
+						)),
 				),
+				listVar.DisplayName("cluster"),
+				listVar.AllowAllValue(false),
+				listVar.AllowMultiple(false),
 			),
-			withCPUGroup(datasource, clusterLabelMatcher),
-			withMemoryGroup(datasource, clusterLabelMatcher),
-			withNetworkingGroup(datasource, clusterLabelMatcher),
 		),
-	).Component("acm")
+		withCPUGroup(datasource, clusterLabelMatcher),
+		withMemoryGroup(datasource, clusterLabelMatcher),
+		withNetworkingGroup(datasource, clusterLabelMatcher),
+	)
 }

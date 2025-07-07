@@ -51,35 +51,33 @@ func withClusterDiskSpaceResourceGroup(datasource string, labelMatcher promql.La
 	)
 }
 
-func BuildClusterResourceUse(project string, datasource string, clusterLabelName string) dashboards.DashboardResult {
+func BuildClusterResourceUse(project string, datasource string, clusterLabelName string) (dashboard.Builder, error) {
 	clusterLabelMatcher := dashboards.GetClusterLabelMatcher(clusterLabelName)
-	return dashboards.NewDashboardResult(
-		dashboard.New("acm-cluster-rsrc-use",
-			dashboard.ProjectName(project),
-			dashboard.Name("USE Method / Cluster"),
-			withDescription("http://www.brendangregg.com/USEmethod/use-linux.html"),
-			dashboard.Duration(time.Hour*3),
-			dashboard.AddVariable("cluster",
-				listVar.List(
-					labelValuesVar.PrometheusLabelValues("name",
-						dashboards.AddVariableDatasource(datasource),
-						labelValuesVar.Matchers(
-							promql.SetLabelMatchers(
-								"acm_managed_cluster_labels{openshiftVersion_major!=\"3\"}",
-								[]promql.LabelMatcher{},
-							)),
-					),
-					listVar.DisplayName("cluster"),
-					listVar.AllowAllValue(true),
-					listVar.AllowMultiple(true),
+	return dashboard.New("acm-cluster-rsrc-use",
+		dashboard.ProjectName(project),
+		dashboard.Name("USE Method / Cluster"),
+		withDescription("http://www.brendangregg.com/USEmethod/use-linux.html"),
+		dashboard.Duration(time.Hour*3),
+		dashboard.AddVariable("cluster",
+			listVar.List(
+				labelValuesVar.PrometheusLabelValues("name",
+					dashboards.AddVariableDatasource(datasource),
+					labelValuesVar.Matchers(
+						promql.SetLabelMatchers(
+							"acm_managed_cluster_labels{openshiftVersion_major!=\"3\"}",
+							[]promql.LabelMatcher{},
+						)),
 				),
+				listVar.DisplayName("cluster"),
+				listVar.AllowAllValue(false),
+				listVar.AllowMultiple(false),
 			),
-			withClusterCPUResourceGroup(datasource, clusterLabelMatcher),
-			withClusterMemoryResourceGroup(datasource, clusterLabelMatcher),
-			withClusterNetworkResourceGroup(datasource, clusterLabelMatcher),
-			withClusterDiskIOResourceGroup(datasource, clusterLabelMatcher),
-			withClusterDiskSpaceResourceGroup(datasource, clusterLabelMatcher),
-			dashboard.RefreshInterval(time.Minute*5),
 		),
-	).Component("acm")
+		withClusterCPUResourceGroup(datasource, clusterLabelMatcher),
+		withClusterMemoryResourceGroup(datasource, clusterLabelMatcher),
+		withClusterNetworkResourceGroup(datasource, clusterLabelMatcher),
+		withClusterDiskIOResourceGroup(datasource, clusterLabelMatcher),
+		withClusterDiskSpaceResourceGroup(datasource, clusterLabelMatcher),
+		dashboard.RefreshInterval(time.Minute*5),
+	)
 }

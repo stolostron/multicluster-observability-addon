@@ -32,9 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-const (
-	localClusterNamespace = "local-cluster"
-)
+var localClusterNamespace = "local-cluster"
 
 var (
 	managedClusterAddonKind                       = "ManagedClusterAddOn"

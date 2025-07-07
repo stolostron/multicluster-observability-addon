@@ -1,11 +1,13 @@
 package acm
 
 import (
-	"github.com/perses/community-dashboards/pkg/dashboards"
-	"github.com/perses/community-dashboards/pkg/promql"
+	commonSdk "github.com/perses/perses/go-sdk/common"
 	"github.com/perses/perses/go-sdk/panel"
 	panelgroup "github.com/perses/perses/go-sdk/panel-group"
 	"github.com/perses/plugins/prometheus/sdk/go/query"
+
+	"github.com/perses/community-dashboards/pkg/dashboards"
+	"github.com/perses/community-dashboards/pkg/promql"
 	tablePanel "github.com/perses/plugins/table/sdk/go"
 )
 
@@ -20,26 +22,36 @@ func Top50MaxLatencyAPIServer(datasourceName string, labelMatchers ...promql.Lab
 					Align:  tablePanel.RightAlign,
 				},
 				{
-					Name:   "value",
+					Name:   "value #1",
 					Header: "Max Latency (99th percentile)",
 					Align:  tablePanel.RightAlign,
+					Format: &commonSdk.Format{
+						Unit:          string(commonSdk.MilliSecondsUnit),
+						DecimalPlaces: 2,
+					},
 				},
 				{
 					Name:   "api_up",
 					Header: "API Server UP",
 					Align:  tablePanel.RightAlign,
+					Format: &commonSdk.Format{
+						Unit: string(commonSdk.PercentDecimalUnit),
+					},
 				},
 				{
-					Name:   "error_rate",
+					Name:   "value #2",
 					Header: "API Error[1h]",
 					Align:  tablePanel.RightAlign,
+					Format: &commonSdk.Format{
+						Unit: commonSdk.DecimalUnit,
+					},
 				},
 			}),
 		),
 		panel.AddQuery(
 			query.PromQL(
 				promql.SetLabelMatchers(
-					"topk(50, max(apiserver_request_duration_seconds:histogram_quantile_99{cluster=~'$cluster',clusterType!=\"ocp3\"}) by (cluster)) * on(cluster) group_left(api_up) count_values without() (\"api_up\", (sum(up{cluster=~'$cluster',job=\"apiserver\",clusterType!=\"ocp3\"} == 1) by (cluster) / count(up{cluster=~'$cluster',job=\"apiserver\",clusterType!=\"ocp3\"}) by (cluster)))",
+					"topk(50, max(apiserver_request_duration_seconds:histogram_quantile_99{cluster=~\"$cluster\",clusterType!=\"ocp3\"}) by (cluster)) * on(cluster) group_left(api_up) count_values without() (\"api_up\", (sum(up{cluster=~'$cluster',job=\"apiserver\",clusterType!=\"ocp3\"} == 1) by (cluster) / count(up{cluster=~'$cluster',job=\"apiserver\",clusterType!=\"ocp3\"}) by (cluster)))",
 					labelMatchers,
 				),
 				dashboards.AddQueryDataSource(datasourceName),
@@ -48,7 +60,7 @@ func Top50MaxLatencyAPIServer(datasourceName string, labelMatchers ...promql.Lab
 		panel.AddQuery(
 			query.PromQL(
 				promql.SetLabelMatchers(
-					"sum by (cluster)(sum:apiserver_request_total:1h{cluster=~'$cluster',code=~\"5..\",clusterType!=\"ocp3\"})",
+					"sum by (cluster)(sum:apiserver_request_total:1h{cluster=~\"$cluster\",code=~\"5..\",clusterType!=\"ocp3\"})",
 					labelMatchers,
 				),
 				dashboards.AddQueryDataSource(datasourceName),
@@ -76,18 +88,25 @@ func EtcdHealth(datasourceName string, labelMatchers ...promql.LabelMatcher) pan
 					Name:   "value",
 					Header: "Leader election change",
 					Align:  tablePanel.RightAlign,
+					Format: &commonSdk.Format{
+						Unit: commonSdk.DecimalUnit,
+					},
 				},
 				{
 					Name:   "db_size",
 					Header: "DB size",
 					Align:  tablePanel.RightAlign,
+					Format: &commonSdk.Format{
+						Unit:          commonSdk.BytesUnit,
+						DecimalPlaces: 2,
+					},
 				},
 			}),
 		),
 		panel.AddQuery(
 			query.PromQL(
 				promql.SetLabelMatchers(
-					"sum(changes(etcd_server_leader_changes_seen_total{cluster=~'$cluster',job=\"etcd\"}[$__range])) by (cluster) * on(cluster) group_left(db_size) count_values without() (\"db_size\", max(etcd_debugging_mvcc_db_total_size_in_bytes{cluster=~'$cluster',job=\"etcd\"}) by (cluster)) * on(cluster) group_left(has_leader) count_values without() (\"has_leader\", max(etcd_server_has_leader{cluster=~'$cluster',job=\"etcd\"}) by (cluster))",
+					"sum(changes(etcd_server_leader_changes_seen_total{cluster=~\"$cluster\",job=\"etcd\"}[$__range])) by (cluster) * on(cluster) group_left(db_size) count_values without() (\"db_size\", max(etcd_debugging_mvcc_db_total_size_in_bytes{cluster=~\"$cluster\",job=\"etcd\"}) by (cluster)) * on(cluster) group_left(has_leader) count_values without() (\"has_leader\", max(etcd_server_has_leader{cluster=~\"$cluster\",job=\"etcd\"}) by (cluster))",
 					labelMatchers,
 				),
 				dashboards.AddQueryDataSource(datasourceName),
@@ -110,16 +129,28 @@ func Top50CPUOverEstimationClusters(datasourceName string, labelMatchers ...prom
 					Name:   "Value",
 					Header: "Overestimation",
 					Align:  tablePanel.RightAlign,
+					Format: &commonSdk.Format{
+						Unit:          string(commonSdk.PercentUnit),
+						DecimalPlaces: 2,
+					},
 				},
 				{
 					Name:   "cpu_requested",
 					Header: "Requested",
 					Align:  tablePanel.RightAlign,
+					Format: &commonSdk.Format{
+						Unit:          string(commonSdk.PercentUnit),
+						DecimalPlaces: 2,
+					},
 				},
 				{
 					Name:   "cpu_utilized",
 					Header: "Utilized",
 					Align:  tablePanel.RightAlign,
+					Format: &commonSdk.Format{
+						Unit:          string(commonSdk.PercentUnit),
+						DecimalPlaces: 2,
+					},
 				},
 			}),
 		),
@@ -149,16 +180,57 @@ func Top50MemoryOverEstimationClusters(datasourceName string, labelMatchers ...p
 					Name:   "Value",
 					Header: "Overestimation",
 					Align:  tablePanel.RightAlign,
+					Format: &commonSdk.Format{
+						Unit:          string(commonSdk.PercentUnit),
+						DecimalPlaces: 2,
+					},
 				},
 				{
 					Name:   "memory_requested",
 					Header: "Requested",
 					Align:  tablePanel.RightAlign,
+					Format: &commonSdk.Format{
+						Unit:          string(commonSdk.PercentUnit),
+						DecimalPlaces: 2,
+					},
 				},
 				{
 					Name:   "memory_utilized",
 					Header: "Utilized",
 					Align:  tablePanel.RightAlign,
+					Format: &commonSdk.Format{
+						Unit:          string(commonSdk.PercentUnit),
+						DecimalPlaces: 2,
+					},
+				},
+				{
+					Name:   "clusterID",
+					Header: "Cluster ID",
+					Align:  tablePanel.RightAlign,
+				},
+				{
+					Name:   "prometheus",
+					Header: "Prometheus",
+					Align:  tablePanel.RightAlign,
+					Format: &commonSdk.Format{
+						Unit: commonSdk.DecimalUnit,
+					},
+				},
+				{
+					Name:   "receive",
+					Header: "Receive",
+					Align:  tablePanel.RightAlign,
+					Format: &commonSdk.Format{
+						Unit: commonSdk.DecimalUnit,
+					},
+				},
+				{
+					Name:   "tenant_id",
+					Header: "Tenant ID",
+					Align:  tablePanel.RightAlign,
+					Format: &commonSdk.Format{
+						Unit: commonSdk.DecimalUnit,
+					},
 				},
 			}),
 		),
@@ -188,21 +260,66 @@ func Top50CPUUtilizedClusters(datasourceName string, labelMatchers ...promql.Lab
 					Name:   "machine_cpu_cores_sum",
 					Header: "Total Cores",
 					Align:  tablePanel.RightAlign,
+					Format: &commonSdk.Format{
+						Unit: commonSdk.DecimalUnit,
+					},
 				},
 				{
 					Name:   "node_allocatable_cpu_cores_sum",
 					Header: "Allocatable Cores",
 					Align:  tablePanel.RightAlign,
+					Format: &commonSdk.Format{
+						Unit: commonSdk.DecimalUnit,
+					},
 				},
 				{
 					Name:   "cpu_requested",
 					Header: "Requested",
 					Align:  tablePanel.RightAlign,
+					Format: &commonSdk.Format{
+						Unit: commonSdk.BytesUnit,
+					},
 				},
 				{
 					Name:   "Value",
 					Header: "Utilized",
 					Align:  tablePanel.RightAlign,
+					Format: &commonSdk.Format{
+						Unit:          string(commonSdk.PercentUnit),
+						DecimalPlaces: 2,
+					},
+				},
+				{
+					Name:   "clusterID",
+					Header: "Cluster ID",
+					Align:  tablePanel.RightAlign,
+					Format: &commonSdk.Format{
+						Unit: commonSdk.DecimalUnit,
+					},
+				},
+				{
+					Name:   "prometheus",
+					Header: "Prometheus",
+					Align:  tablePanel.RightAlign,
+					Format: &commonSdk.Format{
+						Unit: commonSdk.DecimalUnit,
+					},
+				},
+				{
+					Name:   "receive",
+					Header: "Receive",
+					Align:  tablePanel.RightAlign,
+					Format: &commonSdk.Format{
+						Unit: commonSdk.DecimalUnit,
+					},
+				},
+				{
+					Name:   "tenant_id",
+					Header: "Tenant ID",
+					Align:  tablePanel.RightAlign,
+					Format: &commonSdk.Format{
+						Unit: commonSdk.DecimalUnit,
+					},
 				},
 			}),
 		),
@@ -210,45 +327,6 @@ func Top50CPUUtilizedClusters(datasourceName string, labelMatchers ...promql.Lab
 			query.PromQL(
 				promql.SetLabelMatchers(
 					"topk(50, cluster:node_cpu:ratio{cluster=\"$cluster\"}) * on(cluster) group_left(machine_cpu_cores_sum) count_values without() (\"machine_cpu_cores_sum\", cluster:cpu_cores:sum) * on(cluster) group_left(node_allocatable_cpu_cores_sum) count_values without() (\"node_allocatable_cpu_cores_sum\", cluster:cpu_allocatable:sum) * on(cluster) group_left(cpu_requested) count_values without() (\"cpu_requested\", cluster:cpu_requested:ratio)",
-					labelMatchers,
-				),
-				dashboards.AddQueryDataSource(datasourceName),
-			),
-		),
-	)
-}
-
-func Top50MemoryUtilizedClusters(datasourceName string, labelMatchers ...promql.LabelMatcher) panelgroup.Option {
-	return panelgroup.AddPanel("Top 50 Memory Utilized Clusters",
-		panel.Description("Shows memory utilization metrics including available memory, requested memory, and utilization percentage."),
-		tablePanel.Table(
-			tablePanel.WithColumnSettings([]tablePanel.ColumnSettings{
-				{
-					Name:   "cluster",
-					Header: "Cluster",
-					Align:  tablePanel.RightAlign,
-				},
-				{
-					Name:   "machine_memory_sum",
-					Header: "Available Memory",
-					Align:  tablePanel.RightAlign,
-				},
-				{
-					Name:   "machine_memory_requested",
-					Header: "Requested",
-					Align:  tablePanel.RightAlign,
-				},
-				{
-					Name:   "Value",
-					Header: "Utilized",
-					Align:  tablePanel.RightAlign,
-				},
-			}),
-		),
-		panel.AddQuery(
-			query.PromQL(
-				promql.SetLabelMatchers(
-					"topk(50, cluster:memory_utilized:ratio{cluster=\"$cluster\"}) * on(cluster) group_left(machine_memory_sum) count_values without() (\"machine_memory_sum\", cluster:machine_memory:sum) * on(cluster) group_left(machine_memory_requested) count_values without() (\"machine_memory_requested\", cluster:memory_requested:ratio)",
 					labelMatchers,
 				),
 				dashboards.AddQueryDataSource(datasourceName),
@@ -271,6 +349,10 @@ func Top5CPUUtilizationGraph(datasourceName string, labelMatchers ...promql.Labe
 					Name:   "Value",
 					Header: "CPU Usage %",
 					Align:  tablePanel.RightAlign,
+					Format: &commonSdk.Format{
+						Unit:          string(commonSdk.PercentUnit),
+						DecimalPlaces: 2,
+					},
 				},
 			}),
 		),
@@ -278,6 +360,83 @@ func Top5CPUUtilizationGraph(datasourceName string, labelMatchers ...promql.Labe
 			query.PromQL(
 				promql.SetLabelMatchers(
 					"topk(5, cluster:node_cpu:ratio{cluster=\"$cluster\"})",
+					labelMatchers,
+				),
+				dashboards.AddQueryDataSource(datasourceName),
+			),
+		),
+	)
+}
+
+func Top50MemoryUtilizedClusters(datasourceName string, labelMatchers ...promql.LabelMatcher) panelgroup.Option {
+	return panelgroup.AddPanel("Top 50 Memory Utilized Clusters",
+		panel.Description("Shows memory utilization metrics including available memory, requested memory, and utilization percentage."),
+		tablePanel.Table(
+			tablePanel.WithColumnSettings([]tablePanel.ColumnSettings{
+				{
+					Name:   "cluster",
+					Header: "Cluster",
+					Align:  tablePanel.RightAlign,
+				},
+				{
+					Name:   "machine_memory_sum",
+					Header: "Available Memory",
+					Align:  tablePanel.RightAlign,
+					Format: &commonSdk.Format{
+						Unit:          commonSdk.BytesUnit,
+						DecimalPlaces: 2,
+					},
+				},
+				{
+					Name:   "machine_memory_requested",
+					Header: "Requested",
+					Align:  tablePanel.RightAlign,
+					Format: &commonSdk.Format{
+						Unit:          commonSdk.BytesUnit,
+						DecimalPlaces: 2,
+					},
+				},
+				{
+					Name:   "Value",
+					Header: "Utilized",
+					Align:  tablePanel.RightAlign,
+					Format: &commonSdk.Format{
+						Unit:          string(commonSdk.PercentUnit),
+						DecimalPlaces: 2,
+					},
+				},
+				{
+					Name:   "clusterID",
+					Header: "Cluster ID",
+					Align:  tablePanel.RightAlign,
+				},
+				{
+					Name:   "prometheus",
+					Header: "Prometheus",
+					Align:  tablePanel.RightAlign,
+					Format: &commonSdk.Format{
+						Unit: commonSdk.DecimalUnit,
+					},
+				},
+				{
+					Name:   "receive",
+					Header: "Receive",
+					Align:  tablePanel.RightAlign,
+					Format: &commonSdk.Format{
+						Unit: commonSdk.DecimalUnit,
+					},
+				},
+				{
+					Name:   "tenant_id",
+					Header: "Tenant ID",
+					Align:  tablePanel.RightAlign,
+				},
+			}),
+		),
+		panel.AddQuery(
+			query.PromQL(
+				promql.SetLabelMatchers(
+					"topk(50, cluster:memory_utilized:ratio{cluster=\"$cluster\"}) * on(cluster) group_left(machine_memory_sum) count_values without() (\"machine_memory_sum\", cluster:machine_memory:sum) * on(cluster) group_left(machine_memory_requested) count_values without() (\"machine_memory_requested\", cluster:memory_requested:ratio)",
 					labelMatchers,
 				),
 				dashboards.AddQueryDataSource(datasourceName),
@@ -300,6 +459,10 @@ func Top5MemoryUtilizationGraph(datasourceName string, labelMatchers ...promql.L
 					Name:   "Value",
 					Header: "Memory Usage %",
 					Align:  tablePanel.RightAlign,
+					Format: &commonSdk.Format{
+						Unit:          string(commonSdk.PercentUnit),
+						DecimalPlaces: 2,
+					},
 				},
 			}),
 		),
@@ -329,28 +492,44 @@ func BandwidthUtilization(datasourceName string, labelMatchers ...promql.LabelMa
 					Name:   "Value",
 					Header: "Current Bandwidth Received",
 					Align:  tablePanel.RightAlign,
+					Format: &commonSdk.Format{
+						Unit:          commonSdk.BytesUnit,
+						DecimalPlaces: 2,
+					},
 				},
 				{
 					Name:   "node_transmit",
 					Header: "Current Bandwidth Transmitted",
 					Align:  tablePanel.RightAlign,
+					Format: &commonSdk.Format{
+						Unit:          commonSdk.BytesUnit,
+						DecimalPlaces: 2,
+					},
 				},
 				{
 					Name:   "node_receive_drop",
 					Header: "Rate of Received Packets Dropped",
 					Align:  tablePanel.RightAlign,
+					Format: &commonSdk.Format{
+						Unit:          commonSdk.DecimalUnit,
+						DecimalPlaces: 2,
+					},
 				},
 				{
 					Name:   "node_transmit_drop",
 					Header: "Rate of Transmitted Packets Dropped",
 					Align:  tablePanel.RightAlign,
+					Format: &commonSdk.Format{
+						Unit:          commonSdk.DecimalUnit,
+						DecimalPlaces: 2,
+					},
 				},
 			}),
 		),
 		panel.AddQuery(
 			query.PromQL(
 				promql.SetLabelMatchers(
-					"sum(instance:node_network_receive_bytes_excluding_lo:rate1m{cluster=\"$cluster\",job=\"node-exporter\"}) by (cluster) * on(cluster) group_left(node_transmit) count_values without() (\"node_transmit\", sum(instance:node_network_transmit_bytes_excluding_lo:rate1m{cluster=\"$cluster\",job=\"node-exporter\"}) by (cluster)) * on(cluster) group_left(node_receive_drop) count_values without() (\"node_receive_drop\", sum(instance:node_network_receive_drop_excluding_lo:rate1m{cluster=\"$cluster\",job=\"node-exporter\"}) by (cluster)) * on(cluster) group_left(node_transmit_drop) count_values without() (\"node_transmit_drop\", sum(instance:node_network_transmit_drop_excluding_lo:rate1m{cluster=\"$cluster\",job=\"node-exporter\"}) by (cluster))",
+					"sum(instance:node_network_receive_bytes_excluding_lo:rate1m{cluster=~\"$cluster\",job=\"node-exporter\"}) by (cluster) * on(cluster) group_left(node_transmit) count_values without() (\"node_transmit\", sum(instance:node_network_transmit_bytes_excluding_lo:rate1m{cluster=~\"$cluster\",job=\"node-exporter\"}) by (cluster)) * on(cluster) group_left(node_receive_drop) count_values without() (\"node_receive_drop\", sum(instance:node_network_receive_drop_excluding_lo:rate1m{cluster=~\"$cluster\",job=\"node-exporter\"}) by (cluster)) * on(cluster) group_left(node_transmit_drop) count_values without() (\"node_transmit_drop\", sum(instance:node_network_transmit_drop_excluding_lo:rate1m{cluster=~\"$cluster\",job=\"node-exporter\"}) by (cluster))",
 					labelMatchers,
 				),
 				dashboards.AddQueryDataSource(datasourceName),

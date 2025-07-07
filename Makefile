@@ -21,11 +21,6 @@ REGISTRY_BASE ?= $(REGISTRY_BASE_OPENSHIFT)
 # Image URL to use all building/pushing image targets
 IMG ?= $(REGISTRY_BASE)/multicluster-observability-addon:$(VERSION)
 
-# Dashboard build configuration with defaults
-GOMAIN= ./internal/perses/main.go
-OUTPUT_DIR_OPERATOR ?= ./internal/addon/manifests/charts/mcoa/charts/coo/templates/perses/dashboards
-OUTPUT_FORMAT_PERSES ?= operator
-
 .PHONY: deps
 deps: go.mod go.sum
 	go mod tidy
@@ -103,10 +98,3 @@ addon-deploy: download-crds
 .PHONY: addon-undeploy
 addon-undeploy: download-crds
 	$(KUSTOMIZE) build ./deploy | kubectl delete -f -
-
-.PHONY: dashboards
-dashboards:
-	@echo "Removing old dashboards"
-	@rm -rf $(OUTPUT_DIR_OPERATOR)
-	@echo "Building dashboards"
-	@$(ENVVARS) go run $(GOMAIN) --output-dir=$(OUTPUT_DIR_OPERATOR) --output=$(OUTPUT_FORMAT_PERSES)

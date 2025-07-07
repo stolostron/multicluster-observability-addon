@@ -120,24 +120,39 @@ func CPUQuotaPanel(datasourceName string, labelMatchers ...promql.LabelMatcher) 
 					Align:  tablePanel.LeftAlign,
 				},
 				{
-					Name:   "Value #E",
+					Name:   "value #1",
 					Header: "CPU Requests %",
 					Align:  tablePanel.LeftAlign,
+					Format: &commonSdk.Format{
+						Unit:          string(commonSdk.PercentDecimalUnit),
+						DecimalPlaces: 2,
+					},
 				},
 				{
-					Name:   "Value #C",
+					Name:   "value #2",
 					Header: "CPU Usage",
 					Align:  tablePanel.LeftAlign,
+					Format: &commonSdk.Format{
+						Unit:          commonSdk.DecimalUnit,
+						DecimalPlaces: 2,
+					},
 				},
 				{
-					Name:   "Value #D",
+					Name:   "value #3",
 					Header: "CPU Requests",
 					Align:  tablePanel.LeftAlign,
+					Format: &commonSdk.Format{
+						Unit:          commonSdk.DecimalUnit,
+						DecimalPlaces: 2,
+					},
 				},
 				{
-					Name:   "Value #B",
+					Name:   "value #4",
 					Header: "Pods",
 					Align:  tablePanel.LeftAlign,
+					Format: &commonSdk.Format{
+						Unit: commonSdk.DecimalUnit,
+					},
 				},
 			}),
 		),
@@ -240,7 +255,7 @@ func MemoryRequestsCommitmentPanel(datasourceName string, labelMatchers ...promq
 	return panelgroup.AddPanel("Memory Requests Commitment",
 		statPanel.Chart(
 			statPanel.Format(commonSdk.Format{
-				Unit:          string(commonSdk.PercentUnit),
+				Unit:          string(commonSdk.PercentDecimalUnit),
 				DecimalPlaces: 2,
 			}),
 			statPanel.ValueFontSize(50),
@@ -261,7 +276,7 @@ func MemoryUtilizationPanel(datasourceName string, labelMatchers ...promql.Label
 	return panelgroup.AddPanel("Memory Utilization",
 		statPanel.Chart(
 			statPanel.Format(commonSdk.Format{
-				Unit:          string(commonSdk.PercentUnit),
+				Unit:          string(commonSdk.PercentDecimalUnit),
 				DecimalPlaces: 2,
 			}),
 			statPanel.ValueFontSize(50),
@@ -287,27 +302,41 @@ func MemoryRequestsByNamespacePanel(datasourceName string, labelMatchers ...prom
 					Name:   "namespace",
 					Header: "Namespace",
 					Align:  tablePanel.LeftAlign,
-					Width:  300,
 				},
 				{
-					Name:   "Value #E",
+					Name:   "value #1",
 					Header: "Memory Requests %",
 					Align:  tablePanel.LeftAlign,
+					Format: &commonSdk.Format{
+						Unit:          string(commonSdk.PercentDecimalUnit),
+						DecimalPlaces: 2,
+					},
 				},
 				{
-					Name:   "Value #C",
+					Name:   "value #2",
 					Header: "Memory Usage",
 					Align:  tablePanel.LeftAlign,
+					Format: &commonSdk.Format{
+						Unit:          commonSdk.DecimalUnit,
+						DecimalPlaces: 2,
+					},
 				},
 				{
-					Name:   "Value #D",
+					Name:   "value #3",
 					Header: "Memory Requests",
 					Align:  tablePanel.LeftAlign,
+					Format: &commonSdk.Format{
+						Unit:          commonSdk.DecimalUnit,
+						DecimalPlaces: 2,
+					},
 				},
 				{
-					Name:   "Value #B",
+					Name:   "value #4",
 					Header: "Pods",
 					Align:  tablePanel.LeftAlign,
+					Format: &commonSdk.Format{
+						Unit: commonSdk.DecimalUnit,
+					},
 				},
 			}),
 		),
@@ -359,27 +388,42 @@ func NetworkingCurrentStatusPanel(datasourceName string, labelMatchers ...promql
 					Name:   "instance",
 					Header: "Instance",
 					Align:  tablePanel.LeftAlign,
-					Width:  300,
 				},
 				{
-					Name:   "Value #A",
+					Name:   "value #1",
 					Header: "Current Bandwidth Received",
 					Align:  tablePanel.LeftAlign,
+					Format: &commonSdk.Format{
+						Unit:          string(commonSdk.BytesUnit),
+						DecimalPlaces: 2,
+					},
 				},
 				{
-					Name:   "Value #B",
+					Name:   "value #2",
 					Header: "Current Bandwidth Transmitted",
 					Align:  tablePanel.LeftAlign,
+					Format: &commonSdk.Format{
+						Unit:          string(commonSdk.BytesPerSecondsUnit),
+						DecimalPlaces: 2,
+					},
 				},
 				{
-					Name:   "Value #G",
+					Name:   "value #3",
 					Header: "Rate of Received Packets Dropped",
 					Align:  tablePanel.LeftAlign,
+					Format: &commonSdk.Format{
+						Unit:          string(commonSdk.PacketsPerSecondsUnit),
+						DecimalPlaces: 2,
+					},
 				},
 				{
-					Name:   "Value #H",
+					Name:   "value #4",
 					Header: "Rate of Transmitted Packets Dropped",
 					Align:  tablePanel.LeftAlign,
+					Format: &commonSdk.Format{
+						Unit:          string(commonSdk.PacketsPerSecondsUnit),
+						DecimalPlaces: 2,
+					},
 				},
 			}),
 		),
