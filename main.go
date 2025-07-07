@@ -8,6 +8,8 @@ import (
 	"os"
 	"time"
 
+	persesv1 "github.com/perses/perses-operator/api/v1alpha1"
+
 	"github.com/ViaQ/logerr/v2/log"
 	otelv1alpha1 "github.com/open-telemetry/opentelemetry-operator/apis/v1alpha1"
 	otelv1beta1 "github.com/open-telemetry/opentelemetry-operator/apis/v1beta1"
@@ -53,6 +55,7 @@ func init() {
 	utilruntime.Must(prometheusv1.AddToScheme(scheme))
 	utilruntime.Must(uiplugin.AddToScheme(scheme))
 	utilruntime.Must(hyperv1.AddToScheme(scheme))
+	utilruntime.Must(persesv1.AddToScheme(scheme))
 
 	// +kubebuilder:scaffold:scheme
 }

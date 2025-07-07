@@ -61,8 +61,8 @@ func BuildACMClustersOverview(project string, datasource string, clusterLabelNam
 			),
 
 			withControlPlaneHealthGroup(datasource, clusterLabelMatcher),
-			// withOptimizationGroup(datasource, clusterLabelMatcher),
-			// withCapacityGroup(datasource, clusterLabelMatcher),
+			withOptimizationGroup(datasource, clusterLabelMatcher),
+			withCapacityGroup(datasource, clusterLabelMatcher),
 		),
 	).Component("acm")
 }

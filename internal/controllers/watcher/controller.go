@@ -32,7 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-const (
+var (
 	localClusterNamespace = "local-cluster"
 )
 

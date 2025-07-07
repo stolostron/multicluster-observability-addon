@@ -7,7 +7,7 @@ include .bingo/Variables.mk
 .DEFAULT_GOAL := default
 default: all
 
-VERSION ?= v0.0.1
+VERSION ?= 11
 
 CRD_DIR := $(shell pwd)/deploy/crds
 BIN_DIR := $(CURDIR)/bin
@@ -15,15 +15,17 @@ CONTAINER_ENGINE ?= $(shell which podman 2>/dev/null || which docker 2>/dev/null
 
 # REGISTRY_BASE
 # defines the container registry and organization for the bundle and operator container images.
-REGISTRY_BASE_OPENSHIFT = quay.io/rhobs
+REGISTRY_BASE_OPENSHIFT = quay.io/coquadro
 REGISTRY_BASE ?= $(REGISTRY_BASE_OPENSHIFT)
 
 # Image URL to use all building/pushing image targets
 IMG ?= $(REGISTRY_BASE)/multicluster-observability-addon:$(VERSION)
 
+ENVVARS=GOOS=$(GOOS) CGO_ENABLED=0
+
 # Dashboard build configuration with defaults
 GOMAIN= ./internal/perses/main.go
-OUTPUT_DIR_OPERATOR ?= ./internal/addon/manifests/charts/mcoa/charts/coo/templates/perses/dashboards
+OUTPUT_DIR_OPERATOR ?= ./internal/perses/dashboards-output
 OUTPUT_FORMAT_PERSES ?= operator
 
 .PHONY: deps
