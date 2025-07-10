@@ -178,3 +178,6 @@ require (
 )
 
 replace github.com/google/cel-go => github.com/google/cel-go v0.23.2
+
+// remove after latest tag for table plugin is available
+replace github.com/perses/plugins/table => github.com/perses/plugins/table v0.0.0-20250709083656-34e29fed0083

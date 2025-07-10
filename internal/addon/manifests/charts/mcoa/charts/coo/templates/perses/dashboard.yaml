@@ -1,6 +1,6 @@
 {{- if and .Values.enabled .Values.monitoringUIPlugin }}
 {{- range $_, $dashboard := .Values.dashboards }}
-apiVersion: perses.io/v1alpha1
+apiVersion: perses.dev/v1alpha1
 kind: PersesDashboard
 metadata:
   name: {{ $dashboard.name }}
@@ -12,7 +12,6 @@ metadata:
     app.kubernetes.io/name: perses-dashboard
     app.kubernetes.io/part-of: perses-operator
     app.kubernetes.io/component: dashboard
-    test: {{ $dashboard.name }}
 spec:
 {{ $dashboard.data | fromJson | toYaml | nindent 2 }}
 ---

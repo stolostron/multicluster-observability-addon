@@ -5,10 +5,10 @@ import (
 )
 
 func main() {
-	//clusterLabelName := ""
-	//project := flag.String("project", "open-cluster-management-observability", "project name")
-	//datasource := flag.String("datasource", "thanos-query-frontend", "datasource name")
-	//flag.Parse()
+	// clusterLabelName := ""
+	// project := flag.String("project", "open-cluster-management-observability", "project name")
+	// datasource := flag.String("datasource", "thanos-query-frontend", "datasource name")
+	// flag.Parse()
 
 	dashboardWriter := dashboards.NewDashboardWriter()
 	// dashboardWriter.Add(acm.BuildACMClustersOverview(*project, *datasource, clusterLabelName))

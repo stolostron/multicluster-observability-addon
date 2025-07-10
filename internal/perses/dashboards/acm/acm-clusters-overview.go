@@ -37,32 +37,30 @@ func withCapacityGroup(datasource string, labelMatcher promql.LabelMatcher) dash
 	)
 }
 
-func BuildACMClustersOverview(project string, datasource string, clusterLabelName string) dashboards.DashboardResult {
+func BuildACMClustersOverview(project string, datasource string, clusterLabelName string) (dashboard.Builder, error) {
 	clusterLabelMatcher := dashboards.GetClusterLabelMatcher(clusterLabelName)
-	return dashboards.NewDashboardResult(
-		dashboard.New("acm-clusters-overview",
-			dashboard.ProjectName(project),
-			dashboard.Name("ACM Clusters Overview"),
+	return dashboard.New("acm-clusters-overview",
+		dashboard.ProjectName(project),
+		dashboard.Name("ACM Clusters Overview"),
 
-			dashboard.AddVariable("cluster",
-				listVar.List(
-					labelValuesVar.PrometheusLabelValues("name",
-						dashboards.AddVariableDatasource(datasource),
-						labelValuesVar.Matchers(
-							promql.SetLabelMatchers(
-								"acm_managed_cluster_labels",
-								[]promql.LabelMatcher{},
-							)),
-					),
-					listVar.DisplayName("cluster"),
-					listVar.AllowAllValue(true),
-					listVar.AllowMultiple(true),
+		dashboard.AddVariable("cluster",
+			listVar.List(
+				labelValuesVar.PrometheusLabelValues("name",
+					dashboards.AddVariableDatasource(datasource),
+					labelValuesVar.Matchers(
+						promql.SetLabelMatchers(
+							"acm_managed_cluster_labels",
+							[]promql.LabelMatcher{},
+						)),
 				),
+				listVar.DisplayName("cluster"),
+				listVar.AllowAllValue(true),
+				listVar.AllowMultiple(true),
 			),
-
-			withControlPlaneHealthGroup(datasource, clusterLabelMatcher),
-			withOptimizationGroup(datasource, clusterLabelMatcher),
-			withCapacityGroup(datasource, clusterLabelMatcher),
 		),
-	).Component("acm")
+
+		withControlPlaneHealthGroup(datasource, clusterLabelMatcher),
+		withOptimizationGroup(datasource, clusterLabelMatcher),
+		withCapacityGroup(datasource, clusterLabelMatcher),
+	)
 }

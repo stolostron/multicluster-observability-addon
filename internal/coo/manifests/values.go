@@ -2,6 +2,7 @@ package manifests
 
 import (
 	"encoding/json"
+	"github.com/perses/perses/go-sdk/dashboard"
 	"log"
 
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
@@ -24,39 +25,71 @@ type COOValues struct {
 	IncidentDetection  *imanifests.IncidentDetectionValues `json:"incidentDetection,omitempty"`
 }
 
-func buildACMDashboardValues(monitoringUIPlugin bool) []DashboardValue {
-	if !monitoringUIPlugin {
-		return nil
-	}
-
+func buildACMDashboards() []DashboardValue {
 	var dashboards []DashboardValue
 	project := "open-cluster-management-observability"
 	datasource := "thanos-query-frontend"
 	clusterLabelName := ""
 
-	// Generate cluster resource use dashboard only
-	clusterDashboard, err := acm.BuildClusterResourceUse(project, datasource, clusterLabelName)
-	if err != nil {
-		return nil
+	type dashboardBuilderFunc func(string, string, string) (dashboard.Builder, error)
+	builders := []struct {
+		fn   dashboardBuilderFunc
+		name string
+	}{
+		{acm.BuildClusterResourceUse, "ClusterResourceUse"},
+		{acm.BuildNodeResourceUse, "NodeResourceUse"},
+		{acm.BuildACMOptimizationOverview, "ACMOptimizationOverview"},
+		{acm.BuildACMClustersOverview, "ACMClustersOverview"},
 	}
-	// BuildClusterResourceUse returns dashboard.Builder, so we can access the Dashboard field directly
-	clusterDashboardJSON, err := json.Marshal(clusterDashboard.Dashboard.Spec)
-	if err == nil {
+
+	for _, builder := range builders {
+		db, err := builder.fn(project, datasource, clusterLabelName)
+		if err != nil {
+			log.Printf("Failed to build %s dashboard: %v", builder.name, err)
+			continue
+		}
+		data, err := json.Marshal(db.Dashboard.Spec)
+		if err != nil {
+			log.Printf("Failed to marshal %s dashboard: %v", builder.name, err)
+			continue
+		}
 		dashboards = append(dashboards, DashboardValue{
-			Name: clusterDashboard.Dashboard.Metadata.Name,
-			Data: string(clusterDashboardJSON),
+			Name: db.Dashboard.Metadata.Name,
+			Data: string(data),
 		})
 	}
-	// Generate node resource use dashboard only
-	nodeDashboard, err := acm.BuildNodeResourceUse(project, datasource, clusterLabelName)
-	if err != nil {
-		return nil
+
+	return dashboards
+}
+
+func buildIncidentDetetctionDashboards() []DashboardValue {
+	var dashboards []DashboardValue
+	project := "open-cluster-management-observability"
+	datasource := "thanos-query-frontend"
+	clusterLabelName := ""
+
+	type dashboardBuilderFunc func(string, string, string) (dashboard.Builder, error)
+	builders := []struct {
+		fn   dashboardBuilderFunc
+		name string
+	}{
+		{acm.BuildACMIncidentsOverview, "IncidentDetectionOverview"},
 	}
-	nodeDashboardJSON, err := json.Marshal(nodeDashboard.Dashboard.Spec)
-	if err == nil {
+
+	for _, builder := range builders {
+		db, err := builder.fn(project, datasource, clusterLabelName)
+		if err != nil {
+			log.Printf("Failed to build %s dashboard: %v", builder.name, err)
+			continue
+		}
+		data, err := json.Marshal(db.Dashboard.Spec)
+		if err != nil {
+			log.Printf("Failed to marshal %s dashboard: %v", builder.name, err)
+			continue
+		}
 		dashboards = append(dashboards, DashboardValue{
-			Name: nodeDashboard.Dashboard.Metadata.Name,
-			Data: string(nodeDashboardJSON),
+			Name: db.Dashboard.Metadata.Name,
+			Data: string(data),
 		})
 	}
 
@@ -68,16 +101,21 @@ func BuildValues(opts addon.Options, installCOO bool, isHubCluster bool) *COOVal
 
 	incidentDetection := imanifests.EnableUI(opts.Platform.AnalyticsOptions.IncidentDetection)
 
+	var dashboards []DashboardValue
+
 	monitoringUIPlugin := false
 	if metricsUI != nil {
 		monitoringUIPlugin = metricsUI.Enabled
+		if metricsUI.Enabled {
+			dashboards = append(dashboards, buildACMDashboards()...)
+		}
 	}
+
 	if incidentDetection != nil {
 		monitoringUIPlugin = monitoringUIPlugin || incidentDetection.Enabled
-	}
-	var dashboards []DashboardValue
-	if monitoringUIPlugin {
-		dashboards = buildACMDashboardValues(monitoringUIPlugin)
+		if incidentDetection.Enabled {
+			dashboards = append(dashboards, buildIncidentDetetctionDashboards()...)
+		}
 	}
 
 	// add a log here for debug
