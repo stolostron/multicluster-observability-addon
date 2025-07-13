@@ -6,7 +6,7 @@ require (
 	github.com/ViaQ/logerr/v2 v2.1.0
 	github.com/go-logr/logr v1.4.3
 	github.com/open-telemetry/opentelemetry-operator v0.122.0
-	github.com/openshift/cluster-logging-operator/api/observability v0.0.0-20250626181834-6b13ce208eb8 // release-6.3
+	github.com/openshift/cluster-logging-operator/api/observability v0.0.0-20250711175055-e8e366e24fee // release-6.3
 	github.com/openshift/hypershift/api v0.0.0-20250704153439-028227b53766
 	github.com/operator-framework/api v0.30.0
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.80.1
