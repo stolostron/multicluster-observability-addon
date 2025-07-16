@@ -1,0 +1,12 @@
+{
+  "baseBranches": ["main", "/^release-\\d+\\.\\d+/"],
+  "enabledManagers": ["tekton"],
+  "autoApprove": true,
+  "tekton": {
+    "automerge": true,
+    "automergeStrategy": "rebase",
+    "automergeType": "pr",
+    "enabled": true,
+    "platformAutomerge": true
+  }
+}
