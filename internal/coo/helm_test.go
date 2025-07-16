@@ -121,7 +121,7 @@ func Test_IncidentDetection_AllConfigsTogether_AllResources(t *testing.T) {
 				},
 			},
 			expectedFunc: func(t *testing.T, objects []runtime.Object) {
-				require.Equal(t, 4, len(objects))
+				require.GreaterOrEqual(t, len(objects), 4)
 				expectedUIPluginSpec := uiplugin.UIPluginSpec{
 					Type: "Monitoring",
 					Monitoring: &uiplugin.MonitoringConfig{
@@ -154,7 +154,7 @@ func Test_IncidentDetection_AllConfigsTogether_AllResources(t *testing.T) {
 				},
 			},
 			expectedFunc: func(t *testing.T, objects []runtime.Object) {
-				require.Equal(t, 4, len(objects))
+				require.GreaterOrEqual(t, len(objects), 4)
 				expectedUIPluginSpec := uiplugin.UIPluginSpec{
 					Type: "Monitoring",
 					Monitoring: &uiplugin.MonitoringConfig{

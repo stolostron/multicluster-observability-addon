@@ -4,14 +4,18 @@ import (
 	"encoding/json"
 	"log"
 
-	incident_management "github.com/stolostron/multicluster-observability-addon/internal/perses/dashboards/incident-management"
-
 	"github.com/perses/perses/go-sdk/dashboard"
-
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	imanifests "github.com/stolostron/multicluster-observability-addon/internal/analytics/incident-detection/manifests"
 	mmanifests "github.com/stolostron/multicluster-observability-addon/internal/metrics/manifests"
 	"github.com/stolostron/multicluster-observability-addon/internal/perses/dashboards/acm"
+	incident_management "github.com/stolostron/multicluster-observability-addon/internal/perses/dashboards/incident-management"
+)
+
+var (
+	project          = "open-cluster-management-observability"
+	datasource       = "thanos-query-frontend"
+	clusterLabelName = ""
 )
 
 type DashboardValue struct {
@@ -38,9 +42,6 @@ type COOValues struct {
 
 func buildACMDashboards() []DashboardValue {
 	var dashboards []DashboardValue
-	project := "open-cluster-management-observability"
-	datasource := "thanos-query-frontend"
-	clusterLabelName := ""
 
 	builders := []DashboardBuilder{
 		{acm.BuildClusterResourceUse, "ClusterResourceUse"},
@@ -71,9 +72,6 @@ func buildACMDashboards() []DashboardValue {
 
 func buildIncidentDetetctionDashboards() []DashboardValue {
 	var dashboards []DashboardValue
-	project := "open-cluster-management-observability"
-	datasource := "thanos-query-frontend"
-	clusterLabelName := ""
 
 	builders := []DashboardBuilder{
 		{incident_management.BuildACMIncidentsOverview, "IncidentDetectionOverview"},
@@ -120,10 +118,6 @@ func BuildValues(opts addon.Options, installCOO bool, isHubCluster bool) *COOVal
 			dashboards = append(dashboards, buildIncidentDetetctionDashboards()...)
 		}
 	}
-
-	// add a log here for debug
-	log.Printf("COOValues: Enabled=%v, InstallCOO=%v, MonitoringUIPlugin=%v, Dashboards=%d, Metrics=%v, IncidentDetection=%v",
-		monitoringUIPlugin, installCOO, monitoringUIPlugin, len(dashboards), metricsUI, incidentDetection)
 
 	return &COOValues{
 		// Decide if COO chart is needed

@@ -107,6 +107,7 @@ func MemoryUtilization(datasourceName string, labelMatchers ...promql.LabelMatch
 		panel.AddQuery(
 			query.PromQL(
 				promql.SetLabelMatchers(
+					//nolint:misspell
 					"instance:node_memory_utilisation:ratio{cluster=\"$cluster\",job=\"node-exporter\"} / scalar(count(instance:node_memory_utilisation:ratio{cluster=\"$cluster\",job=\"node-exporter\"}))",
 					labelMatchers,
 				),
