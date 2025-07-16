@@ -21,7 +21,7 @@ spec:
   - name: revision
     value: '{{revision}}'
   - name: output-image
-    value: quay.io/redhat-user-workloads/crt-redhat-acm-tenant/release-acm-212/multicluster-observability-addon-acm-212:{{revision}}
+    value: quay.io/redhat-user-workloads/crt-redhat-acm-tenant/multicluster-observability-addon-acm-212:{{revision}}
   - name: dockerfile
     value: Dockerfile.Konflux
   - name: path-context
