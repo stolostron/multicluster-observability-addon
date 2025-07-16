@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"log"
 
-	"github.com/stolostron/multicluster-observability-addon/internal/perses/dashboards/incident-management"
+	incident_management "github.com/stolostron/multicluster-observability-addon/internal/perses/dashboards/incident-management"
 
 	"github.com/perses/perses/go-sdk/dashboard"
 
@@ -17,6 +17,14 @@ import (
 type DashboardValue struct {
 	Name string `json:"name"`
 	Data string `json:"data"`
+}
+
+type DashboardBuilderFunc func(project string, datasource string, clusterLabelName string) (dashboard.Builder, error)
+
+// DashboardBuilder is a struct that holds a dashboard builder function and its name
+type DashboardBuilder struct {
+	fn   DashboardBuilderFunc
+	name string
 }
 
 type COOValues struct {
@@ -34,11 +42,7 @@ func buildACMDashboards() []DashboardValue {
 	datasource := "thanos-query-frontend"
 	clusterLabelName := ""
 
-	type dashboardBuilderFunc func(string, string, string) (dashboard.Builder, error)
-	builders := []struct {
-		fn   dashboardBuilderFunc
-		name string
-	}{
+	builders := []DashboardBuilder{
 		{acm.BuildClusterResourceUse, "ClusterResourceUse"},
 		{acm.BuildNodeResourceUse, "NodeResourceUse"},
 		{acm.BuildACMOptimizationOverview, "ACMOptimizationOverview"},
@@ -71,11 +75,7 @@ func buildIncidentDetetctionDashboards() []DashboardValue {
 	datasource := "thanos-query-frontend"
 	clusterLabelName := ""
 
-	type dashboardBuilderFunc func(string, string, string) (dashboard.Builder, error)
-	builders := []struct {
-		fn   dashboardBuilderFunc
-		name string
-	}{
+	builders := []DashboardBuilder{
 		{incident_management.BuildACMIncidentsOverview, "IncidentDetectionOverview"},
 	}
 
