@@ -1,0 +1,18 @@
+{{- if and .Values.enabled .Values.monitoringUIPlugin }}
+apiVersion: perses.dev/v1alpha1
+kind: PersesDatasource
+metadata:
+  name: thanos-query-frontend
+  namespace: open-cluster-management-observability
+spec:
+  config:
+    default: false
+    plugin:
+      kind: PrometheusDatasource
+      spec:
+        proxy:
+          kind: HTTPProxy
+          spec:
+            url: 'http://observability-thanos-query-frontend.open-cluster-management-observability.svc.cluster.local:9090'
+{{- end }}
+

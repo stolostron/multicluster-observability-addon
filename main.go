@@ -15,6 +15,7 @@ import (
 	hyperv1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
 	operatorsv1 "github.com/operator-framework/api/pkg/operators/v1"
 	operatorsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
+	persesv1 "github.com/perses/perses-operator/api/v1alpha1"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	prometheusv1alpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	uiplugin "github.com/rhobs/observability-operator/pkg/apis/uiplugin/v1alpha1"
@@ -53,6 +54,7 @@ func init() {
 	utilruntime.Must(prometheusv1.AddToScheme(scheme))
 	utilruntime.Must(uiplugin.AddToScheme(scheme))
 	utilruntime.Must(hyperv1.AddToScheme(scheme))
+	utilruntime.Must(persesv1.AddToScheme(scheme))
 
 	// +kubebuilder:scaffold:scheme
 }
