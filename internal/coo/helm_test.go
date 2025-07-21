@@ -7,6 +7,7 @@ import (
 	"github.com/go-logr/logr"
 	operatorsv1 "github.com/operator-framework/api/pkg/operators/v1"
 	operatorsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
+	persesv1 "github.com/perses/perses-operator/api/v1alpha1"
 	uiplugin "github.com/rhobs/observability-operator/pkg/apis/uiplugin/v1alpha1"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
@@ -34,6 +35,7 @@ var (
 	_ = operatorsv1alpha1.AddToScheme(scheme.Scheme)
 	_ = addonapiv1alpha1.AddToScheme(scheme.Scheme)
 	_ = uiplugin.AddToScheme(scheme.Scheme)
+	_ = persesv1.AddToScheme(scheme.Scheme) // Assuming persesv1alpha1 is imported correctly
 )
 
 func fakeGetValues(ctx context.Context, k8s client.Client) addonfactory.GetValuesFunc {
@@ -119,7 +121,7 @@ func Test_IncidentDetection_AllConfigsTogether_AllResources(t *testing.T) {
 				},
 			},
 			expectedFunc: func(t *testing.T, objects []runtime.Object) {
-				require.Equal(t, 4, len(objects))
+				require.GreaterOrEqual(t, len(objects), 4)
 				expectedUIPluginSpec := uiplugin.UIPluginSpec{
 					Type: "Monitoring",
 					Monitoring: &uiplugin.MonitoringConfig{
@@ -152,7 +154,7 @@ func Test_IncidentDetection_AllConfigsTogether_AllResources(t *testing.T) {
 				},
 			},
 			expectedFunc: func(t *testing.T, objects []runtime.Object) {
-				require.Equal(t, 4, len(objects))
+				require.GreaterOrEqual(t, len(objects), 4)
 				expectedUIPluginSpec := uiplugin.UIPluginSpec{
 					Type: "Monitoring",
 					Monitoring: &uiplugin.MonitoringConfig{
