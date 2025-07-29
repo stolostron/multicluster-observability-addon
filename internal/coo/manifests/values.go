@@ -6,6 +6,7 @@ import (
 
 	persesv1 "github.com/perses/perses-operator/api/v1alpha1"
 	"github.com/perses/perses/go-sdk/dashboard"
+
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	imanifests "github.com/stolostron/multicluster-observability-addon/internal/analytics/incident-detection/manifests"

@@ -1,0 +1,19 @@
+apiVersion: perses.dev/v1alpha1
+kind: PersesDatasource
+metadata:
+  name: thanos-query-rbac-proxy
+  namespace: open-cluster-management-observability
+  labels:
+    app.kubernetes.io/name: perses-datasource
+    app.kubernetes.io/part-of: perses-operator
+    app.kubernetes.io/component: datasource
+spec:
+  config:
+    default: false
+    plugin:
+      kind: PrometheusDatasource
+      spec:
+        proxy:
+          kind: HTTPProxy
+          spec:
+            url: 'https://rbac-query-proxy.open-cluster-management-observability.svc:8443'

@@ -90,7 +90,6 @@ func BuildACMAlertsByCluster(project string, datasource string, clusterLabelName
 		dashboard.AddVariable("severity",
 			listVar.List(
 				labelValuesVar.PrometheusLabelValues("severity",
-					dashboards.AddVariableDatasource(datasource),
 					labelValuesVar.Matchers(
 						promql.SetLabelMatchers(
 							"ALERTS",
