@@ -10,6 +10,9 @@ import (
 	panels "github.com/stolostron/multicluster-observability-addon/internal/perses/panels/acm"
 )
 
+// dashboardBuilderFunc is a function type for building dashboards
+type dashboardBuilderFunc func(project string, datasource string, clusterLabelName string) (dashboard.Builder, error)
+
 func withControlPlaneHealthGroup(datasource string, labelMatcher promql.LabelMatcher) dashboard.Option {
 	return dashboard.AddPanelGroup("Control Plane Health",
 		panelgroup.PanelsPerLine(2),
@@ -42,34 +45,25 @@ func BuildACMClustersOverview(project string, datasource string, clusterLabelNam
 	return dashboard.New("acm-clusters-overview",
 		dashboard.ProjectName(project),
 		dashboard.Name("ACM Clusters Overview"),
-
-		// ACM Label Names variable - first level
 		dashboard.AddVariable("acm_label_names",
 			listVar.List(
 				labelValuesVar.PrometheusLabelValues("label_name",
 					labelValuesVar.Matchers(
-						promql.SetLabelMatchers(
-							"acm_label_names",
-							[]promql.LabelMatcher{},
-						),
+						"acm_label_names",
 					),
 					dashboards.AddVariableDatasource(datasource),
 				),
 				listVar.DisplayName("Label"),
+				listVar.DefaultValue("name"),
 				listVar.AllowAllValue(false),
 				listVar.AllowMultiple(false),
 			),
 		),
-
-		// Value variable - second level (depends on acm_label_names)
 		dashboard.AddVariable("value",
 			listVar.List(
-				labelValuesVar.PrometheusLabelValues("acm_label_names",
+				labelValuesVar.PrometheusLabelValues("$acm_label_names",
 					labelValuesVar.Matchers(
-						promql.SetLabelMatchers(
-							"acm_managed_cluster_labels",
-							[]promql.LabelMatcher{},
-						),
+						"acm_managed_cluster_labels",
 					),
 					dashboards.AddVariableDatasource(datasource),
 				),
@@ -96,6 +90,7 @@ func BuildACMClustersOverview(project string, datasource string, clusterLabelNam
 				listVar.DisplayName("Cluster"),
 				listVar.AllowAllValue(true),
 				listVar.AllowMultiple(true),
+				listVar.Hidden(true),
 			),
 		),
 

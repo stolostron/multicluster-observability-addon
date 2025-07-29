@@ -5,6 +5,7 @@ import (
 	"log"
 
 	"github.com/perses/perses/go-sdk/dashboard"
+
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	imanifests "github.com/stolostron/multicluster-observability-addon/internal/analytics/incident-detection/manifests"
@@ -25,7 +26,6 @@ type DashboardValue struct {
 
 type DashboardBuilderFunc func(project string, datasource string, clusterLabelName string) (dashboard.Builder, error)
 
-// DashboardBuilder is a struct that holds a dashboard builder function and its name
 type DashboardBuilder struct {
 	fn   DashboardBuilderFunc
 	name string
@@ -98,6 +98,9 @@ func buildACMDashboards() []DashboardValue {
 		{acm.BuildNodeResourceUse, "NodeResourceUse"},
 		{acm.BuildACMOptimizationOverview, "ACMOptimizationOverview"},
 		{acm.BuildACMClustersOverview, "ACMClustersOverview"},
+		{acm.BuildACMAlertAnalysis, "ACMAlertAnalysis"},
+		{acm.BuildACMAlertsByCluster, "ACMAlertsByCluster"},
+		{acm.BuildACMClustersByAlert, "ACMClustersByAlert"},
 	}
 
 	return buildDashboards(builders, dsThanos)
