@@ -6,7 +6,6 @@ import (
 
 	persesv1 "github.com/perses/perses-operator/api/v1alpha1"
 	"github.com/perses/perses/go-sdk/dashboard"
-
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	imanifests "github.com/stolostron/multicluster-observability-addon/internal/analytics/incident-detection/manifests"
@@ -136,7 +135,7 @@ func buildK8sDashboards() []DashboardValue {
 			continue
 		}
 		dashboards = append(dashboards, DashboardValue{
-			Name: db.ObjectMeta.Name,
+			Name: db.Name,
 			Data: string(data),
 		})
 	}
