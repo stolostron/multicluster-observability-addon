@@ -7,7 +7,7 @@ include .bingo/Variables.mk
 .DEFAULT_GOAL := default
 default: all
 
-VERSION ?= 16
+VERSION ?= v0.0.1
 
 CRD_DIR := $(shell pwd)/deploy/crds
 BIN_DIR := $(CURDIR)/bin
@@ -15,7 +15,7 @@ CONTAINER_ENGINE ?= $(shell which podman 2>/dev/null || which docker 2>/dev/null
 
 # REGISTRY_BASE
 # defines the container registry and organization for the bundle and operator container images.
-REGISTRY_BASE_OPENSHIFT = quay.io/coquadro
+REGISTRY_BASE_OPENSHIFT = quay.io/rhobs
 REGISTRY_BASE ?= $(REGISTRY_BASE_OPENSHIFT)
 
 # Image URL to use all building/pushing image targets

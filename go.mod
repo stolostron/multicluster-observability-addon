@@ -29,11 +29,11 @@ require (
 )
 
 require (
-	github.com/perses/community-dashboards v0.0.0-20250801132011-f6f822393f57
+	github.com/perses/community-dashboards v0.0.0-20250811214411-0a6e5f317386
 	github.com/perses/perses v0.51.1
 	github.com/perses/perses-operator v0.2.0
-	github.com/perses/plugins/prometheus v0.51.0
-	github.com/perses/plugins/statchart v0.8.0
+	github.com/perses/plugins/prometheus v0.52.1
+	github.com/perses/plugins/statchart v0.8.1
 	github.com/perses/plugins/table v0.7.1
 	github.com/perses/plugins/timeserieschart v0.9.1
 )
@@ -188,7 +188,7 @@ require (
 	sigs.k8s.io/json v0.0.0-20241014173422-cfa47c3a1cc8 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.7.0 // indirect
-	sigs.k8s.io/yaml v1.5.0 // indirect
+	sigs.k8s.io/yaml v1.6.0 // indirect
 )
 
 replace github.com/google/cel-go => github.com/google/cel-go v0.23.2

@@ -136,7 +136,7 @@ func buildK8sDashboards() []DashboardValue {
 			continue
 		}
 		dashboards = append(dashboards, DashboardValue{
-			Name: db.Name,
+			Name: db.ObjectMeta.Name,
 			Data: string(data),
 		})
 	}
