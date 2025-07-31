@@ -1,7 +1,7 @@
 images:
 - name: controller
-  newName: quay.io/coquadro/multicluster-observability-addon
-  newTag: "16"
+  newName: quay.io/rhobs/multicluster-observability-addon
+  newTag: v0.0.1
 
 namespace: open-cluster-management-observability
 
