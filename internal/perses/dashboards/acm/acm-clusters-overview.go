@@ -10,9 +10,6 @@ import (
 	panels "github.com/stolostron/multicluster-observability-addon/internal/perses/panels/acm"
 )
 
-// dashboardBuilderFunc is a function type for building dashboards
-type dashboardBuilderFunc func(project string, datasource string, clusterLabelName string) (dashboard.Builder, error)
-
 func withControlPlaneHealthGroup(datasource string, labelMatcher promql.LabelMatcher) dashboard.Option {
 	return dashboard.AddPanelGroup("Control Plane Health",
 		panelgroup.PanelsPerLine(2),
