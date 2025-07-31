@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"log"
 
+	persesv1 "github.com/perses/perses-operator/api/v1alpha1"
+
 	"github.com/perses/perses/go-sdk/dashboard"
 
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
@@ -47,6 +49,7 @@ func BuildValues(opts addon.Options, installCOO bool, isHubCluster bool) *COOVal
 	if metricsUI != nil {
 		if metricsUI.Enabled {
 			dashboards = append(dashboards, buildACMDashboards()...)
+			dashboards = append(dashboards, buildK8sDashboards()...)
 		}
 	}
 
@@ -112,4 +115,31 @@ func buildIncidentDetetctionDashboards() []DashboardValue {
 	}
 
 	return buildDashboards(builders, dsThanos)
+}
+
+func buildK8sDashboards() []DashboardValue {
+	var dashboards []DashboardValue
+	objs, err := acm.BuildK8sDashboards(config.InstallNamespace, dsThanos, clusterLabelName)
+	if err != nil {
+		log.Printf("Failed to build Kubernetes dashboards: %v", err)
+		return nil
+	}
+
+	for _, obj := range objs {
+		db, ok := obj.(*persesv1.PersesDashboard)
+		if !ok {
+			log.Printf("Failed to convert object to PersesDashboard: %v", obj)
+			continue
+		}
+		data, err := json.Marshal(db.Spec)
+		if err != nil {
+			log.Printf("Failed to marshal Kubernetes dashboard: %v", err)
+			continue
+		}
+		dashboards = append(dashboards, DashboardValue{
+			Name: db.ObjectMeta.Name,
+			Data: string(data),
+		})
+	}
+	return dashboards
 }

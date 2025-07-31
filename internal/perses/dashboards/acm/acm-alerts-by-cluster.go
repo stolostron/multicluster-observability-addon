@@ -40,13 +40,10 @@ func BuildACMAlertsByCluster(project string, datasource string, clusterLabelName
 		dashboard.AddVariable("acm_label_names",
 			listVar.List(
 				labelValuesVar.PrometheusLabelValues("label_name",
-					labelValuesVar.Matchers(
-						promql.SetLabelMatchers(
-							"acm_label_names",
-							[]promql.LabelMatcher{},
-						),
-					),
 					dashboards.AddVariableDatasource(datasource),
+					labelValuesVar.Matchers(
+						"acm_label_names",
+					),
 				),
 				listVar.DisplayName("Label"),
 				listVar.DefaultValue("cloud"),
@@ -57,13 +54,15 @@ func BuildACMAlertsByCluster(project string, datasource string, clusterLabelName
 		dashboard.AddVariable("value",
 			listVar.List(
 				labelValuesVar.PrometheusLabelValues("acm_label_names",
+					dashboards.AddVariableDatasource(datasource),
 					labelValuesVar.Matchers(
 						promql.SetLabelMatchers(
 							"acm_managed_cluster_labels",
-							[]promql.LabelMatcher{},
+							[]promql.LabelMatcher{
+								{Name: "acm_label_names", Type: "=", Value: "$acm_label_names"},
+							},
 						),
 					),
-					dashboards.AddVariableDatasource(datasource),
 				),
 				listVar.DisplayName("Value"),
 				listVar.AllowAllValue(false),
@@ -73,15 +72,15 @@ func BuildACMAlertsByCluster(project string, datasource string, clusterLabelName
 		dashboard.AddVariable("cluster",
 			listVar.List(
 				labelValuesVar.PrometheusLabelValues("name",
+					dashboards.AddVariableDatasource(datasource),
 					labelValuesVar.Matchers(
 						promql.SetLabelMatchers(
 							"acm_managed_cluster_labels",
 							[]promql.LabelMatcher{
-								{Name: "$acm_label_names", Type: "=~", Value: "$value"},
+								{Name: "acm_label_names", Type: "=~", Value: "$value"},
 							},
 						),
 					),
-					dashboards.AddVariableDatasource(datasource),
 				),
 				listVar.DisplayName("Cluster"),
 				listVar.AllowAllValue(false),
@@ -91,6 +90,7 @@ func BuildACMAlertsByCluster(project string, datasource string, clusterLabelName
 		dashboard.AddVariable("severity",
 			listVar.List(
 				labelValuesVar.PrometheusLabelValues("severity",
+					dashboards.AddVariableDatasource(datasource),
 					labelValuesVar.Matchers(
 						promql.SetLabelMatchers(
 							"ALERTS",
@@ -99,7 +99,6 @@ func BuildACMAlertsByCluster(project string, datasource string, clusterLabelName
 							},
 						),
 					),
-					dashboards.AddVariableDatasource(datasource),
 				),
 				listVar.DisplayName("Severity"),
 				listVar.DefaultValue("$__all"),

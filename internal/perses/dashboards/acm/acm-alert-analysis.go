@@ -53,13 +53,13 @@ func BuildACMAlertAnalysis(project string, datasource string, clusterLabelName s
 		dashboard.AddVariable("severity",
 			listVar.List(
 				labelValuesVar.PrometheusLabelValues("severity",
+					dashboards.AddVariableDatasource(datasource),
 					labelValuesVar.Matchers(
 						promql.SetLabelMatchers(
 							"ALERTS",
 							[]promql.LabelMatcher{},
 						),
 					),
-					dashboards.AddVariableDatasource(datasource),
 				),
 				listVar.DisplayName("Severity"),
 				listVar.Description("Policy severity level"),

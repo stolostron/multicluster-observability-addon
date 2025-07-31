@@ -251,6 +251,7 @@ func MostFiringAlerts(datasourceName string, labelMatchers ...promql.LabelMatche
 			timeSeriesPanel.WithVisual(
 				timeSeriesPanel.Visual{
 					Display: "bar",
+					Palette: timeSeriesPanel.Palette{Mode: timeSeriesPanel.AutoMode},
 				},
 			),
 		),
@@ -272,6 +273,7 @@ func MostAffectedClusters(datasourceName string, labelMatchers ...promql.LabelMa
 			timeSeriesPanel.WithVisual(
 				timeSeriesPanel.Visual{
 					Display: "bar",
+					Palette: timeSeriesPanel.Palette{Mode: timeSeriesPanel.AutoMode},
 				},
 			),
 		),

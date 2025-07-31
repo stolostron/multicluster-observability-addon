@@ -25,13 +25,13 @@ func BuildACMClustersByAlert(project string, datasource string, clusterLabelName
 		dashboard.AddVariable("alert",
 			listVar.List(
 				labelValuesVar.PrometheusLabelValues("alertname",
+					dashboards.AddVariableDatasource(datasource),
 					labelValuesVar.Matchers(
 						promql.SetLabelMatchers(
 							"ALERTS",
 							[]promql.LabelMatcher{},
 						),
 					),
-					dashboards.AddVariableDatasource(datasource),
 				),
 				listVar.DisplayName("Alert"),
 				listVar.DefaultValue("$__all"),

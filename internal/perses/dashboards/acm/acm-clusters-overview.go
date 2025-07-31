@@ -48,10 +48,10 @@ func BuildACMClustersOverview(project string, datasource string, clusterLabelNam
 		dashboard.AddVariable("acm_label_names",
 			listVar.List(
 				labelValuesVar.PrometheusLabelValues("label_name",
+					dashboards.AddVariableDatasource(datasource),
 					labelValuesVar.Matchers(
 						"acm_label_names",
 					),
-					dashboards.AddVariableDatasource(datasource),
 				),
 				listVar.DisplayName("Label"),
 				listVar.DefaultValue("name"),
@@ -61,11 +61,16 @@ func BuildACMClustersOverview(project string, datasource string, clusterLabelNam
 		),
 		dashboard.AddVariable("value",
 			listVar.List(
-				labelValuesVar.PrometheusLabelValues("$acm_label_names",
-					labelValuesVar.Matchers(
-						"acm_managed_cluster_labels",
-					),
+				labelValuesVar.PrometheusLabelValues("acm_label_names",
 					dashboards.AddVariableDatasource(datasource),
+					labelValuesVar.Matchers(
+						promql.SetLabelMatchers(
+							"acm_managed_cluster_labels",
+							[]promql.LabelMatcher{
+								{Name: "acm_label_names", Type: "=", Value: "$acm_label_names"},
+							},
+						),
+					),
 				),
 				listVar.DisplayName("Value"),
 				listVar.AllowAllValue(true),
@@ -77,15 +82,15 @@ func BuildACMClustersOverview(project string, datasource string, clusterLabelNam
 		dashboard.AddVariable("cluster",
 			listVar.List(
 				labelValuesVar.PrometheusLabelValues("name",
+					dashboards.AddVariableDatasource(datasource),
 					labelValuesVar.Matchers(
 						promql.SetLabelMatchers(
 							"acm_managed_cluster_labels",
 							[]promql.LabelMatcher{
-								{Name: "$acm_label_names", Type: "=~", Value: "$value"},
+								{Name: "acm_label_names", Type: "=~", Value: "$value"},
 							},
 						),
 					),
-					dashboards.AddVariableDatasource(datasource),
 				),
 				listVar.DisplayName("Cluster"),
 				listVar.AllowAllValue(true),
