@@ -29,7 +29,7 @@ require (
 )
 
 require (
-	github.com/perses/community-dashboards v0.0.0-20250721211038-a48ee4302728
+	github.com/perses/community-dashboards v0.0.0-20250801132011-f6f822393f57
 	github.com/perses/perses v0.51.1
 	github.com/perses/perses-operator v0.2.0
 	github.com/perses/plugins/prometheus v0.51.0
