@@ -10,38 +10,33 @@ import (
 	panels "github.com/stolostron/multicluster-observability-addon/internal/perses/panels/acm"
 )
 
-func withControlPlaneHealthGroup(datasource string, labelMatcher promql.LabelMatcher) dashboard.Option {
-	return dashboard.AddPanelGroup("Control Plane Health",
-		panelgroup.PanelsPerLine(2),
-		panels.Top50MaxLatencyAPIServer(datasource, labelMatcher),
-		panels.EtcdHealth(datasource, labelMatcher),
+func withAlertSeverityGroup(datasource string, labelMatcher promql.LabelMatcher) dashboard.Option {
+	return dashboard.AddPanelGroup("Alert Severity",
+		panelgroup.PanelsPerLine(1),
+		panels.AlertSeverity(datasource, labelMatcher),
 	)
 }
 
-func withOptimizationGroup(datasource string, labelMatcher promql.LabelMatcher) dashboard.Option {
-	return dashboard.AddPanelGroup("Optimization",
+func withAlertsByClusterTrendsGroup(datasource string, labelMatcher promql.LabelMatcher) dashboard.Option {
+	return dashboard.AddPanelGroup("Alert Trends",
 		panelgroup.PanelsPerLine(2),
-		panels.Top50CPUOverEstimationClusters(datasource, labelMatcher),
-		panels.Top50MemoryOverEstimationClusters(datasource, labelMatcher),
+		panels.FiringAlertsTrend(datasource, labelMatcher),
+		panels.PendingAlertsTrend(datasource, labelMatcher),
 	)
 }
 
-func withCapacityGroup(datasource string, labelMatcher promql.LabelMatcher) dashboard.Option {
-	return dashboard.AddPanelGroup("Capacity",
-		panelgroup.PanelsPerLine(2),
-		panels.Top50MemoryUtilizedClusters(datasource, labelMatcher),
-		panels.Top50CPUUtilizedClusters(datasource, labelMatcher),
-		panels.Top5MemoryUtilizationGraph(datasource, labelMatcher),
-		panels.Top5CPUUtilizationGraph(datasource, labelMatcher),
-		panels.BandwidthUtilization(datasource, labelMatcher),
+func withAlertTimeSeriesGroup(datasource string, labelMatcher promql.LabelMatcher) dashboard.Option {
+	return dashboard.AddPanelGroup("Alert Time Series",
+		panelgroup.PanelsPerLine(1),
+		panels.AlertsOverTime(datasource, labelMatcher),
 	)
 }
 
-func BuildACMClustersOverview(project string, datasource string, clusterLabelName string) (dashboard.Builder, error) {
+func BuildACMAlertsByCluster(project string, datasource string, clusterLabelName string) (dashboard.Builder, error) {
 	clusterLabelMatcher := dashboards.GetClusterLabelMatcher(clusterLabelName)
-	return dashboard.New("acm-clusters-overview",
+	return dashboard.New("acm-alerts-by-cluster",
 		dashboard.ProjectName(project),
-		dashboard.Name("ACM Clusters Overview"),
+		dashboard.Name("Alerts by Cluster"),
 		dashboard.AddVariable("acm_label_names",
 			listVar.List(
 				labelValuesVar.PrometheusLabelValues("label_name",
@@ -51,7 +46,7 @@ func BuildACMClustersOverview(project string, datasource string, clusterLabelNam
 					),
 				),
 				listVar.DisplayName("Label"),
-				listVar.DefaultValue("name"),
+				listVar.DefaultValue("cloud"),
 				listVar.AllowAllValue(false),
 				listVar.AllowMultiple(false),
 			),
@@ -70,12 +65,10 @@ func BuildACMClustersOverview(project string, datasource string, clusterLabelNam
 					),
 				),
 				listVar.DisplayName("Value"),
-				listVar.AllowAllValue(true),
-				listVar.AllowMultiple(true),
+				listVar.AllowAllValue(false),
+				listVar.AllowMultiple(false),
 			),
 		),
-
-		// Cluster variable - third level (depends on acm_label_names and value)
 		dashboard.AddVariable("cluster",
 			listVar.List(
 				labelValuesVar.PrometheusLabelValues("name",
@@ -90,14 +83,32 @@ func BuildACMClustersOverview(project string, datasource string, clusterLabelNam
 					),
 				),
 				listVar.DisplayName("Cluster"),
+				listVar.AllowAllValue(false),
+				listVar.AllowMultiple(false),
+			),
+		),
+		dashboard.AddVariable("severity",
+			listVar.List(
+				labelValuesVar.PrometheusLabelValues("severity",
+					dashboards.AddVariableDatasource(datasource),
+					labelValuesVar.Matchers(
+						promql.SetLabelMatchers(
+							"ALERTS",
+							[]promql.LabelMatcher{
+								{Name: "cluster", Type: "=", Value: "$cluster"},
+							},
+						),
+					),
+				),
+				listVar.DisplayName("Severity"),
+				listVar.DefaultValue("$__all"),
 				listVar.AllowAllValue(true),
-				listVar.AllowMultiple(true),
+				listVar.AllowMultiple(false),
 				listVar.Hidden(true),
 			),
 		),
-
-		withControlPlaneHealthGroup(datasource, clusterLabelMatcher),
-		withOptimizationGroup(datasource, clusterLabelMatcher),
-		withCapacityGroup(datasource, clusterLabelMatcher),
+		withAlertSeverityGroup(datasource, clusterLabelMatcher),
+		withAlertsByClusterTrendsGroup(datasource, clusterLabelMatcher),
+		withAlertTimeSeriesGroup(datasource, clusterLabelMatcher),
 	)
 }
