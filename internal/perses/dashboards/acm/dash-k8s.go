@@ -2,6 +2,8 @@ package acm
 
 import (
 	dashboards "github.com/perses/community-dashboards/pkg/dashboards"
+	k8sEtcd "github.com/perses/community-dashboards/pkg/dashboards/etcd"
+	k8sApiServer "github.com/perses/community-dashboards/pkg/dashboards/kubernetes/apiserver"
 	k8sComputeResources "github.com/perses/community-dashboards/pkg/dashboards/kubernetes/compute_resources"
 	"github.com/perses/community-dashboards/pkg/promql"
 	"github.com/perses/perses/go-sdk/dashboard"
@@ -123,6 +125,23 @@ func GetTypeVariable(datasource string) dashboard.Option {
 	)
 }
 
+func GetInstanceVariable(datasource string) dashboard.Option {
+	return dashboard.AddVariable("instance",
+		listVar.List(
+			labelValuesVar.PrometheusLabelValues("instance",
+				labelValuesVar.Matchers(
+					promql.SetLabelMatchers(
+						"process_resident_memory_bytes",
+						[]promql.LabelMatcher{{Name: "cluster", Type: "=", Value: "$cluster"}},
+					),
+				),
+				dashboards.AddVariableDatasource(datasource),
+			),
+			listVar.DisplayName("instance"),
+		),
+	)
+}
+
 // Upstream dashboards imported from the community-dashboards repository. https://github.com/perses/community-dashboards/tree/main/pkg/dashboards/kubernetes
 func BuildK8sDashboards(project string, datasource string, clusterLabelName string) (obj []runtime.Object, err error) {
 	dashboardWriter := dashboards.NewDashboardWriter()
@@ -166,6 +185,20 @@ func BuildK8sDashboards(project string, datasource string, clusterLabelName stri
 	}
 	dashboardWriter.Add(k8sComputeResources.BuildKubernetesWorkloadNamespaceOverview(project, datasource, clusterLabelName, dashboardVars...))
 	dashboardWriter.Add(k8sComputeResources.BuildKubernetesMultiClusterOverview(project, datasource, clusterLabelName))
+
+	dashboardVars = []dashboard.Option{
+		GetClusterVariable(datasource),
+		GetInstanceVariable(datasource),
+	}
+	dashboardWriter.Add(k8sApiServer.BuildAPIServerOverview(project, datasource, clusterLabelName))
+
+	objs := dashboardWriter.OperatorResources()
+	return objs, nil
+}
+
+func BuildETCDDashboards(project string, datasource string, clusterLabelName string) (obj []runtime.Object, err error) {
+	dashboardWriter := dashboards.NewDashboardWriter()
+	dashboardWriter.Add(k8sEtcd.BuildETCDOverview(project, datasource, clusterLabelName))
 	objs := dashboardWriter.OperatorResources()
 	return objs, nil
 }
