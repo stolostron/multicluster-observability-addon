@@ -16,7 +16,7 @@ import (
 )
 
 var (
-	dsThanos         = "thanos-query-frontend"
+	dsThanos         = "rbac-query-proxy-datasource"
 	clusterLabelName = ""
 )
 

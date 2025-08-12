@@ -2,7 +2,7 @@
 apiVersion: perses.dev/v1alpha1
 kind: PersesDatasource
 metadata:
-  name: thanos-query-frontend
+  name: rbac-query-proxy-datasource
   namespace: open-cluster-management-observability
 spec:
   client:
