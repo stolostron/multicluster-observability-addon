@@ -4,8 +4,6 @@ import (
 	"encoding/json"
 	"log"
 
-	"k8s.io/apimachinery/pkg/runtime"
-
 	persesv1 "github.com/perses/perses-operator/api/v1alpha1"
 	"github.com/perses/perses/go-sdk/dashboard"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
@@ -14,6 +12,7 @@ import (
 	mmanifests "github.com/stolostron/multicluster-observability-addon/internal/metrics/manifests"
 	"github.com/stolostron/multicluster-observability-addon/internal/perses/dashboards/acm"
 	incident_management "github.com/stolostron/multicluster-observability-addon/internal/perses/dashboards/incident-management"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 var (

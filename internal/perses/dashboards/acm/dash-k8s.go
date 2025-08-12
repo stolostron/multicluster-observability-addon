@@ -190,7 +190,7 @@ func BuildK8sDashboards(project string, datasource string, clusterLabelName stri
 		GetClusterVariable(datasource),
 		GetInstanceVariable(datasource),
 	}
-	dashboardWriter.Add(k8sApiServer.BuildAPIServerOverview(project, datasource, clusterLabelName))
+	dashboardWriter.Add(k8sApiServer.BuildAPIServerOverview(project, datasource, clusterLabelName, dashboardVars...))
 
 	objs := dashboardWriter.OperatorResources()
 	return objs, nil
