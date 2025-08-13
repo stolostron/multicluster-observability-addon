@@ -70,7 +70,7 @@ func GetPodVariable(datasource string) dashboard.Option {
 			labelValuesVar.PrometheusLabelValues("pod",
 				labelValuesVar.Matchers(
 					promql.SetLabelMatchers(
-						"kube_pod_owner",
+						"kube_pod_info",
 						[]promql.LabelMatcher{
 							{Name: "cluster", Type: "=", Value: "$cluster"},
 							{Name: "namespace", Type: "=", Value: "$namespace"},
