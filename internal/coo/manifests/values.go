@@ -12,10 +12,11 @@ import (
 	mmanifests "github.com/stolostron/multicluster-observability-addon/internal/metrics/manifests"
 	"github.com/stolostron/multicluster-observability-addon/internal/perses/dashboards/acm"
 	incident_management "github.com/stolostron/multicluster-observability-addon/internal/perses/dashboards/incident-management"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 var (
-	dsThanos         = "thanos-query-frontend"
+	dsThanos         = "rbac-query-proxy-datasource"
 	clusterLabelName = ""
 )
 
@@ -116,28 +117,38 @@ func buildIncidentDetetctionDashboards() []DashboardValue {
 }
 
 func buildK8sDashboards() []DashboardValue {
-	var dashboards []DashboardValue
-	objs, err := acm.BuildK8sDashboards(config.InstallNamespace, dsThanos, clusterLabelName)
-	if err != nil {
-		log.Printf("Failed to build Kubernetes dashboards: %v", err)
-		return nil
+	type dashboardBuilder struct {
+		fn   func(string, string, string) ([]runtime.Object, error)
+		name string
+	}
+	builders := []dashboardBuilder{
+		{acm.BuildK8sDashboards, "Kubernetes"},
+		{acm.BuildETCDDashboards, "ETCD"},
 	}
 
-	for _, obj := range objs {
-		db, ok := obj.(*persesv1.PersesDashboard)
-		if !ok {
-			log.Printf("Failed to convert object to PersesDashboard: %v", obj)
-			continue
-		}
-		data, err := json.Marshal(db.Spec)
+	var dashboards []DashboardValue
+	for _, builder := range builders {
+		objs, err := builder.fn(config.InstallNamespace, dsThanos, clusterLabelName)
 		if err != nil {
-			log.Printf("Failed to marshal Kubernetes dashboard: %v", err)
+			log.Printf("Failed to build %s dashboards: %v", builder.name, err)
 			continue
 		}
-		dashboards = append(dashboards, DashboardValue{
-			Name: db.Name,
-			Data: string(data),
-		})
+		for _, obj := range objs {
+			db, ok := obj.(*persesv1.PersesDashboard)
+			if !ok {
+				log.Printf("Failed to convert object to PersesDashboard: %v", obj)
+				continue
+			}
+			data, err := json.Marshal(db.Spec)
+			if err != nil {
+				log.Printf("Failed to marshal %s dashboard: %v", builder.name, err)
+				continue
+			}
+			dashboards = append(dashboards, DashboardValue{
+				Name: db.Name,
+				Data: string(data),
+			})
+		}
 	}
 	return dashboards
 }

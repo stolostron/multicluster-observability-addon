@@ -2,17 +2,23 @@
 apiVersion: perses.dev/v1alpha1
 kind: PersesDatasource
 metadata:
-  name: thanos-query-frontend
+  name: rbac-query-proxy-datasource
   namespace: open-cluster-management-observability
 spec:
+  client:
+    tls:
+      caCert:
+        certPath: /ca/service-ca.crt
+        type: file
+      enable: true
   config:
-    default: false
+    default: true
     plugin:
       kind: PrometheusDatasource
       spec:
         proxy:
           kind: HTTPProxy
           spec:
-            url: 'http://observability-thanos-query-frontend.open-cluster-management-observability.svc.cluster.local:9090'
+            url: 'http://rbac-query-proxy.open-cluster-management-observability.svc.cluster.local:8080'
 {{- end }}
 

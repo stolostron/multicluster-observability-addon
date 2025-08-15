@@ -357,10 +357,10 @@ github.com/perses/plugins/gaugechart v0.8.0 h1:exfoItYzKJfjpcxkwuYSfob26P7OXnUqg
 github.com/perses/plugins/gaugechart v0.8.0/go.mod h1:+OrxcpYGzcLNZ8RTNUnlswHdpiN+3kpAkNonBpPKgwg=
 github.com/perses/plugins/markdown v0.8.0 h1:FC/yKUanYPC7XV41z3d7nIhXFTNYfQQxOLJh+CSJ13o=
 github.com/perses/plugins/markdown v0.8.0/go.mod h1:20C+87E7uFEYBhFLKq1wTIq5xm/xQspZpbl730xhlaQ=
-github.com/perses/plugins/prometheus v0.51.0 h1:Z4CjjhJ0i60qhRloiNXfRjpia5GHARV6JD3ss677i2Q=
-github.com/perses/plugins/prometheus v0.51.0/go.mod h1:kQJiZXQaK5Ck0DuoCUqb0LXEt5FtFrSrtaFwhkJ+uvA=
-github.com/perses/plugins/statchart v0.8.0 h1:MaeATqlxi7ioglIwK8n6o3M3sDgCwOsJ+pI1wUtSRkI=
-github.com/perses/plugins/statchart v0.8.0/go.mod h1:yW49CcPJz/q+rJiSkIxZimiNJqQPSzkgzdOtI+FLEVE=
+github.com/perses/plugins/prometheus v0.52.1 h1:VzV+oAEXYQMw7eCYyVi6ZWhCyQY+4QMhpOK81LidB+k=
+github.com/perses/plugins/prometheus v0.52.1/go.mod h1:yloGFbZLSK6jSnW4A7wIb2NQQn6v/ryLgTC3Dw44EXc=
+github.com/perses/plugins/statchart v0.8.1 h1:/YlHVNvIzuDrez3CWxcz75QLnDjQR8UIFggJgHpRkh8=
+github.com/perses/plugins/statchart v0.8.1/go.mod h1:RAg9ZYtUGGbuYzOX5+KbIg4KoriQiySqkHAj5UPj14A=
 github.com/perses/plugins/table v0.0.0-20250709083656-34e29fed0083 h1:JB1BR9IYmChVv3bD1hOEyISV75VscQ7tHScD9Ue7reU=
 github.com/perses/plugins/table v0.0.0-20250709083656-34e29fed0083/go.mod h1:gmmyiOzCxX+ixPOtsy0S2Ufb+F7f7cK49dmaI5UxOzc=
 github.com/perses/plugins/timeserieschart v0.9.1 h1:ojfRdfdKvmJINcKn0At/LZh0h8WQpE7fo9Ge4kocTuQ=
@@ -656,5 +656,5 @@ sigs.k8s.io/randfill v1.0.0/go.mod h1:XeLlZ/jmk4i1HRopwe7/aU3H5n1zNUcX6TM94b3QxO
 sigs.k8s.io/structured-merge-diff/v4 v4.7.0 h1:qPeWmscJcXP0snki5IYF79Z8xrl8ETFxgMd7wez1XkI=
 sigs.k8s.io/structured-merge-diff/v4 v4.7.0/go.mod h1:dDy58f92j70zLsuZVuUX5Wp9vtxXpaZnkPGWeqDfCps=
 sigs.k8s.io/yaml v1.4.0/go.mod h1:Ejl7/uTz7PSA4eKMyQCUTnhZYNmLIl+5c2lQPGR2BPY=
-sigs.k8s.io/yaml v1.5.0 h1:M10b2U7aEUY6hRtU870n2VTPgR5RZiL/I6Lcc2F4NUQ=
-sigs.k8s.io/yaml v1.5.0/go.mod h1:wZs27Rbxoai4C0f8/9urLZtZtF3avA3gKvGyPdDqTO4=
+sigs.k8s.io/yaml v1.6.0 h1:G8fkbMSAFqgEFgh4b1wmtzDnioxFCUgTZhlbj5P9QYs=
+sigs.k8s.io/yaml v1.6.0/go.mod h1:796bPqUfzR/0jLAl6XjHl3Ck7MiyVv8dbTdyT3/pMf4=
