@@ -21,7 +21,7 @@ func Test_BuildSubscriptionChannel(t *testing.T) {
 	}{
 		{
 			name:       "not set",
-			subChannel: "stable-6.2",
+			subChannel: "stable-6.3",
 		},
 		{
 			name:       "user set",
