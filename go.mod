@@ -11,7 +11,6 @@ require (
 	github.com/operator-framework/api v0.30.0
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.80.1
 	github.com/prometheus/prometheus v0.305.0
-	github.com/rhobs/observability-operator v1.0.1-0.20250402055516-9401247f1632 // release-1.1
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/pflag v1.0.6
 	github.com/stolostron/cluster-lifecycle-api v0.0.0-20250625062343-7394aeb3186c
@@ -36,6 +35,7 @@ require (
 	github.com/perses/plugins/statchart v0.8.1
 	github.com/perses/plugins/table v0.7.1
 	github.com/perses/plugins/timeserieschart v0.9.1
+	github.com/rhobs/observability-operator/pkg/apis v0.0.0-20250902133632-f98bd8a20a80
 )
 
 require (
