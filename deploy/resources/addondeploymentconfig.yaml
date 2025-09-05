@@ -7,7 +7,7 @@ spec:
   customizedVariables:
   # Operator Subscription Channels
   - name: openshiftLoggingChannel
-    value: stable-6.2
+    value: stable-6.3
   # Metrics hostname where to forward metrics
   - name: metricsHubHostname
     value: metrics-hub.openshift-monitoring.svc
