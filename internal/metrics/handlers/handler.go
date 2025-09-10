@@ -48,6 +48,7 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 	if ret.ClusterID == "" {
 		ret.ClusterID = managedCluster.Name
 	}
+	ret.ClusterVendor = managedCluster.Labels[config.ManagedClusterLabelVendorKey]
 
 	// Fetch image overrides
 	var err error

@@ -23,7 +23,9 @@ const (
 	PrometheusCAConfigMapName       = "prometheus-server-ca"
 	HubInstallNamespace             = "open-cluster-management-observability"
 
-	ManagedClusterLabelClusterID = "clusterID"
+	ManagedClusterLabelClusterID      = "clusterID"
+	ManagedClusterLabelVendorKey      = "vendor"
+	ManagedClusterLabelVendorOCPValue = "OpenShift"
 
 	// Monitoring resources (meta monitoring)
 	PlatformRBACProxyTLSSecret     = "prometheus-agent-platform-kube-rbac-proxy-tls"

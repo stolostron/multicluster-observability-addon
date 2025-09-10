@@ -13,6 +13,7 @@ type Options struct {
 	Secrets       []*corev1.Secret
 	ClusterName   string
 	ClusterID     string
+	ClusterVendor string
 	Images        mconfig.ImageOverrides
 	UI            UIOptions
 }
