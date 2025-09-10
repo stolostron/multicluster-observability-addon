@@ -8,7 +8,7 @@ import (
 	"github.com/go-logr/logr"
 	hyperv1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
-	prometheusalpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
+	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -25,7 +25,7 @@ func TestHypershift_Nominal(t *testing.T) {
 	require.NoError(t, kubescheme.AddToScheme(scheme))
 	require.NoError(t, hyperv1.AddToScheme(scheme))
 	require.NoError(t, prometheusv1.AddToScheme(scheme))
-	require.NoError(t, prometheusalpha1.AddToScheme(scheme))
+	require.NoError(t, cooprometheusv1alpha1.AddToScheme(scheme))
 	require.NoError(t, clusterv1.AddToScheme(scheme))
 
 	mc := &clusterv1.ManagedCluster{
@@ -37,8 +37,8 @@ func TestHypershift_Nominal(t *testing.T) {
 		Spec: clusterv1.ManagedClusterSpec{},
 	}
 
-	etcdScrapeConfig := &prometheusalpha1.ScrapeConfig{
-		Spec: prometheusalpha1.ScrapeConfigSpec{
+	etcdScrapeConfig := &cooprometheusv1alpha1.ScrapeConfig{
+		Spec: cooprometheusv1alpha1.ScrapeConfigSpec{
 			Params: map[string][]string{
 				"match[]": {
 					`{__name__=":node_memory_MemAvailable_bytes:sum"}`, // ignore rules
@@ -64,8 +64,8 @@ func TestHypershift_Nominal(t *testing.T) {
 			},
 		},
 	}
-	apiserverScrapeConfig := &prometheusalpha1.ScrapeConfig{
-		Spec: prometheusalpha1.ScrapeConfigSpec{
+	apiserverScrapeConfig := &cooprometheusv1alpha1.ScrapeConfig{
+		Spec: cooprometheusv1alpha1.ScrapeConfigSpec{
 			Params: map[string][]string{
 				"match[]": {
 					`{__name__=":node_memory_MemAvailable_bytes:sum"}`, // ignore rules
@@ -160,8 +160,8 @@ func TestHypershift_Nominal(t *testing.T) {
 	}
 
 	res, err := hype.GenerateResources(context.Background(),
-		CollectionConfig{ScrapeConfigs: []*prometheusalpha1.ScrapeConfig{etcdScrapeConfig}, Rules: []*prometheusv1.PrometheusRule{etcdRule}},
-		CollectionConfig{ScrapeConfigs: []*prometheusalpha1.ScrapeConfig{apiserverScrapeConfig}, Rules: []*prometheusv1.PrometheusRule{apiserverRule}},
+		CollectionConfig{ScrapeConfigs: []*cooprometheusv1alpha1.ScrapeConfig{etcdScrapeConfig}, Rules: []*prometheusv1.PrometheusRule{etcdRule}},
+		CollectionConfig{ScrapeConfigs: []*cooprometheusv1alpha1.ScrapeConfig{apiserverScrapeConfig}, Rules: []*prometheusv1.PrometheusRule{apiserverRule}},
 	)
 	assert.NoError(t, err)
 	assert.Len(t, res.ScrapeConfigs, 2)
@@ -208,7 +208,7 @@ func TestHypershift_NoScrapeConfigsAndRules(t *testing.T) {
 	require.NoError(t, kubescheme.AddToScheme(scheme))
 	require.NoError(t, hyperv1.AddToScheme(scheme))
 	require.NoError(t, prometheusv1.AddToScheme(scheme))
-	require.NoError(t, prometheusalpha1.AddToScheme(scheme))
+	require.NoError(t, cooprometheusv1alpha1.AddToScheme(scheme))
 	require.NoError(t, clusterv1.AddToScheme(scheme))
 
 	hostedCluster := &hyperv1.HostedCluster{
@@ -242,7 +242,7 @@ func TestHypershift_NoHypershiftServiceMonitors(t *testing.T) {
 	require.NoError(t, kubescheme.AddToScheme(scheme))
 	require.NoError(t, hyperv1.AddToScheme(scheme))
 	require.NoError(t, prometheusv1.AddToScheme(scheme))
-	require.NoError(t, prometheusalpha1.AddToScheme(scheme))
+	require.NoError(t, cooprometheusv1alpha1.AddToScheme(scheme))
 	require.NoError(t, clusterv1.AddToScheme(scheme))
 
 	hostedCluster := &hyperv1.HostedCluster{
@@ -257,8 +257,8 @@ func TestHypershift_NoHypershiftServiceMonitors(t *testing.T) {
 
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(hostedCluster).Build()
 
-	apiserverScrapeConfig := &prometheusalpha1.ScrapeConfig{
-		Spec: prometheusalpha1.ScrapeConfigSpec{
+	apiserverScrapeConfig := &cooprometheusv1alpha1.ScrapeConfig{
+		Spec: cooprometheusv1alpha1.ScrapeConfigSpec{
 			Params: map[string][]string{
 				"match[]": {
 					`{__name__=":node_memory_MemAvailable_bytes:sum"}`, // ignore rules
@@ -269,8 +269,8 @@ func TestHypershift_NoHypershiftServiceMonitors(t *testing.T) {
 		},
 	}
 
-	etcdScrapeConfig := &prometheusalpha1.ScrapeConfig{
-		Spec: prometheusalpha1.ScrapeConfigSpec{
+	etcdScrapeConfig := &cooprometheusv1alpha1.ScrapeConfig{
+		Spec: cooprometheusv1alpha1.ScrapeConfigSpec{
 			Params: map[string][]string{
 				"match[]": {
 					`{__name__=":node_memory_MemAvailable_bytes:sum"}`, // ignore rules
@@ -289,8 +289,8 @@ func TestHypershift_NoHypershiftServiceMonitors(t *testing.T) {
 	}
 
 	res, err := hype.GenerateResources(context.Background(),
-		CollectionConfig{ScrapeConfigs: []*prometheusalpha1.ScrapeConfig{etcdScrapeConfig}},
-		CollectionConfig{ScrapeConfigs: []*prometheusalpha1.ScrapeConfig{apiserverScrapeConfig}},
+		CollectionConfig{ScrapeConfigs: []*cooprometheusv1alpha1.ScrapeConfig{etcdScrapeConfig}},
+		CollectionConfig{ScrapeConfigs: []*cooprometheusv1alpha1.ScrapeConfig{apiserverScrapeConfig}},
 	)
 	assert.NoError(t, err)
 	assert.Len(t, res.Rules, 0)
@@ -300,15 +300,15 @@ func TestHypershift_NoHypershiftServiceMonitors(t *testing.T) {
 
 func TestHypershift_ExtractDependentMetrics(t *testing.T) {
 	testCases := map[string]struct {
-		scrapeConfig *prometheusalpha1.ScrapeConfig
+		scrapeConfig *cooprometheusv1alpha1.ScrapeConfig
 		rule         *prometheusv1.PrometheusRule
 		expectResult []string
 		expectError  bool
 	}{
 		"none": {},
 		"invalid scrape config": {
-			scrapeConfig: &prometheusalpha1.ScrapeConfig{
-				Spec: prometheusalpha1.ScrapeConfigSpec{
+			scrapeConfig: &cooprometheusv1alpha1.ScrapeConfig{
+				Spec: cooprometheusv1alpha1.ScrapeConfigSpec{
 					Params: map[string][]string{
 						"match[]": {
 							`{__name__"acm_label_names"}`,
@@ -319,8 +319,8 @@ func TestHypershift_ExtractDependentMetrics(t *testing.T) {
 			expectError: true,
 		},
 		"scrape config": {
-			scrapeConfig: &prometheusalpha1.ScrapeConfig{
-				Spec: prometheusalpha1.ScrapeConfigSpec{
+			scrapeConfig: &cooprometheusv1alpha1.ScrapeConfig{
+				Spec: cooprometheusv1alpha1.ScrapeConfigSpec{
 					Params: map[string][]string{
 						"match[]": {
 							`{__name__=":node_memory_MemAvailable_bytes:sum"}`, // ignore rules
@@ -384,8 +384,8 @@ func TestHypershift_ExtractDependentMetrics(t *testing.T) {
 			},
 		},
 		"merged scrape config and rule": { // is deduplicated and sorted alphabetically
-			scrapeConfig: &prometheusalpha1.ScrapeConfig{
-				Spec: prometheusalpha1.ScrapeConfigSpec{
+			scrapeConfig: &cooprometheusv1alpha1.ScrapeConfig{
+				Spec: cooprometheusv1alpha1.ScrapeConfigSpec{
 					Params: map[string][]string{
 						"match[]": {
 							`{__name__="grpc_server_started_total"}`,
@@ -429,7 +429,7 @@ func TestHypershift_ExtractDependentMetrics(t *testing.T) {
 			hype := Hypershift{
 				Logger: logr.Discard(),
 			}
-			scs := []*prometheusalpha1.ScrapeConfig{tc.scrapeConfig}
+			scs := []*cooprometheusv1alpha1.ScrapeConfig{tc.scrapeConfig}
 			rules := []*prometheusv1.PrometheusRule{tc.rule}
 			res, err := hype.extractDependentMetrics(scs, rules)
 			if tc.expectError {

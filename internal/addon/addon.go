@@ -6,7 +6,7 @@ import (
 
 	otelv1alpha1 "github.com/open-telemetry/opentelemetry-operator/apis/v1alpha1"
 	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
-	prometheusalpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
+	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	uiplugin "github.com/rhobs/observability-operator/pkg/apis/uiplugin/v1alpha1"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
@@ -41,8 +41,8 @@ func AgentHealthProber() *agent.HealthProber {
 			ProbeFields: []agent.ProbeField{
 				{
 					ResourceIdentifier: workv1.ResourceIdentifier{
-						Group:     prometheusalpha1.SchemeGroupVersion.Group,
-						Resource:  prometheusalpha1.PrometheusAgentName,
+						Group:     cooprometheusv1alpha1.SchemeGroupVersion.Group,
+						Resource:  cooprometheusv1alpha1.PrometheusAgentName,
 						Name:      mconfig.PlatformMetricsCollectorApp,
 						Namespace: addoncfg.InstallNamespace,
 					},
@@ -126,7 +126,7 @@ func AgentHealthProber() *agent.HealthProber {
 					}
 					identifier := field.ResourceIdentifier
 					switch identifier.Resource {
-					case prometheusalpha1.PrometheusAgentName:
+					case cooprometheusv1alpha1.PrometheusAgentName:
 						for _, value := range field.FeedbackResult.Values {
 							if value.Name != addoncfg.PaProbeKey {
 								return fmt.Errorf("%w: %s with key %s/%s unknown probe keys %s", errUnknownProbeKey, identifier.Resource, identifier.Namespace, identifier.Name, value.Name)

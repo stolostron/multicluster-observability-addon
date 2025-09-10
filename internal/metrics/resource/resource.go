@@ -8,7 +8,7 @@ import (
 
 	"github.com/go-logr/logr"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
-	prometheusalpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
+	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
@@ -125,7 +125,7 @@ func (d DefaultStackResources) reconcileScrapeConfigs(ctx context.Context, mcoUI
 	}
 	labelsSelector := labels.NewSelector().Add(*req)
 
-	scrapeConfigsList := &prometheusalpha1.ScrapeConfigList{}
+	scrapeConfigsList := &cooprometheusv1alpha1.ScrapeConfigList{}
 	if err = d.Client.List(ctx, scrapeConfigsList, client.InNamespace(addoncfg.InstallNamespace), client.MatchingLabelsSelector{Selector: labelsSelector}); err != nil {
 		return nil, fmt.Errorf("failed to list scrapeConfigs: %w", err)
 	}
@@ -148,10 +148,10 @@ func (d DefaultStackResources) reconcileScrapeConfigs(ctx context.Context, mcoUI
 			// If a scrape class is already set for a uwl, don't override
 			desiredSC.Spec.ScrapeClassName = ptr.To(config.ScrapeClassCfgName)
 			desiredSC.Spec.Scheme = ptr.To("HTTPS")
-			desiredSC.Spec.StaticConfigs = []prometheusalpha1.StaticConfig{
+			desiredSC.Spec.StaticConfigs = []cooprometheusv1alpha1.StaticConfig{
 				{
-					Targets: []prometheusalpha1.Target{
-						prometheusalpha1.Target(target),
+					Targets: []cooprometheusv1alpha1.Target{
+						cooprometheusv1alpha1.Target(target),
 					},
 				},
 			}
@@ -269,8 +269,8 @@ func (d DefaultStackResources) reconcileAgentForPlacement(ctx context.Context, p
 	}, nil
 }
 
-func (d DefaultStackResources) getOrCreateDefaultAgent(ctx context.Context, placementRef addonv1alpha1.PlacementRef, isUWL bool) (*prometheusalpha1.PrometheusAgent, error) {
-	promAgents := &prometheusalpha1.PrometheusAgentList{}
+func (d DefaultStackResources) getOrCreateDefaultAgent(ctx context.Context, placementRef addonv1alpha1.PlacementRef, isUWL bool) (*cooprometheusv1alpha1.PrometheusAgent, error) {
+	promAgents := &cooprometheusv1alpha1.PrometheusAgentList{}
 	if err := d.Client.List(ctx, promAgents, &client.ListOptions{
 		Namespace:     config.HubInstallNamespace,
 		LabelSelector: labels.SelectorFromSet(labels.Set(makeConfigResourceLabels(isUWL, placementRef))),
