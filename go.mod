@@ -2,8 +2,6 @@ module github.com/stolostron/multicluster-observability-addon
 
 go 1.24.0
 
-toolchain go1.24.2
-
 require (
 	github.com/ViaQ/logerr/v2 v2.1.0
 	github.com/go-logr/logr v1.4.2
