@@ -6,7 +6,7 @@ import (
 
 	"github.com/go-logr/logr"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
-	prometheusalpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
+	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
@@ -173,7 +173,7 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	if err := r.Get(ctx, types.NamespacedName{Name: addoncfg.Name}, cmao); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to get ClusterManagementAddOn: %w", err)
 	}
-	if err := common.DeleteOrphanResources(ctx, r.Log, r.Client, cmao, &prometheusalpha1.PrometheusAgentList{}); err != nil {
+	if err := common.DeleteOrphanResources(ctx, r.Log, r.Client, cmao, &cooprometheusv1alpha1.PrometheusAgentList{}); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to clean orphan resources: %w", err)
 	}
 
@@ -189,8 +189,8 @@ func (r *ResourceCreatorReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		// Trigger reconciliations if the pool of ManagedClusters changes
 		Watches(&clusterv1.ManagedCluster{}, r.enqueueAODC(), builder.OnlyMetadata).
 		// Trigger reconciliations if the metrics configuration resources change
-		Watches(&prometheusalpha1.PrometheusAgent{}, r.enqueueForMCOAOwnedResources()).
-		Watches(&prometheusalpha1.ScrapeConfig{}, r.enqueueForMCOControlledResources(), partOfMCOAPredicate).
+		Watches(&cooprometheusv1alpha1.PrometheusAgent{}, r.enqueueForMCOAOwnedResources()).
+		Watches(&cooprometheusv1alpha1.ScrapeConfig{}, r.enqueueForMCOControlledResources(), partOfMCOAPredicate).
 		Watches(&prometheusv1.PrometheusRule{}, r.enqueueForMCOControlledResources(), partOfMCOAPredicate).
 		Complete(r)
 }

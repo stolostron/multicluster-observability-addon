@@ -10,7 +10,7 @@ import (
 
 	hyperv1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
-	prometheusalpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
+	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
@@ -58,12 +58,12 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 			UserMetrics:     false,
 			Expects: func(t *testing.T, objects []client.Object) {
 				// ensure the agent is created
-				agent := common.FilterResourcesByLabelSelector[*prometheusalpha1.PrometheusAgent](objects, config.PlatformPrometheusMatchLabels)
+				agent := common.FilterResourcesByLabelSelector[*cooprometheusv1alpha1.PrometheusAgent](objects, config.PlatformPrometheusMatchLabels)
 				assert.Len(t, agent, 1)
 				assert.Equal(t, config.PlatformMetricsCollectorApp, agent[0].GetName())
 				assert.NotEmpty(t, agent[0].Spec.CommonPrometheusFields.RemoteWrite[0].URL)
 				// ensure that scrape config is created and matches the agent
-				scrapeCfgs := common.FilterResourcesByLabelSelector[*prometheusalpha1.ScrapeConfig](objects, config.PlatformPrometheusMatchLabels)
+				scrapeCfgs := common.FilterResourcesByLabelSelector[*cooprometheusv1alpha1.ScrapeConfig](objects, config.PlatformPrometheusMatchLabels)
 				assert.Len(t, scrapeCfgs, 2)
 				assert.Equal(t, config.PrometheusControllerID, scrapeCfgs[0].Annotations["operator.prometheus.io/controller-id"])
 				assert.GreaterOrEqual(t, len(agent[0].Spec.ScrapeConfigSelector.MatchLabels), 0)
@@ -84,12 +84,12 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 			UserMetrics:     true,
 			Expects: func(t *testing.T, objects []client.Object) {
 				// ensure the agent is created
-				agent := common.FilterResourcesByLabelSelector[*prometheusalpha1.PrometheusAgent](objects, config.UserWorkloadPrometheusMatchLabels)
+				agent := common.FilterResourcesByLabelSelector[*cooprometheusv1alpha1.PrometheusAgent](objects, config.UserWorkloadPrometheusMatchLabels)
 				assert.Len(t, agent, 1)
 				assert.Equal(t, config.UserWorkloadMetricsCollectorApp, agent[0].GetName())
 				assert.NotEmpty(t, agent[0].Spec.CommonPrometheusFields.RemoteWrite[0].URL)
 				// ensure that scrape config is created and matches the agent
-				scrapeCfgs := common.FilterResourcesByLabelSelector[*prometheusalpha1.ScrapeConfig](objects, config.UserWorkloadPrometheusMatchLabels)
+				scrapeCfgs := common.FilterResourcesByLabelSelector[*cooprometheusv1alpha1.ScrapeConfig](objects, config.UserWorkloadPrometheusMatchLabels)
 				assert.Len(t, scrapeCfgs, 2)
 				assert.Equal(t, config.PrometheusControllerID, scrapeCfgs[0].Annotations["operator.prometheus.io/controller-id"])
 				assert.GreaterOrEqual(t, len(agent[0].Spec.ScrapeConfigSelector.MatchLabels), 0)
@@ -107,7 +107,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 
 	scheme := runtime.NewScheme()
 	assert.NoError(t, kubescheme.AddToScheme(scheme))
-	assert.NoError(t, prometheusalpha1.AddToScheme(scheme))
+	assert.NoError(t, cooprometheusv1alpha1.AddToScheme(scheme))
 	assert.NoError(t, prometheusv1.AddToScheme(scheme))
 	assert.NoError(t, clusterv1.AddToScheme(scheme))
 	assert.NoError(t, addonapiv1alpha1.AddToScheme(scheme))
@@ -117,17 +117,17 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 
 	// Add platform resources
 	defaultAgentResources := []client.Object{}
-	platformScrapeConfig := &prometheusalpha1.ScrapeConfig{
+	platformScrapeConfig := &cooprometheusv1alpha1.ScrapeConfig{
 		TypeMeta: metav1.TypeMeta{
-			Kind:       prometheusalpha1.ScrapeConfigsKind,
-			APIVersion: prometheusalpha1.SchemeGroupVersion.Identifier(),
+			Kind:       cooprometheusv1alpha1.ScrapeConfigsKind,
+			APIVersion: cooprometheusv1alpha1.SchemeGroupVersion.Identifier(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "platform",
 			Namespace: hubNamespace,
 			Labels:    config.PlatformPrometheusMatchLabels,
 		},
-		Spec: prometheusalpha1.ScrapeConfigSpec{},
+		Spec: cooprometheusv1alpha1.ScrapeConfigSpec{},
 	}
 	platformScrapeConfigAdditional := platformScrapeConfig.DeepCopy() // Checks that the helm loop is well set
 	platformScrapeConfigAdditional.Name = platformScrapeConfigAdditional.Name + "- additional"
@@ -233,7 +233,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 	err = common.EnsureAddonConfig(context.Background(), klog.Background(), client, dc)
 	require.NoError(t, err)
 
-	promAgents := prometheusalpha1.PrometheusAgentList{}
+	promAgents := cooprometheusv1alpha1.PrometheusAgentList{}
 	err = client.List(context.Background(), &promAgents)
 	require.NoError(t, err)
 	require.Len(t, promAgents.Items, 2)
@@ -270,7 +270,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				assert.NoError(t, err)
 
 				// if not a global object, check namespace
-				if !slices.Contains([]string{"ClusterRole", "ClusterRoleBinding"}, obj.GetObjectKind().GroupVersionKind().Kind) {
+				if !slices.Contains([]string{"ClusterRole", "ClusterRoleBinding", "CustomResourceDefinition"}, obj.GetObjectKind().GroupVersionKind().Kind) {
 					assert.Equal(t, installNamespace, accessor.GetNamespace(), fmt.Sprintf("Object: %s/%s", obj.GetObjectKind().GroupVersionKind(), accessor.GetName()))
 				}
 			}
@@ -281,7 +281,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 func TestHelmBuild_Metrics_HCP(t *testing.T) {
 	scheme := runtime.NewScheme()
 	assert.NoError(t, kubescheme.AddToScheme(scheme))
-	assert.NoError(t, prometheusalpha1.AddToScheme(scheme))
+	assert.NoError(t, cooprometheusv1alpha1.AddToScheme(scheme))
 	assert.NoError(t, prometheusv1.AddToScheme(scheme))
 	assert.NoError(t, clusterv1.AddToScheme(scheme))
 	assert.NoError(t, hyperv1.AddToScheme(scheme))
@@ -302,17 +302,17 @@ func TestHelmBuild_Metrics_HCP(t *testing.T) {
 	clientObjects = append(clientObjects, defaultAgentResources...)
 
 	// Add hcp scrape configs and rules
-	etcdHcpScrapeConfig := &prometheusalpha1.ScrapeConfig{
+	etcdHcpScrapeConfig := &cooprometheusv1alpha1.ScrapeConfig{
 		TypeMeta: metav1.TypeMeta{
-			Kind:       prometheusalpha1.ScrapeConfigsKind,
-			APIVersion: prometheusalpha1.SchemeGroupVersion.Identifier(),
+			Kind:       cooprometheusv1alpha1.ScrapeConfigsKind,
+			APIVersion: cooprometheusv1alpha1.SchemeGroupVersion.Identifier(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "etcd-base",
 			Namespace: hubNamespace,
 			Labels:    config.EtcdHcpUserWorkloadPrometheusMatchLabels,
 		},
-		Spec: prometheusalpha1.ScrapeConfigSpec{
+		Spec: cooprometheusv1alpha1.ScrapeConfigSpec{
 			Params: map[string][]string{
 				"match[]": {
 					`{__name__="etcd_metric"}`,
@@ -320,17 +320,17 @@ func TestHelmBuild_Metrics_HCP(t *testing.T) {
 			},
 		},
 	}
-	apiserverHcpScrapeConfig := &prometheusalpha1.ScrapeConfig{
+	apiserverHcpScrapeConfig := &cooprometheusv1alpha1.ScrapeConfig{
 		TypeMeta: metav1.TypeMeta{
-			Kind:       prometheusalpha1.ScrapeConfigsKind,
-			APIVersion: prometheusalpha1.SchemeGroupVersion.Identifier(),
+			Kind:       cooprometheusv1alpha1.ScrapeConfigsKind,
+			APIVersion: cooprometheusv1alpha1.SchemeGroupVersion.Identifier(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "apiserver-base",
 			Namespace: hubNamespace,
 			Labels:    config.ApiserverHcpUserWorkloadPrometheusMatchLabels,
 		},
-		Spec: prometheusalpha1.ScrapeConfigSpec{
+		Spec: cooprometheusv1alpha1.ScrapeConfigSpec{
 			Params: map[string][]string{
 				"match[]": {
 					`{__name__="apiserver_metric"}`,
@@ -484,7 +484,7 @@ func TestHelmBuild_Metrics_HCP(t *testing.T) {
 	err = common.EnsureAddonConfig(context.Background(), klog.Background(), client, dc)
 	require.NoError(t, err)
 
-	promAgents := prometheusalpha1.PrometheusAgentList{}
+	promAgents := cooprometheusv1alpha1.PrometheusAgentList{}
 	err = client.List(context.Background(), &promAgents)
 	require.NoError(t, err)
 	require.Len(t, promAgents.Items, 2)
@@ -513,7 +513,7 @@ func TestHelmBuild_Metrics_HCP(t *testing.T) {
 
 	recordingRules := common.FilterResourcesByLabelSelector[*prometheusv1.PrometheusRule](clientObjs, nil)
 	assert.Len(t, recordingRules, 2)
-	scrapeConfigs := common.FilterResourcesByLabelSelector[*prometheusalpha1.ScrapeConfig](clientObjs, nil)
+	scrapeConfigs := common.FilterResourcesByLabelSelector[*cooprometheusv1alpha1.ScrapeConfig](clientObjs, nil)
 	assert.Len(t, scrapeConfigs, 2)
 	serviceMonitors := common.FilterResourcesByLabelSelector[*prometheusv1.ServiceMonitor](clientObjs, nil)
 	assert.Len(t, serviceMonitors, 4) // 2 for hcps and 1 for meta monitoring

@@ -4,7 +4,8 @@ import (
 	"testing"
 
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
-	prometheusalpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
+	cooprometheusv1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1"
+	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/handlers"
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/manifests"
@@ -22,9 +23,9 @@ func TestBuildValues(t *testing.T) {
 		"with platform resources": {
 			Options: handlers.Options{
 				Platform: handlers.Collector{
-					PrometheusAgent: &prometheusalpha1.PrometheusAgent{
-						Spec: prometheusalpha1.PrometheusAgentSpec{
-							CommonPrometheusFields: prometheusv1.CommonPrometheusFields{
+					PrometheusAgent: &cooprometheusv1alpha1.PrometheusAgent{
+						Spec: cooprometheusv1alpha1.PrometheusAgentSpec{
+							CommonPrometheusFields: cooprometheusv1.CommonPrometheusFields{
 								LogLevel: "info",
 							},
 						},
@@ -40,14 +41,14 @@ func TestBuildValues(t *testing.T) {
 		"with user workloads resources": {
 			Options: handlers.Options{
 				UserWorkloads: handlers.Collector{
-					PrometheusAgent: &prometheusalpha1.PrometheusAgent{
-						Spec: prometheusalpha1.PrometheusAgentSpec{
-							CommonPrometheusFields: prometheusv1.CommonPrometheusFields{
+					PrometheusAgent: &cooprometheusv1alpha1.PrometheusAgent{
+						Spec: cooprometheusv1alpha1.PrometheusAgentSpec{
+							CommonPrometheusFields: cooprometheusv1.CommonPrometheusFields{
 								LogLevel: "info",
 							},
 						},
 					},
-					ScrapeConfigs: []*prometheusalpha1.ScrapeConfig{},
+					ScrapeConfigs: []*cooprometheusv1alpha1.ScrapeConfig{},
 					Rules:         []*prometheusv1.PrometheusRule{},
 				},
 			},
@@ -115,7 +116,7 @@ func TestBuildValues(t *testing.T) {
 		"with platform scrape configs": {
 			Options: handlers.Options{
 				Platform: handlers.Collector{
-					ScrapeConfigs: []*prometheusalpha1.ScrapeConfig{
+					ScrapeConfigs: []*cooprometheusv1alpha1.ScrapeConfig{
 						newScrapeConfig("a"),
 						newScrapeConfig("b"),
 					},
@@ -130,7 +131,7 @@ func TestBuildValues(t *testing.T) {
 		"with user workload scrape configs": {
 			Options: handlers.Options{
 				UserWorkloads: handlers.Collector{
-					ScrapeConfigs: []*prometheusalpha1.ScrapeConfig{
+					ScrapeConfigs: []*cooprometheusv1alpha1.ScrapeConfig{
 						newScrapeConfig("a"),
 						newScrapeConfig("b"),
 					},
@@ -214,8 +215,8 @@ func newConfigmap(name string) *corev1.ConfigMap {
 	}
 }
 
-func newScrapeConfig(name string) *prometheusalpha1.ScrapeConfig {
-	return &prometheusalpha1.ScrapeConfig{
+func newScrapeConfig(name string) *cooprometheusv1alpha1.ScrapeConfig {
+	return &cooprometheusv1alpha1.ScrapeConfig{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},

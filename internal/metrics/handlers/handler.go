@@ -8,7 +8,8 @@ import (
 
 	"github.com/go-logr/logr"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
-	prometheusalpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
+	cooprometheusv1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1"
+	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
@@ -65,7 +66,7 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 		}
 
 		// Fetch rules and scrape configs
-		ret.Platform.ScrapeConfigs = common.FilterResourcesByLabelSelector[*prometheusalpha1.ScrapeConfig](configResources, config.PlatformPrometheusMatchLabels)
+		ret.Platform.ScrapeConfigs = common.FilterResourcesByLabelSelector[*cooprometheusv1alpha1.ScrapeConfig](configResources, config.PlatformPrometheusMatchLabels)
 		if len(ret.Platform.ScrapeConfigs) == 0 {
 			o.Logger.V(1).Info("No scrape configs found for platform metrics")
 		}
@@ -84,7 +85,7 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 		}
 
 		// Fetch rules and scrape configs
-		ret.UserWorkloads.ScrapeConfigs = common.FilterResourcesByLabelSelector[*prometheusalpha1.ScrapeConfig](configResources, config.UserWorkloadPrometheusMatchLabels)
+		ret.UserWorkloads.ScrapeConfigs = common.FilterResourcesByLabelSelector[*cooprometheusv1alpha1.ScrapeConfig](configResources, config.UserWorkloadPrometheusMatchLabels)
 		if len(ret.UserWorkloads.ScrapeConfigs) == 0 {
 			o.Logger.V(1).Info("No scrape configs found for user workloads")
 		}
@@ -114,7 +115,7 @@ func (o *OptionsBuilder) buildPrometheusAgent(ctx context.Context, opts *Options
 	if appName == config.UserWorkloadMetricsCollectorApp {
 		labelsMatcher = config.UserWorkloadPrometheusMatchLabels
 	}
-	platformAgents := common.FilterResourcesByLabelSelector[*prometheusalpha1.PrometheusAgent](configResources, labelsMatcher)
+	platformAgents := common.FilterResourcesByLabelSelector[*cooprometheusv1alpha1.PrometheusAgent](configResources, labelsMatcher)
 	if len(platformAgents) != 1 {
 		return fmt.Errorf("%w: for application %s, found %d agents with labels %+v", errInvalidConfigResourcesCount, appName, len(platformAgents), labelsMatcher)
 	}
@@ -129,7 +130,7 @@ func (o *OptionsBuilder) buildPrometheusAgent(ctx context.Context, opts *Options
 	}
 
 	// add the relabel cfg
-	remoteWriteSpecIdx := slices.IndexFunc(agent.Spec.RemoteWrite, func(e prometheusv1.RemoteWriteSpec) bool {
+	remoteWriteSpecIdx := slices.IndexFunc(agent.Spec.RemoteWrite, func(e cooprometheusv1.RemoteWriteSpec) bool {
 		return e.Name != nil && *e.Name == config.RemoteWriteCfgName
 	})
 	if remoteWriteSpecIdx == -1 {
@@ -158,9 +159,9 @@ func (o *OptionsBuilder) buildPrometheusAgent(ctx context.Context, opts *Options
 }
 
 func (o *OptionsBuilder) buildHypershiftResources(ctx context.Context, opts *Options, managedCluster *clusterv1.ManagedCluster, configResources []client.Object) error {
-	etcdScrapeConfigs := common.FilterResourcesByLabelSelector[*prometheusalpha1.ScrapeConfig](configResources, config.EtcdHcpUserWorkloadPrometheusMatchLabels)
+	etcdScrapeConfigs := common.FilterResourcesByLabelSelector[*cooprometheusv1alpha1.ScrapeConfig](configResources, config.EtcdHcpUserWorkloadPrometheusMatchLabels)
 	etcdRules := common.FilterResourcesByLabelSelector[*prometheusv1.PrometheusRule](configResources, config.EtcdHcpUserWorkloadPrometheusMatchLabels)
-	apiserverScrapeConfigs := common.FilterResourcesByLabelSelector[*prometheusalpha1.ScrapeConfig](configResources, config.ApiserverHcpUserWorkloadPrometheusMatchLabels)
+	apiserverScrapeConfigs := common.FilterResourcesByLabelSelector[*cooprometheusv1alpha1.ScrapeConfig](configResources, config.ApiserverHcpUserWorkloadPrometheusMatchLabels)
 	apiserverRules := common.FilterResourcesByLabelSelector[*prometheusv1.PrometheusRule](configResources, config.ApiserverHcpUserWorkloadPrometheusMatchLabels)
 
 	if len(etcdScrapeConfigs) == 0 {
@@ -212,10 +213,10 @@ func (o *OptionsBuilder) getAvailableConfigResources(ctx context.Context, mcAddo
 	for _, cfg := range mcAddon.Status.ConfigReferences {
 		var obj client.Object
 		switch cfg.Resource {
-		case prometheusalpha1.PrometheusAgentName:
-			obj = &prometheusalpha1.PrometheusAgent{}
-		case prometheusalpha1.ScrapeConfigName:
-			obj = &prometheusalpha1.ScrapeConfig{}
+		case cooprometheusv1alpha1.PrometheusAgentName:
+			obj = &cooprometheusv1alpha1.PrometheusAgent{}
+		case cooprometheusv1alpha1.ScrapeConfigName:
+			obj = &cooprometheusv1alpha1.ScrapeConfig{}
 		case prometheusv1.PrometheusRuleName:
 			obj = &prometheusv1.PrometheusRule{}
 		case "configmaps":
@@ -241,44 +242,44 @@ func (o *OptionsBuilder) getAvailableConfigResources(ctx context.Context, mcAddo
 	return ret, nil
 }
 
-func createWriteRelabelConfigs(clusterName, clusterID string, isHypershiftLocalCluster bool) []prometheusv1.RelabelConfig {
-	ret := []prometheusv1.RelabelConfig{}
+func createWriteRelabelConfigs(clusterName, clusterID string, isHypershiftLocalCluster bool) []cooprometheusv1.RelabelConfig {
+	ret := []cooprometheusv1.RelabelConfig{}
 	if isHypershiftLocalCluster {
 		// Don't overwrite the clusterID label as some are set to the hosted cluster ID (for hosted etcd and apiserver)
 		// These rules ensure that the correct management cluster labels are set if the clusterID label differs from the current cluster one.
 		// If the clusterID it the current cluster one, nothing is done.
-		var isNotHcpTmpLabel prometheusv1.LabelName = "__tmp_is_not_hcp"
+		var isNotHcpTmpLabel cooprometheusv1.LabelName = "__tmp_is_not_hcp"
 		ret = append(ret,
-			prometheusv1.RelabelConfig{
-				SourceLabels: []prometheusv1.LabelName{config.ClusterIDMetricLabel},
+			cooprometheusv1.RelabelConfig{
+				SourceLabels: []cooprometheusv1.LabelName{config.ClusterIDMetricLabel},
 				Regex:        "^$", // Is empty
 				TargetLabel:  config.ClusterNameMetricLabel,
 				Action:       "replace",
 				Replacement:  &clusterName,
 			},
-			prometheusv1.RelabelConfig{
-				SourceLabels: []prometheusv1.LabelName{config.ClusterIDMetricLabel},
+			cooprometheusv1.RelabelConfig{
+				SourceLabels: []cooprometheusv1.LabelName{config.ClusterIDMetricLabel},
 				Regex:        "^$", // Is empty
 				TargetLabel:  config.ClusterIDMetricLabel,
 				Action:       "replace",
 				Replacement:  &clusterID,
 			},
-			prometheusv1.RelabelConfig{
-				SourceLabels: []prometheusv1.LabelName{config.ClusterIDMetricLabel},
+			cooprometheusv1.RelabelConfig{
+				SourceLabels: []cooprometheusv1.LabelName{config.ClusterIDMetricLabel},
 				Regex:        clusterID,
 				TargetLabel:  string(isNotHcpTmpLabel),
 				Action:       "replace",
 				Replacement:  ptr.To("true"),
 			},
-			prometheusv1.RelabelConfig{
-				SourceLabels: []prometheusv1.LabelName{isNotHcpTmpLabel},
+			cooprometheusv1.RelabelConfig{
+				SourceLabels: []cooprometheusv1.LabelName{isNotHcpTmpLabel},
 				Regex:        "^$", // Is not the current clusterID and is not empty
 				TargetLabel:  config.ManagementClusterIDMetricLabel,
 				Action:       "replace",
 				Replacement:  &clusterID,
 			},
-			prometheusv1.RelabelConfig{
-				SourceLabels: []prometheusv1.LabelName{isNotHcpTmpLabel},
+			cooprometheusv1.RelabelConfig{
+				SourceLabels: []cooprometheusv1.LabelName{isNotHcpTmpLabel},
 				Regex:        "^$", // Is not the current clusterID and is not empty
 				TargetLabel:  config.ManagementClusterNameMetricLabel,
 				Action:       "replace",
@@ -288,12 +289,12 @@ func createWriteRelabelConfigs(clusterName, clusterID string, isHypershiftLocalC
 	} else {
 		// If not hypershift hub, enforce the clusterID and Name on all metrics
 		ret = append(ret,
-			prometheusv1.RelabelConfig{
+			cooprometheusv1.RelabelConfig{
 				Replacement: &clusterName,
 				TargetLabel: config.ClusterNameMetricLabel,
 				Action:      "replace",
 			},
-			prometheusv1.RelabelConfig{
+			cooprometheusv1.RelabelConfig{
 				Replacement: &clusterID,
 				TargetLabel: config.ClusterIDMetricLabel,
 				Action:      "replace",
@@ -301,17 +302,17 @@ func createWriteRelabelConfigs(clusterName, clusterID string, isHypershiftLocalC
 	}
 
 	return append(ret,
-		prometheusv1.RelabelConfig{
-			SourceLabels: []prometheusv1.LabelName{"exported_job"},
+		cooprometheusv1.RelabelConfig{
+			SourceLabels: []cooprometheusv1.LabelName{"exported_job"},
 			TargetLabel:  "job",
 			Action:       "replace",
 		},
-		prometheusv1.RelabelConfig{
-			SourceLabels: []prometheusv1.LabelName{"exported_instance"},
+		cooprometheusv1.RelabelConfig{
+			SourceLabels: []cooprometheusv1.LabelName{"exported_instance"},
 			TargetLabel:  "instance",
 			Action:       "replace",
 		},
-		prometheusv1.RelabelConfig{
+		cooprometheusv1.RelabelConfig{
 			Regex:  "exported_job|exported_instance",
 			Action: "labeldrop",
 		})

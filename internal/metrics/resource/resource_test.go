@@ -7,7 +7,7 @@ import (
 
 	hyperv1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
-	prometheusalpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
+	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
@@ -96,7 +96,7 @@ func TestGetOrCreateDefaultAgent(t *testing.T) {
 
 			// ensure there is only one agent
 			if err == nil {
-				res := &prometheusalpha1.PrometheusAgentList{}
+				res := &cooprometheusv1alpha1.PrometheusAgentList{}
 				err := fakeClient.List(context.Background(), res)
 				assert.NoError(t, err)
 				assert.Len(t, res.Items, 1)
@@ -139,7 +139,7 @@ func TestReconcileAgent(t *testing.T) {
 	retAgent, err := d.reconcileAgentForPlacement(context.Background(), placementRef, false)
 	assert.NoError(t, err)
 
-	foundAgent := prometheusalpha1.PrometheusAgent{}
+	foundAgent := cooprometheusv1alpha1.PrometheusAgent{}
 	err = fakeClient.Get(context.Background(), types.NamespacedName{Namespace: retAgent.Config.Namespace, Name: retAgent.Config.Name}, &foundAgent)
 	assert.NoError(t, err)
 
@@ -166,7 +166,7 @@ func TestReconcileAgent(t *testing.T) {
 	retAgent, err = d.reconcileAgentForPlacement(context.Background(), placementRef, true)
 	assert.NoError(t, err)
 
-	foundAgent = prometheusalpha1.PrometheusAgent{}
+	foundAgent = cooprometheusv1alpha1.PrometheusAgent{}
 	err = fakeClient.Get(context.Background(), types.NamespacedName{Namespace: retAgent.Config.Namespace, Name: retAgent.Config.Name}, &foundAgent)
 	assert.NoError(t, err)
 
@@ -196,9 +196,9 @@ func TestReconcile(t *testing.T) {
 		addoncfg.ComponentK8sLabelKey:          config.PlatformMetricsCollectorApp,
 	}
 
-	platformSC := &prometheusalpha1.ScrapeConfig{
+	platformSC := &cooprometheusv1alpha1.ScrapeConfig{
 		TypeMeta: metav1.TypeMeta{
-			Kind: prometheusalpha1.ScrapeConfigsKind,
+			Kind: cooprometheusv1alpha1.ScrapeConfigsKind,
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: config.HubInstallNamespace,
@@ -212,9 +212,9 @@ func TestReconcile(t *testing.T) {
 			},
 		},
 	}
-	uwlSC := &prometheusalpha1.ScrapeConfig{
+	uwlSC := &cooprometheusv1alpha1.ScrapeConfig{
 		TypeMeta: metav1.TypeMeta{
-			Kind: prometheusalpha1.ScrapeConfigsKind,
+			Kind: cooprometheusv1alpha1.ScrapeConfigsKind,
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: config.HubInstallNamespace,
@@ -234,9 +234,9 @@ func TestReconcile(t *testing.T) {
 			Namespace: "hcpns",
 		},
 	}
-	hcpApiserverSC := &prometheusalpha1.ScrapeConfig{
+	hcpApiserverSC := &cooprometheusv1alpha1.ScrapeConfig{
 		TypeMeta: metav1.TypeMeta{
-			Kind: prometheusalpha1.ScrapeConfigsKind,
+			Kind: cooprometheusv1alpha1.ScrapeConfigsKind,
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: config.HubInstallNamespace,
@@ -266,9 +266,9 @@ func TestReconcile(t *testing.T) {
 			},
 		},
 	}
-	hcpEtcdSC := &prometheusalpha1.ScrapeConfig{
+	hcpEtcdSC := &cooprometheusv1alpha1.ScrapeConfig{
 		TypeMeta: metav1.TypeMeta{
-			Kind: prometheusalpha1.ScrapeConfigsKind,
+			Kind: cooprometheusv1alpha1.ScrapeConfigsKind,
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: config.HubInstallNamespace,
@@ -441,7 +441,7 @@ func TestReconcile(t *testing.T) {
 			err = common.EnsureAddonConfig(context.Background(), klog.Background(), fakeClient, dc)
 			assert.NoError(t, err)
 
-			foundAgents := prometheusalpha1.PrometheusAgentList{}
+			foundAgents := cooprometheusv1alpha1.PrometheusAgentList{}
 			err = fakeClient.List(context.Background(), &foundAgents)
 			assert.NoError(t, err)
 			assert.Len(t, foundAgents.Items, tc.expectAgentsCount)
@@ -471,7 +471,7 @@ func TestReconcileScrapeConfigs(t *testing.T) {
 		initObjs          []client.Object
 		isUWL             bool
 		hasHostedClusters bool
-		expects           func(*testing.T, []prometheusalpha1.ScrapeConfig)
+		expects           func(*testing.T, []cooprometheusv1alpha1.ScrapeConfig)
 	}{
 		{
 			name: "no scrape configs",
@@ -479,9 +479,9 @@ func TestReconcileScrapeConfigs(t *testing.T) {
 		{
 			name: "unmanaged SC is ignored",
 			initObjs: []client.Object{
-				&prometheusalpha1.ScrapeConfig{
+				&cooprometheusv1alpha1.ScrapeConfig{
 					TypeMeta: metav1.TypeMeta{
-						Kind: prometheusalpha1.ScrapeConfigsKind,
+						Kind: cooprometheusv1alpha1.ScrapeConfigsKind,
 					},
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: config.HubInstallNamespace,
@@ -490,16 +490,16 @@ func TestReconcileScrapeConfigs(t *testing.T) {
 					},
 				},
 			},
-			expects: func(t *testing.T, objs []prometheusalpha1.ScrapeConfig) {
+			expects: func(t *testing.T, objs []cooprometheusv1alpha1.ScrapeConfig) {
 				assert.Len(t, objs, 0)
 			},
 		},
 		{
 			name: "SC target is enforced for platform",
 			initObjs: []client.Object{
-				&prometheusalpha1.ScrapeConfig{
+				&cooprometheusv1alpha1.ScrapeConfig{
 					TypeMeta: metav1.TypeMeta{
-						Kind: prometheusalpha1.ScrapeConfigsKind,
+						Kind: cooprometheusv1alpha1.ScrapeConfigsKind,
 					},
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace:       config.HubInstallNamespace,
@@ -507,12 +507,12 @@ func TestReconcileScrapeConfigs(t *testing.T) {
 						Labels:          config.PlatformPrometheusMatchLabels,
 						OwnerReferences: []metav1.OwnerReference{mcoOwnerRef},
 					},
-					Spec: prometheusalpha1.ScrapeConfigSpec{
+					Spec: cooprometheusv1alpha1.ScrapeConfigSpec{
 						ScrapeClassName: ptr.To("invalid"),
 					},
 				},
 			},
-			expects: func(t *testing.T, objs []prometheusalpha1.ScrapeConfig) {
+			expects: func(t *testing.T, objs []cooprometheusv1alpha1.ScrapeConfig) {
 				assert.Len(t, objs, 1)
 				assert.Equal(t, *objs[0].Spec.ScrapeClassName, config.ScrapeClassCfgName)
 			},
@@ -520,9 +520,9 @@ func TestReconcileScrapeConfigs(t *testing.T) {
 		{
 			name: "SC target is left for uwl",
 			initObjs: []client.Object{
-				&prometheusalpha1.ScrapeConfig{
+				&cooprometheusv1alpha1.ScrapeConfig{
 					TypeMeta: metav1.TypeMeta{
-						Kind: prometheusalpha1.ScrapeConfigsKind,
+						Kind: cooprometheusv1alpha1.ScrapeConfigsKind,
 					},
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace:       config.HubInstallNamespace,
@@ -530,18 +530,18 @@ func TestReconcileScrapeConfigs(t *testing.T) {
 						Labels:          config.UserWorkloadPrometheusMatchLabels,
 						OwnerReferences: []metav1.OwnerReference{mcoOwnerRef},
 					},
-					Spec: prometheusalpha1.ScrapeConfigSpec{
+					Spec: cooprometheusv1alpha1.ScrapeConfigSpec{
 						ScrapeClassName: ptr.To("custom"),
-						StaticConfigs: []prometheusalpha1.StaticConfig{
+						StaticConfigs: []cooprometheusv1alpha1.StaticConfig{
 							{
-								Targets: []prometheusalpha1.Target{"test"},
+								Targets: []cooprometheusv1alpha1.Target{"test"},
 							},
 						},
 					},
 				},
 			},
 			isUWL: true,
-			expects: func(t *testing.T, objs []prometheusalpha1.ScrapeConfig) {
+			expects: func(t *testing.T, objs []cooprometheusv1alpha1.ScrapeConfig) {
 				assert.Len(t, objs, 1)
 				assert.Equal(t, *objs[0].Spec.ScrapeClassName, "custom")
 			},
@@ -549,9 +549,9 @@ func TestReconcileScrapeConfigs(t *testing.T) {
 		{
 			name: "hcp SC is handled",
 			initObjs: []client.Object{
-				&prometheusalpha1.ScrapeConfig{
+				&cooprometheusv1alpha1.ScrapeConfig{
 					TypeMeta: metav1.TypeMeta{
-						Kind: prometheusalpha1.ScrapeConfigsKind,
+						Kind: cooprometheusv1alpha1.ScrapeConfigsKind,
 					},
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace:       config.HubInstallNamespace,
@@ -563,7 +563,7 @@ func TestReconcileScrapeConfigs(t *testing.T) {
 			},
 			isUWL:             true,
 			hasHostedClusters: true,
-			expects: func(t *testing.T, objs []prometheusalpha1.ScrapeConfig) {
+			expects: func(t *testing.T, objs []cooprometheusv1alpha1.ScrapeConfig) {
 				assert.Len(t, objs, 1)
 				assert.Equal(t, *objs[0].Spec.ScrapeClassName, config.ScrapeClassCfgName)
 			},
@@ -592,9 +592,9 @@ func TestReconcileScrapeConfigs(t *testing.T) {
 			dc, err := d.reconcileScrapeConfigs(context.Background(), mcoUID, tc.isUWL, tc.hasHostedClusters)
 			assert.NoError(t, err)
 
-			scrapeConfigs := []prometheusalpha1.ScrapeConfig{}
+			scrapeConfigs := []cooprometheusv1alpha1.ScrapeConfig{}
 			for _, config := range dc {
-				sc := prometheusalpha1.ScrapeConfig{}
+				sc := cooprometheusv1alpha1.ScrapeConfig{}
 				err = fakeClient.Get(context.Background(), client.ObjectKey(config.Config.ConfigReferent), &sc)
 				assert.NoError(t, err)
 				scrapeConfigs = append(scrapeConfigs, sc)
@@ -802,7 +802,7 @@ func TestGetPrometheusRules(t *testing.T) {
 func newTestScheme() *runtime.Scheme {
 	s := runtime.NewScheme()
 	_ = addonv1alpha1.AddToScheme(s)
-	_ = prometheusalpha1.AddToScheme(s)
+	_ = cooprometheusv1alpha1.AddToScheme(s)
 	_ = prometheusv1.AddToScheme(s)
 	_ = hyperv1.AddToScheme(s)
 	return s

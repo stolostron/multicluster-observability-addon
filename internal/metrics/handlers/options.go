@@ -2,7 +2,7 @@ package handlers
 
 import (
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
-	prometheusalpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
+	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	corev1 "k8s.io/api/core/v1"
 )
@@ -19,8 +19,8 @@ type Options struct {
 
 type Collector struct {
 	ConfigMaps      []*corev1.ConfigMap
-	PrometheusAgent *prometheusalpha1.PrometheusAgent
-	ScrapeConfigs   []*prometheusalpha1.ScrapeConfig
+	PrometheusAgent *cooprometheusv1alpha1.PrometheusAgent
+	ScrapeConfigs   []*cooprometheusv1alpha1.ScrapeConfig
 	Rules           []*prometheusv1.PrometheusRule
 	ServiceMonitors []*prometheusv1.ServiceMonitor // For deploying HCPs service monitor (user workloads)
 }

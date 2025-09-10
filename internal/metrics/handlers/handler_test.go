@@ -7,7 +7,8 @@ import (
 
 	hyperv1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
-	prometheusalpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
+	cooprometheusv1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1"
+	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
@@ -37,23 +38,23 @@ func TestBuildOptions(t *testing.T) {
 	// Setup scheme
 	scheme := runtime.NewScheme()
 	require.NoError(t, kubescheme.AddToScheme(scheme))
-	require.NoError(t, prometheusalpha1.AddToScheme(scheme))
+	require.NoError(t, cooprometheusv1alpha1.AddToScheme(scheme))
 	require.NoError(t, prometheusv1.AddToScheme(scheme))
 	require.NoError(t, clusterv1.AddToScheme(scheme))
 	require.NoError(t, addonapiv1alpha1.AddToScheme(scheme))
 	require.NoError(t, hyperv1.AddToScheme(scheme))
 
-	platformAgent := &prometheusalpha1.PrometheusAgent{
+	platformAgent := &cooprometheusv1alpha1.PrometheusAgent{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-prometheus-agent",
 			Namespace: hubNamespace,
 			Labels:    config.PlatformPrometheusMatchLabels,
 		},
-		Spec: prometheusalpha1.PrometheusAgentSpec{
-			CommonPrometheusFields: prometheusv1.CommonPrometheusFields{
+		Spec: cooprometheusv1alpha1.PrometheusAgentSpec{
+			CommonPrometheusFields: cooprometheusv1.CommonPrometheusFields{
 				LogLevel:   "debug",
 				ConfigMaps: []string{"test-haproxy-config"},
-				RemoteWrite: []prometheusv1.RemoteWriteSpec{
+				RemoteWrite: []cooprometheusv1.RemoteWriteSpec{
 					{
 						Name: ptr.To(config.RemoteWriteCfgName),
 					},
@@ -72,7 +73,7 @@ func TestBuildOptions(t *testing.T) {
 		Data: map[string]string{},
 	}
 
-	platformScrapeConfig := &prometheusalpha1.ScrapeConfig{
+	platformScrapeConfig := &cooprometheusv1alpha1.ScrapeConfig{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-scrape-config",
 			Namespace: hubNamespace,
@@ -88,17 +89,17 @@ func TestBuildOptions(t *testing.T) {
 		},
 	}
 
-	uwlAgent := &prometheusalpha1.PrometheusAgent{
+	uwlAgent := &cooprometheusv1alpha1.PrometheusAgent{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-prometheus-agent-uwl",
 			Namespace: hubNamespace,
 			Labels:    config.UserWorkloadPrometheusMatchLabels,
 		},
-		Spec: prometheusalpha1.PrometheusAgentSpec{
-			CommonPrometheusFields: prometheusv1.CommonPrometheusFields{
+		Spec: cooprometheusv1alpha1.PrometheusAgentSpec{
+			CommonPrometheusFields: cooprometheusv1.CommonPrometheusFields{
 				LogLevel:   "warn",
 				ConfigMaps: []string{"test-haproxy-config-uwl"},
-				RemoteWrite: []prometheusv1.RemoteWriteSpec{
+				RemoteWrite: []cooprometheusv1.RemoteWriteSpec{
 					{
 						Name: ptr.To(config.RemoteWriteCfgName),
 					},
@@ -126,7 +127,7 @@ func TestBuildOptions(t *testing.T) {
 				{
 					ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
 						Group:    "monitoring.coreos.com",
-						Resource: prometheusalpha1.PrometheusAgentName,
+						Resource: cooprometheusv1alpha1.PrometheusAgentName,
 					},
 					DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
 						ConfigReferent: addonapiv1alpha1.ConfigReferent{
@@ -150,7 +151,7 @@ func TestBuildOptions(t *testing.T) {
 				{
 					ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
 						Group:    "monitoring.coreos.com",
-						Resource: prometheusalpha1.ScrapeConfigName,
+						Resource: cooprometheusv1alpha1.ScrapeConfigName,
 					},
 					DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
 						ConfigReferent: addonapiv1alpha1.ConfigReferent{
@@ -361,7 +362,7 @@ func TestBuildOptions(t *testing.T) {
 						{
 							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
 								Group:    "monitoring.coreos.com",
-								Resource: prometheusalpha1.PrometheusAgentName,
+								Resource: cooprometheusv1alpha1.PrometheusAgentName,
 							},
 							DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
 								ConfigReferent: addonapiv1alpha1.ConfigReferent{
@@ -408,7 +409,7 @@ func TestBuildOptions(t *testing.T) {
 						{
 							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
 								Group:    "monitoring.coreos.com",
-								Resource: prometheusalpha1.PrometheusAgentName,
+								Resource: cooprometheusv1alpha1.PrometheusAgentName,
 							},
 							DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
 								ConfigReferent: addonapiv1alpha1.ConfigReferent{
@@ -610,13 +611,13 @@ func newHCPResources() []client.Object {
 
 func newHCPConfigResources(ns string) []client.Object {
 	return []client.Object{
-		&prometheusalpha1.ScrapeConfig{
+		&cooprometheusv1alpha1.ScrapeConfig{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "etcd-base",
 				Namespace: ns,
 				Labels:    config.EtcdHcpUserWorkloadPrometheusMatchLabels,
 			},
-			Spec: prometheusalpha1.ScrapeConfigSpec{
+			Spec: cooprometheusv1alpha1.ScrapeConfigSpec{
 				Params: map[string][]string{
 					"match[]": {
 						`{__name__="etcd_metric"}`,
@@ -624,13 +625,13 @@ func newHCPConfigResources(ns string) []client.Object {
 				},
 			},
 		},
-		&prometheusalpha1.ScrapeConfig{
+		&cooprometheusv1alpha1.ScrapeConfig{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "apiserver-base",
 				Namespace: ns,
 				Labels:    config.ApiserverHcpUserWorkloadPrometheusMatchLabels,
 			},
-			Spec: prometheusalpha1.ScrapeConfigSpec{
+			Spec: cooprometheusv1alpha1.ScrapeConfigSpec{
 				Params: map[string][]string{
 					"match[]": {
 						`{__name__="apiserver_metric"}`,
