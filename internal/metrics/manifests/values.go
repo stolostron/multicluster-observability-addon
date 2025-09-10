@@ -20,6 +20,7 @@ type MetricsValues struct {
 	Platform                  Collector          `json:"platform"`
 	UserWorkload              Collector          `json:"userWorkload"`
 	PrometheusOperator        PrometheusOperator `json:"prometheusOperator"`
+	IsOCPClusterVendor        bool               `json:"isOCPclusterVendor"`
 }
 
 type Collector struct {
@@ -70,6 +71,7 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 		PrometheusOperator: PrometheusOperator{
 			RBACProxyImage: opts.Images.KubeRBACProxy,
 		},
+		IsOCPClusterVendor: opts.ClusterVendor == config.ManagedClusterLabelVendorOCPValue,
 	}
 
 	// Build Prometheus Agent Spec for Platform
@@ -191,7 +193,8 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 
 	// Set images
 	ret.Images = ImagesValues{
-		PrometheusOperator:       opts.Images.PrometheusOperator,
+		// TODO: change this. Ask ACM install team to include it in the configmap?
+		PrometheusOperator:       "registry.redhat.io/cluster-observability-operator/obo-prometheus-rhel9-operator@sha256:e2681bce57dc9c15701f5591532c2dfe8f19778606661339553a28dc003dbca5",
 		PrometheusConfigReloader: opts.Images.PrometheusConfigReloader,
 	}
 
