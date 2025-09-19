@@ -66,6 +66,7 @@ func NewAddonManager(ctx context.Context, kubeConfig *rest.Config, scheme *runti
 		addonfactory.ToAddOnCustomizedVariableValues,
 	)
 
+	agentLogger := logger.WithName("agent")
 	mcoaAgentAddon, err := addonfactory.NewAgentAddonFactory(addoncfg.Name, addon.FS, "manifests/charts/mcoa").
 		WithConfigGVRs(
 			schema.GroupVersionResource{Version: loggingv1.GroupVersion.Version, Group: loggingv1.GroupVersion.Group, Resource: addoncfg.ClusterLogForwardersResource},
@@ -76,8 +77,9 @@ func NewAddonManager(ctx context.Context, kubeConfig *rest.Config, scheme *runti
 			schema.GroupVersionResource{Version: monitoringv1.SchemeGroupVersion.Version, Group: monitoringv1.SchemeGroupVersion.Group, Resource: monitoringv1.PrometheusRuleName},
 			utils.AddOnDeploymentConfigGVR,
 		).
-		WithGetValuesFuncs(addonConfigValuesFn, addonhelm.GetValuesFunc(ctx, k8sClient, logger.WithName("agent"))).
-		WithAgentHealthProber(addon.AgentHealthProber()).
+		WithGetValuesFuncs(addonConfigValuesFn, addonhelm.GetValuesFunc(ctx, k8sClient, agentLogger)).
+		WithAgentHealthProber(addon.AgentHealthProber(agentLogger)).
+		WithUpdaters(addon.Updaters()).
 		WithAgentRegistrationOption(registrationOption).
 		WithScheme(scheme).
 		BuildHelmAgentAddon()

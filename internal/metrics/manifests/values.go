@@ -4,23 +4,24 @@ import (
 	"encoding/json"
 	"strconv"
 
-	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/handlers"
 	corev1 "k8s.io/api/core/v1"
 )
 
 type MetricsValues struct {
-	PlatformEnabled           bool               `json:"platformEnabled"`
-	UserWorkloadsEnabled      bool               `json:"userWorkloadsEnabled"`
-	Secrets                   []ConfigValue      `json:"secrets"`
-	Images                    ImagesValues       `json:"images"`
-	PrometheusControllerID    string             `json:"prometheusControllerID"`
-	PrometheusCAConfigMapName string             `json:"prometheusCAConfigMapName"`
-	Platform                  Collector          `json:"platform"`
-	UserWorkload              Collector          `json:"userWorkload"`
-	PrometheusOperator        PrometheusOperator `json:"prometheusOperator"`
-	IsOCPClusterVendor        bool               `json:"isOCPclusterVendor"`
+	PlatformEnabled               bool               `json:"platformEnabled"`
+	UserWorkloadsEnabled          bool               `json:"userWorkloadsEnabled"`
+	Secrets                       []ConfigValue      `json:"secrets"`
+	Images                        ImagesValues       `json:"images"`
+	PrometheusControllerID        string             `json:"prometheusControllerID"`
+	PrometheusCAConfigMapName     string             `json:"prometheusCAConfigMapName"`
+	Platform                      Collector          `json:"platform"`
+	UserWorkload                  Collector          `json:"userWorkload"`
+	PrometheusOperator            PrometheusOperator `json:"prometheusOperator"`
+	DeployNonOCPStack             bool               `json:"deployNonOCPStack"`
+	DeployCOOResources            bool               `json:"deployCOOResources"`
+	PrometheusOperatorAnnotations string             `json:"prometheusOperatorAnnotations,omitempty"`
 }
 
 type Collector struct {
@@ -39,6 +40,7 @@ type PrometheusOperator struct {
 }
 
 type ImagesValues struct {
+	CooPrometheusOperator    string `json:"cooPrometheusOperator"`
 	PrometheusOperator       string `json:"prometheusOperator"`
 	PrometheusConfigReloader string `json:"prometheusConfigReloader"`
 }
@@ -48,10 +50,6 @@ type ConfigValue struct {
 	Namespace string            `json:"namespace"`
 	Data      string            `json:"data"`
 	Labels    map[string]string `json:"labels"`
-}
-
-type UIValues struct {
-	Enabled bool `json:"enabled"`
 }
 
 func BuildValues(opts handlers.Options) (*MetricsValues, error) {
@@ -71,13 +69,10 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 		PrometheusOperator: PrometheusOperator{
 			RBACProxyImage: opts.Images.KubeRBACProxy,
 		},
-		IsOCPClusterVendor: opts.ClusterVendor == config.ManagedClusterLabelVendorOCPValue,
 	}
 
 	// Build Prometheus Agent Spec for Platform
-	if opts.Platform.PrometheusAgent != nil {
-		ret.PlatformEnabled = true
-
+	if opts.IsPlatformEnabled() {
 		agentJson, err := json.Marshal(opts.Platform.PrometheusAgent.Spec)
 		if err != nil {
 			return ret, err
@@ -90,9 +85,7 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 	}
 
 	// Build Prometheus Agent Spec for User Workloads
-	if opts.UserWorkloads.PrometheusAgent != nil {
-		ret.UserWorkloadsEnabled = true
-
+	if opts.IsUserWorkloadsEnabled() {
 		agentJson, err := json.Marshal(opts.UserWorkloads.PrometheusAgent.Spec)
 		if err != nil {
 			return ret, err
@@ -191,10 +184,17 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 		return ret, err
 	}
 
+	isOCPCluster := opts.IsOCPCluster()
+	ret.PlatformEnabled = opts.IsPlatformEnabled()
+	ret.UserWorkloadsEnabled = opts.IsUserWorkloadsEnabled()
+	ret.DeployNonOCPStack = !isOCPCluster && (ret.PlatformEnabled || ret.UserWorkloadsEnabled)
+	ret.DeployCOOResources = !opts.IsHub && (ret.PlatformEnabled || ret.UserWorkloadsEnabled) && !opts.COOIsSubscribed
+	ret.PrometheusOperatorAnnotations = opts.CRDEstablishedAnnotation
+
 	// Set images
 	ret.Images = ImagesValues{
-		// TODO: change this. Ask ACM install team to include it in the configmap?
-		PrometheusOperator:       "registry.redhat.io/cluster-observability-operator/obo-prometheus-rhel9-operator@sha256:e2681bce57dc9c15701f5591532c2dfe8f19778606661339553a28dc003dbca5",
+		PrometheusOperator:       opts.Images.PrometheusOperator,
+		CooPrometheusOperator:    config.CooPrometheusOperatorImage,
 		PrometheusConfigReloader: opts.Images.PrometheusConfigReloader,
 	}
 
@@ -233,14 +233,4 @@ func buildConfigMaps(configMaps []*corev1.ConfigMap) ([]ConfigValue, error) {
 		configMapsValue = append(configMapsValue, configMapValue)
 	}
 	return configMapsValue, nil
-}
-
-func EnableUI(opts addon.MetricsOptions, isHub bool) *UIValues {
-	if !opts.CollectionEnabled && !opts.UI.Enabled || !isHub {
-		return nil
-	}
-
-	return &UIValues{
-		Enabled: true,
-	}
 }

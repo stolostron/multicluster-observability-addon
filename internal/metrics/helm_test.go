@@ -75,7 +75,10 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				assert.Equal(t, "openshift-monitoring/prometheus-operator", recordingRules[0].Annotations["operator.prometheus.io/controller-id"])
 				// ensure that the number of objects is correct
 				// 4 (prom operator) + 5 (agent) + 2 secrets (mTLS to hub) + 1 cm (prom ca) + 2 rule + 2 scrape config = 16
-				assert.Len(t, objects, 26)
+				expectedCount := 31
+				if len(objects) != expectedCount {
+					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
+				}
 				assert.Len(t, common.FilterResourcesByLabelSelector[*corev1.Secret](objects, nil), 2) // 2 secrets (mTLS to hub)
 			},
 		},
@@ -99,7 +102,10 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				recordingRules := common.FilterResourcesByLabelSelector[*prometheusv1.PrometheusRule](objects, config.UserWorkloadPrometheusMatchLabels)
 				assert.Len(t, recordingRules, 2)
 				assert.Equal(t, "openshift-user-workload-monitoring/prometheus-operator", recordingRules[0].Annotations["operator.prometheus.io/controller-id"])
-				assert.Len(t, objects, 26)
+				expectedCount := 31
+				if len(objects) != expectedCount {
+					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
+				}
 				assert.Len(t, common.FilterResourcesByLabelSelector[*corev1.Secret](objects, nil), 2) // 2 secrets (mTLS to hub)
 			},
 		},
@@ -516,7 +522,7 @@ func TestHelmBuild_Metrics_HCP(t *testing.T) {
 	scrapeConfigs := common.FilterResourcesByLabelSelector[*cooprometheusv1alpha1.ScrapeConfig](clientObjs, nil)
 	assert.Len(t, scrapeConfigs, 2)
 	serviceMonitors := common.FilterResourcesByLabelSelector[*prometheusv1.ServiceMonitor](clientObjs, nil)
-	assert.Len(t, serviceMonitors, 4) // 2 for hcps and 1 for meta monitoring
+	assert.Len(t, serviceMonitors, 3) // 2 for hcps and 1 for meta monitoring
 	// keep only hcps serviceMonitors
 	serviceMonitors = slices.DeleteFunc(serviceMonitors, func(e *prometheusv1.ServiceMonitor) bool { return e.Namespace != "clusters-a" })
 	assert.Len(t, serviceMonitors, 2)
@@ -606,6 +612,14 @@ func runtimeToClientObjects(t *testing.T, objs []runtime.Object) []client.Object
 
 	}
 	return clientObjs
+}
+
+func formatObjects(objects []client.Object) string {
+	s := []string{}
+	for _, o := range objects {
+		s = append(s, fmt.Sprintf("%s/%s/%s", o.GetObjectKind().GroupVersionKind().Kind, o.GetNamespace(), o.GetName()))
+	}
+	return strings.Join(s, "\n")
 }
 
 func newAddonOptions(platformEnabled, uwlEnabled bool) addon.Options {

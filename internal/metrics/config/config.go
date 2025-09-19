@@ -22,6 +22,7 @@ const (
 	ClientCertSecretName            = "observability-controller-open-cluster-management.io-observability-signer-client-cert"
 	PrometheusCAConfigMapName       = "prometheus-server-ca"
 	HubInstallNamespace             = "open-cluster-management-observability"
+	CooPrometheusOperatorImage      = "registry.redhat.io/cluster-observability-operator/obo-prometheus-rhel9-operator:1.2.2-1752503986"
 
 	ManagedClusterLabelClusterID      = "clusterID"
 	ManagedClusterLabelVendorKey      = "vendor"

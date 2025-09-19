@@ -6,8 +6,6 @@ import (
 	"fmt"
 
 	"github.com/go-logr/logr"
-	clusterinfov1beta1 "github.com/stolostron/cluster-lifecycle-api/clusterinfo/v1beta1"
-	clusterlifecycleconstants "github.com/stolostron/cluster-lifecycle-api/constants"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
@@ -49,7 +47,7 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, logger logr.Logger) a
 		logger.V(2).Info("reconciliation triggered")
 		// if hub cluster, then don't install anything.
 		// some kube flavors are also currently not supported
-		if !supportedKubeVendors(cluster) {
+		if !common.IsOpenShiftVendor(cluster) {
 			logger.V(2).Info("unsupported kubernetes vendor, ignoring cluster")
 			return addonfactory.JsonStructToValues(HelmChartValues{})
 		}
@@ -124,7 +122,7 @@ func getLoggingValues(ctx context.Context, k8s client.Client, cluster *clusterv1
 		return nil, nil
 	}
 
-	loggingOpts, err := lhandlers.BuildOptions(ctx, k8s, mcAddon, opts.Platform.Logs, opts.UserWorkloads.Logs, isHubCluster(cluster))
+	loggingOpts, err := lhandlers.BuildOptions(ctx, k8s, mcAddon, opts.Platform.Logs, opts.UserWorkloads.Logs, common.IsHubCluster(cluster))
 	if err != nil {
 		return nil, err
 	}
@@ -133,7 +131,7 @@ func getLoggingValues(ctx context.Context, k8s client.Client, cluster *clusterv1
 }
 
 func getTracingValues(ctx context.Context, k8s client.Client, cluster *clusterv1.ManagedCluster, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, opts addon.Options) (*tmanifests.TracingValues, error) {
-	if isHubCluster(cluster) || !opts.UserWorkloads.Traces.CollectionEnabled {
+	if common.IsHubCluster(cluster) || !opts.UserWorkloads.Traces.CollectionEnabled {
 		return nil, nil
 	}
 
@@ -151,12 +149,12 @@ func getTracingValues(ctx context.Context, k8s client.Client, cluster *clusterv1
 }
 
 func getCOOValues(ctx context.Context, k8s client.Client, logger logr.Logger, cluster *clusterv1.ManagedCluster, opts addon.Options) (*cmanifests.COOValues, error) {
-	installCOO, err := chandlers.InstallCOO(ctx, k8s, logger, isHubCluster(cluster))
+	installCOO, err := chandlers.InstallCOO(ctx, k8s, logger, common.IsHubCluster(cluster))
 	if err != nil {
 		return nil, err
 	}
 
-	return cmanifests.BuildValues(opts, installCOO, isHubCluster(cluster)), nil
+	return cmanifests.BuildValues(opts, installCOO, common.IsHubCluster(cluster)), nil
 }
 
 func getAddOnDeploymentConfig(ctx context.Context, k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAddOn) (*addonapiv1alpha1.AddOnDeploymentConfig, error) {
@@ -173,12 +171,4 @@ func getAddOnDeploymentConfig(ctx context.Context, k8s client.Client, mcAddon *a
 		return aodc, err
 	}
 	return aodc, nil
-}
-
-func isHubCluster(cluster *clusterv1.ManagedCluster) bool {
-	return cluster.Labels[clusterlifecycleconstants.SelfManagedClusterLabelKey] == "true"
-}
-
-func supportedKubeVendors(cluster *clusterv1.ManagedCluster) bool {
-	return cluster.Labels[clusterinfov1beta1.LabelKubeVendor] == string(clusterinfov1beta1.KubeVendorOpenShift)
 }
