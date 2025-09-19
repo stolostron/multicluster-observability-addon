@@ -179,6 +179,37 @@ func TestBuildValues(t *testing.T) {
 				assert.Equal(t, values.UserWorkload.ServiceMonitors[1].Name, "b")
 			},
 		},
+		"with deploy non ocp stack": {
+			Options: handlers.Options{
+				Platform: handlers.Collector{
+					PrometheusAgent: &cooprometheusv1alpha1.PrometheusAgent{},
+				},
+				ClusterVendor: "Other",
+			},
+			Expect: func(t *testing.T, values *manifests.MetricsValues) {
+				assert.True(t, values.DeployNonOCPStack)
+			},
+		},
+		"with deploy coo resources": {
+			Options: handlers.Options{
+				Platform: handlers.Collector{
+					PrometheusAgent: &cooprometheusv1alpha1.PrometheusAgent{},
+				},
+				IsHub:           false,
+				COOIsSubscribed: false,
+			},
+			Expect: func(t *testing.T, values *manifests.MetricsValues) {
+				assert.True(t, values.DeployCOOResources)
+			},
+		},
+		"with prometheus operator annotation": {
+			Options: handlers.Options{
+				CRDEstablishedAnnotation: "true",
+			},
+			Expect: func(t *testing.T, values *manifests.MetricsValues) {
+				assert.Equal(t, "true", values.PrometheusOperatorAnnotations)
+			},
+		},
 	}
 
 	for name, tc := range testCases {
