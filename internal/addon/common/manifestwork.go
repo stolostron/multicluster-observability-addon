@@ -30,11 +30,6 @@ func GetFeedbackValuesForResources(
 		return nil, err
 	}
 
-	lookup := make(map[workv1.ResourceIdentifier]struct{})
-	for _, id := range resourceIDs {
-		lookup[id] = struct{}{}
-	}
-
 	for _, work := range workList.Items {
 		for _, manifestStatus := range work.Status.ResourceStatus.Manifests {
 			currentID := workv1.ResourceIdentifier{
@@ -44,7 +39,7 @@ func GetFeedbackValuesForResources(
 				Namespace: manifestStatus.ResourceMeta.Namespace,
 			}
 
-			if _, ok := lookup[currentID]; ok {
+			if _, ok := results[currentID]; ok {
 				results[currentID] = append(results[currentID], manifestStatus.StatusFeedbacks.Values...)
 			}
 		}
