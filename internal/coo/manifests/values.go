@@ -9,7 +9,6 @@ import (
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	imanifests "github.com/stolostron/multicluster-observability-addon/internal/analytics/incident-detection/manifests"
-	mmanifests "github.com/stolostron/multicluster-observability-addon/internal/metrics/manifests"
 	"github.com/stolostron/multicluster-observability-addon/internal/perses/dashboards/acm"
 	incident_management "github.com/stolostron/multicluster-observability-addon/internal/perses/dashboards/incident-management"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -38,14 +37,18 @@ type COOValues struct {
 	MonitoringUIPlugin bool                                `json:"monitoringUIPlugin"`
 	Perses             bool                                `json:"perses"`
 	Dashboards         []DashboardValue                    `json:"dashboards,omitempty"`
-	Metrics            *mmanifests.UIValues                `json:"metrics,omitempty"`
+	Metrics            *UIValues                           `json:"metrics,omitempty"`
 	IncidentDetection  *imanifests.IncidentDetectionValues `json:"incidentDetection,omitempty"`
+}
+
+type UIValues struct {
+	Enabled bool `json:"enabled"`
 }
 
 func BuildValues(opts addon.Options, installCOO bool, isHubCluster bool) *COOValues {
 	var dashboards []DashboardValue
 	var incidentDetectionEnabled bool
-	metricsUI := mmanifests.EnableUI(opts.Platform.Metrics, isHubCluster)
+	metricsUI := enableUI(opts.Platform.Metrics, isHubCluster)
 	if metricsUI != nil {
 		if metricsUI.Enabled {
 			dashboards = append(dashboards, buildACMDashboards()...)
@@ -73,6 +76,16 @@ func BuildValues(opts addon.Options, installCOO bool, isHubCluster bool) *COOVal
 		Dashboards:         dashboards,
 		Metrics:            metricsUI,
 		IncidentDetection:  incidentDetection,
+	}
+}
+
+func enableUI(opts addon.MetricsOptions, isHub bool) *UIValues {
+	if !opts.CollectionEnabled && !opts.UI.Enabled || !isHub {
+		return nil
+	}
+
+	return &UIValues{
+		Enabled: true,
 	}
 }
 

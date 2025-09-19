@@ -1,6 +1,6 @@
 {{- if .Values.platformEnabled }}
 {{- range $_, $scrapeconfig := .Values.platform.scrapeConfigs }}
-apiVersion: monitoring.coreos.com/v1alpha1
+apiVersion: monitoring.rhobs/v1alpha1
 kind: ScrapeConfig
 metadata:
   name: {{ $scrapeconfig.name }}
@@ -9,12 +9,20 @@ metadata:
     {{- $incomingLabels := $scrapeconfig.labels }}
     {{- $metricsHelmLabels := fromYaml (include "metricshelm.labels" $) }}
     {{- $customLabel := dict "app.kubernetes.io/component" $.Values.platform.component }}
-    {{- $mergedLabels := merge $incomingLabels $metricsHelmLabels $customLabel }}
+    {{- if not $.Values.deployCOOResources }}
+    {{- $_ := set $customLabel "app.kubernetes.io/managed-by" "observability-operator" }}
+    {{- end }}
+    {{- $mergedLabels := mergeOverwrite $incomingLabels $metricsHelmLabels $customLabel }}
     {{- toYaml $mergedLabels | nindent 4 }}
   annotations:
     {{- $incomingAnnotations := $scrapeconfig.annotations }}
-    {{- $stdAnnotations := dict "operator.prometheus.io/controller-id" $.Values.prometheusControllerID }}
-    {{- $mergedAnnotations := merge $stdAnnotations $incomingAnnotations }}
+    {{- $stdAnnotations := dict }}
+    {{- if $.Values.deployCOOResources }}
+    {{- $_ := set $stdAnnotations "operator.prometheus.io/controller-id" $.Values.prometheusControllerID }}
+    {{- else }}
+    {{- $_ := set $stdAnnotations "operator.prometheus.io/controller-id" "" }}
+    {{- end }}
+    {{- $mergedAnnotations := mergeOverwrite $incomingAnnotations $stdAnnotations }}
     {{- toYaml $mergedAnnotations | nindent 4 }}
 spec:
 {{ fromJson $scrapeconfig.data | toYaml | nindent 2 }}

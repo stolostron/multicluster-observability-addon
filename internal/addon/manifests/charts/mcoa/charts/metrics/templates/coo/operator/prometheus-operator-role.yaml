@@ -1,4 +1,4 @@
-{{- if or .Values.platformEnabled .Values.userWorkloadsEnabled }}
+{{- if  .Values.deployCOOResources }}
 kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
@@ -11,7 +11,7 @@ rules:
   - verbs:
       - '*'
     apiGroups:
-      - monitoring.coreos.com
+      - monitoring.rhobs
     resources:
       - prometheuses
       - prometheuses/finalizers

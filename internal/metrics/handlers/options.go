@@ -8,14 +8,16 @@ import (
 )
 
 type Options struct {
-	Platform      Collector
-	UserWorkloads Collector
-	Secrets       []*corev1.Secret
-	ClusterName   string
-	ClusterID     string
-	ClusterVendor string
-	Images        mconfig.ImageOverrides
-	UI            UIOptions
+	Platform                 Collector
+	UserWorkloads            Collector
+	Secrets                  []*corev1.Secret
+	ClusterName              string
+	ClusterID                string
+	ClusterVendor            string
+	Images                   mconfig.ImageOverrides
+	IsHub                    bool
+	COOIsSubscribed          bool
+	CRDEstablishedAnnotation string
 }
 
 type Collector struct {
@@ -28,4 +30,19 @@ type Collector struct {
 
 type UIOptions struct {
 	Enabled bool
+}
+
+// IsPlatformEnabled checks if platform monitoring is configured.
+func (o *Options) IsPlatformEnabled() bool {
+	return o.Platform.PrometheusAgent != nil
+}
+
+// IsUserWorkloadsEnabled checks if user workload monitoring is configured.
+func (o *Options) IsUserWorkloadsEnabled() bool {
+	return o.UserWorkloads.PrometheusAgent != nil
+}
+
+// IsOCPCluster checks if the cluster vendor is OCP.
+func (o *Options) IsOCPCluster() bool {
+	return o.ClusterVendor == mconfig.ManagedClusterLabelVendorOCPValue
 }

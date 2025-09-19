@@ -33,7 +33,7 @@ type CollectionKind string
 const (
 	ClusterLogForwarderV1         CollectionKind = "clusterlogforwarders.v1.observability.openshift.io"
 	OpenTelemetryCollectorV1beta1 CollectionKind = "opentelemetrycollectors.v1beta1.opentelemetry.io"
-	PrometheusAgentV1alpha1       CollectionKind = "prometheusagents.v1alpha1.monitoring.coreos.com"
+	PrometheusAgentV1alpha1       CollectionKind = "prometheusagents.v1alpha1.monitoring.rhobs"
 )
 
 type InstrumentationKind string

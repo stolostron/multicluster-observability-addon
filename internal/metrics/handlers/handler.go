@@ -2,9 +2,11 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 
 	"github.com/go-logr/logr"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
@@ -12,13 +14,16 @@ import (
 	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
+	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	corev1 "k8s.io/api/core/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	workv1 "open-cluster-management.io/api/work/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -37,7 +42,9 @@ type OptionsBuilder struct {
 }
 
 func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, managedCluster *clusterv1.ManagedCluster, platform, userWorkloads addon.MetricsOptions) (Options, error) {
-	ret := Options{}
+	ret := Options{
+		IsHub: common.IsHubCluster(managedCluster),
+	}
 
 	if !platform.CollectionEnabled && !userWorkloads.CollectionEnabled {
 		return ret, nil
@@ -62,7 +69,7 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 
 	// Build Prometheus agents for platform and user workloads
 	if platform.CollectionEnabled {
-		if err := o.buildPrometheusAgent(ctx, &ret, configResources, config.PlatformMetricsCollectorApp, false); err != nil {
+		if err = o.buildPrometheusAgent(ctx, &ret, configResources, config.PlatformMetricsCollectorApp, false); err != nil {
 			return ret, err
 		}
 
@@ -81,7 +88,7 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 	isHypershiftCluster := IsHypershiftEnabled(managedCluster) && HasHostedCLusters(ctx, o.Client, o.Logger)
 
 	if userWorkloads.CollectionEnabled {
-		if err := o.buildPrometheusAgent(ctx, &ret, configResources, config.UserWorkloadMetricsCollectorApp, isHypershiftCluster); err != nil {
+		if err = o.buildPrometheusAgent(ctx, &ret, configResources, config.UserWorkloadMetricsCollectorApp, isHypershiftCluster); err != nil {
 			return ret, err
 		}
 
@@ -98,11 +105,69 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 
 	if isHypershiftCluster {
 		if userWorkloads.CollectionEnabled {
-			if err := o.buildHypershiftResources(ctx, &ret, managedCluster, configResources); err != nil {
+			if err = o.buildHypershiftResources(ctx, &ret, managedCluster, configResources); err != nil {
 				return ret, fmt.Errorf("failed to generate hypershift resources: %w", err)
 			}
 		} else {
 			o.Logger.Info("User workload monitoring is needed to monitor Hosted Control Planes managed by the hypershift addon. Ignoring related resources creation.")
+		}
+	}
+
+	if !common.IsHubCluster(managedCluster) && common.IsOpenShiftVendor(managedCluster) {
+		if ret.COOIsSubscribed, err = o.cooIsSubscribed(ctx, managedCluster); err != nil {
+			return ret, fmt.Errorf("failed to check if coo is subscribed on the managed cluster: %w", err)
+		}
+		if !ret.COOIsSubscribed {
+			// If we deploy our own operator, create an annotation to restart it once the CRDs are established.
+			promAgentCRD := workv1.ResourceIdentifier{
+				Group:    apiextensionsv1.GroupName,
+				Resource: "customresourcedefinitions",
+				Name:     fmt.Sprintf("%s.%s", cooprometheusv1alpha1.PrometheusAgentName, cooprometheusv1alpha1.SchemeGroupVersion.Group),
+			}
+			scrapeConfigCRD := workv1.ResourceIdentifier{
+				Group:    apiextensionsv1.GroupName,
+				Resource: "customresourcedefinitions",
+				Name:     fmt.Sprintf("%s.%s", cooprometheusv1alpha1.ScrapeConfigName, cooprometheusv1alpha1.SchemeGroupVersion.Group),
+			}
+
+			feedback, err := common.GetFeedbackValuesForResources(ctx, o.Client, managedCluster.Name, addoncfg.Name, promAgentCRD, scrapeConfigCRD)
+			if err != nil {
+				return ret, fmt.Errorf("failed to get feedback for CRDs: %w", err)
+			}
+
+			type CrdTimestamps struct {
+				PrometheusAgent string `json:"prometheusAgent,omitempty"`
+				ScrapeConfig    string `json:"scrapeConfig,omitempty"`
+			}
+			timestamps := CrdTimestamps{}
+
+			// Process PrometheusAgent CRD
+			promAgentValues := feedback[promAgentCRD]
+			isEstablishedValues := common.FilterFeedbackValuesByName(promAgentValues, "isEstablished")
+			if len(isEstablishedValues) > 0 && isEstablishedValues[0].Value.String != nil && strings.ToLower(*isEstablishedValues[0].Value.String) == "true" {
+				lastTransitionTimeValues := common.FilterFeedbackValuesByName(promAgentValues, "lastTransitionTime")
+				if len(lastTransitionTimeValues) > 0 && lastTransitionTimeValues[0].Value.String != nil {
+					timestamps.PrometheusAgent = *lastTransitionTimeValues[0].Value.String
+				}
+			}
+
+			// Process ScrapeConfig CRD
+			scrapeConfigValues := feedback[scrapeConfigCRD]
+			isEstablishedValues = common.FilterFeedbackValuesByName(scrapeConfigValues, "isEstablished")
+			if len(isEstablishedValues) > 0 && isEstablishedValues[0].Value.String != nil && strings.ToLower(*isEstablishedValues[0].Value.String) == "true" {
+				lastTransitionTimeValues := common.FilterFeedbackValuesByName(scrapeConfigValues, "lastTransitionTime")
+				if len(lastTransitionTimeValues) > 0 && lastTransitionTimeValues[0].Value.String != nil {
+					timestamps.ScrapeConfig = *lastTransitionTimeValues[0].Value.String
+				}
+			}
+
+			if timestamps.PrometheusAgent != "" && timestamps.ScrapeConfig != "" {
+				jsonBytes, err := json.Marshal(timestamps)
+				if err != nil {
+					return ret, fmt.Errorf("failed to marshal CRD timestamps: %w", err)
+				}
+				ret.CRDEstablishedAnnotation = string(jsonBytes)
+			}
 		}
 	}
 
@@ -241,6 +306,38 @@ func (o *OptionsBuilder) getAvailableConfigResources(ctx context.Context, mcAddo
 	}
 
 	return ret, nil
+}
+
+// cooIsSubscribed returns true if coo is considered installed, preventing conflicting resources creation.
+// It checks the feedback rules for the scrapeconfigs.monitoring.rhobs CRD.
+func (o *OptionsBuilder) cooIsSubscribed(ctx context.Context, managedCluster *clusterv1.ManagedCluster) (bool, error) {
+	crdID := workv1.ResourceIdentifier{
+		Group:    "apiextensions.k8s.io",
+		Resource: "customresourcedefinitions",
+		Name:     fmt.Sprintf("%s.%s", cooprometheusv1alpha1.ScrapeConfigName, cooprometheusv1alpha1.SchemeGroupVersion.Group),
+	}
+
+	feedback, err := common.GetFeedbackValuesForResources(ctx, o.Client, managedCluster.Name, addoncfg.Name, crdID)
+	if err != nil {
+		return false, fmt.Errorf("failed to get feedback values for %s: %w", crdID.Name, err)
+	}
+
+	crdFeedback, ok := feedback[crdID]
+	if !ok || len(crdFeedback) == 0 {
+		o.Logger.V(1).Info("scrapeconfigs.monitoring.rhobs CRD not found in manifestwork status, considering COO as not subscribed")
+		return false, nil
+	}
+
+	olmValues := common.FilterFeedbackValuesByName(crdFeedback, addoncfg.IsOLMManagedFeedbackName)
+	for _, v := range olmValues {
+		if v.Value.String != nil && strings.ToLower(*v.Value.String) == "true" {
+			o.Logger.V(1).Info("found scrapeconfigs.monitoring.rhobs CRD with OLM label, considering COO as subscribed")
+			return true, nil
+		}
+	}
+
+	o.Logger.V(1).Info("scrapeconfigs.monitoring.rhobs CRD missing the OLM label, considering COO as not subscribed")
+	return false, nil
 }
 
 func createWriteRelabelConfigs(clusterName, clusterID string, isHypershiftLocalCluster bool) []cooprometheusv1.RelabelConfig {

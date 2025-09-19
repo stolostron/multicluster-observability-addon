@@ -53,6 +53,11 @@ const (
 	ComponentK8sLabelKey = "app.kubernetes.io/component"
 	ManagedByK8sLabelKey = "app.kubernetes.io/managed-by"
 	PartOfK8sLabelKey    = "app.kubernetes.io/part-of"
+
+	IsEstablishedFeedbackName             = "isEstablished"
+	PrometheusOperatorVersionFeedbackName = "prometheusOperatorVersion"
+	LastTransitionTimeFeedbackName        = "lastTransitionTime"
+	IsOLMManagedFeedbackName              = "isOLMManaged"
 )
 
 var (

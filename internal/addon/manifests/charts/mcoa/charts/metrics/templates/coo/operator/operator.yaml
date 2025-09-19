@@ -1,4 +1,4 @@
-{{- if or .Values.platformEnabled .Values.userWorkloadsEnabled }}
+{{- if  .Values.deployCOOResources }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -19,13 +19,16 @@ spec:
     metadata:
       annotations:
         kubectl.kubernetes.io/default-container: prometheus-operator
+        {{- if .Values.prometheusOperatorAnnotations }}
+        observability.openshift.io/crd-established-timestamps: {{ .Values.prometheusOperatorAnnotations | quote }}
+        {{- end }}
       labels:
         app.kubernetes.io/component: {{ .Values.prometheusOperator.component }}
         app.kubernetes.io/name: {{ .Values.prometheusOperator.appName }}
         app.kubernetes.io/part-of: multicluster-observability-addon
     spec:
       containers:
-      - image: {{ .Values.images.prometheusOperator }}
+      - image: {{ .Values.images.cooPrometheusOperator }}
         args:
           - '--prometheus-config-reloader={{ .Values.images.prometheusConfigReloader }}'
           - '--prometheus-instance-namespaces={{ .Release.Namespace }}'

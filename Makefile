@@ -41,11 +41,15 @@ $(CRD_DIR)/opentelemetry.io_instrumentations.yaml:
 
 $(CRD_DIR)/monitoring.coreos.com_prometheusagents.yaml:
 	@mkdir -p $(CRD_DIR)
-	@curl https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/refs/heads/release-0.81/example/prometheus-operator-crd/monitoring.coreos.com_prometheusagents.yaml  > $(CRD_DIR)/monitoring.coreos.com_prometheusagents.yaml
+	@curl https://raw.githubusercontent.com/rhobs/obo-prometheus-operator/refs/tags/v0.80.1-rhobs1/example/prometheus-operator-crd/monitoring.rhobs_prometheusagents.yaml  > $(CRD_DIR)/monitoring.rhobs_prometheusagents.yaml
 
 $(CRD_DIR)/monitoring.coreos.com_scrapeconfigs.yaml:
 	@mkdir -p $(CRD_DIR)
-	@curl https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/refs/heads/release-0.81/example/prometheus-operator-crd/monitoring.coreos.com_scrapeconfigs.yaml  > $(CRD_DIR)/monitoring.coreos.com_scrapeconfigs.yaml
+	@curl https://raw.githubusercontent.com/rhobs/obo-prometheus-operator/refs/tags/v0.80.1-rhobs1/example/prometheus-operator-crd/monitoring.rhobs_scrapeconfigs.yaml  > $(CRD_DIR)/monitoring.rhobs_scrapeconfigs.yaml
+
+.PHONY: update-metrics-crds
+update-metrics-crds: ## Update the metrics CRDs from the rhobs/obo-prometheus-operator repository.
+	@./hack/update-metrics-crds.sh
 
 .PHONY: download-crds
 download-crds: $(CRD_DIR)/observability.openshift.io_clusterlogforwarders.yaml $(CRD_DIR)/opentelemetry.io_opentelemetrycollectors.yaml $(CRD_DIR)/opentelemetry.io_instrumentations.yaml $(CRD_DIR)/monitoring.coreos.com_prometheusagents.yaml $(CRD_DIR)/monitoring.coreos.com_scrapeconfigs.yaml

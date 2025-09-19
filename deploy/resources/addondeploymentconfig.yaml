@@ -14,14 +14,14 @@ spec:
   # Platform Observability
   # Enables Metrics Collection
   - name: platformMetricsCollection
-    value: prometheusagents.v1alpha1.monitoring.coreos.com
+    value: prometheusagents.v1alpha1.monitoring.rhobs
   # Enables Log Collection
   - name: platformLogsCollection
     value: clusterlogforwarders.v1.observability.openshift.io
   # User Workloads Observability
   # Enables Metrics Collection
   - name: userWorkloadMetricsCollection
-    value: prometheusagents.v1alpha1.monitoring.coreos.com
+    value: prometheusagents.v1alpha1.monitoring.rhobs
   # Enables Log Collection
   - name: userWorkloadLogsCollection
     value: clusterlogforwarders.v1.observability.openshift.io

@@ -1,16 +1,23 @@
 {{- if .Values.platformEnabled }}
-apiVersion: monitoring.coreos.com/v1alpha1
+apiVersion: monitoring.rhobs/v1alpha1
 kind: PrometheusAgent
 metadata:
   name: {{ .Values.platform.appName }}
   namespace: {{ .Release.Namespace }}
   annotations:
+    {{- if .Values.deployCOOResources }}
     operator.prometheus.io/controller-id: {{ .Values.prometheusControllerID }}
+    {{- else }}
+    operator.prometheus.io/controller-id: ""
+    {{- end }}
   labels:
     {{- $incomingLabels := .Values.platform.prometheusAgent.labels }}
     {{- $metricsHelmLabels := fromYaml (include "metricshelm.labels" $) }}
     {{- $customLabel := dict "app.kubernetes.io/component" $.Values.platform.component }}
-    {{- $mergedLabels := merge $incomingLabels $metricsHelmLabels $customLabel }}
+    {{- if not .Values.deployCOOResources }}
+    {{- $_ := set $customLabel "app.kubernetes.io/managed-by" "observability-operator" }}
+    {{- end }}
+    {{- $mergedLabels := mergeOverwrite $incomingLabels $metricsHelmLabels $customLabel }}
     {{- toYaml $mergedLabels | nindent 4 }}
 spec:
 {{- fromJson .Values.platform.prometheusAgent.data | toYaml | nindent 2 }}

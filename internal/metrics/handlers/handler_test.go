@@ -126,7 +126,7 @@ func TestBuildOptions(t *testing.T) {
 			ConfigReferences: []addonapiv1alpha1.ConfigReference{
 				{
 					ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
-						Group:    "monitoring.coreos.com",
+						Group:    "monitoring.rhobs",
 						Resource: cooprometheusv1alpha1.PrometheusAgentName,
 					},
 					DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
@@ -150,7 +150,7 @@ func TestBuildOptions(t *testing.T) {
 				},
 				{
 					ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
-						Group:    "monitoring.coreos.com",
+						Group:    "monitoring.rhobs",
 						Resource: cooprometheusv1alpha1.ScrapeConfigName,
 					},
 					DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
@@ -361,7 +361,7 @@ func TestBuildOptions(t *testing.T) {
 					ConfigReferences: []addonapiv1alpha1.ConfigReference{
 						{
 							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
-								Group:    "monitoring.coreos.com",
+								Group:    "monitoring.rhobs",
 								Resource: cooprometheusv1alpha1.PrometheusAgentName,
 							},
 							DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
@@ -408,7 +408,7 @@ func TestBuildOptions(t *testing.T) {
 					ConfigReferences: []addonapiv1alpha1.ConfigReference{
 						{
 							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
-								Group:    "monitoring.coreos.com",
+								Group:    "monitoring.rhobs",
 								Resource: cooprometheusv1alpha1.PrometheusAgentName,
 							},
 							DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
