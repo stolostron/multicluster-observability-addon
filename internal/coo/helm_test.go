@@ -120,11 +120,15 @@ func Test_IncidentDetection_AllConfigsTogether_AllResources(t *testing.T) {
 					Value: "uiplugins.v1alpha1.observability.openshift.io",
 				},
 			},
+			isHub: true,
 			expectedFunc: func(t *testing.T, objects []runtime.Object) {
 				require.GreaterOrEqual(t, len(objects), 4)
 				expectedUIPluginSpec := uiplugin.UIPluginSpec{
 					Type: "Monitoring",
 					Monitoring: &uiplugin.MonitoringConfig{
+						Perses: &uiplugin.PersesReference{
+							Enabled: true,
+						},
 						Incidents: &uiplugin.IncidentsReference{
 							Enabled: true,
 						},
@@ -141,7 +145,7 @@ func Test_IncidentDetection_AllConfigsTogether_AllResources(t *testing.T) {
 			},
 		},
 		{
-			name:  "incident detection",
+			name:  "platform metrics collection & UI",
 			isHub: true,
 			cv: []addonapiv1alpha1.CustomizedVariable{
 				{

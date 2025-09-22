@@ -36,6 +36,7 @@ type COOValues struct {
 	Enabled            bool                                `json:"enabled"`
 	InstallCOO         bool                                `json:"installCOO"`
 	MonitoringUIPlugin bool                                `json:"monitoringUIPlugin"`
+	Perses             bool                                `json:"perses"`
 	Dashboards         []DashboardValue                    `json:"dashboards,omitempty"`
 	Metrics            *mmanifests.UIValues                `json:"metrics,omitempty"`
 	IncidentDetection  *imanifests.IncidentDetectionValues `json:"incidentDetection,omitempty"`
@@ -43,7 +44,7 @@ type COOValues struct {
 
 func BuildValues(opts addon.Options, installCOO bool, isHubCluster bool) *COOValues {
 	var dashboards []DashboardValue
-
+	var incidentDetectionEnabled bool
 	metricsUI := mmanifests.EnableUI(opts.Platform.Metrics, isHubCluster)
 	if metricsUI != nil {
 		if metricsUI.Enabled {
@@ -55,16 +56,20 @@ func BuildValues(opts addon.Options, installCOO bool, isHubCluster bool) *COOVal
 	incidentDetection := imanifests.EnableUI(opts.Platform.AnalyticsOptions.IncidentDetection)
 	if incidentDetection != nil {
 		if incidentDetection.Enabled {
-			dashboards = append(dashboards, buildIncidentDetetctionDashboards()...)
+			incidentDetectionEnabled = true
+			if isHubCluster {
+				dashboards = append(dashboards, buildIncidentDetetctionDashboards()...)
+			}
 		}
 	}
 
 	return &COOValues{
 		// Decide if this chart is needed
-		Enabled: len(dashboards) > 0,
+		Enabled: len(dashboards) > 0 || incidentDetectionEnabled,
 		// Decide if COO chart is needs to be installed
 		InstallCOO:         installCOO,
-		MonitoringUIPlugin: len(dashboards) > 0,
+		MonitoringUIPlugin: len(dashboards) > 0 || incidentDetectionEnabled,
+		Perses:             len(dashboards) > 0,
 		Dashboards:         dashboards,
 		Metrics:            metricsUI,
 		IncidentDetection:  incidentDetection,
