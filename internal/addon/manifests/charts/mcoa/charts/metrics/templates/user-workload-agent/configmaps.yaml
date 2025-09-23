@@ -9,7 +9,7 @@ metadata:
     {{- $incomingLabels := $configmap.labels }}
     {{- $metricsHelmLabels := fromYaml (include "metricshelm.labels" $) }}
     {{- $customLabel := dict "app.kubernetes.io/component" $.Values.userWorkload.component }}
-    {{- $mergedLabels := merge $incomingLabels $metricsHelmLabels $customLabel }}
+    {{- $mergedLabels := mergeOverwrite $incomingLabels $metricsHelmLabels $customLabel }}
     {{- toYaml $mergedLabels | nindent 4 }}
 data: {{ fromJson $configmap.data | toYaml | nindent 2 }}
 ---

@@ -9,12 +9,12 @@ metadata:
     {{- $incomingLabels := $rule.labels }}
     {{- $metricsHelmLabels := fromYaml (include "metricshelm.labels" $) }}
     {{- $customLabel := dict "app.kubernetes.io/component" $.Values.platform.component }}
-    {{- $mergedLabels := merge $incomingLabels $metricsHelmLabels $customLabel }}
+    {{- $mergedLabels := mergeOverwrite $incomingLabels $metricsHelmLabels $customLabel }}
     {{- toYaml $mergedLabels | nindent 4 }}
   annotations:
     {{- $incomingAnnotations := $rule.annotations }}
     {{- $stdAnnotations := dict "operator.prometheus.io/controller-id" "openshift-monitoring/prometheus-operator" }}
-    {{- $mergedAnnotations := merge $stdAnnotations $incomingAnnotations }}
+    {{- $mergedAnnotations := mergeOverwrite $incomingAnnotations $stdAnnotations }}
     {{- toYaml $mergedAnnotations | nindent 4 }}
 spec:
 {{ fromJson $rule.data | toYaml | nindent 2 }}
