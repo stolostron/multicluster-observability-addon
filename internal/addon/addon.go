@@ -25,6 +25,7 @@ import (
 
 const (
 	minPrometheusOperatorVersion = "0.79.0"
+	crdResourceName              = "customresourcedefinitions"
 )
 
 var (
@@ -81,7 +82,7 @@ func AgentHealthProber(logger logr.Logger) *agent.HealthProber {
 				{
 					ResourceIdentifier: workv1.ResourceIdentifier{
 						Group:    apiextensionsv1.GroupName,
-						Resource: "customresourcedefinitions",
+						Resource: crdResourceName,
 						Name:     scrapeConfigCRDName,
 					},
 					ProbeRules: []workv1.FeedbackRule{
@@ -111,7 +112,7 @@ func AgentHealthProber(logger logr.Logger) *agent.HealthProber {
 				{
 					ResourceIdentifier: workv1.ResourceIdentifier{
 						Group:    apiextensionsv1.GroupName,
-						Resource: "customresourcedefinitions",
+						Resource: crdResourceName,
 						Name:     prometheusAgentCRDName,
 					},
 					ProbeRules: []workv1.FeedbackRule{
@@ -210,7 +211,7 @@ func Updaters() []agent.Updater {
 			UpdateStrategy: ssaWithoutForce,
 			ResourceIdentifier: workv1.ResourceIdentifier{
 				Group:    apiextensionsv1.GroupName,
-				Resource: "customresourcedefinitions",
+				Resource: crdResourceName,
 				Name:     scrapeConfigCRDName,
 			},
 		},
@@ -218,7 +219,7 @@ func Updaters() []agent.Updater {
 			UpdateStrategy: ssaWithoutForce,
 			ResourceIdentifier: workv1.ResourceIdentifier{
 				Group:    apiextensionsv1.GroupName,
-				Resource: "customresourcedefinitions",
+				Resource: crdResourceName,
 				Name:     prometheusAgentCRDName,
 			},
 		},
@@ -226,7 +227,7 @@ func Updaters() []agent.Updater {
 			UpdateStrategy: ssaWithoutForce,
 			ResourceIdentifier: workv1.ResourceIdentifier{
 				Group:    apiextensionsv1.GroupName,
-				Resource: "customresourcedefinitions",
+				Resource: crdResourceName,
 				Name:     serviceMonitorCRDName,
 			},
 		},
@@ -234,7 +235,7 @@ func Updaters() []agent.Updater {
 			UpdateStrategy: ssaWithoutForce,
 			ResourceIdentifier: workv1.ResourceIdentifier{
 				Group:    apiextensionsv1.GroupName,
-				Resource: "customresourcedefinitions",
+				Resource: crdResourceName,
 				Name:     podMonitorCRDName,
 			},
 		},
@@ -242,7 +243,7 @@ func Updaters() []agent.Updater {
 			UpdateStrategy: ssaWithoutForce,
 			ResourceIdentifier: workv1.ResourceIdentifier{
 				Group:    apiextensionsv1.GroupName,
-				Resource: "customresourcedefinitions",
+				Resource: crdResourceName,
 				Name:     probeCRDName,
 			},
 		},
@@ -333,9 +334,9 @@ func healthChecker(logger logr.Logger, fields []agent.FieldResult, mc *v1.Manage
 				}
 				// uiplugin passes the health check
 			}
-		case "customresourcedefinitions":
+		case crdResourceName:
 			switch addoncfg.Name {
-			case "scrapeconfigs.monitoring.rhobs":
+			case scrapeConfigCRDName:
 				if err := checkScrapeConfigCRD(logger, field.FeedbackResult.Values, mc); err != nil {
 					return fmt.Errorf("%w: %s with key %s", err, identifier.Resource, identifier.Name)
 				}

@@ -43,17 +43,19 @@ const (
 	UipProbeKey       = "isAvailable"
 	UipProbePath      = ".status.conditions[?(@.type==\"Available\")].status"
 
-	DefaultStackPrefix            = "default-stack-instance"
+	DefaultStackPrefix = "default-stack-instance"
+
+	// Label keys
 	PlacementRefNameLabelKey      = "placement-ref-name"
 	PlacementRefNamespaceLabelKey = "placement-ref-namespace"
+	ComponentK8sLabelKey          = "app.kubernetes.io/component"
+	ManagedByK8sLabelKey          = "app.kubernetes.io/managed-by"
+	PartOfK8sLabelKey             = "app.kubernetes.io/part-of"
 
 	ClusterClaimClusterID        = "id.k8s.io"
 	ManagedClusterLabelClusterID = "clusterID"
 
-	ComponentK8sLabelKey = "app.kubernetes.io/component"
-	ManagedByK8sLabelKey = "app.kubernetes.io/managed-by"
-	PartOfK8sLabelKey    = "app.kubernetes.io/part-of"
-
+	// Feedback rule names
 	IsEstablishedFeedbackName             = "isEstablished"
 	PrometheusOperatorVersionFeedbackName = "prometheusOperatorVersion"
 	LastTransitionTimeFeedbackName        = "lastTransitionTime"

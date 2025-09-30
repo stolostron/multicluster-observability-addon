@@ -27,6 +27,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+const (
+	crdResourceName = "customresourcedefinitions"
+)
+
 var (
 	errInvalidConfigResourcesCount = errors.New("invalid number of configuration resources")
 	errUnsupportedAppName          = errors.New("unsupported app name")
@@ -121,12 +125,12 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 			// If we deploy our own operator, create an annotation to restart it once the CRDs are established.
 			promAgentCRD := workv1.ResourceIdentifier{
 				Group:    apiextensionsv1.GroupName,
-				Resource: "customresourcedefinitions",
+				Resource: crdResourceName,
 				Name:     fmt.Sprintf("%s.%s", cooprometheusv1alpha1.PrometheusAgentName, cooprometheusv1alpha1.SchemeGroupVersion.Group),
 			}
 			scrapeConfigCRD := workv1.ResourceIdentifier{
 				Group:    apiextensionsv1.GroupName,
-				Resource: "customresourcedefinitions",
+				Resource: crdResourceName,
 				Name:     fmt.Sprintf("%s.%s", cooprometheusv1alpha1.ScrapeConfigName, cooprometheusv1alpha1.SchemeGroupVersion.Group),
 			}
 
@@ -143,9 +147,9 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 
 			// Process PrometheusAgent CRD
 			promAgentValues := feedback[promAgentCRD]
-			isEstablishedValues := common.FilterFeedbackValuesByName(promAgentValues, "isEstablished")
+			isEstablishedValues := common.FilterFeedbackValuesByName(promAgentValues, addoncfg.IsEstablishedFeedbackName)
 			if len(isEstablishedValues) > 0 && isEstablishedValues[0].Value.String != nil && strings.ToLower(*isEstablishedValues[0].Value.String) == "true" {
-				lastTransitionTimeValues := common.FilterFeedbackValuesByName(promAgentValues, "lastTransitionTime")
+				lastTransitionTimeValues := common.FilterFeedbackValuesByName(promAgentValues, addoncfg.LastTransitionTimeFeedbackName)
 				if len(lastTransitionTimeValues) > 0 && lastTransitionTimeValues[0].Value.String != nil {
 					timestamps.PrometheusAgent = *lastTransitionTimeValues[0].Value.String
 				}
@@ -153,9 +157,9 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 
 			// Process ScrapeConfig CRD
 			scrapeConfigValues := feedback[scrapeConfigCRD]
-			isEstablishedValues = common.FilterFeedbackValuesByName(scrapeConfigValues, "isEstablished")
+			isEstablishedValues = common.FilterFeedbackValuesByName(scrapeConfigValues, addoncfg.IsEstablishedFeedbackName)
 			if len(isEstablishedValues) > 0 && isEstablishedValues[0].Value.String != nil && strings.ToLower(*isEstablishedValues[0].Value.String) == "true" {
-				lastTransitionTimeValues := common.FilterFeedbackValuesByName(scrapeConfigValues, "lastTransitionTime")
+				lastTransitionTimeValues := common.FilterFeedbackValuesByName(scrapeConfigValues, addoncfg.LastTransitionTimeFeedbackName)
 				if len(lastTransitionTimeValues) > 0 && lastTransitionTimeValues[0].Value.String != nil {
 					timestamps.ScrapeConfig = *lastTransitionTimeValues[0].Value.String
 				}
@@ -312,8 +316,8 @@ func (o *OptionsBuilder) getAvailableConfigResources(ctx context.Context, mcAddo
 // It checks the feedback rules for the scrapeconfigs.monitoring.rhobs CRD.
 func (o *OptionsBuilder) cooIsSubscribed(ctx context.Context, managedCluster *clusterv1.ManagedCluster) (bool, error) {
 	crdID := workv1.ResourceIdentifier{
-		Group:    "apiextensions.k8s.io",
-		Resource: "customresourcedefinitions",
+		Group:    apiextensionsv1.GroupName,
+		Resource: crdResourceName,
 		Name:     fmt.Sprintf("%s.%s", cooprometheusv1alpha1.ScrapeConfigName, cooprometheusv1alpha1.SchemeGroupVersion.Group),
 	}
 

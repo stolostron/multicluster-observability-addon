@@ -1,7 +1,6 @@
 package common
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -71,7 +70,7 @@ func TestListAddonManifestWorks(t *testing.T) {
 
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(works...).Build()
 
-	workList, err := ListAddonManifestWorks(context.TODO(), fakeClient, testClusterName, testAddonName)
+	workList, err := ListAddonManifestWorks(t.Context(), fakeClient, testClusterName, testAddonName)
 	assert.NoError(t, err)
 	assert.Len(t, workList.Items, 1)
 	assert.Equal(t, "addon-work-1", workList.Items[0].Name)
@@ -139,7 +138,7 @@ func TestGetFeedbackValuesForResources(t *testing.T) {
 
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(works...).Build()
 
-	results, err := GetFeedbackValuesForResources(context.TODO(), fakeClient, testClusterName, testAddonName, resID1, resID2, resID3)
+	results, err := GetFeedbackValuesForResources(t.Context(), fakeClient, testClusterName, testAddonName, resID1, resID2, resID3)
 	assert.NoError(t, err)
 	assert.Len(t, results, 3)
 
