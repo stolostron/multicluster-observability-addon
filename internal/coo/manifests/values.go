@@ -80,7 +80,11 @@ func BuildValues(opts addon.Options, installCOO bool, isHubCluster bool) *COOVal
 }
 
 func enableUI(opts addon.MetricsOptions, isHub bool) *UIValues {
-	if !opts.CollectionEnabled && !opts.UI.Enabled || !isHub {
+	if !isHub {
+		return nil
+	}
+
+	if !opts.CollectionEnabled && !opts.UI.Enabled {
 		return nil
 	}
 

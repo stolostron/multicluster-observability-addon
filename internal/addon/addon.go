@@ -206,48 +206,27 @@ func Updaters() []agent.Updater {
 			Force: false,
 		},
 	}
-	return []agent.Updater{
-		{
-			UpdateStrategy: ssaWithoutForce,
-			ResourceIdentifier: workv1.ResourceIdentifier{
-				Group:    apiextensionsv1.GroupName,
-				Resource: crdResourceName,
-				Name:     scrapeConfigCRDName,
-			},
-		},
-		{
-			UpdateStrategy: ssaWithoutForce,
-			ResourceIdentifier: workv1.ResourceIdentifier{
-				Group:    apiextensionsv1.GroupName,
-				Resource: crdResourceName,
-				Name:     prometheusAgentCRDName,
-			},
-		},
-		{
-			UpdateStrategy: ssaWithoutForce,
-			ResourceIdentifier: workv1.ResourceIdentifier{
-				Group:    apiextensionsv1.GroupName,
-				Resource: crdResourceName,
-				Name:     serviceMonitorCRDName,
-			},
-		},
-		{
-			UpdateStrategy: ssaWithoutForce,
-			ResourceIdentifier: workv1.ResourceIdentifier{
-				Group:    apiextensionsv1.GroupName,
-				Resource: crdResourceName,
-				Name:     podMonitorCRDName,
-			},
-		},
-		{
-			UpdateStrategy: ssaWithoutForce,
-			ResourceIdentifier: workv1.ResourceIdentifier{
-				Group:    apiextensionsv1.GroupName,
-				Resource: crdResourceName,
-				Name:     probeCRDName,
-			},
-		},
+
+	crdNames := []string{
+		scrapeConfigCRDName,
+		prometheusAgentCRDName,
+		serviceMonitorCRDName,
+		podMonitorCRDName,
+		probeCRDName,
 	}
+
+	updaters := make([]agent.Updater, len(crdNames))
+	for i, crdName := range crdNames {
+		updaters[i] = agent.Updater{
+			UpdateStrategy: ssaWithoutForce,
+			ResourceIdentifier: workv1.ResourceIdentifier{
+				Group:    apiextensionsv1.GroupName,
+				Resource: crdResourceName,
+				Name:     crdName,
+			},
+		}
+	}
+	return updaters
 }
 
 func healthChecker(logger logr.Logger, fields []agent.FieldResult, mc *v1.ManagedCluster, mcao *v1alpha1.ManagedClusterAddOn) error {
