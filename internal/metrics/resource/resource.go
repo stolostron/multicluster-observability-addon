@@ -33,7 +33,6 @@ type DefaultStackResources struct {
 	CMAO               *addonv1alpha1.ClusterManagementAddOn
 	Logger             logr.Logger
 	KubeRBACProxyImage string
-	PrometheusImage    string
 }
 
 // Reconcile ensures the state of the configuration resources for metrics collection.
@@ -239,10 +238,8 @@ func (d DefaultStackResources) reconcileAgentForPlacement(ctx context.Context, p
 	promBuilder := PrometheusAgentSSA{
 		ExistingAgent:       agent,
 		IsUwl:               isUWL,
+		KubeRBACProxyImage:  d.KubeRBACProxyImage,
 		RemoteWriteEndpoint: d.AddonOptions.Platform.Metrics.HubEndpoint.String(),
-		// Commented while the stolostron build of prometheus is not based on v3 as it requires support for the --agent flag.
-		// PrometheusImage:     d.PrometheusImage,
-		KubeRBACProxyImage: d.KubeRBACProxyImage,
 		Labels: map[string]string{
 			addoncfg.PlacementRefNameLabelKey:      placementRef.Name,
 			addoncfg.PlacementRefNamespaceLabelKey: placementRef.Namespace,

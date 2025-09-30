@@ -115,7 +115,7 @@ func TestGetOrCreateDefaultAgent(t *testing.T) {
 func TestReconcileAgent(t *testing.T) {
 	cmao := newCMAO()
 	opts := newAddonOptions(true, true)
-	prmetheusImage := "prometheus:version"
+	kubeRbacImage := "kube-rbac-proxy:version"
 	placementRef := addonv1alpha1.PlacementRef{Name: "my-placement", Namespace: "my-namespace"}
 
 	// Dynamic fake client doesn't support apply types of patch. This is overridden with an interceptor toward a
@@ -128,11 +128,11 @@ func TestReconcileAgent(t *testing.T) {
 		},
 	}).WithScheme(newTestScheme()).WithObjects(cmao).Build()
 	d := DefaultStackResources{
-		Client:          fakeClient,
-		CMAO:            cmao,
-		AddonOptions:    opts,
-		Logger:          klog.Background(),
-		PrometheusImage: prmetheusImage,
+		Client:             fakeClient,
+		CMAO:               cmao,
+		AddonOptions:       opts,
+		Logger:             klog.Background(),
+		KubeRBACProxyImage: kubeRbacImage,
 	}
 
 	// >>> Platform agent
@@ -146,9 +146,8 @@ func TestReconcileAgent(t *testing.T) {
 	// Check default fields
 	assert.EqualValues(t, 1, *foundAgent.Spec.Replicas)
 	// Check ssa fields
-	// Commented while the stolostron build of prometheus is not based on v3 as it requires support for the --agent flag.
-	// assert.Equal(t, prmetheusImage, *foundAgent.Spec.Image)
-	assert.Nil(t, foundAgent.Spec.Image)
+	assert.Equal(t, kubeRbacImage, foundAgent.Spec.Containers[0].Image)
+	assert.Empty(t, foundAgent.Spec.Image)
 	assert.Equal(t, config.PlatformMetricsCollectorApp, foundAgent.Spec.ServiceAccountName)
 	// Check placement labels
 	assert.Equal(t, foundAgent.Labels[addoncfg.PlacementRefNameLabelKey], placementRef.Name)
@@ -429,11 +428,11 @@ func TestReconcile(t *testing.T) {
 				},
 			}).WithScheme(newTestScheme()).WithObjects(initObjs...).Build()
 			d := DefaultStackResources{
-				Client:          fakeClient,
-				CMAO:            cmao,
-				Logger:          klog.Background(),
-				AddonOptions:    addonOptions,
-				PrometheusImage: "dummy",
+				Client:             fakeClient,
+				CMAO:               cmao,
+				Logger:             klog.Background(),
+				AddonOptions:       addonOptions,
+				KubeRBACProxyImage: "dummy",
 			}
 
 			dc, err := d.Reconcile(context.Background())
@@ -583,10 +582,10 @@ func TestReconcileScrapeConfigs(t *testing.T) {
 				},
 			}).WithScheme(newTestScheme()).WithObjects(initObjs...).Build()
 			d := DefaultStackResources{
-				CMAO:            cmao,
-				Client:          fakeClient,
-				Logger:          klog.Background(),
-				PrometheusImage: "dummy",
+				CMAO:               cmao,
+				Client:             fakeClient,
+				Logger:             klog.Background(),
+				KubeRBACProxyImage: "dummy",
 			}
 
 			dc, err := d.reconcileScrapeConfigs(context.Background(), mcoUID, tc.isUWL, tc.hasHostedClusters)
@@ -764,10 +763,10 @@ func TestGetPrometheusRules(t *testing.T) {
 				},
 			}).WithScheme(newTestScheme()).WithObjects(initObjs...).Build()
 			d := DefaultStackResources{
-				CMAO:            cmao,
-				Client:          fakeClient,
-				Logger:          klog.Background(),
-				PrometheusImage: "dummy",
+				CMAO:               cmao,
+				Client:             fakeClient,
+				Logger:             klog.Background(),
+				KubeRBACProxyImage: "dummy",
 				AddonOptions: addon.Options{
 					Platform: addon.PlatformOptions{
 						Metrics: addon.MetricsOptions{

@@ -84,7 +84,6 @@ type PrometheusAgentSSA struct {
 	IsUwl               bool
 	KubeRBACProxyImage  string
 	Labels              map[string]string
-	PrometheusImage     string
 	RemoteWriteEndpoint string
 
 	desiredAgent *cooprometheusv1alpha1.PrometheusAgent
@@ -103,6 +102,7 @@ func (p *PrometheusAgentSSA) Build() *cooprometheusv1alpha1.PrometheusAgent {
 				ArbitraryFSAccessThroughSMs: cooprometheusv1.ArbitraryFSAccessThroughSMsConfig{
 					Deny: true,
 				},
+				Image: ptr.To(""), // Make sure the image is not overridden
 				PodMetadata: &cooprometheusv1.EmbeddedObjectMetadata{
 					Labels: map[string]string{
 						"app.kubernetes.io/part-of": config.AddonName,
@@ -119,10 +119,6 @@ func (p *PrometheusAgentSSA) Build() *cooprometheusv1alpha1.PrometheusAgent {
 	if p.IsUwl {
 		p.desiredAgent.Spec.ServiceAccountName = config.UserWorkloadMetricsCollectorApp
 		p.desiredAgent.Spec.ServiceName = ptr.To(config.UserWorkloadMetricsCollectorApp)
-	}
-
-	if len(p.PrometheusImage) > 0 {
-		p.desiredAgent.Spec.Image = &p.PrometheusImage
 	}
 
 	if len(p.Labels) > 0 {

@@ -41,7 +41,6 @@ type PrometheusOperator struct {
 
 type ImagesValues struct {
 	CooPrometheusOperator    string `json:"cooPrometheusOperator"`
-	PrometheusOperator       string `json:"prometheusOperator"`
 	PrometheusConfigReloader string `json:"prometheusConfigReloader"`
 }
 
@@ -193,8 +192,7 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 
 	// Set images
 	ret.Images = ImagesValues{
-		PrometheusOperator:       opts.Images.PrometheusOperator,
-		CooPrometheusOperator:    config.CooPrometheusOperatorImage,
+		CooPrometheusOperator:    opts.Images.CooPrometheusOperatorImage,
 		PrometheusConfigReloader: opts.Images.PrometheusConfigReloader,
 	}
 

@@ -61,12 +61,12 @@ func TestBuildValues(t *testing.T) {
 		"image overrides": {
 			Options: handlers.Options{
 				Images: config.ImageOverrides{
-					PrometheusOperator:       "prometheus-operator:latest",
-					PrometheusConfigReloader: "prometheus-config-reloader:latest",
+					CooPrometheusOperatorImage: "obo-prometheus-operator:latest",
+					PrometheusConfigReloader:   "prometheus-config-reloader:latest",
 				},
 			},
 			Expect: func(t *testing.T, values *manifests.MetricsValues) {
-				assert.Equal(t, "prometheus-operator:latest", values.Images.PrometheusOperator)
+				assert.Equal(t, "obo-prometheus-operator:latest", values.Images.CooPrometheusOperator)
 				assert.Equal(t, "prometheus-config-reloader:latest", values.Images.PrometheusConfigReloader)
 			},
 		},

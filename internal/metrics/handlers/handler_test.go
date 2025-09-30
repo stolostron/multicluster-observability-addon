@@ -220,10 +220,9 @@ func TestBuildOptions(t *testing.T) {
 					Namespace: config.ImagesConfigMapObjKey.Namespace,
 				},
 				Data: map[string]string{
-					"prometheus_operator":        "prom-operator-image",
+					"obo_prometheus_operator":    "obo-prom-operator-image",
 					"kube_rbac_proxy":            "kube-rbac-proxy-image",
 					"prometheus_config_reloader": "prometheus-config-reload-image",
-					"prometheus":                 "prometheus-image",
 				},
 			},
 			platformAgent,
@@ -299,8 +298,8 @@ func TestBuildOptions(t *testing.T) {
 						Namespace: config.ImagesConfigMapObjKey.Namespace,
 					},
 					Data: map[string]string{ // Missing image overrides for config reloader
-						"prometheus_operator": "prom-operator-image",
-						"kube_rbac_proxy":     "kube-rbac-proxy-image",
+						"obo_prometheus_operator": "obo_prom-operator-image",
+						"kube_rbac_proxy":         "kube-rbac-proxy-image",
 					},
 				})
 				return res
@@ -342,7 +341,7 @@ func TestBuildOptions(t *testing.T) {
 				assert.Equal(t, "test-cluster-id", opts.ClusterID)
 				assert.Equal(t, "test-spoke", opts.ClusterName)
 				// Check that image overrides are set
-				assert.Equal(t, "prom-operator-image", opts.Images.PrometheusOperator)
+				assert.Equal(t, "obo-prom-operator-image", opts.Images.CooPrometheusOperatorImage)
 				assert.Equal(t, "kube-rbac-proxy-image", opts.Images.KubeRBACProxy)
 				assert.Equal(t, "prometheus-config-reload-image", opts.Images.PrometheusConfigReloader)
 				// Check that the Prometheus agent is set

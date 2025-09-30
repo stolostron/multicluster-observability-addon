@@ -31,7 +31,8 @@ func TestPrometheusAgentSSA(t *testing.T) {
 			},
 			Expect: func(t *testing.T, agent *cooprometheusv1alpha1.PrometheusAgent) {
 				assert.NotEmpty(t, agent.Spec.ServiceAccountName)
-				assert.NotEmpty(t, agent.Spec.Image)
+				assert.Empty(t, agent.Spec.Image)                                         // is set by the obo-prometheus operator
+				assert.Equal(t, agent.Spec.Containers[0].Image, "kube-rbac-proxy:latest") // kube-rbac-proxy image
 				assert.NotEmpty(t, agent.Spec.RemoteWrite)
 				assert.NotEmpty(t, agent.Spec.RemoteWrite[0].URL)
 			},
@@ -145,7 +146,7 @@ func TestPrometheusAgentSSA(t *testing.T) {
 			builder := resource.PrometheusAgentSSA{
 				ExistingAgent:       tc.ExistingAgent,
 				RemoteWriteEndpoint: "https://example.com/write",
-				PrometheusImage:     "prometheus:latest",
+				KubeRBACProxyImage:  "kube-rbac-proxy:latest",
 				Labels:              tc.Labels,
 			}
 

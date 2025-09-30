@@ -253,10 +253,9 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 					Namespace: config.ImagesConfigMapObjKey.Namespace,
 				},
 				Data: map[string]string{
-					"prometheus_operator":        "quay.io/prometheus/operator",
+					"obo_prometheus_operator":    "quay.io/prometheus/obo-operator",
 					"prometheus_config_reloader": "quay.io/prometheus/config-reloader",
 					"kube_rbac_proxy":            "quay.io/kube/rbac-proxy",
-					"prometheus":                 "quay.io/prometheus/prometheus",
 				},
 			}
 			clientObjects = append(clientObjects, imagesCM)
@@ -501,10 +500,9 @@ func TestHelmBuild_Metrics_HCP(t *testing.T) {
 			Namespace: hubNamespace,
 		},
 		Data: map[string]string{
-			"prometheus_operator":        "quay.io/prometheus/operator",
+			"obo_prometheus_operator":    "quay.io/prometheus/obo-operator",
 			"prometheus_config_reloader": "quay.io/prometheus/config-reloader",
 			"kube_rbac_proxy":            "quay.io/kube/rbac-proxy",
-			"prometheus":                 "quay.io/prometheus/prometheus",
 		},
 	}
 	clientObjects = append(clientObjects, imagesCM)
