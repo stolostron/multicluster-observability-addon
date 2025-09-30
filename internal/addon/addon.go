@@ -189,7 +189,7 @@ func AgentHealthProber(logger logr.Logger) *agent.HealthProber {
 				},
 			},
 			HealthChecker: func(fields []agent.FieldResult, mc *v1.ManagedCluster, mcao *v1alpha1.ManagedClusterAddOn) error {
-				if err := healthChecker(logger, fields, mc, mcao); err != nil {
+				if err := healthChecker(fields); err != nil {
 					logger.V(1).Info("Health check failed for managed cluster %s: %v", mc.Name, err)
 					return err
 				}
@@ -229,7 +229,7 @@ func Updaters() []agent.Updater {
 	return updaters
 }
 
-func healthChecker(logger logr.Logger, fields []agent.FieldResult, mc *v1.ManagedCluster, mcao *v1alpha1.ManagedClusterAddOn) error {
+func healthChecker(fields []agent.FieldResult) error {
 	if len(fields) == 0 {
 		return errMissingFields
 	}
@@ -316,7 +316,7 @@ func healthChecker(logger logr.Logger, fields []agent.FieldResult, mc *v1.Manage
 		case crdResourceName:
 			switch addoncfg.Name {
 			case scrapeConfigCRDName:
-				if err := checkScrapeConfigCRD(logger, field.FeedbackResult.Values, mc); err != nil {
+				if err := checkScrapeConfigCRD(field.FeedbackResult.Values); err != nil {
 					return fmt.Errorf("%w: %s with key %s", err, identifier.Resource, identifier.Name)
 				}
 			}
@@ -329,7 +329,7 @@ func healthChecker(logger logr.Logger, fields []agent.FieldResult, mc *v1.Manage
 	return nil
 }
 
-func checkScrapeConfigCRD(logger logr.Logger, feedbackValues []workv1.FeedbackValue, mc *v1.ManagedCluster) error {
+func checkScrapeConfigCRD(feedbackValues []workv1.FeedbackValue) error {
 	if len(feedbackValues) == 0 {
 		return errProbeValueIsNil
 	}
@@ -358,7 +358,7 @@ func checkScrapeConfigCRD(logger logr.Logger, feedbackValues []workv1.FeedbackVa
 
 	isOlder, err := isVersionOlder(version, minPrometheusOperatorVersion)
 	if err != nil {
-		logger.Info("failed to parse prometheus operator version", "error", err.Error(), "managedCluster", mc.Name)
+		return fmt.Errorf("failed to parse prometheus operator version: %w", err)
 	} else if isOlder {
 		return fmt.Errorf("%w: incompatible prometheus operator version %s, requires %s or above", errProbeConditionNotSatisfied, version, minPrometheusOperatorVersion)
 	}
