@@ -13,6 +13,7 @@ import (
 	prometheusalpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	"github.com/prometheus/prometheus/model/labels"
 	"github.com/prometheus/prometheus/promql/parser"
+	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -66,7 +67,7 @@ func (h *Hypershift) GenerateResources(ctx context.Context, etcdConfig, apiServe
 		},
 		{
 			SourceLabels: []prometheusv1.LabelName{config.ManagementClusterIDMetricLabel}, // Management cluster is the current ManagedCluster
-			Regex:        h.ManagedCluster.Labels[config.ManagedClusterLabelClusterID],
+			Regex:        h.ManagedCluster.Labels[addoncfg.ManagedClusterLabelClusterID],
 			Action:       "keep",
 		},
 	}
@@ -349,7 +350,7 @@ func (h *Hypershift) generateMetricsRelabelConfigs(hostedCluster clusterIdentity
 		{
 			TargetLabel: config.ManagementClusterIDMetricLabel,
 			Action:      "replace",
-			Replacement: ptr.To(h.ManagedCluster.Labels[config.ManagedClusterLabelClusterID]),
+			Replacement: ptr.To(h.ManagedCluster.Labels[addoncfg.ManagedClusterLabelClusterID]),
 		},
 		{
 			TargetLabel: config.ManagementClusterNameMetricLabel,

@@ -200,7 +200,7 @@ func TestBuildOptions(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: spokeName,
 					Labels: map[string]string{
-						config.ManagedClusterLabelClusterID: "test-cluster-id",
+						addoncfg.ManagedClusterLabelClusterID: "test-cluster-id",
 					},
 				},
 			},
@@ -486,7 +486,7 @@ func TestBuildOptions(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "local-cluster-custom-name",
 						Labels: map[string]string{
-							config.ManagedClusterLabelClusterID:                         "test-cluster-id",
+							addoncfg.ManagedClusterLabelClusterID:                       "test-cluster-id",
 							"feature.open-cluster-management.io/addon-hypershift-addon": "available",
 							"local-cluster": "true",
 						},

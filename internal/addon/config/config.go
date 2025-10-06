@@ -47,6 +47,9 @@ const (
 	PlacementRefNameLabelKey      = "placement-ref-name"
 	PlacementRefNamespaceLabelKey = "placement-ref-namespace"
 
+	ClusterClaimClusterID        = "id.k8s.io"
+	ManagedClusterLabelClusterID = "clusterID"
+
 	ComponentK8sLabelKey = "app.kubernetes.io/component"
 	ManagedByK8sLabelKey = "app.kubernetes.io/managed-by"
 	PartOfK8sLabelKey    = "app.kubernetes.io/part-of"
