@@ -121,6 +121,7 @@ func (r *WatcherReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&addonv1alpha1.ManagedClusterAddOn{}, noReconcilePred, builder.OnlyMetadata).
 		Watches(&corev1.Secret{}, r.enqueueForConfigResource(), builder.OnlyMetadata).
 		Watches(&corev1.ConfigMap{}, r.enqueueForConfigResource(), builder.OnlyMetadata).
+		Watches(&corev1.ConfigMap{}, r.enqueueForAllManagedClusters(), imagesConfigMapPredicate, builder.OnlyMetadata).
 		Watches(&hyperv1.HostedCluster{}, r.enqueueForLocalCluster(), hostedClusterPredicate, builder.OnlyMetadata).
 		Watches(&prometheusv1.ServiceMonitor{}, r.enqueueForLocalCluster(), hypershiftServiceMonitorsPredicate(r.Log), builder.OnlyMetadata).
 		Complete(r)
@@ -137,6 +138,30 @@ func (r *WatcherReconciler) enqueueForLocalCluster() handler.EventHandler {
 				},
 			},
 		}
+	})
+}
+
+func (r *WatcherReconciler) enqueueForAllManagedClusters() handler.EventHandler {
+	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
+		r.Log.V(2).Info("Enqueue for all managed clusters", "gvk", obj.GetObjectKind().GroupVersionKind().String(), "name", obj.GetName(), "namespace", obj.GetNamespace())
+
+		addonList := &addonv1alpha1.ManagedClusterAddOnList{}
+		if err := r.List(ctx, addonList, &client.ListOptions{}); err != nil {
+			r.Log.Error(err, "error listing ManagedClusterAddOns to trigger reconciliation for all clusters")
+			return nil
+		}
+
+		requests := make([]reconcile.Request, len(addonList.Items))
+		for i, addon := range addonList.Items {
+			requests[i] = reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Name:      addon.Name,
+					Namespace: addon.Namespace,
+				},
+			}
+		}
+		r.Log.V(2).Info("enqueuing reconciliation for all managed clusters", "count", len(requests))
+		return requests
 	})
 }
 
@@ -236,6 +261,29 @@ var hostedClusterPredicate = builder.WithPredicates(predicate.Funcs{
 	CreateFunc:  func(e event.CreateEvent) bool { return true },
 	DeleteFunc:  func(e event.DeleteEvent) bool { return true },
 	GenericFunc: func(e event.GenericEvent) bool { return false },
+})
+
+var imagesConfigMapPredicate = builder.WithPredicates(predicate.Funcs{
+	UpdateFunc: func(e event.UpdateEvent) bool {
+		if e.ObjectNew.GetName() == mconfig.ImagesConfigMapObjKey.Name && e.ObjectNew.GetNamespace() == mconfig.ImagesConfigMapObjKey.Namespace {
+			oldCM, okOld := e.ObjectOld.(*corev1.ConfigMap)
+			newCM, okNew := e.ObjectNew.(*corev1.ConfigMap)
+			if !okOld || !okNew {
+				return false
+			}
+			return !equality.Semantic.DeepEqual(oldCM.Data, newCM.Data)
+		}
+		return false
+	},
+	CreateFunc: func(e event.CreateEvent) bool {
+		return e.Object.GetName() == mconfig.ImagesConfigMapObjKey.Name && e.Object.GetNamespace() == mconfig.ImagesConfigMapObjKey.Namespace
+	},
+	DeleteFunc: func(e event.DeleteEvent) bool {
+		return e.Object.GetName() == mconfig.ImagesConfigMapObjKey.Name && e.Object.GetNamespace() == mconfig.ImagesConfigMapObjKey.Namespace
+	},
+	GenericFunc: func(e event.GenericEvent) bool {
+		return false
+	},
 })
 
 func hypershiftServiceMonitorsPredicate(logger logr.Logger) builder.Predicates {
