@@ -1,18 +1,24 @@
 {{- if .Values.userWorkloadsEnabled }}
-apiVersion: monitoring.coreos.com/v1alpha1
+apiVersion: monitoring.rhobs/v1alpha1
 kind: PrometheusAgent
 metadata:
   name: {{ .Values.userWorkload.appName }}
   namespace: {{ .Release.Namespace }}
   annotations:
+    {{- if .Values.deployCOOResources }}
     operator.prometheus.io/controller-id: {{ .Values.prometheusControllerID }}
+    {{- else }}
+    operator.prometheus.io/controller-id: ""
+    {{- end }}
   labels:
     app.kubernetes.io/name: {{ .Values.userWorkload.appName }}
     {{- $incomingLabels := .Values.userWorkload.prometheusAgent.labels }}
     {{- $metricsHelmLabels := fromYaml (include "metricshelm.labels" $) }}
-    {{- $customLabel := dict "app.kubernetes.io/component" $.Values.userWorkload.component }}
-    {{- $customLabel := dict "app.kubernetes.io/name" .Values.userWorkload.appName }}
-    {{- $mergedLabels := merge $incomingLabels $metricsHelmLabels $customLabel }}
+    {{- $customLabel := dict "app.kubernetes.io/component" $.Values.userWorkload.component "app.kubernetes.io/name" .Values.userWorkload.appName }}
+    {{- if not .Values.deployCOOResources }}
+    {{- $_ := set $customLabel "app.kubernetes.io/managed-by" "observability-operator" }}
+    {{- end }}
+    {{- $mergedLabels := mergeOverwrite $incomingLabels $metricsHelmLabels $customLabel }}
     {{- toYaml $mergedLabels | nindent 4 }}
 spec:
 {{- fromJson .Values.userWorkload.prometheusAgent.data | toYaml | nindent 2 }}

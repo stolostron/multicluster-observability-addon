@@ -3,6 +3,8 @@ package common
 import (
 	"slices"
 
+	clusterinfov1beta1 "github.com/stolostron/cluster-lifecycle-api/clusterinfo/v1beta1"
+	clusterlifecycleconstants "github.com/stolostron/cluster-lifecycle-api/constants"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 )
@@ -24,4 +26,12 @@ func GetManagedClusterID(cluster *clusterv1.ManagedCluster) string {
 	}
 
 	return cluster.Name
+}
+
+func IsHubCluster(cluster *clusterv1.ManagedCluster) bool {
+	return cluster.Labels[clusterlifecycleconstants.SelfManagedClusterLabelKey] == "true"
+}
+
+func IsOpenShiftVendor(cluster *clusterv1.ManagedCluster) bool {
+	return cluster.Labels[clusterinfov1beta1.LabelKubeVendor] == string(clusterinfov1beta1.KubeVendorOpenShift)
 }

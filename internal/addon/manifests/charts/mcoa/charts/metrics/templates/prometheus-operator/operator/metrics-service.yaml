@@ -1,4 +1,4 @@
-{{- if or .Values.platformEnabled .Values.userWorkloadsEnabled }}
+{{- if  .Values.deployCOOResources }}
 apiVersion: v1
 kind: Service
 metadata:

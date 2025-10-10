@@ -1,7 +1,6 @@
 package helm
 
 import (
-	"context"
 	"testing"
 
 	"github.com/go-logr/logr"
@@ -182,7 +181,7 @@ func Test_Supported_Vendors(t *testing.T) {
 				Build()
 
 			loggingAgentAddon, err := addonfactory.NewAgentAddonFactory(addoncfg.Name, addon.FS, addoncfg.McoaChartDir).
-				WithGetValuesFuncs(GetValuesFunc(context.TODO(), fakeKubeClient, logr.Discard())).
+				WithGetValuesFuncs(GetValuesFunc(t.Context(), fakeKubeClient, logr.Discard())).
 				WithAgentRegistrationOption(&agent.RegistrationOption{}).
 				WithScheme(scheme.Scheme).
 				BuildHelmAgentAddon()
@@ -285,7 +284,7 @@ func TestGetAddOnDeploymentConfig(t *testing.T) {
 			fakeClient := fake.NewClientBuilder().WithScheme(scheme.Scheme).WithObjects(objs...).Build()
 
 			// Call the function
-			ctx := context.TODO()
+			ctx := t.Context()
 			_, err := getAddOnDeploymentConfig(ctx, fakeClient, tt.mcAddon)
 
 			// require the results

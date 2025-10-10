@@ -1,7 +1,6 @@
 package common
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -76,7 +75,7 @@ func TestGetConfigMaps(t *testing.T) {
 			targetConfigMaps := []string{
 				tc.configMapName,
 			}
-			configMaps, err := GetConfigMaps(context.TODO(), fakeKubeClient, tc.configResourceNamespace, tc.mcAddonNamespace, targetConfigMaps)
+			configMaps, err := GetConfigMaps(t.Context(), fakeKubeClient, tc.configResourceNamespace, tc.mcAddonNamespace, targetConfigMaps)
 			if tc.expectedError {
 				require.Error(t, err)
 				return

@@ -1,7 +1,6 @@
 package watcher
 
 import (
-	"context"
 	"testing"
 
 	"github.com/go-logr/logr"
@@ -175,7 +174,7 @@ func TestGetReconcileRequestsFromManifestWorks(t *testing.T) {
 			}
 
 			cliObj := tc.object.(client.Object)
-			rqs := r.getReconcileRequestsFromManifestWorks(context.TODO(), cliObj)
+			rqs := r.getReconcileRequestsFromManifestWorks(t.Context(), cliObj)
 			assert.Equal(t, tc.expectedReconcileRequests, rqs)
 		})
 	}

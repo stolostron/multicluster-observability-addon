@@ -8,7 +8,7 @@ import (
 
 	"github.com/go-logr/logr"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
-	prometheusv1alpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
+	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -123,12 +123,12 @@ func ObjectToAddonConfig(obj client.Object) (addonv1alpha1.AddOnConfig, error) {
 	}
 
 	switch obj.GetObjectKind().GroupVersionKind().Kind {
-	case prometheusv1alpha1.ScrapeConfigsKind:
-		ret.Resource = prometheusv1alpha1.ScrapeConfigName
+	case cooprometheusv1alpha1.ScrapeConfigsKind:
+		ret.Resource = cooprometheusv1alpha1.ScrapeConfigName
 	case prometheusv1.PrometheusRuleKind:
 		ret.Resource = prometheusv1.PrometheusRuleName
-	case prometheusv1alpha1.PrometheusAgentsKind:
-		ret.Resource = prometheusv1alpha1.PrometheusAgentName
+	case cooprometheusv1alpha1.PrometheusAgentsKind:
+		ret.Resource = cooprometheusv1alpha1.PrometheusAgentName
 	default:
 		return ret, fmt.Errorf("%w: %s %s/%s", errUnsupportedKind, obj.GetObjectKind().GroupVersionKind().Kind, obj.GetNamespace(), obj.GetName())
 	}
