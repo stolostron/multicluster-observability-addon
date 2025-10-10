@@ -200,13 +200,6 @@ func AgentHealthProber(logger logr.Logger) *agent.HealthProber {
 }
 
 func Updaters() []agent.Updater {
-	ssaWithoutForce := workv1.UpdateStrategy{
-		Type: workv1.UpdateStrategyTypeServerSideApply,
-		ServerSideApply: &workv1.ServerSideApplyConfig{
-			Force: false,
-		},
-	}
-
 	crdNames := []string{
 		scrapeConfigCRDName,
 		prometheusAgentCRDName,
@@ -218,7 +211,12 @@ func Updaters() []agent.Updater {
 	updaters := make([]agent.Updater, len(crdNames))
 	for i, crdName := range crdNames {
 		updaters[i] = agent.Updater{
-			UpdateStrategy: ssaWithoutForce,
+			UpdateStrategy: workv1.UpdateStrategy{
+				Type: workv1.UpdateStrategyTypeServerSideApply,
+				ServerSideApply: &workv1.ServerSideApplyConfig{
+					Force: false,
+				},
+			},
 			ResourceIdentifier: workv1.ResourceIdentifier{
 				Group:    apiextensionsv1.GroupName,
 				Resource: crdResourceName,
@@ -234,14 +232,13 @@ func healthChecker(fields []agent.FieldResult) error {
 		return errMissingFields
 	}
 	for _, field := range fields {
+		if len(field.FeedbackResult.Values) == 0 {
+			// If a probe didn't get any values maybe the resources were not deployed
+			continue
+		}
 		identifier := field.ResourceIdentifier
 		switch identifier.Resource {
 		case cooprometheusv1alpha1.PrometheusAgentName:
-			if len(field.FeedbackResult.Values) == 0 {
-				// If the PrometheusAgent didn't get yet feedback values, it means it wasn't reconciled by the operator
-				// It's in bad health.
-				return fmt.Errorf("%w: %s with key %s/%s", errMissingFields, identifier.Resource, identifier.Namespace, identifier.Name)
-			}
 			for _, value := range field.FeedbackResult.Values {
 				if value.Name != addoncfg.PaProbeKey {
 					return fmt.Errorf("%w: %s with key %s/%s unknown probe keys %s", errUnknownProbeKey, identifier.Resource, identifier.Namespace, identifier.Name, value.Name)
@@ -257,10 +254,6 @@ func healthChecker(fields []agent.FieldResult) error {
 				// pa passes the health check
 			}
 		case addoncfg.ClusterLogForwardersResource:
-			if len(field.FeedbackResult.Values) == 0 {
-				// If a probe didn't get any values maybe the resources were not deployed
-				continue
-			}
 			for _, value := range field.FeedbackResult.Values {
 				if value.Name != addoncfg.ClfProbeKey {
 					return fmt.Errorf("%w: %s with key %s/%s unknown probe keys %s", errUnknownProbeKey, identifier.Resource, identifier.Namespace, identifier.Name, value.Name)
@@ -276,10 +269,6 @@ func healthChecker(fields []agent.FieldResult) error {
 				// clf passes the health check
 			}
 		case addoncfg.OpenTelemetryCollectorsResource:
-			if len(field.FeedbackResult.Values) == 0 {
-				// If a probe didn't get any values maybe the resources were not deployed
-				continue
-			}
 			for _, value := range field.FeedbackResult.Values {
 				if value.Name != addoncfg.OtelColProbeKey {
 					return fmt.Errorf("%w: %s with key %s/%s unknown probe keys %s", errUnknownProbeKey, identifier.Resource, identifier.Namespace, identifier.Name, value.Name)
@@ -295,10 +284,6 @@ func healthChecker(fields []agent.FieldResult) error {
 				// otel collector passes the health check
 			}
 		case addoncfg.UiPluginsResource:
-			if len(field.FeedbackResult.Values) == 0 {
-				// If a probe didn't get any values maybe the resources were not deployed
-				continue
-			}
 			for _, value := range field.FeedbackResult.Values {
 				if value.Name != addoncfg.UipProbeKey {
 					return fmt.Errorf("%w: %s with key %s unknown probe keys %s", errUnknownProbeKey, identifier.Resource, identifier.Name, value.Name)
