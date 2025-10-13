@@ -19,8 +19,11 @@ import (
 	"k8s.io/client-go/rest"
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager"
+	"open-cluster-management.io/addon-framework/pkg/agent"
 	"open-cluster-management.io/addon-framework/pkg/utils"
+	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 )
@@ -78,7 +81,6 @@ func NewAddonManager(ctx context.Context, kubeConfig *rest.Config, scheme *runti
 			utils.AddOnDeploymentConfigGVR,
 		).
 		WithGetValuesFuncs(addonConfigValuesFn, addonhelm.GetValuesFunc(ctx, k8sClient, agentLogger)).
-		WithAgentHealthProber(addon.AgentHealthProber(agentLogger)).
 		WithUpdaters(addon.Updaters()).
 		WithAgentRegistrationOption(registrationOption).
 		WithScheme(scheme).
@@ -87,10 +89,31 @@ func NewAddonManager(ctx context.Context, kubeConfig *rest.Config, scheme *runti
 		return nil, fmt.Errorf("failed to build helm agent addon: %w", err)
 	}
 
-	err = mgr.AddAgent(mcoaAgentAddon)
+	err = mgr.AddAgent(&AgentAddonWithDynamicHealthProber{
+		agent:  mcoaAgentAddon,
+		logger: agentLogger,
+		client: k8sClient,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to add mcoa agent to manager: %w", err)
 	}
 
 	return mgr, nil
+}
+
+type AgentAddonWithDynamicHealthProber struct {
+	agent  agent.AgentAddon
+	logger logr.Logger
+	client client.Client
+}
+
+func (a *AgentAddonWithDynamicHealthProber) Manifests(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) ([]runtime.Object, error) {
+	return a.agent.Manifests(cluster, addon)
+}
+
+func (a *AgentAddonWithDynamicHealthProber) GetAgentAddonOptions() agent.AgentAddonOptions {
+	options := a.agent.GetAgentAddonOptions()
+	options.HealthProber = addon.DynamicAgentHealthProber(a.client, a.logger)
+
+	return options
 }
