@@ -3,7 +3,7 @@ package common
 import (
 	"testing"
 
-	prometheusalpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
+	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -12,8 +12,8 @@ import (
 
 func TestEnsureConfigsInAddon(t *testing.T) {
 	paConfigGR := addonv1alpha1.ConfigGroupResource{
-		Group:    prometheusalpha1.SchemeGroupVersion.Group,
-		Resource: prometheusalpha1.PrometheusAgentName,
+		Group:    cooprometheusv1alpha1.SchemeGroupVersion.Group,
+		Resource: cooprometheusv1alpha1.PrometheusAgentName,
 	}
 	platformConfig := addonv1alpha1.AddOnConfig{
 		ConfigGroupResource: paConfigGR,

@@ -2,18 +2,25 @@ package handlers
 
 import (
 	"context"
+	"fmt"
+	"strconv"
 	"strings"
 	"testing"
 
 	hyperv1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
-	prometheusalpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
+	cooprometheusv1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1"
+	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
+	clusterinfov1beta1 "github.com/stolostron/cluster-lifecycle-api/clusterinfo/v1beta1"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 	corev1 "k8s.io/api/core/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -22,6 +29,7 @@ import (
 	"k8s.io/utils/ptr"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	workv1 "open-cluster-management.io/api/work/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -37,23 +45,24 @@ func TestBuildOptions(t *testing.T) {
 	// Setup scheme
 	scheme := runtime.NewScheme()
 	require.NoError(t, kubescheme.AddToScheme(scheme))
-	require.NoError(t, prometheusalpha1.AddToScheme(scheme))
+	require.NoError(t, cooprometheusv1alpha1.AddToScheme(scheme))
 	require.NoError(t, prometheusv1.AddToScheme(scheme))
 	require.NoError(t, clusterv1.AddToScheme(scheme))
 	require.NoError(t, addonapiv1alpha1.AddToScheme(scheme))
 	require.NoError(t, hyperv1.AddToScheme(scheme))
+	require.NoError(t, workv1.AddToScheme(scheme))
 
-	platformAgent := &prometheusalpha1.PrometheusAgent{
+	platformAgent := &cooprometheusv1alpha1.PrometheusAgent{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-prometheus-agent",
 			Namespace: hubNamespace,
 			Labels:    config.PlatformPrometheusMatchLabels,
 		},
-		Spec: prometheusalpha1.PrometheusAgentSpec{
-			CommonPrometheusFields: prometheusv1.CommonPrometheusFields{
+		Spec: cooprometheusv1alpha1.PrometheusAgentSpec{
+			CommonPrometheusFields: cooprometheusv1.CommonPrometheusFields{
 				LogLevel:   "debug",
 				ConfigMaps: []string{"test-haproxy-config"},
-				RemoteWrite: []prometheusv1.RemoteWriteSpec{
+				RemoteWrite: []cooprometheusv1.RemoteWriteSpec{
 					{
 						Name: ptr.To(config.RemoteWriteCfgName),
 					},
@@ -72,7 +81,7 @@ func TestBuildOptions(t *testing.T) {
 		Data: map[string]string{},
 	}
 
-	platformScrapeConfig := &prometheusalpha1.ScrapeConfig{
+	platformScrapeConfig := &cooprometheusv1alpha1.ScrapeConfig{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-scrape-config",
 			Namespace: hubNamespace,
@@ -88,17 +97,17 @@ func TestBuildOptions(t *testing.T) {
 		},
 	}
 
-	uwlAgent := &prometheusalpha1.PrometheusAgent{
+	uwlAgent := &cooprometheusv1alpha1.PrometheusAgent{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-prometheus-agent-uwl",
 			Namespace: hubNamespace,
 			Labels:    config.UserWorkloadPrometheusMatchLabels,
 		},
-		Spec: prometheusalpha1.PrometheusAgentSpec{
-			CommonPrometheusFields: prometheusv1.CommonPrometheusFields{
+		Spec: cooprometheusv1alpha1.PrometheusAgentSpec{
+			CommonPrometheusFields: cooprometheusv1.CommonPrometheusFields{
 				LogLevel:   "warn",
 				ConfigMaps: []string{"test-haproxy-config-uwl"},
-				RemoteWrite: []prometheusv1.RemoteWriteSpec{
+				RemoteWrite: []cooprometheusv1.RemoteWriteSpec{
 					{
 						Name: ptr.To(config.RemoteWriteCfgName),
 					},
@@ -125,8 +134,8 @@ func TestBuildOptions(t *testing.T) {
 			ConfigReferences: []addonapiv1alpha1.ConfigReference{
 				{
 					ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
-						Group:    "monitoring.coreos.com",
-						Resource: prometheusalpha1.PrometheusAgentName,
+						Group:    "monitoring.rhobs",
+						Resource: cooprometheusv1alpha1.PrometheusAgentName,
 					},
 					DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
 						ConfigReferent: addonapiv1alpha1.ConfigReferent{
@@ -149,8 +158,8 @@ func TestBuildOptions(t *testing.T) {
 				},
 				{
 					ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
-						Group:    "monitoring.coreos.com",
-						Resource: prometheusalpha1.ScrapeConfigName,
+						Group:    "monitoring.rhobs",
+						Resource: cooprometheusv1alpha1.ScrapeConfigName,
 					},
 					DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
 						ConfigReferent: addonapiv1alpha1.ConfigReferent{
@@ -200,7 +209,8 @@ func TestBuildOptions(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: spokeName,
 					Labels: map[string]string{
-						addoncfg.ManagedClusterLabelClusterID: "test-cluster-id",
+						config.ManagedClusterLabelClusterID: "test-cluster-id",
+						clusterinfov1beta1.LabelKubeVendor:  string(clusterinfov1beta1.KubeVendorOpenShift),
 					},
 				},
 			},
@@ -210,10 +220,9 @@ func TestBuildOptions(t *testing.T) {
 					Namespace: config.ImagesConfigMapObjKey.Namespace,
 				},
 				Data: map[string]string{
-					"prometheus_operator":        "prom-operator-image",
+					"obo_prometheus_operator":    "obo-prom-operator-image",
 					"kube_rbac_proxy":            "kube-rbac-proxy-image",
 					"prometheus_config_reloader": "prometheus-config-reload-image",
-					"prometheus":                 "prometheus-image",
 				},
 			},
 			platformAgent,
@@ -289,8 +298,8 @@ func TestBuildOptions(t *testing.T) {
 						Namespace: config.ImagesConfigMapObjKey.Namespace,
 					},
 					Data: map[string]string{ // Missing image overrides for config reloader
-						"prometheus_operator": "prom-operator-image",
-						"kube_rbac_proxy":     "kube-rbac-proxy-image",
+						"obo_prometheus_operator": "obo_prom-operator-image",
+						"kube_rbac_proxy":         "kube-rbac-proxy-image",
 					},
 				})
 				return res
@@ -315,8 +324,12 @@ func TestBuildOptions(t *testing.T) {
 			},
 		},
 
-		"platform collection is enabled": {
-			resources:       createResources,
+		"platform collection is enabled, coo is not installed": {
+			resources: func() []client.Object {
+				ret := createResources()
+				ret = append(ret, newManifestWork(spokeName, false))
+				return ret
+			},
 			addon:           platformManagedClusterAddOn,
 			platformEnabled: true,
 			expects: func(t *testing.T, opts Options, err error) {
@@ -328,7 +341,7 @@ func TestBuildOptions(t *testing.T) {
 				assert.Equal(t, "test-cluster-id", opts.ClusterID)
 				assert.Equal(t, "test-spoke", opts.ClusterName)
 				// Check that image overrides are set
-				assert.Equal(t, "prom-operator-image", opts.Images.PrometheusOperator)
+				assert.Equal(t, "obo-prom-operator-image", opts.Images.CooPrometheusOperatorImage)
 				assert.Equal(t, "kube-rbac-proxy-image", opts.Images.KubeRBACProxy)
 				assert.Equal(t, "prometheus-config-reload-image", opts.Images.PrometheusConfigReloader)
 				// Check that the Prometheus agent is set
@@ -347,6 +360,21 @@ func TestBuildOptions(t *testing.T) {
 				assert.Len(t, opts.Platform.ScrapeConfigs, 1)
 				// Check that the Prometheus rule is set
 				assert.Len(t, opts.Platform.Rules, 1)
+				assert.False(t, opts.COOIsSubscribed)
+				assert.NotEmpty(t, opts.CRDEstablishedAnnotation)
+			},
+		},
+		"platform collection is enabled, coo is installed": {
+			resources: func() []client.Object {
+				ret := createResources()
+				ret = append(ret, newManifestWork(spokeName, true))
+				return ret
+			},
+			addon:           platformManagedClusterAddOn,
+			platformEnabled: true,
+			expects: func(t *testing.T, opts Options, err error) {
+				assert.True(t, opts.COOIsSubscribed)
+				assert.Empty(t, opts.CRDEstablishedAnnotation)
 			},
 		},
 		"user workloads collection is enabled": {
@@ -360,8 +388,8 @@ func TestBuildOptions(t *testing.T) {
 					ConfigReferences: []addonapiv1alpha1.ConfigReference{
 						{
 							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
-								Group:    "monitoring.coreos.com",
-								Resource: prometheusalpha1.PrometheusAgentName,
+								Group:    "monitoring.rhobs",
+								Resource: cooprometheusv1alpha1.PrometheusAgentName,
 							},
 							DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
 								ConfigReferent: addonapiv1alpha1.ConfigReferent{
@@ -395,6 +423,7 @@ func TestBuildOptions(t *testing.T) {
 				assert.Equal(t, spokeName, *opts.UserWorkloads.PrometheusAgent.Spec.CommonPrometheusFields.RemoteWrite[0].WriteRelabelConfigs[0].Replacement)
 				assert.Equal(t, config.ClusterNameMetricLabel, opts.UserWorkloads.PrometheusAgent.Spec.CommonPrometheusFields.RemoteWrite[0].WriteRelabelConfigs[0].TargetLabel)
 				assert.Len(t, opts.UserWorkloads.PrometheusAgent.Spec.CommonPrometheusFields.RemoteWrite[0].WriteRelabelConfigs, 5)
+				assert.False(t, opts.COOIsSubscribed)
 			},
 		},
 		"user workload is enabled and is hypershift hub": {
@@ -407,8 +436,8 @@ func TestBuildOptions(t *testing.T) {
 					ConfigReferences: []addonapiv1alpha1.ConfigReference{
 						{
 							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
-								Group:    "monitoring.coreos.com",
-								Resource: prometheusalpha1.PrometheusAgentName,
+								Group:    "monitoring.rhobs",
+								Resource: cooprometheusv1alpha1.PrometheusAgentName,
 							},
 							DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
 								ConfigReferent: addonapiv1alpha1.ConfigReferent{
@@ -566,6 +595,81 @@ func filterOutResource[T client.Object](resources []client.Object, name string) 
 	return filtered
 }
 
+func newManifestWork(name string, isOLMSubscrided bool) *workv1.ManifestWork {
+	return &workv1.ManifestWork{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: name,
+			Labels: map[string]string{
+				addonapiv1alpha1.AddonLabelKey: addoncfg.Name,
+			},
+		},
+		Status: workv1.ManifestWorkStatus{
+			ResourceStatus: workv1.ManifestResourceStatus{
+				Manifests: []workv1.ManifestCondition{
+					{
+						ResourceMeta: workv1.ManifestResourceMeta{
+							Group:    apiextensionsv1.GroupName,
+							Resource: "customresourcedefinitions",
+							Name:     fmt.Sprintf("%s.%s", cooprometheusv1alpha1.PrometheusAgentName, cooprometheusv1alpha1.SchemeGroupVersion.Group),
+						},
+						StatusFeedbacks: workv1.StatusFeedbackResult{
+							Values: []workv1.FeedbackValue{
+								{
+									Name: addoncfg.IsEstablishedFeedbackName,
+									Value: workv1.FieldValue{
+										Type:   workv1.String,
+										String: ptr.To("True"),
+									},
+								},
+								{
+									Name: addoncfg.LastTransitionTimeFeedbackName,
+									Value: workv1.FieldValue{
+										Type:   workv1.String,
+										String: ptr.To("12:00"),
+									},
+								},
+							},
+						},
+					},
+					{
+						ResourceMeta: workv1.ManifestResourceMeta{
+							Group:    apiextensionsv1.GroupName,
+							Resource: "customresourcedefinitions",
+							Name:     fmt.Sprintf("%s.%s", cooprometheusv1alpha1.ScrapeConfigName, cooprometheusv1alpha1.SchemeGroupVersion.Group),
+						},
+						StatusFeedbacks: workv1.StatusFeedbackResult{
+							Values: []workv1.FeedbackValue{
+								{
+									Name: addoncfg.IsEstablishedFeedbackName,
+									Value: workv1.FieldValue{
+										Type:   workv1.String,
+										String: ptr.To("True"),
+									},
+								},
+								{
+									Name: addoncfg.LastTransitionTimeFeedbackName,
+									Value: workv1.FieldValue{
+										Type:   workv1.String,
+										String: ptr.To("12:00"),
+									},
+								},
+								{
+									Name: addoncfg.IsOLMManagedFeedbackName,
+									Value: workv1.FieldValue{
+										Type:   workv1.String,
+										String: ptr.To(cases.Title(language.English).String(strconv.FormatBool(isOLMSubscrided))),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
 func newHCPResources() []client.Object {
 	targetPort := intstr.FromString("target")
 	return []client.Object{
@@ -610,13 +714,13 @@ func newHCPResources() []client.Object {
 
 func newHCPConfigResources(ns string) []client.Object {
 	return []client.Object{
-		&prometheusalpha1.ScrapeConfig{
+		&cooprometheusv1alpha1.ScrapeConfig{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "etcd-base",
 				Namespace: ns,
 				Labels:    config.EtcdHcpUserWorkloadPrometheusMatchLabels,
 			},
-			Spec: prometheusalpha1.ScrapeConfigSpec{
+			Spec: cooprometheusv1alpha1.ScrapeConfigSpec{
 				Params: map[string][]string{
 					"match[]": {
 						`{__name__="etcd_metric"}`,
@@ -624,13 +728,13 @@ func newHCPConfigResources(ns string) []client.Object {
 				},
 			},
 		},
-		&prometheusalpha1.ScrapeConfig{
+		&cooprometheusv1alpha1.ScrapeConfig{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "apiserver-base",
 				Namespace: ns,
 				Labels:    config.ApiserverHcpUserWorkloadPrometheusMatchLabels,
 			},
-			Spec: prometheusalpha1.ScrapeConfigSpec{
+			Spec: cooprometheusv1alpha1.ScrapeConfigSpec{
 				Params: map[string][]string{
 					"match[]": {
 						`{__name__="apiserver_metric"}`,

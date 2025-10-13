@@ -392,6 +392,8 @@ github.com/prometheus/prometheus v0.305.0 h1:UO/LsM32/E9yBDtvQj8tN+WwhbyWKR10lO3
 github.com/prometheus/prometheus v0.305.0/go.mod h1:JG+jKIDUJ9Bn97anZiCjwCxRyAx+lpcEQ0QnZlUlbwY=
 github.com/prometheus/sigv4 v0.2.0 h1:qDFKnHYFswJxdzGeRP63c4HlH3Vbn1Yf/Ao2zabtVXk=
 github.com/prometheus/sigv4 v0.2.0/go.mod h1:D04rqmAaPPEUkjRQxGqjoxdyJuyCh6E0M18fZr0zBiE=
+github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring v0.83.0-rhobs1 h1:tnuw3oTPuZN/srWcVXU6+BqtXJTxOQebsI+MYMKdE08=
+github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring v0.83.0-rhobs1/go.mod h1:cVp/Ggq8Y2v3WUDhwbDAF4b07C8P75lozrsJg6eIYxw=
 github.com/rhobs/observability-operator/pkg/apis v0.0.0-20250902133632-f98bd8a20a80 h1:8gjLYQGW/2Ct1LS7GwII5V+YW4ec4QSPXD4vU8dRv3U=
 github.com/rhobs/observability-operator/pkg/apis v0.0.0-20250902133632-f98bd8a20a80/go.mod h1:bNP815/mCv8ydNQ2Q3a9gqlx9b2XouWa6hws9vthq78=
 github.com/rogpeppe/go-internal v1.14.1 h1:UQB4HGPB6osV0SQTLymcB4TgvyWu6ZyliaW0tI/otEQ=

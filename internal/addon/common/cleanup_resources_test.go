@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	prometheusalpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
+	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -28,12 +28,12 @@ func TestCleanOrphanResources(t *testing.T) {
 	// Create a new scheme and add the types we need
 	scheme := runtime.NewScheme()
 	require.NoError(t, addonapiv1alpha1.AddToScheme(scheme))
-	require.NoError(t, prometheusalpha1.AddToScheme(scheme))
+	require.NoError(t, cooprometheusv1alpha1.AddToScheme(scheme))
 
 	tests := []struct {
 		name               string
 		cmao               *addonapiv1alpha1.ClusterManagementAddOn
-		cmaoOwnedResources []*prometheusalpha1.PrometheusAgent
+		cmaoOwnedResources []*cooprometheusv1alpha1.PrometheusAgent
 		extraResources     []client.Object
 		expectDeleted      map[string]bool
 	}{
@@ -48,7 +48,7 @@ func TestCleanOrphanResources(t *testing.T) {
 				},
 			},
 			extraResources: []client.Object{
-				&prometheusalpha1.PrometheusAgent{
+				&cooprometheusv1alpha1.PrometheusAgent{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "agent-1",
 						Namespace: testNamespace,
@@ -74,7 +74,7 @@ func TestCleanOrphanResources(t *testing.T) {
 					// No placements
 				},
 			},
-			cmaoOwnedResources: []*prometheusalpha1.PrometheusAgent{
+			cmaoOwnedResources: []*cooprometheusv1alpha1.PrometheusAgent{
 				// Will be deleted because it's owned by CMAO but no placement
 				{
 					ObjectMeta: metav1.ObjectMeta{
@@ -111,7 +111,7 @@ func TestCleanOrphanResources(t *testing.T) {
 					},
 				},
 			},
-			cmaoOwnedResources: []*prometheusalpha1.PrometheusAgent{
+			cmaoOwnedResources: []*cooprometheusv1alpha1.PrometheusAgent{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "agent-3",
@@ -125,7 +125,7 @@ func TestCleanOrphanResources(t *testing.T) {
 				},
 			},
 			extraResources: []client.Object{
-				&prometheusalpha1.PrometheusAgent{
+				&cooprometheusv1alpha1.PrometheusAgent{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "agent-4",
 						Namespace: testNamespace,
@@ -161,7 +161,7 @@ func TestCleanOrphanResources(t *testing.T) {
 					},
 				},
 			},
-			cmaoOwnedResources: []*prometheusalpha1.PrometheusAgent{
+			cmaoOwnedResources: []*cooprometheusv1alpha1.PrometheusAgent{
 				// Will not be deleted because it matches a placement
 				{
 					ObjectMeta: metav1.ObjectMeta{
@@ -212,12 +212,12 @@ func TestCleanOrphanResources(t *testing.T) {
 			}
 
 			// Run the function under test
-			err := DeleteOrphanResources(context.Background(), klog.Background(), fakeClient, tc.cmao, &prometheusalpha1.PrometheusAgentList{})
+			err := DeleteOrphanResources(context.Background(), klog.Background(), fakeClient, tc.cmao, &cooprometheusv1alpha1.PrometheusAgentList{})
 			require.NoError(t, err, "CleanOrphanResources should not return an error")
 
 			// Check that resources were deleted or not as expected
 			for name, shouldBeDeleted := range tc.expectDeleted {
-				agent := &prometheusalpha1.PrometheusAgent{}
+				agent := &cooprometheusv1alpha1.PrometheusAgent{}
 				err := fakeClient.Get(context.Background(), types.NamespacedName{
 					Name:      name,
 					Namespace: testNamespace,

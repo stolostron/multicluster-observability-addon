@@ -150,7 +150,7 @@ func Test_IncidentDetection_AllConfigsTogether_AllResources(t *testing.T) {
 			cv: []addonapiv1alpha1.CustomizedVariable{
 				{
 					Name:  "platformMetricsCollection",
-					Value: "prometheusagents.v1alpha1.monitoring.coreos.com",
+					Value: "prometheusagents.v1alpha1.monitoring.rhobs",
 				},
 				{
 					Name:  "platformMetricsUI",

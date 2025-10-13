@@ -23,6 +23,10 @@ const (
 	PrometheusCAConfigMapName       = "prometheus-server-ca"
 	HubInstallNamespace             = "open-cluster-management-observability"
 
+	ManagedClusterLabelClusterID      = "clusterID"
+	ManagedClusterLabelVendorKey      = "vendor"
+	ManagedClusterLabelVendorOCPValue = "OpenShift"
+
 	// Monitoring resources (meta monitoring)
 	PlatformRBACProxyTLSSecret     = "prometheus-agent-platform-kube-rbac-proxy-tls"
 	UserWorkloadRBACProxyTLSSecret = "prometheus-agent-user-workload-kube-rbac-proxy-tls"
@@ -71,10 +75,9 @@ var (
 )
 
 type ImageOverrides struct {
-	PrometheusOperator       string
-	PrometheusConfigReloader string
-	KubeRBACProxy            string
-	Prometheus               string
+	PrometheusConfigReloader   string
+	KubeRBACProxy              string
+	CooPrometheusOperatorImage string
 }
 
 func GetImageOverrides(ctx context.Context, c client.Client) (ImageOverrides, error) {
@@ -87,19 +90,17 @@ func GetImageOverrides(ctx context.Context, c client.Client) (ImageOverrides, er
 
 	for key, value := range imagesList.Data {
 		switch key {
-		case "prometheus_operator":
-			ret.PrometheusOperator = value
 		case "prometheus_config_reloader":
 			ret.PrometheusConfigReloader = value
 		case "kube_rbac_proxy":
 			ret.KubeRBACProxy = value
-		case "prometheus":
-			ret.Prometheus = value
+		case "obo_prometheus_operator":
+			ret.CooPrometheusOperatorImage = value
 		default:
 		}
 	}
 
-	if ret.PrometheusOperator == "" || ret.PrometheusConfigReloader == "" || ret.KubeRBACProxy == "" || ret.Prometheus == "" {
+	if ret.CooPrometheusOperatorImage == "" || ret.PrometheusConfigReloader == "" || ret.KubeRBACProxy == "" {
 		return ret, fmt.Errorf("%w: %+v", ErrMissingImageOverride, ret)
 	}
 

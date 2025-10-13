@@ -5,8 +5,8 @@ import (
 	"maps"
 	"slices"
 
-	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
-	prometheusalpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
+	cooprometheusv1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1"
+	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	corev1 "k8s.io/api/core/v1"
@@ -18,15 +18,15 @@ import (
 
 // NewDefaultPrometheusAgent generates the default prometheusAgent resource containing sensible
 // defaults that can be overridden by the user.
-func NewDefaultPrometheusAgent(ns, name string, isUWL bool, placementRef addonv1alpha1.PlacementRef) *prometheusalpha1.PrometheusAgent {
-	agent := &prometheusalpha1.PrometheusAgent{
+func NewDefaultPrometheusAgent(ns, name string, isUWL bool, placementRef addonv1alpha1.PlacementRef) *cooprometheusv1alpha1.PrometheusAgent {
+	agent := &cooprometheusv1alpha1.PrometheusAgent{
 		TypeMeta: metav1.TypeMeta{
-			Kind:       prometheusalpha1.PrometheusAgentsKind,
-			APIVersion: prometheusalpha1.SchemeGroupVersion.String(),
+			Kind:       cooprometheusv1alpha1.PrometheusAgentsKind,
+			APIVersion: cooprometheusv1alpha1.SchemeGroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{},
-		Spec: prometheusalpha1.PrometheusAgentSpec{
-			CommonPrometheusFields: prometheusv1.CommonPrometheusFields{
+		Spec: cooprometheusv1alpha1.PrometheusAgentSpec{
+			CommonPrometheusFields: cooprometheusv1.CommonPrometheusFields{
 				Replicas: ptr.To(int32(1)),
 				LogLevel: "info",
 				NodeSelector: map[string]string{
@@ -42,7 +42,7 @@ func NewDefaultPrometheusAgent(ns, name string, isUWL bool, placementRef addonv1
 				SecurityContext: &corev1.PodSecurityContext{
 					RunAsNonRoot: ptr.To(true),
 				},
-				ScrapeTimeout: prometheusv1.Duration("30s"),
+				ScrapeTimeout: cooprometheusv1.Duration("30s"),
 				PortName:      "web", // set this value to the default to avoid triggering update when comparing the spec
 			},
 		},
@@ -80,30 +80,30 @@ func makeConfigResourceLabels(isUWL bool, placementRef addonv1alpha1.PlacementRe
 // PrometheusAgentSSA applies configuration and invariants to an existing PrometheusAgent
 // It is used to enforce mandatory fields with server-side apply.
 type PrometheusAgentSSA struct {
-	ExistingAgent       *prometheusalpha1.PrometheusAgent
+	ExistingAgent       *cooprometheusv1alpha1.PrometheusAgent
 	IsUwl               bool
 	KubeRBACProxyImage  string
 	Labels              map[string]string
-	PrometheusImage     string
 	RemoteWriteEndpoint string
 
-	desiredAgent *prometheusalpha1.PrometheusAgent
+	desiredAgent *cooprometheusv1alpha1.PrometheusAgent
 }
 
 // Build generate the prometheusAgent resource containing only fields that must be enforced using server-side apply.
-func (p *PrometheusAgentSSA) Build() *prometheusalpha1.PrometheusAgent {
-	p.desiredAgent = &prometheusalpha1.PrometheusAgent{
+func (p *PrometheusAgentSSA) Build() *cooprometheusv1alpha1.PrometheusAgent {
+	p.desiredAgent = &cooprometheusv1alpha1.PrometheusAgent{
 		TypeMeta: p.ExistingAgent.TypeMeta,
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      p.ExistingAgent.Name,
 			Namespace: p.ExistingAgent.Namespace,
 		},
-		Spec: prometheusalpha1.PrometheusAgentSpec{
-			CommonPrometheusFields: prometheusv1.CommonPrometheusFields{
-				ArbitraryFSAccessThroughSMs: prometheusv1.ArbitraryFSAccessThroughSMsConfig{
+		Spec: cooprometheusv1alpha1.PrometheusAgentSpec{
+			CommonPrometheusFields: cooprometheusv1.CommonPrometheusFields{
+				ArbitraryFSAccessThroughSMs: cooprometheusv1.ArbitraryFSAccessThroughSMsConfig{
 					Deny: true,
 				},
-				PodMetadata: &prometheusv1.EmbeddedObjectMetadata{
+				Image: ptr.To(""), // Make sure the image is not overridden
+				PodMetadata: &cooprometheusv1.EmbeddedObjectMetadata{
 					Labels: map[string]string{
 						"app.kubernetes.io/part-of": config.AddonName,
 					},
@@ -119,10 +119,6 @@ func (p *PrometheusAgentSSA) Build() *prometheusalpha1.PrometheusAgent {
 	if p.IsUwl {
 		p.desiredAgent.Spec.ServiceAccountName = config.UserWorkloadMetricsCollectorApp
 		p.desiredAgent.Spec.ServiceName = ptr.To(config.UserWorkloadMetricsCollectorApp)
-	}
-
-	if len(p.PrometheusImage) > 0 {
-		p.desiredAgent.Spec.Image = &p.PrometheusImage
 	}
 
 	if len(p.Labels) > 0 {
@@ -152,11 +148,11 @@ func (p *PrometheusAgentSSA) setPrometheusRemoteWriteConfig() {
 	}
 
 	// keep user remote write configs and enforce ours
-	desiredRemoteWriteSpec := prometheusv1.RemoteWriteSpec{
+	desiredRemoteWriteSpec := cooprometheusv1.RemoteWriteSpec{
 		URL:           p.RemoteWriteEndpoint,
 		Name:          ptr.To(config.RemoteWriteCfgName),
-		RemoteTimeout: ptr.To(prometheusv1.Duration("30s")),
-		TLSConfig: &prometheusv1.TLSConfig{
+		RemoteTimeout: ptr.To(cooprometheusv1.Duration("30s")),
+		TLSConfig: &cooprometheusv1.TLSConfig{
 			CAFile:   p.formatSecretPath(config.HubCASecretName, "ca.crt"),
 			CertFile: p.formatSecretPath(config.ClientCertSecretName, "tls.crt"),
 			KeyFile:  p.formatSecretPath(config.ClientCertSecretName, "tls.key"),
@@ -165,9 +161,9 @@ func (p *PrometheusAgentSSA) setPrometheusRemoteWriteConfig() {
 	}
 
 	// Ensure there is a single instance of our config
-	var found *prometheusv1.RemoteWriteSpec
+	var found *cooprometheusv1.RemoteWriteSpec
 	p.desiredAgent.Spec.RemoteWrite = slices.Clone(p.ExistingAgent.Spec.RemoteWrite)
-	p.desiredAgent.Spec.RemoteWrite = slices.DeleteFunc(p.desiredAgent.Spec.RemoteWrite, func(e prometheusv1.RemoteWriteSpec) bool {
+	p.desiredAgent.Spec.RemoteWrite = slices.DeleteFunc(p.desiredAgent.Spec.RemoteWrite, func(e cooprometheusv1.RemoteWriteSpec) bool {
 		if e.Name == nil || *e.Name != *desiredRemoteWriteSpec.Name {
 			return false
 		}
@@ -189,7 +185,7 @@ func (p *PrometheusAgentSSA) setPrometheusRemoteWriteConfig() {
 	}
 
 	// Insert or replace the config
-	index := slices.IndexFunc(p.desiredAgent.Spec.RemoteWrite, func(e prometheusv1.RemoteWriteSpec) bool {
+	index := slices.IndexFunc(p.desiredAgent.Spec.RemoteWrite, func(e cooprometheusv1.RemoteWriteSpec) bool {
 		return e.Name != nil && *e.Name == *desiredRemoteWriteSpec.Name
 	})
 	if index >= 0 {
@@ -208,6 +204,7 @@ func (p *PrometheusAgentSSA) setWatchedResources() {
 		p.desiredAgent.Spec.ScrapeConfigSelector = &metav1.LabelSelector{
 			MatchLabels: config.PlatformPrometheusMatchLabels,
 		}
+		p.desiredAgent.Spec.ScrapeConfigNamespaceSelector = nil
 	}
 }
 
@@ -221,21 +218,21 @@ func (p *PrometheusAgentSSA) setScrapeClasses() {
 		}
 	}
 
-	desiredScrapeClass := prometheusv1.ScrapeClass{
-		Authorization: &prometheusv1.Authorization{
+	desiredScrapeClass := cooprometheusv1.ScrapeClass{
+		Authorization: &cooprometheusv1.Authorization{
 			CredentialsFile: "/var/run/secrets/kubernetes.io/serviceaccount/token",
 		},
 		Name: config.ScrapeClassCfgName,
-		TLSConfig: &prometheusv1.TLSConfig{
+		TLSConfig: &cooprometheusv1.TLSConfig{
 			CAFile: fmt.Sprintf("/etc/prometheus/configmaps/%s/service-ca.crt", config.PrometheusCAConfigMapName),
 		},
 		Default: ptr.To(true),
 	}
 
 	// Ensure there is a single ocp-monitring class
-	var found *prometheusv1.ScrapeClass
+	var found *cooprometheusv1.ScrapeClass
 	p.desiredAgent.Spec.ScrapeClasses = p.ExistingAgent.Spec.ScrapeClasses
-	p.desiredAgent.Spec.ScrapeClasses = slices.DeleteFunc(p.desiredAgent.Spec.ScrapeClasses, func(e prometheusv1.ScrapeClass) bool {
+	p.desiredAgent.Spec.ScrapeClasses = slices.DeleteFunc(p.desiredAgent.Spec.ScrapeClasses, func(e cooprometheusv1.ScrapeClass) bool {
 		if e.Name != desiredScrapeClass.Name {
 			return false
 		}
@@ -254,7 +251,7 @@ func (p *PrometheusAgentSSA) setScrapeClasses() {
 	}
 
 	// Insert or replace the config
-	index := slices.IndexFunc(p.desiredAgent.Spec.ScrapeClasses, func(e prometheusv1.ScrapeClass) bool { return e.Name == desiredScrapeClass.Name })
+	index := slices.IndexFunc(p.desiredAgent.Spec.ScrapeClasses, func(e cooprometheusv1.ScrapeClass) bool { return e.Name == desiredScrapeClass.Name })
 	if index >= 0 {
 		p.desiredAgent.Spec.ScrapeClasses[index] = desiredScrapeClass
 	} else {

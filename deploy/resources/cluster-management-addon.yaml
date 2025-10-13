@@ -16,9 +16,9 @@ spec:
         name: multicluster-observability-addon
         namespace: open-cluster-management-observability
     # Resources for configuring the deployment of the Metrics collection
-    - group: monitoring.coreos.com
+    - group: monitoring.rhobs
       resource: scrapeconfigs
-    - group: monitoring.coreos.com
+    - group: monitoring.rhobs
       resource: prometheusagents
     - group: monitoring.coreos.com
       resource: prometheusrules

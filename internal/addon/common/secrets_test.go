@@ -1,7 +1,6 @@
 package common
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -76,7 +75,7 @@ func TestGetSecrets(t *testing.T) {
 			targetSecrets := []string{
 				tc.secretName,
 			}
-			secrets, err := GetSecrets(context.TODO(), fakeKubeClient, tc.configResourceNamespace, tc.mcAddonNamespace, targetSecrets)
+			secrets, err := GetSecrets(t.Context(), fakeKubeClient, tc.configResourceNamespace, tc.mcAddonNamespace, targetSecrets)
 			if tc.expecedError {
 				require.Error(t, err)
 				return

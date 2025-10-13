@@ -1,4 +1,4 @@
-{{- if or .Values.platformEnabled .Values.userWorkloadsEnabled }}
+{{- if  .Values.deployCOOResources }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:

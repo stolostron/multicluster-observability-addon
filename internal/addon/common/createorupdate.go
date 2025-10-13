@@ -7,7 +7,7 @@ import (
 
 	"github.com/go-logr/logr"
 	prometheus "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
-	prometheusalpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
+	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -55,12 +55,12 @@ func mutateFuncFor(want, existing client.Object) controllerutil.MutateFn {
 		maps.Copy(existing.GetAnnotations(), want.GetAnnotations())
 
 		switch existingTyped := existing.(type) {
-		case *prometheusalpha1.PrometheusAgent:
-			existingTyped.Spec = want.(*prometheusalpha1.PrometheusAgent).Spec
+		case *cooprometheusv1alpha1.PrometheusAgent:
+			existingTyped.Spec = want.(*cooprometheusv1alpha1.PrometheusAgent).Spec
 		case *prometheus.PrometheusRule:
 			existingTyped.Spec = want.(*prometheus.PrometheusRule).Spec
-		case *prometheusalpha1.ScrapeConfig:
-			existingTyped.Spec = want.(*prometheusalpha1.ScrapeConfig).Spec
+		case *cooprometheusv1alpha1.ScrapeConfig:
+			existingTyped.Spec = want.(*cooprometheusv1alpha1.ScrapeConfig).Spec
 		case *corev1.ConfigMap:
 			existingTyped.Data = want.(*corev1.ConfigMap).Data
 		default:
