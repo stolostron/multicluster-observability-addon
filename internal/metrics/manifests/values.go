@@ -36,12 +36,14 @@ type Collector struct {
 }
 
 type PrometheusOperator struct {
-	RBACProxyImage string `json:"rbacProxyImage"`
 }
 
 type ImagesValues struct {
 	CooPrometheusOperator    string `json:"cooPrometheusOperator"`
 	PrometheusConfigReloader string `json:"prometheusConfigReloader"`
+	KubeStateMetrics         string `json:"kubeStateMetrics"`
+	NodeExporter             string `json:"nodeExporter"`
+	RBACProxyImage           string `json:"rbacProxyImage"`
 }
 
 type ConfigValue struct {
@@ -65,9 +67,7 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 			RBACProxyTLSSecret: config.UserWorkloadRBACProxyTLSSecret,
 			RBACProxyPort:      strconv.Itoa(config.RBACProxyPort),
 		},
-		PrometheusOperator: PrometheusOperator{
-			RBACProxyImage: opts.Images.KubeRBACProxy,
-		},
+		PrometheusOperator: PrometheusOperator{},
 	}
 
 	// Build Prometheus Agent Spec for Platform
@@ -194,6 +194,9 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 	ret.Images = ImagesValues{
 		CooPrometheusOperator:    opts.Images.CooPrometheusOperatorImage,
 		PrometheusConfigReloader: opts.Images.PrometheusConfigReloader,
+		KubeStateMetrics:         opts.Images.KubeStateMetrics,
+		NodeExporter:             opts.Images.NodeExporter,
+		RBACProxyImage:           opts.Images.KubeRBACProxy,
 	}
 
 	return ret, nil
