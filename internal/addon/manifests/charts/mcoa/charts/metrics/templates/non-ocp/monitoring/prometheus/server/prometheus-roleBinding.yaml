@@ -1,0 +1,19 @@
+{{- if .Values.DeployNonOCPStack }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "prometheus.serviceAccountName" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "prometheus.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "prometheus.serviceAccountName" . }}
+subjects:
+- kind: ServiceAccount
+  name: {{ include "prometheus.serviceAccountName" . }}
+  namespace: {{ .Release.Namespace }}
+
+
+{{- end }}
