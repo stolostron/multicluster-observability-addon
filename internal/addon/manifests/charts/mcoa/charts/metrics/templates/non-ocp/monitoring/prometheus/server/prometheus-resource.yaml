@@ -1,4 +1,4 @@
-{{- if .Values.DeployNonOCPStack }}
+{{- if .Values.deployNonOCPStack }}
 apiVersion: monitoring.rhobs/v1
 kind: Prometheus
 metadata:
