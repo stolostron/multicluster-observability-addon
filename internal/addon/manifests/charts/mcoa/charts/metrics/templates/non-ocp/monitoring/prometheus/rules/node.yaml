@@ -5,7 +5,9 @@ apiVersion: monitoring.rhobs/v1
 kind: PrometheusRule
 metadata:
   name: node-rules
-  namespace: open-cluster-management-addon-observability
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "prometheus-rules.labels" . | nindent 4 }}
 spec:
   groups:
   - name: node.rules
