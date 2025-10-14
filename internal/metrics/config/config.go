@@ -2,6 +2,7 @@ package config
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -87,9 +88,11 @@ var (
 )
 
 type ImageOverrides struct {
-	PrometheusConfigReloader   string
-	KubeRBACProxy              string
-	CooPrometheusOperatorImage string
+	PrometheusConfigReloader   string `json:"prometheus_config_reloader"`
+	KubeRBACProxy              string `json:"kube_rbac_proxy"`
+	CooPrometheusOperatorImage string `json:"obo_prometheus_operator"`
+	KubeStateMetrics           string `json:"kube_state_metrics"`
+	NodeExporter               string `json:"node_exporter"`
 }
 
 func GetImageOverrides(ctx context.Context, c client.Client) (ImageOverrides, error) {
@@ -100,19 +103,20 @@ func GetImageOverrides(ctx context.Context, c client.Client) (ImageOverrides, er
 		return ret, fmt.Errorf("failed to get image overrides configmap: %w", err)
 	}
 
-	for key, value := range imagesList.Data {
-		switch key {
-		case "prometheus_config_reloader":
-			ret.PrometheusConfigReloader = value
-		case "kube_rbac_proxy":
-			ret.KubeRBACProxy = value
-		case "obo_prometheus_operator":
-			ret.CooPrometheusOperatorImage = value
-		default:
-		}
+	jsonData, err := json.Marshal(imagesList.Data)
+	if err != nil {
+		return ret, fmt.Errorf("failed to marshal image overrides data: %w", err)
 	}
 
-	if ret.CooPrometheusOperatorImage == "" || ret.PrometheusConfigReloader == "" || ret.KubeRBACProxy == "" {
+	if err := json.Unmarshal(jsonData, &ret); err != nil {
+		return ret, fmt.Errorf("failed to unmarshal image overrides: %w", err)
+	}
+
+	if ret.CooPrometheusOperatorImage == "" ||
+		ret.PrometheusConfigReloader == "" ||
+		ret.KubeRBACProxy == "" ||
+		ret.KubeStateMetrics == "" ||
+		ret.NodeExporter == "" {
 		return ret, fmt.Errorf("%w: %+v", ErrMissingImageOverride, ret)
 	}
 
