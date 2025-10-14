@@ -11,6 +11,7 @@ import (
 
 	hyperv1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	cooprometheusv1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1"
 	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	clusterinfov1beta1 "github.com/stolostron/cluster-lifecycle-api/clusterinfo/v1beta1"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
@@ -53,11 +54,13 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 		PlatformMetrics bool
 		UserMetrics     bool
 		COOIsInstalled  bool
+		IsOCP           bool
 		Expects         func(*testing.T, []client.Object)
 	}{
 		"no metrics": {
 			PlatformMetrics: false,
 			UserMetrics:     false,
+			IsOCP:           true,
 			Expects: func(t *testing.T, objects []client.Object) {
 				assert.Len(t, objects, 0)
 			},
@@ -66,6 +69,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 			PlatformMetrics: true,
 			UserMetrics:     false,
 			COOIsInstalled:  false,
+			IsOCP:           true,
 			Expects: func(t *testing.T, objects []client.Object) {
 				// ensure the agent is created
 				agent := common.FilterResourcesByLabelSelector[*cooprometheusv1alpha1.PrometheusAgent](objects, config.PlatformPrometheusMatchLabels)
@@ -99,6 +103,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 			PlatformMetrics: true,
 			UserMetrics:     false,
 			COOIsInstalled:  true,
+			IsOCP:           true,
 			Expects: func(t *testing.T, objects []client.Object) {
 				// ensure the agent is created and gets the label expected by the OLM installed COO operator
 				agent := common.FilterResourcesByLabelSelector[*cooprometheusv1alpha1.PrometheusAgent](objects, config.PlatformPrometheusMatchLabels)
@@ -115,6 +120,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 		"user workload metrics": {
 			PlatformMetrics: false,
 			UserMetrics:     true,
+			IsOCP:           true,
 			Expects: func(t *testing.T, objects []client.Object) {
 				// ensure the agent is created
 				agent := common.FilterResourcesByLabelSelector[*cooprometheusv1alpha1.PrometheusAgent](objects, config.UserWorkloadPrometheusMatchLabels)
@@ -143,6 +149,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 			PlatformMetrics: false,
 			UserMetrics:     true,
 			COOIsInstalled:  true,
+			IsOCP:           true,
 			Expects: func(t *testing.T, objects []client.Object) {
 				// ensure the agent is created and gets the label expected by the OLM installed COO operator
 				agent := common.FilterResourcesByLabelSelector[*cooprometheusv1alpha1.PrometheusAgent](objects, config.UserWorkloadPrometheusMatchLabels)
@@ -156,12 +163,31 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				}
 			},
 		},
+		"is non ocp": {
+			PlatformMetrics: true,
+			UserMetrics:     false,
+			COOIsInstalled:  false,
+			IsOCP:           false,
+			Expects: func(t *testing.T, objects []client.Object) {
+				// ensure the agent is created
+				agent := common.FilterResourcesByLabelSelector[*cooprometheusv1alpha1.PrometheusAgent](objects, config.PlatformPrometheusMatchLabels)
+				assert.Len(t, agent, 1)
+				assert.Equal(t, config.PlatformMetricsCollectorApp, agent[0].GetName())
+				assert.NotEmpty(t, agent[0].Spec.CommonPrometheusFields.RemoteWrite[0].URL)
+				// ensure that the number of objects is correct
+				expectedCount := 67
+				if len(objects) != expectedCount {
+					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
+				}
+			},
+		},
 	}
 
 	scheme := runtime.NewScheme()
 	assert.NoError(t, kubescheme.AddToScheme(scheme))
 	assert.NoError(t, cooprometheusv1alpha1.AddToScheme(scheme))
 	assert.NoError(t, prometheusv1.AddToScheme(scheme))
+	assert.NoError(t, cooprometheusv1.AddToScheme(scheme))
 	assert.NoError(t, clusterv1.AddToScheme(scheme))
 	assert.NoError(t, addonapiv1alpha1.AddToScheme(scheme))
 	assert.NoError(t, workv1.AddToScheme(scheme))
@@ -237,8 +263,9 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 
 			// Setup a managed cluster
 			managedCluster := addontesting.NewManagedCluster("cluster-1")
-			managedCluster.Labels = map[string]string{
-				clusterinfov1beta1.LabelKubeVendor: string(clusterinfov1beta1.KubeVendorOpenShift),
+			managedCluster.Labels = map[string]string{}
+			if tc.IsOCP {
+				managedCluster.Labels[clusterinfov1beta1.LabelKubeVendor] = string(clusterinfov1beta1.KubeVendorOpenShift)
 			}
 			clientObjects = append(clientObjects, managedCluster)
 
@@ -256,6 +283,8 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 					"obo_prometheus_operator":    "quay.io/prometheus/obo-operator",
 					"prometheus_config_reloader": "quay.io/prometheus/config-reloader",
 					"kube_rbac_proxy":            "quay.io/kube/rbac-proxy",
+					"kube_state_metrics":         "quay.io/kube/kube-state-metrics",
+					"node_exporter":              "quay.io/kube/node-exporter",
 				},
 			}
 			clientObjects = append(clientObjects, imagesCM)
@@ -348,6 +377,7 @@ func TestHelmBuild_Metrics_HCP(t *testing.T) {
 	assert.NoError(t, kubescheme.AddToScheme(scheme))
 	assert.NoError(t, cooprometheusv1alpha1.AddToScheme(scheme))
 	assert.NoError(t, prometheusv1.AddToScheme(scheme))
+	assert.NoError(t, cooprometheusv1.AddToScheme(scheme))
 	assert.NoError(t, clusterv1.AddToScheme(scheme))
 	assert.NoError(t, hyperv1.AddToScheme(scheme))
 	assert.NoError(t, addonapiv1alpha1.AddToScheme(scheme))
@@ -517,6 +547,8 @@ func TestHelmBuild_Metrics_HCP(t *testing.T) {
 			"obo_prometheus_operator":    "quay.io/prometheus/obo-operator",
 			"prometheus_config_reloader": "quay.io/prometheus/config-reloader",
 			"kube_rbac_proxy":            "quay.io/kube/rbac-proxy",
+			"kube_state_metrics":         "quay.io/kube/kube-state-metrics",
+			"node_exporter":              "quay.io/kube/node-exporter",
 		},
 	}
 	clientObjects = append(clientObjects, imagesCM)

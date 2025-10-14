@@ -245,6 +245,8 @@ func TestBuildOptions(t *testing.T) {
 					"obo_prometheus_operator":    "obo-prom-operator-image",
 					"kube_rbac_proxy":            "kube-rbac-proxy-image",
 					"prometheus_config_reloader": "prometheus-config-reload-image",
+					"kube_state_metrics":         "quay.io/kube/kube-state-metrics",
+					"node_exporter":              "quay.io/kube/node-exporter",
 				},
 			},
 			platformAgent,
