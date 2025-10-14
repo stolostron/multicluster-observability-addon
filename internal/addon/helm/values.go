@@ -45,12 +45,6 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, logger logr.Logger) a
 	) (addonfactory.Values, error) {
 		logger = logger.WithValues("cluster", cluster.Name)
 		logger.V(2).Info("reconciliation triggered")
-		// if hub cluster, then don't install anything.
-		// some kube flavors are also currently not supported
-		if !common.IsOpenShiftVendor(cluster) {
-			logger.V(2).Info("unsupported kubernetes vendor, ignoring cluster")
-			return addonfactory.JsonStructToValues(HelmChartValues{})
-		}
 
 		aodc, err := getAddOnDeploymentConfig(ctx, k8s, mcAddon)
 		if err != nil {
@@ -122,6 +116,10 @@ func getLoggingValues(ctx context.Context, k8s client.Client, cluster *clusterv1
 		return nil, nil
 	}
 
+	if !common.IsOpenShiftVendor(cluster) {
+		return nil, nil
+	}
+
 	loggingOpts, err := lhandlers.BuildOptions(ctx, k8s, mcAddon, opts.Platform.Logs, opts.UserWorkloads.Logs, common.IsHubCluster(cluster))
 	if err != nil {
 		return nil, err
@@ -132,6 +130,10 @@ func getLoggingValues(ctx context.Context, k8s client.Client, cluster *clusterv1
 
 func getTracingValues(ctx context.Context, k8s client.Client, cluster *clusterv1.ManagedCluster, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, opts addon.Options) (*tmanifests.TracingValues, error) {
 	if common.IsHubCluster(cluster) || !opts.UserWorkloads.Traces.CollectionEnabled {
+		return nil, nil
+	}
+
+	if !common.IsOpenShiftVendor(cluster) {
 		return nil, nil
 	}
 
@@ -149,6 +151,10 @@ func getTracingValues(ctx context.Context, k8s client.Client, cluster *clusterv1
 }
 
 func getCOOValues(ctx context.Context, k8s client.Client, logger logr.Logger, cluster *clusterv1.ManagedCluster, opts addon.Options) (*cmanifests.COOValues, error) {
+	if !common.IsOpenShiftVendor(cluster) {
+		return nil, nil
+	}
+
 	installCOO, err := chandlers.InstallCOO(ctx, k8s, logger, common.IsHubCluster(cluster))
 	if err != nil {
 		return nil, err
