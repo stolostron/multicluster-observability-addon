@@ -44,13 +44,6 @@ var (
 	errCastingObject                              = errors.New("object is not a client.Object")
 )
 
-var noReconcilePred = builder.WithPredicates(predicate.Funcs{
-	UpdateFunc:  func(ue event.UpdateEvent) bool { return false },
-	CreateFunc:  func(e event.CreateEvent) bool { return false },
-	DeleteFunc:  func(e event.DeleteEvent) bool { return false },
-	GenericFunc: func(e event.GenericEvent) bool { return false },
-})
-
 type WatcherManager struct {
 	mgr    *ctrl.Manager
 	logger logr.Logger
@@ -118,7 +111,7 @@ func (r *WatcherReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 // SetupWithManager sets up the controller with the Manager.
 func (r *WatcherReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&addonv1alpha1.ManagedClusterAddOn{}, noReconcilePred, builder.OnlyMetadata).
+		For(&addonv1alpha1.ManagedClusterAddOn{}, managedClusterAddonPredicate, builder.OnlyMetadata).
 		Watches(&corev1.Secret{}, r.enqueueForConfigResource(), builder.OnlyMetadata).
 		Watches(&corev1.ConfigMap{}, r.enqueueForConfigResource(), builder.OnlyMetadata).
 		Watches(&corev1.ConfigMap{}, r.enqueueForAllManagedClusters(), imagesConfigMapPredicate, builder.OnlyMetadata).
@@ -251,6 +244,21 @@ func (r *WatcherReconciler) manifestToObject(m workv1.Manifest) (client.Object, 
 
 	return clientObj, nil
 }
+
+var managedClusterAddonPredicate = builder.WithPredicates(predicate.Funcs{
+	UpdateFunc: func(e event.UpdateEvent) bool {
+		return e.ObjectNew.GetName() == addoncfg.Name
+	},
+	CreateFunc: func(e event.CreateEvent) bool {
+		return e.Object.GetName() == addoncfg.Name
+	},
+	DeleteFunc: func(e event.DeleteEvent) bool {
+		return e.Object.GetName() == addoncfg.Name
+	},
+	GenericFunc: func(e event.GenericEvent) bool {
+		return false
+	},
+})
 
 var hostedClusterPredicate = builder.WithPredicates(predicate.Funcs{
 	UpdateFunc: func(e event.UpdateEvent) bool {
