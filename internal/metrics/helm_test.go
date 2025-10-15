@@ -668,7 +668,17 @@ func fakeGetValues(k8s client.Client, platformMetrics, userWorkloadMetrics bool)
 
 		hubEp, _ := url.Parse("http://remote-write.example.com")
 
-		opts, err := optionsBuilder.Build(context.Background(), mcAddon, cluster, addon.MetricsOptions{CollectionEnabled: platformMetrics, HubEndpoint: hubEp}, addon.MetricsOptions{CollectionEnabled: userWorkloadMetrics})
+		addonOpts := addon.Options{
+			Platform: addon.PlatformOptions{
+				Metrics: addon.MetricsOptions{CollectionEnabled: platformMetrics, HubEndpoint: hubEp},
+			},
+			UserWorkloads: addon.UserWorkloadOptions{
+				Metrics: addon.MetricsOptions{CollectionEnabled: userWorkloadMetrics},
+			},
+		}
+
+		// opts, err := optionsBuilder.Build(context.Background(), mcAddon, cluster, addon.MetricsOptions{CollectionEnabled: platformMetrics, HubEndpoint: hubEp}, addon.MetricsOptions{CollectionEnabled: userWorkloadMetrics})
+		opts, err := optionsBuilder.Build(context.Background(), mcAddon, cluster, addonOpts)
 		if err != nil {
 			return nil, err
 		}

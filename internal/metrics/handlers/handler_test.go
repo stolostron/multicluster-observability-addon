@@ -588,8 +588,14 @@ func TestBuildOptions(t *testing.T) {
 			}
 			hubEp, _ := url.Parse("http://remote-write.example.com")
 			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(resources...).Build()
-			platform := addon.MetricsOptions{CollectionEnabled: tc.platformEnabled, HubEndpoint: hubEp}
-			userWorkloads := addon.MetricsOptions{CollectionEnabled: tc.userWorkloadsEnabled}
+			addonOpts := addon.Options{
+				Platform: addon.PlatformOptions{
+					Metrics: addon.MetricsOptions{CollectionEnabled: tc.platformEnabled, HubEndpoint: hubEp},
+				},
+				UserWorkloads: addon.UserWorkloadOptions{
+					Metrics: addon.MetricsOptions{CollectionEnabled: tc.userWorkloadsEnabled},
+				},
+			}
 
 			optsBuilder := &OptionsBuilder{
 				Client:         fakeClient,
@@ -600,7 +606,7 @@ func TestBuildOptions(t *testing.T) {
 			require.NoError(t, err)
 			require.Len(t, managedClusters.Items, 1)
 			foundManagedCluster := managedClusters.Items[0]
-			opts, err := optsBuilder.Build(context.Background(), tc.addon, &foundManagedCluster, platform, userWorkloads)
+			opts, err := optsBuilder.Build(context.Background(), tc.addon, &foundManagedCluster, addonOpts)
 
 			tc.expects(t, opts, err)
 		})

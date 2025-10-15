@@ -103,7 +103,7 @@ func getMonitoringValues(ctx context.Context, k8s client.Client, logger logr.Log
 		RemoteWriteURL: opts.Platform.Metrics.HubEndpoint.String(),
 		Logger:         logger,
 	}
-	metricsOpts, err := optsBuilder.Build(ctx, mcAddon, cluster, opts.Platform.Metrics, opts.UserWorkloads.Metrics)
+	metricsOpts, err := optsBuilder.Build(ctx, mcAddon, cluster, opts)
 	if err != nil {
 		return nil, err
 	}
