@@ -79,7 +79,12 @@ func NewAddonManager(ctx context.Context, kubeConfig *rest.Config, scheme *runti
 		WithGetValuesFuncs(addonConfigValuesFn, addonhelm.GetValuesFunc(ctx, k8sClient, logger.WithName("agent"))).
 		WithAgentHealthProber(addon.AgentHealthProber()).
 		WithAgentRegistrationOption(registrationOption).
-		WithScheme(scheme).
+		WithAgentInstallNamespace(
+			// Set agent install namespace from addon deployment config if it exists
+			utils.AgentInstallNamespaceFromDeploymentConfigFunc(
+				utils.NewAddOnDeploymentConfigGetter(addonClient),
+			),
+		).WithScheme(scheme).
 		BuildHelmAgentAddon()
 	if err != nil {
 		return nil, fmt.Errorf("failed to build helm agent addon: %w", err)
