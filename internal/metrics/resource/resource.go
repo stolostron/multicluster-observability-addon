@@ -18,7 +18,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/ptr"
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -138,22 +137,11 @@ func (d DefaultStackResources) reconcileScrapeConfigs(ctx context.Context, mcoUI
 		desiredSC := existingSC.DeepCopy()
 		desiredSC.ManagedFields = nil // required for patching with ssa
 
-		target := config.ScrapeClassPlatformTarget
-		if isUWL {
-			target = config.ScrapeClassUWLTarget
-		}
-
-		if !isUWL || (isUWL && len(desiredSC.Spec.StaticConfigs) == 0) {
-			// If a scrape class is already set for a uwl, don't override
-			desiredSC.Spec.ScrapeClassName = ptr.To(config.ScrapeClassCfgName)
-			desiredSC.Spec.Scheme = ptr.To("HTTPS")
-			desiredSC.Spec.StaticConfigs = []cooprometheusv1alpha1.StaticConfig{
-				{
-					Targets: []cooprometheusv1alpha1.Target{
-						cooprometheusv1alpha1.Target(target),
-					},
-				},
-			}
+		if !isUWL {
+			// Enforce empty values, they are set when generating the manifests for a given managedCluster
+			desiredSC.Spec.ScrapeClassName = nil
+			desiredSC.Spec.Scheme = nil
+			desiredSC.Spec.StaticConfigs = nil
 		}
 
 		// SSA the objects rendered

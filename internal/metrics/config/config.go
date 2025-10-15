@@ -49,6 +49,7 @@ const (
 
 	RemoteWriteCfgName        = "acm-observability"
 	ScrapeClassCfgName        = "ocp-monitoring"
+	NonOCPScrapeClassName     = "non-ocp-monitoring"
 	ScrapeClassPlatformTarget = "prometheus-k8s.openshift-monitoring.svc:9091"
 	ScrapeClassUWLTarget      = "prometheus-user-workload.openshift-user-workload-monitoring.svc:9092"
 

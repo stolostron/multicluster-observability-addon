@@ -130,12 +130,12 @@ func TestPrometheusAgentSSA(t *testing.T) {
 				},
 			},
 			Expect: func(t *testing.T, agent *cooprometheusv1alpha1.PrometheusAgent) {
-				assert.Equal(t, agent.Spec.ConfigMaps, []string{"cm", config.PrometheusCAConfigMapName})
+				assert.Equal(t, agent.Spec.ConfigMaps, []string{"cm"})
 				assert.Len(t, agent.Spec.ScrapeClasses, 2)
 				index := slices.IndexFunc(agent.Spec.ScrapeClasses, func(e cooprometheusv1.ScrapeClass) bool {
 					return e.Name == config.ScrapeClassCfgName
 				})
-				assert.Equal(t, "/var/run/secrets/kubernetes.io/serviceaccount/token", agent.Spec.ScrapeClasses[index].Authorization.CredentialsFile)
+				assert.Empty(t, agent.Spec.ScrapeClasses[index].Authorization)
 				assert.Len(t, agent.Spec.ScrapeClasses[index].MetricRelabelings, 1)
 			},
 		},
