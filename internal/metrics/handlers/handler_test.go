@@ -564,8 +564,14 @@ func TestBuildOptions(t *testing.T) {
 			}
 
 			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(resources...).Build()
-			platform := addon.MetricsOptions{CollectionEnabled: tc.platformEnabled}
-			userWorkloads := addon.MetricsOptions{CollectionEnabled: tc.userWorkloadsEnabled}
+			addonOpts := addon.Options{
+				Platform: addon.PlatformOptions{
+					Metrics: addon.MetricsOptions{CollectionEnabled: tc.platformEnabled},
+				},
+				UserWorkloads: addon.UserWorkloadOptions{
+					Metrics: addon.MetricsOptions{CollectionEnabled: tc.userWorkloadsEnabled},
+				},
+			}
 
 			optsBuilder := &OptionsBuilder{
 				Client:         fakeClient,
@@ -576,7 +582,7 @@ func TestBuildOptions(t *testing.T) {
 			require.NoError(t, err)
 			require.Len(t, managedClusters.Items, 1)
 			foundManagedCluster := managedClusters.Items[0]
-			opts, err := optsBuilder.Build(context.Background(), tc.addon, &foundManagedCluster, platform, userWorkloads)
+			opts, err := optsBuilder.Build(context.Background(), tc.addon, &foundManagedCluster, addonOpts)
 
 			tc.expects(t, opts, err)
 		})

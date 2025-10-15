@@ -111,7 +111,7 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 		scheme := "HTTPS"
 		scrapeClassName := config.ScrapeClassCfgName
 		if !isOCPCluster {
-			target = fmt.Sprintf("prometheus-k8s.%s.svc:9091", config.HubInstallNamespace) // TODO: replace with install namespace from the config
+			target = fmt.Sprintf("prometheus-k8s.%s.svc:9091", opts.InstallNamespace) // TODO: replace with install namespace from the config
 			scrapeClassName = config.NonOCPScrapeClassName
 			scrapeConfig.Spec.TLSConfig = &cooprometheusv1.SafeTLSConfig{
 				InsecureSkipVerify: ptr.To(true),

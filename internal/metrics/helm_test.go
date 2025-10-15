@@ -652,7 +652,16 @@ func fakeGetValues(k8s client.Client, platformMetrics, userWorkloadMetrics bool)
 			RemoteWriteURL: "https://observatorium-api-open-cluster-management-observability.apps.sno-4xlarge-416-lqsr2.dev07.red-chesterfield.com/api/metrics/v1/default/api/v1/receive",
 		}
 
-		opts, err := optionsBuilder.Build(context.Background(), mcAddon, cluster, addon.MetricsOptions{CollectionEnabled: platformMetrics}, addon.MetricsOptions{CollectionEnabled: userWorkloadMetrics})
+		addonOpts := addon.Options{
+			Platform: addon.PlatformOptions{
+				Metrics: addon.MetricsOptions{CollectionEnabled: platformMetrics},
+			},
+			UserWorkloads: addon.UserWorkloadOptions{
+				Metrics: addon.MetricsOptions{CollectionEnabled: userWorkloadMetrics},
+			},
+		}
+
+		opts, err := optionsBuilder.Build(context.Background(), mcAddon, cluster, addonOpts)
 		if err != nil {
 			return nil, err
 		}

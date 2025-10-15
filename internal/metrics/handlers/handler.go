@@ -45,12 +45,13 @@ type OptionsBuilder struct {
 	Logger         logr.Logger
 }
 
-func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, managedCluster *clusterv1.ManagedCluster, platform, userWorkloads addon.MetricsOptions) (Options, error) {
+func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, managedCluster *clusterv1.ManagedCluster, opts addon.Options) (Options, error) {
 	ret := Options{
-		IsHub: common.IsHubCluster(managedCluster),
+		IsHub:            common.IsHubCluster(managedCluster),
+		InstallNamespace: opts.InstallNamespace,
 	}
 
-	if !platform.CollectionEnabled && !userWorkloads.CollectionEnabled {
+	if !opts.Platform.Metrics.CollectionEnabled && !opts.UserWorkloads.Metrics.CollectionEnabled {
 		return ret, nil
 	}
 
@@ -72,7 +73,7 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 	}
 
 	// Build Prometheus agents for platform and user workloads
-	if platform.CollectionEnabled {
+	if opts.Platform.Metrics.CollectionEnabled {
 		if err = o.buildPrometheusAgent(ctx, &ret, configResources, config.PlatformMetricsCollectorApp, false); err != nil {
 			return ret, err
 		}
@@ -91,7 +92,7 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 	// Check both if hypershift is enabled and has hosted clusters to limit noisy logs when uwl monitoring is disabled while there is no hostedCluster
 	isHypershiftCluster := IsHypershiftEnabled(managedCluster) && HasHostedCLusters(ctx, o.Client, o.Logger)
 
-	if userWorkloads.CollectionEnabled {
+	if opts.UserWorkloads.Metrics.CollectionEnabled {
 		if err = o.buildPrometheusAgent(ctx, &ret, configResources, config.UserWorkloadMetricsCollectorApp, isHypershiftCluster); err != nil {
 			return ret, err
 		}
@@ -108,7 +109,7 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 	}
 
 	if isHypershiftCluster {
-		if userWorkloads.CollectionEnabled {
+		if opts.UserWorkloads.Metrics.CollectionEnabled {
 			if err = o.buildHypershiftResources(ctx, &ret, managedCluster, configResources); err != nil {
 				return ret, fmt.Errorf("failed to generate hypershift resources: %w", err)
 			}
