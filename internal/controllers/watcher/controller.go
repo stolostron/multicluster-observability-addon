@@ -119,6 +119,7 @@ func (r *WatcherReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 func (r *WatcherReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&addonv1alpha1.ManagedClusterAddOn{}, noReconcilePred, builder.OnlyMetadata).
+		Watches(&addonv1alpha1.AddOnDeploymentConfig{}, r.enqueueForAllManagedClusters(), addOnDeploymentConfigPredicate, builder.OnlyMetadata).
 		Watches(&corev1.Secret{}, r.enqueueForConfigResource(), builder.OnlyMetadata).
 		Watches(&corev1.ConfigMap{}, r.enqueueForConfigResource(), builder.OnlyMetadata).
 		Watches(&corev1.ConfigMap{}, r.enqueueForAllManagedClusters(), imagesConfigMapPredicate, builder.OnlyMetadata).
@@ -251,6 +252,27 @@ func (r *WatcherReconciler) manifestToObject(m workv1.Manifest) (client.Object, 
 
 	return clientObj, nil
 }
+
+var addOnDeploymentConfigPredicate = builder.WithPredicates(predicate.Funcs{
+	UpdateFunc: func(e event.UpdateEvent) bool {
+		if e.ObjectNew.GetName() != addoncfg.Name || e.ObjectNew.GetNamespace() != addoncfg.InstallNamespace {
+			return false
+		}
+		oldADC, okOld := e.ObjectOld.(*addonv1alpha1.AddOnDeploymentConfig)
+		newADC, okNew := e.ObjectNew.(*addonv1alpha1.AddOnDeploymentConfig)
+		if !okOld || !okNew {
+			return false
+		}
+		return !equality.Semantic.DeepEqual(oldADC.Spec, newADC.Spec)
+	},
+	CreateFunc: func(e event.CreateEvent) bool {
+		return e.Object.GetName() == addoncfg.Name && e.Object.GetNamespace() == addoncfg.InstallNamespace
+	},
+	DeleteFunc: func(e event.DeleteEvent) bool {
+		return e.Object.GetName() == addoncfg.Name && e.Object.GetNamespace() == addoncfg.InstallNamespace
+	},
+	GenericFunc: func(e event.GenericEvent) bool { return false },
+})
 
 var hostedClusterPredicate = builder.WithPredicates(predicate.Funcs{
 	UpdateFunc: func(e event.UpdateEvent) bool {
