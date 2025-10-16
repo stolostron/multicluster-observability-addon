@@ -116,6 +116,7 @@ func TestReconcileAgent(t *testing.T) {
 	cmao := newCMAO()
 	opts := newAddonOptions(true, true)
 	kubeRbacImage := "kube-rbac-proxy:version"
+	prometheusImage := "prometheus:version"
 	placementRef := addonv1alpha1.PlacementRef{Name: "my-placement", Namespace: "my-namespace"}
 
 	// Dynamic fake client doesn't support apply types of patch. This is overridden with an interceptor toward a
@@ -133,6 +134,7 @@ func TestReconcileAgent(t *testing.T) {
 		AddonOptions:       opts,
 		Logger:             klog.Background(),
 		KubeRBACProxyImage: kubeRbacImage,
+		PrometheusImage:    prometheusImage,
 	}
 
 	// >>> Platform agent
@@ -147,7 +149,7 @@ func TestReconcileAgent(t *testing.T) {
 	assert.EqualValues(t, 1, *foundAgent.Spec.Replicas)
 	// Check ssa fields
 	assert.Equal(t, kubeRbacImage, foundAgent.Spec.Containers[0].Image)
-	assert.Empty(t, foundAgent.Spec.Image)
+	assert.Equal(t, prometheusImage, *foundAgent.Spec.Image)
 	assert.Equal(t, config.PlatformMetricsCollectorApp, foundAgent.Spec.ServiceAccountName)
 	// Check placement labels
 	assert.Equal(t, foundAgent.Labels[addoncfg.PlacementRefNameLabelKey], placementRef.Name)
