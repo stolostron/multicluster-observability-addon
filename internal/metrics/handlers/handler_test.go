@@ -247,6 +247,7 @@ func TestBuildOptions(t *testing.T) {
 					"prometheus_config_reloader": "prometheus-config-reload-image",
 					"kube_state_metrics":         "quay.io/kube/kube-state-metrics",
 					"node_exporter":              "quay.io/kube/node-exporter",
+					"prometheus":                 "quay.io/prometheus/prometheus",
 				},
 			},
 			platformAgent,

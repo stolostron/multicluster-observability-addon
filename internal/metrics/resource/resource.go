@@ -18,6 +18,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -140,9 +141,9 @@ func (d DefaultStackResources) reconcileScrapeConfigs(ctx context.Context, mcoUI
 
 		if !isUWL {
 			// Enforce empty values, they are set when generating the manifests for a given managedCluster
-			desiredSC.Spec.ScrapeClassName = nil
-			desiredSC.Spec.Scheme = nil
-			desiredSC.Spec.StaticConfigs = nil
+			desiredSC.Spec.ScrapeClassName = ptr.To("")
+			desiredSC.Spec.Scheme = ptr.To("")
+			desiredSC.Spec.StaticConfigs = []cooprometheusv1alpha1.StaticConfig{}
 		}
 
 		// SSA the objects rendered

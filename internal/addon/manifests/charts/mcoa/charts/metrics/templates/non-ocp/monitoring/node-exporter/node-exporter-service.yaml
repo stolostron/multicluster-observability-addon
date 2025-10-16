@@ -10,7 +10,7 @@ spec:
   clusterIP: None
   ports:
   - name: https
-    port: 9100
+    port: {{ .Values.nodeExporter.hostPort }}
     targetPort: https
   selector:
     {{- include "node-exporter.selectorLabels" . | nindent 4 }}

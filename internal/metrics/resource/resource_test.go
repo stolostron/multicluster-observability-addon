@@ -515,7 +515,7 @@ func TestReconcileScrapeConfigs(t *testing.T) {
 			},
 			expects: func(t *testing.T, objs []cooprometheusv1alpha1.ScrapeConfig) {
 				assert.Len(t, objs, 1)
-				assert.Equal(t, *objs[0].Spec.ScrapeClassName, config.ScrapeClassCfgName)
+				assert.Empty(t, objs[0].Spec.ScrapeClassName)
 			},
 		},
 		{
@@ -566,7 +566,7 @@ func TestReconcileScrapeConfigs(t *testing.T) {
 			hasHostedClusters: true,
 			expects: func(t *testing.T, objs []cooprometheusv1alpha1.ScrapeConfig) {
 				assert.Len(t, objs, 1)
-				assert.Equal(t, *objs[0].Spec.ScrapeClassName, config.ScrapeClassCfgName)
+				assert.Empty(t, objs[0].Spec.ScrapeClassName)
 			},
 		},
 	}

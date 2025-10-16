@@ -74,7 +74,7 @@ func Test_Supported_Vendors(t *testing.T) {
 					Value: string(addon.ClusterLogForwarderV1),
 				},
 			},
-			expectedObjects: false,
+			expectedObjects: true,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
