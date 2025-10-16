@@ -4,6 +4,8 @@ kind: Prometheus
 metadata:
   name: {{ include "prometheus.fullname" . }}
   namespace: {{ .Release.Namespace }}
+  annotations:
+    operator.prometheus.io/controller-id: {{ .Values.prometheusControllerID }}
   labels:
     {{- include "prometheus.labels" . | nindent 4 }}
 spec:
@@ -70,7 +72,7 @@ spec:
   rules:
     alert: {}
   arbitraryFSAccessThroughSMs: {}
-  image: quay.io/stolostron/prometheus:2.5.0-SNAPSHOT-2022-01-25-02-13-09
+  image: {{ .Values.images.prometheus }}
   replicas: 1
   ruleSelector: {}
   ruleNamespaceSelector: {}

@@ -45,6 +45,7 @@ type ImagesValues struct {
 	KubeStateMetrics         string `json:"kubeStateMetrics"`
 	NodeExporter             string `json:"nodeExporter"`
 	RBACProxyImage           string `json:"rbacProxyImage"`
+	Prometheus               string `json:"prometheus"`
 }
 
 type ConfigValue struct {
@@ -238,6 +239,7 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 		KubeStateMetrics:         opts.Images.KubeStateMetrics,
 		NodeExporter:             opts.Images.NodeExporter,
 		RBACProxyImage:           opts.Images.KubeRBACProxy,
+		Prometheus:               opts.Images.Prometheus,
 	}
 
 	return ret, nil
