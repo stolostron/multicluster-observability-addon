@@ -19,6 +19,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
@@ -69,6 +70,10 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 	configResources, err := o.getAvailableConfigResources(ctx, mcAddon)
 	if err != nil {
 		return ret, fmt.Errorf("failed to get configuration resources: %w", err)
+	}
+
+	if err = o.addAlertmanagerSecrets(ctx, &ret.Secrets); err != nil {
+		return ret, fmt.Errorf("failed to add alertmanager secrets: %w", err)
 	}
 
 	// Build Prometheus agents for platform and user workloads
@@ -220,7 +225,7 @@ func (o *OptionsBuilder) buildPrometheusAgent(ctx context.Context, opts *Options
 
 	// Fetch related secrets
 	for _, secretName := range agent.Spec.Secrets {
-		if err := o.addSecret(ctx, &opts.Secrets, secretName, agent.Namespace); err != nil {
+		if err := o.addSecret(ctx, &opts.Secrets, secretName, agent.Namespace, agent.Namespace); err != nil {
 			return err
 		}
 	}
@@ -263,7 +268,7 @@ func (o *OptionsBuilder) buildHypershiftResources(ctx context.Context, opts *Opt
 }
 
 // Simplified addSecret function (unchanged)
-func (o *OptionsBuilder) addSecret(ctx context.Context, secrets *[]*corev1.Secret, secretName, secretNamespace string) error {
+func (o *OptionsBuilder) addSecret(ctx context.Context, secrets *[]*corev1.Secret, secretName, secretNamespace string, targetNamespace string) error {
 	if slices.IndexFunc(*secrets, func(s *corev1.Secret) bool { return s.Name == secretName && s.Namespace == secretNamespace }) != -1 {
 		return nil
 	}
@@ -272,6 +277,8 @@ func (o *OptionsBuilder) addSecret(ctx context.Context, secrets *[]*corev1.Secre
 	if err := o.Client.Get(ctx, types.NamespacedName{Name: secretName, Namespace: secretNamespace}, secret); err != nil {
 		return fmt.Errorf("failed to get secret %s in namespace %s: %w", secretName, secretNamespace, err)
 	}
+
+	secret.Namespace = targetNamespace
 
 	*secrets = append(*secrets, secret)
 	return nil
@@ -418,4 +425,64 @@ func createWriteRelabelConfigs(clusterName, clusterID string, isHypershiftLocalC
 			Regex:  "exported_job|exported_instance",
 			Action: "labeldrop",
 		})
+}
+
+func (o *OptionsBuilder) addAlertmanagerSecrets(ctx context.Context, secrets *[]*corev1.Secret) error {
+	// Add acceesor secret to platform and UWL namespaces
+	if err := o.addSecret(ctx, secrets, config.AlertmanagerAccessorSecretName, config.HubInstallNamespace, config.AlertmanagerPlatformNamespace); err != nil {
+		return fmt.Errorf("failed to add secret: %w", err)
+	}
+
+	if err := o.addSecret(ctx, secrets, config.AlertmanagerAccessorSecretName, config.HubInstallNamespace, config.AlertmanagerUWLNamespace); err != nil {
+		return fmt.Errorf("failed to add secret: %w", err)
+	}
+
+	amRouteBYOCaSrt := &corev1.Secret{}
+	amRouteBYOCertSrt := &corev1.Secret{}
+	routerCASecret := &corev1.Secret{}
+	err1 := o.Client.Get(
+		ctx,
+		types.NamespacedName{Name: config.AlertmanagerRouteBYOCAName, Namespace: config.HubInstallNamespace},
+		amRouteBYOCaSrt,
+	)
+	err2 := o.Client.Get(
+		ctx,
+		types.NamespacedName{Name: config.AlertmanagerRouteBYOCERTName, Namespace: config.HubInstallNamespace},
+		amRouteBYOCertSrt,
+	)
+	if err1 == nil && err2 == nil {
+		// BYO certs exists, use these
+		routerCASecret = amRouteBYOCaSrt
+	} else {
+		// No BYO certs, use default ingress certs
+		err := o.Client.Get(
+			ctx,
+			types.NamespacedName{Name: "router-certs-default", Namespace: "openshift-ingress"},
+			routerCASecret,
+		)
+		if err != nil {
+			return err
+		}
+
+	}
+
+	ca := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      config.AlertmanagerRouterCASecretName,
+			Namespace: config.AlertmanagerPlatformNamespace,
+		},
+		Data: map[string][]byte{"service-ca.crt": routerCASecret.Data["tls.crt"]},
+	}
+	*secrets = append(*secrets, ca)
+
+	caUWL := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      config.AlertmanagerRouterCASecretName,
+			Namespace: config.AlertmanagerUWLNamespace,
+		},
+		Data: map[string][]byte{"service-ca.crt": routerCASecret.Data["tls.crt"]},
+	}
+	*secrets = append(*secrets, caUWL)
+
+	return nil
 }

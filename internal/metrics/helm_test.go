@@ -88,11 +88,11 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				assert.Len(t, cooOperator, 1)
 				// ensure that the number of objects is correct
 				// 4 (prom operator) + 5 (agent) + 2 secrets (mTLS to hub) + 1 cm (prom ca) + 2 rule + 2 scrape config = 16
-				expectedCount := 31
+				expectedCount := 35
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
-				assert.Len(t, common.FilterResourcesByLabelSelector[*corev1.Secret](objects, nil), 2) // 2 secrets (mTLS to hub)
+				assert.Len(t, common.FilterResourcesByLabelSelector[*corev1.Secret](objects, nil), 6) // 6 secrets (mTLS to hub) + alertmananger secrets (accessor+ca in platform+uwl)
 			},
 		},
 		"platform metrics, coo is installed": {
@@ -106,7 +106,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				assert.Equal(t, "observability-operator", agent[0].Labels["app.kubernetes.io/managed-by"])
 				assert.Empty(t, agent[0].Annotations["operator.prometheus.io/controller-id"])
 				// ensure that the number of objects is correct
-				expectedCount := 23
+				expectedCount := 27
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
@@ -132,11 +132,11 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				recordingRules := common.FilterResourcesByLabelSelector[*prometheusv1.PrometheusRule](objects, config.UserWorkloadPrometheusMatchLabels)
 				assert.Len(t, recordingRules, 2)
 				assert.Equal(t, "openshift-user-workload-monitoring/prometheus-operator", recordingRules[0].Annotations["operator.prometheus.io/controller-id"])
-				expectedCount := 31
+				expectedCount := 35
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
-				assert.Len(t, common.FilterResourcesByLabelSelector[*corev1.Secret](objects, nil), 2) // 2 secrets (mTLS to hub)
+				assert.Len(t, common.FilterResourcesByLabelSelector[*corev1.Secret](objects, nil), 6) // 2 secrets (mTLS to hub)
 			},
 		},
 		"user workload, coo is installed": {
@@ -150,7 +150,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				assert.Equal(t, "observability-operator", agent[0].Labels["app.kubernetes.io/managed-by"])
 				assert.Empty(t, agent[0].Annotations["operator.prometheus.io/controller-id"])
 				// ensure that the number of objects is correct
-				expectedCount := 23
+				expectedCount := 27
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
@@ -261,6 +261,12 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 			clientObjects = append(clientObjects, imagesCM)
 			clientObjects = append(clientObjects, newManifestWork("cluster-1", tc.COOIsInstalled))
 
+			// Add alermanager secrets
+			clientObjects = append(clientObjects, newSecret(config.AlertmanagerAccessorSecretName, hubNamespace))
+			routerCertsSecret := newSecret(config.RouterDefaultCertsConfigMapObjKey.Name, config.RouterDefaultCertsConfigMapObjKey.Namespace)
+			routerCertsSecret.Data["tls.crt"] = []byte("toto")
+			clientObjects = append(clientObjects, routerCertsSecret)
+
 			// Setup the fake k8s client
 			client := fakeclient.NewClientBuilder().
 				WithInterceptorFuncs(interceptor.Funcs{
@@ -327,7 +333,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				assert.NoError(t, err)
 
 				// if not a global object, check namespace
-				if !slices.Contains([]string{"ClusterRole", "ClusterRoleBinding", "CustomResourceDefinition"}, obj.GetObjectKind().GroupVersionKind().Kind) {
+				if !slices.Contains([]string{"ClusterRole", "ClusterRoleBinding", "CustomResourceDefinition", "Secret"}, obj.GetObjectKind().GroupVersionKind().Kind) {
 					assert.Equal(t, installNamespace, accessor.GetNamespace(), fmt.Sprintf("Object: %s/%s", obj.GetObjectKind().GroupVersionKind(), accessor.GetName()))
 				}
 			}
@@ -484,6 +490,12 @@ func TestHelmBuild_Metrics_HCP(t *testing.T) {
 	// Add secrets needed for the agent connection to the hub
 	clientObjects = append(clientObjects, newSecret(config.HubCASecretName, hubNamespace))
 	clientObjects = append(clientObjects, newSecret(config.ClientCertSecretName, hubNamespace))
+
+	// Add alermanager secrets
+	clientObjects = append(clientObjects, newSecret(config.AlertmanagerAccessorSecretName, hubNamespace))
+	routerCertsSecret := newSecret(config.RouterDefaultCertsConfigMapObjKey.Name, config.RouterDefaultCertsConfigMapObjKey.Namespace)
+	routerCertsSecret.Data["tls.crt"] = []byte("toto")
+	clientObjects = append(clientObjects, routerCertsSecret)
 
 	// Setup a the local cluster as managed cluster
 	managedCluster := addontesting.NewManagedCluster("cluster-1")
