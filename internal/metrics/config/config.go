@@ -94,6 +94,7 @@ type ImageOverrides struct {
 	CooPrometheusOperatorImage string `json:"obo_prometheus_operator"`
 	KubeStateMetrics           string `json:"kube_state_metrics"`
 	NodeExporter               string `json:"node_exporter"`
+	Prometheus                 string `json:"prometheus"`
 }
 
 func GetImageOverrides(ctx context.Context, c client.Client) (ImageOverrides, error) {
@@ -117,6 +118,7 @@ func GetImageOverrides(ctx context.Context, c client.Client) (ImageOverrides, er
 		ret.PrometheusConfigReloader == "" ||
 		ret.KubeRBACProxy == "" ||
 		ret.KubeStateMetrics == "" ||
+		ret.Prometheus == "" ||
 		ret.NodeExporter == "" {
 		return ret, fmt.Errorf("%w: %+v", ErrMissingImageOverride, ret)
 	}

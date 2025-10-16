@@ -285,6 +285,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 					"kube_rbac_proxy":            "quay.io/kube/rbac-proxy",
 					"kube_state_metrics":         "quay.io/kube/kube-state-metrics",
 					"node_exporter":              "quay.io/kube/node-exporter",
+					"prometheus":                 "quay.io/prometheus/prometheus",
 				},
 			}
 			clientObjects = append(clientObjects, imagesCM)
@@ -549,6 +550,7 @@ func TestHelmBuild_Metrics_HCP(t *testing.T) {
 			"kube_rbac_proxy":            "quay.io/kube/rbac-proxy",
 			"kube_state_metrics":         "quay.io/kube/kube-state-metrics",
 			"node_exporter":              "quay.io/kube/node-exporter",
+			"prometheus":                 "quay.io/prometheus/prometheus",
 		},
 	}
 	clientObjects = append(clientObjects, imagesCM)

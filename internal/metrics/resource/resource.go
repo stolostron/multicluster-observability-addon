@@ -32,6 +32,7 @@ type DefaultStackResources struct {
 	CMAO               *addonv1alpha1.ClusterManagementAddOn
 	Logger             logr.Logger
 	KubeRBACProxyImage string
+	PrometheusImage    string
 }
 
 // Reconcile ensures the state of the configuration resources for metrics collection.
@@ -226,6 +227,7 @@ func (d DefaultStackResources) reconcileAgentForPlacement(ctx context.Context, p
 	promBuilder := PrometheusAgentSSA{
 		ExistingAgent:       agent,
 		IsUwl:               isUWL,
+		PrometheusImage:     d.PrometheusImage,
 		KubeRBACProxyImage:  d.KubeRBACProxyImage,
 		RemoteWriteEndpoint: d.AddonOptions.Platform.Metrics.HubEndpoint.String(),
 		Labels: map[string]string{

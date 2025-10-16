@@ -82,6 +82,7 @@ func makeConfigResourceLabels(isUWL bool, placementRef addonv1alpha1.PlacementRe
 type PrometheusAgentSSA struct {
 	ExistingAgent       *cooprometheusv1alpha1.PrometheusAgent
 	IsUwl               bool
+	PrometheusImage     string
 	KubeRBACProxyImage  string
 	Labels              map[string]string
 	RemoteWriteEndpoint string
@@ -119,6 +120,10 @@ func (p *PrometheusAgentSSA) Build() *cooprometheusv1alpha1.PrometheusAgent {
 	if p.IsUwl {
 		p.desiredAgent.Spec.ServiceAccountName = config.UserWorkloadMetricsCollectorApp
 		p.desiredAgent.Spec.ServiceName = ptr.To(config.UserWorkloadMetricsCollectorApp)
+	}
+
+	if len(p.PrometheusImage) > 0 {
+		p.desiredAgent.Spec.Image = &p.PrometheusImage
 	}
 
 	if len(p.Labels) > 0 {
