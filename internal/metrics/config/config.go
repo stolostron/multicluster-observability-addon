@@ -22,6 +22,7 @@ const (
 	HubCASecretName                 = "observability-managed-cluster-certs"
 	ClientCertSecretName            = "observability-controller-open-cluster-management.io-observability-signer-client-cert"
 	PrometheusCAConfigMapName       = "prometheus-server-ca"
+	PrometheusServerName            = "acm-prometheus-k8s" // For non ocp spokes
 	HubInstallNamespace             = "open-cluster-management-observability"
 
 	ManagedClusterLabelClusterID      = "clusterID"

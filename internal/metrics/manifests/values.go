@@ -21,6 +21,7 @@ type MetricsValues struct {
 	Images                        ImagesValues  `json:"images"`
 	PrometheusControllerID        string        `json:"prometheusControllerID"`
 	PrometheusCAConfigMapName     string        `json:"prometheusCAConfigMapName"`
+	PrometheusServerName          string        `json:"prometheusServerName"`
 	Platform                      Collector     `json:"platform"`
 	UserWorkload                  Collector     `json:"userWorkload"`
 	DeployNonOCPStack             bool          `json:"deployNonOCPStack"`
@@ -59,6 +60,7 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 	ret := &MetricsValues{
 		PrometheusControllerID:    config.PrometheusControllerID,
 		PrometheusCAConfigMapName: config.PrometheusCAConfigMapName,
+		PrometheusServerName:      config.PrometheusServerName,
 		Platform: Collector{
 			AppName:            config.PlatformMetricsCollectorApp,
 			RBACProxyTLSSecret: config.PlatformRBACProxyTLSSecret,
@@ -112,7 +114,7 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 		scheme := "HTTPS"
 		scrapeClassName := config.ScrapeClassCfgName
 		if !isOCPCluster {
-			target = fmt.Sprintf("prometheus-k8s.%s.svc:9091", opts.InstallNamespace) // TODO: replace with install namespace from the config
+			target = fmt.Sprintf("%s.%s.svc:9091", config.PrometheusServerName, opts.InstallNamespace)
 			scrapeClassName = config.NonOCPScrapeClassName
 			scrapeConfig.Spec.TLSConfig = &cooprometheusv1.SafeTLSConfig{
 				InsecureSkipVerify: ptr.To(true),

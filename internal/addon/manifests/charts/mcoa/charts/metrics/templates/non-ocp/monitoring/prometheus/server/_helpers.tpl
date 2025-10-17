@@ -1,16 +1,4 @@
-{{/*
-prometheus fullname.
-*/}}
-{{- define "prometheus.fullname" -}}
-acm-prometheus-k8s
-{{- end -}}
 
-{{/*
-prometheus service account name.
-*/}}
-{{- define "prometheus.serviceAccountName" -}}
-acm-prometheus-k8s
-{{- end -}}
 
 {{/*
 Common labels for prometheus.
