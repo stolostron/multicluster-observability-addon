@@ -2,7 +2,7 @@
 apiVersion: monitoring.rhobs/v1
 kind: Prometheus
 metadata:
-  name: {{ include "prometheus.fullname" . }}
+  name: {{ .Values.prometheusServerName }}
   namespace: {{ .Release.Namespace }}
   annotations:
     operator.prometheus.io/controller-id: {{ .Values.prometheusControllerID }}
@@ -11,7 +11,7 @@ metadata:
 spec:
   nodeSelector:
     kubernetes.io/os: linux
-  serviceAccountName: {{ include "prometheus.serviceAccountName" . }}
+  serviceAccountName: {{ .Values.prometheusServerName }}
   secrets:
     - hub-alertmanager-router-ca
     - observability-alertmanager-accessor
@@ -69,7 +69,7 @@ spec:
   volumes:
   - name: proxy-config
     configMap:
-      name: {{ include "prometheus.fullname" . }}-proxy-config
+      name: {{ .Values.prometheusServerName }}-proxy-config
   podMetadata:
     annotations:
       target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'

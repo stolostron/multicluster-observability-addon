@@ -4,17 +4,17 @@ kind: RoleBinding
 metadata:
   annotations:
     update-namespace: "false"
-  name: {{ include "prometheus.serviceAccountName" . }}
+  name: {{ .Values.prometheusServerName }}
   namespace: {{ .Release.Namespace }}
   labels:
     {{- include "prometheus.labels" . | nindent 4 }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: {{ include "prometheus.serviceAccountName" . }}
+  name: {{ .Values.prometheusServerName }}
 subjects:
 - kind: ServiceAccount
-  name: {{ include "prometheus.serviceAccountName" . }}
+  name: {{ .Values.prometheusServerName }}
   namespace: {{ .Release.Namespace }}
 
 
