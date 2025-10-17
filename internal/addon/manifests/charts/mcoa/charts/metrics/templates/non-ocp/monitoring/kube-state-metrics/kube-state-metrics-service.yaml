@@ -1,0 +1,20 @@
+{{- if .Values.deployNonOCPStack }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "kube-state-metrics.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "kube-state-metrics.labels" . | nindent 4 }}
+spec:
+  clusterIP: None
+  ports:
+  - name: https-main
+    port: 8443
+    targetPort: https-main
+  - name: https-self
+    port: 9443
+    targetPort: https-self
+  selector:
+    {{- include "kube-state-metrics.selectorLabels" . | nindent 4 }}
+{{- end }}

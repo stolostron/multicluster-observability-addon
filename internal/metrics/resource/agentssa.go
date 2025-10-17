@@ -82,6 +82,7 @@ func makeConfigResourceLabels(isUWL bool, placementRef addonv1alpha1.PlacementRe
 type PrometheusAgentSSA struct {
 	ExistingAgent       *cooprometheusv1alpha1.PrometheusAgent
 	IsUwl               bool
+	PrometheusImage     string
 	KubeRBACProxyImage  string
 	Labels              map[string]string
 	RemoteWriteEndpoint string
@@ -119,6 +120,10 @@ func (p *PrometheusAgentSSA) Build() *cooprometheusv1alpha1.PrometheusAgent {
 	if p.IsUwl {
 		p.desiredAgent.Spec.ServiceAccountName = config.UserWorkloadMetricsCollectorApp
 		p.desiredAgent.Spec.ServiceName = ptr.To(config.UserWorkloadMetricsCollectorApp)
+	}
+
+	if len(p.PrometheusImage) > 0 {
+		p.desiredAgent.Spec.Image = &p.PrometheusImage
 	}
 
 	if len(p.Labels) > 0 {
@@ -209,54 +214,26 @@ func (p *PrometheusAgentSSA) setWatchedResources() {
 }
 
 func (p *PrometheusAgentSSA) setScrapeClasses() {
-	// Add remote write configmaps and keep user defined ones, keeping original order
+	// The addon dynamically injects scrape classes based on the managed cluster type.
+	// To avoid conflicts and confusion, we enforce that users can only customize
+	// the MetricRelabelings for the addon's scrape classes on the hub PrometheusAgent CR.
+	// Other fields like TLSConfig or Authorization are managed by the addon's values logic.
+	p.desiredAgent.Spec.ScrapeClasses = slices.Clone(p.ExistingAgent.Spec.ScrapeClasses)
+	for i, sc := range p.desiredAgent.Spec.ScrapeClasses {
+		if sc.Name == config.ScrapeClassCfgName || sc.Name == config.NonOCPScrapeClassName {
+			p.desiredAgent.Spec.ScrapeClasses[i] = cooprometheusv1.ScrapeClass{
+				Name:              sc.Name,
+				MetricRelabelings: sc.MetricRelabelings,
+			}
+		}
+	}
+
+	// We also remove the associated configmap if manually added by the user,
+	// as it's only injected for OCP clusters by the values logic.
 	p.desiredAgent.Spec.ConfigMaps = slices.Clone(p.ExistingAgent.Spec.ConfigMaps)
-	neededConfigMaps := []string{config.PrometheusCAConfigMapName}
-	for _, cm := range neededConfigMaps {
-		if !slices.Contains(p.ExistingAgent.Spec.ConfigMaps, cm) {
-			p.desiredAgent.Spec.ConfigMaps = append(p.desiredAgent.Spec.ConfigMaps, cm)
-		}
-	}
-
-	desiredScrapeClass := cooprometheusv1.ScrapeClass{
-		Authorization: &cooprometheusv1.Authorization{
-			CredentialsFile: "/var/run/secrets/kubernetes.io/serviceaccount/token",
-		},
-		Name: config.ScrapeClassCfgName,
-		TLSConfig: &cooprometheusv1.TLSConfig{
-			CAFile: fmt.Sprintf("/etc/prometheus/configmaps/%s/service-ca.crt", config.PrometheusCAConfigMapName),
-		},
-		Default: ptr.To(true),
-	}
-
-	// Ensure there is a single ocp-monitring class
-	var found *cooprometheusv1.ScrapeClass
-	p.desiredAgent.Spec.ScrapeClasses = p.ExistingAgent.Spec.ScrapeClasses
-	p.desiredAgent.Spec.ScrapeClasses = slices.DeleteFunc(p.desiredAgent.Spec.ScrapeClasses, func(e cooprometheusv1.ScrapeClass) bool {
-		if e.Name != desiredScrapeClass.Name {
-			return false
-		}
-		if found == nil {
-			found = &e
-			return false
-		}
-		return true
+	p.desiredAgent.Spec.ConfigMaps = slices.DeleteFunc(p.desiredAgent.Spec.ConfigMaps, func(e string) bool {
+		return e == config.PrometheusCAConfigMapName
 	})
-
-	// Keep some of the existing parameters, allowing the user to override them
-	if found != nil {
-		if len(found.MetricRelabelings) > 0 {
-			desiredScrapeClass.MetricRelabelings = found.MetricRelabelings
-		}
-	}
-
-	// Insert or replace the config
-	index := slices.IndexFunc(p.desiredAgent.Spec.ScrapeClasses, func(e cooprometheusv1.ScrapeClass) bool { return e.Name == desiredScrapeClass.Name })
-	if index >= 0 {
-		p.desiredAgent.Spec.ScrapeClasses[index] = desiredScrapeClass
-	} else {
-		p.desiredAgent.Spec.ScrapeClasses = append(p.desiredAgent.Spec.ScrapeClasses, desiredScrapeClass)
-	}
 }
 
 func (p *PrometheusAgentSSA) setKubeRBACProxySidecar() {

@@ -92,8 +92,9 @@ type MetricsUIOptions struct {
 }
 
 type Options struct {
-	Platform      PlatformOptions
-	UserWorkloads UserWorkloadOptions
+	Platform         PlatformOptions
+	UserWorkloads    UserWorkloadOptions
+	InstallNamespace string
 }
 
 func BuildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Options, error) {
@@ -101,6 +102,8 @@ func BuildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Opti
 	if addOnDeployment == nil {
 		return opts, nil
 	}
+
+	opts.InstallNamespace = addOnDeployment.Spec.AgentInstallNamespace
 
 	if addOnDeployment.Spec.CustomizedVariables == nil {
 		return opts, nil

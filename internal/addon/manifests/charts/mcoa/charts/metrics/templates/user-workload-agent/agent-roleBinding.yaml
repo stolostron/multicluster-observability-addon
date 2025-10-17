@@ -13,5 +13,5 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: {{ .Values.userWorkload.appName }}
-  namespace: open-cluster-management-addon-observability
+  namespace: {{ .Release.Namespace }}
 {{- end }}

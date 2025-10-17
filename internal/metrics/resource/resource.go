@@ -33,6 +33,7 @@ type DefaultStackResources struct {
 	CMAO               *addonv1alpha1.ClusterManagementAddOn
 	Logger             logr.Logger
 	KubeRBACProxyImage string
+	PrometheusImage    string
 }
 
 // Reconcile ensures the state of the configuration resources for metrics collection.
@@ -138,22 +139,11 @@ func (d DefaultStackResources) reconcileScrapeConfigs(ctx context.Context, mcoUI
 		desiredSC := existingSC.DeepCopy()
 		desiredSC.ManagedFields = nil // required for patching with ssa
 
-		target := config.ScrapeClassPlatformTarget
-		if isUWL {
-			target = config.ScrapeClassUWLTarget
-		}
-
-		if !isUWL || (isUWL && len(desiredSC.Spec.StaticConfigs) == 0) {
-			// If a scrape class is already set for a uwl, don't override
-			desiredSC.Spec.ScrapeClassName = ptr.To(config.ScrapeClassCfgName)
-			desiredSC.Spec.Scheme = ptr.To("HTTPS")
-			desiredSC.Spec.StaticConfigs = []cooprometheusv1alpha1.StaticConfig{
-				{
-					Targets: []cooprometheusv1alpha1.Target{
-						cooprometheusv1alpha1.Target(target),
-					},
-				},
-			}
+		if !isUWL {
+			// Enforce empty values, they are set when generating the manifests for a given managedCluster
+			desiredSC.Spec.ScrapeClassName = ptr.To("")
+			desiredSC.Spec.Scheme = ptr.To("")
+			desiredSC.Spec.StaticConfigs = []cooprometheusv1alpha1.StaticConfig{}
 		}
 
 		// SSA the objects rendered
@@ -238,6 +228,7 @@ func (d DefaultStackResources) reconcileAgentForPlacement(ctx context.Context, p
 	promBuilder := PrometheusAgentSSA{
 		ExistingAgent:       agent,
 		IsUwl:               isUWL,
+		PrometheusImage:     d.PrometheusImage,
 		KubeRBACProxyImage:  d.KubeRBACProxyImage,
 		RemoteWriteEndpoint: d.AddonOptions.Platform.Metrics.HubEndpoint.String(),
 		Labels: map[string]string{

@@ -1,0 +1,17 @@
+{{- if .Values.deployNonOCPStack }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "node-exporter.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "node-exporter.labels" . | nindent 4 }}
+spec:
+  clusterIP: None
+  ports:
+  - name: https
+    port: {{ .Values.nodeExporter.hostPort }}
+    targetPort: https
+  selector:
+    {{- include "node-exporter.selectorLabels" . | nindent 4 }}
+{{- end }}

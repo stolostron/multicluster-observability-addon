@@ -155,6 +155,7 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		AddonOptions:       opts,
 		Logger:             r.Log,
 		KubeRBACProxyImage: images.KubeRBACProxy,
+		PrometheusImage:    images.Prometheus,
 	}
 
 	mDefaultConfig, err := mdefault.Reconcile(ctx)

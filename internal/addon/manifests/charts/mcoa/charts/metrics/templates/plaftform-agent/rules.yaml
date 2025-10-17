@@ -1,6 +1,10 @@
 {{- if .Values.platformEnabled }}
 {{- range $_, $rule := .Values.platform.rules }}
+{{- if $.Values.deployNonOCPStack }}
+apiVersion: monitoring.rhobs/v1
+{{- else }}
 apiVersion: monitoring.coreos.com/v1
+{{- end }}
 kind: PrometheusRule
 metadata:
   name: {{ $rule.name }}
@@ -13,7 +17,12 @@ metadata:
     {{- toYaml $mergedLabels | nindent 4 }}
   annotations:
     {{- $incomingAnnotations := $rule.annotations }}
-    {{- $stdAnnotations := dict "operator.prometheus.io/controller-id" "openshift-monitoring/prometheus-operator" }}
+    {{- $stdAnnotations := dict }}
+    {{- if $.Values.deployNonOCPStack }}
+    {{- $_ := set $stdAnnotations "operator.prometheus.io/controller-id" $.Values.prometheusControllerID }}
+    {{- else }}
+    {{- $_ := set $stdAnnotations "operator.prometheus.io/controller-id" "openshift-monitoring/prometheus-operator" }}
+    {{- end }}
     {{- $mergedAnnotations := mergeOverwrite $incomingAnnotations $stdAnnotations }}
     {{- toYaml $mergedAnnotations | nindent 4 }}
 spec:
