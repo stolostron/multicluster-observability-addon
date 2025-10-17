@@ -1,0 +1,17 @@
+{{- if and .Values.platformEnabled .Values.deployNonOCPStack }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "prometheus.fullname" . }}-proxy-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "prometheus.labels" . | nindent 4 }}
+data:
+  config.yaml: |
+    authorization:
+      static:
+        - path: /federate
+          verb: get
+          user:
+            name: system:serviceaccount:{{ .Release.Namespace }}:{{ .Values.platform.appName }}
+{{- end }}

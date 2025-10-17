@@ -1,4 +1,4 @@
-{{- if .Values.platformEnabled }}
+{{- if and .Values.platformEnabled (not .Values.deployNonOCPStack) }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:

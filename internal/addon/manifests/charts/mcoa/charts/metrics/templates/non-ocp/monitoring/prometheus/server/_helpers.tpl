@@ -2,14 +2,14 @@
 prometheus fullname.
 */}}
 {{- define "prometheus.fullname" -}}
-k8s
+acm-prometheus-k8s
 {{- end -}}
 
 {{/*
 prometheus service account name.
 */}}
 {{- define "prometheus.serviceAccountName" -}}
-prometheus-k8s
+acm-prometheus-k8s
 {{- end -}}
 
 {{/*

@@ -4,7 +4,7 @@ apiVersion: monitoring.rhobs/v1
 kind: PrometheusRule
 metadata:
   name: kube-apiserver-availability-rules
-  namespace: open-cluster-management-addon-observability
+  namespace: {{ .Release.Namespace }}
 spec:
   {{ (.Files.Glob "files/kube-apiserver-availability.yaml").AsConfig }}
 

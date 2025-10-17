@@ -80,6 +80,11 @@ var (
 		Namespace: "open-cluster-management-observability",
 	}
 
+	RouterDefaultCertsConfigMapObjKey = types.NamespacedName{
+		Name:      "router-certs-default",
+		Namespace: "openshift-ingress",
+	}
+
 	ErrMissingImageOverride = errors.New("missing image override")
 
 	RouterDefaultCertsConfigMapObjKey = types.NamespacedName{
