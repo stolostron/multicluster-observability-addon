@@ -261,6 +261,12 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 			clientObjects = append(clientObjects, newSecret(config.HubCASecretName, hubNamespace))
 			clientObjects = append(clientObjects, newSecret(config.ClientCertSecretName, hubNamespace))
 
+			// Add alermanager secrets
+			clientObjects = append(clientObjects, newSecret(config.AlertmanagerAccessorSecretName, hubNamespace))
+			routerCertsSecret := newSecret(config.RouterDefaultCertsConfigMapObjKey.Name, config.RouterDefaultCertsConfigMapObjKey.Namespace)
+			routerCertsSecret.Data["tls.crt"] = []byte("toto")
+			clientObjects = append(clientObjects, routerCertsSecret)
+
 			// Setup a managed cluster
 			managedCluster := addontesting.NewManagedCluster("cluster-1")
 			managedCluster.Labels = map[string]string{}
@@ -515,6 +521,12 @@ func TestHelmBuild_Metrics_HCP(t *testing.T) {
 	// Add secrets needed for the agent connection to the hub
 	clientObjects = append(clientObjects, newSecret(config.HubCASecretName, hubNamespace))
 	clientObjects = append(clientObjects, newSecret(config.ClientCertSecretName, hubNamespace))
+
+	// Add alermanager secrets
+	clientObjects = append(clientObjects, newSecret(config.AlertmanagerAccessorSecretName, hubNamespace))
+	routerCertsSecret := newSecret(config.RouterDefaultCertsConfigMapObjKey.Name, config.RouterDefaultCertsConfigMapObjKey.Namespace)
+	routerCertsSecret.Data["tls.crt"] = []byte("toto")
+	clientObjects = append(clientObjects, routerCertsSecret)
 
 	// Setup a the local cluster as managed cluster
 	managedCluster := addontesting.NewManagedCluster("cluster-1")

@@ -52,6 +52,8 @@ const (
 	NonOCPScrapeClassName     = "non-ocp-monitoring"
 	ScrapeClassPlatformTarget = "prometheus-k8s.openshift-monitoring.svc:9091"
 	ScrapeClassUWLTarget      = "prometheus-user-workload.openshift-user-workload-monitoring.svc:9092"
+
+	AlertmanagerAccessorSecretName = "observability-alertmanager-accessor"
 )
 
 var (
@@ -71,6 +73,11 @@ var (
 	ImagesConfigMapObjKey = types.NamespacedName{
 		Name:      "images-list",
 		Namespace: "open-cluster-management-observability",
+	}
+
+	RouterDefaultCertsConfigMapObjKey = types.NamespacedName{
+		Name:      "router-certs-default",
+		Namespace: "openshift-ingress",
 	}
 
 	ErrMissingImageOverride = errors.New("missing image override")
