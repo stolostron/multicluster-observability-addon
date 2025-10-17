@@ -16,6 +16,7 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	workv1 "open-cluster-management.io/api/work/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
 func Test_AgentHealthProber_PPA(t *testing.T) {
@@ -38,7 +39,7 @@ func Test_AgentHealthProber_PPA(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			healthProber := AgentHealthProber(logr.Discard())
+			healthProber := DynamicAgentHealthProber(fake.NewClientBuilder().Build(), logr.Discard())
 			err := healthProber.WorkProber.HealthChecker(
 				[]agent.FieldResult{
 					{
@@ -90,7 +91,7 @@ func Test_AgentHealthProber_CLF(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			healthProber := AgentHealthProber(logr.Discard())
+			healthProber := DynamicAgentHealthProber(fake.NewClientBuilder().Build(), logr.Discard())
 			err := healthProber.WorkProber.HealthChecker(
 				[]agent.FieldResult{
 					{
@@ -142,7 +143,7 @@ func Test_AgentHealthProber_OTELCol(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			healthProber := AgentHealthProber(logr.Discard())
+			healthProber := DynamicAgentHealthProber(fake.NewClientBuilder().Build(), logr.Discard())
 			err := healthProber.WorkProber.HealthChecker([]agent.FieldResult{
 				{
 					ResourceIdentifier: workv1.ResourceIdentifier{
@@ -193,7 +194,7 @@ func Test_AgentHealthProber_UIPlugin(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			healthProber := AgentHealthProber(logr.Discard())
+			healthProber := DynamicAgentHealthProber(fake.NewClientBuilder().Build(), logr.Discard())
 			err := healthProber.WorkProber.HealthChecker([]agent.FieldResult{
 				{
 					ResourceIdentifier: workv1.ResourceIdentifier{
