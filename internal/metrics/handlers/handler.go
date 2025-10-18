@@ -71,6 +71,10 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 		return ret, fmt.Errorf("failed to get configuration resources: %w", err)
 	}
 
+	if err = o.addSecret(ctx, &ret.Secrets, config.AlertmanagerAccessorSecretName, config.HubInstallNamespace); err != nil {
+		return ret, fmt.Errorf("failed to get secret: %w", err)
+	}
+
 	// Build Prometheus agents for platform and user workloads
 	if platform.CollectionEnabled {
 		if err = o.buildPrometheusAgent(ctx, &ret, configResources, config.PlatformMetricsCollectorApp, false); err != nil {
