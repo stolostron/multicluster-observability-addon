@@ -1,6 +1,7 @@
 package addon
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strconv"
@@ -18,9 +19,10 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	"open-cluster-management.io/addon-framework/pkg/utils"
-	"open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	v1 "open-cluster-management.io/api/cluster/v1"
 	workv1 "open-cluster-management.io/api/work/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -29,6 +31,7 @@ const (
 )
 
 var (
+	errMissingFeedbackValues      = errors.New("missing feedback values")
 	errMissingFields              = errors.New("no fields found in health checker")
 	errProbeConditionNotSatisfied = errors.New("probe condition is not satisfied")
 	errProbeValueIsNil            = errors.New("probe value is nil")
@@ -53,147 +56,196 @@ func NewRegistrationOption(agentName string) *agent.RegistrationOption {
 	}
 }
 
-// AgentHealthProber returns a HealthProber struct that contains the necessary
-// information to assert if an addon deployment is ready or not.
-func AgentHealthProber(logger logr.Logger) *agent.HealthProber {
+// DynamicAgentHealthProber returns a HealthProber struct that contains the necessary
+// information to assert if an addon deployment is ready or not, taking into account
+// the enabled features.
+func DynamicAgentHealthProber(k8s client.Client, logger logr.Logger) *agent.HealthProber {
+	// Get addonDeploymentConfig and generate Options
+	aodc := &addonapiv1alpha1.AddOnDeploymentConfig{}
+	key := client.ObjectKey{
+		Namespace: "open-cluster-management-observability",
+		Name:      "multicluster-observability-addon",
+	}
+	if err := k8s.Get(context.Background(), key, aodc, &client.GetOptions{}); err != nil {
+		logger.Error(err, "failed to get the AddOnDeploymentConfig")
+	}
+	opts, err := BuildOptions(aodc)
+	if err != nil {
+		logger.Error(err, "failed to build options")
+	}
+
+	// Depending on enabled options, set appropriate probefields
+	probeFields := []agent.ProbeField{}
+	if opts.Platform.Metrics.CollectionEnabled {
+		probeFields = append(probeFields, getMetricsProbeFields()...)
+	}
+	if opts.Platform.Logs.CollectionEnabled {
+		probeFields = append(probeFields, getLogsProbeFields()...)
+	}
+	if opts.UserWorkloads.Traces.CollectionEnabled {
+		probeFields = append(probeFields, getTracesProbeFields()...)
+	}
+
+	if opts.Platform.AnalyticsOptions.IncidentDetection.Enabled {
+		probeFields = append(probeFields, getAnalyticsProbeFields()...)
+	}
 	return &agent.HealthProber{
 		Type: agent.HealthProberTypeWork,
 		WorkProber: &agent.WorkHealthProber{
-			ProbeFields: []agent.ProbeField{
-				{
-					ResourceIdentifier: workv1.ResourceIdentifier{
-						Group:     cooprometheusv1alpha1.SchemeGroupVersion.Group,
-						Resource:  cooprometheusv1alpha1.PrometheusAgentName,
-						Name:      mconfig.PlatformMetricsCollectorApp,
-						Namespace: addonfactory.AddonDefaultInstallNamespace,
-					},
-					ProbeRules: []workv1.FeedbackRule{
-						{
-							Type: workv1.JSONPathsType,
-							JsonPaths: []workv1.JsonPath{
-								{
-									Name: addoncfg.PaProbeKey,
-									Path: addoncfg.PaProbePath,
-								},
-							},
-						},
-					},
-				},
-				{
-					ResourceIdentifier: workv1.ResourceIdentifier{
-						Group:    apiextensionsv1.GroupName,
-						Resource: crdResourceName,
-						Name:     scrapeConfigCRDName,
-					},
-					ProbeRules: []workv1.FeedbackRule{
-						{
-							Type: workv1.JSONPathsType,
-							JsonPaths: []workv1.JsonPath{
-								{
-									Name: addoncfg.PrometheusOperatorVersionFeedbackName,
-									Path: `.metadata.annotations.operator\.prometheus\.io/version`,
-								},
-								{
-									Name: addoncfg.IsEstablishedFeedbackName,
-									Path: isEstablishedFeedbackPath,
-								},
-								{
-									Name: addoncfg.LastTransitionTimeFeedbackName,
-									Path: lastTransitionTimeFeedbackPath,
-								},
-								{
-									Name: addoncfg.IsOLMManagedFeedbackName,
-									Path: `.metadata.labels.olm\.managed`,
-								},
-							},
-						},
-					},
-				},
-				{
-					ResourceIdentifier: workv1.ResourceIdentifier{
-						Group:    apiextensionsv1.GroupName,
-						Resource: crdResourceName,
-						Name:     prometheusAgentCRDName,
-					},
-					ProbeRules: []workv1.FeedbackRule{
-						{
-							Type: workv1.JSONPathsType,
-							JsonPaths: []workv1.JsonPath{
-								{
-									Name: addoncfg.IsEstablishedFeedbackName, // needed for generating the sync annotation on the prometheus operator
-									Path: isEstablishedFeedbackPath,
-								},
-								{
-									Name: addoncfg.LastTransitionTimeFeedbackName,
-									Path: lastTransitionTimeFeedbackPath,
-								},
-							},
-						},
-					},
-				},
-				{
-					ResourceIdentifier: workv1.ResourceIdentifier{
-						Group:     loggingv1.GroupVersion.Group,
-						Resource:  addoncfg.ClusterLogForwardersResource,
-						Name:      addoncfg.SpokeCLFName,
-						Namespace: addoncfg.SpokeCLFNamespace,
-					},
-					ProbeRules: []workv1.FeedbackRule{
-						{
-							Type: workv1.JSONPathsType,
-							JsonPaths: []workv1.JsonPath{
-								{
-									Name: addoncfg.ClfProbeKey,
-									Path: addoncfg.ClfProbePath,
-								},
-							},
-						},
-					},
-				},
-				{
-					ResourceIdentifier: workv1.ResourceIdentifier{
-						Group:     otelv1alpha1.GroupVersion.Group,
-						Resource:  addoncfg.OpenTelemetryCollectorsResource,
-						Name:      addoncfg.SpokeOTELColName,
-						Namespace: addoncfg.SpokeOTELColNamespace,
-					},
-					ProbeRules: []workv1.FeedbackRule{
-						{
-							Type: workv1.JSONPathsType,
-							JsonPaths: []workv1.JsonPath{
-								{
-									Name: addoncfg.OtelColProbeKey,
-									Path: addoncfg.OtelColProbePath,
-								},
-							},
-						},
-					},
-				},
-				{
-					ResourceIdentifier: workv1.ResourceIdentifier{
-						Group:    uiplugin.GroupVersion.Group,
-						Resource: addoncfg.UiPluginsResource,
-						Name:     "monitoring",
-					},
-					ProbeRules: []workv1.FeedbackRule{
-						{
-							Type: workv1.JSONPathsType,
-							JsonPaths: []workv1.JsonPath{
-								{
-									Name: addoncfg.UipProbeKey,
-									Path: addoncfg.UipProbePath,
-								},
-							},
-						},
-					},
-				},
-			},
-			HealthChecker: func(fields []agent.FieldResult, mc *v1.ManagedCluster, mcao *v1alpha1.ManagedClusterAddOn) error {
+			ProbeFields: probeFields,
+			HealthChecker: func(fields []agent.FieldResult, mc *v1.ManagedCluster, mcao *addonapiv1alpha1.ManagedClusterAddOn) error {
 				if err := healthChecker(fields); err != nil {
 					logger.V(1).Info("Health check failed for managed cluster %s: %v", mc.Name, err)
 					return err
 				}
 				return nil
+			},
+		},
+	}
+}
+
+func getMetricsProbeFields() []agent.ProbeField {
+	return []agent.ProbeField{
+		{
+			ResourceIdentifier: workv1.ResourceIdentifier{
+				Group:     cooprometheusv1alpha1.SchemeGroupVersion.Group,
+				Resource:  cooprometheusv1alpha1.PrometheusAgentName,
+				Name:      mconfig.PlatformMetricsCollectorApp,
+				Namespace: addonfactory.AddonDefaultInstallNamespace,
+			},
+			ProbeRules: []workv1.FeedbackRule{
+				{
+					Type: workv1.JSONPathsType,
+					JsonPaths: []workv1.JsonPath{
+						{
+							Name: addoncfg.PaProbeKey,
+							Path: addoncfg.PaProbePath,
+						},
+					},
+				},
+			},
+		},
+		{
+			ResourceIdentifier: workv1.ResourceIdentifier{
+				Group:    apiextensionsv1.GroupName,
+				Resource: crdResourceName,
+				Name:     scrapeConfigCRDName,
+			},
+			ProbeRules: []workv1.FeedbackRule{
+				{
+					Type: workv1.JSONPathsType,
+					JsonPaths: []workv1.JsonPath{
+						{
+							Name: addoncfg.PrometheusOperatorVersionFeedbackName,
+							Path: `.metadata.annotations.operator\.prometheus\.io/version`,
+						},
+						{
+							Name: addoncfg.IsEstablishedFeedbackName,
+							Path: isEstablishedFeedbackPath,
+						},
+						{
+							Name: addoncfg.LastTransitionTimeFeedbackName,
+							Path: lastTransitionTimeFeedbackPath,
+						},
+						{
+							Name: addoncfg.IsOLMManagedFeedbackName,
+							Path: `.metadata.labels.olm\.managed`,
+						},
+					},
+				},
+			},
+		},
+		{
+			ResourceIdentifier: workv1.ResourceIdentifier{
+				Group:    apiextensionsv1.GroupName,
+				Resource: crdResourceName,
+				Name:     prometheusAgentCRDName,
+			},
+			ProbeRules: []workv1.FeedbackRule{
+				{
+					Type: workv1.JSONPathsType,
+					JsonPaths: []workv1.JsonPath{
+						{
+							Name: addoncfg.IsEstablishedFeedbackName, // needed for generating the sync annotation on the prometheus operator
+							Path: isEstablishedFeedbackPath,
+						},
+						{
+							Name: addoncfg.LastTransitionTimeFeedbackName,
+							Path: lastTransitionTimeFeedbackPath,
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func getLogsProbeFields() []agent.ProbeField {
+	return []agent.ProbeField{
+		{
+			ResourceIdentifier: workv1.ResourceIdentifier{
+				Group:     loggingv1.GroupVersion.Group,
+				Resource:  addoncfg.ClusterLogForwardersResource,
+				Name:      addoncfg.SpokeCLFName,
+				Namespace: addoncfg.SpokeCLFNamespace,
+			},
+			ProbeRules: []workv1.FeedbackRule{
+				{
+					Type: workv1.JSONPathsType,
+					JsonPaths: []workv1.JsonPath{
+						{
+							Name: addoncfg.ClfProbeKey,
+							Path: addoncfg.ClfProbePath,
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func getTracesProbeFields() []agent.ProbeField {
+	return []agent.ProbeField{
+		{
+			ResourceIdentifier: workv1.ResourceIdentifier{
+				Group:     otelv1alpha1.GroupVersion.Group,
+				Resource:  addoncfg.OpenTelemetryCollectorsResource,
+				Name:      addoncfg.SpokeOTELColName,
+				Namespace: addoncfg.SpokeOTELColNamespace,
+			},
+			ProbeRules: []workv1.FeedbackRule{
+				{
+					Type: workv1.JSONPathsType,
+					JsonPaths: []workv1.JsonPath{
+						{
+							Name: addoncfg.OtelColProbeKey,
+							Path: addoncfg.OtelColProbePath,
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func getAnalyticsProbeFields() []agent.ProbeField {
+	return []agent.ProbeField{
+		{
+			ResourceIdentifier: workv1.ResourceIdentifier{
+				Group:    uiplugin.GroupVersion.Group,
+				Resource: addoncfg.UiPluginsResource,
+				Name:     "monitoring",
+			},
+			ProbeRules: []workv1.FeedbackRule{
+				{
+					Type: workv1.JSONPathsType,
+					JsonPaths: []workv1.JsonPath{
+						{
+							Name: addoncfg.UipProbeKey,
+							Path: addoncfg.UipProbePath,
+						},
+					},
+				},
 			},
 		},
 	}
@@ -232,13 +284,14 @@ func healthChecker(fields []agent.FieldResult) error {
 		return errMissingFields
 	}
 	for _, field := range fields {
-		if len(field.FeedbackResult.Values) == 0 {
-			// If a probe didn't get any values maybe the resources were not deployed
-			continue
-		}
 		identifier := field.ResourceIdentifier
 		switch identifier.Resource {
 		case cooprometheusv1alpha1.PrometheusAgentName:
+			if len(field.FeedbackResult.Values) == 0 {
+				// If the PrometheusAgent didn't get yet feedback values, it means it wasn't reconciled by the operator
+				// It's in bad health.
+				return fmt.Errorf("%w for %s with key %s/%s", errMissingFeedbackValues, identifier.Resource, identifier.Namespace, identifier.Name)
+			}
 			for _, value := range field.FeedbackResult.Values {
 				if value.Name != addoncfg.PaProbeKey {
 					return fmt.Errorf("%w: %s with key %s/%s unknown probe keys %s", errUnknownProbeKey, identifier.Resource, identifier.Namespace, identifier.Name, value.Name)
@@ -254,6 +307,9 @@ func healthChecker(fields []agent.FieldResult) error {
 				// pa passes the health check
 			}
 		case addoncfg.ClusterLogForwardersResource:
+			if len(field.FeedbackResult.Values) == 0 {
+				return fmt.Errorf("%w for %s with key %s/%s", errMissingFeedbackValues, identifier.Resource, identifier.Namespace, identifier.Name)
+			}
 			for _, value := range field.FeedbackResult.Values {
 				if value.Name != addoncfg.ClfProbeKey {
 					return fmt.Errorf("%w: %s with key %s/%s unknown probe keys %s", errUnknownProbeKey, identifier.Resource, identifier.Namespace, identifier.Name, value.Name)
@@ -269,6 +325,9 @@ func healthChecker(fields []agent.FieldResult) error {
 				// clf passes the health check
 			}
 		case addoncfg.OpenTelemetryCollectorsResource:
+			if len(field.FeedbackResult.Values) == 0 {
+				return fmt.Errorf("%w for %s with key %s/%s", errMissingFeedbackValues, identifier.Resource, identifier.Namespace, identifier.Name)
+			}
 			for _, value := range field.FeedbackResult.Values {
 				if value.Name != addoncfg.OtelColProbeKey {
 					return fmt.Errorf("%w: %s with key %s/%s unknown probe keys %s", errUnknownProbeKey, identifier.Resource, identifier.Namespace, identifier.Name, value.Name)
@@ -284,6 +343,9 @@ func healthChecker(fields []agent.FieldResult) error {
 				// otel collector passes the health check
 			}
 		case addoncfg.UiPluginsResource:
+			if len(field.FeedbackResult.Values) == 0 {
+				return fmt.Errorf("%w for %s with key %s/%s", errMissingFeedbackValues, identifier.Resource, identifier.Namespace, identifier.Name)
+			}
 			for _, value := range field.FeedbackResult.Values {
 				if value.Name != addoncfg.UipProbeKey {
 					return fmt.Errorf("%w: %s with key %s unknown probe keys %s", errUnknownProbeKey, identifier.Resource, identifier.Name, value.Name)
@@ -299,6 +361,9 @@ func healthChecker(fields []agent.FieldResult) error {
 				// uiplugin passes the health check
 			}
 		case crdResourceName:
+			if len(field.FeedbackResult.Values) == 0 {
+				return fmt.Errorf("%w for %s with key %s/%s", errMissingFeedbackValues, identifier.Resource, identifier.Namespace, identifier.Name)
+			}
 			switch addoncfg.Name {
 			case scrapeConfigCRDName:
 				if err := checkScrapeConfigCRD(field.FeedbackResult.Values); err != nil {
