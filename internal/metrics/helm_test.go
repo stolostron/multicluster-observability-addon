@@ -175,7 +175,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				assert.Equal(t, config.PlatformMetricsCollectorApp, agent[0].GetName())
 				assert.NotEmpty(t, agent[0].Spec.CommonPrometheusFields.RemoteWrite[0].URL)
 				// ensure that the number of objects is correct
-				expectedCount := 67
+				expectedCount := 69
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
@@ -286,12 +286,12 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 					Namespace: config.ImagesConfigMapObjKey.Namespace,
 				},
 				Data: map[string]string{
-					"obo_prometheus_operator":    "quay.io/prometheus/obo-operator",
-					"prometheus_config_reloader": "quay.io/prometheus/config-reloader",
-					"kube_rbac_proxy":            "quay.io/kube/rbac-proxy",
-					"kube_state_metrics":         "quay.io/kube/kube-state-metrics",
-					"node_exporter":              "quay.io/kube/node-exporter",
-					"prometheus":                 "quay.io/prometheus/prometheus",
+					"obo_prometheus_rhel9_operator": "quay.io/prometheus/obo-operator",
+					"prometheus_config_reloader":    "quay.io/prometheus/config-reloader",
+					"kube_rbac_proxy":               "quay.io/kube/rbac-proxy",
+					"kube_state_metrics":            "quay.io/kube/kube-state-metrics",
+					"node_exporter":                 "quay.io/kube/node-exporter",
+					"prometheus":                    "quay.io/prometheus/prometheus",
 				},
 			}
 			clientObjects = append(clientObjects, imagesCM)
@@ -551,12 +551,12 @@ func TestHelmBuild_Metrics_HCP(t *testing.T) {
 			Namespace: hubNamespace,
 		},
 		Data: map[string]string{
-			"obo_prometheus_operator":    "quay.io/prometheus/obo-operator",
-			"prometheus_config_reloader": "quay.io/prometheus/config-reloader",
-			"kube_rbac_proxy":            "quay.io/kube/rbac-proxy",
-			"kube_state_metrics":         "quay.io/kube/kube-state-metrics",
-			"node_exporter":              "quay.io/kube/node-exporter",
-			"prometheus":                 "quay.io/prometheus/prometheus",
+			"obo_prometheus_rhel9_operator": "quay.io/prometheus/obo-operator",
+			"prometheus_config_reloader":    "quay.io/prometheus/config-reloader",
+			"kube_rbac_proxy":               "quay.io/kube/rbac-proxy",
+			"kube_state_metrics":            "quay.io/kube/kube-state-metrics",
+			"node_exporter":                 "quay.io/kube/node-exporter",
+			"prometheus":                    "quay.io/prometheus/prometheus",
 		},
 	}
 	clientObjects = append(clientObjects, imagesCM)

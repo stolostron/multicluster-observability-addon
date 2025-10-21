@@ -242,12 +242,12 @@ func TestBuildOptions(t *testing.T) {
 					Namespace: config.ImagesConfigMapObjKey.Namespace,
 				},
 				Data: map[string]string{
-					"obo_prometheus_operator":    "obo-prom-operator-image",
-					"kube_rbac_proxy":            "kube-rbac-proxy-image",
-					"prometheus_config_reloader": "prometheus-config-reload-image",
-					"kube_state_metrics":         "quay.io/kube/kube-state-metrics",
-					"node_exporter":              "quay.io/kube/node-exporter",
-					"prometheus":                 "quay.io/prometheus/prometheus",
+					"obo_prometheus_rhel9_operator": "obo-prom-operator-image",
+					"kube_rbac_proxy":               "kube-rbac-proxy-image",
+					"prometheus_config_reloader":    "prometheus-config-reload-image",
+					"kube_state_metrics":            "quay.io/kube/kube-state-metrics",
+					"node_exporter":                 "quay.io/kube/node-exporter",
+					"prometheus":                    "quay.io/prometheus/prometheus",
 				},
 			},
 			platformAgent,
@@ -325,8 +325,8 @@ func TestBuildOptions(t *testing.T) {
 						Namespace: config.ImagesConfigMapObjKey.Namespace,
 					},
 					Data: map[string]string{ // Missing image overrides for config reloader
-						"obo_prometheus_operator": "obo_prom-operator-image",
-						"kube_rbac_proxy":         "kube-rbac-proxy-image",
+						"obo_prometheus_rhel9_operator": "obo_prom-operator-image",
+						"kube_rbac_proxy":               "kube-rbac-proxy-image",
 					},
 				})
 				return res
