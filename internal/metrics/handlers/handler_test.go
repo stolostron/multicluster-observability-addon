@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"strconv"
 	"strings"
 	"testing"
@@ -583,9 +584,9 @@ func TestBuildOptions(t *testing.T) {
 			if tc.addon != nil {
 				resources = append(resources, tc.addon)
 			}
-
+			hubEp, _ := url.Parse("http://remote-write.example.com")
 			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(resources...).Build()
-			platform := addon.MetricsOptions{CollectionEnabled: tc.platformEnabled}
+			platform := addon.MetricsOptions{CollectionEnabled: tc.platformEnabled, HubEndpoint: hubEp}
 			userWorkloads := addon.MetricsOptions{CollectionEnabled: tc.userWorkloadsEnabled}
 
 			optsBuilder := &OptionsBuilder{

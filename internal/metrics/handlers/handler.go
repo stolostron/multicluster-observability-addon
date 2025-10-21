@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"slices"
 	"strings"
 
@@ -72,7 +73,12 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 		return ret, fmt.Errorf("failed to get configuration resources: %w", err)
 	}
 
-	if err = o.addAlertmanagerSecrets(ctx, &ret.Secrets); err != nil {
+	clusterName, err := getClusterName(platform.HubEndpoint.String())
+	if err != nil {
+		return ret, fmt.Errorf("failed to get clustername from HubEndpoint: %w", err)
+	}
+
+	if err = o.addAlertmanagerSecrets(ctx, &ret.Secrets, clusterName); err != nil {
 		return ret, fmt.Errorf("failed to add alertmanager secrets: %w", err)
 	}
 
@@ -225,7 +231,7 @@ func (o *OptionsBuilder) buildPrometheusAgent(ctx context.Context, opts *Options
 
 	// Fetch related secrets
 	for _, secretName := range agent.Spec.Secrets {
-		if err := o.addSecret(ctx, &opts.Secrets, secretName, agent.Namespace, agent.Namespace); err != nil {
+		if err := o.addSecret(ctx, &opts.Secrets, secretName, agent.Namespace, secretName, agent.Namespace); err != nil {
 			return err
 		}
 	}
@@ -268,7 +274,7 @@ func (o *OptionsBuilder) buildHypershiftResources(ctx context.Context, opts *Opt
 }
 
 // Simplified addSecret function (unchanged)
-func (o *OptionsBuilder) addSecret(ctx context.Context, secrets *[]*corev1.Secret, secretName, secretNamespace string, targetNamespace string) error {
+func (o *OptionsBuilder) addSecret(ctx context.Context, secrets *[]*corev1.Secret, secretName, secretNamespace string, targetName string, targetNamespace string) error {
 	if slices.IndexFunc(*secrets, func(s *corev1.Secret) bool { return s.Name == secretName && s.Namespace == secretNamespace }) != -1 {
 		return nil
 	}
@@ -279,6 +285,7 @@ func (o *OptionsBuilder) addSecret(ctx context.Context, secrets *[]*corev1.Secre
 	}
 
 	secret.Namespace = targetNamespace
+	secret.Name = targetName
 
 	*secrets = append(*secrets, secret)
 	return nil
@@ -427,13 +434,13 @@ func createWriteRelabelConfigs(clusterName, clusterID string, isHypershiftLocalC
 		})
 }
 
-func (o *OptionsBuilder) addAlertmanagerSecrets(ctx context.Context, secrets *[]*corev1.Secret) error {
+func (o *OptionsBuilder) addAlertmanagerSecrets(ctx context.Context, secrets *[]*corev1.Secret, clusterName string) error {
 	// Add acceesor secret to platform and UWL namespaces
-	if err := o.addSecret(ctx, secrets, config.AlertmanagerAccessorSecretName, config.HubInstallNamespace, config.AlertmanagerPlatformNamespace); err != nil {
+	if err := o.addSecret(ctx, secrets, config.AlertmanagerAccessorSecretName, config.HubInstallNamespace, config.AlertmanagerAccessorSecretName+"-"+clusterName, config.AlertmanagerPlatformNamespace); err != nil {
 		return fmt.Errorf("failed to add secret: %w", err)
 	}
 
-	if err := o.addSecret(ctx, secrets, config.AlertmanagerAccessorSecretName, config.HubInstallNamespace, config.AlertmanagerUWLNamespace); err != nil {
+	if err := o.addSecret(ctx, secrets, config.AlertmanagerAccessorSecretName, config.HubInstallNamespace, config.AlertmanagerAccessorSecretName+"-"+clusterName, config.AlertmanagerUWLNamespace); err != nil {
 		return fmt.Errorf("failed to add secret: %w", err)
 	}
 
@@ -468,7 +475,7 @@ func (o *OptionsBuilder) addAlertmanagerSecrets(ctx context.Context, secrets *[]
 
 	ca := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      config.AlertmanagerRouterCASecretName,
+			Name:      config.AlertmanagerRouterCASecretName + "-" + clusterName,
 			Namespace: config.AlertmanagerPlatformNamespace,
 		},
 		Data: map[string][]byte{"service-ca.crt": routerCASecret.Data["tls.crt"]},
@@ -477,7 +484,7 @@ func (o *OptionsBuilder) addAlertmanagerSecrets(ctx context.Context, secrets *[]
 
 	caUWL := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      config.AlertmanagerRouterCASecretName,
+			Name:      config.AlertmanagerRouterCASecretName + "-" + clusterName,
 			Namespace: config.AlertmanagerUWLNamespace,
 		},
 		Data: map[string][]byte{"service-ca.crt": routerCASecret.Data["tls.crt"]},
@@ -485,4 +492,17 @@ func (o *OptionsBuilder) addAlertmanagerSecrets(ctx context.Context, secrets *[]
 	*secrets = append(*secrets, caUWL)
 
 	return nil
+}
+
+func getClusterName(obsApiURL string) (string, error) {
+	u, err := url.Parse(obsApiURL)
+	if err != nil {
+		return "", err
+	}
+	hostParts := strings.Split(u.Hostname(), ".")
+	if len(hostParts) < 3 {
+		return "", err
+	}
+	clusterName := hostParts[2]
+	return clusterName, nil
 }
