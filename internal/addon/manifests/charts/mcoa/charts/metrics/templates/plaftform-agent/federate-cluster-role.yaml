@@ -1,0 +1,13 @@
+{{- if .Values.deployNonOCPStack }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ .Values.platform.appName }}-federate
+  labels:
+    {{- include "metricshelm.labels" . | nindent 4 }}
+rules:
+- nonResourceURLs:
+  - "/federate"
+  verbs:
+  - "get"
+{{- end }}

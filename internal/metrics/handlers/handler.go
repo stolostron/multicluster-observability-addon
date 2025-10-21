@@ -58,14 +58,16 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 
 	ret.ClusterName = managedCluster.Name
 	ret.ClusterID = common.GetManagedClusterID(managedCluster)
-	ret.AlertManagerEndpoint = opts.Platform.Metrics.AlertManagerEndpoint.String()
+	ret.AlertManagerEndpoint = opts.Platform.Metrics.AlertManagerEndpoint.Host // Just the host othrewise, pronetheus raises error if the scheme is included
 	ret.ClusterVendor = managedCluster.Labels[config.ManagedClusterLabelVendorKey]
 	// For e2e testing non OCP cases more easily, we use a special annotation to override the cluster vendor
-	if managedCluster.Annotations[addoncfg.VendorOverrideAnnotationKey] != "" {
-		ret.ClusterVendor = managedCluster.Annotations[addoncfg.VendorOverrideAnnotationKey]
+	vendorOverride := mcAddon.Annotations[addoncfg.VendorOverrideAnnotationKey]
+	if vendorOverride != "" {
+		o.Logger.V(1).Info("Vendor for the managed cluster is overridden.", "managedcluster", managedCluster.Name, "vendor", vendorOverride)
+		ret.ClusterVendor = vendorOverride
 	}
 	if ret.AlertManagerEndpoint == "" && !ret.IsOCPCluster() {
-		o.Logger.Info(fmt.Sprintf("Alert forwarding is not configured for non OCP cluster %s as the AlertManager domain is not set in the addOnDeploymentConfig", managedCluster.Name))
+		o.Logger.Info("Alert forwarding is not configured for non OCP cluster as the AlertManager domain is not set in the addOnDeploymentConfig", "managedcluster", managedCluster.Name)
 	}
 
 	// Fetch image overrides
