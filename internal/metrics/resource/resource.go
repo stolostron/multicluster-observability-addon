@@ -24,7 +24,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-var errTooManyConfigResources = errors.New("too many configuration resources")
+var (
+	errTooManyConfigResources = errors.New("too many configuration resources")
+	errMissingHubEndpoint     = errors.New("hub endpoint is missing")
+)
 
 // DefaultStackResources reconciles the configuration resources needed for metrics collection
 type DefaultStackResources struct {
@@ -222,6 +225,10 @@ func (d DefaultStackResources) reconcileAgentForPlacement(ctx context.Context, p
 	agent, err := d.getOrCreateDefaultAgent(ctx, placementRef, isUWL)
 	if err != nil {
 		return common.DefaultConfig{}, fmt.Errorf("failed to get or create agent for placement %s: %w", placementRef.Name, err)
+	}
+
+	if d.AddonOptions.Platform.Metrics.HubEndpoint.Host == "" {
+		return common.DefaultConfig{}, errMissingHubEndpoint
 	}
 
 	// SSA mendatory field values

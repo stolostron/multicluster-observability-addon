@@ -27,6 +27,7 @@ type MetricsValues struct {
 	DeployNonOCPStack             bool          `json:"deployNonOCPStack"`
 	DeployCOOResources            bool          `json:"deployCOOResources"`
 	PrometheusOperatorAnnotations string        `json:"prometheusOperatorAnnotations,omitempty"`
+	AlertManagerEndpoint          string        `json:"alertManagerEndpoint,omitempty"`
 }
 
 type Collector struct {
@@ -71,6 +72,7 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 			RBACProxyTLSSecret: config.UserWorkloadRBACProxyTLSSecret,
 			RBACProxyPort:      strconv.Itoa(config.RBACProxyPort),
 		},
+		AlertManagerEndpoint: opts.AlertManagerEndpoint,
 	}
 
 	isOCPCluster := opts.IsOCPCluster()

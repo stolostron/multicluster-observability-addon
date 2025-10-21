@@ -42,9 +42,8 @@ var (
 )
 
 type OptionsBuilder struct {
-	Client         client.Client
-	RemoteWriteURL string
-	Logger         logr.Logger
+	Client client.Client
+	Logger logr.Logger
 }
 
 func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, managedCluster *clusterv1.ManagedCluster, opts addon.Options) (Options, error) {
@@ -59,7 +58,15 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 
 	ret.ClusterName = managedCluster.Name
 	ret.ClusterID = common.GetManagedClusterID(managedCluster)
+	ret.AlertManagerEndpoint = opts.Platform.Metrics.AlertManagerEndpoint.String()
 	ret.ClusterVendor = managedCluster.Labels[config.ManagedClusterLabelVendorKey]
+	// For e2e testing non OCP cases more easily, we use a special annotation to override the cluster vendor
+	if managedCluster.Annotations[addoncfg.VendorOverrideAnnotationKey] != "" {
+		ret.ClusterVendor = managedCluster.Annotations[addoncfg.VendorOverrideAnnotationKey]
+	}
+	if ret.AlertManagerEndpoint == "" && !ret.IsOCPCluster() {
+		o.Logger.Info(fmt.Sprintf("Alert forwarding is not configured for non OCP cluster %s as the AlertManager domain is not set in the addOnDeploymentConfig", managedCluster.Name))
+	}
 
 	// Fetch image overrides
 	var err error

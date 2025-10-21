@@ -670,8 +670,7 @@ func fakeGetValues(k8s client.Client, platformMetrics, userWorkloadMetrics bool)
 		mcAddon *addonapiv1alpha1.ManagedClusterAddOn,
 	) (addonfactory.Values, error) {
 		optionsBuilder := handlers.OptionsBuilder{
-			Client:         k8s,
-			RemoteWriteURL: "https://observatorium-api-open-cluster-management-observability.apps.sno-4xlarge-416-lqsr2.dev07.red-chesterfield.com/api/metrics/v1/default/api/v1/receive",
+			Client: k8s,
 		}
 
 		hubEp, _ := url.Parse("http://remote-write.example.com")
@@ -744,7 +743,7 @@ func newAddonOptions(platformEnabled, uwlEnabled bool) addon.Options {
 		Platform: addon.PlatformOptions{
 			Metrics: addon.MetricsOptions{
 				CollectionEnabled: platformEnabled,
-				HubEndpoint:       hubEp,
+				HubEndpoint:       *hubEp,
 			},
 		},
 		UserWorkloads: addon.UserWorkloadOptions{

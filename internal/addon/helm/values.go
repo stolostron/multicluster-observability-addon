@@ -25,9 +25,8 @@ import (
 )
 
 var (
-	errMissingAODCRef     = errors.New("missing required AddOnDeploymentConfig reference in addon configuration")
-	errMultipleAODCRef    = errors.New("addonmultiple AddOnDeploymentConfig references found - only one is supported")
-	errMissingHubEndpoint = errors.New("metricsHubHostname key is missing but it's required when either platformMetricsCollection or userWorkloadMetricsCollection are present")
+	errMissingAODCRef  = errors.New("missing required AddOnDeploymentConfig reference in addon configuration")
+	errMultipleAODCRef = errors.New("addonmultiple AddOnDeploymentConfig references found - only one is supported")
 )
 
 type HelmChartValues struct {
@@ -94,14 +93,9 @@ func getMonitoringValues(ctx context.Context, k8s client.Client, logger logr.Log
 		return nil, nil
 	}
 
-	if opts.Platform.Metrics.HubEndpoint == nil || opts.Platform.Metrics.HubEndpoint.Host == "" {
-		return nil, errMissingHubEndpoint
-	}
-
 	optsBuilder := mhandlers.OptionsBuilder{
-		Client:         k8s,
-		RemoteWriteURL: opts.Platform.Metrics.HubEndpoint.String(),
-		Logger:         logger,
+		Client: k8s,
+		Logger: logger,
 	}
 	metricsOpts, err := optsBuilder.Build(ctx, mcAddon, cluster, opts)
 	if err != nil {

@@ -380,7 +380,7 @@ func TestBuildOptions(t *testing.T) {
 				assert.Equal(t, config.ClusterNameMetricLabel, opts.Platform.PrometheusAgent.Spec.CommonPrometheusFields.RemoteWrite[0].WriteRelabelConfigs[0].TargetLabel)
 				assert.Len(t, opts.Platform.PrometheusAgent.Spec.CommonPrometheusFields.RemoteWrite[0].WriteRelabelConfigs, 5)
 				// Check that the secrets are set
-				assert.Len(t, opts.Secrets, 6)
+				assert.Len(t, opts.Secrets, 4)
 				// Check that user workloads are not enabled
 				assert.Nil(t, opts.UserWorkloads.PrometheusAgent)
 				// Check that scrape configs are set
@@ -400,6 +400,7 @@ func TestBuildOptions(t *testing.T) {
 			addon:           platformManagedClusterAddOn,
 			platformEnabled: true,
 			expects: func(t *testing.T, opts Options, err error) {
+				assert.NoError(t, err)
 				assert.True(t, opts.COOIsSubscribed)
 				assert.Empty(t, opts.CRDEstablishedAnnotation)
 			},
@@ -599,8 +600,7 @@ func TestBuildOptions(t *testing.T) {
 			}
 
 			optsBuilder := &OptionsBuilder{
-				Client:         fakeClient,
-				RemoteWriteURL: "https://example.com/write",
+				Client: fakeClient,
 			}
 			managedClusters := &clusterv1.ManagedClusterList{}
 			err := fakeClient.List(context.Background(), managedClusters)

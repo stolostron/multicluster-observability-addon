@@ -414,7 +414,7 @@ func TestReconcile(t *testing.T) {
 				Platform: addon.PlatformOptions{
 					Metrics: addon.MetricsOptions{
 						CollectionEnabled: tc.platformEnabled,
-						HubEndpoint:       hubUrl,
+						HubEndpoint:       *hubUrl,
 					},
 				},
 				UserWorkloads: addon.UserWorkloadOptions{
@@ -835,7 +835,7 @@ func newAddonOptions(platformEnabled, uwlEnabled bool) addon.Options {
 		Platform: addon.PlatformOptions{
 			Metrics: addon.MetricsOptions{
 				CollectionEnabled: platformEnabled,
-				HubEndpoint:       hubEp,
+				HubEndpoint:       *hubEp,
 			},
 		},
 		UserWorkloads: addon.UserWorkloadOptions{

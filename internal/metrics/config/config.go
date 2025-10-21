@@ -97,7 +97,7 @@ var (
 type ImageOverrides struct {
 	PrometheusConfigReloader   string `json:"prometheus_config_reloader"`
 	KubeRBACProxy              string `json:"kube_rbac_proxy"`
-	CooPrometheusOperatorImage string `json:"obo_prometheus_operator"`
+	CooPrometheusOperatorImage string `json:"obo_prometheus_rhel9_operator"`
 	KubeStateMetrics           string `json:"kube_state_metrics"`
 	NodeExporter               string `json:"node_exporter"`
 	Prometheus                 string `json:"prometheus"`
