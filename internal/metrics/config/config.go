@@ -87,11 +87,6 @@ var (
 	}
 
 	ErrMissingImageOverride = errors.New("missing image override")
-
-	RouterDefaultCertsConfigMapObjKey = types.NamespacedName{
-		Name:      "router-certs-default",
-		Namespace: "openshift-ingress",
-	}
 )
 
 type ImageOverrides struct {

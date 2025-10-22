@@ -592,7 +592,7 @@ func TestBuildOptions(t *testing.T) {
 			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(resources...).Build()
 			addonOpts := addon.Options{
 				Platform: addon.PlatformOptions{
-					Metrics: addon.MetricsOptions{CollectionEnabled: tc.platformEnabled, HubEndpoint: hubEp},
+					Metrics: addon.MetricsOptions{CollectionEnabled: tc.platformEnabled, HubEndpoint: *hubEp},
 				},
 				UserWorkloads: addon.UserWorkloadOptions{
 					Metrics: addon.MetricsOptions{CollectionEnabled: tc.userWorkloadsEnabled},
