@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"strconv"
 	"strings"
 	"testing"
@@ -193,6 +194,27 @@ func TestBuildOptions(t *testing.T) {
 	require.NoError(t, controllerutil.SetOwnerReference(cmao, platformAgent, scheme))
 	require.NoError(t, controllerutil.SetOwnerReference(cmao, uwlAgent, scheme))
 
+	// Alertmanager secrets
+	alertmanagerAccessorSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      config.AlertmanagerAccessorSecretName,
+			Namespace: addoncfg.InstallNamespace,
+		},
+		Data: map[string][]byte{
+			"key":  []byte("data"),
+			"pass": []byte("data"),
+		},
+	}
+	alertmanagerRouterCA := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      config.RouterDefaultCertsConfigMapObjKey.Name,
+			Namespace: config.RouterDefaultCertsConfigMapObjKey.Namespace,
+		},
+		Data: map[string][]byte{
+			"tls.key": []byte("data"),
+		},
+	}
+
 	createResources := func() []client.Object {
 		return []client.Object{
 			&corev1.Namespace{
@@ -232,6 +254,8 @@ func TestBuildOptions(t *testing.T) {
 			uwlAgent,
 			uwlHAProxyCM,
 			cmao,
+			alertmanagerAccessorSecret,
+			alertmanagerRouterCA,
 			&corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      config.ClientCertSecretName,
@@ -353,7 +377,7 @@ func TestBuildOptions(t *testing.T) {
 				assert.Equal(t, config.ClusterNameMetricLabel, opts.Platform.PrometheusAgent.Spec.CommonPrometheusFields.RemoteWrite[0].WriteRelabelConfigs[0].TargetLabel)
 				assert.Len(t, opts.Platform.PrometheusAgent.Spec.CommonPrometheusFields.RemoteWrite[0].WriteRelabelConfigs, 5)
 				// Check that the secrets are set
-				assert.Len(t, opts.Secrets, 2)
+				assert.Len(t, opts.Secrets, 6)
 				// Check that user workloads are not enabled
 				assert.Nil(t, opts.UserWorkloads.PrometheusAgent)
 				// Check that scrape configs are set
@@ -560,9 +584,9 @@ func TestBuildOptions(t *testing.T) {
 			if tc.addon != nil {
 				resources = append(resources, tc.addon)
 			}
-
+			hubEp, _ := url.Parse("http://remote-write.example.com")
 			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(resources...).Build()
-			platform := addon.MetricsOptions{CollectionEnabled: tc.platformEnabled}
+			platform := addon.MetricsOptions{CollectionEnabled: tc.platformEnabled, HubEndpoint: hubEp}
 			userWorkloads := addon.MetricsOptions{CollectionEnabled: tc.userWorkloadsEnabled}
 
 			optsBuilder := &OptionsBuilder{
