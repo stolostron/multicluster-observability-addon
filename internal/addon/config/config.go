@@ -51,6 +51,8 @@ const (
 	ComponentK8sLabelKey          = "app.kubernetes.io/component"
 	ManagedByK8sLabelKey          = "app.kubernetes.io/managed-by"
 	PartOfK8sLabelKey             = "app.kubernetes.io/part-of"
+	BackupLabelKey                = "cluster.open-cluster-management.io/backup"
+	BackupLabelValue              = ""
 
 	ClusterClaimClusterID        = "id.k8s.io"
 	ManagedClusterLabelClusterID = "clusterID"

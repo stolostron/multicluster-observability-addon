@@ -134,6 +134,11 @@ func (p *PrometheusAgentSSA) Build() *cooprometheusv1alpha1.PrometheusAgent {
 		maps.Copy(p.desiredAgent.Labels, p.Labels)
 	}
 
+	if p.desiredAgent.Labels == nil {
+		p.desiredAgent.Labels = map[string]string{}
+	}
+	p.desiredAgent.Labels[addoncfg.BackupLabelKey] = addoncfg.BackupLabelValue
+
 	p.setPrometheusRemoteWriteConfig()
 	p.setWatchedResources()
 	p.setScrapeClasses()
