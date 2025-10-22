@@ -1,0 +1,9 @@
+{{- if and (or .Values.platformEnabled .Values.userWorkloadsEnabled) (ne .Release.Namespace "open-cluster-management-agent-addon") }}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Release.Namespace }}
+  labels:
+    {{ include "metricshelm.labels" . | nindent 4 }}
+    openshift.io/cluster-monitoring: "true"
+{{- end }}

@@ -51,11 +51,12 @@ import (
 
 func TestHelmBuild_Metrics_All(t *testing.T) {
 	testCases := map[string]struct {
-		PlatformMetrics bool
-		UserMetrics     bool
-		COOIsInstalled  bool
-		IsOCP           bool
-		Expects         func(*testing.T, []client.Object)
+		PlatformMetrics  bool
+		UserMetrics      bool
+		COOIsInstalled   bool
+		IsOCP            bool
+		InstallNamespace string
+		Expects          func(*testing.T, []client.Object)
 	}{
 		"no metrics": {
 			PlatformMetrics: false,
@@ -181,6 +182,24 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				}
 			},
 		},
+		"custom namespace": {
+			PlatformMetrics:  true,
+			UserMetrics:      false,
+			COOIsInstalled:   false,
+			IsOCP:            false,
+			InstallNamespace: "custom",
+			Expects: func(t *testing.T, objects []client.Object) {
+				// ensure the namespace is created
+				ns := common.FilterResourcesByLabelSelector[*corev1.Namespace](objects, nil)
+				assert.Len(t, ns, 1)
+				assert.Equal(t, "custom", ns[0].Name)
+				// ensure that the number of objects is correct
+				expectedCount := 70
+				if len(objects) != expectedCount {
+					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
+				}
+			},
+		},
 	}
 
 	scheme := runtime.NewScheme()
@@ -192,11 +211,13 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 	assert.NoError(t, addonapiv1alpha1.AddToScheme(scheme))
 	assert.NoError(t, workv1.AddToScheme(scheme))
 
-	installNamespace := "open-cluster-management-addon-observability"
 	hubNamespace := "open-cluster-management-observability"
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
+			if tc.InstallNamespace == "" {
+				tc.InstallNamespace = addonfactory.AddonDefaultInstallNamespace
+			}
 			// Add platform resources
 			defaultAgentResources := []client.Object{}
 			platformScrapeConfig := &cooprometheusv1alpha1.ScrapeConfig{
@@ -336,7 +357,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 
 			// Register the addon for the managed cluster
 			managedClusterAddOn := addontesting.NewAddon("test", "cluster-1")
-			managedClusterAddOn.Spec.InstallNamespace = installNamespace
+			managedClusterAddOn.Spec.InstallNamespace = tc.InstallNamespace
 			managedClusterAddOn.Status.ConfigReferences = []addonapiv1alpha1.ConfigReference{}
 			managedClusterAddOn.Status.ConfigReferences = append(managedClusterAddOn.Status.ConfigReferences, configReferences...)
 
@@ -365,8 +386,8 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				// if not a global object, check namespace
 				// secrets are possible to install in multiple namespaces (such as openshift-monitoring)
 				// and are therefore also ignored.
-				if !slices.Contains([]string{"ClusterRole", "ClusterRoleBinding", "CustomResourceDefinition", "Secret"}, obj.GetObjectKind().GroupVersionKind().Kind) {
-					assert.Equal(t, installNamespace, accessor.GetNamespace(), fmt.Sprintf("Object: %s/%s", obj.GetObjectKind().GroupVersionKind(), accessor.GetName()))
+				if !slices.Contains([]string{"ClusterRole", "ClusterRoleBinding", "CustomResourceDefinition", "Secret", "Namespace"}, obj.GetObjectKind().GroupVersionKind().Kind) {
+					assert.Equal(t, tc.InstallNamespace, accessor.GetNamespace(), fmt.Sprintf("Object: %s/%s", obj.GetObjectKind().GroupVersionKind(), accessor.GetName()))
 				}
 			}
 		})
