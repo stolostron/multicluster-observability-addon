@@ -231,7 +231,8 @@ func (o *OptionsBuilder) buildPrometheusAgent(ctx context.Context, opts *Options
 
 	// Fetch related secrets
 	for _, secretName := range agent.Spec.Secrets {
-		if err := o.addSecret(ctx, &opts.Secrets, secretName, agent.Namespace, secretName, agent.Namespace); err != nil {
+		// empty target namespace result in using default $.Release.Namespace in yaml
+		if err := o.addSecret(ctx, &opts.Secrets, secretName, agent.Namespace, secretName, ""); err != nil {
 			return err
 		}
 	}
@@ -274,6 +275,7 @@ func (o *OptionsBuilder) buildHypershiftResources(ctx context.Context, opts *Opt
 }
 
 // Simplified addSecret function (unchanged)
+// empty target namespace result in using default $.Release.Namespace in yaml
 func (o *OptionsBuilder) addSecret(ctx context.Context, secrets *[]*corev1.Secret, secretName, secretNamespace string, targetName string, targetNamespace string) error {
 	if slices.IndexFunc(*secrets, func(s *corev1.Secret) bool { return s.Name == secretName && s.Namespace == secretNamespace }) != -1 {
 		return nil

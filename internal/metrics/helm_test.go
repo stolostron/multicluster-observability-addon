@@ -333,6 +333,8 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				assert.NoError(t, err)
 
 				// if not a global object, check namespace
+				// secrets are possible to install in multiple namespaces (such as openshift-monitoring)
+				// and are therefore also ignored.
 				if !slices.Contains([]string{"ClusterRole", "ClusterRoleBinding", "CustomResourceDefinition", "Secret"}, obj.GetObjectKind().GroupVersionKind().Kind) {
 					assert.Equal(t, installNamespace, accessor.GetNamespace(), fmt.Sprintf("Object: %s/%s", obj.GetObjectKind().GroupVersionKind(), accessor.GetName()))
 				}
