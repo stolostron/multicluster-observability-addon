@@ -42,23 +42,33 @@ var (
 )
 
 type OptionsBuilder struct {
-	Client         client.Client
-	RemoteWriteURL string
-	Logger         logr.Logger
+	Client client.Client
+	Logger logr.Logger
 }
 
-func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, managedCluster *clusterv1.ManagedCluster, platform, userWorkloads addon.MetricsOptions) (Options, error) {
+func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, managedCluster *clusterv1.ManagedCluster, opts addon.Options) (Options, error) {
 	ret := Options{
-		IsHub: common.IsHubCluster(managedCluster),
+		IsHub:            common.IsHubCluster(managedCluster),
+		InstallNamespace: opts.InstallNamespace,
 	}
 
-	if !platform.CollectionEnabled && !userWorkloads.CollectionEnabled {
+	if !opts.Platform.Metrics.CollectionEnabled && !opts.UserWorkloads.Metrics.CollectionEnabled {
 		return ret, nil
 	}
 
 	ret.ClusterName = managedCluster.Name
 	ret.ClusterID = common.GetManagedClusterID(managedCluster)
+	ret.AlertManagerEndpoint = opts.Platform.Metrics.AlertManagerEndpoint.Host // Just the host othrewise, pronetheus raises error if the scheme is included
 	ret.ClusterVendor = managedCluster.Labels[config.ManagedClusterLabelVendorKey]
+	// For e2e testing non OCP cases more easily, we use a special annotation to override the cluster vendor
+	vendorOverride := mcAddon.Annotations[addoncfg.VendorOverrideAnnotationKey]
+	if vendorOverride != "" {
+		o.Logger.V(1).Info("Vendor for the managed cluster is overridden.", "managedcluster", managedCluster.Name, "vendor", vendorOverride)
+		ret.ClusterVendor = vendorOverride
+	}
+	if ret.AlertManagerEndpoint == "" && !ret.IsOCPCluster() {
+		o.Logger.Info("Alert forwarding is not configured for non OCP cluster as the AlertManager domain is not set in the addOnDeploymentConfig", "managedcluster", managedCluster.Name)
+	}
 
 	// Fetch image overrides
 	var err error
@@ -73,17 +83,17 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 		return ret, fmt.Errorf("failed to get configuration resources: %w", err)
 	}
 
-	clusterName, err := getClusterName(platform.HubEndpoint.String())
+	clusterName, err := getClusterName(opts.Platform.Metrics.HubEndpoint.String())
 	if err != nil {
 		return ret, fmt.Errorf("failed to get clustername from HubEndpoint: %w", err)
 	}
 
-	if err = o.addAlertmanagerSecrets(ctx, &ret.Secrets, clusterName); err != nil {
+	if err = o.addAlertmanagerSecrets(ctx, &ret.Secrets, clusterName, opts); err != nil {
 		return ret, fmt.Errorf("failed to add alertmanager secrets: %w", err)
 	}
 
 	// Build Prometheus agents for platform and user workloads
-	if platform.CollectionEnabled {
+	if opts.Platform.Metrics.CollectionEnabled {
 		if err = o.buildPrometheusAgent(ctx, &ret, configResources, config.PlatformMetricsCollectorApp, false); err != nil {
 			return ret, err
 		}
@@ -102,7 +112,7 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 	// Check both if hypershift is enabled and has hosted clusters to limit noisy logs when uwl monitoring is disabled while there is no hostedCluster
 	isHypershiftCluster := IsHypershiftEnabled(managedCluster) && HasHostedCLusters(ctx, o.Client, o.Logger)
 
-	if userWorkloads.CollectionEnabled {
+	if opts.UserWorkloads.Metrics.CollectionEnabled {
 		if err = o.buildPrometheusAgent(ctx, &ret, configResources, config.UserWorkloadMetricsCollectorApp, isHypershiftCluster); err != nil {
 			return ret, err
 		}
@@ -119,7 +129,7 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 	}
 
 	if isHypershiftCluster {
-		if userWorkloads.CollectionEnabled {
+		if opts.UserWorkloads.Metrics.CollectionEnabled {
 			if err = o.buildHypershiftResources(ctx, &ret, managedCluster, configResources); err != nil {
 				return ret, fmt.Errorf("failed to generate hypershift resources: %w", err)
 			}
@@ -436,62 +446,52 @@ func createWriteRelabelConfigs(clusterName, clusterID string, isHypershiftLocalC
 		})
 }
 
-func (o *OptionsBuilder) addAlertmanagerSecrets(ctx context.Context, secrets *[]*corev1.Secret, clusterName string) error {
-	// Add acceesor secret to platform and UWL namespaces
-	if err := o.addSecret(ctx, secrets, config.AlertmanagerAccessorSecretName, config.HubInstallNamespace, config.AlertmanagerAccessorSecretName+"-"+clusterName, config.AlertmanagerPlatformNamespace); err != nil {
-		return fmt.Errorf("failed to add secret: %w", err)
-	}
-
-	if err := o.addSecret(ctx, secrets, config.AlertmanagerAccessorSecretName, config.HubInstallNamespace, config.AlertmanagerAccessorSecretName+"-"+clusterName, config.AlertmanagerUWLNamespace); err != nil {
-		return fmt.Errorf("failed to add secret: %w", err)
-	}
-
-	amRouteBYOCaSrt := &corev1.Secret{}
-	amRouteBYOCertSrt := &corev1.Secret{}
+func (o *OptionsBuilder) addAlertmanagerSecrets(ctx context.Context, secrets *[]*corev1.Secret, clusterName string, opts addon.Options) error {
+	// Get the router CA secret
 	routerCASecret := &corev1.Secret{}
-	err1 := o.Client.Get(
-		ctx,
-		types.NamespacedName{Name: config.AlertmanagerRouteBYOCAName, Namespace: config.HubInstallNamespace},
-		amRouteBYOCaSrt,
-	)
-	err2 := o.Client.Get(
-		ctx,
-		types.NamespacedName{Name: config.AlertmanagerRouteBYOCERTName, Namespace: config.HubInstallNamespace},
-		amRouteBYOCertSrt,
-	)
+	amRouteBYOCaSrt := &corev1.Secret{}
+	err1 := o.Client.Get(ctx, types.NamespacedName{Name: config.AlertmanagerRouteBYOCAName, Namespace: config.HubInstallNamespace}, amRouteBYOCaSrt)
+	amRouteBYOCertSrt := &corev1.Secret{}
+	err2 := o.Client.Get(ctx, types.NamespacedName{Name: config.AlertmanagerRouteBYOCERTName, Namespace: config.HubInstallNamespace}, amRouteBYOCertSrt)
+
 	if err1 == nil && err2 == nil {
 		// BYO certs exists, use these
 		routerCASecret = amRouteBYOCaSrt
 	} else {
 		// No BYO certs, use default ingress certs
-		err := o.Client.Get(
-			ctx,
-			types.NamespacedName{Name: "router-certs-default", Namespace: "openshift-ingress"},
-			routerCASecret,
-		)
-		if err != nil {
+		if err := o.Client.Get(ctx, types.NamespacedName{Name: "router-certs-default", Namespace: "openshift-ingress"}, routerCASecret); err != nil {
 			return err
 		}
-
 	}
 
-	ca := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      config.AlertmanagerRouterCASecretName + "-" + clusterName,
-			Namespace: config.AlertmanagerPlatformNamespace,
-		},
-		Data: map[string][]byte{"service-ca.crt": routerCASecret.Data["tls.crt"]},
+	// Add secrets based on enabled metric collection
+	if opts.Platform.Metrics.CollectionEnabled {
+		if err := o.addSecret(ctx, secrets, config.AlertmanagerAccessorSecretName, config.HubInstallNamespace, config.AlertmanagerAccessorSecretName+"-"+clusterName, config.AlertmanagerPlatformNamespace); err != nil {
+			return fmt.Errorf("failed to add accessor secret for platform metrics: %w", err)
+		}
+		ca := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      config.AlertmanagerRouterCASecretName + "-" + clusterName,
+				Namespace: config.AlertmanagerPlatformNamespace,
+			},
+			Data: map[string][]byte{"service-ca.crt": routerCASecret.Data["tls.crt"]},
+		}
+		*secrets = append(*secrets, ca)
 	}
-	*secrets = append(*secrets, ca)
 
-	caUWL := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      config.AlertmanagerRouterCASecretName + "-" + clusterName,
-			Namespace: config.AlertmanagerUWLNamespace,
-		},
-		Data: map[string][]byte{"service-ca.crt": routerCASecret.Data["tls.crt"]},
+	if opts.UserWorkloads.Metrics.CollectionEnabled {
+		if err := o.addSecret(ctx, secrets, config.AlertmanagerAccessorSecretName, config.HubInstallNamespace, config.AlertmanagerAccessorSecretName+"-"+clusterName, config.AlertmanagerUWLNamespace); err != nil {
+			return fmt.Errorf("failed to add accessor secret for user workload metrics: %w", err)
+		}
+		caUWL := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      config.AlertmanagerRouterCASecretName + "-" + clusterName,
+				Namespace: config.AlertmanagerUWLNamespace,
+			},
+			Data: map[string][]byte{"service-ca.crt": routerCASecret.Data["tls.crt"]},
+		}
+		*secrets = append(*secrets, caUWL)
 	}
-	*secrets = append(*secrets, caUWL)
 
 	return nil
 }

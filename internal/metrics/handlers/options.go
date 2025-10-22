@@ -8,15 +8,17 @@ import (
 )
 
 type Options struct {
-	Platform        Collector
-	UserWorkloads   Collector
-	Secrets         []*corev1.Secret
-	ClusterName     string
-	ClusterID       string
-	ClusterVendor   string
-	Images          mconfig.ImageOverrides
-	IsHub           bool
-	COOIsSubscribed bool
+	Platform             Collector
+	UserWorkloads        Collector
+	Secrets              []*corev1.Secret
+	AlertManagerEndpoint string
+	ClusterName          string
+	ClusterID            string
+	ClusterVendor        string
+	InstallNamespace     string
+	Images               mconfig.ImageOverrides
+	IsHub                bool
+	COOIsSubscribed      bool
 	// CRDEstablishedAnnotation is injected into the Prometheus Operator Deployment to trigger a
 	// restart when optional CRDs (PrometheusAgent, ScrapeConfig) become available. This
 	// prevents synchronization issues by ensuring the operator can watch these resources upon startup.

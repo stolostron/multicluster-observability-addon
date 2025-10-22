@@ -2,6 +2,7 @@ package config
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -21,6 +22,7 @@ const (
 	HubCASecretName                 = "observability-managed-cluster-certs"
 	ClientCertSecretName            = "observability-controller-open-cluster-management.io-observability-signer-client-cert"
 	PrometheusCAConfigMapName       = "prometheus-server-ca"
+	PrometheusServerName            = "acm-prometheus-k8s" // For non ocp spokes
 	HubInstallNamespace             = "open-cluster-management-observability"
 
 	ManagedClusterLabelClusterID      = "clusterID"
@@ -48,6 +50,7 @@ const (
 
 	RemoteWriteCfgName        = "acm-observability"
 	ScrapeClassCfgName        = "ocp-monitoring"
+	NonOCPScrapeClassName     = "non-ocp-monitoring"
 	ScrapeClassPlatformTarget = "prometheus-k8s.openshift-monitoring.svc:9091"
 	ScrapeClassUWLTarget      = "prometheus-user-workload.openshift-user-workload-monitoring.svc:9092"
 
@@ -78,18 +81,21 @@ var (
 		Namespace: "open-cluster-management-observability",
 	}
 
-	ErrMissingImageOverride = errors.New("missing image override")
-
 	RouterDefaultCertsConfigMapObjKey = types.NamespacedName{
 		Name:      "router-certs-default",
 		Namespace: "openshift-ingress",
 	}
+
+	ErrMissingImageOverride = errors.New("missing image override")
 )
 
 type ImageOverrides struct {
-	PrometheusConfigReloader   string
-	KubeRBACProxy              string
-	CooPrometheusOperatorImage string
+	PrometheusConfigReloader   string `json:"prometheus_config_reloader"`
+	KubeRBACProxy              string `json:"kube_rbac_proxy"`
+	CooPrometheusOperatorImage string `json:"obo_prometheus_rhel9_operator"`
+	KubeStateMetrics           string `json:"kube_state_metrics"`
+	NodeExporter               string `json:"node_exporter"`
+	Prometheus                 string `json:"prometheus"`
 }
 
 func GetImageOverrides(ctx context.Context, c client.Client) (ImageOverrides, error) {
@@ -100,19 +106,21 @@ func GetImageOverrides(ctx context.Context, c client.Client) (ImageOverrides, er
 		return ret, fmt.Errorf("failed to get image overrides configmap: %w", err)
 	}
 
-	for key, value := range imagesList.Data {
-		switch key {
-		case "prometheus_config_reloader":
-			ret.PrometheusConfigReloader = value
-		case "kube_rbac_proxy":
-			ret.KubeRBACProxy = value
-		case "obo_prometheus_operator":
-			ret.CooPrometheusOperatorImage = value
-		default:
-		}
+	jsonData, err := json.Marshal(imagesList.Data)
+	if err != nil {
+		return ret, fmt.Errorf("failed to marshal image overrides data: %w", err)
 	}
 
-	if ret.CooPrometheusOperatorImage == "" || ret.PrometheusConfigReloader == "" || ret.KubeRBACProxy == "" {
+	if err := json.Unmarshal(jsonData, &ret); err != nil {
+		return ret, fmt.Errorf("failed to unmarshal image overrides: %w", err)
+	}
+
+	if ret.CooPrometheusOperatorImage == "" ||
+		ret.PrometheusConfigReloader == "" ||
+		ret.KubeRBACProxy == "" ||
+		ret.KubeStateMetrics == "" ||
+		ret.Prometheus == "" ||
+		ret.NodeExporter == "" {
 		return ret, fmt.Errorf("%w: %+v", ErrMissingImageOverride, ret)
 	}
 

@@ -60,9 +60,12 @@ const (
 	PrometheusOperatorVersionFeedbackName = "prometheusOperatorVersion"
 	LastTransitionTimeFeedbackName        = "lastTransitionTime"
 	IsOLMManagedFeedbackName              = "isOLMManaged"
+
+	VendorOverrideAnnotationKey = "mcoa-override-vendor"
 )
 
 var (
-	ErrInvalidMetricsHubHostname  = errors.New("invalid metrics hub hostname")
-	ErrInvalidSubscriptionChannel = errors.New("current version of the cluster-observability-operator installed doesn't match the supported MCOA version")
+	ErrInvalidMetricsHubHostname          = errors.New("invalid metrics hub hostname")
+	ErrInvalidMetricsAlertManagerHostname = errors.New("invalid metrics alert manager hostname")
+	ErrInvalidSubscriptionChannel         = errors.New("current version of the cluster-observability-operator installed doesn't match the supported MCOA version")
 )

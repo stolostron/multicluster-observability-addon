@@ -11,6 +11,7 @@ import (
 
 	hyperv1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	cooprometheusv1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1"
 	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	clusterinfov1beta1 "github.com/stolostron/cluster-lifecycle-api/clusterinfo/v1beta1"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
@@ -53,11 +54,13 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 		PlatformMetrics bool
 		UserMetrics     bool
 		COOIsInstalled  bool
+		IsOCP           bool
 		Expects         func(*testing.T, []client.Object)
 	}{
 		"no metrics": {
 			PlatformMetrics: false,
 			UserMetrics:     false,
+			IsOCP:           true,
 			Expects: func(t *testing.T, objects []client.Object) {
 				assert.Len(t, objects, 0)
 			},
@@ -66,6 +69,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 			PlatformMetrics: true,
 			UserMetrics:     false,
 			COOIsInstalled:  false,
+			IsOCP:           true,
 			Expects: func(t *testing.T, objects []client.Object) {
 				// ensure the agent is created
 				agent := common.FilterResourcesByLabelSelector[*cooprometheusv1alpha1.PrometheusAgent](objects, config.PlatformPrometheusMatchLabels)
@@ -88,17 +92,18 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				assert.Len(t, cooOperator, 1)
 				// ensure that the number of objects is correct
 				// 4 (prom operator) + 5 (agent) + 2 secrets (mTLS to hub) + 1 cm (prom ca) + 2 rule + 2 scrape config = 16
-				expectedCount := 35
+				expectedCount := 33
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
-				assert.Len(t, common.FilterResourcesByLabelSelector[*corev1.Secret](objects, nil), 6) // 6 secrets (mTLS to hub) + alertmananger secrets (accessor+ca in platform+uwl)
+				assert.Len(t, common.FilterResourcesByLabelSelector[*corev1.Secret](objects, nil), 4) // 6 secrets (mTLS to hub) + alertmananger secrets (accessor+ca in platform)
 			},
 		},
 		"platform metrics, coo is installed": {
 			PlatformMetrics: true,
 			UserMetrics:     false,
 			COOIsInstalled:  true,
+			IsOCP:           true,
 			Expects: func(t *testing.T, objects []client.Object) {
 				// ensure the agent is created and gets the label expected by the OLM installed COO operator
 				agent := common.FilterResourcesByLabelSelector[*cooprometheusv1alpha1.PrometheusAgent](objects, config.PlatformPrometheusMatchLabels)
@@ -106,7 +111,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				assert.Equal(t, "observability-operator", agent[0].Labels["app.kubernetes.io/managed-by"])
 				assert.Empty(t, agent[0].Annotations["operator.prometheus.io/controller-id"])
 				// ensure that the number of objects is correct
-				expectedCount := 27
+				expectedCount := 25
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
@@ -115,6 +120,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 		"user workload metrics": {
 			PlatformMetrics: false,
 			UserMetrics:     true,
+			IsOCP:           true,
 			Expects: func(t *testing.T, objects []client.Object) {
 				// ensure the agent is created
 				agent := common.FilterResourcesByLabelSelector[*cooprometheusv1alpha1.PrometheusAgent](objects, config.UserWorkloadPrometheusMatchLabels)
@@ -132,17 +138,18 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				recordingRules := common.FilterResourcesByLabelSelector[*prometheusv1.PrometheusRule](objects, config.UserWorkloadPrometheusMatchLabels)
 				assert.Len(t, recordingRules, 2)
 				assert.Equal(t, "openshift-user-workload-monitoring/prometheus-operator", recordingRules[0].Annotations["operator.prometheus.io/controller-id"])
-				expectedCount := 35
+				expectedCount := 33
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
-				assert.Len(t, common.FilterResourcesByLabelSelector[*corev1.Secret](objects, nil), 6) // 2 secrets (mTLS to hub)
+				assert.Len(t, common.FilterResourcesByLabelSelector[*corev1.Secret](objects, nil), 4) // 2 secrets (mTLS to hub) + alertmananger secrets (accessor+ca in uwl)
 			},
 		},
 		"user workload, coo is installed": {
 			PlatformMetrics: false,
 			UserMetrics:     true,
 			COOIsInstalled:  true,
+			IsOCP:           true,
 			Expects: func(t *testing.T, objects []client.Object) {
 				// ensure the agent is created and gets the label expected by the OLM installed COO operator
 				agent := common.FilterResourcesByLabelSelector[*cooprometheusv1alpha1.PrometheusAgent](objects, config.UserWorkloadPrometheusMatchLabels)
@@ -150,7 +157,25 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				assert.Equal(t, "observability-operator", agent[0].Labels["app.kubernetes.io/managed-by"])
 				assert.Empty(t, agent[0].Annotations["operator.prometheus.io/controller-id"])
 				// ensure that the number of objects is correct
-				expectedCount := 27
+				expectedCount := 25
+				if len(objects) != expectedCount {
+					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
+				}
+			},
+		},
+		"is non ocp": {
+			PlatformMetrics: true,
+			UserMetrics:     false,
+			COOIsInstalled:  false,
+			IsOCP:           false,
+			Expects: func(t *testing.T, objects []client.Object) {
+				// ensure the agent is created
+				agent := common.FilterResourcesByLabelSelector[*cooprometheusv1alpha1.PrometheusAgent](objects, config.PlatformPrometheusMatchLabels)
+				assert.Len(t, agent, 1)
+				assert.Equal(t, config.PlatformMetricsCollectorApp, agent[0].GetName())
+				assert.NotEmpty(t, agent[0].Spec.CommonPrometheusFields.RemoteWrite[0].URL)
+				// ensure that the number of objects is correct
+				expectedCount := 69
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
@@ -162,6 +187,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 	assert.NoError(t, kubescheme.AddToScheme(scheme))
 	assert.NoError(t, cooprometheusv1alpha1.AddToScheme(scheme))
 	assert.NoError(t, prometheusv1.AddToScheme(scheme))
+	assert.NoError(t, cooprometheusv1.AddToScheme(scheme))
 	assert.NoError(t, clusterv1.AddToScheme(scheme))
 	assert.NoError(t, addonapiv1alpha1.AddToScheme(scheme))
 	assert.NoError(t, workv1.AddToScheme(scheme))
@@ -235,10 +261,17 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 			clientObjects = append(clientObjects, newSecret(config.HubCASecretName, hubNamespace))
 			clientObjects = append(clientObjects, newSecret(config.ClientCertSecretName, hubNamespace))
 
+			// Add alermanager secrets
+			clientObjects = append(clientObjects, newSecret(config.AlertmanagerAccessorSecretName, hubNamespace))
+			routerCertsSecret := newSecret(config.RouterDefaultCertsConfigMapObjKey.Name, config.RouterDefaultCertsConfigMapObjKey.Namespace)
+			routerCertsSecret.Data["tls.crt"] = []byte("toto")
+			clientObjects = append(clientObjects, routerCertsSecret)
+
 			// Setup a managed cluster
 			managedCluster := addontesting.NewManagedCluster("cluster-1")
-			managedCluster.Labels = map[string]string{
-				clusterinfov1beta1.LabelKubeVendor: string(clusterinfov1beta1.KubeVendorOpenShift),
+			managedCluster.Labels = map[string]string{}
+			if tc.IsOCP {
+				managedCluster.Labels[clusterinfov1beta1.LabelKubeVendor] = string(clusterinfov1beta1.KubeVendorOpenShift)
 			}
 			clientObjects = append(clientObjects, managedCluster)
 
@@ -253,19 +286,16 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 					Namespace: config.ImagesConfigMapObjKey.Namespace,
 				},
 				Data: map[string]string{
-					"obo_prometheus_operator":    "quay.io/prometheus/obo-operator",
-					"prometheus_config_reloader": "quay.io/prometheus/config-reloader",
-					"kube_rbac_proxy":            "quay.io/kube/rbac-proxy",
+					"obo_prometheus_rhel9_operator": "quay.io/prometheus/obo-operator",
+					"prometheus_config_reloader":    "quay.io/prometheus/config-reloader",
+					"kube_rbac_proxy":               "quay.io/kube/rbac-proxy",
+					"kube_state_metrics":            "quay.io/kube/kube-state-metrics",
+					"node_exporter":                 "quay.io/kube/node-exporter",
+					"prometheus":                    "quay.io/prometheus/prometheus",
 				},
 			}
 			clientObjects = append(clientObjects, imagesCM)
 			clientObjects = append(clientObjects, newManifestWork("cluster-1", tc.COOIsInstalled))
-
-			// Add alermanager secrets
-			clientObjects = append(clientObjects, newSecret(config.AlertmanagerAccessorSecretName, hubNamespace))
-			routerCertsSecret := newSecret(config.RouterDefaultCertsConfigMapObjKey.Name, config.RouterDefaultCertsConfigMapObjKey.Namespace)
-			routerCertsSecret.Data["tls.crt"] = []byte("toto")
-			clientObjects = append(clientObjects, routerCertsSecret)
 
 			// Setup the fake k8s client
 			client := fakeclient.NewClientBuilder().
@@ -348,6 +378,7 @@ func TestHelmBuild_Metrics_HCP(t *testing.T) {
 	assert.NoError(t, kubescheme.AddToScheme(scheme))
 	assert.NoError(t, cooprometheusv1alpha1.AddToScheme(scheme))
 	assert.NoError(t, prometheusv1.AddToScheme(scheme))
+	assert.NoError(t, cooprometheusv1.AddToScheme(scheme))
 	assert.NoError(t, clusterv1.AddToScheme(scheme))
 	assert.NoError(t, hyperv1.AddToScheme(scheme))
 	assert.NoError(t, addonapiv1alpha1.AddToScheme(scheme))
@@ -514,9 +545,12 @@ func TestHelmBuild_Metrics_HCP(t *testing.T) {
 			Namespace: hubNamespace,
 		},
 		Data: map[string]string{
-			"obo_prometheus_operator":    "quay.io/prometheus/obo-operator",
-			"prometheus_config_reloader": "quay.io/prometheus/config-reloader",
-			"kube_rbac_proxy":            "quay.io/kube/rbac-proxy",
+			"obo_prometheus_rhel9_operator": "quay.io/prometheus/obo-operator",
+			"prometheus_config_reloader":    "quay.io/prometheus/config-reloader",
+			"kube_rbac_proxy":               "quay.io/kube/rbac-proxy",
+			"kube_state_metrics":            "quay.io/kube/kube-state-metrics",
+			"node_exporter":                 "quay.io/kube/node-exporter",
+			"prometheus":                    "quay.io/prometheus/prometheus",
 		},
 	}
 	clientObjects = append(clientObjects, imagesCM)
@@ -630,13 +664,22 @@ func fakeGetValues(k8s client.Client, platformMetrics, userWorkloadMetrics bool)
 		mcAddon *addonapiv1alpha1.ManagedClusterAddOn,
 	) (addonfactory.Values, error) {
 		optionsBuilder := handlers.OptionsBuilder{
-			Client:         k8s,
-			RemoteWriteURL: "https://observatorium-api-open-cluster-management-observability.apps.sno-4xlarge-416-lqsr2.dev07.red-chesterfield.com/api/metrics/v1/default/api/v1/receive",
+			Client: k8s,
 		}
 
 		hubEp, _ := url.Parse("http://remote-write.example.com")
 
-		opts, err := optionsBuilder.Build(context.Background(), mcAddon, cluster, addon.MetricsOptions{CollectionEnabled: platformMetrics, HubEndpoint: hubEp}, addon.MetricsOptions{CollectionEnabled: userWorkloadMetrics})
+		addonOpts := addon.Options{
+			Platform: addon.PlatformOptions{
+				Metrics: addon.MetricsOptions{CollectionEnabled: platformMetrics, HubEndpoint: *hubEp},
+			},
+			UserWorkloads: addon.UserWorkloadOptions{
+				Metrics: addon.MetricsOptions{CollectionEnabled: userWorkloadMetrics},
+			},
+		}
+
+		// opts, err := optionsBuilder.Build(context.Background(), mcAddon, cluster, addon.MetricsOptions{CollectionEnabled: platformMetrics, HubEndpoint: hubEp}, addon.MetricsOptions{CollectionEnabled: userWorkloadMetrics})
+		opts, err := optionsBuilder.Build(context.Background(), mcAddon, cluster, addonOpts)
 		if err != nil {
 			return nil, err
 		}
@@ -694,7 +737,7 @@ func newAddonOptions(platformEnabled, uwlEnabled bool) addon.Options {
 		Platform: addon.PlatformOptions{
 			Metrics: addon.MetricsOptions{
 				CollectionEnabled: platformEnabled,
-				HubEndpoint:       hubEp,
+				HubEndpoint:       *hubEp,
 			},
 		},
 		UserWorkloads: addon.UserWorkloadOptions{

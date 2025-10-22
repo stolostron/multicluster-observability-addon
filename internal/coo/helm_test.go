@@ -153,6 +153,14 @@ func Test_IncidentDetection_AllConfigsTogether_AllResources(t *testing.T) {
 					Value: "prometheusagents.v1alpha1.monitoring.rhobs",
 				},
 				{
+					Name:  addon.KeyMetricsHubHostname,
+					Value: "metrics.hub.com",
+				},
+				{
+					Name:  addon.KeyMetricsAlertManagerHostname,
+					Value: "alerts.hub.com",
+				},
+				{
 					Name:  "platformMetricsUI",
 					Value: "uiplugins.v1alpha1.observability.openshift.io",
 				},

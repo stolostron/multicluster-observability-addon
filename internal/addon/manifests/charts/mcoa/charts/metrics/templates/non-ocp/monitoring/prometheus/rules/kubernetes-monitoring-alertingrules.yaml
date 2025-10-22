@@ -1,0 +1,11 @@
+{{- if .Values.deployNonOCPStack }}
+apiVersion: monitoring.rhobs/v1
+kind: PrometheusRule
+metadata:
+  name: kubernetes-monitoring-alertingrules
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "prometheus-rules.labels" . | nindent 4 }}
+spec:
+  {{ (.Files.Glob "files/kubernetes-monitoring-alertingrules.yaml").AsConfig }}
+{{- end }}

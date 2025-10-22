@@ -25,9 +25,8 @@ import (
 )
 
 var (
-	errMissingAODCRef     = errors.New("missing required AddOnDeploymentConfig reference in addon configuration")
-	errMultipleAODCRef    = errors.New("addonmultiple AddOnDeploymentConfig references found - only one is supported")
-	errMissingHubEndpoint = errors.New("metricsHubHostname key is missing but it's required when either platformMetricsCollection or userWorkloadMetricsCollection are present")
+	errMissingAODCRef  = errors.New("missing required AddOnDeploymentConfig reference in addon configuration")
+	errMultipleAODCRef = errors.New("addonmultiple AddOnDeploymentConfig references found - only one is supported")
 )
 
 type HelmChartValues struct {
@@ -45,12 +44,6 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, logger logr.Logger) a
 	) (addonfactory.Values, error) {
 		logger = logger.WithValues("cluster", cluster.Name)
 		logger.V(2).Info("reconciliation triggered")
-		// if hub cluster, then don't install anything.
-		// some kube flavors are also currently not supported
-		if !common.IsOpenShiftVendor(cluster) {
-			logger.V(2).Info("unsupported kubernetes vendor, ignoring cluster")
-			return addonfactory.JsonStructToValues(HelmChartValues{})
-		}
 
 		aodc, err := getAddOnDeploymentConfig(ctx, k8s, mcAddon)
 		if err != nil {
@@ -100,16 +93,11 @@ func getMonitoringValues(ctx context.Context, k8s client.Client, logger logr.Log
 		return nil, nil
 	}
 
-	if opts.Platform.Metrics.HubEndpoint == nil || opts.Platform.Metrics.HubEndpoint.Host == "" {
-		return nil, errMissingHubEndpoint
-	}
-
 	optsBuilder := mhandlers.OptionsBuilder{
-		Client:         k8s,
-		RemoteWriteURL: opts.Platform.Metrics.HubEndpoint.String(),
-		Logger:         logger,
+		Client: k8s,
+		Logger: logger,
 	}
-	metricsOpts, err := optsBuilder.Build(ctx, mcAddon, cluster, opts.Platform.Metrics, opts.UserWorkloads.Metrics)
+	metricsOpts, err := optsBuilder.Build(ctx, mcAddon, cluster, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -119,6 +107,10 @@ func getMonitoringValues(ctx context.Context, k8s client.Client, logger logr.Log
 
 func getLoggingValues(ctx context.Context, k8s client.Client, cluster *clusterv1.ManagedCluster, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, opts addon.Options) (*lmanifests.LoggingValues, error) {
 	if !opts.Platform.Logs.CollectionEnabled && !opts.UserWorkloads.Logs.CollectionEnabled {
+		return nil, nil
+	}
+
+	if !common.IsOpenShiftVendor(cluster) {
 		return nil, nil
 	}
 
@@ -132,6 +124,10 @@ func getLoggingValues(ctx context.Context, k8s client.Client, cluster *clusterv1
 
 func getTracingValues(ctx context.Context, k8s client.Client, cluster *clusterv1.ManagedCluster, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, opts addon.Options) (*tmanifests.TracingValues, error) {
 	if common.IsHubCluster(cluster) || !opts.UserWorkloads.Traces.CollectionEnabled {
+		return nil, nil
+	}
+
+	if !common.IsOpenShiftVendor(cluster) {
 		return nil, nil
 	}
 
@@ -149,6 +145,10 @@ func getTracingValues(ctx context.Context, k8s client.Client, cluster *clusterv1
 }
 
 func getCOOValues(ctx context.Context, k8s client.Client, logger logr.Logger, cluster *clusterv1.ManagedCluster, opts addon.Options) (*cmanifests.COOValues, error) {
+	if !common.IsOpenShiftVendor(cluster) {
+		return nil, nil
+	}
+
 	installCOO, err := chandlers.InstallCOO(ctx, k8s, logger, common.IsHubCluster(cluster))
 	if err != nil {
 		return nil, err

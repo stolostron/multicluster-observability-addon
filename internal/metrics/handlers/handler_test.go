@@ -242,9 +242,12 @@ func TestBuildOptions(t *testing.T) {
 					Namespace: config.ImagesConfigMapObjKey.Namespace,
 				},
 				Data: map[string]string{
-					"obo_prometheus_operator":    "obo-prom-operator-image",
-					"kube_rbac_proxy":            "kube-rbac-proxy-image",
-					"prometheus_config_reloader": "prometheus-config-reload-image",
+					"obo_prometheus_rhel9_operator": "obo-prom-operator-image",
+					"kube_rbac_proxy":               "kube-rbac-proxy-image",
+					"prometheus_config_reloader":    "prometheus-config-reload-image",
+					"kube_state_metrics":            "quay.io/kube/kube-state-metrics",
+					"node_exporter":                 "quay.io/kube/node-exporter",
+					"prometheus":                    "quay.io/prometheus/prometheus",
 				},
 			},
 			platformAgent,
@@ -322,8 +325,8 @@ func TestBuildOptions(t *testing.T) {
 						Namespace: config.ImagesConfigMapObjKey.Namespace,
 					},
 					Data: map[string]string{ // Missing image overrides for config reloader
-						"obo_prometheus_operator": "obo_prom-operator-image",
-						"kube_rbac_proxy":         "kube-rbac-proxy-image",
+						"obo_prometheus_rhel9_operator": "obo_prom-operator-image",
+						"kube_rbac_proxy":               "kube-rbac-proxy-image",
 					},
 				})
 				return res
@@ -377,7 +380,7 @@ func TestBuildOptions(t *testing.T) {
 				assert.Equal(t, config.ClusterNameMetricLabel, opts.Platform.PrometheusAgent.Spec.CommonPrometheusFields.RemoteWrite[0].WriteRelabelConfigs[0].TargetLabel)
 				assert.Len(t, opts.Platform.PrometheusAgent.Spec.CommonPrometheusFields.RemoteWrite[0].WriteRelabelConfigs, 5)
 				// Check that the secrets are set
-				assert.Len(t, opts.Secrets, 6)
+				assert.Len(t, opts.Secrets, 4)
 				// Check that user workloads are not enabled
 				assert.Nil(t, opts.UserWorkloads.PrometheusAgent)
 				// Check that scrape configs are set
@@ -397,6 +400,7 @@ func TestBuildOptions(t *testing.T) {
 			addon:           platformManagedClusterAddOn,
 			platformEnabled: true,
 			expects: func(t *testing.T, opts Options, err error) {
+				assert.NoError(t, err)
 				assert.True(t, opts.COOIsSubscribed)
 				assert.Empty(t, opts.CRDEstablishedAnnotation)
 			},
@@ -586,19 +590,24 @@ func TestBuildOptions(t *testing.T) {
 			}
 			hubEp, _ := url.Parse("http://remote-write.example.com")
 			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(resources...).Build()
-			platform := addon.MetricsOptions{CollectionEnabled: tc.platformEnabled, HubEndpoint: hubEp}
-			userWorkloads := addon.MetricsOptions{CollectionEnabled: tc.userWorkloadsEnabled}
+			addonOpts := addon.Options{
+				Platform: addon.PlatformOptions{
+					Metrics: addon.MetricsOptions{CollectionEnabled: tc.platformEnabled, HubEndpoint: *hubEp},
+				},
+				UserWorkloads: addon.UserWorkloadOptions{
+					Metrics: addon.MetricsOptions{CollectionEnabled: tc.userWorkloadsEnabled},
+				},
+			}
 
 			optsBuilder := &OptionsBuilder{
-				Client:         fakeClient,
-				RemoteWriteURL: "https://example.com/write",
+				Client: fakeClient,
 			}
 			managedClusters := &clusterv1.ManagedClusterList{}
 			err := fakeClient.List(context.Background(), managedClusters)
 			require.NoError(t, err)
 			require.Len(t, managedClusters.Items, 1)
 			foundManagedCluster := managedClusters.Items[0]
-			opts, err := optsBuilder.Build(context.Background(), tc.addon, &foundManagedCluster, platform, userWorkloads)
+			opts, err := optsBuilder.Build(context.Background(), tc.addon, &foundManagedCluster, addonOpts)
 
 			tc.expects(t, opts, err)
 		})

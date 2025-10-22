@@ -17,3 +17,5 @@ prometheusOperator:
   component: controller
   rbacProxyTlsSecret: prometheus-operator-kube-rbac-proxy-tls
   rbacProxyPort: 9092
+nodeExporter:
+  hostPort: 19100

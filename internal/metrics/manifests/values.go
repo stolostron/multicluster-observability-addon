@@ -2,26 +2,32 @@ package manifests
 
 import (
 	"encoding/json"
+	"fmt"
+	"slices"
 	"strconv"
 
+	cooprometheusv1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1"
+	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/handlers"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/utils/ptr"
 )
 
 type MetricsValues struct {
-	PlatformEnabled               bool               `json:"platformEnabled"`
-	UserWorkloadsEnabled          bool               `json:"userWorkloadsEnabled"`
-	Secrets                       []ConfigValue      `json:"secrets"`
-	Images                        ImagesValues       `json:"images"`
-	PrometheusControllerID        string             `json:"prometheusControllerID"`
-	PrometheusCAConfigMapName     string             `json:"prometheusCAConfigMapName"`
-	Platform                      Collector          `json:"platform"`
-	UserWorkload                  Collector          `json:"userWorkload"`
-	PrometheusOperator            PrometheusOperator `json:"prometheusOperator"`
-	DeployNonOCPStack             bool               `json:"deployNonOCPStack"`
-	DeployCOOResources            bool               `json:"deployCOOResources"`
-	PrometheusOperatorAnnotations string             `json:"prometheusOperatorAnnotations,omitempty"`
+	PlatformEnabled               bool          `json:"platformEnabled"`
+	UserWorkloadsEnabled          bool          `json:"userWorkloadsEnabled"`
+	Secrets                       []ConfigValue `json:"secrets"`
+	Images                        ImagesValues  `json:"images"`
+	PrometheusControllerID        string        `json:"prometheusControllerID"`
+	PrometheusCAConfigMapName     string        `json:"prometheusCAConfigMapName"`
+	PrometheusServerName          string        `json:"prometheusServerName"`
+	Platform                      Collector     `json:"platform"`
+	UserWorkload                  Collector     `json:"userWorkload"`
+	DeployNonOCPStack             bool          `json:"deployNonOCPStack"`
+	DeployCOOResources            bool          `json:"deployCOOResources"`
+	PrometheusOperatorAnnotations string        `json:"prometheusOperatorAnnotations,omitempty"`
+	AlertManagerEndpoint          string        `json:"alertManagerEndpoint,omitempty"`
 }
 
 type Collector struct {
@@ -35,13 +41,13 @@ type Collector struct {
 	RBACProxyPort       string        `json:"rbacProxyPort"`
 }
 
-type PrometheusOperator struct {
-	RBACProxyImage string `json:"rbacProxyImage"`
-}
-
 type ImagesValues struct {
 	CooPrometheusOperator    string `json:"cooPrometheusOperator"`
 	PrometheusConfigReloader string `json:"prometheusConfigReloader"`
+	KubeStateMetrics         string `json:"kubeStateMetrics"`
+	NodeExporter             string `json:"nodeExporter"`
+	RBACProxyImage           string `json:"rbacProxyImage"`
+	Prometheus               string `json:"prometheus"`
 }
 
 type ConfigValue struct {
@@ -55,6 +61,7 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 	ret := &MetricsValues{
 		PrometheusControllerID:    config.PrometheusControllerID,
 		PrometheusCAConfigMapName: config.PrometheusCAConfigMapName,
+		PrometheusServerName:      config.PrometheusServerName,
 		Platform: Collector{
 			AppName:            config.PlatformMetricsCollectorApp,
 			RBACProxyTLSSecret: config.PlatformRBACProxyTLSSecret,
@@ -65,9 +72,16 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 			RBACProxyTLSSecret: config.UserWorkloadRBACProxyTLSSecret,
 			RBACProxyPort:      strconv.Itoa(config.RBACProxyPort),
 		},
-		PrometheusOperator: PrometheusOperator{
-			RBACProxyImage: opts.Images.KubeRBACProxy,
-		},
+		AlertManagerEndpoint: opts.AlertManagerEndpoint,
+	}
+
+	isOCPCluster := opts.IsOCPCluster()
+	if isOCPCluster {
+		configureAgentForOCP(opts.Platform.PrometheusAgent)
+		configureAgentForOCP(opts.UserWorkloads.PrometheusAgent)
+	} else {
+		configureAgentForNonOCP(opts.Platform.PrometheusAgent)
+		configureAgentForNonOCP(opts.UserWorkloads.PrometheusAgent)
 	}
 
 	// Build Prometheus Agent Spec for Platform
@@ -98,6 +112,27 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 
 	// Build scrape configs
 	for _, scrapeConfig := range opts.Platform.ScrapeConfigs {
+		target := config.ScrapeClassPlatformTarget
+		scheme := "HTTPS"
+		scrapeClassName := config.ScrapeClassCfgName
+		if !isOCPCluster {
+			target = fmt.Sprintf("%s.%s.svc:9091", config.PrometheusServerName, opts.InstallNamespace)
+			scrapeClassName = config.NonOCPScrapeClassName
+			scrapeConfig.Spec.TLSConfig = &cooprometheusv1.SafeTLSConfig{
+				InsecureSkipVerify: ptr.To(true),
+			}
+		}
+
+		scrapeConfig.Spec.ScrapeClassName = ptr.To(scrapeClassName)
+		scrapeConfig.Spec.Scheme = ptr.To(scheme)
+		scrapeConfig.Spec.StaticConfigs = []cooprometheusv1alpha1.StaticConfig{
+			{
+				Targets: []cooprometheusv1alpha1.Target{
+					cooprometheusv1alpha1.Target(target),
+				},
+			},
+		}
+
 		scrapeConfigJson, err := json.Marshal(scrapeConfig.Spec)
 		if err != nil {
 			return ret, err
@@ -111,6 +146,18 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 	}
 
 	for _, scrapeConfig := range opts.UserWorkloads.ScrapeConfigs {
+		if len(scrapeConfig.Spec.StaticConfigs) == 0 && isOCPCluster {
+			scrapeConfig.Spec.ScrapeClassName = ptr.To(config.ScrapeClassCfgName)
+			scrapeConfig.Spec.Scheme = ptr.To("HTTPS")
+			scrapeConfig.Spec.StaticConfigs = []cooprometheusv1alpha1.StaticConfig{
+				{
+					Targets: []cooprometheusv1alpha1.Target{
+						cooprometheusv1alpha1.Target(config.ScrapeClassUWLTarget),
+					},
+				},
+			}
+		}
+
 		scrapeConfigJson, err := json.Marshal(scrapeConfig.Spec)
 		if err != nil {
 			return ret, err
@@ -183,7 +230,6 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 		return ret, err
 	}
 
-	isOCPCluster := opts.IsOCPCluster()
 	ret.PlatformEnabled = opts.IsPlatformEnabled()
 	ret.UserWorkloadsEnabled = opts.IsUserWorkloadsEnabled()
 	ret.DeployNonOCPStack = !isOCPCluster && (ret.PlatformEnabled || ret.UserWorkloadsEnabled)
@@ -194,6 +240,10 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 	ret.Images = ImagesValues{
 		CooPrometheusOperator:    opts.Images.CooPrometheusOperatorImage,
 		PrometheusConfigReloader: opts.Images.PrometheusConfigReloader,
+		KubeStateMetrics:         opts.Images.KubeStateMetrics,
+		NodeExporter:             opts.Images.NodeExporter,
+		RBACProxyImage:           opts.Images.KubeRBACProxy,
+		Prometheus:               opts.Images.Prometheus,
 	}
 
 	return ret, nil
@@ -232,4 +282,69 @@ func buildConfigMaps(configMaps []*corev1.ConfigMap) ([]ConfigValue, error) {
 		configMapsValue = append(configMapsValue, configMapValue)
 	}
 	return configMapsValue, nil
+}
+
+func configureAgentForOCP(agent *cooprometheusv1alpha1.PrometheusAgent) {
+	if agent == nil {
+		return
+	}
+	// Add prometheus-ca configmap
+	if !slices.Contains(agent.Spec.ConfigMaps, config.PrometheusCAConfigMapName) {
+		agent.Spec.ConfigMaps = append(agent.Spec.ConfigMaps, config.PrometheusCAConfigMapName)
+	}
+
+	// Add scrape class for ocp-monitoring
+	desiredScrapeClass := cooprometheusv1.ScrapeClass{
+		Authorization: &cooprometheusv1.Authorization{
+			CredentialsFile: "/var/run/secrets/kubernetes.io/serviceaccount/token",
+		},
+		Name: config.ScrapeClassCfgName,
+		TLSConfig: &cooprometheusv1.TLSConfig{
+			CAFile: fmt.Sprintf("/etc/prometheus/configmaps/%s/service-ca.crt", config.PrometheusCAConfigMapName),
+		},
+		Default: ptr.To(true),
+	}
+
+	index := slices.IndexFunc(agent.Spec.ScrapeClasses, func(e cooprometheusv1.ScrapeClass) bool {
+		return e.Name == desiredScrapeClass.Name
+	})
+
+	if index >= 0 {
+		// Preserve user-defined MetricRelabelings
+		if len(agent.Spec.ScrapeClasses[index].MetricRelabelings) > 0 {
+			desiredScrapeClass.MetricRelabelings = agent.Spec.ScrapeClasses[index].MetricRelabelings
+		}
+		// Replace existing scrape class
+		agent.Spec.ScrapeClasses[index] = desiredScrapeClass
+	} else {
+		// Add new scrape class
+		agent.Spec.ScrapeClasses = append(agent.Spec.ScrapeClasses, desiredScrapeClass)
+	}
+}
+
+func configureAgentForNonOCP(agent *cooprometheusv1alpha1.PrometheusAgent) {
+	if agent == nil {
+		return
+	}
+
+	desiredScrapeClass := cooprometheusv1.ScrapeClass{
+		Authorization: &cooprometheusv1.Authorization{
+			CredentialsFile: "/var/run/secrets/kubernetes.io/serviceaccount/token",
+		},
+		Name:    config.NonOCPScrapeClassName,
+		Default: ptr.To(true),
+	}
+
+	index := slices.IndexFunc(agent.Spec.ScrapeClasses, func(e cooprometheusv1.ScrapeClass) bool {
+		return e.Name == desiredScrapeClass.Name
+	})
+
+	if index >= 0 {
+		if len(agent.Spec.ScrapeClasses[index].MetricRelabelings) > 0 {
+			desiredScrapeClass.MetricRelabelings = agent.Spec.ScrapeClasses[index].MetricRelabelings
+		}
+		agent.Spec.ScrapeClasses[index] = desiredScrapeClass
+	} else {
+		agent.Spec.ScrapeClasses = append(agent.Spec.ScrapeClasses, desiredScrapeClass)
+	}
 }

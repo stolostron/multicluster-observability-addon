@@ -14,10 +14,11 @@ const (
 	KeyOpenShiftLoggingChannel = "openshiftLoggingChannel"
 
 	// Platform Observability Keys
-	KeyPlatformMetricsCollection = "platformMetricsCollection"
-	KeyPlatformLogsCollection    = "platformLogsCollection"
-	KeyPlatformIncidentDetection = "platformIncidentDetection"
-	KeyMetricsHubHostname        = "metricsHubHostname"
+	KeyPlatformMetricsCollection   = "platformMetricsCollection"
+	KeyPlatformLogsCollection      = "platformLogsCollection"
+	KeyPlatformIncidentDetection   = "platformIncidentDetection"
+	KeyMetricsHubHostname          = "metricsHubHostname"
+	KeyMetricsAlertManagerHostname = "metricsAlertManagerHostname"
 
 	// User Workloads Observability Keys
 	KeyUserWorkloadMetricsCollection = "userWorkloadMetricsCollection"
@@ -49,9 +50,10 @@ const (
 )
 
 type MetricsOptions struct {
-	CollectionEnabled bool
-	HubEndpoint       *url.URL
-	UI                MetricsUIOptions
+	CollectionEnabled    bool
+	HubEndpoint          url.URL
+	AlertManagerEndpoint url.URL
+	UI                   MetricsUIOptions
 }
 
 type IncidentDetection struct {
@@ -92,8 +94,29 @@ type MetricsUIOptions struct {
 }
 
 type Options struct {
-	Platform      PlatformOptions
-	UserWorkloads UserWorkloadOptions
+	Platform         PlatformOptions
+	UserWorkloads    UserWorkloadOptions
+	InstallNamespace string
+}
+
+func (o Options) validate() error {
+	if err := o.validateMetrics(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (o Options) validateMetrics() error {
+	if !o.Platform.Metrics.CollectionEnabled && !o.UserWorkloads.Metrics.CollectionEnabled {
+		return nil
+	}
+
+	if o.Platform.Metrics.HubEndpoint.Host == "" {
+		return addoncfg.ErrInvalidMetricsHubHostname
+	}
+
+	return nil
 }
 
 func BuildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Options, error) {
@@ -101,6 +124,8 @@ func BuildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Opti
 	if addOnDeployment == nil {
 		return opts, nil
 	}
+
+	opts.InstallNamespace = addOnDeployment.Spec.AgentInstallNamespace
 
 	if addOnDeployment.Spec.CustomizedVariables == nil {
 		return opts, nil
@@ -131,7 +156,25 @@ func BuildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Opti
 				return opts, fmt.Errorf("%w: invalid hostname format '%s'", addoncfg.ErrInvalidMetricsHubHostname, url.Host)
 			}
 
-			opts.Platform.Metrics.HubEndpoint = url
+			opts.Platform.Metrics.HubEndpoint = *url
+		case KeyMetricsAlertManagerHostname:
+			val := keyvalue.Value
+			if !strings.HasPrefix(val, "http") {
+				val = "https://" + val
+			}
+			url, err := url.Parse(val)
+			if err != nil {
+				return opts, fmt.Errorf("%w: %s", addoncfg.ErrInvalidMetricsAlertManagerHostname, err.Error())
+			}
+
+			// Hostname validation:
+			// - Check if host is empty
+			// - Check for invalid hostname formats like ":"
+			if strings.TrimSpace(url.Host) == "" || url.Host == ":" || strings.HasPrefix(url.Host, ":") {
+				return opts, fmt.Errorf("%w: invalid hostname format '%s'", addoncfg.ErrInvalidMetricsAlertManagerHostname, url.Host)
+			}
+
+			opts.Platform.Metrics.AlertManagerEndpoint = *url
 		case KeyPlatformMetricsCollection:
 			if keyvalue.Value == string(PrometheusAgentV1alpha1) {
 				opts.Platform.Enabled = true
@@ -175,5 +218,5 @@ func BuildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Opti
 			}
 		}
 	}
-	return opts, nil
+	return opts, opts.validate()
 }
