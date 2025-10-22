@@ -515,7 +515,7 @@ func TestReconcileScrapeConfigs(t *testing.T) {
 			},
 			expects: func(t *testing.T, objs []cooprometheusv1alpha1.ScrapeConfig) {
 				assert.Len(t, objs, 1)
-				assert.Empty(t, objs[0].Spec.ScrapeClassName)
+				assert.Equal(t, "not-configurable", *objs[0].Spec.ScrapeClassName)
 			},
 		},
 		{
