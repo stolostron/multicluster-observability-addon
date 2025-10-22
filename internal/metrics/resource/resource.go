@@ -144,9 +144,15 @@ func (d DefaultStackResources) reconcileScrapeConfigs(ctx context.Context, mcoUI
 
 		if !isUWL {
 			// Enforce empty values, they are set when generating the manifests for a given managedCluster
-			desiredSC.Spec.ScrapeClassName = ptr.To("")
-			desiredSC.Spec.Scheme = ptr.To("")
-			desiredSC.Spec.StaticConfigs = []cooprometheusv1alpha1.StaticConfig{}
+			desiredSC.Spec.ScrapeClassName = ptr.To("not-configurable")
+			desiredSC.Spec.Scheme = ptr.To("HTTPS")
+			desiredSC.Spec.StaticConfigs = []cooprometheusv1alpha1.StaticConfig{
+				{
+					Targets: []cooprometheusv1alpha1.Target{
+						"not-configurable",
+					},
+				},
+			}
 		}
 
 		// SSA the objects rendered
