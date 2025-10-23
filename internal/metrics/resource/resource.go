@@ -142,6 +142,11 @@ func (d DefaultStackResources) reconcileScrapeConfigs(ctx context.Context, mcoUI
 		desiredSC := existingSC.DeepCopy()
 		desiredSC.ManagedFields = nil // required for patching with ssa
 
+		if desiredSC.Labels == nil {
+			desiredSC.Labels = map[string]string{}
+		}
+		desiredSC.Labels[addoncfg.BackupLabelKey] = addoncfg.BackupLabelValue
+
 		if !isUWL {
 			// Enforce empty values, they are set when generating the manifests for a given managedCluster
 			desiredSC.Spec.ScrapeClassName = ptr.To("not-configurable")
@@ -156,7 +161,8 @@ func (d DefaultStackResources) reconcileScrapeConfigs(ctx context.Context, mcoUI
 		}
 
 		// SSA the objects rendered
-		if !equality.Semantic.DeepDerivative(desiredSC.Spec, existingSC.Spec) {
+		if !equality.Semantic.DeepDerivative(desiredSC.Spec, existingSC.Spec) ||
+			!equality.Semantic.DeepDerivative(desiredSC.Labels, existingSC.Labels) {
 			if err = common.ServerSideApply(ctx, d.Client, desiredSC, nil); err != nil { // object is controlled by MCO, no owner
 				return nil, fmt.Errorf("failed to patch with with server-side apply: %w", err)
 			}

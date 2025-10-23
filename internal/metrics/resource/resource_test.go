@@ -516,6 +516,8 @@ func TestReconcileScrapeConfigs(t *testing.T) {
 			expects: func(t *testing.T, objs []cooprometheusv1alpha1.ScrapeConfig) {
 				assert.Len(t, objs, 1)
 				assert.Equal(t, "not-configurable", *objs[0].Spec.ScrapeClassName)
+				assert.Contains(t, objs[0].Labels, addoncfg.BackupLabelKey, "backup label key should be present")
+				assert.Equal(t, addoncfg.BackupLabelValue, objs[0].Labels[addoncfg.BackupLabelKey])
 			},
 		},
 		{
@@ -545,6 +547,8 @@ func TestReconcileScrapeConfigs(t *testing.T) {
 			expects: func(t *testing.T, objs []cooprometheusv1alpha1.ScrapeConfig) {
 				assert.Len(t, objs, 1)
 				assert.Equal(t, *objs[0].Spec.ScrapeClassName, "custom")
+				assert.Contains(t, objs[0].Labels, addoncfg.BackupLabelKey, "backup label key should be present")
+				assert.Equal(t, addoncfg.BackupLabelValue, objs[0].Labels[addoncfg.BackupLabelKey])
 			},
 		},
 		{
@@ -567,6 +571,8 @@ func TestReconcileScrapeConfigs(t *testing.T) {
 			expects: func(t *testing.T, objs []cooprometheusv1alpha1.ScrapeConfig) {
 				assert.Len(t, objs, 1)
 				assert.Empty(t, objs[0].Spec.ScrapeClassName)
+				assert.Contains(t, objs[0].Labels, addoncfg.BackupLabelKey, "backup label key should be present")
+				assert.Equal(t, addoncfg.BackupLabelValue, objs[0].Labels[addoncfg.BackupLabelKey])
 			},
 		},
 	}

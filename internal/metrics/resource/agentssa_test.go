@@ -6,6 +6,7 @@ import (
 
 	cooprometheusv1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1"
 	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
+	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/resource"
 	"github.com/stretchr/testify/assert"
@@ -53,6 +54,20 @@ func TestPrometheusAgentSSA(t *testing.T) {
 			Expect: func(t *testing.T, agent *cooprometheusv1alpha1.PrometheusAgent) {
 				assert.NotEmpty(t, agent.Labels["dummy"])
 				assert.NotEmpty(t, agent.Labels["placement"])
+			},
+		},
+		{
+			Name: "backup label is added",
+			ExistingAgent: &cooprometheusv1alpha1.PrometheusAgent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test",
+					Namespace: config.HubInstallNamespace,
+				},
+				Spec: cooprometheusv1alpha1.PrometheusAgentSpec{},
+			},
+			Expect: func(t *testing.T, agent *cooprometheusv1alpha1.PrometheusAgent) {
+				assert.Contains(t, agent.Labels, addoncfg.BackupLabelKey, "backup label key should be present")
+				assert.Equal(t, addoncfg.BackupLabelValue, agent.Labels[addoncfg.BackupLabelKey])
 			},
 		},
 		{
