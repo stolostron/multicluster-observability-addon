@@ -81,8 +81,6 @@ spec:
             - ALL
       hostNetwork: true
       hostPID: true
-      nodeSelector:
-        kubernetes.io/os: linux
       securityContext:
         privileged: false
         readOnlyRootFilesystem: true
@@ -90,8 +88,20 @@ spec:
         seccompProfile:
           type: RuntimeDefault
       serviceAccountName: {{ include "node-exporter.serviceAccountName" . }}
+      {{- if .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml .Values.nodeSelector | nindent 8 }}
+      {{- else }}
+      nodeSelector:
+        kubernetes.io/os: linux
+      {{- end }}
+      {{- if .Values.tolerations }}
+      tolerations:
+        {{- toYaml .Values.tolerations | nindent 8 }}
+      {{- else }}
       tolerations:
       - operator: Exists
+      {{- end }}
       volumes:
       - hostPath:
           path: /sys

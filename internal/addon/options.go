@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
+	corev1 "k8s.io/api/core/v1"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 )
 
@@ -97,6 +98,8 @@ type Options struct {
 	Platform         PlatformOptions
 	UserWorkloads    UserWorkloadOptions
 	InstallNamespace string
+	Tolerations      []corev1.Toleration
+	NodeSelector     map[string]string
 }
 
 func (o Options) validate() error {
@@ -126,6 +129,10 @@ func BuildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Opti
 	}
 
 	opts.InstallNamespace = addOnDeployment.Spec.AgentInstallNamespace
+	if addOnDeployment.Spec.NodePlacement != nil {
+		opts.NodeSelector = addOnDeployment.Spec.NodePlacement.NodeSelector
+		opts.Tolerations = addOnDeployment.Spec.NodePlacement.Tolerations
+	}
 
 	if addOnDeployment.Spec.CustomizedVariables == nil {
 		return opts, nil

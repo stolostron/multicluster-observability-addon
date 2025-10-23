@@ -19,6 +19,8 @@ type Options struct {
 	Images               mconfig.ImageOverrides
 	IsHub                bool
 	COOIsSubscribed      bool
+	Tolerations          []corev1.Toleration
+	NodeSelector         map[string]string
 	// CRDEstablishedAnnotation is injected into the Prometheus Operator Deployment to trigger a
 	// restart when optional CRDs (PrometheusAgent, ScrapeConfig) become available. This
 	// prevents synchronization issues by ensuring the operator can watch these resources upon startup.

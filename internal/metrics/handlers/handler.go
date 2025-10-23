@@ -50,6 +50,8 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 	ret := Options{
 		IsHub:            common.IsHubCluster(managedCluster),
 		InstallNamespace: opts.InstallNamespace,
+		NodeSelector:     opts.NodeSelector,
+		Tolerations:      opts.Tolerations,
 	}
 
 	if !opts.Platform.Metrics.CollectionEnabled && !opts.UserWorkloads.Metrics.CollectionEnabled {
@@ -228,6 +230,10 @@ func (o *OptionsBuilder) buildPrometheusAgent(ctx context.Context, opts *Options
 		return fmt.Errorf("%w: failed to get the %q remote write spec in agent %s/%s", errMissingRemoteWriteConfig, config.RemoteWriteCfgName, agent.Namespace, agent.Name)
 	}
 	agent.Spec.RemoteWrite[remoteWriteSpecIdx].WriteRelabelConfigs = createWriteRelabelConfigs(opts.ClusterName, opts.ClusterID, isHypershift)
+
+	// Apply addonDeploymentConfig settings
+	agent.Spec.Tolerations = opts.Tolerations
+	agent.Spec.NodeSelector = opts.NodeSelector
 
 	// Set the built agent in the appropriate workload option
 	switch appName {
