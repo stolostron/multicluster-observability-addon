@@ -16,7 +16,6 @@ import (
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	"open-cluster-management.io/addon-framework/pkg/utils"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
@@ -63,8 +62,8 @@ func DynamicAgentHealthProber(k8s client.Client, logger logr.Logger) *agent.Heal
 	// Get addonDeploymentConfig and generate Options
 	aodc := &addonapiv1alpha1.AddOnDeploymentConfig{}
 	key := client.ObjectKey{
-		Namespace: "open-cluster-management-observability",
-		Name:      "multicluster-observability-addon",
+		Namespace: addoncfg.InstallNamespace,
+		Name:      addoncfg.Name,
 	}
 	if err := k8s.Get(context.Background(), key, aodc, &client.GetOptions{}); err != nil {
 		logger.Error(err, "failed to get the AddOnDeploymentConfig")
@@ -77,7 +76,7 @@ func DynamicAgentHealthProber(k8s client.Client, logger logr.Logger) *agent.Heal
 	// Depending on enabled options, set appropriate probefields
 	probeFields := []agent.ProbeField{}
 	if opts.Platform.Metrics.CollectionEnabled {
-		probeFields = append(probeFields, getMetricsProbeFields()...)
+		probeFields = append(probeFields, getMetricsProbeFields(aodc.Spec.AgentInstallNamespace)...)
 	}
 	if opts.Platform.Logs.CollectionEnabled {
 		probeFields = append(probeFields, getLogsProbeFields()...)
@@ -104,14 +103,14 @@ func DynamicAgentHealthProber(k8s client.Client, logger logr.Logger) *agent.Heal
 	}
 }
 
-func getMetricsProbeFields() []agent.ProbeField {
+func getMetricsProbeFields(ns string) []agent.ProbeField {
 	return []agent.ProbeField{
 		{
 			ResourceIdentifier: workv1.ResourceIdentifier{
 				Group:     cooprometheusv1alpha1.SchemeGroupVersion.Group,
 				Resource:  cooprometheusv1alpha1.PrometheusAgentName,
 				Name:      mconfig.PlatformMetricsCollectorApp,
-				Namespace: addonfactory.AddonDefaultInstallNamespace,
+				Namespace: ns,
 			},
 			ProbeRules: []workv1.FeedbackRule{
 				{
