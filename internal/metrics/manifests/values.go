@@ -15,19 +15,21 @@ import (
 )
 
 type MetricsValues struct {
-	PlatformEnabled               bool          `json:"platformEnabled"`
-	UserWorkloadsEnabled          bool          `json:"userWorkloadsEnabled"`
-	Secrets                       []ConfigValue `json:"secrets"`
-	Images                        ImagesValues  `json:"images"`
-	PrometheusControllerID        string        `json:"prometheusControllerID"`
-	PrometheusCAConfigMapName     string        `json:"prometheusCAConfigMapName"`
-	PrometheusServerName          string        `json:"prometheusServerName"`
-	Platform                      Collector     `json:"platform"`
-	UserWorkload                  Collector     `json:"userWorkload"`
-	DeployNonOCPStack             bool          `json:"deployNonOCPStack"`
-	DeployCOOResources            bool          `json:"deployCOOResources"`
-	PrometheusOperatorAnnotations string        `json:"prometheusOperatorAnnotations,omitempty"`
-	AlertManagerEndpoint          string        `json:"alertManagerEndpoint,omitempty"`
+	PlatformEnabled               bool                `json:"platformEnabled"`
+	UserWorkloadsEnabled          bool                `json:"userWorkloadsEnabled"`
+	Secrets                       []ConfigValue       `json:"secrets"`
+	Images                        ImagesValues        `json:"images"`
+	PrometheusControllerID        string              `json:"prometheusControllerID"`
+	PrometheusCAConfigMapName     string              `json:"prometheusCAConfigMapName"`
+	PrometheusServerName          string              `json:"prometheusServerName"`
+	Platform                      Collector           `json:"platform"`
+	UserWorkload                  Collector           `json:"userWorkload"`
+	DeployNonOCPStack             bool                `json:"deployNonOCPStack"`
+	DeployCOOResources            bool                `json:"deployCOOResources"`
+	PrometheusOperatorAnnotations string              `json:"prometheusOperatorAnnotations,omitempty"`
+	AlertManagerEndpoint          string              `json:"alertManagerEndpoint,omitempty"`
+	Tolerations                   []corev1.Toleration `json:"tolerations"`
+	NodeSelector                  map[string]string   `json:"nodeSelector"`
 }
 
 type Collector struct {
@@ -73,6 +75,8 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 			RBACProxyPort:      strconv.Itoa(config.RBACProxyPort),
 		},
 		AlertManagerEndpoint: opts.AlertManagerEndpoint,
+		NodeSelector:         opts.NodeSelector,
+		Tolerations:          opts.Tolerations,
 	}
 
 	isOCPCluster := opts.IsOCPCluster()

@@ -28,7 +28,7 @@ func NewDefaultPrometheusAgent(ns, name string, isUWL bool, placementRef addonv1
 		Spec: cooprometheusv1alpha1.PrometheusAgentSpec{
 			CommonPrometheusFields: cooprometheusv1.CommonPrometheusFields{
 				Replicas: ptr.To(int32(1)),
-				LogLevel: "info",
+				LogLevel: "warn",
 				NodeSelector: map[string]string{
 					"kubernetes.io/os": "linux",
 				},
@@ -38,7 +38,7 @@ func NewDefaultPrometheusAgent(ns, name string, isUWL bool, placementRef addonv1
 						corev1.ResourceMemory: resource.MustParse("150Mi"),
 					},
 				},
-				ScrapeInterval: "120s",
+				ScrapeInterval: "300s",
 				SecurityContext: &corev1.PodSecurityContext{
 					RunAsNonRoot: ptr.To(true),
 				},
