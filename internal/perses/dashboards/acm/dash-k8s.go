@@ -1,11 +1,11 @@
 package acm
 
 import (
-	dashboards "github.com/perses/community-dashboards/pkg/dashboards"
-	k8sEtcd "github.com/perses/community-dashboards/pkg/dashboards/etcd"
-	k8sApiServer "github.com/perses/community-dashboards/pkg/dashboards/kubernetes/apiserver"
-	k8sComputeResources "github.com/perses/community-dashboards/pkg/dashboards/kubernetes/compute_resources"
-	"github.com/perses/community-dashboards/pkg/promql"
+	dashboards "github.com/perses/community-mixins/pkg/dashboards"
+	k8sEtcd "github.com/perses/community-mixins/pkg/dashboards/etcd"
+	k8sApiServer "github.com/perses/community-mixins/pkg/dashboards/kubernetes/apiserver"
+	k8sComputeResources "github.com/perses/community-mixins/pkg/dashboards/kubernetes/compute_resources"
+	"github.com/perses/community-mixins/pkg/promql"
 	"github.com/perses/perses/go-sdk/dashboard"
 	listVar "github.com/perses/perses/go-sdk/variable/list-variable"
 	labelValuesVar "github.com/perses/plugins/prometheus/sdk/go/variable/label-values"
