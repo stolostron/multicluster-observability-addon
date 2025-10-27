@@ -285,6 +285,9 @@ func TestBuildOptions(t *testing.T) {
 		addon                *addonapiv1alpha1.ManagedClusterAddOn
 		platformEnabled      bool
 		userWorkloadsEnabled bool
+		proxyConfig          *addon.ProxyConfig
+		tolerations          []corev1.Toleration
+		nodeSelector         map[string]string
 		resources            func() []client.Object
 		expects              func(t *testing.T, opts Options, err error)
 	}{
@@ -579,6 +582,50 @@ func TestBuildOptions(t *testing.T) {
 				assert.Len(t, opts.UserWorkloads.PrometheusAgent.Spec.CommonPrometheusFields.RemoteWrite[0].WriteRelabelConfigs, 8)
 			},
 		},
+		"proxy configuration is enabled": {
+			addon:           platformManagedClusterAddOn,
+			platformEnabled: true,
+			proxyConfig: &addon.ProxyConfig{
+				ProxyURL: func() *url.URL {
+					u, _ := url.Parse("http://proxy.example.com:8080")
+					return u
+				}(),
+				NoProxy: "*.example.com",
+			},
+			tolerations: []corev1.Toleration{
+				{
+					Key:      "node-role.kubernetes.io/infra",
+					Operator: "Exists",
+					Effect:   "NoSchedule",
+				},
+			},
+			nodeSelector: map[string]string{"node-role.kubernetes.io/infra": ""},
+			resources:    createResources,
+			expects: func(t *testing.T, opts Options, err error) {
+				assert.NoError(t, err)
+				require.NotNil(t, opts.Platform.PrometheusAgent)
+				require.NotEmpty(t, opts.Platform.PrometheusAgent.Spec.RemoteWrite)
+
+				expectedProxyURL := "http://proxy.example.com:8080"
+				expectedNoProxy := "*.example.com"
+
+				for _, rw := range opts.Platform.PrometheusAgent.Spec.RemoteWrite {
+					require.NotNil(t, rw.ProxyURL)
+					assert.Equal(t, expectedProxyURL, *rw.ProxyURL)
+					require.NotNil(t, rw.NoProxy)
+					assert.Equal(t, expectedNoProxy, *rw.NoProxy)
+				}
+
+				assert.Equal(t, []corev1.Toleration{
+					{
+						Key:      "node-role.kubernetes.io/infra",
+						Operator: "Exists",
+						Effect:   "NoSchedule",
+					},
+				}, opts.Platform.PrometheusAgent.Spec.Tolerations)
+				assert.Equal(t, map[string]string{"node-role.kubernetes.io/infra": ""}, opts.Platform.PrometheusAgent.Spec.NodeSelector)
+			},
+		},
 	}
 
 	// Run the test cases
@@ -597,6 +644,11 @@ func TestBuildOptions(t *testing.T) {
 				UserWorkloads: addon.UserWorkloadOptions{
 					Metrics: addon.MetricsOptions{CollectionEnabled: tc.userWorkloadsEnabled},
 				},
+				Tolerations:  tc.tolerations,
+				NodeSelector: tc.nodeSelector,
+			}
+			if tc.proxyConfig != nil {
+				addonOpts.ProxyConfig = *tc.proxyConfig
 			}
 
 			optsBuilder := &OptionsBuilder{

@@ -52,6 +52,7 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 		InstallNamespace: opts.InstallNamespace,
 		NodeSelector:     opts.NodeSelector,
 		Tolerations:      opts.Tolerations,
+		ProxyConfig:      opts.ProxyConfig,
 	}
 
 	if !opts.Platform.Metrics.CollectionEnabled && !opts.UserWorkloads.Metrics.CollectionEnabled {
@@ -230,6 +231,15 @@ func (o *OptionsBuilder) buildPrometheusAgent(ctx context.Context, opts *Options
 		return fmt.Errorf("%w: failed to get the %q remote write spec in agent %s/%s", errMissingRemoteWriteConfig, config.RemoteWriteCfgName, agent.Namespace, agent.Name)
 	}
 	agent.Spec.RemoteWrite[remoteWriteSpecIdx].WriteRelabelConfigs = createWriteRelabelConfigs(opts.ClusterName, opts.ClusterID, isHypershift)
+
+	// Add proxy configuration to all remoteWrite configurations
+	if opts.ProxyConfig.ProxyURL != nil {
+		proxyURL := opts.ProxyConfig.ProxyURL.String()
+		for i := range agent.Spec.RemoteWrite {
+			agent.Spec.RemoteWrite[i].ProxyURL = &proxyURL
+			agent.Spec.RemoteWrite[i].NoProxy = &opts.ProxyConfig.NoProxy
+		}
+	}
 
 	// Apply addonDeploymentConfig settings
 	agent.Spec.Tolerations = opts.Tolerations

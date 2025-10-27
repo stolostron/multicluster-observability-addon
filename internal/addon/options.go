@@ -94,12 +94,18 @@ type MetricsUIOptions struct {
 	Enabled bool
 }
 
+type ProxyConfig struct {
+	ProxyURL *url.URL
+	NoProxy  string
+}
+
 type Options struct {
 	Platform         PlatformOptions
 	UserWorkloads    UserWorkloadOptions
 	InstallNamespace string
 	Tolerations      []corev1.Toleration
 	NodeSelector     map[string]string
+	ProxyConfig      ProxyConfig
 }
 
 func (o Options) validate() error {
@@ -133,6 +139,16 @@ func BuildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Opti
 		opts.NodeSelector = addOnDeployment.Spec.NodePlacement.NodeSelector
 		opts.Tolerations = addOnDeployment.Spec.NodePlacement.Tolerations
 	}
+
+	if addOnDeployment.Spec.ProxyConfig.HTTPProxy != "" {
+		proxyURL, err := url.Parse(addOnDeployment.Spec.ProxyConfig.HTTPProxy)
+		if err != nil {
+			return opts, fmt.Errorf("%w: %s", addoncfg.ErrInvalidProxyURL, err.Error())
+		}
+		opts.ProxyConfig.ProxyURL = proxyURL
+	}
+
+	opts.ProxyConfig.NoProxy = addOnDeployment.Spec.ProxyConfig.NoProxy
 
 	if addOnDeployment.Spec.CustomizedVariables == nil {
 		return opts, nil

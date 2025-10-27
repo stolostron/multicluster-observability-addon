@@ -3,6 +3,7 @@ package handlers
 import (
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
+	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	corev1 "k8s.io/api/core/v1"
 )
@@ -25,6 +26,7 @@ type Options struct {
 	// restart when optional CRDs (PrometheusAgent, ScrapeConfig) become available. This
 	// prevents synchronization issues by ensuring the operator can watch these resources upon startup.
 	CRDEstablishedAnnotation string
+	ProxyConfig              addon.ProxyConfig
 }
 
 type Collector struct {
