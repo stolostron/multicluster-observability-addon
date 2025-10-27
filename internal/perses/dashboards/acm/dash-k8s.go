@@ -155,7 +155,7 @@ func BuildK8sDashboards(project string, datasource string, clusterLabelName stri
 	dashboardVars = []dashboard.Option{
 		GetClusterVariable(datasource),
 	}
-	dashboardWriter.Add(k8sComputeResources.BuildKubernetesClusterOverview(project, datasource, clusterLabelName, dashboardVars...))
+	dashboardWriter.Add(k8sComputeResources.BuildKubernetesMultiClusterOverview(project, datasource, clusterLabelName))
 
 	dashboardVars = []dashboard.Option{
 		GetClusterVariable(datasource),
