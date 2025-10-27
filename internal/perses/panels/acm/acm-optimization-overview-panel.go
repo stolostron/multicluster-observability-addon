@@ -1,8 +1,8 @@
 package acm
 
 import (
-	"github.com/perses/community-dashboards/pkg/dashboards"
-	"github.com/perses/community-dashboards/pkg/promql"
+	"github.com/perses/community-mixins/pkg/dashboards"
+	"github.com/perses/community-mixins/pkg/promql"
 	commonSdk "github.com/perses/perses/go-sdk/common"
 	panel "github.com/perses/perses/go-sdk/panel"
 	panelgroup "github.com/perses/perses/go-sdk/panel-group"
@@ -17,7 +17,7 @@ func CPUOverestimationPanel(datasourceName string, labelMatchers ...promql.Label
 		panel.Description("Highlights % differences between CPU requests commitments vs utilization. When this difference is large (>20%), it means that resources are reserved but unused."),
 		statPanel.Chart(
 			statPanel.Format(commonSdk.Format{
-				Unit:          string(commonSdk.PercentUnit),
+				Unit:          &dashboards.PercentUnit,
 				DecimalPlaces: 2,
 			}),
 			statPanel.ValueFontSize(50),
@@ -39,7 +39,7 @@ func CPUUsagePanel(datasourceName string, labelMatchers ...promql.LabelMatcher) 
 		timeSeriesPanel.Chart(
 			timeSeriesPanel.WithYAxis(timeSeriesPanel.YAxis{
 				Format: &commonSdk.Format{
-					Unit: string(commonSdk.BytesUnit),
+					Unit: &dashboards.BytesUnit,
 				},
 			}),
 			timeSeriesPanel.WithLegend(timeSeriesPanel.Legend{
@@ -72,7 +72,7 @@ func CPURequestsCommitmentPanel(datasourceName string, labelMatchers ...promql.L
 	return panelgroup.AddPanel("CPU Requests Commitment",
 		statPanel.Chart(
 			statPanel.Format(commonSdk.Format{
-				Unit:          string(commonSdk.PercentUnit),
+				Unit:          &dashboards.PercentUnit,
 				DecimalPlaces: 2,
 			}),
 			statPanel.ValueFontSize(50),
@@ -93,7 +93,7 @@ func CPUUtilizationPanel(datasourceName string, labelMatchers ...promql.LabelMat
 	return panelgroup.AddPanel("CPU Utilization",
 		statPanel.Chart(
 			statPanel.Format(commonSdk.Format{
-				Unit:          string(commonSdk.PercentUnit),
+				Unit:          &dashboards.PercentUnit,
 				DecimalPlaces: 2,
 			}),
 			statPanel.ValueFontSize(50),
@@ -124,7 +124,7 @@ func CPUQuotaPanel(datasourceName string, labelMatchers ...promql.LabelMatcher) 
 					Header: "CPU Requests %",
 					Align:  tablePanel.LeftAlign,
 					Format: &commonSdk.Format{
-						Unit:          string(commonSdk.PercentDecimalUnit),
+						Unit:          &dashboards.PercentDecimalUnit,
 						DecimalPlaces: 2,
 					},
 				},
@@ -133,7 +133,7 @@ func CPUQuotaPanel(datasourceName string, labelMatchers ...promql.LabelMatcher) 
 					Header: "CPU Usage",
 					Align:  tablePanel.LeftAlign,
 					Format: &commonSdk.Format{
-						Unit:          commonSdk.DecimalUnit,
+						Unit:          &dashboards.DecimalUnit,
 						DecimalPlaces: 2,
 					},
 				},
@@ -142,7 +142,7 @@ func CPUQuotaPanel(datasourceName string, labelMatchers ...promql.LabelMatcher) 
 					Header: "CPU Requests",
 					Align:  tablePanel.LeftAlign,
 					Format: &commonSdk.Format{
-						Unit:          commonSdk.DecimalUnit,
+						Unit:          &dashboards.DecimalUnit,
 						DecimalPlaces: 2,
 					},
 				},
@@ -151,7 +151,7 @@ func CPUQuotaPanel(datasourceName string, labelMatchers ...promql.LabelMatcher) 
 					Header: "Pods",
 					Align:  tablePanel.LeftAlign,
 					Format: &commonSdk.Format{
-						Unit: commonSdk.DecimalUnit,
+						Unit: &dashboards.DecimalUnit,
 					},
 				},
 			}),
@@ -200,7 +200,7 @@ func MemoryOverestimationPanel(datasourceName string, labelMatchers ...promql.La
 		panel.Description("Highlights % differences between memory requests commitments vs utilization. When this difference is large (>20%), it means that resources are reserved but unused."),
 		statPanel.Chart(
 			statPanel.Format(commonSdk.Format{
-				Unit:          string(commonSdk.PercentUnit),
+				Unit:          &dashboards.PercentUnit,
 				DecimalPlaces: 2,
 			}),
 			statPanel.ValueFontSize(50),
@@ -222,7 +222,7 @@ func MemoryUsagePanel(datasourceName string, labelMatchers ...promql.LabelMatche
 		timeSeriesPanel.Chart(
 			timeSeriesPanel.WithYAxis(timeSeriesPanel.YAxis{
 				Format: &commonSdk.Format{
-					Unit: string(commonSdk.BytesUnit),
+					Unit: &dashboards.BytesUnit,
 				},
 			}),
 			timeSeriesPanel.WithLegend(timeSeriesPanel.Legend{
@@ -255,7 +255,7 @@ func MemoryRequestsCommitmentPanel(datasourceName string, labelMatchers ...promq
 	return panelgroup.AddPanel("Memory Requests Commitment",
 		statPanel.Chart(
 			statPanel.Format(commonSdk.Format{
-				Unit:          string(commonSdk.PercentDecimalUnit),
+				Unit:          &dashboards.PercentDecimalUnit,
 				DecimalPlaces: 2,
 			}),
 			statPanel.ValueFontSize(50),
@@ -276,7 +276,7 @@ func MemoryUtilizationPanel(datasourceName string, labelMatchers ...promql.Label
 	return panelgroup.AddPanel("Memory Utilization",
 		statPanel.Chart(
 			statPanel.Format(commonSdk.Format{
-				Unit:          string(commonSdk.PercentDecimalUnit),
+				Unit:          &dashboards.PercentDecimalUnit,
 				DecimalPlaces: 2,
 			}),
 			statPanel.ValueFontSize(50),
@@ -308,7 +308,7 @@ func MemoryRequestsByNamespacePanel(datasourceName string, labelMatchers ...prom
 					Header: "Memory Requests %",
 					Align:  tablePanel.LeftAlign,
 					Format: &commonSdk.Format{
-						Unit:          string(commonSdk.PercentDecimalUnit),
+						Unit:          &dashboards.PercentDecimalUnit,
 						DecimalPlaces: 2,
 					},
 				},
@@ -317,7 +317,7 @@ func MemoryRequestsByNamespacePanel(datasourceName string, labelMatchers ...prom
 					Header: "Memory Usage",
 					Align:  tablePanel.LeftAlign,
 					Format: &commonSdk.Format{
-						Unit:          commonSdk.DecimalUnit,
+						Unit:          &dashboards.DecimalUnit,
 						DecimalPlaces: 2,
 					},
 				},
@@ -326,7 +326,7 @@ func MemoryRequestsByNamespacePanel(datasourceName string, labelMatchers ...prom
 					Header: "Memory Requests",
 					Align:  tablePanel.LeftAlign,
 					Format: &commonSdk.Format{
-						Unit:          commonSdk.DecimalUnit,
+						Unit:          &dashboards.DecimalUnit,
 						DecimalPlaces: 2,
 					},
 				},
@@ -335,7 +335,7 @@ func MemoryRequestsByNamespacePanel(datasourceName string, labelMatchers ...prom
 					Header: "Pods",
 					Align:  tablePanel.LeftAlign,
 					Format: &commonSdk.Format{
-						Unit: commonSdk.DecimalUnit,
+						Unit: &dashboards.DecimalUnit,
 					},
 				},
 			}),
@@ -394,7 +394,7 @@ func NetworkingCurrentStatusPanel(datasourceName string, labelMatchers ...promql
 					Header: "Current Bandwidth Received",
 					Align:  tablePanel.LeftAlign,
 					Format: &commonSdk.Format{
-						Unit:          string(commonSdk.BytesUnit),
+						Unit:          &dashboards.BytesUnit,
 						DecimalPlaces: 2,
 					},
 				},
@@ -403,7 +403,7 @@ func NetworkingCurrentStatusPanel(datasourceName string, labelMatchers ...promql
 					Header: "Current Bandwidth Transmitted",
 					Align:  tablePanel.LeftAlign,
 					Format: &commonSdk.Format{
-						Unit:          string(commonSdk.BytesPerSecondsUnit),
+						Unit:          &dashboards.BytesPerSecondsUnit,
 						DecimalPlaces: 2,
 					},
 				},
@@ -412,7 +412,7 @@ func NetworkingCurrentStatusPanel(datasourceName string, labelMatchers ...promql
 					Header: "Rate of Received Packets Dropped",
 					Align:  tablePanel.LeftAlign,
 					Format: &commonSdk.Format{
-						Unit:          string(commonSdk.PacketsPerSecondsUnit),
+						Unit:          &dashboards.PacketsPerSecondsUnit,
 						DecimalPlaces: 2,
 					},
 				},
@@ -421,7 +421,7 @@ func NetworkingCurrentStatusPanel(datasourceName string, labelMatchers ...promql
 					Header: "Rate of Transmitted Packets Dropped",
 					Align:  tablePanel.LeftAlign,
 					Format: &commonSdk.Format{
-						Unit:          string(commonSdk.PacketsPerSecondsUnit),
+						Unit:          &dashboards.PacketsPerSecondsUnit,
 						DecimalPlaces: 2,
 					},
 				},
