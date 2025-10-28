@@ -1,6 +1,8 @@
 package acm
 
 import (
+	"flag"
+
 	dashboards "github.com/perses/community-mixins/pkg/dashboards"
 	k8sEtcd "github.com/perses/community-mixins/pkg/dashboards/etcd"
 	k8sApiServer "github.com/perses/community-mixins/pkg/dashboards/kubernetes/apiserver"
@@ -144,6 +146,8 @@ func GetInstanceVariable(datasource string) dashboard.Option {
 
 // Upstream dashboards imported from the community-dashboards repository. https://github.com/perses/community-dashboards/tree/main/pkg/dashboards/kubernetes
 func BuildK8sDashboards(project string, datasource string, clusterLabelName string) (obj []runtime.Object, err error) {
+	flag.String("output", "", "output format of the dashboard exec")
+	flag.String("output-dir", "", "output directory of the dashboard exec")
 	dashboardWriter := dashboards.NewDashboardWriter()
 
 	dashboardVars := []dashboard.Option{
