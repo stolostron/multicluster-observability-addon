@@ -1,6 +1,6 @@
 module github.com/stolostron/multicluster-observability-addon
 
-go 1.25.0
+go 1.25.1
 
 require (
 	github.com/ViaQ/logerr/v2 v2.1.0
@@ -29,13 +29,13 @@ require (
 
 require (
 	github.com/openshift/api v0.0.0-20250704153732-ad766c4e6d8e
-	github.com/perses/community-mixins v0.0.0-20251027141559-0bf2cf9adc7d
-	github.com/perses/perses v0.52.0
+	github.com/perses/community-mixins v0.0.0-20251027163913-1d0e405f5169
+	github.com/perses/perses v0.53.0-beta.0
 	github.com/perses/perses-operator v0.2.0
 	github.com/perses/plugins/prometheus v0.54.0
 	github.com/perses/plugins/statchart v0.10.0
 	github.com/perses/plugins/table v0.7.1
-	github.com/perses/plugins/timeserieschart v0.11.0
+	github.com/perses/plugins/timeserieschart v0.11.1
 	github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring v0.83.0-rhobs1
 	github.com/rhobs/observability-operator/pkg/apis v0.0.0-20250902133632-f98bd8a20a80
 	golang.org/x/text v0.31.0
@@ -124,7 +124,7 @@ require (
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasttemplate v1.2.2 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
-	github.com/zitadel/oidc/v3 v3.44.0 // indirect
+	github.com/zitadel/oidc/v3 v3.45.0 // indirect
 	github.com/zitadel/schema v1.3.1 // indirect
 	go.etcd.io/etcd/api/v3 v3.6.4 // indirect
 	go.etcd.io/etcd/client/pkg/v3 v3.6.4 // indirect
@@ -159,7 +159,7 @@ require (
 	go.yaml.in/yaml/v2 v2.4.3 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/crypto v0.45.0 // indirect
-	golang.org/x/exp v0.0.0-20250819193227-8b4c13bb791b // indirect
+	golang.org/x/exp v0.0.0-20250911091902-df9299821621 // indirect
 	golang.org/x/net v0.47.0 // indirect
 	golang.org/x/oauth2 v0.31.0 // indirect
 	golang.org/x/sync v0.18.0 // indirect

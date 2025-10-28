@@ -160,7 +160,7 @@ func AlertTypeOverTime(datasourceName string, labelMatchers ...promql.LabelMatch
 					Display:      "bar",
 					LineWidth:    2,
 					Stack:        "all",
-					Palette:      timeSeriesPanel.Palette{Mode: timeSeriesPanel.AutoMode},
+					Palette:      &timeSeriesPanel.Palette{Mode: timeSeriesPanel.AutoMode},
 				},
 			),
 		),
@@ -193,7 +193,7 @@ func ClusterAffectedOverTime(datasourceName string, labelMatchers ...promql.Labe
 					Display:      "bar",
 					LineWidth:    1,
 					Stack:        "all",
-					Palette:      timeSeriesPanel.Palette{Mode: timeSeriesPanel.AutoMode},
+					Palette:      &timeSeriesPanel.Palette{Mode: timeSeriesPanel.AutoMode},
 				},
 			),
 		),
@@ -251,7 +251,7 @@ func MostFiringAlerts(datasourceName string, labelMatchers ...promql.LabelMatche
 			timeSeriesPanel.WithVisual(
 				timeSeriesPanel.Visual{
 					Display: "bar",
-					Palette: timeSeriesPanel.Palette{Mode: timeSeriesPanel.AutoMode},
+					Palette: &timeSeriesPanel.Palette{Mode: timeSeriesPanel.AutoMode},
 				},
 			),
 		),
@@ -273,7 +273,7 @@ func MostAffectedClusters(datasourceName string, labelMatchers ...promql.LabelMa
 			timeSeriesPanel.WithVisual(
 				timeSeriesPanel.Visual{
 					Display: "bar",
-					Palette: timeSeriesPanel.Palette{Mode: timeSeriesPanel.AutoMode},
+					Palette: &timeSeriesPanel.Palette{Mode: timeSeriesPanel.AutoMode},
 				},
 			),
 		),
