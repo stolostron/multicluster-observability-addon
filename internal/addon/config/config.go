@@ -43,7 +43,7 @@ const (
 	UipProbeKey       = "isAvailable"
 	UipProbePath      = ".status.conditions[?(@.type==\"Available\")].status"
 
-	DefaultStackPrefix = "default-stack-instance"
+	DefaultStackPrefix = "mcoa-default"
 
 	// Label keys
 	PlacementRefNameLabelKey      = "placement-ref-name"
