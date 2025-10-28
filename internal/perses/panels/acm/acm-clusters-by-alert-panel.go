@@ -23,7 +23,7 @@ func ClustersWithAlertSeverity(datasourceName string, labelMatchers ...promql.La
 				LineWidth:    2,
 				AreaOpacity:  0.7,
 				Stack:        timeSeriesPanel.AllStack,
-				Palette:      timeSeriesPanel.Palette{Mode: timeSeriesPanel.AutoMode},
+				Palette:      &timeSeriesPanel.Palette{Mode: timeSeriesPanel.AutoMode},
 			}),
 		),
 		panel.AddQuery(
