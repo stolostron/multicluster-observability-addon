@@ -626,6 +626,44 @@ func TestBuildOptions(t *testing.T) {
 				assert.Equal(t, map[string]string{"node-role.kubernetes.io/infra": ""}, opts.Platform.PrometheusAgent.Spec.NodeSelector)
 			},
 		},
+		"platform collection is enabled with existing relabel configs": {
+			addon:           platformManagedClusterAddOn,
+			platformEnabled: true,
+			resources: func() []client.Object {
+				res := createResources()
+				// Modify the platform agent to include an existing relabel config
+				for i, r := range res {
+					if pa, ok := r.(*cooprometheusv1alpha1.PrometheusAgent); ok && pa.Name == platformAgent.Name {
+						pa.Spec.RemoteWrite[0].WriteRelabelConfigs = []cooprometheusv1.RelabelConfig{
+							{
+								SourceLabels: []cooprometheusv1.LabelName{"foo"},
+								TargetLabel:  "bar",
+								Action:       "replace",
+							},
+						}
+						res[i] = pa
+						break
+					}
+				}
+				return res
+			},
+			expects: func(t *testing.T, opts Options, err error) {
+				assert.NoError(t, err)
+				require.NotNil(t, opts.Platform.PrometheusAgent)
+				require.NotEmpty(t, opts.Platform.PrometheusAgent.Spec.RemoteWrite)
+				// There are 5 generated rules + 1 existing
+				assert.Len(t, opts.Platform.PrometheusAgent.Spec.RemoteWrite[0].WriteRelabelConfigs, 6)
+				// Check that the existing rule is still there
+				existingRuleFound := false
+				for _, rule := range opts.Platform.PrometheusAgent.Spec.RemoteWrite[0].WriteRelabelConfigs {
+					if rule.TargetLabel == "bar" {
+						existingRuleFound = true
+						break
+					}
+				}
+				assert.True(t, existingRuleFound, "existing relabel config not found")
+			},
+		},
 	}
 
 	// Run the test cases

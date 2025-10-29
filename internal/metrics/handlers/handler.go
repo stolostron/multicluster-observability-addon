@@ -230,7 +230,8 @@ func (o *OptionsBuilder) buildPrometheusAgent(ctx context.Context, opts *Options
 	if remoteWriteSpecIdx == -1 {
 		return fmt.Errorf("%w: failed to get the %q remote write spec in agent %s/%s", errMissingRemoteWriteConfig, config.RemoteWriteCfgName, agent.Namespace, agent.Name)
 	}
-	agent.Spec.RemoteWrite[remoteWriteSpecIdx].WriteRelabelConfigs = createWriteRelabelConfigs(opts.ClusterName, opts.ClusterID, isHypershift)
+	agent.Spec.RemoteWrite[remoteWriteSpecIdx].WriteRelabelConfigs = append(agent.Spec.RemoteWrite[remoteWriteSpecIdx].WriteRelabelConfigs,
+		createWriteRelabelConfigs(opts.ClusterName, opts.ClusterID, isHypershift)...)
 
 	// Add proxy configuration to all remoteWrite configurations
 	if opts.ProxyConfig.ProxyURL != nil {
