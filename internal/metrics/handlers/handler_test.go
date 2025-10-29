@@ -634,11 +634,26 @@ func TestBuildOptions(t *testing.T) {
 				// Modify the platform agent to include an existing relabel config
 				for i, r := range res {
 					if pa, ok := r.(*cooprometheusv1alpha1.PrometheusAgent); ok && pa.Name == platformAgent.Name {
-						pa.Spec.RemoteWrite[0].WriteRelabelConfigs = []cooprometheusv1.RelabelConfig{
+						pa.Spec.RemoteWrite = []cooprometheusv1.RemoteWriteSpec{
 							{
-								SourceLabels: []cooprometheusv1.LabelName{"foo"},
-								TargetLabel:  "bar",
-								Action:       "replace",
+								Name: ptr.To(config.RemoteWriteCfgName),
+								WriteRelabelConfigs: []cooprometheusv1.RelabelConfig{
+									{
+										SourceLabels: []cooprometheusv1.LabelName{"foo"},
+										TargetLabel:  "bar",
+										Action:       "replace",
+									},
+								},
+							},
+							{
+								Name: ptr.To("second-remote-write"),
+								WriteRelabelConfigs: []cooprometheusv1.RelabelConfig{
+									{
+										SourceLabels: []cooprometheusv1.LabelName{"baz"},
+										TargetLabel:  "qux",
+										Action:       "replace",
+									},
+								},
 							},
 						}
 						res[i] = pa
@@ -650,18 +665,22 @@ func TestBuildOptions(t *testing.T) {
 			expects: func(t *testing.T, opts Options, err error) {
 				assert.NoError(t, err)
 				require.NotNil(t, opts.Platform.PrometheusAgent)
-				require.NotEmpty(t, opts.Platform.PrometheusAgent.Spec.RemoteWrite)
-				// There are 5 generated rules + 1 existing
-				assert.Len(t, opts.Platform.PrometheusAgent.Spec.RemoteWrite[0].WriteRelabelConfigs, 6)
-				// Check that the existing rule is still there
-				existingRuleFound := false
-				for _, rule := range opts.Platform.PrometheusAgent.Spec.RemoteWrite[0].WriteRelabelConfigs {
-					if rule.TargetLabel == "bar" {
-						existingRuleFound = true
-						break
+				require.Len(t, opts.Platform.PrometheusAgent.Spec.RemoteWrite, 2)
+				for _, rw := range opts.Platform.PrometheusAgent.Spec.RemoteWrite {
+					// There are 5 generated rules + 1 existing
+					assert.Len(t, rw.WriteRelabelConfigs, 6)
+					if *rw.Name == config.RemoteWriteCfgName {
+						// Check that the existing rule is still there
+						existingRuleFound := false
+						for _, rule := range rw.WriteRelabelConfigs {
+							if rule.TargetLabel == "bar" {
+								existingRuleFound = true
+								break
+							}
+						}
+						assert.True(t, existingRuleFound, "existing relabel config not found")
 					}
 				}
-				assert.True(t, existingRuleFound, "existing relabel config not found")
 			},
 		},
 	}
