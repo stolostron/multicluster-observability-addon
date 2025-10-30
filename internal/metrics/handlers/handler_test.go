@@ -626,6 +626,63 @@ func TestBuildOptions(t *testing.T) {
 				assert.Equal(t, map[string]string{"node-role.kubernetes.io/infra": ""}, opts.Platform.PrometheusAgent.Spec.NodeSelector)
 			},
 		},
+		"platform collection is enabled with existing relabel configs": {
+			addon:           platformManagedClusterAddOn,
+			platformEnabled: true,
+			resources: func() []client.Object {
+				res := createResources()
+				// Modify the platform agent to include an existing relabel config
+				for i, r := range res {
+					if pa, ok := r.(*cooprometheusv1alpha1.PrometheusAgent); ok && pa.Name == platformAgent.Name {
+						pa.Spec.RemoteWrite = []cooprometheusv1.RemoteWriteSpec{
+							{
+								Name: ptr.To(config.RemoteWriteCfgName),
+								WriteRelabelConfigs: []cooprometheusv1.RelabelConfig{
+									{
+										SourceLabels: []cooprometheusv1.LabelName{"foo"},
+										TargetLabel:  "bar",
+										Action:       "replace",
+									},
+								},
+							},
+							{
+								Name: ptr.To("second-remote-write"),
+								WriteRelabelConfigs: []cooprometheusv1.RelabelConfig{
+									{
+										SourceLabels: []cooprometheusv1.LabelName{"baz"},
+										TargetLabel:  "qux",
+										Action:       "replace",
+									},
+								},
+							},
+						}
+						res[i] = pa
+						break
+					}
+				}
+				return res
+			},
+			expects: func(t *testing.T, opts Options, err error) {
+				assert.NoError(t, err)
+				require.NotNil(t, opts.Platform.PrometheusAgent)
+				require.Len(t, opts.Platform.PrometheusAgent.Spec.RemoteWrite, 2)
+				for _, rw := range opts.Platform.PrometheusAgent.Spec.RemoteWrite {
+					// There are 5 generated rules + 1 existing
+					assert.Len(t, rw.WriteRelabelConfigs, 6)
+					if *rw.Name == config.RemoteWriteCfgName {
+						// Check that the existing rule is still there
+						existingRuleFound := false
+						for _, rule := range rw.WriteRelabelConfigs {
+							if rule.TargetLabel == "bar" {
+								existingRuleFound = true
+								break
+							}
+						}
+						assert.True(t, existingRuleFound, "existing relabel config not found")
+					}
+				}
+			},
+		},
 	}
 
 	// Run the test cases

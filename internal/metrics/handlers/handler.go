@@ -223,14 +223,19 @@ func (o *OptionsBuilder) buildPrometheusAgent(ctx context.Context, opts *Options
 		return fmt.Errorf("%w: kind %s %s/%s", errMissingCMAOOwnership, agent.Kind, agent.Namespace, agent.Name)
 	}
 
-	// add the relabel cfg
+	// ensure the expected remote write config exists
 	remoteWriteSpecIdx := slices.IndexFunc(agent.Spec.RemoteWrite, func(e cooprometheusv1.RemoteWriteSpec) bool {
 		return e.Name != nil && *e.Name == config.RemoteWriteCfgName
 	})
 	if remoteWriteSpecIdx == -1 {
 		return fmt.Errorf("%w: failed to get the %q remote write spec in agent %s/%s", errMissingRemoteWriteConfig, config.RemoteWriteCfgName, agent.Namespace, agent.Name)
 	}
-	agent.Spec.RemoteWrite[remoteWriteSpecIdx].WriteRelabelConfigs = createWriteRelabelConfigs(opts.ClusterName, opts.ClusterID, isHypershift)
+
+	// add the relabel cfg to all remote write configs
+	for i := range agent.Spec.RemoteWrite {
+		agent.Spec.RemoteWrite[i].WriteRelabelConfigs = append(agent.Spec.RemoteWrite[i].WriteRelabelConfigs,
+			createWriteRelabelConfigs(opts.ClusterName, opts.ClusterID, isHypershift)...)
+	}
 
 	// Add proxy configuration to all remoteWrite configurations
 	if opts.ProxyConfig.ProxyURL != nil {
