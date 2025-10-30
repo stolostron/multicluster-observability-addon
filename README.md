@@ -1,3 +1,4 @@
+test
 # Multi Cluster Observability AddOn
 
 ## Description
