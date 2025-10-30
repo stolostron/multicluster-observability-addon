@@ -92,8 +92,17 @@ type PrometheusAgentSSA struct {
 
 // Build generate the prometheusAgent resource containing only fields that must be enforced using server-side apply.
 func (p *PrometheusAgentSSA) Build() *cooprometheusv1alpha1.PrometheusAgent {
+	// Ensure TypeMeta is always set, even if the existing agent doesn't have it
+	typeMeta := p.ExistingAgent.TypeMeta
+	if typeMeta.Kind == "" {
+		typeMeta = metav1.TypeMeta{
+			Kind:       cooprometheusv1alpha1.PrometheusAgentsKind,
+			APIVersion: cooprometheusv1alpha1.SchemeGroupVersion.String(),
+		}
+	}
+
 	p.desiredAgent = &cooprometheusv1alpha1.PrometheusAgent{
-		TypeMeta: p.ExistingAgent.TypeMeta,
+		TypeMeta: typeMeta,
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      p.ExistingAgent.Name,
 			Namespace: p.ExistingAgent.Namespace,

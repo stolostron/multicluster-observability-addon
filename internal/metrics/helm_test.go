@@ -454,7 +454,53 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 			client := fakeclient.NewClientBuilder().
 				WithInterceptorFuncs(interceptor.Funcs{
 					Patch: func(ctx context.Context, clientww client.WithWatch, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
-						return clientww.Patch(ctx, obj, client.Merge, opts...)
+						// Preserve TypeMeta before patch operation
+						var originalTypeMeta metav1.TypeMeta
+
+						// Set obj type if missing using type assertions
+						if pa, ok := obj.(*cooprometheusv1alpha1.PrometheusAgent); ok {
+							originalTypeMeta = pa.TypeMeta
+							if pa.GroupVersionKind().Kind == "" {
+								pa.SetGroupVersionKind(cooprometheusv1alpha1.SchemeGroupVersion.WithKind(cooprometheusv1alpha1.PrometheusAgentsKind))
+							}
+						}
+
+						// Filter out SSA-specific options that are incompatible with merge patches
+						var filteredOpts []client.PatchOption
+						for _, opt := range opts {
+							// Skip SSA-specific options by checking their string representation
+							optStr := fmt.Sprintf("%T", opt)
+							if strings.Contains(optStr, "forceOwnership") || strings.Contains(optStr, "FieldOwner") {
+								continue // Skip SSA-specific options
+							}
+							filteredOpts = append(filteredOpts, opt) // Keep all other options
+						}
+
+						err := clientww.Patch(ctx, obj, client.Merge, filteredOpts...)
+
+						// Restore TypeMeta after patch operation
+						if err == nil && originalTypeMeta.Kind != "" {
+							if pa, ok := obj.(*cooprometheusv1alpha1.PrometheusAgent); ok {
+								pa.TypeMeta = originalTypeMeta
+							}
+						}
+
+						return err
+					},
+					List: func(ctx context.Context, clientww client.WithWatch, obj client.ObjectList, opts ...client.ListOption) error {
+						err := clientww.List(ctx, obj, opts...)
+						if err != nil {
+							return err
+						}
+						// Ensure GVK is set for PrometheusAgent objects in lists
+						if paList, ok := obj.(*cooprometheusv1alpha1.PrometheusAgentList); ok {
+							for i := range paList.Items {
+								if paList.Items[i].GroupVersionKind().Kind == "" {
+									paList.Items[i].SetGroupVersionKind(cooprometheusv1alpha1.SchemeGroupVersion.WithKind(cooprometheusv1alpha1.PrometheusAgentsKind))
+								}
+							}
+						}
+						return nil
 					},
 				}).
 				WithScheme(scheme).
@@ -757,7 +803,52 @@ func TestHelmBuild_Metrics_HCP(t *testing.T) {
 	client := fakeclient.NewClientBuilder().
 		WithInterceptorFuncs(interceptor.Funcs{
 			Patch: func(ctx context.Context, clientww client.WithWatch, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
-				return clientww.Patch(ctx, obj, client.Merge, opts...)
+				// Preserve TypeMeta before patch operation
+				var originalTypeMeta metav1.TypeMeta
+
+				// Set obj type if missing using type assertions
+				if pa, ok := obj.(*cooprometheusv1alpha1.PrometheusAgent); ok {
+					originalTypeMeta = pa.TypeMeta
+					if pa.GroupVersionKind().Kind == "" {
+						pa.SetGroupVersionKind(cooprometheusv1alpha1.SchemeGroupVersion.WithKind(cooprometheusv1alpha1.PrometheusAgentsKind))
+					}
+				}
+
+				// Filter out SSA-specific options that are incompatible with merge patches
+				var filteredOpts []client.PatchOption
+				for _, opt := range opts {
+					optStr := fmt.Sprintf("%T", opt)
+					if strings.Contains(optStr, "forceOwnership") || strings.Contains(optStr, "FieldOwner") {
+						continue
+					}
+					filteredOpts = append(filteredOpts, opt)
+				}
+
+				err := clientww.Patch(ctx, obj, client.Merge, filteredOpts...)
+
+				// Restore TypeMeta after patch operation
+				if err == nil && originalTypeMeta.Kind != "" {
+					if pa, ok := obj.(*cooprometheusv1alpha1.PrometheusAgent); ok {
+						pa.TypeMeta = originalTypeMeta
+					}
+				}
+
+				return err
+			},
+			List: func(ctx context.Context, clientww client.WithWatch, obj client.ObjectList, opts ...client.ListOption) error {
+				err := clientww.List(ctx, obj, opts...)
+				if err != nil {
+					return err
+				}
+				// Ensure GVK is set for PrometheusAgent objects in lists
+				if paList, ok := obj.(*cooprometheusv1alpha1.PrometheusAgentList); ok {
+					for i := range paList.Items {
+						if paList.Items[i].GroupVersionKind().Kind == "" {
+							paList.Items[i].SetGroupVersionKind(cooprometheusv1alpha1.SchemeGroupVersion.WithKind(cooprometheusv1alpha1.PrometheusAgentsKind))
+						}
+					}
+				}
+				return nil
 			},
 		}).
 		WithScheme(scheme).
