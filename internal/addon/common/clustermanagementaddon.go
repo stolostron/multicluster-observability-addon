@@ -112,9 +112,11 @@ func ensureConfigsInAddon(cmao *addonv1alpha1.ClusterManagementAddOn, configs []
 }
 
 func ObjectToAddonConfig(obj client.Object) (addonv1alpha1.AddOnConfig, error) {
+	gvk := obj.GetObjectKind().GroupVersionKind()
+
 	ret := addonv1alpha1.AddOnConfig{
 		ConfigGroupResource: addonv1alpha1.ConfigGroupResource{
-			Group: obj.GetObjectKind().GroupVersionKind().Group,
+			Group: gvk.Group,
 		},
 		ConfigReferent: addonv1alpha1.ConfigReferent{
 			Namespace: obj.GetNamespace(),
@@ -122,7 +124,7 @@ func ObjectToAddonConfig(obj client.Object) (addonv1alpha1.AddOnConfig, error) {
 		},
 	}
 
-	switch obj.GetObjectKind().GroupVersionKind().Kind {
+	switch gvk.Kind {
 	case cooprometheusv1alpha1.ScrapeConfigsKind:
 		ret.Resource = cooprometheusv1alpha1.ScrapeConfigName
 	case prometheusv1.PrometheusRuleKind:

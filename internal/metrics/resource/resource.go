@@ -265,7 +265,7 @@ func (d DefaultStackResources) reconcileAgentForPlacement(ctx context.Context, p
 		d.Logger.Info("updated prometheus agent with server-side apply", "namespace", promSSA.Namespace, "name", promSSA.Name)
 	}
 
-	cfg, err := common.ObjectToAddonConfig(agent)
+	cfg, err := common.ObjectToAddonConfig(promSSA)
 	if err != nil {
 		return common.DefaultConfig{}, fmt.Errorf("failed to generate addon config for %s: %w", agent.Name, err)
 	}
