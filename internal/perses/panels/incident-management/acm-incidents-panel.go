@@ -17,7 +17,7 @@ func ActiveIncidents(datasourceName string, labelMatchers ...promql.LabelMatcher
 		panel.AddQuery(
 			query.PromQL(
 				promql.SetLabelMatchers(
-					"max(cluster:health:components:map{cluster=\"$cluster\",src_alertname!~\"Watchdog\"}>0) by (group_id,cluster,component,src_alertname) * on (cluster) group_left(url) console_url",
+					"max(cluster_health_components_map{cluster=\"$cluster\",src_alertname!~\"Watchdog\"}>0) by (group_id,cluster,component,src_alertname) * on (cluster) group_left(url) console_url",
 					labelMatchers,
 				),
 				dashboards.AddQueryDataSource(datasourceName),
@@ -26,7 +26,7 @@ func ActiveIncidents(datasourceName string, labelMatchers ...promql.LabelMatcher
 		panel.AddQuery(
 			query.PromQL(
 				promql.SetLabelMatchers(
-					"min_over_time(timestamp(max by (group_id) (cluster:health:components:map{cluster=\"$cluster\",src_alertname!~\"Watchdog\"}))[$__range:1m]) * 1000",
+					"min_over_time(timestamp(max by (group_id) (cluster_health_components_map{cluster=\"$cluster\",src_alertname!~\"Watchdog\"}))[$__range:1m]) * 1000",
 					labelMatchers,
 				),
 				dashboards.AddQueryDataSource(datasourceName),
@@ -70,9 +70,6 @@ func ActiveIncidents(datasourceName string, labelMatchers ...promql.LabelMatcher
 					Name:   "value #2",
 					Header: "start time",
 					Align:  tablePanel.LeftAlign,
-					Format: &commonSdk.Format{
-						Unit: string(commonSdk.MilliSecondsUnit),
-					},
 				},
 			}),
 			tablePanel.WithCellSettings(
@@ -148,7 +145,7 @@ func IncidentCount(datasourceName string, labelMatchers ...promql.LabelMatcher) 
 		panel.AddQuery(
 			query.PromQL(
 				promql.SetLabelMatchers(
-					"count(sum(count_over_time((cluster:health:components:map{cluster=\"$cluster\",src_severity!=\"none\",src_alertname!~\"Watchdog\"}>0)[$__interval:1m])) by (group_id))",
+					"count(sum(count_over_time((cluster_health_components_map{cluster=\"$cluster\",src_severity!=\"none\",src_alertname!~\"Watchdog\"}>0)[$__interval:1m])) by (group_id))",
 					labelMatchers,
 				),
 				dashboards.AddQueryDataSource(datasourceName),
