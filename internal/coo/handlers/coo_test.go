@@ -32,7 +32,7 @@ func TestInstallCOO(t *testing.T) {
 			isHub:                   false,
 			options:                 addon.Options{},
 			expectedUIPluginInstall: false,
-			expectedCOOInstall:      true,
+			expectedCOOInstall:      false,
 		},
 		{
 			name:  "Non-hub cluster with incident detection enabled",
@@ -71,7 +71,7 @@ func TestInstallCOO(t *testing.T) {
 			isHub:                   true,
 			options:                 addon.Options{},
 			expectedUIPluginInstall: false,
-			expectedCOOInstall:      true,
+			expectedCOOInstall:      false,
 		},
 		{
 			name:  "Hub cluster with COO installed and incident detection enabled",
@@ -163,8 +163,8 @@ func TestInstallCOO(t *testing.T) {
 					},
 				},
 			},
-			expectedUIPluginInstall: true,
-			expectedCOOInstall:      true,
+			expectedUIPluginInstall: false,
+			expectedCOOInstall:      false,
 		},
 	}
 

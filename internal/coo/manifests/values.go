@@ -48,7 +48,7 @@ type UIValues struct {
 func BuildValues(opts addon.Options, installCOO bool, isHubCluster bool) *COOValues {
 	var dashboards []DashboardValue
 	var incidentDetectionEnabled bool
-	metricsUI := enableUI(opts.Platform.Metrics, isHubCluster)
+	metricsUI := EnableUI(opts.Platform.Metrics, isHubCluster)
 	if metricsUI != nil {
 		if metricsUI.Enabled {
 			dashboards = append(dashboards, buildACMDashboards()...)
@@ -66,6 +66,10 @@ func BuildValues(opts addon.Options, installCOO bool, isHubCluster bool) *COOVal
 		}
 	}
 
+	if (metricsUI == nil || !metricsUI.Enabled) && !incidentDetectionEnabled {
+		installCOO = false
+	}
+
 	return &COOValues{
 		// Decide if this chart is needed
 		Enabled: len(dashboards) > 0 || incidentDetectionEnabled,
@@ -79,12 +83,12 @@ func BuildValues(opts addon.Options, installCOO bool, isHubCluster bool) *COOVal
 	}
 }
 
-func enableUI(opts addon.MetricsOptions, isHub bool) *UIValues {
+func EnableUI(opts addon.MetricsOptions, isHub bool) *UIValues {
 	if !isHub {
 		return nil
 	}
 
-	if !opts.CollectionEnabled && !opts.UI.Enabled {
+	if !opts.CollectionEnabled || !opts.UI.Enabled {
 		return nil
 	}
 
