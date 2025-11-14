@@ -45,7 +45,7 @@ type UIValues struct {
 	Enabled bool `json:"enabled"`
 }
 
-func BuildValues(opts addon.Options, installCOO bool, isHubCluster bool) *COOValues {
+func BuildValues(opts addon.Options, installOfCOOOnTheHubIsNeeded bool, isHubCluster bool) *COOValues {
 	var dashboards []DashboardValue
 	var incidentDetectionEnabled bool
 	metricsUI := enableUI(opts.Platform.Metrics, isHubCluster)
@@ -66,8 +66,13 @@ func BuildValues(opts addon.Options, installCOO bool, isHubCluster bool) *COOVal
 		}
 	}
 
-	if (metricsUI == nil || !metricsUI.Enabled) && !incidentDetectionEnabled {
-		installCOO = false
+	var installCOO bool
+	if (metricsUI != nil && metricsUI.Enabled) || incidentDetectionEnabled {
+		if isHubCluster {
+			installCOO = installOfCOOOnTheHubIsNeeded
+		} else {
+			installCOO = true
+		}
 	}
 
 	return &COOValues{
