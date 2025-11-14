@@ -149,7 +149,7 @@ func getCOOValues(ctx context.Context, k8s client.Client, logger logr.Logger, cl
 		return nil, nil
 	}
 
-	installCOO, err := chandlers.InstallCOO(ctx, k8s, logger, common.IsHubCluster(cluster))
+	installCOO, err := chandlers.InstallOfCOOOnTheHubIsNeeded(ctx, k8s, logger, common.IsHubCluster(cluster))
 	if err != nil {
 		return nil, err
 	}

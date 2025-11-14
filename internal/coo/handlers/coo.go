@@ -11,11 +11,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func InstallCOO(ctx context.Context, k8s client.Client, logger logr.Logger, isHub bool) (bool, error) {
+func InstallOfCOOOnTheHubIsNeeded(ctx context.Context, k8s client.Client, logger logr.Logger, isHub bool) (bool, error) {
 	// Currently, the InstallCOO option is only relevant for hub clusters
 	// since we don't have k8s clients for the spokes
 	if !isHub {
-		return true, nil
+		return false, nil
 	}
 
 	cooSub := &operatorv1alpha1.Subscription{}
