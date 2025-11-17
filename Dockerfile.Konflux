@@ -1,7 +1,7 @@
 # Copyright Contributors to the Open Cluster Management project
 # Licensed under the Apache License 2.0
 
-FROM brew.registry.redhat.io/rh-osbs/openshift-golang-builder:v1.24.3-202506060640.ge53d574.el9 AS builder
+FROM brew.registry.redhat.io/rh-osbs/openshift-golang-builder:v1.24.6-202510150934.g4284440.el9 AS builder
 
 WORKDIR /workspace
 # Copy the Go Modules manifests
@@ -16,7 +16,7 @@ COPY main.go main.go
 COPY internal/ internal/
 
 # Build
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -mod=readonly -a -o multicluster-observability-addon main.go
+RUN CGO_ENABLED=0 GOOS=linux GO111MODULE=on go build -mod=readonly -a -o multicluster-observability-addon main.go
 
 FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
 
