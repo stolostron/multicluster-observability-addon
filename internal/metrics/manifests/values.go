@@ -237,7 +237,7 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 	ret.PlatformEnabled = opts.IsPlatformEnabled()
 	ret.UserWorkloadsEnabled = opts.IsUserWorkloadsEnabled()
 	ret.DeployNonOCPStack = !isOCPCluster && (ret.PlatformEnabled || ret.UserWorkloadsEnabled)
-	ret.DeployCOOResources = !opts.IsHub && (ret.PlatformEnabled || ret.UserWorkloadsEnabled) && !opts.COOIsSubscribed
+	ret.DeployCOOResources = (ret.PlatformEnabled || ret.UserWorkloadsEnabled) && !opts.COOIsSubscribed
 	ret.PrometheusOperatorAnnotations = opts.CRDEstablishedAnnotation
 
 	// Set images

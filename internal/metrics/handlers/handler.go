@@ -141,7 +141,7 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 		}
 	}
 
-	if !common.IsHubCluster(managedCluster) && common.IsOpenShiftVendor(managedCluster) {
+	if common.IsOpenShiftVendor(managedCluster) {
 		if ret.COOIsSubscribed, err = o.cooIsSubscribed(ctx, managedCluster); err != nil {
 			return ret, fmt.Errorf("failed to check if coo is subscribed on the managed cluster: %w", err)
 		}
