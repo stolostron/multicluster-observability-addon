@@ -194,11 +194,16 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 			return ret, err
 		}
 
-		ret.UserWorkload.Rules = append(ret.UserWorkload.Rules, ConfigValue{
+		configValueItem := ConfigValue{
 			Name:   rule.Name,
 			Data:   string(ruleJson),
 			Labels: rule.Labels,
-		})
+		}
+		targetNamespace := rule.Annotations[config.TargetNamespaceAnnotation]
+		if targetNamespace != "" {
+			configValueItem.Namespace = targetNamespace
+		}
+		ret.UserWorkload.Rules = append(ret.UserWorkload.Rules, configValueItem)
 	}
 
 	// Build HCP's serviceMonitors for userWorkloads

@@ -275,6 +275,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 			uwlRules.Labels = config.UserWorkloadPrometheusMatchLabels
 			uwlRulesAdditional := uwlRules.DeepCopy()
 			uwlRulesAdditional.Name = "uwl-rules-additional"
+			uwlRulesAdditional.Annotations = map[string]string{config.TargetNamespaceAnnotation: "target-namespace"}
 			configReferences = append(configReferences, newConfigReference(uwlRules), newConfigReference(uwlRulesAdditional))
 			clientObjects = append(clientObjects, uwlRules, uwlRulesAdditional)
 
@@ -387,7 +388,11 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				// secrets are possible to install in multiple namespaces (such as openshift-monitoring)
 				// and are therefore also ignored.
 				if !slices.Contains([]string{"ClusterRole", "ClusterRoleBinding", "CustomResourceDefinition", "Secret", "Namespace"}, obj.GetObjectKind().GroupVersionKind().Kind) {
-					assert.Equal(t, tc.InstallNamespace, accessor.GetNamespace(), fmt.Sprintf("Object: %s/%s", obj.GetObjectKind().GroupVersionKind(), accessor.GetName()))
+					if obj.GetObjectKind().GroupVersionKind().Kind == "PrometheusRule" && accessor.GetName() == "uwl-rules-additional" {
+						assert.Equal(t, "target-namespace", accessor.GetNamespace(), fmt.Sprintf("Object: %s/%s", obj.GetObjectKind().GroupVersionKind(), accessor.GetName()))
+					} else {
+						assert.Equal(t, tc.InstallNamespace, accessor.GetNamespace(), fmt.Sprintf("Object: %s/%s", obj.GetObjectKind().GroupVersionKind(), accessor.GetName()))
+					}
 				}
 			}
 		})
