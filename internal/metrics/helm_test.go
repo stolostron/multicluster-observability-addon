@@ -641,7 +641,7 @@ func TestHelmBuild_Metrics_HCP(t *testing.T) {
 	scrapeConfigs := common.FilterResourcesByLabelSelector[*cooprometheusv1alpha1.ScrapeConfig](clientObjs, nil)
 	assert.Len(t, scrapeConfigs, 2)
 	serviceMonitors := common.FilterResourcesByLabelSelector[*prometheusv1.ServiceMonitor](clientObjs, nil)
-	assert.Len(t, serviceMonitors, 3) // 2 for hcps and 1 for meta monitoring
+	assert.Len(t, serviceMonitors, 4) // 2 for hcps and 1 for meta monitoring, 1 for obo-prometheus operator
 	// keep only hcps serviceMonitors
 	serviceMonitors = slices.DeleteFunc(serviceMonitors, func(e *prometheusv1.ServiceMonitor) bool { return e.Namespace != "clusters-a" })
 	assert.Len(t, serviceMonitors, 2)
