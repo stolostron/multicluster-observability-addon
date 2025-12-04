@@ -250,15 +250,15 @@ func TestBuildOptions(t *testing.T) {
 					"prometheus":                    "quay.io/prometheus/prometheus",
 				},
 			},
-			platformAgent,
-			platformHAProxyCM,
-			platformScrapeConfig,
-			platformRule,
-			uwlAgent,
-			uwlHAProxyCM,
-			cmao,
-			alertmanagerAccessorSecret,
-			alertmanagerRouterCA,
+			platformAgent.DeepCopy(),
+			platformHAProxyCM.DeepCopy(),
+			platformScrapeConfig.DeepCopy(),
+			platformRule.DeepCopy(),
+			uwlAgent.DeepCopy(),
+			uwlHAProxyCM.DeepCopy(),
+			cmao.DeepCopy(),
+			alertmanagerAccessorSecret.DeepCopy(),
+			alertmanagerRouterCA.DeepCopy(),
 			&corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      config.ClientCertSecretName,
@@ -285,6 +285,9 @@ func TestBuildOptions(t *testing.T) {
 		addon                *addonapiv1alpha1.ManagedClusterAddOn
 		platformEnabled      bool
 		userWorkloadsEnabled bool
+		proxyConfig          *addon.ProxyConfig
+		tolerations          []corev1.Toleration
+		nodeSelector         map[string]string
 		resources            func() []client.Object
 		expects              func(t *testing.T, opts Options, err error)
 	}{
@@ -579,6 +582,107 @@ func TestBuildOptions(t *testing.T) {
 				assert.Len(t, opts.UserWorkloads.PrometheusAgent.Spec.CommonPrometheusFields.RemoteWrite[0].WriteRelabelConfigs, 8)
 			},
 		},
+		"proxy configuration is enabled": {
+			addon:           platformManagedClusterAddOn,
+			platformEnabled: true,
+			proxyConfig: &addon.ProxyConfig{
+				ProxyURL: func() *url.URL {
+					u, _ := url.Parse("http://proxy.example.com:8080")
+					return u
+				}(),
+				NoProxy: "*.example.com",
+			},
+			tolerations: []corev1.Toleration{
+				{
+					Key:      "node-role.kubernetes.io/infra",
+					Operator: "Exists",
+					Effect:   "NoSchedule",
+				},
+			},
+			nodeSelector: map[string]string{"node-role.kubernetes.io/infra": ""},
+			resources:    createResources,
+			expects: func(t *testing.T, opts Options, err error) {
+				assert.NoError(t, err)
+				require.NotNil(t, opts.Platform.PrometheusAgent)
+				require.NotEmpty(t, opts.Platform.PrometheusAgent.Spec.RemoteWrite)
+
+				expectedProxyURL := "http://proxy.example.com:8080"
+				expectedNoProxy := "*.example.com"
+
+				for _, rw := range opts.Platform.PrometheusAgent.Spec.RemoteWrite {
+					require.NotNil(t, rw.ProxyURL)
+					assert.Equal(t, expectedProxyURL, *rw.ProxyURL)
+					require.NotNil(t, rw.NoProxy)
+					assert.Equal(t, expectedNoProxy, *rw.NoProxy)
+				}
+
+				assert.Equal(t, []corev1.Toleration{
+					{
+						Key:      "node-role.kubernetes.io/infra",
+						Operator: "Exists",
+						Effect:   "NoSchedule",
+					},
+				}, opts.Platform.PrometheusAgent.Spec.Tolerations)
+				assert.Equal(t, map[string]string{"node-role.kubernetes.io/infra": ""}, opts.Platform.PrometheusAgent.Spec.NodeSelector)
+			},
+		},
+		"platform collection is enabled with existing relabel configs": {
+			addon:           platformManagedClusterAddOn,
+			platformEnabled: true,
+			resources: func() []client.Object {
+				res := createResources()
+				// Modify the platform agent to include an existing relabel config
+				for i, r := range res {
+					if pa, ok := r.(*cooprometheusv1alpha1.PrometheusAgent); ok && pa.Name == platformAgent.Name {
+						pa.Spec.RemoteWrite = []cooprometheusv1.RemoteWriteSpec{
+							{
+								Name: ptr.To(config.RemoteWriteCfgName),
+								WriteRelabelConfigs: []cooprometheusv1.RelabelConfig{
+									{
+										SourceLabels: []cooprometheusv1.LabelName{"foo"},
+										TargetLabel:  "bar",
+										Action:       "replace",
+									},
+								},
+							},
+							{
+								Name: ptr.To("second-remote-write"),
+								WriteRelabelConfigs: []cooprometheusv1.RelabelConfig{
+									{
+										SourceLabels: []cooprometheusv1.LabelName{"baz"},
+										TargetLabel:  "qux",
+										Action:       "replace",
+									},
+								},
+							},
+						}
+						res[i] = pa
+						break
+					}
+				}
+				return res
+			},
+			expects: func(t *testing.T, opts Options, err error) {
+				assert.NoError(t, err)
+				require.NotNil(t, opts.Platform.PrometheusAgent)
+				require.Len(t, opts.Platform.PrometheusAgent.Spec.RemoteWrite, 2)
+				for _, rw := range opts.Platform.PrometheusAgent.Spec.RemoteWrite {
+					// There are 5 generated rules + 1 existing
+					assert.Len(t, rw.WriteRelabelConfigs, 6)
+					if *rw.Name == config.RemoteWriteCfgName {
+						// Check that the existing rule is still there
+						existingRuleFound := false
+						for _, rule := range rw.WriteRelabelConfigs {
+							if rule.TargetLabel == "bar" {
+								existingRuleFound = true
+								break
+							}
+						}
+						assert.True(t, existingRuleFound, "existing relabel config not found")
+					}
+				}
+			},
+		},
 	}
 
 	// Run the test cases
@@ -597,6 +701,11 @@ func TestBuildOptions(t *testing.T) {
 				UserWorkloads: addon.UserWorkloadOptions{
 					Metrics: addon.MetricsOptions{CollectionEnabled: tc.userWorkloadsEnabled},
 				},
+				Tolerations:  tc.tolerations,
+				NodeSelector: tc.nodeSelector,
+			}
+			if tc.proxyConfig != nil {
+				addonOpts.ProxyConfig = *tc.proxyConfig
 			}
 
 			optsBuilder := &OptionsBuilder{

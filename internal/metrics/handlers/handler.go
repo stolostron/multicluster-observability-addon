@@ -50,6 +50,9 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 	ret := Options{
 		IsHub:            common.IsHubCluster(managedCluster),
 		InstallNamespace: opts.InstallNamespace,
+		NodeSelector:     opts.NodeSelector,
+		Tolerations:      opts.Tolerations,
+		ProxyConfig:      opts.ProxyConfig,
 	}
 
 	if !opts.Platform.Metrics.CollectionEnabled && !opts.UserWorkloads.Metrics.CollectionEnabled {
@@ -138,7 +141,7 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 		}
 	}
 
-	if !common.IsHubCluster(managedCluster) && common.IsOpenShiftVendor(managedCluster) {
+	if common.IsOpenShiftVendor(managedCluster) {
 		if ret.COOIsSubscribed, err = o.cooIsSubscribed(ctx, managedCluster); err != nil {
 			return ret, fmt.Errorf("failed to check if coo is subscribed on the managed cluster: %w", err)
 		}
@@ -220,14 +223,32 @@ func (o *OptionsBuilder) buildPrometheusAgent(ctx context.Context, opts *Options
 		return fmt.Errorf("%w: kind %s %s/%s", errMissingCMAOOwnership, agent.Kind, agent.Namespace, agent.Name)
 	}
 
-	// add the relabel cfg
+	// ensure the expected remote write config exists
 	remoteWriteSpecIdx := slices.IndexFunc(agent.Spec.RemoteWrite, func(e cooprometheusv1.RemoteWriteSpec) bool {
 		return e.Name != nil && *e.Name == config.RemoteWriteCfgName
 	})
 	if remoteWriteSpecIdx == -1 {
 		return fmt.Errorf("%w: failed to get the %q remote write spec in agent %s/%s", errMissingRemoteWriteConfig, config.RemoteWriteCfgName, agent.Namespace, agent.Name)
 	}
-	agent.Spec.RemoteWrite[remoteWriteSpecIdx].WriteRelabelConfigs = createWriteRelabelConfigs(opts.ClusterName, opts.ClusterID, isHypershift)
+
+	// add the relabel cfg to all remote write configs
+	for i := range agent.Spec.RemoteWrite {
+		agent.Spec.RemoteWrite[i].WriteRelabelConfigs = append(agent.Spec.RemoteWrite[i].WriteRelabelConfigs,
+			createWriteRelabelConfigs(opts.ClusterName, opts.ClusterID, isHypershift)...)
+	}
+
+	// Add proxy configuration to all remoteWrite configurations
+	if opts.ProxyConfig.ProxyURL != nil {
+		proxyURL := opts.ProxyConfig.ProxyURL.String()
+		for i := range agent.Spec.RemoteWrite {
+			agent.Spec.RemoteWrite[i].ProxyURL = &proxyURL
+			agent.Spec.RemoteWrite[i].NoProxy = &opts.ProxyConfig.NoProxy
+		}
+	}
+
+	// Apply addonDeploymentConfig settings
+	agent.Spec.Tolerations = opts.Tolerations
+	agent.Spec.NodeSelector = opts.NodeSelector
 
 	// Set the built agent in the appropriate workload option
 	switch appName {

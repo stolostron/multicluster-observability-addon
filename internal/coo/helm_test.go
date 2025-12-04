@@ -61,7 +61,7 @@ func fakeGetValues(ctx context.Context, k8s client.Client) addonfactory.GetValue
 			}
 		}
 
-		installCOO, err := handlers.InstallCOO(ctx, k8s, logr.Discard(), isHub)
+		installCOO, err := handlers.InstallOfCOOOnTheHubIsNeeded(ctx, k8s, logr.Discard(), isHub)
 		if err != nil {
 			return nil, err
 		}

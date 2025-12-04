@@ -40,6 +40,8 @@ const (
 	ManagementClusterNameMetricLabel = "managementcluster"
 	ManagementClusterIDMetricLabel   = "managementclusterID"
 
+	TargetNamespaceAnnotation = "observability.open-cluster-management.io/target-namespace"
+
 	// Hypershift
 	LocalManagedClusterLabel              = "local-cluster"
 	HypershiftAddonStateLabel             = "feature.open-cluster-management.io/addon-hypershift-addon"

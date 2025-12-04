@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
+	corev1 "k8s.io/api/core/v1"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 )
 
@@ -93,10 +94,18 @@ type MetricsUIOptions struct {
 	Enabled bool
 }
 
+type ProxyConfig struct {
+	ProxyURL *url.URL
+	NoProxy  string
+}
+
 type Options struct {
 	Platform         PlatformOptions
 	UserWorkloads    UserWorkloadOptions
 	InstallNamespace string
+	Tolerations      []corev1.Toleration
+	NodeSelector     map[string]string
+	ProxyConfig      ProxyConfig
 }
 
 func (o Options) validate() error {
@@ -126,6 +135,20 @@ func BuildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Opti
 	}
 
 	opts.InstallNamespace = addOnDeployment.Spec.AgentInstallNamespace
+	if addOnDeployment.Spec.NodePlacement != nil {
+		opts.NodeSelector = addOnDeployment.Spec.NodePlacement.NodeSelector
+		opts.Tolerations = addOnDeployment.Spec.NodePlacement.Tolerations
+	}
+
+	if addOnDeployment.Spec.ProxyConfig.HTTPProxy != "" {
+		proxyURL, err := url.Parse(addOnDeployment.Spec.ProxyConfig.HTTPProxy)
+		if err != nil {
+			return opts, fmt.Errorf("%w: %s", addoncfg.ErrInvalidProxyURL, err.Error())
+		}
+		opts.ProxyConfig.ProxyURL = proxyURL
+	}
+
+	opts.ProxyConfig.NoProxy = addOnDeployment.Spec.ProxyConfig.NoProxy
 
 	if addOnDeployment.Spec.CustomizedVariables == nil {
 		return opts, nil

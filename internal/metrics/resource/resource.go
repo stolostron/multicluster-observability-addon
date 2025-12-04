@@ -312,7 +312,15 @@ func (d DefaultStackResources) getOrCreateDefaultAgent(ctx context.Context, plac
 	}
 	d.Logger.Info("created default prometheus agent for placement", "agentNamespace", agent.Namespace, "agentName", agent.Name, "placementName", placementRef.Name)
 
-	return agent, nil
+	// Re-fetch the agent to populate server-side fields and, critically, TypeMeta.
+	// The 'agent' object was mutated by Create() and its TypeMeta is now empty.
+	key := client.ObjectKeyFromObject(agent)
+	createdAgent := &cooprometheusv1alpha1.PrometheusAgent{}
+	if err := d.Client.Get(ctx, key, createdAgent); err != nil {
+		return nil, fmt.Errorf("failed to re-fetch created default agent %q: %w", key, err)
+	}
+
+	return createdAgent, nil
 }
 
 func (d DefaultStackResources) generateConfigsForAllPlacements(object []client.Object) ([]common.DefaultConfig, error) {

@@ -9,8 +9,17 @@ metadata:
   labels:
     {{- include "prometheus.labels" . | nindent 4 }}
 spec:
+  {{- if .Values.nodeSelector }}
+  nodeSelector:
+    {{- toYaml .Values.nodeSelector | nindent 4 }}
+  {{- else }}
   nodeSelector:
     kubernetes.io/os: linux
+  {{- end }}
+  {{- if .Values.tolerations }}
+  tolerations:
+    {{- toYaml .Values.tolerations | nindent 4 }}
+  {{- end }}
   serviceAccountName: {{ .Values.prometheusServerName }}
   secrets:
     - hub-alertmanager-router-ca

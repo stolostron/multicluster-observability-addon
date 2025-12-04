@@ -15,19 +15,21 @@ import (
 )
 
 type MetricsValues struct {
-	PlatformEnabled               bool          `json:"platformEnabled"`
-	UserWorkloadsEnabled          bool          `json:"userWorkloadsEnabled"`
-	Secrets                       []ConfigValue `json:"secrets"`
-	Images                        ImagesValues  `json:"images"`
-	PrometheusControllerID        string        `json:"prometheusControllerID"`
-	PrometheusCAConfigMapName     string        `json:"prometheusCAConfigMapName"`
-	PrometheusServerName          string        `json:"prometheusServerName"`
-	Platform                      Collector     `json:"platform"`
-	UserWorkload                  Collector     `json:"userWorkload"`
-	DeployNonOCPStack             bool          `json:"deployNonOCPStack"`
-	DeployCOOResources            bool          `json:"deployCOOResources"`
-	PrometheusOperatorAnnotations string        `json:"prometheusOperatorAnnotations,omitempty"`
-	AlertManagerEndpoint          string        `json:"alertManagerEndpoint,omitempty"`
+	PlatformEnabled               bool                `json:"platformEnabled"`
+	UserWorkloadsEnabled          bool                `json:"userWorkloadsEnabled"`
+	Secrets                       []ConfigValue       `json:"secrets"`
+	Images                        ImagesValues        `json:"images"`
+	PrometheusControllerID        string              `json:"prometheusControllerID"`
+	PrometheusCAConfigMapName     string              `json:"prometheusCAConfigMapName"`
+	PrometheusServerName          string              `json:"prometheusServerName"`
+	Platform                      Collector           `json:"platform"`
+	UserWorkload                  Collector           `json:"userWorkload"`
+	DeployNonOCPStack             bool                `json:"deployNonOCPStack"`
+	DeployCOOResources            bool                `json:"deployCOOResources"`
+	PrometheusOperatorAnnotations string              `json:"prometheusOperatorAnnotations,omitempty"`
+	AlertManagerEndpoint          string              `json:"alertManagerEndpoint,omitempty"`
+	Tolerations                   []corev1.Toleration `json:"tolerations"`
+	NodeSelector                  map[string]string   `json:"nodeSelector"`
 }
 
 type Collector struct {
@@ -73,6 +75,8 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 			RBACProxyPort:      strconv.Itoa(config.RBACProxyPort),
 		},
 		AlertManagerEndpoint: opts.AlertManagerEndpoint,
+		NodeSelector:         opts.NodeSelector,
+		Tolerations:          opts.Tolerations,
 	}
 
 	isOCPCluster := opts.IsOCPCluster()
@@ -190,11 +194,16 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 			return ret, err
 		}
 
-		ret.UserWorkload.Rules = append(ret.UserWorkload.Rules, ConfigValue{
+		configValueItem := ConfigValue{
 			Name:   rule.Name,
 			Data:   string(ruleJson),
 			Labels: rule.Labels,
-		})
+		}
+		targetNamespace := rule.Annotations[config.TargetNamespaceAnnotation]
+		if targetNamespace != "" {
+			configValueItem.Namespace = targetNamespace
+		}
+		ret.UserWorkload.Rules = append(ret.UserWorkload.Rules, configValueItem)
 	}
 
 	// Build HCP's serviceMonitors for userWorkloads
@@ -233,7 +242,7 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 	ret.PlatformEnabled = opts.IsPlatformEnabled()
 	ret.UserWorkloadsEnabled = opts.IsUserWorkloadsEnabled()
 	ret.DeployNonOCPStack = !isOCPCluster && (ret.PlatformEnabled || ret.UserWorkloadsEnabled)
-	ret.DeployCOOResources = !opts.IsHub && (ret.PlatformEnabled || ret.UserWorkloadsEnabled) && !opts.COOIsSubscribed
+	ret.DeployCOOResources = (ret.PlatformEnabled || ret.UserWorkloadsEnabled) && !opts.COOIsSubscribed
 	ret.PrometheusOperatorAnnotations = opts.CRDEstablishedAnnotation
 
 	// Set images

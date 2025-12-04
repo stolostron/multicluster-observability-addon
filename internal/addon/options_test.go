@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	corev1 "k8s.io/api/core/v1"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 )
 
@@ -188,6 +189,53 @@ func TestBuildOptions(t *testing.T) {
 							Enabled: true,
 						},
 					},
+				},
+			},
+		},
+		{
+			name: "valid node selector and tolerations",
+			addOnDeploy: &addonapiv1alpha1.AddOnDeploymentConfig{
+				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
+					NodePlacement: &addonapiv1alpha1.NodePlacement{
+						NodeSelector: map[string]string{"node-role.kubernetes.io/infra": ""},
+						Tolerations: []corev1.Toleration{
+							{
+								Key:      "node-role.kubernetes.io/infra",
+								Operator: "Exists",
+								Effect:   "NoSchedule",
+							},
+						},
+					},
+				},
+			},
+			expectedOpts: Options{
+				NodeSelector: map[string]string{"node-role.kubernetes.io/infra": ""},
+				Tolerations: []corev1.Toleration{
+					{
+						Key:      "node-role.kubernetes.io/infra",
+						Operator: "Exists",
+						Effect:   "NoSchedule",
+					},
+				},
+			},
+		},
+		{
+			name: "valid http proxy and no proxy",
+			addOnDeploy: &addonapiv1alpha1.AddOnDeploymentConfig{
+				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
+					ProxyConfig: addonapiv1alpha1.ProxyConfig{
+						HTTPProxy: "http://proxy.example.com:8080",
+						NoProxy:   "*.example.com",
+					},
+				},
+			},
+			expectedOpts: Options{
+				ProxyConfig: ProxyConfig{
+					ProxyURL: &url.URL{
+						Scheme: "http",
+						Host:   "proxy.example.com:8080",
+					},
+					NoProxy: "*.example.com",
 				},
 			},
 		},
