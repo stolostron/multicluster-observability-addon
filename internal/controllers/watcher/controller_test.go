@@ -1,6 +1,8 @@
 package watcher
 
 import (
+	"context"
+	"encoding/json"
 	"testing"
 
 	"github.com/go-logr/logr"
@@ -11,15 +13,19 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/util/workqueue"
 	workv1 "open-cluster-management.io/api/work/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-func TestGetReconcileRequestsFromManifestWorks(t *testing.T) {
+func TestEnqueueForConfigResource(t *testing.T) {
 	existingSecret := &corev1.Secret{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "v1",
@@ -47,6 +53,9 @@ func TestGetReconcileRequestsFromManifestWorks(t *testing.T) {
 			"foo": []byte("baz"),
 		},
 	}
+
+	newSecretNoGVK := newSecret.DeepCopy()
+	newSecretNoGVK.SetGroupVersionKind(schema.GroupVersionKind{})
 
 	existingConfigmap := &corev1.ConfigMap{
 		TypeMeta: metav1.TypeMeta{
@@ -101,6 +110,25 @@ func TestGetReconcileRequestsFromManifestWorks(t *testing.T) {
 			},
 		},
 		{
+			name:   "reconcile secret with empty GVK (simulating Informer)",
+			object: newSecretNoGVK,
+			manifests: []workv1.Manifest{
+				{
+					RawExtension: runtime.RawExtension{
+						Object: existingSecret,
+					},
+				},
+			},
+			expectedReconcileRequests: []reconcile.Request{
+				{
+					NamespacedName: types.NamespacedName{
+						Name:      "multicluster-observability-addon",
+						Namespace: "test-namespace",
+					},
+				},
+			},
+		},
+		{
 			name:   "reconcile configmap in manifests",
 			object: newConfigmap,
 			manifests: []workv1.Manifest{
@@ -129,7 +157,14 @@ func TestGetReconcileRequestsFromManifestWorks(t *testing.T) {
 					},
 				},
 			},
-			expectedReconcileRequests: []reconcile.Request{},
+			expectedReconcileRequests: []reconcile.Request{
+				{
+					NamespacedName: types.NamespacedName{
+						Name:      "multicluster-observability-addon",
+						Namespace: "test-namespace",
+					},
+				},
+			},
 		},
 		{
 			name:   "dont reconcile if resource not in manifests",
@@ -171,11 +206,49 @@ func TestGetReconcileRequestsFromManifestWorks(t *testing.T) {
 			r := &WatcherReconciler{
 				Client: cl,
 				Scheme: s,
+				Cache:  NewReferenceCache(),
 			}
 
+			// Populate cache
+			keys := []string{}
+			decode := serializer.NewCodecFactory(r.Scheme).UniversalDeserializer().Decode
+			for i, m := range tc.manifests {
+				if m.Raw == nil && m.Object != nil {
+					raw, err := json.Marshal(m.Object)
+					if err != nil {
+						t.Errorf("failed to marshal object: %v", err)
+						continue
+					}
+					tc.manifests[i].Raw = raw
+					m.Raw = raw
+				}
+				obj, _, err := decode(m.Raw, nil, nil)
+				if err != nil {
+					t.Errorf("failed to decode manifest: %v", err)
+					continue
+				}
+				clientObj, ok := obj.(client.Object)
+				if !ok {
+					continue
+				}
+				keys = append(keys, r.getConfigResourceKey(clientObj))
+			}
+			r.Cache.Add(manifestWork.Namespace, manifestWork.Name, keys)
+
 			cliObj := tc.object.(client.Object)
-			rqs := r.getReconcileRequestsFromManifestWorks(t.Context(), cliObj)
-			assert.Equal(t, tc.expectedReconcileRequests, rqs)
+
+			h := r.enqueueForConfigResource()
+			q := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[reconcile.Request]())
+
+			h.Create(context.Background(), event.CreateEvent{Object: cliObj}, q)
+
+			var actual []reconcile.Request
+			for q.Len() > 0 {
+				item, _ := q.Get()
+				actual = append(actual, item)
+				q.Done(item)
+			}
+			assert.ElementsMatch(t, tc.expectedReconcileRequests, actual)
 		})
 	}
 }
