@@ -94,7 +94,7 @@ func DynamicAgentHealthProber(k8s client.Client, logger logr.Logger) *agent.Heal
 			ProbeFields: probeFields,
 			HealthChecker: func(fields []agent.FieldResult, mc *v1.ManagedCluster, mcao *addonapiv1alpha1.ManagedClusterAddOn) error {
 				if err := healthChecker(fields); err != nil {
-					logger.V(1).Info("Health check failed for managed cluster %s: %v", mc.Name, err)
+					logger.V(1).Info("Health check failed for managed cluster", "clusterName", mc.Name, "error", err.Error())
 					return err
 				}
 				return nil

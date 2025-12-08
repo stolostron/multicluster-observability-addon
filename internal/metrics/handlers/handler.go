@@ -91,7 +91,7 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 		return ret, fmt.Errorf("failed to get clustername from HubEndpoint: %w", err)
 	}
 
-	if err = o.addAlertmanagerSecrets(ctx, &ret.Secrets, clusterName, opts); err != nil {
+	if err = o.addAlertmanagerSecrets(ctx, &ret.Secrets, clusterName, opts, common.IsOpenShiftVendor(managedCluster)); err != nil {
 		return ret, fmt.Errorf("failed to add alertmanager secrets: %w", err)
 	}
 
@@ -467,9 +467,9 @@ func createWriteRelabelConfigs(clusterName, clusterID string, isHypershiftLocalC
 		})
 }
 
-func (o *OptionsBuilder) addAlertmanagerSecrets(ctx context.Context, secrets *[]*corev1.Secret, clusterName string, opts addon.Options) error {
+func (o *OptionsBuilder) addAlertmanagerSecrets(ctx context.Context, secrets *[]*corev1.Secret, clusterName string, opts addon.Options, isOCP bool) error {
 	// Get the router CA secret
-	routerCASecret := &corev1.Secret{}
+	var routerCACert []byte
 	amRouteBYOCaSrt := &corev1.Secret{}
 	err1 := o.Client.Get(ctx, types.NamespacedName{Name: config.AlertmanagerRouteBYOCAName, Namespace: config.HubInstallNamespace}, amRouteBYOCaSrt)
 	amRouteBYOCertSrt := &corev1.Secret{}
@@ -477,39 +477,58 @@ func (o *OptionsBuilder) addAlertmanagerSecrets(ctx context.Context, secrets *[]
 
 	if err1 == nil && err2 == nil {
 		// BYO certs exists, use these
-		routerCASecret = amRouteBYOCaSrt
+		// routerCASecret = amRouteBYOCaSrt
+		routerCACert = amRouteBYOCaSrt.Data["tls.crt"]
 	} else {
 		// No BYO certs, use default ingress certs
+		routerCASecret := &corev1.Secret{}
 		if err := o.Client.Get(ctx, types.NamespacedName{Name: "router-certs-default", Namespace: "openshift-ingress"}, routerCASecret); err != nil {
-			return err
+			// If the secret is not found, look for the configmap
+			if apierrors.IsNotFound(err) {
+				o.Logger.V(1).Info("router-certs-default secret not found, trying to get service-ca-bundle configmap")
+				caConfigMap := &corev1.ConfigMap{}
+				if err := o.Client.Get(ctx, types.NamespacedName{Name: "service-ca-bundle", Namespace: "openshift-ingress"}, caConfigMap); err != nil {
+					return fmt.Errorf("failed to get service-ca-bundle configmap: %w", err)
+				}
+				routerCACert = []byte(caConfigMap.Data["service-ca.crt"])
+			} else {
+				return err
+			}
+		} else {
+			routerCACert = routerCASecret.Data["tls.crt"]
 		}
 	}
 
 	// Add secrets based on enabled metric collection
 	if opts.Platform.Metrics.CollectionEnabled {
-		if err := o.addSecret(ctx, secrets, config.AlertmanagerAccessorSecretName, config.HubInstallNamespace, config.AlertmanagerAccessorSecretName+"-"+clusterName, config.AlertmanagerPlatformNamespace); err != nil {
+		targetNamespace := config.AlertmanagerPlatformNamespace
+		if !isOCP {
+			targetNamespace = "" // This is replaced by the default value in the help template that is the installation namespace
+		}
+		if err := o.addSecret(ctx, secrets, config.AlertmanagerAccessorSecretName, config.HubInstallNamespace, config.AlertmanagerAccessorSecretName+"-"+clusterName, targetNamespace); err != nil {
 			return fmt.Errorf("failed to add accessor secret for platform metrics: %w", err)
 		}
 		ca := &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      config.AlertmanagerRouterCASecretName + "-" + clusterName,
-				Namespace: config.AlertmanagerPlatformNamespace,
+				Namespace: targetNamespace,
 			},
-			Data: map[string][]byte{"service-ca.crt": routerCASecret.Data["tls.crt"]},
+			Data: map[string][]byte{"service-ca.crt": routerCACert},
 		}
 		*secrets = append(*secrets, ca)
 	}
 
-	if opts.UserWorkloads.Metrics.CollectionEnabled {
-		if err := o.addSecret(ctx, secrets, config.AlertmanagerAccessorSecretName, config.HubInstallNamespace, config.AlertmanagerAccessorSecretName+"-"+clusterName, config.AlertmanagerUWLNamespace); err != nil {
+	if isOCP && opts.UserWorkloads.Metrics.CollectionEnabled {
+		targetNamespace := config.AlertmanagerUWLNamespace
+		if err := o.addSecret(ctx, secrets, config.AlertmanagerAccessorSecretName, config.HubInstallNamespace, config.AlertmanagerAccessorSecretName+"-"+clusterName, targetNamespace); err != nil {
 			return fmt.Errorf("failed to add accessor secret for user workload metrics: %w", err)
 		}
 		caUWL := &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      config.AlertmanagerRouterCASecretName + "-" + clusterName,
-				Namespace: config.AlertmanagerUWLNamespace,
+				Namespace: targetNamespace,
 			},
-			Data: map[string][]byte{"service-ca.crt": routerCASecret.Data["tls.crt"]},
+			Data: map[string][]byte{"service-ca.crt": routerCACert},
 		}
 		*secrets = append(*secrets, caUWL)
 	}

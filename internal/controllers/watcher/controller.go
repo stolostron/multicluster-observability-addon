@@ -14,6 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -34,6 +35,7 @@ import (
 
 const (
 	localClusterNamespace = "local-cluster"
+	manifestWorkIndexKey  = "spec.workload.manifests.references"
 )
 
 var (
@@ -110,15 +112,53 @@ func (r *WatcherReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *WatcherReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	if err := mgr.GetFieldIndexer().IndexField(context.Background(), &workv1.ManifestWork{}, manifestWorkIndexKey, indexManifestWorks(mgr.GetScheme())); err != nil {
+		return err
+	}
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&addonv1alpha1.ManagedClusterAddOn{}, managedClusterAddonPredicate, builder.OnlyMetadata).
-		Watches(&addonv1alpha1.AddOnDeploymentConfig{}, r.enqueueForAllManagedClusters(), addOnDeploymentConfigPredicate, builder.OnlyMetadata).
 		Watches(&corev1.Secret{}, r.enqueueForConfigResource(), builder.OnlyMetadata).
 		Watches(&corev1.ConfigMap{}, r.enqueueForConfigResource(), builder.OnlyMetadata).
 		Watches(&corev1.ConfigMap{}, r.enqueueForAllManagedClusters(), imagesConfigMapPredicate, builder.OnlyMetadata).
 		Watches(&hyperv1.HostedCluster{}, r.enqueueForLocalCluster(), hostedClusterPredicate, builder.OnlyMetadata).
 		Watches(&prometheusv1.ServiceMonitor{}, r.enqueueForLocalCluster(), hypershiftServiceMonitorsPredicate(r.Log), builder.OnlyMetadata).
 		Complete(r)
+}
+
+// getConfigResourceKey generates a key for a given client.Object.
+// The key format is "<Group>/<Kind>/<Namespace>/<Name>".
+func getConfigResourceKey(obj client.Object) string {
+	gvk := obj.GetObjectKind().GroupVersionKind()
+	return fmt.Sprintf("%s/%s/%s/%s", gvk.Group, gvk.Kind, obj.GetNamespace(), obj.GetName())
+}
+
+func indexManifestWorks(scheme *runtime.Scheme) client.IndexerFunc {
+	return func(obj client.Object) []string {
+		mw, ok := obj.(*workv1.ManifestWork)
+		if !ok {
+			return nil
+		}
+
+		decode := serializer.NewCodecFactory(scheme).UniversalDeserializer().Decode
+		keys := []string{}
+
+		for _, m := range mw.Spec.Workload.Manifests {
+			obj, _, err := decode(m.Raw, nil, nil)
+			if err != nil {
+				continue
+			}
+
+			clientObj, ok := obj.(client.Object)
+			if !ok {
+				continue
+			}
+
+			keys = append(keys, getConfigResourceKey(clientObj))
+		}
+
+		return keys
+	}
 }
 
 func (r *WatcherReconciler) enqueueForLocalCluster() handler.EventHandler {
@@ -140,7 +180,7 @@ func (r *WatcherReconciler) enqueueForAllManagedClusters() handler.EventHandler 
 		r.Log.V(2).Info("Enqueue for all managed clusters", "gvk", obj.GetObjectKind().GroupVersionKind().String(), "name", obj.GetName(), "namespace", obj.GetNamespace())
 
 		addonList := &addonv1alpha1.ManagedClusterAddOnList{}
-		if err := r.List(ctx, addonList, &client.ListOptions{}); err != nil {
+		if err := r.List(ctx, addonList, &client.ListOptions{FieldSelector: fields.OneTermEqualSelector("metadata.name", addoncfg.Name)}); err != nil {
 			r.Log.Error(err, "error listing ManagedClusterAddOns to trigger reconciliation for all clusters")
 			return nil
 		}
@@ -161,6 +201,7 @@ func (r *WatcherReconciler) enqueueForAllManagedClusters() handler.EventHandler 
 
 func (r *WatcherReconciler) enqueueForConfigResource() handler.EventHandler {
 	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
+		r.Log.V(2).Info("Enqueue for config resource event", "gvk", obj.GetObjectKind().GroupVersionKind().String(), "name", obj.GetName(), "namespace", obj.GetNamespace())
 		key := client.ObjectKey{Name: addoncfg.Name, Namespace: obj.GetNamespace()}
 		mcaddon := &metav1.PartialObjectMetadata{}
 		mcaddon.SetGroupVersionKind(schema.GroupVersionKind{
@@ -194,15 +235,19 @@ func (r *WatcherReconciler) getReconcileRequestsFromManifestWorks(ctx context.Co
 	newObjKey := client.ObjectKeyFromObject(newObj)
 
 	mws := &workv1.ManifestWorkList{}
+	indexKey := getConfigResourceKey(newObj)
 	labelSelector := labels.SelectorFromSet(labels.Set{
 		addoncfg.LabelOCMAddonName: addoncfg.Name,
 	})
-	if err := r.List(ctx, mws, &client.ListOptions{LabelSelector: labelSelector}); err != nil {
+	if err := r.List(ctx, mws, client.MatchingFields{manifestWorkIndexKey: indexKey}, &client.ListOptions{LabelSelector: labelSelector}); err != nil {
 		r.Log.Error(err, errMessageListingManifestWorkResources)
 		return nil
 	}
 
 	for _, mw := range mws.Items {
+		// Even though we found the MW via index, we still need to check if the specific object has changed.
+		// The index confirms the MW contains *a* version of this object, but we need to compare it
+		// with the new object to decide if reconciliation is needed.
 		for _, m := range mw.Spec.Workload.Manifests {
 			obj, err := r.manifestToObject(m)
 			if err != nil {
@@ -212,18 +257,15 @@ func (r *WatcherReconciler) getReconcileRequestsFromManifestWorks(ctx context.Co
 			objKind := obj.GetObjectKind()
 			objKey := client.ObjectKeyFromObject(obj)
 			if objKind.GroupVersionKind().String() == newObjKind.GroupVersionKind().String() && objKey == newObjKey {
-				// Only trigger a reconcile request if the object has changed
-				if !equality.Semantic.DeepEqual(newObj, obj) {
-					rqs = append(rqs,
-						// Trigger a reconcile request for the addon in the ManifestWork namespace
-						reconcile.Request{
-							NamespacedName: types.NamespacedName{
-								Name:      addoncfg.Name,
-								Namespace: mw.Namespace,
-							},
+				rqs = append(rqs,
+					// Trigger a reconcile request for the addon in the ManifestWork namespace
+					reconcile.Request{
+						NamespacedName: types.NamespacedName{
+							Name:      addoncfg.Name,
+							Namespace: mw.Namespace,
 						},
-					)
-				}
+					},
+				)
 			}
 		}
 	}
@@ -245,27 +287,6 @@ func (r *WatcherReconciler) manifestToObject(m workv1.Manifest) (client.Object, 
 
 	return clientObj, nil
 }
-
-var addOnDeploymentConfigPredicate = builder.WithPredicates(predicate.Funcs{
-	UpdateFunc: func(e event.UpdateEvent) bool {
-		if e.ObjectNew.GetName() != addoncfg.Name || e.ObjectNew.GetNamespace() != addoncfg.InstallNamespace {
-			return false
-		}
-		oldADC, okOld := e.ObjectOld.(*addonv1alpha1.AddOnDeploymentConfig)
-		newADC, okNew := e.ObjectNew.(*addonv1alpha1.AddOnDeploymentConfig)
-		if !okOld || !okNew {
-			return false
-		}
-		return !equality.Semantic.DeepEqual(oldADC.Spec, newADC.Spec)
-	},
-	CreateFunc: func(e event.CreateEvent) bool {
-		return e.Object.GetName() == addoncfg.Name && e.Object.GetNamespace() == addoncfg.InstallNamespace
-	},
-	DeleteFunc: func(e event.DeleteEvent) bool {
-		return e.Object.GetName() == addoncfg.Name && e.Object.GetNamespace() == addoncfg.InstallNamespace
-	},
-	GenericFunc: func(e event.GenericEvent) bool { return false },
-})
 
 var managedClusterAddonPredicate = builder.WithPredicates(predicate.Funcs{
 	UpdateFunc: func(e event.UpdateEvent) bool {
