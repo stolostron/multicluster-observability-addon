@@ -408,6 +408,7 @@ func TestHelmBuild_Metrics_HCP(t *testing.T) {
 	assert.NoError(t, clusterv1.AddToScheme(scheme))
 	assert.NoError(t, hyperv1.AddToScheme(scheme))
 	assert.NoError(t, addonapiv1alpha1.AddToScheme(scheme))
+	assert.NoError(t, workv1.AddToScheme(scheme))
 
 	installNamespace := "open-cluster-management-addon-observability"
 	hubNamespace := "open-cluster-management-observability"
@@ -559,8 +560,9 @@ func TestHelmBuild_Metrics_HCP(t *testing.T) {
 	// Setup a the local cluster as managed cluster
 	managedCluster := addontesting.NewManagedCluster("cluster-1")
 	managedCluster.Labels = map[string]string{
-		config.LocalManagedClusterLabel:  "true",
-		config.HypershiftAddonStateLabel: "available",
+		config.LocalManagedClusterLabel:    "true",
+		config.HypershiftAddonStateLabel:   "available",
+		clusterinfov1beta1.LabelKubeVendor: string(clusterinfov1beta1.KubeVendorOpenShift),
 	}
 	clientObjects = append(clientObjects, managedCluster)
 

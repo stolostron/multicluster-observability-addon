@@ -115,7 +115,7 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 	// Check both if hypershift is enabled and has hosted clusters to limit noisy logs when uwl monitoring is disabled while there is no hostedCluster
 	isHypershiftCluster := IsHypershiftEnabled(managedCluster) && HasHostedCLusters(ctx, o.Client, o.Logger)
 
-	if opts.UserWorkloads.Metrics.CollectionEnabled {
+	if common.IsOpenShiftVendor(managedCluster) && opts.UserWorkloads.Metrics.CollectionEnabled {
 		if err = o.buildPrometheusAgent(ctx, &ret, configResources, config.UserWorkloadMetricsCollectorApp, isHypershiftCluster); err != nil {
 			return ret, err
 		}
@@ -485,7 +485,7 @@ func (o *OptionsBuilder) addAlertmanagerSecrets(ctx context.Context, secrets *[]
 		if err := o.Client.Get(ctx, types.NamespacedName{Name: "router-certs-default", Namespace: "openshift-ingress"}, routerCASecret); err != nil {
 			// If the secret is not found, look for the configmap
 			if apierrors.IsNotFound(err) {
-				o.Logger.V(1).Info("router-certs-default secret not found, trying to get service-ca-bundle configmap")
+				o.Logger.V(3).Info("router-certs-default secret not found, trying to get service-ca-bundle configmap")
 				caConfigMap := &corev1.ConfigMap{}
 				if err := o.Client.Get(ctx, types.NamespacedName{Name: "service-ca-bundle", Namespace: "openshift-ingress"}, caConfigMap); err != nil {
 					return fmt.Errorf("failed to get service-ca-bundle configmap: %w", err)

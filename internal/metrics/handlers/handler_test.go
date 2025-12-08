@@ -548,7 +548,8 @@ func TestBuildOptions(t *testing.T) {
 						Labels: map[string]string{
 							addoncfg.ManagedClusterLabelClusterID:                       "test-cluster-id",
 							"feature.open-cluster-management.io/addon-hypershift-addon": "available",
-							"local-cluster": "true",
+							"local-cluster":                    "true",
+							clusterinfov1beta1.LabelKubeVendor: string(clusterinfov1beta1.KubeVendorOpenShift),
 						},
 					},
 				})
