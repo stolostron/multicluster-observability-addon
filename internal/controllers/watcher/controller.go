@@ -12,7 +12,6 @@ import (
 	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -272,20 +271,25 @@ func (r *WatcherReconciler) enqueueForAllManagedClusters() handler.EventHandler 
 	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
 		r.Log.V(2).Info("Enqueue for all managed clusters", "gvk", obj.GetObjectKind().GroupVersionKind().String(), "name", obj.GetName(), "namespace", obj.GetNamespace())
 
-		addonList := &addonv1alpha1.ManagedClusterAddOnList{}
-		if err := r.List(ctx, addonList, &client.ListOptions{FieldSelector: fields.OneTermEqualSelector("metadata.name", addoncfg.Name)}); err != nil {
-			r.Log.Error(err, "error listing ManagedClusterAddOns to trigger reconciliation for all clusters")
+		mwList := &workv1.ManifestWorkList{}
+		if err := r.List(ctx, mwList, client.MatchingLabels{addoncfg.LabelOCMAddonName: addoncfg.Name}); err != nil {
+			r.Log.Error(err, "error listing ManifestWorks to trigger reconciliation for all clusters")
 			return nil
 		}
 
-		requests := make([]reconcile.Request, len(addonList.Items))
-		for i, addon := range addonList.Items {
-			requests[i] = reconcile.Request{
+		namespaces := make(map[string]struct{})
+		for _, mw := range mwList.Items {
+			namespaces[mw.Namespace] = struct{}{}
+		}
+
+		requests := make([]reconcile.Request, 0, len(namespaces))
+		for ns := range namespaces {
+			requests = append(requests, reconcile.Request{
 				NamespacedName: types.NamespacedName{
-					Name:      addon.Name,
-					Namespace: addon.Namespace,
+					Name:      addoncfg.Name,
+					Namespace: ns,
 				},
-			}
+			})
 		}
 		r.Log.V(2).Info("enqueuing reconciliation for all managed clusters", "count", len(requests))
 		return requests
