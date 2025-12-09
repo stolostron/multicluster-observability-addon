@@ -11,6 +11,7 @@ metadata:
     app: {{ template "mcoahelm.name" . }}
     chart: {{ template "mcoahelm.chart" . }}
     release: {{ .Release.Name }}
+    open-cluster-management.io/aggregate-to-work: "true"
 rules:
   - apiGroups: ["operators.coreos.com"]
     resources: ["operatorgroups"]
