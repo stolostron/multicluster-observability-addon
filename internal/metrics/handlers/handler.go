@@ -104,11 +104,11 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 		// Fetch rules and scrape configs
 		ret.Platform.ScrapeConfigs = common.FilterResourcesByLabelSelector[*cooprometheusv1alpha1.ScrapeConfig](configResources, config.PlatformPrometheusMatchLabels)
 		if len(ret.Platform.ScrapeConfigs) == 0 {
-			o.Logger.V(1).Info("No scrape configs found for platform metrics")
+			o.Logger.V(2).Info("No scrape configs found for platform metrics")
 		}
 		ret.Platform.Rules = common.FilterResourcesByLabelSelector[*prometheusv1.PrometheusRule](configResources, config.PlatformPrometheusMatchLabels)
 		if len(ret.Platform.Rules) == 0 {
-			o.Logger.V(1).Info("No rules found for platform metrics")
+			o.Logger.V(2).Info("No rules found for platform metrics")
 		}
 	}
 
@@ -123,11 +123,11 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 		// Fetch rules and scrape configs
 		ret.UserWorkloads.ScrapeConfigs = common.FilterResourcesByLabelSelector[*cooprometheusv1alpha1.ScrapeConfig](configResources, config.UserWorkloadPrometheusMatchLabels)
 		if len(ret.UserWorkloads.ScrapeConfigs) == 0 {
-			o.Logger.V(1).Info("No scrape configs found for user workloads")
+			o.Logger.V(2).Info("No scrape configs found for user workloads")
 		}
 		ret.UserWorkloads.Rules = common.FilterResourcesByLabelSelector[*prometheusv1.PrometheusRule](configResources, config.UserWorkloadPrometheusMatchLabels)
 		if len(ret.UserWorkloads.Rules) == 0 {
-			o.Logger.V(1).Info("No rules found for user workloads")
+			o.Logger.V(2).Info("No rules found for user workloads")
 		}
 	}
 
@@ -375,19 +375,19 @@ func (o *OptionsBuilder) cooIsSubscribed(ctx context.Context, managedCluster *cl
 
 	crdFeedback, ok := feedback[crdID]
 	if !ok || len(crdFeedback) == 0 {
-		o.Logger.V(1).Info("scrapeconfigs.monitoring.rhobs CRD not found in manifestwork status, considering COO as not subscribed")
+		o.Logger.V(2).Info("scrapeconfigs.monitoring.rhobs CRD not found in manifestwork status, considering COO as not subscribed")
 		return false, nil
 	}
 
 	olmValues := common.FilterFeedbackValuesByName(crdFeedback, addoncfg.IsOLMManagedFeedbackName)
 	for _, v := range olmValues {
 		if v.Value.String != nil && strings.ToLower(*v.Value.String) == "true" {
-			o.Logger.V(1).Info("found scrapeconfigs.monitoring.rhobs CRD with OLM label, considering COO as subscribed")
+			o.Logger.V(2).Info("found scrapeconfigs.monitoring.rhobs CRD with OLM label, considering COO as subscribed")
 			return true, nil
 		}
 	}
 
-	o.Logger.V(1).Info("scrapeconfigs.monitoring.rhobs CRD missing the OLM label, considering COO as not subscribed")
+	o.Logger.V(2).Info("scrapeconfigs.monitoring.rhobs CRD missing the OLM label, considering COO as not subscribed")
 	return false, nil
 }
 
