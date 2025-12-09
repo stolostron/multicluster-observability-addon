@@ -18,7 +18,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/workqueue"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager"
-	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	workv1 "open-cluster-management.io/api/work/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -184,7 +183,6 @@ func (r *WatcherReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 // SetupWithManager sets up the controller with the Manager.
 func (r *WatcherReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&addonv1alpha1.ManagedClusterAddOn{}, managedClusterAddonPredicate, builder.OnlyMetadata).
 		Watches(&workv1.ManifestWork{}, r.enqueueForManifestWork(), builder.WithPredicates(manifestWorkPredicate)).
 		Watches(&corev1.Secret{}, r.enqueueForConfigResource(), builder.OnlyMetadata).
 		Watches(&corev1.ConfigMap{}, r.enqueueForConfigResource(), builder.OnlyMetadata).
@@ -325,20 +323,6 @@ var manifestWorkPredicate = predicate.NewPredicateFuncs(func(obj client.Object) 
 	return obj.GetLabels()[addoncfg.LabelOCMAddonName] == addoncfg.Name
 })
 
-var managedClusterAddonPredicate = builder.WithPredicates(predicate.Funcs{
-	UpdateFunc: func(e event.UpdateEvent) bool {
-		return e.ObjectNew.GetName() == addoncfg.Name
-	},
-	CreateFunc: func(e event.CreateEvent) bool {
-		return e.Object.GetName() == addoncfg.Name
-	},
-	DeleteFunc: func(e event.DeleteEvent) bool {
-		return e.Object.GetName() == addoncfg.Name
-	},
-	GenericFunc: func(e event.GenericEvent) bool {
-		return false
-	},
-})
 
 var hostedClusterPredicate = builder.WithPredicates(predicate.Funcs{
 	UpdateFunc: func(e event.UpdateEvent) bool {
