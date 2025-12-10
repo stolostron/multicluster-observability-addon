@@ -58,6 +58,7 @@ spec:
           requests:
             cpu: 5m
             memory: 100Mi
+      {{- if not .Values.deployNonOCPStack }}
       - resources:
           requests:
             cpu: 1m
@@ -90,6 +91,7 @@ spec:
           - '--tls-private-key-file=/etc/tls/private/tls.key'
           - '--logtostderr=true'
           - '--allow-paths=/metrics'
+      {{- end }}
       dnsPolicy: ClusterFirst
       {{- if .Values.nodeSelector }}
       nodeSelector:
@@ -107,9 +109,11 @@ spec:
       serviceAccount: prometheus-operator
       serviceAccountName:  {{ .Values.prometheusOperator.appName }}
       terminationGracePeriodSeconds: 600
+      {{- if not .Values.deployNonOCPStack }}
       volumes:
         - name: kube-rbac-proxy-tls
           secret:
             secretName: {{ .Values.prometheusOperator.rbacProxyTlsSecret }}
             defaultMode: 420
+      {{- end }}
 {{- end }}
