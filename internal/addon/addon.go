@@ -263,10 +263,7 @@ func Updaters() []agent.Updater {
 	for i, crdName := range crdNames {
 		updaters[i] = agent.Updater{
 			UpdateStrategy: workv1.UpdateStrategy{
-				Type: workv1.UpdateStrategyTypeServerSideApply,
-				ServerSideApply: &workv1.ServerSideApplyConfig{
-					Force: false,
-				},
+				Type: workv1.UpdateStrategyTypeCreateOnly,
 			},
 			ResourceIdentifier: workv1.ResourceIdentifier{
 				Group:    apiextensionsv1.GroupName,
