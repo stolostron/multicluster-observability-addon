@@ -2,8 +2,8 @@ package watcher
 
 import (
 	"context"
-	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/go-logr/logr"
 	hyperv1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
@@ -12,15 +12,12 @@ import (
 	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/workqueue"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager"
-	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	workv1 "open-cluster-management.io/api/work/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -34,14 +31,6 @@ import (
 
 const (
 	localClusterNamespace = "local-cluster"
-)
-
-var (
-	managedClusterAddonKind                       = "ManagedClusterAddOn"
-	errMessageGettingManagedClusterAddonResources = "Error getting managedclusteraddon resources in event handler"
-	errMessageListingManifestWorkResources        = "Error listing manifestwork resources in event handler"
-	errMessageDecodingManifestIntoObject          = "Error decoding manifest to client.object"
-	errCastingObject                              = errors.New("object is not a client.Object")
 )
 
 type WatcherManager struct {
@@ -62,6 +51,7 @@ func NewWatcherManager(addonManager *addonmanager.AddonManager, scheme *runtime.
 		Log:           l.WithName("controller"),
 		Scheme:        mgr.GetScheme(),
 		addonnManager: addonManager,
+		Cache:         NewReferenceCache(),
 	}).SetupWithManager(mgr); err != nil {
 		return nil, fmt.Errorf("unable to create mcoa-watcher controller: %w", err)
 	}
@@ -97,6 +87,7 @@ type WatcherReconciler struct {
 	Log           logr.Logger
 	Scheme        *runtime.Scheme
 	addonnManager *addonmanager.AddonManager
+	Cache         *ReferenceCache
 }
 
 // For more details, check Reconcile and its Result here:
@@ -111,14 +102,89 @@ func (r *WatcherReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 // SetupWithManager sets up the controller with the Manager.
 func (r *WatcherReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&addonv1alpha1.ManagedClusterAddOn{}, managedClusterAddonPredicate, builder.OnlyMetadata).
-		Watches(&addonv1alpha1.AddOnDeploymentConfig{}, r.enqueueForAllManagedClusters(), addOnDeploymentConfigPredicate, builder.OnlyMetadata).
+		Named("watcher").
+		Watches(&workv1.ManifestWork{}, r.enqueueForManifestWork(), builder.WithPredicates(manifestWorkPredicate)).
 		Watches(&corev1.Secret{}, r.enqueueForConfigResource(), builder.OnlyMetadata).
 		Watches(&corev1.ConfigMap{}, r.enqueueForConfigResource(), builder.OnlyMetadata).
 		Watches(&corev1.ConfigMap{}, r.enqueueForAllManagedClusters(), imagesConfigMapPredicate, builder.OnlyMetadata).
-		Watches(&hyperv1.HostedCluster{}, r.enqueueForLocalCluster(), hostedClusterPredicate, builder.OnlyMetadata).
+		Watches(&hyperv1.HostedCluster{}, r.enqueueForLocalCluster(), hostedClusterPredicate).
 		Watches(&prometheusv1.ServiceMonitor{}, r.enqueueForLocalCluster(), hypershiftServiceMonitorsPredicate(r.Log), builder.OnlyMetadata).
 		Complete(r)
+}
+
+// getConfigResourceKey generates a key for a given client.Object.
+// The key format is "<Group>/<Kind>/<Namespace>/<Name>".
+func (r *WatcherReconciler) getConfigResourceKey(obj client.Object) string {
+	gvk := obj.GetObjectKind().GroupVersionKind()
+	if gvk.Empty() {
+		// GVK might be missing for objects from the informer.
+		// Try to look it up from the scheme.
+		gvks, _, err := r.Scheme.ObjectKinds(obj)
+		if err == nil && len(gvks) > 0 {
+			gvk = gvks[0]
+		}
+	}
+	return fmt.Sprintf("%s/%s/%s/%s", gvk.Group, gvk.Kind, obj.GetNamespace(), obj.GetName())
+}
+
+// enqueueForManifestWork updates the cache when a ManifestWork is created/updated/deleted
+func (r *WatcherReconciler) enqueueForManifestWork() handler.EventHandler {
+	return handler.Funcs{
+		CreateFunc: func(ctx context.Context, e event.CreateEvent, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+			r.updateCache(e.Object)
+		},
+		UpdateFunc: func(ctx context.Context, e event.UpdateEvent, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+			r.updateCache(e.ObjectNew)
+		},
+		DeleteFunc: func(ctx context.Context, e event.DeleteEvent, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+			r.Cache.Remove(e.Object.GetNamespace(), e.Object.GetName())
+		},
+	}
+}
+
+func (r *WatcherReconciler) updateCache(obj client.Object) {
+	mw, ok := obj.(*workv1.ManifestWork)
+	if !ok {
+		return
+	}
+
+	keys := []string{}
+	decode := serializer.NewCodecFactory(r.Scheme).UniversalDeserializer().Decode
+
+	for _, m := range mw.Spec.Workload.Manifests {
+		obj, gvk, err := decode(m.Raw, nil, nil)
+		if err != nil {
+			continue
+		}
+
+		clientObj, ok := obj.(client.Object)
+		if !ok {
+			continue
+		}
+
+		switch clientObj.(type) {
+		case *corev1.Secret, *corev1.ConfigMap:
+			var namespace, name string
+
+			if originalResource, ok := clientObj.GetAnnotations()[addoncfg.AnnotationOriginalResource]; ok {
+				parts := strings.Split(originalResource, "/")
+				if len(parts) == 2 {
+					namespace = parts[0]
+					name = parts[1]
+				}
+			}
+
+			if namespace == "" || name == "" {
+				r.Log.V(3).Info("configuration resource is missing the original-resource annotation, it is not added to the cache")
+				continue
+			}
+
+			key := fmt.Sprintf("%s/%s/%s/%s", gvk.Group, gvk.Kind, namespace, name)
+			keys = append(keys, key)
+		}
+	}
+
+	r.Cache.Add(mw.Namespace, mw.Name, keys)
 }
 
 func (r *WatcherReconciler) enqueueForLocalCluster() handler.EventHandler {
@@ -139,20 +205,25 @@ func (r *WatcherReconciler) enqueueForAllManagedClusters() handler.EventHandler 
 	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
 		r.Log.V(2).Info("Enqueue for all managed clusters", "gvk", obj.GetObjectKind().GroupVersionKind().String(), "name", obj.GetName(), "namespace", obj.GetNamespace())
 
-		addonList := &addonv1alpha1.ManagedClusterAddOnList{}
-		if err := r.List(ctx, addonList, &client.ListOptions{}); err != nil {
-			r.Log.Error(err, "error listing ManagedClusterAddOns to trigger reconciliation for all clusters")
+		mwList := &workv1.ManifestWorkList{}
+		if err := r.List(ctx, mwList, client.MatchingLabels{addoncfg.LabelOCMAddonName: addoncfg.Name}); err != nil {
+			r.Log.Error(err, "error listing ManifestWorks to trigger reconciliation for all clusters")
 			return nil
 		}
 
-		requests := make([]reconcile.Request, len(addonList.Items))
-		for i, addon := range addonList.Items {
-			requests[i] = reconcile.Request{
+		namespaces := make(map[string]struct{})
+		for _, mw := range mwList.Items {
+			namespaces[mw.Namespace] = struct{}{}
+		}
+
+		requests := make([]reconcile.Request, 0, len(namespaces))
+		for ns := range namespaces {
+			requests = append(requests, reconcile.Request{
 				NamespacedName: types.NamespacedName{
-					Name:      addon.Name,
-					Namespace: addon.Namespace,
+					Name:      addoncfg.Name,
+					Namespace: ns,
 				},
-			}
+			})
 		}
 		r.Log.V(2).Info("enqueuing reconciliation for all managed clusters", "count", len(requests))
 		return requests
@@ -161,125 +232,31 @@ func (r *WatcherReconciler) enqueueForAllManagedClusters() handler.EventHandler 
 
 func (r *WatcherReconciler) enqueueForConfigResource() handler.EventHandler {
 	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
-		key := client.ObjectKey{Name: addoncfg.Name, Namespace: obj.GetNamespace()}
-		mcaddon := &metav1.PartialObjectMetadata{}
-		mcaddon.SetGroupVersionKind(schema.GroupVersionKind{
-			Group:   addonv1alpha1.GroupVersion.Group,
-			Version: addonv1alpha1.GroupVersion.Version,
-			Kind:    managedClusterAddonKind,
-		})
-		if err := r.Get(ctx, key, mcaddon); err != nil {
-			if apierrors.IsNotFound(err) {
-				return r.getReconcileRequestsFromManifestWorks(ctx, obj)
-			}
-			r.Log.Error(err, errMessageGettingManagedClusterAddonResources)
-			return nil
+		rqs := []reconcile.Request{}
+		namespaces := r.Cache.GetNamespaces(r.getConfigResourceKey(obj))
+		if len(namespaces) == 0 {
+			return []reconcile.Request{}
 		}
 
-		return []reconcile.Request{
-			{
-				NamespacedName: types.NamespacedName{
-					Name:      mcaddon.Name,
-					Namespace: mcaddon.Namespace,
+		r.Log.V(2).Info("Enqueue for config resource event", "gvk", obj.GetObjectKind().GroupVersionKind().String(), "name", obj.GetName(), "namespace", obj.GetNamespace(), "clustersCount", len(namespaces))
+
+		for _, ns := range namespaces {
+			rqs = append(rqs,
+				// Trigger a reconcile request for the addon in the ManifestWork namespace
+				reconcile.Request{
+					NamespacedName: types.NamespacedName{
+						Name:      addoncfg.Name,
+						Namespace: ns,
+					},
 				},
-			},
+			)
 		}
+		return rqs
 	})
 }
 
-// getReconcileRequestsFromManifestWorks gets reconcile.Request for resources referenced in ManifestWorks.
-func (r *WatcherReconciler) getReconcileRequestsFromManifestWorks(ctx context.Context, newObj client.Object) []reconcile.Request {
-	rqs := []reconcile.Request{}
-	newObjKind := newObj.GetObjectKind()
-	newObjKey := client.ObjectKeyFromObject(newObj)
-
-	mws := &workv1.ManifestWorkList{}
-	labelSelector := labels.SelectorFromSet(labels.Set{
-		addoncfg.LabelOCMAddonName: addoncfg.Name,
-	})
-	if err := r.List(ctx, mws, &client.ListOptions{LabelSelector: labelSelector}); err != nil {
-		r.Log.Error(err, errMessageListingManifestWorkResources)
-		return nil
-	}
-
-	for _, mw := range mws.Items {
-		for _, m := range mw.Spec.Workload.Manifests {
-			obj, err := r.manifestToObject(m)
-			if err != nil {
-				r.Log.Error(err, errMessageDecodingManifestIntoObject)
-				continue
-			}
-			objKind := obj.GetObjectKind()
-			objKey := client.ObjectKeyFromObject(obj)
-			if objKind.GroupVersionKind().String() == newObjKind.GroupVersionKind().String() && objKey == newObjKey {
-				// Only trigger a reconcile request if the object has changed
-				if !equality.Semantic.DeepEqual(newObj, obj) {
-					rqs = append(rqs,
-						// Trigger a reconcile request for the addon in the ManifestWork namespace
-						reconcile.Request{
-							NamespacedName: types.NamespacedName{
-								Name:      addoncfg.Name,
-								Namespace: mw.Namespace,
-							},
-						},
-					)
-				}
-			}
-		}
-	}
-	return rqs
-}
-
-func (r *WatcherReconciler) manifestToObject(m workv1.Manifest) (client.Object, error) {
-	decode := serializer.NewCodecFactory(r.Scheme).UniversalDeserializer().Decode
-
-	obj, _, err := decode(m.Raw, nil, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	clientObj, ok := obj.(client.Object)
-	if !ok {
-		return nil, errCastingObject
-	}
-
-	return clientObj, nil
-}
-
-var addOnDeploymentConfigPredicate = builder.WithPredicates(predicate.Funcs{
-	UpdateFunc: func(e event.UpdateEvent) bool {
-		if e.ObjectNew.GetName() != addoncfg.Name || e.ObjectNew.GetNamespace() != addoncfg.InstallNamespace {
-			return false
-		}
-		oldADC, okOld := e.ObjectOld.(*addonv1alpha1.AddOnDeploymentConfig)
-		newADC, okNew := e.ObjectNew.(*addonv1alpha1.AddOnDeploymentConfig)
-		if !okOld || !okNew {
-			return false
-		}
-		return !equality.Semantic.DeepEqual(oldADC.Spec, newADC.Spec)
-	},
-	CreateFunc: func(e event.CreateEvent) bool {
-		return e.Object.GetName() == addoncfg.Name && e.Object.GetNamespace() == addoncfg.InstallNamespace
-	},
-	DeleteFunc: func(e event.DeleteEvent) bool {
-		return e.Object.GetName() == addoncfg.Name && e.Object.GetNamespace() == addoncfg.InstallNamespace
-	},
-	GenericFunc: func(e event.GenericEvent) bool { return false },
-})
-
-var managedClusterAddonPredicate = builder.WithPredicates(predicate.Funcs{
-	UpdateFunc: func(e event.UpdateEvent) bool {
-		return e.ObjectNew.GetName() == addoncfg.Name
-	},
-	CreateFunc: func(e event.CreateEvent) bool {
-		return e.Object.GetName() == addoncfg.Name
-	},
-	DeleteFunc: func(e event.DeleteEvent) bool {
-		return e.Object.GetName() == addoncfg.Name
-	},
-	GenericFunc: func(e event.GenericEvent) bool {
-		return false
-	},
+var manifestWorkPredicate = predicate.NewPredicateFuncs(func(obj client.Object) bool {
+	return obj.GetLabels()[addoncfg.LabelOCMAddonName] == addoncfg.Name
 })
 
 var hostedClusterPredicate = builder.WithPredicates(predicate.Funcs{
