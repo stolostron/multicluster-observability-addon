@@ -3,6 +3,7 @@ package watcher
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/go-logr/logr"
 	hyperv1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
@@ -163,13 +164,29 @@ func (r *WatcherReconciler) updateCache(obj client.Object) {
 
 		switch clientObj.(type) {
 		case *corev1.Secret, *corev1.ConfigMap:
-			key := fmt.Sprintf("%s/%s/%s/%s", gvk.Group, gvk.Kind, clientObj.GetNamespace(), clientObj.GetName())
+			var namespace, name string
+
+			if originalResource, ok := clientObj.GetAnnotations()[addoncfg.AnnotationOriginalResource]; ok {
+				parts := strings.Split(originalResource, "/")
+				if len(parts) == 2 {
+					namespace = parts[0]
+					name = parts[1]
+				}
+			}
+
+			if namespace == "" || name == "" {
+				r.Log.V(3).Info("configuration resource is missing the original-resource annotation, it is not added to the cache")
+				continue
+			}
+
+			key := fmt.Sprintf("%s/%s/%s/%s", gvk.Group, gvk.Kind, namespace, name)
 			keys = append(keys, key)
 		}
 	}
 
 	r.Cache.Add(mw.Namespace, mw.Name, keys)
 }
+
 func (r *WatcherReconciler) enqueueForLocalCluster() handler.EventHandler {
 	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
 		r.Log.V(2).Info("Enqueue for local cluster event", "gvk", obj.GetObjectKind().GroupVersionKind().String(), "name", obj.GetName(), "namespace", obj.GetNamespace())

@@ -12,6 +12,7 @@ type Options struct {
 	Platform             Collector
 	UserWorkloads        Collector
 	Secrets              []*corev1.Secret
+	ConfigMaps           []*corev1.ConfigMap
 	AlertManagerEndpoint string
 	ClusterName          string
 	ClusterID            string
@@ -30,7 +31,6 @@ type Options struct {
 }
 
 type Collector struct {
-	ConfigMaps      []*corev1.ConfigMap
 	PrometheusAgent *cooprometheusv1alpha1.PrometheusAgent
 	ScrapeConfigs   []*cooprometheusv1alpha1.ScrapeConfig
 	Rules           []*prometheusv1.PrometheusRule

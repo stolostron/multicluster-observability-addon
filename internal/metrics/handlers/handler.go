@@ -268,6 +268,14 @@ func (o *OptionsBuilder) buildPrometheusAgent(ctx context.Context, opts *Options
 		}
 	}
 
+	// Fetch related configmaps
+	for _, configMapName := range agent.Spec.ConfigMaps {
+		// empty target namespace result in using default $.Release.Namespace in yaml
+		if err := o.addConfigMap(ctx, &opts.ConfigMaps, configMapName, agent.Namespace, configMapName, ""); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -317,10 +325,37 @@ func (o *OptionsBuilder) addSecret(ctx context.Context, secrets *[]*corev1.Secre
 		return fmt.Errorf("failed to get secret %s in namespace %s: %w", secretName, secretNamespace, err)
 	}
 
+	if secret.Annotations == nil {
+		secret.Annotations = map[string]string{}
+	}
+	secret.Annotations[addoncfg.AnnotationOriginalResource] = fmt.Sprintf("%s/%s", secret.Namespace, secret.Name)
+
 	secret.Namespace = targetNamespace
 	secret.Name = targetName
 
 	*secrets = append(*secrets, secret)
+	return nil
+}
+
+func (o *OptionsBuilder) addConfigMap(ctx context.Context, configMaps *[]*corev1.ConfigMap, configMapName, configMapNamespace string, targetName string, targetNamespace string) error {
+	if slices.IndexFunc(*configMaps, func(cm *corev1.ConfigMap) bool { return cm.Name == configMapName && cm.Namespace == configMapNamespace }) != -1 {
+		return nil
+	}
+
+	configMap := &corev1.ConfigMap{}
+	if err := o.Client.Get(ctx, types.NamespacedName{Name: configMapName, Namespace: configMapNamespace}, configMap); err != nil {
+		return fmt.Errorf("failed to get configmap %s in namespace %s: %w", configMapName, configMapNamespace, err)
+	}
+
+	if configMap.Annotations == nil {
+		configMap.Annotations = map[string]string{}
+	}
+	configMap.Annotations[addoncfg.AnnotationOriginalResource] = fmt.Sprintf("%s/%s", configMap.Namespace, configMap.Name)
+
+	configMap.Namespace = targetNamespace
+	configMap.Name = targetName
+
+	*configMaps = append(*configMaps, configMap)
 	return nil
 }
 
@@ -469,7 +504,11 @@ func createWriteRelabelConfigs(clusterName, clusterID string, isHypershiftLocalC
 
 func (o *OptionsBuilder) addAlertmanagerSecrets(ctx context.Context, secrets *[]*corev1.Secret, clusterName string, opts addon.Options, isOCP bool) error {
 	// Get the router CA secret
-	var routerCACert []byte
+	var routerCACert struct {
+		Crt       []byte
+		Namespace string
+		Name      string
+	}
 	amRouteBYOCaSrt := &corev1.Secret{}
 	err1 := o.Client.Get(ctx, types.NamespacedName{Name: config.AlertmanagerRouteBYOCAName, Namespace: config.HubInstallNamespace}, amRouteBYOCaSrt)
 	amRouteBYOCertSrt := &corev1.Secret{}
@@ -477,8 +516,9 @@ func (o *OptionsBuilder) addAlertmanagerSecrets(ctx context.Context, secrets *[]
 
 	if err1 == nil && err2 == nil {
 		// BYO certs exists, use these
-		// routerCASecret = amRouteBYOCaSrt
-		routerCACert = amRouteBYOCaSrt.Data["tls.crt"]
+		routerCACert.Crt = amRouteBYOCaSrt.Data["tls.crt"]
+		routerCACert.Namespace = amRouteBYOCaSrt.Namespace
+		routerCACert.Name = amRouteBYOCaSrt.Name
 	} else {
 		// No BYO certs, use default ingress certs
 		routerCASecret := &corev1.Secret{}
@@ -487,15 +527,19 @@ func (o *OptionsBuilder) addAlertmanagerSecrets(ctx context.Context, secrets *[]
 			if apierrors.IsNotFound(err) {
 				o.Logger.V(3).Info("router-certs-default secret not found, trying to get service-ca-bundle configmap")
 				caConfigMap := &corev1.ConfigMap{}
-				if err := o.Client.Get(ctx, types.NamespacedName{Name: "service-ca-bundle", Namespace: "openshift-ingress"}, caConfigMap); err != nil {
-					return fmt.Errorf("failed to get service-ca-bundle configmap: %w", err)
+				if errCM := o.Client.Get(ctx, types.NamespacedName{Name: "service-ca-bundle", Namespace: "openshift-ingress"}, caConfigMap); errCM != nil {
+					return fmt.Errorf("failed to get service-ca-bundle configmap: %w", errCM)
 				}
-				routerCACert = []byte(caConfigMap.Data["service-ca.crt"])
+				routerCACert.Crt = []byte(caConfigMap.Data["service-ca.crt"])
+				routerCACert.Namespace = caConfigMap.Namespace
+				routerCACert.Name = caConfigMap.Name
 			} else {
 				return err
 			}
 		} else {
-			routerCACert = routerCASecret.Data["tls.crt"]
+			routerCACert.Crt = routerCASecret.Data["tls.crt"]
+			routerCACert.Namespace = routerCASecret.Namespace
+			routerCACert.Name = routerCASecret.Name
 		}
 	}
 
@@ -512,8 +556,11 @@ func (o *OptionsBuilder) addAlertmanagerSecrets(ctx context.Context, secrets *[]
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      config.AlertmanagerRouterCASecretName + "-" + clusterName,
 				Namespace: targetNamespace,
+				Annotations: map[string]string{
+					addoncfg.AnnotationOriginalResource: fmt.Sprintf("%s/%s", routerCACert.Namespace, routerCACert.Name),
+				},
 			},
-			Data: map[string][]byte{"service-ca.crt": routerCACert},
+			Data: map[string][]byte{"service-ca.crt": routerCACert.Crt},
 		}
 		*secrets = append(*secrets, ca)
 	}
@@ -527,8 +574,11 @@ func (o *OptionsBuilder) addAlertmanagerSecrets(ctx context.Context, secrets *[]
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      config.AlertmanagerRouterCASecretName + "-" + clusterName,
 				Namespace: targetNamespace,
+				Annotations: map[string]string{
+					addoncfg.AnnotationOriginalResource: fmt.Sprintf("%s/%s", routerCACert.Namespace, routerCACert.Name),
+				},
 			},
-			Data: map[string][]byte{"service-ca.crt": routerCACert},
+			Data: map[string][]byte{"service-ca.crt": routerCACert.Crt},
 		}
 		*secrets = append(*secrets, caUWL)
 	}

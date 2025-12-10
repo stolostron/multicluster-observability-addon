@@ -9,6 +9,10 @@ type ReferenceCache struct {
 	sync.RWMutex
 	// configToMWNs maps a Configuration Resource Key (Group/Kind/Namespace/Name)
 	// to a set of ManifestWork Namespaces that reference it.
+	// NOTE: This assumes that a given configuration resource is referenced by at most
+	// one ManifestWork in a given namespace. If multiple ManifestWorks in the same
+	// namespace reference the same configuration, removing one will stop tracking
+	// for the entire namespace.
 	configToMWNs map[string]map[string]struct{}
 	// mwKeyToConfigs maps a ManifestWork Key (Namespace/Name) to the set of
 	// Configuration Resource Keys it references. Used for efficient cleanup.
@@ -23,14 +27,32 @@ func NewReferenceCache() *ReferenceCache {
 }
 
 func (c *ReferenceCache) Add(mwNamespace, mwName string, configKeys []string) {
-	c.Lock()
-	defer c.Unlock()
-
 	mwKey := fmt.Sprintf("%s/%s", mwNamespace, mwName)
-	newConfigs := make(map[string]struct{})
+	newConfigs := make(map[string]struct{}, len(configKeys))
 	for _, k := range configKeys {
 		newConfigs[k] = struct{}{}
 	}
+
+	c.RLock()
+	if oldConfigs, exists := c.mwKeyToConfigs[mwKey]; exists {
+		if len(oldConfigs) == len(newConfigs) {
+			match := true
+			for k := range newConfigs {
+				if _, ok := oldConfigs[k]; !ok {
+					match = false
+					break
+				}
+			}
+			if match {
+				c.RUnlock()
+				return
+			}
+		}
+	}
+	c.RUnlock()
+
+	c.Lock()
+	defer c.Unlock()
 
 	// Remove old references if any (handle update)
 	if oldConfigs, exists := c.mwKeyToConfigs[mwKey]; exists {
@@ -52,10 +74,19 @@ func (c *ReferenceCache) Add(mwNamespace, mwName string, configKeys []string) {
 }
 
 func (c *ReferenceCache) Remove(mwNamespace, mwName string) {
+	mwKey := fmt.Sprintf("%s/%s", mwNamespace, mwName)
+
+	c.RLock()
+	_, exists := c.mwKeyToConfigs[mwKey]
+	c.RUnlock()
+
+	if !exists {
+		return
+	}
+
 	c.Lock()
 	defer c.Unlock()
 
-	mwKey := fmt.Sprintf("%s/%s", mwNamespace, mwName)
 	if oldConfigs, exists := c.mwKeyToConfigs[mwKey]; exists {
 		for configKey := range oldConfigs {
 			c.removeRef(mwNamespace, configKey)

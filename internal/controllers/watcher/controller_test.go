@@ -3,10 +3,12 @@ package watcher
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	"github.com/go-logr/logr"
 	hyperv1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
+	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
@@ -324,4 +326,230 @@ func createTestObject(name string, owners []metav1.OwnerReference) client.Object
 	u.SetName(name)
 	u.SetOwnerReferences(owners)
 	return u
+}
+
+func TestUpdateCache(t *testing.T) {
+	s := scheme.Scheme
+	_ = workv1.Install(s)
+	_ = corev1.AddToScheme(s)
+
+	tests := []struct {
+		name         string
+		obj          client.Object
+		expectedKeys []string
+		shouldExist  bool // true if ManifestWork and processed
+	}{
+		{
+			name: "Not a ManifestWork",
+			obj: &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-secret",
+					Namespace: "default",
+				},
+			},
+			expectedKeys: nil,
+			shouldExist:  false,
+		},
+		{
+			name: "ManifestWork with valid Secret and ConfigMap",
+			obj: &workv1.ManifestWork{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "mw1",
+					Namespace: "cluster1",
+				},
+				Spec: workv1.ManifestWorkSpec{
+					Workload: workv1.ManifestsTemplate{
+						Manifests: []workv1.Manifest{
+							{
+								RawExtension: runtime.RawExtension{
+									Raw: mustMarshal(&corev1.Secret{
+										TypeMeta: metav1.TypeMeta{
+											Kind:       "Secret",
+											APIVersion: "v1",
+										},
+										ObjectMeta: metav1.ObjectMeta{
+											Name:      "secret1",
+											Namespace: "ns1",
+											Annotations: map[string]string{
+												addoncfg.AnnotationOriginalResource: "source-ns/source-secret",
+											},
+										},
+									}),
+								},
+							},
+							{
+								RawExtension: runtime.RawExtension{
+									Raw: mustMarshal(&corev1.ConfigMap{
+										TypeMeta: metav1.TypeMeta{
+											Kind:       "ConfigMap",
+											APIVersion: "v1",
+										},
+										ObjectMeta: metav1.ObjectMeta{
+											Name:      "cm1",
+											Namespace: "ns1",
+											Annotations: map[string]string{
+												addoncfg.AnnotationOriginalResource: "source-ns/source-cm",
+											},
+										},
+									}),
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedKeys: []string{
+				"/Secret/source-ns/source-secret",
+				"/ConfigMap/source-ns/source-cm",
+			},
+			shouldExist: true,
+		},
+		{
+			name: "ManifestWork with missing annotations",
+			obj: &workv1.ManifestWork{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "mw2",
+					Namespace: "cluster1",
+				},
+				Spec: workv1.ManifestWorkSpec{
+					Workload: workv1.ManifestsTemplate{
+						Manifests: []workv1.Manifest{
+							{
+								RawExtension: runtime.RawExtension{
+									Raw: mustMarshal(&corev1.Secret{
+										TypeMeta: metav1.TypeMeta{
+											Kind:       "Secret",
+											APIVersion: "v1",
+										},
+										ObjectMeta: metav1.ObjectMeta{
+											Name:      "secret2",
+											Namespace: "ns1",
+										},
+									}),
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedKeys: []string{},
+			shouldExist:  true,
+		},
+		{
+			name: "ManifestWork with invalid annotation format",
+			obj: &workv1.ManifestWork{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "mw3",
+					Namespace: "cluster1",
+				},
+				Spec: workv1.ManifestWorkSpec{
+					Workload: workv1.ManifestsTemplate{
+						Manifests: []workv1.Manifest{
+							{
+								RawExtension: runtime.RawExtension{
+									Raw: mustMarshal(&corev1.Secret{
+										TypeMeta: metav1.TypeMeta{
+											Kind:       "Secret",
+											APIVersion: "v1",
+										},
+										ObjectMeta: metav1.ObjectMeta{
+											Name:      "secret3",
+											Namespace: "ns1",
+											Annotations: map[string]string{
+												addoncfg.AnnotationOriginalResource: "invalid-format",
+											},
+										},
+									}),
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedKeys: []string{},
+			shouldExist:  true,
+		},
+		{
+			name: "ManifestWork with non-config resource",
+			obj: &workv1.ManifestWork{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "mw4",
+					Namespace: "cluster1",
+				},
+				Spec: workv1.ManifestWorkSpec{
+					Workload: workv1.ManifestsTemplate{
+						Manifests: []workv1.Manifest{
+							{
+								RawExtension: runtime.RawExtension{
+									Raw: mustMarshal(&corev1.Service{
+										TypeMeta: metav1.TypeMeta{
+											Kind:       "Service",
+											APIVersion: "v1",
+										},
+										ObjectMeta: metav1.ObjectMeta{
+											Name:      "svc1",
+											Namespace: "ns1",
+											Annotations: map[string]string{
+												addoncfg.AnnotationOriginalResource: "source-ns/source-svc",
+											},
+										},
+									}),
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedKeys: []string{},
+			shouldExist:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := &WatcherReconciler{
+				Log:    logr.Discard(),
+				Scheme: s,
+				Cache:  NewReferenceCache(),
+			}
+
+			r.updateCache(tt.obj)
+
+			if !tt.shouldExist {
+				// Verify cache is empty
+				r.Cache.RLock()
+				defer r.Cache.RUnlock()
+				assert.Empty(t, r.Cache.mwKeyToConfigs)
+				return
+			}
+
+			// Verify keys are added
+			for _, key := range tt.expectedKeys {
+				namespaces := r.Cache.GetNamespaces(key)
+				assert.Contains(t, namespaces, tt.obj.GetNamespace())
+			}
+
+			// Verify exact match of keys for the MW
+			mwKey := fmt.Sprintf("%s/%s", tt.obj.GetNamespace(), tt.obj.GetName())
+			r.Cache.RLock()
+			configs, exists := r.Cache.mwKeyToConfigs[mwKey]
+			r.Cache.RUnlock()
+
+			assert.True(t, exists, "ManifestWork key should exist in cache")
+			assert.Equal(t, len(tt.expectedKeys), len(configs), "Number of config keys should match")
+
+			for _, k := range tt.expectedKeys {
+				_, ok := configs[k]
+				assert.True(t, ok, "Config key %s should be in mwKeyToConfigs", k)
+			}
+		})
+	}
+}
+
+func mustMarshal(obj interface{}) []byte {
+	b, err := json.Marshal(obj)
+	if err != nil {
+		panic(err)
+	}
+	return b
 }
