@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ViaQ/logerr/v2/log"
+	operatorv1 "github.com/openshift/api/operator/v1"
 	otelv1alpha1 "github.com/open-telemetry/opentelemetry-operator/apis/v1alpha1"
 	otelv1beta1 "github.com/open-telemetry/opentelemetry-operator/apis/v1beta1"
 	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
@@ -51,6 +52,7 @@ func init() {
 	utilruntime.Must(operatorsv1.AddToScheme(scheme))
 	utilruntime.Must(operatorsv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(clusterv1.AddToScheme(scheme))
+	utilruntime.Must(operatorv1.AddToScheme(scheme))
 	utilruntime.Must(cooprometheusv1.AddToScheme(scheme))
 	utilruntime.Must(cooprometheusv1alpha1.AddToScheme(scheme)) // Adds prometheusAgent and scrapeConfig
 	utilruntime.Must(prometheusv1.AddToScheme(scheme))          // Adds prometheusRule
