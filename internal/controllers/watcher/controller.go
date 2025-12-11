@@ -2,6 +2,7 @@ package watcher
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -12,9 +13,9 @@ import (
 	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/workqueue"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager"
@@ -106,7 +107,7 @@ func (r *WatcherReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(&workv1.ManifestWork{}, r.enqueueForManifestWork(), builder.WithPredicates(manifestWorkPredicate)).
 		Watches(&corev1.Secret{}, r.enqueueForConfigResource(), builder.OnlyMetadata).
 		Watches(&corev1.ConfigMap{}, r.enqueueForConfigResource(), builder.OnlyMetadata).
-		Watches(&corev1.ConfigMap{}, r.enqueueForAllManagedClusters(), imagesConfigMapPredicate, builder.OnlyMetadata).
+		Watches(&corev1.ConfigMap{}, r.enqueueForAllManagedClusters(), imagesConfigMapPredicate).
 		Watches(&hyperv1.HostedCluster{}, r.enqueueForLocalCluster(), hostedClusterPredicate).
 		Watches(&prometheusv1.ServiceMonitor{}, r.enqueueForLocalCluster(), hypershiftServiceMonitorsPredicate(r.Log), builder.OnlyMetadata).
 		Complete(r)
@@ -134,7 +135,14 @@ func (r *WatcherReconciler) enqueueForManifestWork() handler.EventHandler {
 			r.updateCache(e.Object)
 		},
 		UpdateFunc: func(ctx context.Context, e event.UpdateEvent, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
-			r.updateCache(e.ObjectNew)
+			oldMw, okOld := e.ObjectOld.(*workv1.ManifestWork)
+			newMw, okNew := e.ObjectNew.(*workv1.ManifestWork)
+			if !okOld || !okNew {
+				return
+			}
+			if oldMw.Generation != newMw.Generation {
+				r.updateCache(e.ObjectNew)
+			}
 		},
 		DeleteFunc: func(ctx context.Context, e event.DeleteEvent, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 			r.Cache.Remove(e.Object.GetNamespace(), e.Object.GetName())
@@ -149,33 +157,35 @@ func (r *WatcherReconciler) updateCache(obj client.Object) {
 	}
 
 	keys := []string{}
-	decode := serializer.NewCodecFactory(r.Scheme).UniversalDeserializer().Decode
 
 	for _, m := range mw.Spec.Workload.Manifests {
-		obj, gvk, err := decode(m.Raw, nil, nil)
-		if err != nil {
+		minimalObj := &metav1.PartialObjectMetadata{}
+		if err := json.Unmarshal(m.Raw, minimalObj); err != nil {
+			r.Log.V(3).Error(err, "failed to unmarshal manifest to PartialObjectMetadata")
 			continue
 		}
 
-		clientObj, ok := obj.(client.Object)
-		if !ok {
-			continue
-		}
+		gvk := minimalObj.GroupVersionKind()
 
-		switch clientObj.(type) {
-		case *corev1.Secret, *corev1.ConfigMap:
-			var namespace, name string
-
-			if originalResource, ok := clientObj.GetAnnotations()[addoncfg.AnnotationOriginalResource]; ok {
-				parts := strings.Split(originalResource, "/")
-				if len(parts) == 2 {
-					namespace = parts[0]
-					name = parts[1]
-				}
+		switch gvk.GroupKind() {
+		case corev1.SchemeGroupVersion.WithKind("Secret").GroupKind(), corev1.SchemeGroupVersion.WithKind("ConfigMap").GroupKind():
+			originalResource, ok := minimalObj.GetAnnotations()[addoncfg.AnnotationOriginalResource]
+			if !ok {
+				r.Log.V(3).Info("configuration resource is missing the original-resource annotation, it is not added to the cache")
+				continue
 			}
 
+			parts := strings.Split(originalResource, "/")
+			if len(parts) != 2 {
+				r.Log.V(3).Info("original-resource annotation is malformed, expected format 'namespace/name'", "annotation", originalResource)
+				continue
+			}
+
+			namespace := parts[0]
+			name := parts[1]
+
 			if namespace == "" || name == "" {
-				r.Log.V(3).Info("configuration resource is missing the original-resource annotation, it is not added to the cache")
+				r.Log.V(3).Info("original-resource annotation contains empty namespace or name")
 				continue
 			}
 
