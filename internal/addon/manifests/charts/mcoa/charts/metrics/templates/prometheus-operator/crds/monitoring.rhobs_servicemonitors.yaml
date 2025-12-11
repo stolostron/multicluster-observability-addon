@@ -6,6 +6,9 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.17.1
     operator.prometheus.io/version: 0.80.1-rhobs1
+    {{- if not .Values.deployCOOResources }}
+    addon.open-cluster-management.io/deletion-orphan: ""
+    {{- end }}
   name: servicemonitors.monitoring.rhobs
 spec:
   group: monitoring.rhobs
