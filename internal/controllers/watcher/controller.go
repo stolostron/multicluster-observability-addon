@@ -132,7 +132,7 @@ func (r *WatcherReconciler) getConfigResourceKey(obj client.Object) string {
 func (r *WatcherReconciler) enqueueForManifestWork() handler.EventHandler {
 	return handler.Funcs{
 		CreateFunc: func(ctx context.Context, e event.CreateEvent, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
-			r.updateCache(e.Object)
+			r.updateCache(e.Object.(*workv1.ManifestWork))
 		},
 		UpdateFunc: func(ctx context.Context, e event.UpdateEvent, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 			oldMw, okOld := e.ObjectOld.(*workv1.ManifestWork)
@@ -141,7 +141,7 @@ func (r *WatcherReconciler) enqueueForManifestWork() handler.EventHandler {
 				return
 			}
 			if oldMw.Generation != newMw.Generation {
-				r.updateCache(e.ObjectNew)
+				r.updateCache(e.ObjectNew.(*workv1.ManifestWork))
 			}
 		},
 		DeleteFunc: func(ctx context.Context, e event.DeleteEvent, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
@@ -150,11 +150,7 @@ func (r *WatcherReconciler) enqueueForManifestWork() handler.EventHandler {
 	}
 }
 
-func (r *WatcherReconciler) updateCache(obj client.Object) {
-	mw, ok := obj.(*workv1.ManifestWork)
-	if !ok {
-		return
-	}
+func (r *WatcherReconciler) updateCache(mw *workv1.ManifestWork) {
 
 	keys := []string{}
 

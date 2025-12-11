@@ -340,17 +340,6 @@ func TestUpdateCache(t *testing.T) {
 		shouldExist  bool // true if ManifestWork and processed
 	}{
 		{
-			name: "Not a ManifestWork",
-			obj: &corev1.Secret{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-secret",
-					Namespace: "default",
-				},
-			},
-			expectedKeys: nil,
-			shouldExist:  false,
-		},
-		{
 			name: "ManifestWork with valid Secret and ConfigMap",
 			obj: &workv1.ManifestWork{
 				ObjectMeta: metav1.ObjectMeta{
@@ -513,7 +502,7 @@ func TestUpdateCache(t *testing.T) {
 				Cache:  NewReferenceCache(),
 			}
 
-			r.updateCache(tt.obj)
+			r.updateCache(tt.obj.(*workv1.ManifestWork))
 
 			if !tt.shouldExist {
 				// Verify cache is empty
