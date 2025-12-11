@@ -151,7 +151,6 @@ func (r *WatcherReconciler) enqueueForManifestWork() handler.EventHandler {
 }
 
 func (r *WatcherReconciler) updateCache(mw *workv1.ManifestWork) {
-
 	keys := []string{}
 
 	for _, m := range mw.Spec.Workload.Manifests {
