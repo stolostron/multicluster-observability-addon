@@ -2,6 +2,7 @@ package watcher
 
 import (
 	"fmt"
+	"maps"
 	"sync"
 )
 
@@ -34,28 +35,24 @@ func (c *ReferenceCache) Add(mwNamespace, mwName string, configKeys []string) {
 	}
 
 	c.RLock()
-	if oldConfigs, exists := c.mwKeyToConfigs[mwKey]; exists {
-		if len(oldConfigs) == len(newConfigs) {
-			match := true
-			for k := range newConfigs {
-				if _, ok := oldConfigs[k]; !ok {
-					match = false
-					break
-				}
-			}
-			if match {
-				c.RUnlock()
-				return
-			}
-		}
+	oldConfigs, exists := c.mwKeyToConfigs[mwKey]
+	if exists && maps.Equal(oldConfigs, newConfigs) {
+		c.RUnlock()
+		return
 	}
 	c.RUnlock()
 
 	c.Lock()
 	defer c.Unlock()
 
+	// Re-check after acquiring write lock to handle potential race conditions
+	oldConfigs, exists = c.mwKeyToConfigs[mwKey]
+	if exists && maps.Equal(oldConfigs, newConfigs) {
+		return
+	}
+
 	// Remove old references if any (handle update)
-	if oldConfigs, exists := c.mwKeyToConfigs[mwKey]; exists {
+	if exists {
 		for configKey := range oldConfigs {
 			if _, keep := newConfigs[configKey]; !keep {
 				c.removeRef(mwNamespace, configKey)
