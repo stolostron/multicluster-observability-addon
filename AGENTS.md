@@ -1,17 +1,6 @@
-# AGENTS.md
+# multicluster-observability-addon
 
-This file provides guidance for working with code in this repository,
-for use by coding assistants.
-
-## What This Project Does
-
-The **multicluster-observability-addon** is an Open Cluster Management (OCM) addon that automates
-the collection and forwarding of observability signals (metrics, logs, traces) from managed
-clusters to central storage. It's built on the
-[addon-framework](https://github.com/open-cluster-management-io/addon-framework) and runs on the
-hub cluster to manage observability components on spoke clusters.
-
-**Tech Stack**: Go 1.24, Kubernetes controller-runtime, OCM addon-framework
+OCM addon automating observability signal collection (metrics, logs, traces) from managed spoke clusters to central storage. Go 1.24 + controller-runtime + addon-framework.
 
 ## Architecture Overview
 
@@ -42,40 +31,18 @@ hub cluster to manage observability components on spoke clusters.
 - **Logs**: ClusterLogForwarder collects and forwards logs
 - **Traces**: OpenTelemetryCollector receives and forwards traces
 
-## Project Structure
-
-```
-.
-├── main.go                    # Addon manager entry point
-├── internal/
-│   ├── addon/                 # Addon framework integration
-│   ├── controllers/           # Kubernetes controllers
-│   ├── logging/               # ClusterLogForwarder logic
-│   ├── tracing/               # OpenTelemetry logic
-│   ├── metrics/               # Prometheus metrics logic
-│   ├── perses/                # Dashboard definitions
-│   ├── analytics/             # Analytics and reporting
-│   └── coo/                   # Cluster-logging-operator utils
-├── deploy/                    # Kustomize deployment manifests
-├── hack/                      # Development tools and test resources
-└── .bingo/                    # Tool dependency management
-```
-
 ## Development Workflow
 
 ### Quick Start
 
 ```bash
-# Build and test
 make addon          # Build binary
 make test           # Run unit tests
 make fmt            # Format code
 make lint           # Run linters
 
-# Deploy to development cluster
-export REGISTRY_BASE=quay.io/YOUR_QUAY_ID
-make oci            # Build and push image
-make addon-deploy   # Deploy to hub cluster
+make oci            # Build+push image (set REGISTRY_BASE env first)
+make addon-deploy   # Deploy to hub
 ```
 
 ### Iterative Development
@@ -91,35 +58,14 @@ Additional useful targets: `make install-crds`, `make download-crds`, `make upda
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for multi-cluster development setup and [README.md](README.md) for detailed installation.
 
+## Common Mistakes to Avoid
+
+TBD - to be populated with project-specific gotchas and anti-patterns
+
 ## Prerequisites and Dependencies
 
-**Hub Cluster Requirements**:
-- cert-manager operator (required)
-- multicluster-observability-operator (for metrics)
-
-**Spoke Cluster Operators** (installed automatically by addon):
-- cluster-logging-operator (for logs)
-- opentelemetry-operator (for traces)
-- prometheus-operator (for metrics)
-
-## Important Notes
-
-- Addon runs on hub cluster, manages resources on spoke clusters
-- Manifests deployed to spokes are copies of hub stanzas (except serviceAccountName)
-- Secrets can be in spoke namespace or same namespace as stanza
-- Service account for logs: `openshift-logging/mcoa-logcollector`
-- Default installation: all managed clusters (modify `ClusterManagementAddOn.spec.installStrategy`)
-- Configuration via `AddOnDeploymentConfig.spec.customizedVariables` (see README for details)
-- Deployment modes: via MCO (recommended) or Kustomize
+See [README.md](README.md)
 
 ## Maintaining This Document
 
-Always suggest AGENTS.md edits when architectural, structural, or conventional changes are made:
-- New packages under `internal/`
-- Changes to Makefile targets or build system
-- New CRDs or API resources
-- Changes to deployment procedures
-- Updates to testing approaches
-- Platform or dependency changes
-
-Keep this file concise and universally applicable. For task-specific details, point to other documentation.
+Always suggest AGENTS.md edits when architectural, structural, or conventional changes are made.
