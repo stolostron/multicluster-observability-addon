@@ -150,7 +150,7 @@ func (r *WatcherReconciler) enqueueForManifestWork() handler.EventHandler {
 }
 
 func (r *WatcherReconciler) updateCache(mw *workv1.ManifestWork) {
-	keys := []string{}
+	keys := map[string]struct{}{}
 
 	for _, m := range mw.Spec.Workload.Manifests {
 		minimalObj := &metav1.PartialObjectMetadata{}
@@ -184,7 +184,7 @@ func (r *WatcherReconciler) updateCache(mw *workv1.ManifestWork) {
 			}
 
 			key := fmt.Sprintf("%s/%s/%s/%s", gvk.Group, gvk.Kind, namespace, name)
-			keys = append(keys, key)
+			keys[key] = struct{}{}
 		}
 	}
 
