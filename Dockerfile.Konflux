@@ -1,7 +1,7 @@
 # Copyright Contributors to the Open Cluster Management project
 # Licensed under the Apache License 2.0
 
-FROM brew.registry.redhat.io/rh-osbs/openshift-golang-builder:v1.24.6-202510150934.g4284440.el9 AS builder
+FROM brew.registry.redhat.io/rh-osbs/openshift-golang-builder:v1.25.3 AS builder
 
 WORKDIR /workspace
 # Copy the Go Modules manifests
