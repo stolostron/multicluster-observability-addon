@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	operatorv1 "github.com/openshift/api/operator/v1"
 	hyperv1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	cooprometheusv1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1"
@@ -46,6 +47,7 @@ func TestBuildOptions(t *testing.T) {
 	// Setup scheme
 	scheme := runtime.NewScheme()
 	require.NoError(t, kubescheme.AddToScheme(scheme))
+	require.NoError(t, operatorv1.AddToScheme(scheme))
 	require.NoError(t, cooprometheusv1alpha1.AddToScheme(scheme))
 	require.NoError(t, prometheusv1.AddToScheme(scheme))
 	require.NoError(t, clusterv1.AddToScheme(scheme))
@@ -225,6 +227,12 @@ func TestBuildOptions(t *testing.T) {
 			&corev1.Namespace{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: spokeName,
+				},
+			},
+			&operatorv1.IngressController{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "default",
+					Namespace: "openshift-ingress-operator",
 				},
 			},
 			&clusterv1.ManagedCluster{
@@ -548,7 +556,8 @@ func TestBuildOptions(t *testing.T) {
 						Labels: map[string]string{
 							addoncfg.ManagedClusterLabelClusterID:                       "test-cluster-id",
 							"feature.open-cluster-management.io/addon-hypershift-addon": "available",
-							"local-cluster": "true",
+							"local-cluster":                    "true",
+							clusterinfov1beta1.LabelKubeVendor: string(clusterinfov1beta1.KubeVendorOpenShift),
 						},
 					},
 				})

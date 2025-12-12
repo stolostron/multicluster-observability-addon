@@ -64,6 +64,7 @@ const (
 	IsOLMManagedFeedbackName              = "isOLMManaged"
 
 	VendorOverrideAnnotationKey = "mcoa-override-vendor"
+	AnnotationOriginalResource  = "mcoa.openshift.io/original-resource"
 )
 
 var (

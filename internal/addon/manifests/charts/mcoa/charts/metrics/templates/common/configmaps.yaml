@@ -1,0 +1,20 @@
+{{- if or .Values.platformEnabled .Values.userWorkloadsEnabled }}
+{{- range $_, $configmap := .Values.configMaps }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $configmap.name }}
+  namespace: {{ $configmap.namespace | default $.Release.Namespace }}
+  labels:
+    {{- $incomingLabels := $configmap.labels }}
+    {{- $metricsHelmLabels := fromYaml (include "metricshelm.labels" $) }}
+    {{- $mergedLabels := mergeOverwrite $incomingLabels $metricsHelmLabels }}
+    {{- toYaml $mergedLabels | nindent 4 }}
+  {{- with $configmap.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+data: {{ fromJson $configmap.data | toYaml | nindent 2 }}
+---
+{{- end }}
+{{- end }}
