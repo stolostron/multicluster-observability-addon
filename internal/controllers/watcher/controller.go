@@ -12,7 +12,6 @@ import (
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -107,7 +106,7 @@ func (r *WatcherReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(&workv1.ManifestWork{}, r.enqueueForManifestWork(), builder.WithPredicates(manifestWorkPredicate)).
 		Watches(&corev1.Secret{}, r.enqueueForConfigResource(), builder.OnlyMetadata).
 		Watches(&corev1.ConfigMap{}, r.enqueueForConfigResource(), builder.OnlyMetadata).
-		Watches(&corev1.ConfigMap{}, r.enqueueForAllManagedClusters(), imagesConfigMapPredicate).
+		Watches(&corev1.ConfigMap{}, r.enqueueForAllManagedClusters(), builder.WithPredicates(imagesConfigMapPredicate), builder.OnlyMetadata).
 		Watches(&hyperv1.HostedCluster{}, r.enqueueForLocalCluster(), hostedClusterPredicate).
 		Watches(&prometheusv1.ServiceMonitor{}, r.enqueueForLocalCluster(), hypershiftServiceMonitorsPredicate(r.Log), builder.OnlyMetadata).
 		Complete(r)
@@ -275,28 +274,23 @@ var hostedClusterPredicate = builder.WithPredicates(predicate.Funcs{
 	GenericFunc: func(e event.GenericEvent) bool { return false },
 })
 
-var imagesConfigMapPredicate = builder.WithPredicates(predicate.Funcs{
+var imagesConfigMapPredicate = predicate.Funcs{
 	UpdateFunc: func(e event.UpdateEvent) bool {
-		if e.ObjectNew.GetName() == mconfig.ImagesConfigMapObjKey.Name && e.ObjectNew.GetNamespace() == mconfig.ImagesConfigMapObjKey.Namespace {
-			oldCM, okOld := e.ObjectOld.(*corev1.ConfigMap)
-			newCM, okNew := e.ObjectNew.(*corev1.ConfigMap)
-			if !okOld || !okNew {
-				return false
-			}
-			return !equality.Semantic.DeepEqual(oldCM.Data, newCM.Data)
-		}
-		return false
+		return e.ObjectNew.GetName() == mconfig.ImagesConfigMapObjKey.Name &&
+			e.ObjectNew.GetNamespace() == mconfig.ImagesConfigMapObjKey.Namespace
 	},
 	CreateFunc: func(e event.CreateEvent) bool {
-		return e.Object.GetName() == mconfig.ImagesConfigMapObjKey.Name && e.Object.GetNamespace() == mconfig.ImagesConfigMapObjKey.Namespace
+		return e.Object.GetName() == mconfig.ImagesConfigMapObjKey.Name &&
+			e.Object.GetNamespace() == mconfig.ImagesConfigMapObjKey.Namespace
 	},
 	DeleteFunc: func(e event.DeleteEvent) bool {
-		return e.Object.GetName() == mconfig.ImagesConfigMapObjKey.Name && e.Object.GetNamespace() == mconfig.ImagesConfigMapObjKey.Namespace
+		return e.Object.GetName() == mconfig.ImagesConfigMapObjKey.Name &&
+			e.Object.GetNamespace() == mconfig.ImagesConfigMapObjKey.Namespace
 	},
 	GenericFunc: func(e event.GenericEvent) bool {
 		return false
 	},
-})
+}
 
 func hypershiftServiceMonitorsPredicate(logger logr.Logger) builder.Predicates {
 	return builder.WithPredicates(predicate.Funcs{
