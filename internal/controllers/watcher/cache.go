@@ -27,12 +27,8 @@ func NewReferenceCache() *ReferenceCache {
 	}
 }
 
-func (c *ReferenceCache) Add(mwNamespace, mwName string, configKeys []string) {
+func (c *ReferenceCache) Add(mwNamespace, mwName string, newConfigs map[string]struct{}) {
 	mwKey := fmt.Sprintf("%s/%s", mwNamespace, mwName)
-	newConfigs := make(map[string]struct{}, len(configKeys))
-	for _, k := range configKeys {
-		newConfigs[k] = struct{}{}
-	}
 
 	c.RLock()
 	oldConfigs, exists := c.mwKeyToConfigs[mwKey]
@@ -62,7 +58,7 @@ func (c *ReferenceCache) Add(mwNamespace, mwName string, configKeys []string) {
 
 	// Add new references
 	c.mwKeyToConfigs[mwKey] = newConfigs
-	for _, configKey := range configKeys {
+	for configKey := range newConfigs {
 		if _, ok := c.configToMWNs[configKey]; !ok {
 			c.configToMWNs[configKey] = make(map[string]struct{})
 		}

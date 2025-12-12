@@ -212,7 +212,7 @@ func TestEnqueueForConfigResource(t *testing.T) {
 			}
 
 			// Populate cache
-			keys := []string{}
+			keys := map[string]struct{}{}
 			decode := serializer.NewCodecFactory(r.Scheme).UniversalDeserializer().Decode
 			for i, m := range tc.manifests {
 				if m.Raw == nil && m.Object != nil {
@@ -233,7 +233,7 @@ func TestEnqueueForConfigResource(t *testing.T) {
 				if !ok {
 					continue
 				}
-				keys = append(keys, r.getConfigResourceKey(clientObj))
+				keys[r.getConfigResourceKey(clientObj)] = struct{}{}
 			}
 			r.Cache.Add(manifestWork.Namespace, manifestWork.Name, keys)
 
