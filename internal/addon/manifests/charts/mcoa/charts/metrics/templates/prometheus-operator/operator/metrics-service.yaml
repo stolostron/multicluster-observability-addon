@@ -13,8 +13,13 @@ metadata:
 spec:
   ports:
   - name: metrics
+    {{- if .Values.deployNonOCPStack }}
+    port: 8080
+    targetPort: metrics
+    {{- else }}
     port: {{ .Values.prometheusOperator.rbacProxyPort }}
     targetPort: metrics
+    {{- end }}
   selector:
     app.kubernetes.io/name: {{ .Values.prometheusOperator.appName }}
 {{- end }}
