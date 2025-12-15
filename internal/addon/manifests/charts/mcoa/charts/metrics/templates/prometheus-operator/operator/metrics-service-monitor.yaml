@@ -10,6 +10,11 @@ metadata:
     {{ include "metricshelm.labels" . | nindent 4 }}
 spec:
   endpoints:
+  {{- if .Values.deployNonOCPStack }}
+  - interval: 30s
+    port: metrics
+    scheme: http
+  {{- else }}
   - interval: 30s
     port: metrics
     scheme: https
@@ -17,6 +22,7 @@ spec:
     tlsConfig:
       caFile: /etc/prometheus/configmaps/serving-certs-ca-bundle/service-ca.crt
       serverName: "{{ .Values.prometheusOperator.appName }}.{{ .Release.Namespace }}.svc"
+  {{- end }}
   selector:
     matchLabels:
       app.kubernetes.io/name: {{ .Values.prometheusOperator.appName }}

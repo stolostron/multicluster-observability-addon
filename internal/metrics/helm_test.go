@@ -210,6 +210,49 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				assert.Len(t, agent, 1)
 				assert.Equal(t, config.PlatformMetricsCollectorApp, agent[0].GetName())
 				assert.NotEmpty(t, agent[0].Spec.CommonPrometheusFields.RemoteWrite[0].URL)
+
+				matchLabels := map[string]string{
+					"app.kubernetes.io/name": "prometheus-operator",
+				}
+
+				// Ensure the ServiceMonitor is configured for HTTP
+				sms := common.FilterResourcesByLabelSelector[*prometheusv1.ServiceMonitor](objects, matchLabels)
+				assert.Len(t, sms, 1)
+				operatorSM := sms[0]
+				assert.Equal(t, "http", operatorSM.Spec.Endpoints[0].Scheme)
+				assert.Nil(t, operatorSM.Spec.Endpoints[0].TLSConfig)
+
+				// Ensure the Service is targeting the correct port
+				svcs := common.FilterResourcesByLabelSelector[*corev1.Service](objects, matchLabels)
+				assert.Len(t, svcs, 1)
+				operatorSvc := svcs[0]
+				assert.Equal(t, "metrics", operatorSvc.Spec.Ports[0].TargetPort.StrVal)
+				assert.Equal(t, int32(8080), operatorSvc.Spec.Ports[0].Port)
+
+				// Ensure the Deployment has the correct ports and no sidecar
+				deps := common.FilterResourcesByLabelSelector[*appsv1.Deployment](objects, matchLabels)
+				assert.Len(t, deps, 1)
+				operatorDep := deps[0]
+
+				// Check for metrics port on the main container
+				metricsPortFound := false
+				for _, port := range operatorDep.Spec.Template.Spec.Containers[0].Ports {
+					if port.ContainerPort == 8080 && port.Name == "metrics" {
+						metricsPortFound = true
+						break
+					}
+				}
+				assert.True(t, metricsPortFound, "Metrics port 8080 not found on operator container")
+				// Check that kube-rbac-proxy sidecar is NOT present
+				sidecarFound := false
+				for _, c := range operatorDep.Spec.Template.Spec.Containers {
+					if c.Name == "kube-rbac-proxy" {
+						sidecarFound = true
+						break
+					}
+				}
+				assert.False(t, sidecarFound, "kube-rbac-proxy sidecar should not be present")
+
 				// ensure that the number of objects is correct
 				expectedCount := 70
 				if len(objects) != expectedCount {
