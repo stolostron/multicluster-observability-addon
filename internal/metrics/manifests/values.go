@@ -18,6 +18,7 @@ type MetricsValues struct {
 	PlatformEnabled               bool                `json:"platformEnabled"`
 	UserWorkloadsEnabled          bool                `json:"userWorkloadsEnabled"`
 	Secrets                       []ConfigValue       `json:"secrets"`
+	ConfigMaps                    []ConfigValue       `json:"configMaps"`
 	Images                        ImagesValues        `json:"images"`
 	PrometheusControllerID        string              `json:"prometheusControllerID"`
 	PrometheusCAConfigMapName     string              `json:"prometheusCAConfigMapName"`
@@ -34,7 +35,6 @@ type MetricsValues struct {
 
 type Collector struct {
 	AppName             string        `json:"appName"`
-	ConfigMaps          []ConfigValue `json:"configMaps"`
 	PrometheusAgentSpec ConfigValue   `json:"prometheusAgent"`
 	ScrapeConfigs       []ConfigValue `json:"scrapeConfigs"`
 	Rules               []ConfigValue `json:"rules"`
@@ -53,10 +53,11 @@ type ImagesValues struct {
 }
 
 type ConfigValue struct {
-	Name      string            `json:"name"`
-	Namespace string            `json:"namespace"`
-	Data      string            `json:"data"`
-	Labels    map[string]string `json:"labels"`
+	Name        string            `json:"name"`
+	Namespace   string            `json:"namespace"`
+	Data        string            `json:"data"`
+	Labels      map[string]string `json:"labels"`
+	Annotations map[string]string `json:"annotations"`
 }
 
 func BuildValues(opts handlers.Options) (*MetricsValues, error) {
@@ -228,13 +229,7 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 		return ret, err
 	}
 
-	// Set config maps
-	ret.Platform.ConfigMaps, err = buildConfigMaps(opts.Platform.ConfigMaps)
-	if err != nil {
-		return ret, err
-	}
-
-	ret.UserWorkload.ConfigMaps, err = buildConfigMaps(opts.UserWorkloads.ConfigMaps)
+	ret.ConfigMaps, err = buildConfigMaps(opts.ConfigMaps)
 	if err != nil {
 		return ret, err
 	}
@@ -266,10 +261,11 @@ func buildSecrets(secrets []*corev1.Secret) ([]ConfigValue, error) {
 			return secretsValue, err
 		}
 		secretValue := ConfigValue{
-			Name:      secret.Name,
-			Namespace: secret.Namespace,
-			Data:      string(dataJSON),
-			Labels:    secret.Labels,
+			Name:        secret.Name,
+			Namespace:   secret.Namespace,
+			Data:        string(dataJSON),
+			Labels:      secret.Labels,
+			Annotations: secret.Annotations,
 		}
 		secretsValue = append(secretsValue, secretValue)
 	}
@@ -284,9 +280,11 @@ func buildConfigMaps(configMaps []*corev1.ConfigMap) ([]ConfigValue, error) {
 			return configMapsValue, err
 		}
 		configMapValue := ConfigValue{
-			Name:   configMap.Name,
-			Data:   string(dataJSON),
-			Labels: configMap.Labels,
+			Name:        configMap.Name,
+			Namespace:   configMap.Namespace,
+			Data:        string(dataJSON),
+			Labels:      configMap.Labels,
+			Annotations: configMap.Annotations,
 		}
 		configMapsValue = append(configMapsValue, configMapValue)
 	}
