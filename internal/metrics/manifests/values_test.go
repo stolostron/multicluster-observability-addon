@@ -83,34 +83,17 @@ func TestBuildValues(t *testing.T) {
 				assert.Equal(t, "b", values.Secrets[1].Name)
 			},
 		},
-		"with platform configmaps": {
+		"with configmaps": {
 			Options: handlers.Options{
-				Platform: handlers.Collector{
-					ConfigMaps: []*corev1.ConfigMap{
-						newConfigmap("a"),
-						newConfigmap("b"),
-					},
+				ConfigMaps: []*corev1.ConfigMap{
+					newConfigmap("a"),
+					newConfigmap("b"),
 				},
 			},
 			Expect: func(t *testing.T, values *manifests.MetricsValues) {
-				assert.Len(t, values.Platform.ConfigMaps, 2)
-				assert.Equal(t, "a", values.Platform.ConfigMaps[0].Name)
-				assert.Equal(t, "b", values.Platform.ConfigMaps[1].Name)
-			},
-		},
-		"with user workload configmaps": {
-			Options: handlers.Options{
-				UserWorkloads: handlers.Collector{
-					ConfigMaps: []*corev1.ConfigMap{
-						newConfigmap("a"),
-						newConfigmap("b"),
-					},
-				},
-			},
-			Expect: func(t *testing.T, values *manifests.MetricsValues) {
-				assert.Len(t, values.UserWorkload.ConfigMaps, 2)
-				assert.Equal(t, "a", values.UserWorkload.ConfigMaps[0].Name)
-				assert.Equal(t, "b", values.UserWorkload.ConfigMaps[1].Name)
+				assert.Len(t, values.ConfigMaps, 2)
+				assert.Equal(t, "a", values.ConfigMaps[0].Name)
+				assert.Equal(t, "b", values.ConfigMaps[1].Name)
 			},
 		},
 		"with platform scrape configs": {
