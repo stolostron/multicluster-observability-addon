@@ -1,8 +1,10 @@
 package addon
 
 import (
+	"cmp"
 	"context"
 	"fmt"
+	"slices"
 
 	"github.com/go-logr/logr"
 	otelv1alpha1 "github.com/open-telemetry/opentelemetry-operator/apis/v1alpha1"
@@ -13,6 +15,7 @@ import (
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	addonhelm "github.com/stolostron/multicluster-observability-addon/internal/addon/helm"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
@@ -113,7 +116,44 @@ type AgentAddonWithDynamicHealthProber struct {
 }
 
 func (a *AgentAddonWithDynamicHealthProber) Manifests(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) ([]runtime.Object, error) {
-	return a.agent.Manifests(cluster, addon)
+	objects, err := a.agent.Manifests(cluster, addon)
+	if err != nil {
+		return nil, err
+	}
+	// Sort the manifests to ensure a stable order of resources, which is crucial for
+	// fields like 'orphaningRules' in ManifestWork to prevent constant reconciliations.
+	slices.SortStableFunc(objects, func(a, b runtime.Object) int {
+		gvkA := a.GetObjectKind().GroupVersionKind()
+		gvkB := b.GetObjectKind().GroupVersionKind()
+
+		if n := cmp.Compare(gvkA.Group, gvkB.Group); n != 0 {
+			return n
+		}
+		if n := cmp.Compare(gvkA.Version, gvkB.Version); n != 0 {
+			return n
+		}
+		if n := cmp.Compare(gvkA.Kind, gvkB.Kind); n != 0 {
+			return n
+		}
+
+		accA, errA := meta.Accessor(a)
+		accB, errB := meta.Accessor(b)
+		if errA != nil && errB != nil {
+			return 0
+		}
+		if errA != nil {
+			return 1
+		}
+		if errB != nil {
+			return -1
+		}
+
+		if n := cmp.Compare(accA.GetNamespace(), accB.GetNamespace()); n != 0 {
+			return n
+		}
+		return cmp.Compare(accA.GetName(), accB.GetName())
+	})
+	return objects, nil
 }
 
 func (a *AgentAddonWithDynamicHealthProber) GetAgentAddonOptions() agent.AgentAddonOptions {
