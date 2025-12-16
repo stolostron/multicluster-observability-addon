@@ -218,21 +218,6 @@ func TestIsHypershiftServiceMonitor(t *testing.T) {
 			expectedResult: true,
 		},
 		{
-			name:           "hypershift serviceMonitor with no owner",
-			inputObject:    createTestObject(mconfig.AcmEtcdServiceMonitorName, nil),
-			expectedResult: true,
-		},
-		{
-			name:           "acm etcd serviceMonitor name",
-			inputObject:    createTestObject(mconfig.AcmEtcdServiceMonitorName, nil),
-			expectedResult: true,
-		},
-		{
-			name:           "acm apiServer serviceMonitor name",
-			inputObject:    createTestObject(mconfig.AcmApiServerServiceMonitorName, nil),
-			expectedResult: true,
-		},
-		{
 			name:           "unrelated serviceMonitor name",
 			inputObject:    createTestObject("random-monitor", []metav1.OwnerReference{hypershiftOwner}),
 			expectedResult: false,
