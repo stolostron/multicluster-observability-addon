@@ -272,6 +272,25 @@ func Updaters() []agent.Updater {
 			},
 		}
 	}
+
+	updaters = append(updaters, agent.Updater{
+		UpdateStrategy: workv1.UpdateStrategy{
+			Type: workv1.UpdateStrategyTypeServerSideApply,
+			ServerSideApply: &workv1.ServerSideApplyConfig{
+				IgnoreFields: []workv1.IgnoreField{
+					{
+						Condition: "OnSpokePresent",
+						JSONPaths: []string{".data"},
+					},
+				},
+			},
+		},
+		ResourceIdentifier: workv1.ResourceIdentifier{
+			Group:    "",
+			Resource: "configmaps",
+			Name:     mconfig.PrometheusCAConfigMapName,
+		},
+	})
 	return updaters
 }
 
