@@ -98,6 +98,17 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
 				assert.Len(t, common.FilterResourcesByLabelSelector[*corev1.Secret](objects, nil), 4) // 6 secrets (mTLS to hub) + alertmananger secrets (accessor+ca in platform)
+
+				crds := common.FilterResourcesByLabelSelector[*apiextensionsv1.CustomResourceDefinition](objects, nil)
+				checkedCRDs := 0
+				for _, crd := range crds {
+					if crd.Spec.Group != "monitoring.rhobs" {
+						continue
+					}
+					checkedCRDs++
+					assert.NotContains(t, crd.Annotations, "addon.open-cluster-management.io/deletion-orphan")
+				}
+				assert.NotZero(t, checkedCRDs)
 			},
 		},
 		"platform metrics, coo is installed": {
@@ -157,6 +168,18 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				assert.Len(t, agent, 1)
 				assert.Equal(t, "observability-operator", agent[0].Labels["app.kubernetes.io/managed-by"])
 				assert.Empty(t, agent[0].Annotations["operator.prometheus.io/controller-id"])
+
+				crds := common.FilterResourcesByLabelSelector[*apiextensionsv1.CustomResourceDefinition](objects, nil)
+				checkedCRDs := 0
+				for _, crd := range crds {
+					if crd.Spec.Group != "monitoring.rhobs" {
+						continue
+					}
+					checkedCRDs++
+					assert.Contains(t, crd.Annotations, "addon.open-cluster-management.io/deletion-orphan")
+				}
+				assert.NotZero(t, checkedCRDs)
+
 				// ensure that the number of objects is correct
 				expectedCount := 25
 				if len(objects) != expectedCount {
