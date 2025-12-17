@@ -28,6 +28,7 @@ require (
 )
 
 require (
+	github.com/openshift/api v0.0.0-20250704153732-ad766c4e6d8e
 	github.com/perses/community-dashboards v0.0.0-20250801132011-f6f822393f57
 	github.com/perses/perses v0.51.1
 	github.com/perses/perses-operator v0.2.0
@@ -37,6 +38,7 @@ require (
 	github.com/perses/plugins/timeserieschart v0.9.1
 	github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring v0.83.0-rhobs1
 	github.com/rhobs/observability-operator/pkg/apis v0.0.0-20250902133632-f98bd8a20a80
+	golang.org/x/text v0.27.0
 )
 
 require (
@@ -104,7 +106,6 @@ require (
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/mwitkow/go-conntrack v0.0.0-20190716064945-2f068394615f // indirect
 	github.com/nexucis/lamenv v0.5.2 // indirect
-	github.com/openshift/api v0.0.0-20250704153732-ad766c4e6d8e // indirect
 	github.com/perses/common v0.28.0 // indirect
 	github.com/perses/plugins/gaugechart v0.8.0 // indirect
 	github.com/perses/plugins/markdown v0.8.0 // indirect
@@ -164,7 +165,6 @@ require (
 	golang.org/x/sync v0.16.0 // indirect
 	golang.org/x/sys v0.34.0 // indirect
 	golang.org/x/term v0.33.0 // indirect
-	golang.org/x/text v0.27.0 // indirect
 	golang.org/x/time v0.12.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.4.0 // indirect
 	google.golang.org/genproto v0.0.0-20240708141625-4ad9e859172b // indirect

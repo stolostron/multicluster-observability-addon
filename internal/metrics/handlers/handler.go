@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/go-logr/logr"
+	operatorv1 "github.com/openshift/api/operator/v1"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	cooprometheusv1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1"
 	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
@@ -91,7 +92,7 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 		return ret, fmt.Errorf("failed to get clustername from HubEndpoint: %w", err)
 	}
 
-	if err = o.addAlertmanagerSecrets(ctx, &ret.Secrets, clusterName, opts); err != nil {
+	if err = o.addAlertmanagerSecrets(ctx, &ret.Secrets, clusterName, opts, common.IsOpenShiftVendor(managedCluster)); err != nil {
 		return ret, fmt.Errorf("failed to add alertmanager secrets: %w", err)
 	}
 
@@ -104,18 +105,18 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 		// Fetch rules and scrape configs
 		ret.Platform.ScrapeConfigs = common.FilterResourcesByLabelSelector[*cooprometheusv1alpha1.ScrapeConfig](configResources, config.PlatformPrometheusMatchLabels)
 		if len(ret.Platform.ScrapeConfigs) == 0 {
-			o.Logger.V(1).Info("No scrape configs found for platform metrics")
+			o.Logger.V(2).Info("No scrape configs found for platform metrics")
 		}
 		ret.Platform.Rules = common.FilterResourcesByLabelSelector[*prometheusv1.PrometheusRule](configResources, config.PlatformPrometheusMatchLabels)
 		if len(ret.Platform.Rules) == 0 {
-			o.Logger.V(1).Info("No rules found for platform metrics")
+			o.Logger.V(2).Info("No rules found for platform metrics")
 		}
 	}
 
 	// Check both if hypershift is enabled and has hosted clusters to limit noisy logs when uwl monitoring is disabled while there is no hostedCluster
 	isHypershiftCluster := IsHypershiftEnabled(managedCluster) && HasHostedCLusters(ctx, o.Client, o.Logger)
 
-	if opts.UserWorkloads.Metrics.CollectionEnabled {
+	if common.IsOpenShiftVendor(managedCluster) && opts.UserWorkloads.Metrics.CollectionEnabled {
 		if err = o.buildPrometheusAgent(ctx, &ret, configResources, config.UserWorkloadMetricsCollectorApp, isHypershiftCluster); err != nil {
 			return ret, err
 		}
@@ -123,11 +124,11 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 		// Fetch rules and scrape configs
 		ret.UserWorkloads.ScrapeConfigs = common.FilterResourcesByLabelSelector[*cooprometheusv1alpha1.ScrapeConfig](configResources, config.UserWorkloadPrometheusMatchLabels)
 		if len(ret.UserWorkloads.ScrapeConfigs) == 0 {
-			o.Logger.V(1).Info("No scrape configs found for user workloads")
+			o.Logger.V(2).Info("No scrape configs found for user workloads")
 		}
 		ret.UserWorkloads.Rules = common.FilterResourcesByLabelSelector[*prometheusv1.PrometheusRule](configResources, config.UserWorkloadPrometheusMatchLabels)
 		if len(ret.UserWorkloads.Rules) == 0 {
-			o.Logger.V(1).Info("No rules found for user workloads")
+			o.Logger.V(2).Info("No rules found for user workloads")
 		}
 	}
 
@@ -268,6 +269,14 @@ func (o *OptionsBuilder) buildPrometheusAgent(ctx context.Context, opts *Options
 		}
 	}
 
+	// Fetch related configmaps
+	for _, configMapName := range agent.Spec.ConfigMaps {
+		// empty target namespace result in using default $.Release.Namespace in yaml
+		if err := o.addConfigMap(ctx, &opts.ConfigMaps, configMapName, agent.Namespace, configMapName, ""); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -317,10 +326,37 @@ func (o *OptionsBuilder) addSecret(ctx context.Context, secrets *[]*corev1.Secre
 		return fmt.Errorf("failed to get secret %s in namespace %s: %w", secretName, secretNamespace, err)
 	}
 
+	if secret.Annotations == nil {
+		secret.Annotations = map[string]string{}
+	}
+	secret.Annotations[addoncfg.AnnotationOriginalResource] = fmt.Sprintf("%s/%s", secret.Namespace, secret.Name)
+
 	secret.Namespace = targetNamespace
 	secret.Name = targetName
 
 	*secrets = append(*secrets, secret)
+	return nil
+}
+
+func (o *OptionsBuilder) addConfigMap(ctx context.Context, configMaps *[]*corev1.ConfigMap, configMapName, configMapNamespace string, targetName string, targetNamespace string) error {
+	if slices.IndexFunc(*configMaps, func(cm *corev1.ConfigMap) bool { return cm.Name == configMapName && cm.Namespace == configMapNamespace }) != -1 {
+		return nil
+	}
+
+	configMap := &corev1.ConfigMap{}
+	if err := o.Client.Get(ctx, types.NamespacedName{Name: configMapName, Namespace: configMapNamespace}, configMap); err != nil {
+		return fmt.Errorf("failed to get configmap %s in namespace %s: %w", configMapName, configMapNamespace, err)
+	}
+
+	if configMap.Annotations == nil {
+		configMap.Annotations = map[string]string{}
+	}
+	configMap.Annotations[addoncfg.AnnotationOriginalResource] = fmt.Sprintf("%s/%s", configMap.Namespace, configMap.Name)
+
+	configMap.Namespace = targetNamespace
+	configMap.Name = targetName
+
+	*configMaps = append(*configMaps, configMap)
 	return nil
 }
 
@@ -375,19 +411,19 @@ func (o *OptionsBuilder) cooIsSubscribed(ctx context.Context, managedCluster *cl
 
 	crdFeedback, ok := feedback[crdID]
 	if !ok || len(crdFeedback) == 0 {
-		o.Logger.V(1).Info("scrapeconfigs.monitoring.rhobs CRD not found in manifestwork status, considering COO as not subscribed")
+		o.Logger.V(2).Info("scrapeconfigs.monitoring.rhobs CRD not found in manifestwork status, considering COO as not subscribed")
 		return false, nil
 	}
 
 	olmValues := common.FilterFeedbackValuesByName(crdFeedback, addoncfg.IsOLMManagedFeedbackName)
 	for _, v := range olmValues {
 		if v.Value.String != nil && strings.ToLower(*v.Value.String) == "true" {
-			o.Logger.V(1).Info("found scrapeconfigs.monitoring.rhobs CRD with OLM label, considering COO as subscribed")
+			o.Logger.V(2).Info("found scrapeconfigs.monitoring.rhobs CRD with OLM label, considering COO as subscribed")
 			return true, nil
 		}
 	}
 
-	o.Logger.V(1).Info("scrapeconfigs.monitoring.rhobs CRD missing the OLM label, considering COO as not subscribed")
+	o.Logger.V(2).Info("scrapeconfigs.monitoring.rhobs CRD missing the OLM label, considering COO as not subscribed")
 	return false, nil
 }
 
@@ -467,49 +503,79 @@ func createWriteRelabelConfigs(clusterName, clusterID string, isHypershiftLocalC
 		})
 }
 
-func (o *OptionsBuilder) addAlertmanagerSecrets(ctx context.Context, secrets *[]*corev1.Secret, clusterName string, opts addon.Options) error {
-	// Get the router CA secret
-	routerCASecret := &corev1.Secret{}
+func (o *OptionsBuilder) getRouterCACert(ctx context.Context) ([]byte, string, string, error) {
+	// Check if BYO certs exist
 	amRouteBYOCaSrt := &corev1.Secret{}
 	err1 := o.Client.Get(ctx, types.NamespacedName{Name: config.AlertmanagerRouteBYOCAName, Namespace: config.HubInstallNamespace}, amRouteBYOCaSrt)
 	amRouteBYOCertSrt := &corev1.Secret{}
 	err2 := o.Client.Get(ctx, types.NamespacedName{Name: config.AlertmanagerRouteBYOCERTName, Namespace: config.HubInstallNamespace}, amRouteBYOCertSrt)
 
 	if err1 == nil && err2 == nil {
-		// BYO certs exists, use these
-		routerCASecret = amRouteBYOCaSrt
-	} else {
-		// No BYO certs, use default ingress certs
-		if err := o.Client.Get(ctx, types.NamespacedName{Name: "router-certs-default", Namespace: "openshift-ingress"}, routerCASecret); err != nil {
-			return err
-		}
+		return amRouteBYOCaSrt.Data["tls.crt"], amRouteBYOCaSrt.Namespace, amRouteBYOCaSrt.Name, nil
+	}
+
+	// No BYO certs, use default ingress certs
+	ingressOperator := &operatorv1.IngressController{}
+	if err := o.Client.Get(ctx, types.NamespacedName{Name: "default", Namespace: "openshift-ingress-operator"}, ingressOperator); err != nil {
+		return nil, "", "", fmt.Errorf("failed to get default ingress controller: %w", err)
+	}
+
+	routerCASrtName := "router-certs-default"
+	// check if custom default certificate is provided or not
+	if ingressOperator.Spec.DefaultCertificate != nil {
+		routerCASrtName = ingressOperator.Spec.DefaultCertificate.Name
+	}
+
+	routerCASecret := &corev1.Secret{}
+	if err := o.Client.Get(ctx, types.NamespacedName{Name: routerCASrtName, Namespace: "openshift-ingress"}, routerCASecret); err != nil {
+		return nil, "", "", fmt.Errorf("failed to get router CA secret: %w", err)
+	}
+	return routerCASecret.Data["tls.crt"], routerCASecret.Namespace, routerCASecret.Name, nil
+}
+
+func (o *OptionsBuilder) addAlertmanagerSecrets(ctx context.Context, secrets *[]*corev1.Secret, clusterName string, opts addon.Options, isOCP bool) error {
+	// Get the router CA secret
+	routerCACert, routerCANamespace, routerCAName, err := o.getRouterCACert(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get router CA cert: %w", err)
 	}
 
 	// Add secrets based on enabled metric collection
 	if opts.Platform.Metrics.CollectionEnabled {
-		if err := o.addSecret(ctx, secrets, config.AlertmanagerAccessorSecretName, config.HubInstallNamespace, config.AlertmanagerAccessorSecretName+"-"+clusterName, config.AlertmanagerPlatformNamespace); err != nil {
+		targetNamespace := config.AlertmanagerPlatformNamespace
+		if !isOCP {
+			targetNamespace = "" // This is replaced by the default value in the help template that is the installation namespace
+		}
+		if err := o.addSecret(ctx, secrets, config.AlertmanagerAccessorSecretName, config.HubInstallNamespace, config.AlertmanagerAccessorSecretName+"-"+clusterName, targetNamespace); err != nil {
 			return fmt.Errorf("failed to add accessor secret for platform metrics: %w", err)
 		}
 		ca := &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      config.AlertmanagerRouterCASecretName + "-" + clusterName,
-				Namespace: config.AlertmanagerPlatformNamespace,
+				Namespace: targetNamespace,
+				Annotations: map[string]string{
+					addoncfg.AnnotationOriginalResource: fmt.Sprintf("%s/%s", routerCANamespace, routerCAName),
+				},
 			},
-			Data: map[string][]byte{"service-ca.crt": routerCASecret.Data["tls.crt"]},
+			Data: map[string][]byte{"service-ca.crt": routerCACert},
 		}
 		*secrets = append(*secrets, ca)
 	}
 
-	if opts.UserWorkloads.Metrics.CollectionEnabled {
-		if err := o.addSecret(ctx, secrets, config.AlertmanagerAccessorSecretName, config.HubInstallNamespace, config.AlertmanagerAccessorSecretName+"-"+clusterName, config.AlertmanagerUWLNamespace); err != nil {
+	if isOCP && opts.UserWorkloads.Metrics.CollectionEnabled {
+		targetNamespace := config.AlertmanagerUWLNamespace
+		if err := o.addSecret(ctx, secrets, config.AlertmanagerAccessorSecretName, config.HubInstallNamespace, config.AlertmanagerAccessorSecretName+"-"+clusterName, targetNamespace); err != nil {
 			return fmt.Errorf("failed to add accessor secret for user workload metrics: %w", err)
 		}
 		caUWL := &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      config.AlertmanagerRouterCASecretName + "-" + clusterName,
-				Namespace: config.AlertmanagerUWLNamespace,
+				Namespace: targetNamespace,
+				Annotations: map[string]string{
+					addoncfg.AnnotationOriginalResource: fmt.Sprintf("%s/%s", routerCANamespace, routerCAName),
+				},
 			},
-			Data: map[string][]byte{"service-ca.crt": routerCASecret.Data["tls.crt"]},
+			Data: map[string][]byte{"service-ca.crt": routerCACert},
 		}
 		*secrets = append(*secrets, caUWL)
 	}
