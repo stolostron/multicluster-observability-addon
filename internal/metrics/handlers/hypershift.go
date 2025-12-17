@@ -16,7 +16,6 @@ import (
 	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
-	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -164,7 +163,6 @@ func (h *Hypershift) generateEtcdServiceMonitor(ctx context.Context, namespace s
 			Scheme:               endpoint.Scheme,
 			Port:                 endpoint.Port,
 			TargetPort:           endpoint.TargetPort,
-			BearerTokenSecret:    &corev1.SecretKeySelector{},
 			TLSConfig:            endpoint.TLSConfig,
 			MetricRelabelConfigs: h.generateMetricsRelabelConfigs(hostedCluster, metrics),
 			RelabelConfigs: []prometheusv1.RelabelConfig{
@@ -214,7 +212,6 @@ func (h *Hypershift) generateApiServerServiceMonitor(ctx context.Context, namesp
 			Scheme:               endpoint.Scheme,
 			Port:                 endpoint.Port,
 			TargetPort:           endpoint.TargetPort,
-			BearerTokenSecret:    &corev1.SecretKeySelector{},
 			TLSConfig:            endpoint.TLSConfig,
 			MetricRelabelConfigs: h.generateMetricsRelabelConfigs(hostedCluster, metrics),
 			RelabelConfigs: []prometheusv1.RelabelConfig{

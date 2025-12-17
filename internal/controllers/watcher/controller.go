@@ -318,9 +318,5 @@ func isHypershiftServiceMonitor(logger logr.Logger, obj client.Object) bool {
 		}
 	}
 
-	if obj.GetName() == mconfig.AcmEtcdServiceMonitorName || obj.GetName() == mconfig.AcmApiServerServiceMonitorName {
-		return true
-	}
-
 	return false
 }
