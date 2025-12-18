@@ -5,11 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/url"
 	"slices"
 	"strings"
 
 	"github.com/go-logr/logr"
+	ocinfrav1 "github.com/openshift/api/config/v1"
 	operatorv1 "github.com/openshift/api/operator/v1"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	cooprometheusv1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1"
@@ -19,7 +19,6 @@ import (
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	corev1 "k8s.io/api/core/v1"
-	ocinfrav1 "github.com/openshift/api/config/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -582,19 +581,6 @@ func (o *OptionsBuilder) addAlertmanagerSecrets(ctx context.Context, secrets *[]
 	}
 
 	return nil
-}
-
-func getClusterName(obsApiURL string) (string, error) {
-	u, err := url.Parse(obsApiURL)
-	if err != nil {
-		return "", err
-	}
-	hostParts := strings.Split(u.Hostname(), ".")
-	if len(hostParts) < 3 {
-		return "", err
-	}
-	clusterName := hostParts[2]
-	return clusterName, nil
 }
 
 // getClusterID is used to get the cluster uid.
