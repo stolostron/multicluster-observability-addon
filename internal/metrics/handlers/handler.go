@@ -19,6 +19,7 @@ import (
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	corev1 "k8s.io/api/core/v1"
+	ocinfrav1 "github.com/openshift/api/config/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -87,12 +88,12 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 		return ret, fmt.Errorf("failed to get configuration resources: %w", err)
 	}
 
-	clusterName, err := getClusterName(opts.Platform.Metrics.HubEndpoint.String())
+	trimmedClusterID, err := getTrimmedClusterID(o.Client)
 	if err != nil {
-		return ret, fmt.Errorf("failed to get clustername from HubEndpoint: %w", err)
+		return ret, fmt.Errorf("failed to get clusterID: %w", err)
 	}
 
-	if err = o.addAlertmanagerSecrets(ctx, &ret.Secrets, clusterName, opts, common.IsOpenShiftVendor(managedCluster)); err != nil {
+	if err = o.addAlertmanagerSecrets(ctx, &ret.Secrets, trimmedClusterID, opts, common.IsOpenShiftVendor(managedCluster)); err != nil {
 		return ret, fmt.Errorf("failed to add alertmanager secrets: %w", err)
 	}
 
@@ -533,7 +534,7 @@ func (o *OptionsBuilder) getRouterCACert(ctx context.Context) ([]byte, string, s
 	return routerCASecret.Data["tls.crt"], routerCASecret.Namespace, routerCASecret.Name, nil
 }
 
-func (o *OptionsBuilder) addAlertmanagerSecrets(ctx context.Context, secrets *[]*corev1.Secret, clusterName string, opts addon.Options, isOCP bool) error {
+func (o *OptionsBuilder) addAlertmanagerSecrets(ctx context.Context, secrets *[]*corev1.Secret, trimmedClusterID string, opts addon.Options, isOCP bool) error {
 	// Get the router CA secret
 	routerCACert, routerCANamespace, routerCAName, err := o.getRouterCACert(ctx)
 	if err != nil {
@@ -546,12 +547,12 @@ func (o *OptionsBuilder) addAlertmanagerSecrets(ctx context.Context, secrets *[]
 		if !isOCP {
 			targetNamespace = "" // This is replaced by the default value in the help template that is the installation namespace
 		}
-		if err := o.addSecret(ctx, secrets, config.AlertmanagerAccessorSecretName, config.HubInstallNamespace, config.AlertmanagerAccessorSecretName+"-"+clusterName, targetNamespace); err != nil {
+		if err := o.addSecret(ctx, secrets, config.AlertmanagerAccessorSecretName, config.HubInstallNamespace, config.AlertmanagerAccessorSecretName+"-"+trimmedClusterID, targetNamespace); err != nil {
 			return fmt.Errorf("failed to add accessor secret for platform metrics: %w", err)
 		}
 		ca := &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      config.AlertmanagerRouterCASecretName + "-" + clusterName,
+				Name:      config.AlertmanagerRouterCASecretName + "-" + trimmedClusterID,
 				Namespace: targetNamespace,
 				Annotations: map[string]string{
 					addoncfg.AnnotationOriginalResource: fmt.Sprintf("%s/%s", routerCANamespace, routerCAName),
@@ -564,12 +565,12 @@ func (o *OptionsBuilder) addAlertmanagerSecrets(ctx context.Context, secrets *[]
 
 	if isOCP && opts.UserWorkloads.Metrics.CollectionEnabled {
 		targetNamespace := config.AlertmanagerUWLNamespace
-		if err := o.addSecret(ctx, secrets, config.AlertmanagerAccessorSecretName, config.HubInstallNamespace, config.AlertmanagerAccessorSecretName+"-"+clusterName, targetNamespace); err != nil {
+		if err := o.addSecret(ctx, secrets, config.AlertmanagerAccessorSecretName, config.HubInstallNamespace, config.AlertmanagerAccessorSecretName+"-"+trimmedClusterID, targetNamespace); err != nil {
 			return fmt.Errorf("failed to add accessor secret for user workload metrics: %w", err)
 		}
 		caUWL := &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      config.AlertmanagerRouterCASecretName + "-" + clusterName,
+				Name:      config.AlertmanagerRouterCASecretName + "-" + trimmedClusterID,
 				Namespace: targetNamespace,
 				Annotations: map[string]string{
 					addoncfg.AnnotationOriginalResource: fmt.Sprintf("%s/%s", routerCANamespace, routerCAName),
@@ -594,4 +595,31 @@ func getClusterName(obsApiURL string) (string, error) {
 	}
 	clusterName := hostParts[2]
 	return clusterName, nil
+}
+
+// getClusterID is used to get the cluster uid.
+func getClusterID(ctx context.Context, c client.Client) (string, error) {
+	clusterVersion := &ocinfrav1.ClusterVersion{}
+	if err := c.Get(ctx, types.NamespacedName{Name: "version"}, clusterVersion); err != nil {
+		return "", fmt.Errorf("failed to get clusterVersion: %w", err)
+	}
+
+	return string(clusterVersion.Spec.ClusterID), nil
+}
+
+func getTrimmedClusterID(c client.Client) (string, error) {
+	id, err := getClusterID(context.TODO(), c)
+	if err != nil {
+		return "", err
+	}
+	// We use this ID later to postfix the follow secrets:
+	// hub-alertmanager-router-ca
+	// observability-alertmanager-accessor
+	//
+	// Since these will be to long to comply with 63 char max length.
+	// we therefore have to truncate the id here to 27 chars.
+	// In order to avoid collisions as much as possible, we also
+	// remove any `-` chars.
+	idTrim := strings.ReplaceAll(id, "-", "")
+	return fmt.Sprintf("%.27s", idTrim), nil
 }
