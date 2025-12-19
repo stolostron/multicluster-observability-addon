@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	configv1 "github.com/openshift/api/config/v1"
 	operatorv1 "github.com/openshift/api/operator/v1"
 	hyperv1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
@@ -344,6 +345,16 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 			}
 			defaultAgentResources = append(defaultAgentResources, cm)
 
+			// add a cluster id
+			clusterVersion := &configv1.ClusterVersion{
+				ObjectMeta: metav1.ObjectMeta{Name: "version"},
+				Spec: configv1.ClusterVersionSpec{
+					ClusterID: configv1.ClusterID("97e51387-3da1-4ae4-89e3-f29bcd42fd42"),
+				},
+			}
+
+			defaultAgentResources = append(defaultAgentResources, clusterVersion)
+
 			// Add user workload resources
 			configReferences := []addonapiv1alpha1.ConfigReference{}
 			for _, obj := range defaultAgentResources {
@@ -529,6 +540,16 @@ func TestHelmBuild_Metrics_HCP(t *testing.T) {
 	for _, obj := range defaultAgentResources {
 		configReferences = append(configReferences, newConfigReference(obj))
 	}
+
+	// add a cluster id
+	clusterVersion := &configv1.ClusterVersion{
+		ObjectMeta: metav1.ObjectMeta{Name: "version"},
+		Spec: configv1.ClusterVersionSpec{
+			ClusterID: configv1.ClusterID("97e51387-3da1-4ae4-89e3-f29bcd42fd42"),
+		},
+	}
+
+	defaultAgentResources = append(defaultAgentResources, clusterVersion)
 
 	clientObjects := []client.Object{}
 	clientObjects = append(clientObjects, defaultAgentResources...)
