@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	configv1 "github.com/openshift/api/config/v1"
 	operatorv1 "github.com/openshift/api/operator/v1"
 	hyperv1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
@@ -284,6 +285,12 @@ func TestBuildOptions(t *testing.T) {
 				},
 				Data: map[string][]byte{
 					"ca.crt": []byte("test-ca"),
+				},
+			},
+			&configv1.ClusterVersion{
+				ObjectMeta: metav1.ObjectMeta{Name: "version"},
+				Spec: configv1.ClusterVersionSpec{
+					ClusterID: configv1.ClusterID("97e51387-3da1-4ae4-89e3-f29bcd42fd42"),
 				},
 			},
 		}
