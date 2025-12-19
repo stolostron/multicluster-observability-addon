@@ -87,7 +87,7 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 		return ret, fmt.Errorf("failed to get configuration resources: %w", err)
 	}
 
-	trimmedClusterID, err := getTrimmedClusterID(o.Client)
+	trimmedClusterID, err := getTrimmedClusterID(ctx, o.Client)
 	if err != nil {
 		return ret, fmt.Errorf("failed to get clusterID: %w", err)
 	}
@@ -593,8 +593,8 @@ func getClusterID(ctx context.Context, c client.Client) (string, error) {
 	return string(clusterVersion.Spec.ClusterID), nil
 }
 
-func getTrimmedClusterID(c client.Client) (string, error) {
-	id, err := getClusterID(context.TODO(), c)
+func getTrimmedClusterID(ctx context.Context, c client.Client) (string, error) {
+	id, err := getClusterID(ctx, c)
 	if err != nil {
 		return "", err
 	}
