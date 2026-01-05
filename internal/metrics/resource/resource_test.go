@@ -125,13 +125,35 @@ func TestReconcileAgent(t *testing.T) {
 	// merge type patch that has no unwanted effect for this unit test.
 	patchCalls := 0
 	fakeClient := fake.NewClientBuilder().WithInterceptorFuncs(interceptor.Funcs{
+		Get: func(ctx context.Context, clientww client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+			err := clientww.Get(ctx, key, obj, opts...)
+			if err != nil {
+				return err
+			}
+			if pa, ok := obj.(*cooprometheusv1alpha1.PrometheusAgent); ok {
+				if pa.GroupVersionKind().Kind == "" {
+					pa.SetGroupVersionKind(cooprometheusv1alpha1.SchemeGroupVersion.WithKind(cooprometheusv1alpha1.PrometheusAgentsKind))
+				}
+			}
+			return nil
+		},
+		List: func(ctx context.Context, clientww client.WithWatch, obj client.ObjectList, opts ...client.ListOption) error {
+			err := clientww.List(ctx, obj, opts...)
+			if err != nil {
+				return err
+			}
+			if paList, ok := obj.(*cooprometheusv1alpha1.PrometheusAgentList); ok {
+				for i := range paList.Items {
+					if paList.Items[i].GroupVersionKind().Kind == "" {
+						paList.Items[i].SetGroupVersionKind(cooprometheusv1alpha1.SchemeGroupVersion.WithKind(cooprometheusv1alpha1.PrometheusAgentsKind))
+					}
+				}
+			}
+			return nil
+		},
 		Patch: func(ctx context.Context, clientww client.WithWatch, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
 			patchCalls++
-
-			// Preserve TypeMeta before patch operation
 			var originalTypeMeta metav1.TypeMeta
-
-			// Set obj type if missing using type assertions
 			if pa, ok := obj.(*cooprometheusv1alpha1.PrometheusAgent); ok {
 				originalTypeMeta = pa.TypeMeta
 				if pa.GroupVersionKind().Kind == "" {
@@ -162,7 +184,6 @@ func TestReconcileAgent(t *testing.T) {
 
 			err := clientww.Patch(ctx, obj, client.Merge, filteredOpts...)
 
-			// Restore TypeMeta after patch operation
 			if err == nil && originalTypeMeta.Kind != "" {
 				if pa, ok := obj.(*cooprometheusv1alpha1.PrometheusAgent); ok {
 					pa.TypeMeta = originalTypeMeta
@@ -473,11 +494,21 @@ func TestReconcile(t *testing.T) {
 			}
 			initObjs := append(tc.initObjs, cmao)
 			fakeClient := fake.NewClientBuilder().WithInterceptorFuncs(interceptor.Funcs{
+				Get: func(ctx context.Context, clientww client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+					err := clientww.Get(ctx, key, obj, opts...)
+					if err != nil {
+						return err
+					}
+					if pa, ok := obj.(*cooprometheusv1alpha1.PrometheusAgent); ok {
+						if pa.GroupVersionKind().Kind == "" {
+							pa.SetGroupVersionKind(cooprometheusv1alpha1.SchemeGroupVersion.WithKind(cooprometheusv1alpha1.PrometheusAgentsKind))
+						}
+					}
+					return nil
+				},
 				Patch: func(ctx context.Context, clientww client.WithWatch, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
-					// Preserve TypeMeta before patch operation
 					var originalTypeMeta metav1.TypeMeta
 
-					// Set obj type if missing using type assertions
 					switch o := obj.(type) {
 					case *cooprometheusv1alpha1.PrometheusAgent:
 						originalTypeMeta = o.TypeMeta
@@ -496,7 +527,6 @@ func TestReconcile(t *testing.T) {
 						}
 					}
 
-					// Filter out SSA-specific options that are incompatible with merge patches
 					var filteredOpts []client.PatchOption
 					for _, opt := range opts {
 						optStr := fmt.Sprintf("%T", opt)
@@ -508,7 +538,6 @@ func TestReconcile(t *testing.T) {
 
 					err := clientww.Patch(ctx, obj, client.Merge, filteredOpts...)
 
-					// Restore TypeMeta after patch operation
 					if err == nil {
 						switch o := obj.(type) {
 						case *cooprometheusv1alpha1.PrometheusAgent:
@@ -528,7 +557,6 @@ func TestReconcile(t *testing.T) {
 						return err
 					}
 
-					// Set obj type if missing using type assertions
 					switch list := obj.(type) {
 					case *cooprometheusv1alpha1.PrometheusAgentList:
 						for i := range list.Items {

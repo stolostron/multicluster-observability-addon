@@ -84,6 +84,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				// ensure the agent is created
 				agent := common.FilterResourcesByLabelSelector[*cooprometheusv1alpha1.PrometheusAgent](objects, config.PlatformPrometheusMatchLabels)
 				assert.Len(t, agent, 1)
+
 				assert.Equal(t, config.PlatformMetricsCollectorApp, agent[0].GetName())
 				assert.NotEmpty(t, agent[0].Spec.CommonPrometheusFields.RemoteWrite[0].URL)
 				assert.Contains(t, agent[0].Spec.ConfigMaps, "my-configmap")
@@ -302,6 +303,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 	assert.NoError(t, addonapiv1alpha1.AddToScheme(scheme))
 	assert.NoError(t, workv1.AddToScheme(scheme))
 	assert.NoError(t, operatorv1.AddToScheme(scheme))
+	assert.NoError(t, hyperv1.AddToScheme(scheme))
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
@@ -453,11 +455,30 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 			// Setup the fake k8s client
 			client := fakeclient.NewClientBuilder().
 				WithInterceptorFuncs(interceptor.Funcs{
+					Get: func(ctx context.Context, clientww client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+						err := clientww.Get(ctx, key, obj, opts...)
+						if err != nil {
+							return err
+						}
+						// Ensure GVK is set for PrometheusAgent objects during Get operations
+						if pa, ok := obj.(*cooprometheusv1alpha1.PrometheusAgent); ok {
+							if pa.GroupVersionKind().Kind == "" {
+								pa.SetGroupVersionKind(cooprometheusv1alpha1.SchemeGroupVersion.WithKind(cooprometheusv1alpha1.PrometheusAgentsKind))
+							}
+						}
+						return nil
+					},
+					Update: func(ctx context.Context, clientww client.WithWatch, obj client.Object, opts ...client.UpdateOption) error {
+						// Set GVK for PrometheusAgent objects during Update operations
+						if pa, ok := obj.(*cooprometheusv1alpha1.PrometheusAgent); ok {
+							if pa.GroupVersionKind().Kind == "" {
+								pa.SetGroupVersionKind(cooprometheusv1alpha1.SchemeGroupVersion.WithKind(cooprometheusv1alpha1.PrometheusAgentsKind))
+							}
+						}
+						return clientww.Update(ctx, obj, opts...)
+					},
 					Patch: func(ctx context.Context, clientww client.WithWatch, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
-						// Preserve TypeMeta before patch operation
 						var originalTypeMeta metav1.TypeMeta
-
-						// Set obj type if missing using type assertions
 						if pa, ok := obj.(*cooprometheusv1alpha1.PrometheusAgent); ok {
 							originalTypeMeta = pa.TypeMeta
 							if pa.GroupVersionKind().Kind == "" {
@@ -471,14 +492,13 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 							// Skip SSA-specific options by checking their string representation
 							optStr := fmt.Sprintf("%T", opt)
 							if strings.Contains(optStr, "forceOwnership") || strings.Contains(optStr, "FieldOwner") {
-								continue // Skip SSA-specific options
+								continue
 							}
 							filteredOpts = append(filteredOpts, opt) // Keep all other options
 						}
 
 						err := clientww.Patch(ctx, obj, client.Merge, filteredOpts...)
 
-						// Restore TypeMeta after patch operation
 						if err == nil && originalTypeMeta.Kind != "" {
 							if pa, ok := obj.(*cooprometheusv1alpha1.PrometheusAgent); ok {
 								pa.TypeMeta = originalTypeMeta
@@ -492,7 +512,6 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 						if err != nil {
 							return err
 						}
-						// Ensure GVK is set for PrometheusAgent objects in lists
 						if paList, ok := obj.(*cooprometheusv1alpha1.PrometheusAgentList); ok {
 							for i := range paList.Items {
 								if paList.Items[i].GroupVersionKind().Kind == "" {
@@ -538,7 +557,12 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			configReferences = append(configReferences, newConfigReference(&promAgents.Items[0]), newConfigReference(&promAgents.Items[1]))
+			// Get updated agents for config references (they have proper GVK after update)
+			updatedPromAgents := cooprometheusv1alpha1.PrometheusAgentList{}
+			err = client.List(context.Background(), &updatedPromAgents)
+			require.NoError(t, err)
+
+			configReferences = append(configReferences, newConfigReference(&updatedPromAgents.Items[0]), newConfigReference(&updatedPromAgents.Items[1]))
 
 			// Register the addon for the managed cluster
 			managedClusterAddOn := addontesting.NewAddon("test", "cluster-1")
@@ -802,11 +826,20 @@ func TestHelmBuild_Metrics_HCP(t *testing.T) {
 	// Setup the fake k8s client
 	client := fakeclient.NewClientBuilder().
 		WithInterceptorFuncs(interceptor.Funcs{
+			Get: func(ctx context.Context, clientww client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+				err := clientww.Get(ctx, key, obj, opts...)
+				if err != nil {
+					return err
+				}
+				if pa, ok := obj.(*cooprometheusv1alpha1.PrometheusAgent); ok {
+					if pa.GroupVersionKind().Kind == "" {
+						pa.SetGroupVersionKind(cooprometheusv1alpha1.SchemeGroupVersion.WithKind(cooprometheusv1alpha1.PrometheusAgentsKind))
+					}
+				}
+				return nil
+			},
 			Patch: func(ctx context.Context, clientww client.WithWatch, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
-				// Preserve TypeMeta before patch operation
 				var originalTypeMeta metav1.TypeMeta
-
-				// Set obj type if missing using type assertions
 				if pa, ok := obj.(*cooprometheusv1alpha1.PrometheusAgent); ok {
 					originalTypeMeta = pa.TypeMeta
 					if pa.GroupVersionKind().Kind == "" {
@@ -826,7 +859,6 @@ func TestHelmBuild_Metrics_HCP(t *testing.T) {
 
 				err := clientww.Patch(ctx, obj, client.Merge, filteredOpts...)
 
-				// Restore TypeMeta after patch operation
 				if err == nil && originalTypeMeta.Kind != "" {
 					if pa, ok := obj.(*cooprometheusv1alpha1.PrometheusAgent); ok {
 						pa.TypeMeta = originalTypeMeta

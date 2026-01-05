@@ -28,7 +28,6 @@ require (
 )
 
 require (
-	github.com/openshift/api v0.0.0-20250704153732-ad766c4e6d8e
 	github.com/perses/community-mixins v0.0.0-20251027163913-1d0e405f5169
 	github.com/perses/perses v0.53.0-beta.0
 	github.com/perses/perses-operator v0.2.0
@@ -106,6 +105,7 @@ require (
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/mwitkow/go-conntrack v0.0.0-20190716064945-2f068394615f // indirect
 	github.com/nexucis/lamenv v0.5.2 // indirect
+	github.com/openshift/api v0.0.0-20250704153732-ad766c4e6d8e
 	github.com/perses/common v0.28.0 // indirect; indirect // indirect
 	github.com/perses/plugins/gaugechart v0.10.0 // indirect
 	github.com/perses/plugins/markdown v0.10.0 // indirect
