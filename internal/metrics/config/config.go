@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/go-logr/logr"
 	hyperv1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
@@ -137,4 +138,25 @@ func HasHostedCLusters(ctx context.Context, c client.Client, logger logr.Logger)
 	}
 
 	return len(hostedClusters.Items) != 0
+}
+
+func GetTrimmedClusterID(clusterID string) string {
+	// We use this ID later to postfix the follow secrets:
+	// hub-alertmanager-router-ca
+	// observability-alertmanager-accessor
+	//
+	// when prom-opreator mounts these secrets to the prometheus-k8s pod
+	// it will take the name of the secret, and prepend `secret-` to the
+	// volume mount name. However since this is volume mount name is a label
+	// that must be at most 63 chars. Therefore we trim it here to 19 chars.
+	idTrim := strings.ReplaceAll(clusterID, "-", "")
+	return fmt.Sprintf("%.19s", idTrim)
+}
+
+func GetAlertmanagerRouterCASecretName(trimmedClusterID string) string {
+	return fmt.Sprintf("%s-%s", AlertmanagerRouterCASecretName, trimmedClusterID)
+}
+
+func GetAlertmanagerAccessorSecretName(trimmedClusterID string) string {
+	return fmt.Sprintf("%s-%s", AlertmanagerAccessorSecretName, trimmedClusterID)
 }

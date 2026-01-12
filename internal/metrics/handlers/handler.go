@@ -546,12 +546,12 @@ func (o *OptionsBuilder) addAlertmanagerSecrets(ctx context.Context, secrets *[]
 		if !isOCP {
 			targetNamespace = "" // This is replaced by the default value in the help template that is the installation namespace
 		}
-		if err := o.addSecret(ctx, secrets, config.AlertmanagerAccessorSecretName, config.HubInstallNamespace, config.AlertmanagerAccessorSecretName+"-"+trimmedClusterID, targetNamespace); err != nil {
+		if err := o.addSecret(ctx, secrets, config.AlertmanagerAccessorSecretName, config.HubInstallNamespace, config.GetAlertmanagerAccessorSecretName(trimmedClusterID), targetNamespace); err != nil {
 			return fmt.Errorf("failed to add accessor secret for platform metrics: %w", err)
 		}
 		ca := &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      config.AlertmanagerRouterCASecretName + "-" + trimmedClusterID,
+				Name:      config.GetAlertmanagerRouterCASecretName(trimmedClusterID),
 				Namespace: targetNamespace,
 				Annotations: map[string]string{
 					addoncfg.AnnotationOriginalResource: fmt.Sprintf("%s/%s", routerCANamespace, routerCAName),
@@ -564,12 +564,12 @@ func (o *OptionsBuilder) addAlertmanagerSecrets(ctx context.Context, secrets *[]
 
 	if isOCP && opts.UserWorkloads.Metrics.CollectionEnabled {
 		targetNamespace := config.AlertmanagerUWLNamespace
-		if err := o.addSecret(ctx, secrets, config.AlertmanagerAccessorSecretName, config.HubInstallNamespace, config.AlertmanagerAccessorSecretName+"-"+trimmedClusterID, targetNamespace); err != nil {
+		if err := o.addSecret(ctx, secrets, config.AlertmanagerAccessorSecretName, config.HubInstallNamespace, config.GetAlertmanagerAccessorSecretName(trimmedClusterID), targetNamespace); err != nil {
 			return fmt.Errorf("failed to add accessor secret for user workload metrics: %w", err)
 		}
 		caUWL := &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      config.AlertmanagerRouterCASecretName + "-" + trimmedClusterID,
+				Name:      config.GetAlertmanagerRouterCASecretName(trimmedClusterID),
 				Namespace: targetNamespace,
 				Annotations: map[string]string{
 					addoncfg.AnnotationOriginalResource: fmt.Sprintf("%s/%s", routerCANamespace, routerCAName),
@@ -598,14 +598,5 @@ func getTrimmedClusterID(ctx context.Context, c client.Client) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	// We use this ID later to postfix the follow secrets:
-	// hub-alertmanager-router-ca
-	// observability-alertmanager-accessor
-	//
-	// when prom-opreator mounts these secrets to the prometheus-k8s pod
-	// it will take the name of the secret, and prepend `secret-` to the
-	// volume mount name. However since this is volume mount name is a label
-	// that must be at most 63 chars. Therefore we trim it here to 19 chars.
-	idTrim := strings.ReplaceAll(id, "-", "")
-	return fmt.Sprintf("%.19s", idTrim), nil
+	return config.GetTrimmedClusterID(id), nil
 }

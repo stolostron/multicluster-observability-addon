@@ -22,8 +22,8 @@ spec:
   {{- end }}
   serviceAccountName: {{ .Values.prometheusServerName }}
   secrets:
-    - hub-alertmanager-router-ca
-    - observability-alertmanager-accessor
+    - {{ .Values.alertmanagerRouterCASecretName }}
+    - {{ .Values.alertmanagerAccessorSecretName }}
   serviceMonitorSelector: {}
   resources:
     requests:
