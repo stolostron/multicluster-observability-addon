@@ -33,5 +33,16 @@ func IsHubCluster(cluster *clusterv1.ManagedCluster) bool {
 }
 
 func IsOpenShiftVendor(cluster *clusterv1.ManagedCluster) bool {
-	return cluster.Labels[clusterinfov1beta1.LabelKubeVendor] == string(clusterinfov1beta1.KubeVendorOpenShift)
+	if cluster.Labels[clusterinfov1beta1.LabelKubeVendor] == string(clusterinfov1beta1.KubeVendorOpenShift) {
+		return true
+	}
+
+	if _, ok := cluster.Labels[clusterinfov1beta1.OCPVersion]; ok {
+		return true
+	}
+
+	idx := slices.IndexFunc(cluster.Status.ClusterClaims, func(c clusterv1.ManagedClusterClaim) bool {
+		return c.Name == "id.openshift.io"
+	})
+	return idx != -1
 }
