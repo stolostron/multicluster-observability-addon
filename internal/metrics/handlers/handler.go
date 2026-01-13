@@ -87,12 +87,13 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 		return ret, fmt.Errorf("failed to get configuration resources: %w", err)
 	}
 
-	trimmedClusterID, err := getTrimmedClusterID(ctx, o.Client)
+	hubId, err := getClusterID(ctx, o.Client)
 	if err != nil {
-		return ret, fmt.Errorf("failed to get clusterID: %w", err)
+		return ret, fmt.Errorf("failed to get the hub cluster id: %w", err)
 	}
+	ret.HubClusterID = hubId
 
-	if err = o.addAlertmanagerSecrets(ctx, &ret.Secrets, trimmedClusterID, opts, common.IsOpenShiftVendor(managedCluster)); err != nil {
+	if err = o.addAlertmanagerSecrets(ctx, &ret.Secrets, config.GetTrimmedClusterID(hubId), opts, common.IsOpenShiftVendor(managedCluster)); err != nil {
 		return ret, fmt.Errorf("failed to add alertmanager secrets: %w", err)
 	}
 
@@ -591,12 +592,4 @@ func getClusterID(ctx context.Context, c client.Client) (string, error) {
 	}
 
 	return string(clusterVersion.Spec.ClusterID), nil
-}
-
-func getTrimmedClusterID(ctx context.Context, c client.Client) (string, error) {
-	id, err := getClusterID(ctx, c)
-	if err != nil {
-		return "", err
-	}
-	return config.GetTrimmedClusterID(id), nil
 }

@@ -67,8 +67,8 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 		PrometheusControllerID:         config.PrometheusControllerID,
 		PrometheusCAConfigMapName:      config.PrometheusCAConfigMapName,
 		PrometheusServerName:           config.PrometheusServerName,
-		AlertmanagerRouterCASecretName: config.GetAlertmanagerRouterCASecretName(config.GetTrimmedClusterID(opts.ClusterID)),
-		AlertmanagerAccessorSecretName: config.GetAlertmanagerAccessorSecretName(config.GetTrimmedClusterID(opts.ClusterID)),
+		AlertmanagerRouterCASecretName: config.GetAlertmanagerRouterCASecretName(config.GetTrimmedClusterID(opts.HubClusterID)),
+		AlertmanagerAccessorSecretName: config.GetAlertmanagerAccessorSecretName(config.GetTrimmedClusterID(opts.HubClusterID)),
 		Platform: Collector{
 			AppName:            config.PlatformMetricsCollectorApp,
 			RBACProxyTLSSecret: config.PlatformRBACProxyTLSSecret,

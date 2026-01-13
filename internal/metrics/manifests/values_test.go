@@ -193,6 +193,16 @@ func TestBuildValues(t *testing.T) {
 				assert.Equal(t, "true", values.PrometheusOperatorAnnotations)
 			},
 		},
+		"with hub cluster id": {
+			Options: handlers.Options{
+				HubClusterID: "12345-67890-abcdef",
+			},
+			Expect: func(t *testing.T, values *manifests.MetricsValues) {
+				trimmedID := config.GetTrimmedClusterID("12345-67890-abcdef")
+				assert.Equal(t, config.GetAlertmanagerRouterCASecretName(trimmedID), values.AlertmanagerRouterCASecretName)
+				assert.Equal(t, config.GetAlertmanagerAccessorSecretName(trimmedID), values.AlertmanagerAccessorSecretName)
+			},
+		},
 	}
 
 	for name, tc := range testCases {
