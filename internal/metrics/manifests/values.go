@@ -15,22 +15,24 @@ import (
 )
 
 type MetricsValues struct {
-	PlatformEnabled               bool                `json:"platformEnabled"`
-	UserWorkloadsEnabled          bool                `json:"userWorkloadsEnabled"`
-	Secrets                       []ConfigValue       `json:"secrets"`
-	ConfigMaps                    []ConfigValue       `json:"configMaps"`
-	Images                        ImagesValues        `json:"images"`
-	PrometheusControllerID        string              `json:"prometheusControllerID"`
-	PrometheusCAConfigMapName     string              `json:"prometheusCAConfigMapName"`
-	PrometheusServerName          string              `json:"prometheusServerName"`
-	Platform                      Collector           `json:"platform"`
-	UserWorkload                  Collector           `json:"userWorkload"`
-	DeployNonOCPStack             bool                `json:"deployNonOCPStack"`
-	DeployCOOResources            bool                `json:"deployCOOResources"`
-	PrometheusOperatorAnnotations string              `json:"prometheusOperatorAnnotations,omitempty"`
-	AlertManagerEndpoint          string              `json:"alertManagerEndpoint,omitempty"`
-	Tolerations                   []corev1.Toleration `json:"tolerations"`
-	NodeSelector                  map[string]string   `json:"nodeSelector"`
+	PlatformEnabled                bool                `json:"platformEnabled"`
+	UserWorkloadsEnabled           bool                `json:"userWorkloadsEnabled"`
+	Secrets                        []ConfigValue       `json:"secrets"`
+	ConfigMaps                     []ConfigValue       `json:"configMaps"`
+	Images                         ImagesValues        `json:"images"`
+	PrometheusControllerID         string              `json:"prometheusControllerID"`
+	PrometheusCAConfigMapName      string              `json:"prometheusCAConfigMapName"`
+	PrometheusServerName           string              `json:"prometheusServerName"`
+	AlertmanagerRouterCASecretName string              `json:"alertmanagerRouterCASecretName"`
+	AlertmanagerAccessorSecretName string              `json:"alertmanagerAccessorSecretName"`
+	Platform                       Collector           `json:"platform"`
+	UserWorkload                   Collector           `json:"userWorkload"`
+	DeployNonOCPStack              bool                `json:"deployNonOCPStack"`
+	DeployCOOResources             bool                `json:"deployCOOResources"`
+	PrometheusOperatorAnnotations  string              `json:"prometheusOperatorAnnotations,omitempty"`
+	AlertManagerEndpoint           string              `json:"alertManagerEndpoint,omitempty"`
+	Tolerations                    []corev1.Toleration `json:"tolerations"`
+	NodeSelector                   map[string]string   `json:"nodeSelector"`
 }
 
 type Collector struct {
@@ -62,9 +64,11 @@ type ConfigValue struct {
 
 func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 	ret := &MetricsValues{
-		PrometheusControllerID:    config.PrometheusControllerID,
-		PrometheusCAConfigMapName: config.PrometheusCAConfigMapName,
-		PrometheusServerName:      config.PrometheusServerName,
+		PrometheusControllerID:         config.PrometheusControllerID,
+		PrometheusCAConfigMapName:      config.PrometheusCAConfigMapName,
+		PrometheusServerName:           config.PrometheusServerName,
+		AlertmanagerRouterCASecretName: config.GetAlertmanagerRouterCASecretName(config.GetTrimmedClusterID(opts.HubClusterID)),
+		AlertmanagerAccessorSecretName: config.GetAlertmanagerAccessorSecretName(config.GetTrimmedClusterID(opts.HubClusterID)),
 		Platform: Collector{
 			AppName:            config.PlatformMetricsCollectorApp,
 			RBACProxyTLSSecret: config.PlatformRBACProxyTLSSecret,

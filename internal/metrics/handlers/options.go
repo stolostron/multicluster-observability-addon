@@ -15,6 +15,7 @@ type Options struct {
 	ConfigMaps           []*corev1.ConfigMap
 	AlertManagerEndpoint string
 	ClusterName          string
+	HubClusterID         string
 	ClusterID            string
 	ClusterVendor        string
 	InstallNamespace     string

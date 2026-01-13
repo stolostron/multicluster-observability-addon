@@ -51,6 +51,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 )
 
+const (
+	testClusterID = "97e51387-3da1-4ae4-89e3-f29bcd42fd42"
+)
+
 func TestHelmBuild_Metrics_All(t *testing.T) {
 	hubNamespace := "open-cluster-management-observability"
 
@@ -254,6 +258,13 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				}
 				assert.False(t, sidecarFound, "kube-rbac-proxy sidecar should not be present")
 
+				// Ensure the Prometheus resource has the correct secrets
+				proms := common.FilterResourcesByLabelSelector[*cooprometheusv1.Prometheus](objects, nil)
+				assert.Len(t, proms, 1)
+				trimmedID := config.GetTrimmedClusterID(testClusterID)
+				assert.Contains(t, proms[0].Spec.Secrets, config.GetAlertmanagerRouterCASecretName(trimmedID))
+				assert.Contains(t, proms[0].Spec.Secrets, config.GetAlertmanagerAccessorSecretName(trimmedID))
+
 				// ensure that the number of objects is correct
 				expectedCount := 70
 				if len(objects) != expectedCount {
@@ -349,7 +360,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 			clusterVersion := &configv1.ClusterVersion{
 				ObjectMeta: metav1.ObjectMeta{Name: "version"},
 				Spec: configv1.ClusterVersionSpec{
-					ClusterID: configv1.ClusterID("97e51387-3da1-4ae4-89e3-f29bcd42fd42"),
+					ClusterID: configv1.ClusterID(testClusterID),
 				},
 			}
 
@@ -403,7 +414,9 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 
 			// Setup a managed cluster
 			managedCluster := addontesting.NewManagedCluster("cluster-1")
-			managedCluster.Labels = map[string]string{}
+			managedCluster.Labels = map[string]string{
+				addoncfg.ManagedClusterLabelClusterID: testClusterID,
+			}
 			if tc.IsOCP {
 				managedCluster.Labels[clusterinfov1beta1.LabelKubeVendor] = string(clusterinfov1beta1.KubeVendorOpenShift)
 			}
@@ -545,7 +558,7 @@ func TestHelmBuild_Metrics_HCP(t *testing.T) {
 	clusterVersion := &configv1.ClusterVersion{
 		ObjectMeta: metav1.ObjectMeta{Name: "version"},
 		Spec: configv1.ClusterVersionSpec{
-			ClusterID: configv1.ClusterID("97e51387-3da1-4ae4-89e3-f29bcd42fd42"),
+			ClusterID: configv1.ClusterID(testClusterID),
 		},
 	}
 
@@ -698,9 +711,10 @@ func TestHelmBuild_Metrics_HCP(t *testing.T) {
 	// Setup a the local cluster as managed cluster
 	managedCluster := addontesting.NewManagedCluster("cluster-1")
 	managedCluster.Labels = map[string]string{
-		config.LocalManagedClusterLabel:    "true",
-		config.HypershiftAddonStateLabel:   "available",
-		clusterinfov1beta1.LabelKubeVendor: string(clusterinfov1beta1.KubeVendorOpenShift),
+		addoncfg.ManagedClusterLabelClusterID: testClusterID,
+		config.LocalManagedClusterLabel:       "true",
+		config.HypershiftAddonStateLabel:      "available",
+		clusterinfov1beta1.LabelKubeVendor:    string(clusterinfov1beta1.KubeVendorOpenShift),
 	}
 	clientObjects = append(clientObjects, managedCluster)
 
