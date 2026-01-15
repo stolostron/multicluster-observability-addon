@@ -84,8 +84,7 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 		Tolerations:          opts.Tolerations,
 	}
 
-	isOCPCluster := opts.IsOCPCluster()
-	if isOCPCluster {
+	if opts.IsOpenShiftVendor {
 		configureAgentForOCP(opts.Platform.PrometheusAgent)
 		configureAgentForOCP(opts.UserWorkloads.PrometheusAgent)
 	} else {
@@ -124,7 +123,7 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 		target := config.ScrapeClassPlatformTarget
 		scheme := "HTTPS"
 		scrapeClassName := config.ScrapeClassCfgName
-		if !isOCPCluster {
+		if !opts.IsOpenShiftVendor {
 			target = fmt.Sprintf("%s.%s.svc:9091", config.PrometheusServerName, opts.InstallNamespace)
 			scrapeClassName = config.NonOCPScrapeClassName
 			scrapeConfig.Spec.TLSConfig = &cooprometheusv1.SafeTLSConfig{
@@ -155,7 +154,7 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 	}
 
 	for _, scrapeConfig := range opts.UserWorkloads.ScrapeConfigs {
-		if len(scrapeConfig.Spec.StaticConfigs) == 0 && isOCPCluster {
+		if len(scrapeConfig.Spec.StaticConfigs) == 0 && opts.IsOpenShiftVendor {
 			scrapeConfig.Spec.ScrapeClassName = ptr.To(config.ScrapeClassCfgName)
 			scrapeConfig.Spec.Scheme = ptr.To("HTTPS")
 			scrapeConfig.Spec.StaticConfigs = []cooprometheusv1alpha1.StaticConfig{
@@ -240,7 +239,7 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 
 	ret.PlatformEnabled = opts.IsPlatformEnabled()
 	ret.UserWorkloadsEnabled = opts.IsUserWorkloadsEnabled()
-	ret.DeployNonOCPStack = !isOCPCluster && (ret.PlatformEnabled || ret.UserWorkloadsEnabled)
+	ret.DeployNonOCPStack = !opts.IsOpenShiftVendor && (ret.PlatformEnabled || ret.UserWorkloadsEnabled)
 	ret.DeployCOOResources = (ret.PlatformEnabled || ret.UserWorkloadsEnabled) && !opts.COOIsSubscribed
 	ret.PrometheusOperatorAnnotations = opts.CRDEstablishedAnnotation
 

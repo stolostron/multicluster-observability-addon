@@ -63,14 +63,14 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 	ret.ClusterName = managedCluster.Name
 	ret.ClusterID = common.GetManagedClusterID(managedCluster)
 	ret.AlertManagerEndpoint = opts.Platform.Metrics.AlertManagerEndpoint.Host // Just the host othrewise, pronetheus raises error if the scheme is included
-	ret.ClusterVendor = managedCluster.Labels[config.ManagedClusterLabelVendorKey]
-	// For e2e testing non OCP cases more easily, we use a special annotation to override the cluster vendor
-	vendorOverride := mcAddon.Annotations[addoncfg.VendorOverrideAnnotationKey]
-	if vendorOverride != "" {
-		o.Logger.V(1).Info("Vendor for the managed cluster is overridden.", "managedcluster", managedCluster.Name, "vendor", vendorOverride)
-		ret.ClusterVendor = vendorOverride
+	isOpenShiftVendor := common.IsOpenShiftVendor(managedCluster)
+	ret.IsOpenShiftVendor = isOpenShiftVendor
+
+	if fakeVendor := common.VendorIsOverridden(managedCluster); fakeVendor != "" {
+		o.Logger.V(2).Info("Vendor for the managed cluster is overridden. This annotation is for testing prupose only", "managedcluster", managedCluster.Name, "newVendor", fakeVendor)
 	}
-	if ret.AlertManagerEndpoint == "" && !ret.IsOCPCluster() {
+
+	if ret.AlertManagerEndpoint == "" && !isOpenShiftVendor {
 		o.Logger.Info("Alert forwarding is not configured for non OCP cluster as the AlertManager domain is not set in the addOnDeploymentConfig", "managedcluster", managedCluster.Name)
 	}
 
@@ -93,7 +93,7 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 	}
 	ret.HubClusterID = hubId
 
-	if err = o.addAlertmanagerSecrets(ctx, &ret.Secrets, config.GetTrimmedClusterID(hubId), opts, common.IsOpenShiftVendor(managedCluster)); err != nil {
+	if err = o.addAlertmanagerSecrets(ctx, &ret.Secrets, config.GetTrimmedClusterID(hubId), opts, isOpenShiftVendor); err != nil {
 		return ret, fmt.Errorf("failed to add alertmanager secrets: %w", err)
 	}
 
@@ -117,7 +117,7 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 	// Check both if hypershift is enabled and has hosted clusters to limit noisy logs when uwl monitoring is disabled while there is no hostedCluster
 	isHypershiftCluster := IsHypershiftEnabled(managedCluster) && HasHostedCLusters(ctx, o.Client, o.Logger)
 
-	if common.IsOpenShiftVendor(managedCluster) && opts.UserWorkloads.Metrics.CollectionEnabled {
+	if isOpenShiftVendor && opts.UserWorkloads.Metrics.CollectionEnabled {
 		if err = o.buildPrometheusAgent(ctx, &ret, configResources, config.UserWorkloadMetricsCollectorApp, isHypershiftCluster); err != nil {
 			return ret, err
 		}
@@ -143,7 +143,7 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 		}
 	}
 
-	if common.IsOpenShiftVendor(managedCluster) {
+	if isOpenShiftVendor {
 		if ret.COOIsSubscribed, err = o.cooIsSubscribed(ctx, managedCluster); err != nil {
 			return ret, fmt.Errorf("failed to check if coo is subscribed on the managed cluster: %w", err)
 		}
