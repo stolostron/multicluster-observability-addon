@@ -167,7 +167,7 @@ func TestBuildValues(t *testing.T) {
 				Platform: handlers.Collector{
 					PrometheusAgent: &cooprometheusv1alpha1.PrometheusAgent{},
 				},
-				ClusterVendor: "Other",
+				IsOpenShiftVendor: false,
 			},
 			Expect: func(t *testing.T, values *manifests.MetricsValues) {
 				assert.True(t, values.DeployNonOCPStack)
