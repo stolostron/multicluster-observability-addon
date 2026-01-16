@@ -51,8 +51,3 @@ func (o *Options) IsPlatformEnabled() bool {
 func (o *Options) IsUserWorkloadsEnabled() bool {
 	return o.UserWorkloads.PrometheusAgent != nil
 }
-
-// IsOCPCluster checks if the cluster vendor is OCP.
-// func (o *Options) IsOCPCluster() bool {
-// 	return o.ClusterVendor == mconfig.ManagedClusterLabelVendorOCPValue
-// }
