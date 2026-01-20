@@ -17,7 +17,7 @@ type Options struct {
 	ClusterName          string
 	HubClusterID         string
 	ClusterID            string
-	ClusterVendor        string
+	IsOpenShiftVendor    bool
 	InstallNamespace     string
 	Images               mconfig.ImageOverrides
 	IsHub                bool
@@ -50,9 +50,4 @@ func (o *Options) IsPlatformEnabled() bool {
 // IsUserWorkloadsEnabled checks if user workload monitoring is configured.
 func (o *Options) IsUserWorkloadsEnabled() bool {
 	return o.UserWorkloads.PrometheusAgent != nil
-}
-
-// IsOCPCluster checks if the cluster vendor is OCP.
-func (o *Options) IsOCPCluster() bool {
-	return o.ClusterVendor == mconfig.ManagedClusterLabelVendorOCPValue
 }
