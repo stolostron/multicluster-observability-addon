@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -53,6 +54,7 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 		InstallNamespace: opts.InstallNamespace,
 		NodeSelector:     opts.NodeSelector,
 		Tolerations:      opts.Tolerations,
+		ResourceReqs:     opts.ResourceReqs,
 		ProxyConfig:      opts.ProxyConfig,
 	}
 
@@ -251,6 +253,18 @@ func (o *OptionsBuilder) buildPrometheusAgent(ctx context.Context, opts *Options
 	// Apply addonDeploymentConfig settings
 	agent.Spec.Tolerations = opts.Tolerations
 	agent.Spec.NodeSelector = opts.NodeSelector
+
+	for _, resReq := range opts.ResourceReqs {
+		re, err := regexp.Compile(resReq.ContainerID)
+		if err != nil {
+			return fmt.Errorf("invalid regex pattern %s: %v", resReq.ContainerID, err)
+		}
+
+		if re.MatchString(appName) {
+			agent.Spec.Resources = resReq.Resources
+			break
+		}
+	}
 
 	// Set the built agent in the appropriate workload option
 	switch appName {

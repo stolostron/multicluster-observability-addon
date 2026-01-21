@@ -99,12 +99,17 @@ type ProxyConfig struct {
 	NoProxy  string
 }
 
+//type ContainerResourceRequirements struct {
+//	container
+//}
+
 type Options struct {
 	Platform         PlatformOptions
 	UserWorkloads    UserWorkloadOptions
 	InstallNamespace string
 	Tolerations      []corev1.Toleration
 	NodeSelector     map[string]string
+	ResourceReqs     []addonapiv1alpha1.ContainerResourceRequirements
 	ProxyConfig      ProxyConfig
 }
 
@@ -138,6 +143,10 @@ func BuildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Opti
 	if addOnDeployment.Spec.NodePlacement != nil {
 		opts.NodeSelector = addOnDeployment.Spec.NodePlacement.NodeSelector
 		opts.Tolerations = addOnDeployment.Spec.NodePlacement.Tolerations
+	}
+
+	if addOnDeployment.Spec.ResourceRequirements != nil {
+		opts.ResourceReqs = addOnDeployment.Spec.ResourceRequirements
 	}
 
 	if addOnDeployment.Spec.ProxyConfig.HTTPProxy != "" {
