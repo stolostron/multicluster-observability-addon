@@ -1,6 +1,6 @@
 module github.com/stolostron/multicluster-observability-addon
 
-go 1.25.3
+go 1.25.5
 
 require (
 	github.com/ViaQ/logerr/v2 v2.1.0
