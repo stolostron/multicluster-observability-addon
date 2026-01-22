@@ -265,6 +265,23 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				assert.Contains(t, proms[0].Spec.Secrets, config.GetAlertmanagerRouterCASecretName(trimmedID))
 				assert.Contains(t, proms[0].Spec.Secrets, config.GetAlertmanagerAccessorSecretName(trimmedID))
 
+				// Ensure the alertmanager secrets are deployed to the default namespace and not openshift-monitoring
+				secrets := common.FilterResourcesByLabelSelector[*corev1.Secret](objects, nil)
+				assert.GreaterOrEqual(t, len(secrets), 2)
+				var accessorNamespaceVerified, routerCANamespaceVerified bool
+				for _, secret := range secrets {
+					switch secret.Name {
+					case config.GetAlertmanagerAccessorSecretName(trimmedID):
+						assert.Equal(t, "open-cluster-management-agent-addon", secret.Namespace)
+						accessorNamespaceVerified = true
+					case config.GetAlertmanagerRouterCASecretName(trimmedID):
+						assert.Equal(t, "open-cluster-management-agent-addon", secret.Namespace)
+						routerCANamespaceVerified = true
+					}
+				}
+				assert.True(t, accessorNamespaceVerified)
+				assert.True(t, routerCANamespaceVerified)
+
 				// ensure that the number of objects is correct
 				expectedCount := 70
 				if len(objects) != expectedCount {
