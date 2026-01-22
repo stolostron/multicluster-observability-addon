@@ -78,6 +78,9 @@ func DynamicAgentHealthProber(k8s client.Client, logger logr.Logger) *agent.Heal
 	if opts.Platform.Metrics.CollectionEnabled {
 		probeFields = append(probeFields, getMetricsProbeFields(aodc.Spec.AgentInstallNamespace)...)
 	}
+	if opts.UserWorkloads.Metrics.CollectionEnabled {
+		probeFields = append(probeFields, getUWLMetricsProbeFields(aodc.Spec.AgentInstallNamespace)...)
+	}
 	if opts.Platform.Logs.CollectionEnabled {
 		probeFields = append(probeFields, getLogsProbeFields()...)
 	}
@@ -171,6 +174,30 @@ func getMetricsProbeFields(ns string) []agent.ProbeField {
 						{
 							Name: addoncfg.LastTransitionTimeFeedbackName,
 							Path: lastTransitionTimeFeedbackPath,
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func getUWLMetricsProbeFields(ns string) []agent.ProbeField {
+	return []agent.ProbeField{
+		{
+			ResourceIdentifier: workv1.ResourceIdentifier{
+				Group:     cooprometheusv1alpha1.SchemeGroupVersion.Group,
+				Resource:  cooprometheusv1alpha1.PrometheusAgentName,
+				Name:      mconfig.UserWorkloadMetricsCollectorApp,
+				Namespace: ns,
+			},
+			ProbeRules: []workv1.FeedbackRule{
+				{
+					Type: workv1.JSONPathsType,
+					JsonPaths: []workv1.JsonPath{
+						{
+							Name: addoncfg.PaProbeKey,
+							Path: addoncfg.PaProbePath,
 						},
 					},
 				},

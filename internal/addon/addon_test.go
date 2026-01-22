@@ -71,6 +71,58 @@ func Test_AgentHealthProber_PPA(t *testing.T) {
 	}
 }
 
+func Test_AgentHealthProber_UWL(t *testing.T) {
+	unhealthyError := fmt.Errorf("%w: %s status condition type is %s for %s/%s", errProbeConditionNotSatisfied, cooprometheusv1alpha1.PrometheusAgentName, "False", addonfactory.AddonDefaultInstallNamespace, mconfig.UserWorkloadMetricsCollectorApp)
+	managedCluster := addontesting.NewManagedCluster("cluster-1")
+	managedClusterAddOn := addontesting.NewAddon("test", "cluster-1")
+	for _, tc := range []struct {
+		name        string
+		status      string
+		expectedErr string
+	}{
+		{
+			name:   "healthy",
+			status: "True",
+		},
+		{
+			name:        "unhealthy",
+			status:      "False",
+			expectedErr: unhealthyError.Error(),
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			healthProber := DynamicAgentHealthProber(fake.NewClientBuilder().Build(), logr.Discard())
+			err := healthProber.WorkProber.HealthChecker(
+				[]agent.FieldResult{
+					{
+						ResourceIdentifier: workv1.ResourceIdentifier{
+							Group:     cooprometheusv1alpha1.SchemeGroupVersion.Group,
+							Resource:  cooprometheusv1alpha1.PrometheusAgentName,
+							Name:      mconfig.UserWorkloadMetricsCollectorApp,
+							Namespace: addonfactory.AddonDefaultInstallNamespace,
+						},
+						FeedbackResult: workv1.StatusFeedbackResult{
+							Values: []workv1.FeedbackValue{
+								{
+									Name: addoncfg.PaProbeKey,
+									Value: workv1.FieldValue{
+										Type:   workv1.String,
+										String: &tc.status,
+									},
+								},
+							},
+						},
+					},
+				}, managedCluster, managedClusterAddOn)
+			if tc.expectedErr != "" {
+				require.EqualError(t, err, tc.expectedErr)
+				return
+			}
+			require.NoError(t, err)
+		})
+	}
+}
+
 func Test_AgentHealthProber_CLF(t *testing.T) {
 	unhealthyError := fmt.Errorf("%w: %s status condition type is %s for %s/%s", errProbeConditionNotSatisfied, addoncfg.ClusterLogForwardersResource, "False", addoncfg.SpokeCLFNamespace, addoncfg.SpokeCLFName)
 	managedCluster := addontesting.NewManagedCluster("cluster-1")
