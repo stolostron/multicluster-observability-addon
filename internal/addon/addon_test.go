@@ -501,4 +501,3 @@ func addUserWorkloadMetricsCustomizedVariables(aodc *addonapiv1alpha1.AddOnDeplo
 		},
 	}...)
 }
-
