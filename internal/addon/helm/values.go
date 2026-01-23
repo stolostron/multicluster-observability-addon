@@ -2,7 +2,6 @@ package helm
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/go-logr/logr"
@@ -20,11 +19,6 @@ import (
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-)
-
-var (
-	errMissingAODCRef  = errors.New("missing required AddOnDeploymentConfig reference in addon configuration")
-	errMultipleAODCRef = errors.New("addonmultiple AddOnDeploymentConfig references found - only one is supported")
 )
 
 type HelmChartValues struct {

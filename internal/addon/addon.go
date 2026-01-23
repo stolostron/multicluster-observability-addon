@@ -36,7 +36,6 @@ var (
 	errProbeConditionNotSatisfied = errors.New("probe condition is not satisfied")
 	errProbeValueIsNil            = errors.New("probe value is nil")
 	errUnknownProbeKey            = errors.New("probe has key that doesn't match the key defined")
-	errUnknownResource            = errors.New("undefined health check for resource")
 	errInvalidVersionString       = errors.New("invalid version string")
 
 	prometheusAgentCRDName = fmt.Sprintf("%s.%s", cooprometheusv1alpha1.PrometheusAgentName, cooprometheusv1alpha1.SchemeGroupVersion.Group)
