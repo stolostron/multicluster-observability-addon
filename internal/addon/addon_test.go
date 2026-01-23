@@ -1,7 +1,6 @@
 package addon
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/go-logr/logr"
@@ -12,21 +11,30 @@ import (
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	"github.com/stretchr/testify/require"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
 	"open-cluster-management.io/addon-framework/pkg/agent"
+	addonutils "open-cluster-management.io/addon-framework/pkg/utils"
+	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	workv1 "open-cluster-management.io/api/work/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
 func Test_AgentHealthProber_PPA(t *testing.T) {
-	unhealthyError := fmt.Errorf("%w: %s status condition type is %s for %s/%s", errProbeConditionNotSatisfied, cooprometheusv1alpha1.PrometheusAgentName, "False", addonfactory.AddonDefaultInstallNamespace, mconfig.PlatformMetricsCollectorApp)
 	managedCluster := addontesting.NewManagedCluster("cluster-1")
 	managedClusterAddOn := addontesting.NewAddon("test", "cluster-1")
+	aodc := newAddonDeploymentConfig()
+	addPlatformMetricsCustomizedVariables(aodc)
+	addAODCConfigReference(managedClusterAddOn, aodc)
+	scheme := runtime.NewScheme()
+	require.NoError(t, addonapiv1alpha1.AddToScheme(scheme))
+
 	for _, tc := range []struct {
 		name        string
 		status      string
-		expectedErr string
+		expectedErr error
 	}{
 		{
 			name:   "healthy",
@@ -35,11 +43,11 @@ func Test_AgentHealthProber_PPA(t *testing.T) {
 		{
 			name:        "unhealthy",
 			status:      "False",
-			expectedErr: unhealthyError.Error(),
+			expectedErr: errProbeConditionNotSatisfied,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			healthProber := DynamicAgentHealthProber(fake.NewClientBuilder().Build(), logr.Discard())
+			healthProber := HealthProber(fake.NewClientBuilder().WithScheme(scheme).WithObjects(aodc).Build(), logr.Discard())
 			err := healthProber.WorkProber.HealthChecker(
 				[]agent.FieldResult{
 					{
@@ -62,8 +70,8 @@ func Test_AgentHealthProber_PPA(t *testing.T) {
 						},
 					},
 				}, managedCluster, managedClusterAddOn)
-			if tc.expectedErr != "" {
-				require.EqualError(t, err, tc.expectedErr)
+			if tc.expectedErr != nil {
+				require.ErrorIs(t, err, tc.expectedErr)
 				return
 			}
 			require.NoError(t, err)
@@ -72,13 +80,18 @@ func Test_AgentHealthProber_PPA(t *testing.T) {
 }
 
 func Test_AgentHealthProber_CLF(t *testing.T) {
-	unhealthyError := fmt.Errorf("%w: %s status condition type is %s for %s/%s", errProbeConditionNotSatisfied, addoncfg.ClusterLogForwardersResource, "False", addoncfg.SpokeCLFNamespace, addoncfg.SpokeCLFName)
 	managedCluster := addontesting.NewManagedCluster("cluster-1")
 	managedClusterAddOn := addontesting.NewAddon("test", "cluster-1")
+	aodc := newAddonDeploymentConfig()
+	addLoggingCustomizedVariables(aodc)
+	addAODCConfigReference(managedClusterAddOn, aodc)
+	scheme := runtime.NewScheme()
+	require.NoError(t, addonapiv1alpha1.AddToScheme(scheme))
+
 	for _, tc := range []struct {
 		name        string
 		status      string
-		expectedErr string
+		expectedErr error
 	}{
 		{
 			name:   "healthy",
@@ -87,11 +100,11 @@ func Test_AgentHealthProber_CLF(t *testing.T) {
 		{
 			name:        "unhealthy",
 			status:      "False",
-			expectedErr: unhealthyError.Error(),
+			expectedErr: errProbeConditionNotSatisfied,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			healthProber := DynamicAgentHealthProber(fake.NewClientBuilder().Build(), logr.Discard())
+			healthProber := HealthProber(fake.NewClientBuilder().WithScheme(scheme).WithObjects(aodc).Build(), logr.Discard())
 			err := healthProber.WorkProber.HealthChecker(
 				[]agent.FieldResult{
 					{
@@ -114,8 +127,8 @@ func Test_AgentHealthProber_CLF(t *testing.T) {
 						},
 					},
 				}, managedCluster, managedClusterAddOn)
-			if tc.expectedErr != "" {
-				require.EqualError(t, err, tc.expectedErr)
+			if tc.expectedErr != nil {
+				require.ErrorIs(t, err, tc.expectedErr)
 				return
 			}
 			require.NoError(t, err)
@@ -124,13 +137,18 @@ func Test_AgentHealthProber_CLF(t *testing.T) {
 }
 
 func Test_AgentHealthProber_OTELCol(t *testing.T) {
-	unhealthyError := fmt.Errorf("%w: %s replicas is %d for %s/%s", errProbeConditionNotSatisfied, addoncfg.OpenTelemetryCollectorsResource, 0, addoncfg.SpokeOTELColNamespace, addoncfg.SpokeOTELColName)
 	managedCluster := addontesting.NewManagedCluster("cluster-1")
 	managedClusterAddOn := addontesting.NewAddon("test", "cluster-1")
+	aodc := newAddonDeploymentConfig()
+	addTracingCustomizedVariables(aodc)
+	addAODCConfigReference(managedClusterAddOn, aodc)
+	scheme := runtime.NewScheme()
+	require.NoError(t, addonapiv1alpha1.AddToScheme(scheme))
+
 	for _, tc := range []struct {
 		name        string
 		replicas    int64
-		expectedErr string
+		expectedErr error
 	}{
 		{
 			name:     "healthy",
@@ -139,11 +157,11 @@ func Test_AgentHealthProber_OTELCol(t *testing.T) {
 		{
 			name:        "unhealthy",
 			replicas:    0,
-			expectedErr: unhealthyError.Error(),
+			expectedErr: errProbeConditionNotSatisfied,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			healthProber := DynamicAgentHealthProber(fake.NewClientBuilder().Build(), logr.Discard())
+			healthProber := HealthProber(fake.NewClientBuilder().WithScheme(scheme).WithObjects(aodc).Build(), logr.Discard())
 			err := healthProber.WorkProber.HealthChecker([]agent.FieldResult{
 				{
 					ResourceIdentifier: workv1.ResourceIdentifier{
@@ -165,8 +183,8 @@ func Test_AgentHealthProber_OTELCol(t *testing.T) {
 					},
 				},
 			}, managedCluster, managedClusterAddOn)
-			if tc.expectedErr != "" {
-				require.EqualError(t, err, tc.expectedErr)
+			if tc.expectedErr != nil {
+				require.ErrorIs(t, err, tc.expectedErr)
 				return
 			}
 			require.NoError(t, err)
@@ -175,13 +193,19 @@ func Test_AgentHealthProber_OTELCol(t *testing.T) {
 }
 
 func Test_AgentHealthProber_UIPlugin(t *testing.T) {
-	unhealthyError := fmt.Errorf("%w: %s status condition type is %s for %s", errProbeConditionNotSatisfied, addoncfg.UiPluginsResource, "False", "monitoring")
 	managedCluster := addontesting.NewManagedCluster("cluster-1")
 	managedClusterAddOn := addontesting.NewAddon("test", "cluster-1")
+	aodc := newAddonDeploymentConfig()
+	addUIPluginCustomizedVariables(aodc)
+	addPlatformMetricsCustomizedVariables(aodc)
+	addAODCConfigReference(managedClusterAddOn, aodc)
+	scheme := runtime.NewScheme()
+	require.NoError(t, addonapiv1alpha1.AddToScheme(scheme))
+
 	for _, tc := range []struct {
 		name        string
 		status      string
-		expectedErr string
+		expectedErr error
 	}{
 		{
 			name:   "healthy",
@@ -190,11 +214,11 @@ func Test_AgentHealthProber_UIPlugin(t *testing.T) {
 		{
 			name:        "unhealthy",
 			status:      "False",
-			expectedErr: unhealthyError.Error(),
+			expectedErr: errProbeConditionNotSatisfied,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			healthProber := DynamicAgentHealthProber(fake.NewClientBuilder().Build(), logr.Discard())
+			healthProber := HealthProber(fake.NewClientBuilder().WithScheme(scheme).WithObjects(aodc).Build(), logr.Discard())
 			err := healthProber.WorkProber.HealthChecker([]agent.FieldResult{
 				{
 					ResourceIdentifier: workv1.ResourceIdentifier{
@@ -215,8 +239,8 @@ func Test_AgentHealthProber_UIPlugin(t *testing.T) {
 					},
 				},
 			}, managedCluster, managedClusterAddOn)
-			if tc.expectedErr != "" {
-				require.EqualError(t, err, tc.expectedErr)
+			if tc.expectedErr != nil {
+				require.ErrorIs(t, err, tc.expectedErr)
 				return
 			}
 			require.NoError(t, err)
@@ -325,5 +349,71 @@ func TestIsVersionOlder(t *testing.T) {
 				require.Equal(t, tc.expected, isOlder)
 			}
 		})
+	}
+}
+
+func newAddonDeploymentConfig() *addonapiv1alpha1.AddOnDeploymentConfig {
+	return &addonapiv1alpha1.AddOnDeploymentConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "multicluster-observability-addon",
+			Namespace: "open-cluster-management-observability",
+		},
+	}
+}
+
+func addPlatformMetricsCustomizedVariables(aodc *addonapiv1alpha1.AddOnDeploymentConfig) {
+	aodc.Spec.CustomizedVariables = append(aodc.Spec.CustomizedVariables, []addonapiv1alpha1.CustomizedVariable{
+		{
+			Name:  KeyPlatformMetricsCollection,
+			Value: string(PrometheusAgentV1alpha1),
+		},
+		{
+			Name:  KeyMetricsHubHostname,
+			Value: "https://the-hub.com",
+		},
+	}...)
+}
+
+func addLoggingCustomizedVariables(aodc *addonapiv1alpha1.AddOnDeploymentConfig) {
+	aodc.Spec.CustomizedVariables = append(aodc.Spec.CustomizedVariables, []addonapiv1alpha1.CustomizedVariable{
+		{
+			Name:  KeyPlatformLogsCollection,
+			Value: string(ClusterLogForwarderV1),
+		},
+	}...)
+}
+
+func addTracingCustomizedVariables(aodc *addonapiv1alpha1.AddOnDeploymentConfig) {
+	aodc.Spec.CustomizedVariables = append(aodc.Spec.CustomizedVariables, []addonapiv1alpha1.CustomizedVariable{
+		{
+			Name:  KeyUserWorkloadTracesCollection,
+			Value: string(OpenTelemetryCollectorV1beta1),
+		},
+	}...)
+}
+
+func addUIPluginCustomizedVariables(aodc *addonapiv1alpha1.AddOnDeploymentConfig) {
+	aodc.Spec.CustomizedVariables = append(aodc.Spec.CustomizedVariables, []addonapiv1alpha1.CustomizedVariable{
+		{
+			Name:  KeyPlatformMetricsUI,
+			Value: string(UIPluginV1alpha1),
+		},
+	}...)
+}
+
+func addAODCConfigReference(managedClusterAddOn *addonapiv1alpha1.ManagedClusterAddOn, aodc *addonapiv1alpha1.AddOnDeploymentConfig) {
+	managedClusterAddOn.Status.ConfigReferences = []addonapiv1alpha1.ConfigReference{
+		{
+			ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+				Group:    addonutils.AddOnDeploymentConfigGVR.Group,
+				Resource: addoncfg.AddonDeploymentConfigResource,
+			},
+			DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
+				ConfigReferent: addonapiv1alpha1.ConfigReferent{
+					Namespace: aodc.Namespace,
+					Name:      aodc.Name,
+				},
+			},
+		},
 	}
 }
