@@ -42,6 +42,7 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
 	"open-cluster-management.io/addon-framework/pkg/agent"
+	"open-cluster-management.io/addon-framework/pkg/utils"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	fakeaddon "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
@@ -281,7 +282,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 			Expects: func(t *testing.T, objects []client.Object) {
 				// ensure the namespace is created
 				ns := common.FilterResourcesByLabelSelector[*corev1.Namespace](objects, nil)
-				assert.Len(t, ns, 1)
+				require.Len(t, ns, 1)
 				assert.Equal(t, "custom", ns[0].Name)
 				// ensure that the number of objects is correct
 				expectedCount := 71
@@ -304,9 +305,6 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			if tc.InstallNamespace == "" {
-				tc.InstallNamespace = addonfactory.AddonDefaultInstallNamespace
-			}
 			// Add platform resources
 			defaultAgentResources := []client.Object{}
 			platformScrapeConfig := &cooprometheusv1alpha1.ScrapeConfig{
@@ -426,6 +424,14 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 			cmao := newCMOA()
 			clientObjects = append(clientObjects, cmao)
 
+			// Add addonDeploymentConfig
+			aodc := newAddonDeploymentConfig()
+			if tc.InstallNamespace != "" {
+				aodc.Spec.AgentInstallNamespace = tc.InstallNamespace
+			}
+			clientObjects = append(clientObjects, aodc)
+			configReferences = append(configReferences, newConfigReference(aodc))
+
 			// Images overrides configMap
 			imagesCM := &corev1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
@@ -456,7 +462,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				Build()
 
 			// Setup the fake addon client
-			addonClient := fakeaddon.NewSimpleClientset(newAddonDeploymentConfig())
+			addonClient := fakeaddon.NewSimpleClientset(aodc)
 			addonConfigValuesFn := addonfactory.GetAddOnDeploymentConfigValues(
 				addonfactory.NewAddOnDeploymentConfigGetter(addonClient),
 				addonfactory.ToAddOnCustomizedVariableValues,
@@ -490,14 +496,19 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 
 			// Register the addon for the managed cluster
 			managedClusterAddOn := addontesting.NewAddon("test", "cluster-1")
-			managedClusterAddOn.Spec.InstallNamespace = tc.InstallNamespace
 			managedClusterAddOn.Status.ConfigReferences = []addonapiv1alpha1.ConfigReference{}
 			managedClusterAddOn.Status.ConfigReferences = append(managedClusterAddOn.Status.ConfigReferences, configReferences...)
 
 			// Wire everything together to a fake addon instance
 			agentAddon, err := addonfactory.NewAgentAddonFactory(addoncfg.Name, addon.FS, addoncfg.MetricsChartDir).
-				WithGetValuesFuncs(addonConfigValuesFn, fakeGetValues(client, tc.PlatformMetrics, tc.UserMetrics)).
+				WithGetValuesFuncs(addonConfigValuesFn, fakeGetValues(client, tc.PlatformMetrics, tc.UserMetrics, tc.InstallNamespace)).
 				WithAgentRegistrationOption(&agent.RegistrationOption{}).
+				WithAgentInstallNamespace(
+					// Set agent install namespace from addon deployment config if it exists
+					utils.AgentInstallNamespaceFromDeploymentConfigFunc(
+						utils.NewAddOnDeploymentConfigGetter(addonClient),
+					),
+				).
 				WithScheme(scheme).
 				BuildHelmAgentAddon()
 			if err != nil {
@@ -523,7 +534,11 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 					if obj.GetObjectKind().GroupVersionKind().Kind == "PrometheusRule" && accessor.GetName() == "uwl-rules-additional" {
 						assert.Equal(t, "target-namespace", accessor.GetNamespace(), fmt.Sprintf("Object: %s/%s", obj.GetObjectKind().GroupVersionKind(), accessor.GetName()))
 					} else {
-						assert.Equal(t, tc.InstallNamespace, accessor.GetNamespace(), fmt.Sprintf("Object: %s/%s", obj.GetObjectKind().GroupVersionKind(), accessor.GetName()))
+						installNamespace := addonfactory.AddonDefaultInstallNamespace
+						if tc.InstallNamespace != "" {
+							installNamespace = tc.InstallNamespace
+						}
+						assert.Equal(t, installNamespace, accessor.GetNamespace(), fmt.Sprintf("Object: %s/%s", obj.GetObjectKind().GroupVersionKind(), accessor.GetName()))
 					}
 				}
 			}
@@ -543,7 +558,7 @@ func TestHelmBuild_Metrics_HCP(t *testing.T) {
 	assert.NoError(t, workv1.AddToScheme(scheme))
 	assert.NoError(t, operatorv1.AddToScheme(scheme))
 
-	installNamespace := "open-cluster-management-addon-observability"
+	// installNamespace := "open-cluster-management-addon-observability"
 	hubNamespace := "open-cluster-management-observability"
 
 	// Add user workload resources
@@ -776,13 +791,12 @@ func TestHelmBuild_Metrics_HCP(t *testing.T) {
 
 	// Register the addon for the managed cluster
 	managedClusterAddOn := addontesting.NewAddon("test", "cluster-1")
-	managedClusterAddOn.Spec.InstallNamespace = installNamespace
 	managedClusterAddOn.Status.ConfigReferences = []addonapiv1alpha1.ConfigReference{}
 	managedClusterAddOn.Status.ConfigReferences = append(managedClusterAddOn.Status.ConfigReferences, configReferences...)
 
 	// Wire everything together to a fake addon instance
 	agentAddon, err := addonfactory.NewAgentAddonFactory(addoncfg.Name, addon.FS, addoncfg.MetricsChartDir).
-		WithGetValuesFuncs(addonConfigValuesFn, fakeGetValues(client, false, true)).
+		WithGetValuesFuncs(addonConfigValuesFn, fakeGetValues(client, false, true, "")).
 		WithAgentRegistrationOption(&agent.RegistrationOption{}).
 		WithScheme(scheme).
 		BuildHelmAgentAddon()
@@ -810,6 +824,10 @@ func TestHelmBuild_Metrics_HCP(t *testing.T) {
 
 func newAddonDeploymentConfig() *addonapiv1alpha1.AddOnDeploymentConfig {
 	return &addonapiv1alpha1.AddOnDeploymentConfig{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "AddOnDeploymentConfig",
+			APIVersion: addonapiv1alpha1.GroupVersion.String(),
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "multicluster-observability-addon",
 			Namespace: "open-cluster-management-observability",
@@ -838,7 +856,7 @@ func newSecret(name, ns string) *corev1.Secret {
 	}
 }
 
-func fakeGetValues(k8s client.Client, platformMetrics, userWorkloadMetrics bool) addonfactory.GetValuesFunc {
+func fakeGetValues(k8s client.Client, platformMetrics, userWorkloadMetrics bool, installNs string) addonfactory.GetValuesFunc {
 	return func(
 		cluster *clusterv1.ManagedCluster,
 		mcAddon *addonapiv1alpha1.ManagedClusterAddOn,
@@ -856,6 +874,10 @@ func fakeGetValues(k8s client.Client, platformMetrics, userWorkloadMetrics bool)
 			UserWorkloads: addon.UserWorkloadOptions{
 				Metrics: addon.MetricsOptions{CollectionEnabled: userWorkloadMetrics},
 			},
+		}
+
+		if installNs != "" {
+			addonOpts.InstallNamespace = installNs
 		}
 
 		// opts, err := optionsBuilder.Build(context.Background(), mcAddon, cluster, addon.MetricsOptions{CollectionEnabled: platformMetrics, HubEndpoint: hubEp}, addon.MetricsOptions{CollectionEnabled: userWorkloadMetrics})
@@ -886,6 +908,7 @@ func newConfigReference(obj client.Object) addonapiv1alpha1.ConfigReference {
 				Namespace: obj.GetNamespace(),
 				Name:      obj.GetName(),
 			},
+			SpecHash: "dummy",
 		},
 	}
 }
