@@ -13,6 +13,7 @@ import (
 	cooprometheusv1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1"
 	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	uiplugin "github.com/rhobs/observability-operator/pkg/apis/uiplugin/v1alpha1"
+	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -55,47 +56,20 @@ func NewRegistrationOption(agentName string) *agent.RegistrationOption {
 	}
 }
 
-// DynamicAgentHealthProber returns a HealthProber struct that contains the necessary
-// information to assert if an addon deployment is ready or not, taking into account
-// the enabled features.
-func DynamicAgentHealthProber(k8s client.Client, logger logr.Logger) *agent.HealthProber {
-	// Get addonDeploymentConfig and generate Options
-	aodc := &addonapiv1alpha1.AddOnDeploymentConfig{}
-	key := client.ObjectKey{
-		Namespace: addoncfg.InstallNamespace,
-		Name:      addoncfg.Name,
-	}
-	if err := k8s.Get(context.Background(), key, aodc, &client.GetOptions{}); err != nil {
-		logger.Error(err, "failed to get the AddOnDeploymentConfig")
-	}
-	opts, err := BuildOptions(aodc)
-	if err != nil {
-		logger.Error(err, "failed to build options")
-	}
-
-	// Depending on enabled options, set appropriate probefields
+func HealthProber(k8s client.Client, logger logr.Logger) *agent.HealthProber {
 	probeFields := []agent.ProbeField{}
-	if opts.Platform.Metrics.CollectionEnabled {
-		probeFields = append(probeFields, getMetricsProbeFields(aodc.Spec.AgentInstallNamespace)...)
-	}
-	if opts.Platform.Logs.CollectionEnabled {
-		probeFields = append(probeFields, getLogsProbeFields()...)
-	}
-	if opts.UserWorkloads.Traces.CollectionEnabled {
-		probeFields = append(probeFields, getTracesProbeFields()...)
-	}
-
-	if opts.Platform.AnalyticsOptions.IncidentDetection.Enabled {
-		probeFields = append(probeFields, getAnalyticsProbeFields()...)
-	}
+	probeFields = append(probeFields, getMetricsProbeFields()...)
+	probeFields = append(probeFields, getLogsProbeFields()...)
+	probeFields = append(probeFields, getTracesProbeFields()...)
+	probeFields = append(probeFields, getAnalyticsProbeFields()...)
 	return &agent.HealthProber{
 		Type: agent.HealthProberTypeWork,
 		WorkProber: &agent.WorkHealthProber{
 			ProbeFields: probeFields,
 			HealthChecker: func(fields []agent.FieldResult, mc *v1.ManagedCluster, mcao *addonapiv1alpha1.ManagedClusterAddOn) error {
-				if err := healthChecker(fields); err != nil {
+				if err := healthChecker(k8s, fields, mcao); err != nil {
 					logger.V(1).Info("Health check failed for managed cluster", "clusterName", mc.Name, "error", err.Error())
-					return err
+					return fmt.Errorf("healthChecker failed: %w", err)
 				}
 				return nil
 			},
@@ -103,14 +77,33 @@ func DynamicAgentHealthProber(k8s client.Client, logger logr.Logger) *agent.Heal
 	}
 }
 
-func getMetricsProbeFields(ns string) []agent.ProbeField {
+func getMetricsProbeFields() []agent.ProbeField {
 	return []agent.ProbeField{
 		{
 			ResourceIdentifier: workv1.ResourceIdentifier{
 				Group:     cooprometheusv1alpha1.SchemeGroupVersion.Group,
 				Resource:  cooprometheusv1alpha1.PrometheusAgentName,
 				Name:      mconfig.PlatformMetricsCollectorApp,
-				Namespace: ns,
+				Namespace: "*", // Use wildcard to support custom installation namespaces. This works as long as these resources have unique names
+			},
+			ProbeRules: []workv1.FeedbackRule{
+				{
+					Type: workv1.JSONPathsType,
+					JsonPaths: []workv1.JsonPath{
+						{
+							Name: addoncfg.PaProbeKey,
+							Path: addoncfg.PaProbePath,
+						},
+					},
+				},
+			},
+		},
+		{
+			ResourceIdentifier: workv1.ResourceIdentifier{
+				Group:     cooprometheusv1alpha1.SchemeGroupVersion.Group,
+				Resource:  cooprometheusv1alpha1.PrometheusAgentName,
+				Name:      mconfig.UserWorkloadMetricsCollectorApp,
+				Namespace: "*", // Use wildcard to support custom installation namespaces. This works as long as these resources have unique names
 			},
 			ProbeRules: []workv1.FeedbackRule{
 				{
@@ -294,33 +287,84 @@ func Updaters() []agent.Updater {
 	return updaters
 }
 
-func healthChecker(fields []agent.FieldResult) error {
+func healthChecker(k8s client.Client, fields []agent.FieldResult, mcao *addonapiv1alpha1.ManagedClusterAddOn) error {
 	if len(fields) == 0 {
 		return errMissingFields
 	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), addoncfg.DefaultContextTimeout)
+	defer cancel()
+
+	aodc, err := common.GetAddOnDeploymentConfig(ctx, k8s, mcao)
+	if err != nil {
+		return fmt.Errorf("failed to get AddOnDeploymentConfig: %w", err)
+	}
+	opts, err := BuildOptions(aodc)
+	if err != nil {
+		return fmt.Errorf("failed to build addon options: %w", err)
+	}
+
+	if err := checkMetrics(fields, opts); err != nil {
+		return err
+	}
+	if err := checkLogging(fields, opts); err != nil {
+		return err
+	}
+	if err := checkTracing(fields, opts); err != nil {
+		return err
+	}
+	if err := checkMetricsUIPlugin(fields, opts); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func checkMetrics(fields []agent.FieldResult, opts Options) error {
+	if !opts.Platform.Metrics.CollectionEnabled && !opts.UserWorkloads.Metrics.CollectionEnabled {
+		return nil
+	}
+
 	for _, field := range fields {
 		identifier := field.ResourceIdentifier
 		switch identifier.Resource {
 		case cooprometheusv1alpha1.PrometheusAgentName:
-			if len(field.FeedbackResult.Values) == 0 {
-				// If the PrometheusAgent didn't get yet feedback values, it means it wasn't reconciled by the operator
-				// It's in bad health.
-				return fmt.Errorf("%w for %s with key %s/%s", errMissingFeedbackValues, identifier.Resource, identifier.Namespace, identifier.Name)
+			switch identifier.Name {
+			case mconfig.PlatformMetricsCollectorApp:
+				if !opts.Platform.Metrics.CollectionEnabled {
+					return nil
+				}
+				if err := checkPrometheusAgent(field.FeedbackResult.Values); err != nil {
+					return fmt.Errorf("failed to check resource %s with name %s: %w", identifier.Resource, identifier.Name, err)
+				}
+			case mconfig.UserWorkloadMetricsCollectorApp:
+				if !opts.UserWorkloads.Metrics.CollectionEnabled {
+					return nil
+				}
+				if err := checkPrometheusAgent(field.FeedbackResult.Values); err != nil {
+					return fmt.Errorf("failed to check resource %s with name %s: %w", identifier.Resource, identifier.Name, err)
+				}
 			}
-			for _, value := range field.FeedbackResult.Values {
-				if value.Name != addoncfg.PaProbeKey {
-					return fmt.Errorf("%w: %s with key %s/%s unknown probe keys %s", errUnknownProbeKey, identifier.Resource, identifier.Namespace, identifier.Name, value.Name)
-				}
 
-				if value.Value.String == nil {
-					return fmt.Errorf("%w: %s with key %s/%s", errProbeValueIsNil, identifier.Resource, identifier.Namespace, identifier.Name)
+		case crdResourceName:
+			if identifier.Name == scrapeConfigCRDName {
+				if err := checkScrapeConfigCRD(field.FeedbackResult.Values); err != nil {
+					return fmt.Errorf("%w: %s with key %s", err, identifier.Resource, identifier.Name)
 				}
-
-				if *value.Value.String != "True" {
-					return fmt.Errorf("%w: %s status condition type is %s for %s/%s", errProbeConditionNotSatisfied, identifier.Resource, *value.Value.String, identifier.Namespace, identifier.Name)
-				}
-				// pa passes the health check
 			}
+		}
+	}
+	return nil
+}
+
+func checkLogging(fields []agent.FieldResult, opts Options) error {
+	if !opts.Platform.Logs.CollectionEnabled && !opts.UserWorkloads.Logs.CollectionEnabled {
+		return nil
+	}
+
+	for _, field := range fields {
+		identifier := field.ResourceIdentifier
+		switch identifier.Resource {
 		case addoncfg.ClusterLogForwardersResource:
 			if len(field.FeedbackResult.Values) == 0 {
 				return fmt.Errorf("%w for %s with key %s/%s", errMissingFeedbackValues, identifier.Resource, identifier.Namespace, identifier.Name)
@@ -339,6 +383,19 @@ func healthChecker(fields []agent.FieldResult) error {
 				}
 				// clf passes the health check
 			}
+		}
+	}
+	return nil
+}
+
+func checkTracing(fields []agent.FieldResult, opts Options) error {
+	if !opts.UserWorkloads.Traces.CollectionEnabled {
+		return nil
+	}
+
+	for _, field := range fields {
+		identifier := field.ResourceIdentifier
+		switch identifier.Resource {
 		case addoncfg.OpenTelemetryCollectorsResource:
 			if len(field.FeedbackResult.Values) == 0 {
 				return fmt.Errorf("%w for %s with key %s/%s", errMissingFeedbackValues, identifier.Resource, identifier.Namespace, identifier.Name)
@@ -357,6 +414,19 @@ func healthChecker(fields []agent.FieldResult) error {
 				}
 				// otel collector passes the health check
 			}
+		}
+	}
+	return nil
+}
+
+func checkMetricsUIPlugin(fields []agent.FieldResult, opts Options) error {
+	if !opts.Platform.Metrics.UI.Enabled {
+		return nil
+	}
+
+	for _, field := range fields {
+		identifier := field.ResourceIdentifier
+		switch identifier.Resource {
 		case addoncfg.UiPluginsResource:
 			if len(field.FeedbackResult.Values) == 0 {
 				return fmt.Errorf("%w for %s with key %s/%s", errMissingFeedbackValues, identifier.Resource, identifier.Namespace, identifier.Name)
@@ -375,22 +445,32 @@ func healthChecker(fields []agent.FieldResult) error {
 				}
 				// uiplugin passes the health check
 			}
-		case crdResourceName:
-			if len(field.FeedbackResult.Values) == 0 {
-				return fmt.Errorf("%w for %s with key %s/%s", errMissingFeedbackValues, identifier.Resource, identifier.Namespace, identifier.Name)
-			}
-			switch addoncfg.Name {
-			case scrapeConfigCRDName:
-				if err := checkScrapeConfigCRD(field.FeedbackResult.Values); err != nil {
-					return fmt.Errorf("%w: %s with key %s", err, identifier.Resource, identifier.Name)
-				}
-			}
-			continue
-		default:
-			// If a resource is being probed it should have a health check defined
-			return fmt.Errorf("%w: %s with key %s/%s", errUnknownResource, identifier.Resource, identifier.Namespace, identifier.Name)
 		}
 	}
+	return nil
+}
+
+func checkPrometheusAgent(feedbackValues []workv1.FeedbackValue) error {
+	if len(feedbackValues) == 0 {
+		// If the PrometheusAgent didn't get yet feedback values, it means it wasn't reconciled by the operator
+		// It's in bad health.
+		return errMissingFeedbackValues
+	}
+
+	for _, value := range feedbackValues {
+		if value.Name != addoncfg.PaProbeKey {
+			return fmt.Errorf("%w: %s", errUnknownProbeKey, value.Name)
+		}
+
+		if value.Value.String == nil {
+			return fmt.Errorf("%w: %s", errProbeValueIsNil, value.Name)
+		}
+
+		if *value.Value.String != "True" {
+			return fmt.Errorf("%w: %s", errProbeConditionNotSatisfied, value.Name)
+		}
+	}
+
 	return nil
 }
 
