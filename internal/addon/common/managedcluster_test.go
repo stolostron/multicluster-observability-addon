@@ -131,6 +131,31 @@ func TestIsOpenShiftVendor(t *testing.T) {
 			expected: false,
 		},
 		{
+			name: "with vendor override annotation (OpenShift)",
+			cluster: &clusterv1.ManagedCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						addoncfg.VendorOverrideAnnotationKey: "OpenShift",
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "with vendor override annotation (Other)",
+			cluster: &clusterv1.ManagedCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						addoncfg.VendorOverrideAnnotationKey: "Other",
+					},
+					Labels: map[string]string{
+						"vendor": "OpenShift",
+					},
+				},
+			},
+			expected: false,
+		},
+		{
 			name:     "with empty cluster",
 			cluster:  &clusterv1.ManagedCluster{},
 			expected: false,

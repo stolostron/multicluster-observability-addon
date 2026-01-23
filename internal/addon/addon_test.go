@@ -79,6 +79,77 @@ func Test_AgentHealthProber_PPA(t *testing.T) {
 	}
 }
 
+func Test_AgentHealthProber_PPA_UserWorkload(t *testing.T) {
+	managedCluster := addontesting.NewManagedCluster("cluster-1")
+	managedCluster.Labels = map[string]string{"vendor": "OpenShift"}
+	managedClusterAddOn := addontesting.NewAddon("test", "cluster-1")
+	aodc := newAddonDeploymentConfig()
+	addUserWorkloadMetricsCustomizedVariables(aodc)
+	addAODCConfigReference(managedClusterAddOn, aodc)
+	scheme := runtime.NewScheme()
+	require.NoError(t, addonapiv1alpha1.AddToScheme(scheme))
+
+	for _, tc := range []struct {
+		name        string
+		status      string
+		isOCP       bool
+		expectedErr error
+	}{
+		{
+			name:   "healthy OCP",
+			status: "True",
+			isOCP:  true,
+		},
+		{
+			name:        "unhealthy OCP",
+			status:      "False",
+			isOCP:       true,
+			expectedErr: errProbeConditionNotSatisfied,
+		},
+		{
+			name:   "unhealthy non-OCP",
+			status: "False",
+			isOCP:  false,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.isOCP {
+				managedCluster.Labels["vendor"] = "OpenShift"
+			} else {
+				managedCluster.Labels["vendor"] = "Other"
+			}
+			healthProber := HealthProber(fake.NewClientBuilder().WithScheme(scheme).WithObjects(aodc).Build(), logr.Discard())
+			err := healthProber.WorkProber.HealthChecker(
+				[]agent.FieldResult{
+					{
+						ResourceIdentifier: workv1.ResourceIdentifier{
+							Group:     cooprometheusv1alpha1.SchemeGroupVersion.Group,
+							Resource:  cooprometheusv1alpha1.PrometheusAgentName,
+							Name:      mconfig.UserWorkloadMetricsCollectorApp,
+							Namespace: addonfactory.AddonDefaultInstallNamespace,
+						},
+						FeedbackResult: workv1.StatusFeedbackResult{
+							Values: []workv1.FeedbackValue{
+								{
+									Name: addoncfg.PaProbeKey,
+									Value: workv1.FieldValue{
+										Type:   workv1.String,
+										String: &tc.status,
+									},
+								},
+							},
+						},
+					},
+				}, managedCluster, managedClusterAddOn)
+			if tc.expectedErr != nil {
+				require.ErrorIs(t, err, tc.expectedErr)
+				return
+			}
+			require.NoError(t, err)
+		})
+	}
+}
+
 func Test_AgentHealthProber_CLF(t *testing.T) {
 	managedCluster := addontesting.NewManagedCluster("cluster-1")
 	managedClusterAddOn := addontesting.NewAddon("test", "cluster-1")
@@ -417,3 +488,17 @@ func addAODCConfigReference(managedClusterAddOn *addonapiv1alpha1.ManagedCluster
 		},
 	}
 }
+
+func addUserWorkloadMetricsCustomizedVariables(aodc *addonapiv1alpha1.AddOnDeploymentConfig) {
+	aodc.Spec.CustomizedVariables = append(aodc.Spec.CustomizedVariables, []addonapiv1alpha1.CustomizedVariable{
+		{
+			Name:  KeyUserWorkloadMetricsCollection,
+			Value: string(PrometheusAgentV1alpha1),
+		},
+		{
+			Name:  KeyMetricsHubHostname,
+			Value: "https://the-hub.com",
+		},
+	}...)
+}
+
