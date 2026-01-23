@@ -66,7 +66,7 @@ func HealthProber(k8s client.Client, logger logr.Logger) *agent.HealthProber {
 		WorkProber: &agent.WorkHealthProber{
 			ProbeFields: probeFields,
 			HealthChecker: func(fields []agent.FieldResult, mc *v1.ManagedCluster, mcao *addonapiv1alpha1.ManagedClusterAddOn) error {
-				if err := healthChecker(k8s, fields, mcao); err != nil {
+				if err := healthChecker(k8s, fields, mc, mcao); err != nil {
 					logger.V(1).Info("Health check failed for managed cluster", "clusterName", mc.Name, "error", err.Error())
 					return fmt.Errorf("healthChecker failed: %w", err)
 				}
@@ -286,7 +286,7 @@ func Updaters() []agent.Updater {
 	return updaters
 }
 
-func healthChecker(k8s client.Client, fields []agent.FieldResult, mcao *addonapiv1alpha1.ManagedClusterAddOn) error {
+func healthChecker(k8s client.Client, fields []agent.FieldResult, mc *v1.ManagedCluster, mcao *addonapiv1alpha1.ManagedClusterAddOn) error {
 	if len(fields) == 0 {
 		return errMissingFields
 	}
@@ -303,7 +303,8 @@ func healthChecker(k8s client.Client, fields []agent.FieldResult, mcao *addonapi
 		return fmt.Errorf("failed to build addon options: %w", err)
 	}
 
-	if err := checkMetrics(fields, opts); err != nil {
+	isOpenShiftVendor := common.IsOpenShiftVendor(mc)
+	if err := checkMetrics(fields, opts, isOpenShiftVendor); err != nil {
 		return err
 	}
 	if err := checkLogging(fields, opts); err != nil {
@@ -319,7 +320,7 @@ func healthChecker(k8s client.Client, fields []agent.FieldResult, mcao *addonapi
 	return nil
 }
 
-func checkMetrics(fields []agent.FieldResult, opts Options) error {
+func checkMetrics(fields []agent.FieldResult, opts Options, isOCP bool) error {
 	if !opts.Platform.Metrics.CollectionEnabled && !opts.UserWorkloads.Metrics.CollectionEnabled {
 		return nil
 	}
@@ -337,7 +338,7 @@ func checkMetrics(fields []agent.FieldResult, opts Options) error {
 					return fmt.Errorf("failed to check resource %s with name %s: %w", identifier.Resource, identifier.Name, err)
 				}
 			case mconfig.UserWorkloadMetricsCollectorApp:
-				if !opts.UserWorkloads.Metrics.CollectionEnabled {
+				if !opts.UserWorkloads.Metrics.CollectionEnabled || !isOCP {
 					return nil
 				}
 				if err := checkPrometheusAgent(field.FeedbackResult.Values); err != nil {
