@@ -2,9 +2,7 @@ package resource
 
 import (
 	"context"
-	"fmt"
 	"net/url"
-	"strings"
 	"testing"
 
 	hyperv1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
@@ -16,6 +14,7 @@ import (
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -23,6 +22,7 @@ import (
 	"k8s.io/utils/ptr"
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -124,79 +124,8 @@ func TestReconcileAgent(t *testing.T) {
 	// Dynamic fake client doesn't support apply types of patch. This is overridden with an interceptor toward a
 	// merge type patch that has no unwanted effect for this unit test.
 	patchCalls := 0
-	fakeClient := fake.NewClientBuilder().WithInterceptorFuncs(interceptor.Funcs{
-		Get: func(ctx context.Context, clientww client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
-			err := clientww.Get(ctx, key, obj, opts...)
-			if err != nil {
-				return err
-			}
-			if pa, ok := obj.(*cooprometheusv1alpha1.PrometheusAgent); ok {
-				if pa.GroupVersionKind().Kind == "" {
-					pa.SetGroupVersionKind(cooprometheusv1alpha1.SchemeGroupVersion.WithKind(cooprometheusv1alpha1.PrometheusAgentsKind))
-				}
-			}
-			return nil
-		},
-		List: func(ctx context.Context, clientww client.WithWatch, obj client.ObjectList, opts ...client.ListOption) error {
-			err := clientww.List(ctx, obj, opts...)
-			if err != nil {
-				return err
-			}
-			if paList, ok := obj.(*cooprometheusv1alpha1.PrometheusAgentList); ok {
-				for i := range paList.Items {
-					if paList.Items[i].GroupVersionKind().Kind == "" {
-						paList.Items[i].SetGroupVersionKind(cooprometheusv1alpha1.SchemeGroupVersion.WithKind(cooprometheusv1alpha1.PrometheusAgentsKind))
-					}
-				}
-			}
-			return nil
-		},
-		Patch: func(ctx context.Context, clientww client.WithWatch, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
-			patchCalls++
-			var originalTypeMeta metav1.TypeMeta
-			if pa, ok := obj.(*cooprometheusv1alpha1.PrometheusAgent); ok {
-				originalTypeMeta = pa.TypeMeta
-				if pa.GroupVersionKind().Kind == "" {
-					pa.SetGroupVersionKind(cooprometheusv1alpha1.SchemeGroupVersion.WithKind(cooprometheusv1alpha1.PrometheusAgentsKind))
-				}
-			} else if sc, ok := obj.(*cooprometheusv1alpha1.ScrapeConfig); ok {
-				originalTypeMeta = sc.TypeMeta
-				if sc.GroupVersionKind().Kind == "" {
-					sc.SetGroupVersionKind(cooprometheusv1alpha1.SchemeGroupVersion.WithKind(cooprometheusv1alpha1.ScrapeConfigsKind))
-				}
-			} else if pr, ok := obj.(*prometheusv1.PrometheusRule); ok {
-				originalTypeMeta = pr.TypeMeta
-				if pr.GroupVersionKind().Kind == "" {
-					pr.SetGroupVersionKind(prometheusv1.SchemeGroupVersion.WithKind(prometheusv1.PrometheusRuleKind))
-				}
-			}
-
-			// Filter out SSA-specific options that are incompatible with merge patches
-			var filteredOpts []client.PatchOption
-			for _, opt := range opts {
-				// Skip SSA-specific options by checking their string representation
-				optStr := fmt.Sprintf("%T", opt)
-				if strings.Contains(optStr, "forceOwnership") || strings.Contains(optStr, "FieldOwner") {
-					continue // Skip SSA-specific options
-				}
-				filteredOpts = append(filteredOpts, opt) // Keep all other options
-			}
-
-			err := clientww.Patch(ctx, obj, client.Merge, filteredOpts...)
-
-			if err == nil && originalTypeMeta.Kind != "" {
-				if pa, ok := obj.(*cooprometheusv1alpha1.PrometheusAgent); ok {
-					pa.TypeMeta = originalTypeMeta
-				} else if sc, ok := obj.(*cooprometheusv1alpha1.ScrapeConfig); ok {
-					sc.TypeMeta = originalTypeMeta
-				} else if pr, ok := obj.(*prometheusv1.PrometheusRule); ok {
-					pr.TypeMeta = originalTypeMeta
-				}
-			}
-
-			return err
-		},
-	}).WithScheme(newTestScheme()).WithObjects(cmao).Build()
+	scheme := newTestScheme()
+	fakeClient := fake.NewClientBuilder().WithInterceptorFuncs(ensureGVKIsSet(scheme)).WithScheme(scheme).WithObjects(cmao).Build()
 	d := DefaultStackResources{
 		Client:             fakeClient,
 		CMAO:               cmao,
@@ -493,93 +422,8 @@ func TestReconcile(t *testing.T) {
 				},
 			}
 			initObjs := append(tc.initObjs, cmao)
-			fakeClient := fake.NewClientBuilder().WithInterceptorFuncs(interceptor.Funcs{
-				Get: func(ctx context.Context, clientww client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
-					err := clientww.Get(ctx, key, obj, opts...)
-					if err != nil {
-						return err
-					}
-					if pa, ok := obj.(*cooprometheusv1alpha1.PrometheusAgent); ok {
-						if pa.GroupVersionKind().Kind == "" {
-							pa.SetGroupVersionKind(cooprometheusv1alpha1.SchemeGroupVersion.WithKind(cooprometheusv1alpha1.PrometheusAgentsKind))
-						}
-					}
-					return nil
-				},
-				Patch: func(ctx context.Context, clientww client.WithWatch, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
-					var originalTypeMeta metav1.TypeMeta
-
-					switch o := obj.(type) {
-					case *cooprometheusv1alpha1.PrometheusAgent:
-						originalTypeMeta = o.TypeMeta
-						if o.GroupVersionKind().Kind == "" {
-							o.SetGroupVersionKind(cooprometheusv1alpha1.SchemeGroupVersion.WithKind(cooprometheusv1alpha1.PrometheusAgentsKind))
-						}
-					case *cooprometheusv1alpha1.ScrapeConfig:
-						originalTypeMeta = o.TypeMeta
-						if o.GroupVersionKind().Kind == "" {
-							o.SetGroupVersionKind(cooprometheusv1alpha1.SchemeGroupVersion.WithKind(cooprometheusv1alpha1.ScrapeConfigsKind))
-						}
-					case *prometheusv1.PrometheusRule:
-						originalTypeMeta = o.TypeMeta
-						if o.GroupVersionKind().Kind == "" {
-							o.SetGroupVersionKind(prometheusv1.SchemeGroupVersion.WithKind(prometheusv1.PrometheusRuleKind))
-						}
-					}
-
-					var filteredOpts []client.PatchOption
-					for _, opt := range opts {
-						optStr := fmt.Sprintf("%T", opt)
-						if strings.Contains(optStr, "forceOwnership") || strings.Contains(optStr, "FieldOwner") {
-							continue
-						}
-						filteredOpts = append(filteredOpts, opt)
-					}
-
-					err := clientww.Patch(ctx, obj, client.Merge, filteredOpts...)
-
-					if err == nil {
-						switch o := obj.(type) {
-						case *cooprometheusv1alpha1.PrometheusAgent:
-							o.TypeMeta = originalTypeMeta
-						case *cooprometheusv1alpha1.ScrapeConfig:
-							o.TypeMeta = originalTypeMeta
-						case *prometheusv1.PrometheusRule:
-							o.TypeMeta = originalTypeMeta
-						}
-					}
-
-					return err
-				},
-				List: func(ctx context.Context, clientww client.WithWatch, obj client.ObjectList, opts ...client.ListOption) error {
-					err := clientww.List(ctx, obj, opts...)
-					if err != nil {
-						return err
-					}
-
-					switch list := obj.(type) {
-					case *cooprometheusv1alpha1.PrometheusAgentList:
-						for i := range list.Items {
-							if list.Items[i].GroupVersionKind().Kind == "" {
-								list.Items[i].SetGroupVersionKind(cooprometheusv1alpha1.SchemeGroupVersion.WithKind(cooprometheusv1alpha1.PrometheusAgentsKind))
-							}
-						}
-					case *cooprometheusv1alpha1.ScrapeConfigList:
-						for i := range list.Items {
-							if list.Items[i].GroupVersionKind().Kind == "" {
-								list.Items[i].SetGroupVersionKind(cooprometheusv1alpha1.SchemeGroupVersion.WithKind(cooprometheusv1alpha1.ScrapeConfigsKind))
-							}
-						}
-					case *prometheusv1.PrometheusRuleList:
-						for i := range list.Items {
-							if list.Items[i].GroupVersionKind().Kind == "" {
-								list.Items[i].SetGroupVersionKind(prometheusv1.SchemeGroupVersion.WithKind(prometheusv1.PrometheusRuleKind))
-							}
-						}
-					}
-					return nil
-				},
-			}).WithScheme(newTestScheme()).WithObjects(initObjs...).Build()
+			scheme := newTestScheme()
+			fakeClient := fake.NewClientBuilder().WithInterceptorFuncs(ensureGVKIsSet(scheme)).WithScheme(scheme).WithObjects(initObjs...).Build()
 			d := DefaultStackResources{
 				Client:             fakeClient,
 				CMAO:               cmao,
@@ -735,56 +579,8 @@ func TestReconcileScrapeConfigs(t *testing.T) {
 				PlacementRef: placementRefA,
 			})
 			initObjs := append(tc.initObjs, cmao)
-			fakeClient := fake.NewClientBuilder().WithInterceptorFuncs(interceptor.Funcs{
-				Patch: func(ctx context.Context, clientww client.WithWatch, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
-					// Preserve TypeMeta before patch operation
-					var originalTypeMeta metav1.TypeMeta
-
-					// Set obj type if missing using type assertions
-					if sc, ok := obj.(*cooprometheusv1alpha1.ScrapeConfig); ok {
-						originalTypeMeta = sc.TypeMeta
-						if sc.GroupVersionKind().Kind == "" {
-							sc.SetGroupVersionKind(cooprometheusv1alpha1.SchemeGroupVersion.WithKind(cooprometheusv1alpha1.ScrapeConfigsKind))
-						}
-					}
-
-					// Filter out SSA-specific options that are incompatible with merge patches
-					var filteredOpts []client.PatchOption
-					for _, opt := range opts {
-						optStr := fmt.Sprintf("%T", opt)
-						if strings.Contains(optStr, "forceOwnership") || strings.Contains(optStr, "FieldOwner") {
-							continue
-						}
-						filteredOpts = append(filteredOpts, opt)
-					}
-
-					err := clientww.Patch(ctx, obj, client.Merge, filteredOpts...)
-
-					// Restore TypeMeta after patch operation
-					if err == nil && originalTypeMeta.Kind != "" {
-						if sc, ok := obj.(*cooprometheusv1alpha1.ScrapeConfig); ok {
-							sc.TypeMeta = originalTypeMeta
-						}
-					}
-
-					return err
-				},
-				List: func(ctx context.Context, clientww client.WithWatch, obj client.ObjectList, opts ...client.ListOption) error {
-					err := clientww.List(ctx, obj, opts...)
-					if err != nil {
-						return err
-					}
-					// Ensure GVK is set for objects in lists using type assertions
-					if scList, ok := obj.(*cooprometheusv1alpha1.ScrapeConfigList); ok {
-						for i := range scList.Items {
-							if scList.Items[i].GroupVersionKind().Kind == "" {
-								scList.Items[i].SetGroupVersionKind(cooprometheusv1alpha1.SchemeGroupVersion.WithKind(cooprometheusv1alpha1.ScrapeConfigsKind))
-							}
-						}
-					}
-					return nil
-				},
-			}).WithScheme(newTestScheme()).WithObjects(initObjs...).Build()
+			scheme := newTestScheme()
+			fakeClient := fake.NewClientBuilder().WithInterceptorFuncs(ensureGVKIsSet(scheme)).WithScheme(scheme).WithObjects(initObjs...).Build()
 			d := DefaultStackResources{
 				CMAO:               cmao,
 				Client:             fakeClient,
@@ -961,55 +757,8 @@ func TestGetPrometheusRules(t *testing.T) {
 				PlacementRef: placementRefA,
 			})
 			initObjs := append(tc.initObjs, cmao)
-			fakeClient := fake.NewClientBuilder().WithInterceptorFuncs(interceptor.Funcs{
-				Patch: func(ctx context.Context, clientww client.WithWatch, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
-					// Preserve TypeMeta before patch operation
-					var originalTypeMeta metav1.TypeMeta
-
-					// Set obj type if missing using type assertions
-					if pr, ok := obj.(*prometheusv1.PrometheusRule); ok {
-						originalTypeMeta = pr.TypeMeta
-						if pr.GroupVersionKind().Kind == "" {
-							pr.SetGroupVersionKind(prometheusv1.SchemeGroupVersion.WithKind(prometheusv1.PrometheusRuleKind))
-						}
-					}
-
-					// Filter out SSA-specific options that are incompatible with merge patches
-					var filteredOpts []client.PatchOption
-					for _, opt := range opts {
-						optStr := fmt.Sprintf("%T", opt)
-						if strings.Contains(optStr, "forceOwnership") || strings.Contains(optStr, "FieldOwner") {
-							continue
-						}
-						filteredOpts = append(filteredOpts, opt)
-					}
-
-					err := clientww.Patch(ctx, obj, client.Merge, filteredOpts...)
-
-					// Restore TypeMeta after patch operation
-					if err == nil && originalTypeMeta.Kind != "" {
-						if pr, ok := obj.(*prometheusv1.PrometheusRule); ok {
-							pr.TypeMeta = originalTypeMeta
-						}
-					}
-
-					return err
-				},
-				List: func(ctx context.Context, clientww client.WithWatch, obj client.ObjectList, opts ...client.ListOption) error {
-					err := clientww.List(ctx, obj, opts...)
-					if err != nil {
-						return err
-					}
-					if prList, ok := obj.(*prometheusv1.PrometheusRuleList); ok {
-						for i := range prList.Items {
-							if prList.Items[i].GroupVersionKind().Kind == "" {
-								prList.Items[i].SetGroupVersionKind(prometheusv1.SchemeGroupVersion.WithKind(prometheusv1.PrometheusRuleKind))
-							}
-						}
-					}
-					return nil
-				},
-			}).WithScheme(newTestScheme()).WithObjects(initObjs...).Build()
+			scheme := newTestScheme()
+			fakeClient := fake.NewClientBuilder().WithInterceptorFuncs(ensureGVKIsSet(scheme)).WithScheme(scheme).WithObjects(initObjs...).Build()
 			d := DefaultStackResources{
 				CMAO:               cmao,
 				Client:             fakeClient,
@@ -1088,6 +837,47 @@ func newAddonOptions(platformEnabled, uwlEnabled bool) addon.Options {
 			Metrics: addon.MetricsOptions{
 				CollectionEnabled: uwlEnabled,
 			},
+		},
+	}
+}
+
+func ensureGVKIsSet(scheme *runtime.Scheme) interceptor.Funcs {
+	return interceptor.Funcs{
+		Get: func(ctx context.Context, clientww client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+			err := clientww.Get(ctx, key, obj, opts...)
+			if err != nil {
+				return err
+			}
+			gvk, err := apiutil.GVKForObject(obj, scheme)
+			if err == nil {
+				obj.GetObjectKind().SetGroupVersionKind(gvk)
+			}
+			return nil
+		},
+		Patch: func(ctx context.Context, clientww client.WithWatch, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
+			gvk, _ := apiutil.GVKForObject(obj, scheme)
+			if !gvk.Empty() {
+				obj.GetObjectKind().SetGroupVersionKind(gvk)
+			}
+			err := clientww.Patch(ctx, obj, patch, opts...)
+			if err == nil && !gvk.Empty() {
+				obj.GetObjectKind().SetGroupVersionKind(gvk)
+			}
+			return err
+		},
+		List: func(ctx context.Context, clientww client.WithWatch, obj client.ObjectList, opts ...client.ListOption) error {
+			err := clientww.List(ctx, obj, opts...)
+			if err != nil {
+				return err
+			}
+			return meta.EachListItem(obj, func(object runtime.Object) error {
+				gvk, err := apiutil.GVKForObject(object, scheme)
+				if err != nil {
+					return nil
+				}
+				object.GetObjectKind().SetGroupVersionKind(gvk)
+				return nil
+			})
 		},
 	}
 }
