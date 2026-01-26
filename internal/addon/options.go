@@ -236,10 +236,15 @@ func BuildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Opti
 			}
 			// Observability UI Options
 		case KeyPlatformMetricsUI:
-			if keyvalue.Value == string(UIPluginV1alpha1) && opts.Platform.Metrics.CollectionEnabled {
+			if keyvalue.Value == string(UIPluginV1alpha1) {
 				opts.Platform.Metrics.UI.Enabled = true
 			}
 		}
 	}
+
+	if !opts.Platform.Metrics.CollectionEnabled {
+		opts.Platform.Metrics.UI.Enabled = false
+	}
+
 	return opts, opts.validate()
 }
