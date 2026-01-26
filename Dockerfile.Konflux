@@ -19,11 +19,16 @@ COPY internal/ internal/
 # Enable CGO for FIPS compliance (dynamic linking)
 RUN CGO_ENABLED=1 GOOS=linux GO111MODULE=on go build -mod=readonly -a -o multicluster-observability-addon main.go
 
+# IMPORTANT: When changing base image RHEL version (ubi9 → ubi10):
+# 1. Update FROM statement below
+# 2. Update 'name' label to match new destination repo (rhel9 → rhel10)
+# 3. Update 'cpe' label with correct RHEL version (::el9 → ::el10)
+# 4. Verify destination repository exists in registry.redhat.io
+# 5. Run 'make verify-dockerfile-labels' to check consistency (if script exists)
 FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
 
 ARG VCS_REF
 ARG VCS_URL
-ARG IMAGE_NAME
 ARG IMAGE_DESCRIPTION
 ARG IMAGE_DISPLAY_NAME
 ARG IMAGE_NAME_ARCH
@@ -42,7 +47,8 @@ LABEL org.label-schema.vendor="Red Hat" \
     org.label-schema.vcs-url=$VCS_URL \
     org.label-schema.license="Red Hat Advanced Cluster Management for Kubernetes EULA" \
     org.label-schema.schema-version="1.0" \
-    name="$IMAGE_NAME" \
+    name="rhacm2/multicluster-observability-addon-rhel9" \
+    cpe="cpe:/a:redhat:acm:2.14::el9" \
     maintainer="$IMAGE_MAINTAINER" \
     version="$IMAGE_VERSION" \
     release="$IMAGE_RELEASE" \
