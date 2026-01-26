@@ -21,7 +21,7 @@ jobs:
     - name: Lint
       uses: golangci/golangci-lint-action@v7
       with:
-        version: v2.0.2
+        version: v2.7.2
         args: --timeout=4m
 
   test:
@@ -42,5 +42,5 @@ jobs:
       uses: shogo82148/actions-goveralls@v1
       with:
         path-to-profile: profile.cov
-        flag-name: Go-1.23
+        flag-name: Go-1.25
         shallow: true
