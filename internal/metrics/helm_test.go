@@ -16,6 +16,7 @@ import (
 	cooprometheusv1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1"
 	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	clusterinfov1beta1 "github.com/stolostron/cluster-lifecycle-api/clusterinfo/v1beta1"
+	clusterlifecycleconstants "github.com/stolostron/cluster-lifecycle-api/constants"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
@@ -64,6 +65,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 		UserMetrics      bool
 		COOIsInstalled   bool
 		IsOCP            bool
+		IsHub            bool
 		InstallNamespace string
 		Expects          func(*testing.T, []client.Object)
 	}{
@@ -126,6 +128,25 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 					}
 					origin := obj.Annotations[addoncfg.AnnotationOriginalResource]
 					assert.NotEmpty(t, origin, "original resource annotation should not be empty", "name", obj.Name, "annotation", origin)
+				}
+			},
+		},
+		"platform metrics, no coo, is hub": {
+			PlatformMetrics: true,
+			UserMetrics:     false,
+			COOIsInstalled:  false,
+			IsOCP:           true,
+			IsHub:           true,
+			Expects: func(t *testing.T, objects []client.Object) {
+				crds := common.FilterResourcesByLabelSelector[*apiextensionsv1.CustomResourceDefinition](objects, nil)
+				expectedCount := 4 // Some CRDs are not installed by MCOA on the hub but by MCO
+				if len(crds) != expectedCount {
+					t.Fatalf("expected %d objects, but got %d", expectedCount, len(crds))
+				}
+				// ensure that the number of objects is correct
+				expectedCount = 33
+				if len(objects) != expectedCount {
+					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
 			},
 		},
@@ -409,6 +430,9 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 			}
 			if tc.IsOCP {
 				managedCluster.Labels[clusterinfov1beta1.LabelKubeVendor] = string(clusterinfov1beta1.KubeVendorOpenShift)
+			}
+			if tc.IsHub {
+				managedCluster.Labels[clusterlifecycleconstants.SelfManagedClusterLabelKey] = "true"
 			}
 			clientObjects = append(clientObjects, managedCluster)
 
