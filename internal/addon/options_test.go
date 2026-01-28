@@ -226,14 +226,15 @@ func TestBuildOptions(t *testing.T) {
 				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
 					ResourceRequirements: []addonapiv1alpha1.ContainerResourceRequirements{
 						{
-							ContainerID: "deployments:klusterlet-addon-search:collector",
+							ContainerID: "deployments:platform-metrics:collector",
 							Resources: corev1.ResourceRequirements{
 								Limits: corev1.ResourceList{
 									corev1.ResourceCPU:    resource.MustParse("100m"),
 									corev1.ResourceMemory: resource.MustParse("3000Mi"),
 								},
 								Requests: corev1.ResourceList{
-									corev1.ResourceCPU: resource.MustParse("10m"), // lack of memory request in annotation leads to default of 128Mi
+									corev1.ResourceCPU:    resource.MustParse("10m"),
+									corev1.ResourceMemory: resource.MustParse("128Mi"),
 								},
 							},
 						},
@@ -241,14 +242,19 @@ func TestBuildOptions(t *testing.T) {
 				},
 			},
 			expectedOpts: Options{
-				ResourceReqs: corev1.ResourceRequirements{
-					Limits: corev1.ResourceList{
-						corev1.ResourceCPU:    resource.MustParse("100m"),
-						corev1.ResourceMemory: resource.MustParse("3000Mi"),
-					},
-					Requests: corev1.ResourceList{
-						corev1.ResourceCPU:    resource.MustParse("10m"),
-						corev1.ResourceMemory: resource.MustParse("128Mi"),
+				ResourceReqs: []addonapiv1alpha1.ContainerResourceRequirements{
+					{
+						ContainerID: "deployments:platform-metrics:collector",
+						Resources: corev1.ResourceRequirements{
+							Limits: corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("100m"),
+								corev1.ResourceMemory: resource.MustParse("3000Mi"),
+							},
+							Requests: corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("10m"),
+								corev1.ResourceMemory: resource.MustParse("128Mi"),
+							},
+						},
 					},
 				},
 			},
