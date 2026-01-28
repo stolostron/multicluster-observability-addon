@@ -14,6 +14,7 @@ import (
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -21,6 +22,7 @@ import (
 	"k8s.io/utils/ptr"
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -122,12 +124,8 @@ func TestReconcileAgent(t *testing.T) {
 	// Dynamic fake client doesn't support apply types of patch. This is overridden with an interceptor toward a
 	// merge type patch that has no unwanted effect for this unit test.
 	patchCalls := 0
-	fakeClient := fake.NewClientBuilder().WithInterceptorFuncs(interceptor.Funcs{
-		Patch: func(ctx context.Context, clientww client.WithWatch, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
-			patchCalls++
-			return clientww.Patch(ctx, obj, client.Merge, opts...)
-		},
-	}).WithScheme(newTestScheme()).WithObjects(cmao).Build()
+	scheme := newTestScheme()
+	fakeClient := fake.NewClientBuilder().WithInterceptorFuncs(ensureGVKIsSet(scheme)).WithScheme(scheme).WithObjects(cmao).Build()
 	d := DefaultStackResources{
 		Client:             fakeClient,
 		CMAO:               cmao,
@@ -424,11 +422,8 @@ func TestReconcile(t *testing.T) {
 				},
 			}
 			initObjs := append(tc.initObjs, cmao)
-			fakeClient := fake.NewClientBuilder().WithInterceptorFuncs(interceptor.Funcs{
-				Patch: func(ctx context.Context, clientww client.WithWatch, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
-					return clientww.Patch(ctx, obj, client.Merge, opts...)
-				},
-			}).WithScheme(newTestScheme()).WithObjects(initObjs...).Build()
+			scheme := newTestScheme()
+			fakeClient := fake.NewClientBuilder().WithInterceptorFuncs(ensureGVKIsSet(scheme)).WithScheme(scheme).WithObjects(initObjs...).Build()
 			d := DefaultStackResources{
 				Client:             fakeClient,
 				CMAO:               cmao,
@@ -584,11 +579,8 @@ func TestReconcileScrapeConfigs(t *testing.T) {
 				PlacementRef: placementRefA,
 			})
 			initObjs := append(tc.initObjs, cmao)
-			fakeClient := fake.NewClientBuilder().WithInterceptorFuncs(interceptor.Funcs{
-				Patch: func(ctx context.Context, clientww client.WithWatch, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
-					return clientww.Patch(ctx, obj, client.Merge, opts...)
-				},
-			}).WithScheme(newTestScheme()).WithObjects(initObjs...).Build()
+			scheme := newTestScheme()
+			fakeClient := fake.NewClientBuilder().WithInterceptorFuncs(ensureGVKIsSet(scheme)).WithScheme(scheme).WithObjects(initObjs...).Build()
 			d := DefaultStackResources{
 				CMAO:               cmao,
 				Client:             fakeClient,
@@ -765,11 +757,8 @@ func TestGetPrometheusRules(t *testing.T) {
 				PlacementRef: placementRefA,
 			})
 			initObjs := append(tc.initObjs, cmao)
-			fakeClient := fake.NewClientBuilder().WithInterceptorFuncs(interceptor.Funcs{
-				Patch: func(ctx context.Context, clientww client.WithWatch, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
-					return clientww.Patch(ctx, obj, client.Merge, opts...)
-				},
-			}).WithScheme(newTestScheme()).WithObjects(initObjs...).Build()
+			scheme := newTestScheme()
+			fakeClient := fake.NewClientBuilder().WithInterceptorFuncs(ensureGVKIsSet(scheme)).WithScheme(scheme).WithObjects(initObjs...).Build()
 			d := DefaultStackResources{
 				CMAO:               cmao,
 				Client:             fakeClient,
@@ -848,6 +837,47 @@ func newAddonOptions(platformEnabled, uwlEnabled bool) addon.Options {
 			Metrics: addon.MetricsOptions{
 				CollectionEnabled: uwlEnabled,
 			},
+		},
+	}
+}
+
+func ensureGVKIsSet(scheme *runtime.Scheme) interceptor.Funcs {
+	return interceptor.Funcs{
+		Get: func(ctx context.Context, clientww client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+			err := clientww.Get(ctx, key, obj, opts...)
+			if err != nil {
+				return err
+			}
+			gvk, err := apiutil.GVKForObject(obj, scheme)
+			if err == nil {
+				obj.GetObjectKind().SetGroupVersionKind(gvk)
+			}
+			return nil
+		},
+		Patch: func(ctx context.Context, clientww client.WithWatch, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
+			gvk, _ := apiutil.GVKForObject(obj, scheme)
+			if !gvk.Empty() {
+				obj.GetObjectKind().SetGroupVersionKind(gvk)
+			}
+			err := clientww.Patch(ctx, obj, patch, opts...)
+			if err == nil && !gvk.Empty() {
+				obj.GetObjectKind().SetGroupVersionKind(gvk)
+			}
+			return err
+		},
+		List: func(ctx context.Context, clientww client.WithWatch, obj client.ObjectList, opts ...client.ListOption) error {
+			err := clientww.List(ctx, obj, opts...)
+			if err != nil {
+				return err
+			}
+			return meta.EachListItem(obj, func(object runtime.Object) error {
+				gvk, err := apiutil.GVKForObject(object, scheme)
+				if err != nil {
+					return nil
+				}
+				object.GetObjectKind().SetGroupVersionKind(gvk)
+				return nil
+			})
 		},
 	}
 }

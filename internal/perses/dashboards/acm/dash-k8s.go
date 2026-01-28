@@ -1,11 +1,13 @@
 package acm
 
 import (
-	dashboards "github.com/perses/community-dashboards/pkg/dashboards"
-	k8sEtcd "github.com/perses/community-dashboards/pkg/dashboards/etcd"
-	k8sApiServer "github.com/perses/community-dashboards/pkg/dashboards/kubernetes/apiserver"
-	k8sComputeResources "github.com/perses/community-dashboards/pkg/dashboards/kubernetes/compute_resources"
-	"github.com/perses/community-dashboards/pkg/promql"
+	"flag"
+
+	dashboards "github.com/perses/community-mixins/pkg/dashboards"
+	k8sEtcd "github.com/perses/community-mixins/pkg/dashboards/etcd"
+	k8sApiServer "github.com/perses/community-mixins/pkg/dashboards/kubernetes/apiserver"
+	k8sComputeResources "github.com/perses/community-mixins/pkg/dashboards/kubernetes/compute_resources"
+	"github.com/perses/community-mixins/pkg/promql"
 	"github.com/perses/perses/go-sdk/dashboard"
 	listVar "github.com/perses/perses/go-sdk/variable/list-variable"
 	labelValuesVar "github.com/perses/plugins/prometheus/sdk/go/variable/label-values"
@@ -144,6 +146,8 @@ func GetInstanceVariable(datasource string) dashboard.Option {
 
 // Upstream dashboards imported from the community-dashboards repository. https://github.com/perses/community-dashboards/tree/main/pkg/dashboards/kubernetes
 func BuildK8sDashboards(project string, datasource string, clusterLabelName string) (obj []runtime.Object, err error) {
+	flag.String("output", "", "output format of the dashboard exec")
+	flag.String("output-dir", "", "output directory of the dashboard exec")
 	dashboardWriter := dashboards.NewDashboardWriter()
 
 	dashboardVars := []dashboard.Option{
@@ -152,10 +156,7 @@ func BuildK8sDashboards(project string, datasource string, clusterLabelName stri
 	}
 	dashboardWriter.Add(k8sComputeResources.BuildKubernetesNodeResourcesOverview(project, datasource, clusterLabelName, dashboardVars...))
 
-	dashboardVars = []dashboard.Option{
-		GetClusterVariable(datasource),
-	}
-	dashboardWriter.Add(k8sComputeResources.BuildKubernetesClusterOverview(project, datasource, clusterLabelName, dashboardVars...))
+	dashboardWriter.Add(k8sComputeResources.BuildKubernetesMultiClusterOverview(project, datasource, clusterLabelName))
 
 	dashboardVars = []dashboard.Option{
 		GetClusterVariable(datasource),

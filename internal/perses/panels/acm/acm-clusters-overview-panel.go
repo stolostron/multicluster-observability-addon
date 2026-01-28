@@ -1,8 +1,8 @@
 package acm
 
 import (
-	"github.com/perses/community-dashboards/pkg/dashboards"
-	"github.com/perses/community-dashboards/pkg/promql"
+	"github.com/perses/community-mixins/pkg/dashboards"
+	"github.com/perses/community-mixins/pkg/promql"
 	commonSdk "github.com/perses/perses/go-sdk/common"
 	"github.com/perses/perses/go-sdk/panel"
 	panelgroup "github.com/perses/perses/go-sdk/panel-group"
@@ -25,7 +25,7 @@ func Top50MaxLatencyAPIServer(datasourceName string, labelMatchers ...promql.Lab
 					Header: "Max Latency (99th percentile)",
 					Align:  tablePanel.RightAlign,
 					Format: &commonSdk.Format{
-						Unit:          string(commonSdk.MilliSecondsUnit),
+						Unit:          &dashboards.MilliSecondsUnit,
 						DecimalPlaces: 2,
 					},
 				},
@@ -34,7 +34,7 @@ func Top50MaxLatencyAPIServer(datasourceName string, labelMatchers ...promql.Lab
 					Header: "API Server UP",
 					Align:  tablePanel.RightAlign,
 					Format: &commonSdk.Format{
-						Unit: string(commonSdk.PercentDecimalUnit),
+						Unit: &dashboards.PercentDecimalUnit,
 					},
 				},
 				{
@@ -42,7 +42,7 @@ func Top50MaxLatencyAPIServer(datasourceName string, labelMatchers ...promql.Lab
 					Header: "API Error[1h]",
 					Align:  tablePanel.RightAlign,
 					Format: &commonSdk.Format{
-						Unit: commonSdk.DecimalUnit,
+						Unit: &dashboards.DecimalUnit,
 					},
 				},
 			}),
@@ -88,7 +88,7 @@ func EtcdHealth(datasourceName string, labelMatchers ...promql.LabelMatcher) pan
 					Header: "Leader election change",
 					Align:  tablePanel.RightAlign,
 					Format: &commonSdk.Format{
-						Unit: commonSdk.DecimalUnit,
+						Unit: &dashboards.DecimalUnit,
 					},
 				},
 				{
@@ -96,7 +96,7 @@ func EtcdHealth(datasourceName string, labelMatchers ...promql.LabelMatcher) pan
 					Header: "DB size",
 					Align:  tablePanel.RightAlign,
 					Format: &commonSdk.Format{
-						Unit:          commonSdk.BytesUnit,
+						Unit:          &dashboards.BytesUnit,
 						DecimalPlaces: 2,
 					},
 				},
@@ -129,7 +129,7 @@ func Top50CPUOverEstimationClusters(datasourceName string, labelMatchers ...prom
 					Header: "Overestimation",
 					Align:  tablePanel.RightAlign,
 					Format: &commonSdk.Format{
-						Unit:          string(commonSdk.PercentUnit),
+						Unit:          &dashboards.PercentUnit,
 						DecimalPlaces: 2,
 					},
 				},
@@ -138,7 +138,7 @@ func Top50CPUOverEstimationClusters(datasourceName string, labelMatchers ...prom
 					Header: "Requested",
 					Align:  tablePanel.RightAlign,
 					Format: &commonSdk.Format{
-						Unit:          string(commonSdk.PercentUnit),
+						Unit:          &dashboards.PercentUnit,
 						DecimalPlaces: 2,
 					},
 				},
@@ -147,7 +147,7 @@ func Top50CPUOverEstimationClusters(datasourceName string, labelMatchers ...prom
 					Header: "Utilized",
 					Align:  tablePanel.RightAlign,
 					Format: &commonSdk.Format{
-						Unit:          string(commonSdk.PercentUnit),
+						Unit:          &dashboards.PercentUnit,
 						DecimalPlaces: 2,
 					},
 				},
@@ -180,7 +180,7 @@ func Top50MemoryOverEstimationClusters(datasourceName string, labelMatchers ...p
 					Header: "Overestimation",
 					Align:  tablePanel.RightAlign,
 					Format: &commonSdk.Format{
-						Unit:          string(commonSdk.PercentUnit),
+						Unit:          &dashboards.PercentUnit,
 						DecimalPlaces: 2,
 					},
 				},
@@ -189,7 +189,7 @@ func Top50MemoryOverEstimationClusters(datasourceName string, labelMatchers ...p
 					Header: "Requested",
 					Align:  tablePanel.RightAlign,
 					Format: &commonSdk.Format{
-						Unit:          string(commonSdk.PercentUnit),
+						Unit:          &dashboards.PercentUnit,
 						DecimalPlaces: 2,
 					},
 				},
@@ -198,7 +198,7 @@ func Top50MemoryOverEstimationClusters(datasourceName string, labelMatchers ...p
 					Header: "Utilized",
 					Align:  tablePanel.RightAlign,
 					Format: &commonSdk.Format{
-						Unit:          string(commonSdk.PercentUnit),
+						Unit:          &dashboards.PercentUnit,
 						DecimalPlaces: 2,
 					},
 				},
@@ -212,7 +212,7 @@ func Top50MemoryOverEstimationClusters(datasourceName string, labelMatchers ...p
 					Header: "Prometheus",
 					Align:  tablePanel.RightAlign,
 					Format: &commonSdk.Format{
-						Unit: commonSdk.DecimalUnit,
+						Unit: &dashboards.DecimalUnit,
 					},
 				},
 				{
@@ -220,7 +220,7 @@ func Top50MemoryOverEstimationClusters(datasourceName string, labelMatchers ...p
 					Header: "Receive",
 					Align:  tablePanel.RightAlign,
 					Format: &commonSdk.Format{
-						Unit: commonSdk.DecimalUnit,
+						Unit: &dashboards.DecimalUnit,
 					},
 				},
 				{
@@ -228,7 +228,7 @@ func Top50MemoryOverEstimationClusters(datasourceName string, labelMatchers ...p
 					Header: "Tenant ID",
 					Align:  tablePanel.RightAlign,
 					Format: &commonSdk.Format{
-						Unit: commonSdk.DecimalUnit,
+						Unit: &dashboards.DecimalUnit,
 					},
 				},
 			}),
@@ -260,7 +260,7 @@ func Top50CPUUtilizedClusters(datasourceName string, labelMatchers ...promql.Lab
 					Header: "Total Cores",
 					Align:  tablePanel.RightAlign,
 					Format: &commonSdk.Format{
-						Unit: commonSdk.DecimalUnit,
+						Unit: &dashboards.DecimalUnit,
 					},
 				},
 				{
@@ -268,7 +268,7 @@ func Top50CPUUtilizedClusters(datasourceName string, labelMatchers ...promql.Lab
 					Header: "Allocatable Cores",
 					Align:  tablePanel.RightAlign,
 					Format: &commonSdk.Format{
-						Unit: commonSdk.DecimalUnit,
+						Unit: &dashboards.DecimalUnit,
 					},
 				},
 				{
@@ -276,7 +276,7 @@ func Top50CPUUtilizedClusters(datasourceName string, labelMatchers ...promql.Lab
 					Header: "Requested",
 					Align:  tablePanel.RightAlign,
 					Format: &commonSdk.Format{
-						Unit: commonSdk.BytesUnit,
+						Unit: &dashboards.BytesUnit,
 					},
 				},
 				{
@@ -284,7 +284,7 @@ func Top50CPUUtilizedClusters(datasourceName string, labelMatchers ...promql.Lab
 					Header: "Utilized",
 					Align:  tablePanel.RightAlign,
 					Format: &commonSdk.Format{
-						Unit:          string(commonSdk.PercentUnit),
+						Unit:          &dashboards.PercentUnit,
 						DecimalPlaces: 2,
 					},
 				},
@@ -293,7 +293,7 @@ func Top50CPUUtilizedClusters(datasourceName string, labelMatchers ...promql.Lab
 					Header: "Cluster ID",
 					Align:  tablePanel.RightAlign,
 					Format: &commonSdk.Format{
-						Unit: commonSdk.DecimalUnit,
+						Unit: &dashboards.DecimalUnit,
 					},
 				},
 				{
@@ -301,7 +301,7 @@ func Top50CPUUtilizedClusters(datasourceName string, labelMatchers ...promql.Lab
 					Header: "Prometheus",
 					Align:  tablePanel.RightAlign,
 					Format: &commonSdk.Format{
-						Unit: commonSdk.DecimalUnit,
+						Unit: &dashboards.DecimalUnit,
 					},
 				},
 				{
@@ -309,7 +309,7 @@ func Top50CPUUtilizedClusters(datasourceName string, labelMatchers ...promql.Lab
 					Header: "Receive",
 					Align:  tablePanel.RightAlign,
 					Format: &commonSdk.Format{
-						Unit: commonSdk.DecimalUnit,
+						Unit: &dashboards.DecimalUnit,
 					},
 				},
 				{
@@ -317,7 +317,7 @@ func Top50CPUUtilizedClusters(datasourceName string, labelMatchers ...promql.Lab
 					Header: "Tenant ID",
 					Align:  tablePanel.RightAlign,
 					Format: &commonSdk.Format{
-						Unit: commonSdk.DecimalUnit,
+						Unit: &dashboards.DecimalUnit,
 					},
 				},
 			}),
@@ -349,7 +349,7 @@ func Top5CPUUtilizationGraph(datasourceName string, labelMatchers ...promql.Labe
 					Header: "CPU Usage %",
 					Align:  tablePanel.RightAlign,
 					Format: &commonSdk.Format{
-						Unit:          string(commonSdk.PercentUnit),
+						Unit:          &dashboards.PercentUnit,
 						DecimalPlaces: 2,
 					},
 				},
@@ -382,7 +382,7 @@ func Top50MemoryUtilizedClusters(datasourceName string, labelMatchers ...promql.
 					Header: "Available Memory",
 					Align:  tablePanel.RightAlign,
 					Format: &commonSdk.Format{
-						Unit:          commonSdk.BytesUnit,
+						Unit:          &dashboards.BytesUnit,
 						DecimalPlaces: 2,
 					},
 				},
@@ -391,7 +391,7 @@ func Top50MemoryUtilizedClusters(datasourceName string, labelMatchers ...promql.
 					Header: "Requested",
 					Align:  tablePanel.RightAlign,
 					Format: &commonSdk.Format{
-						Unit:          commonSdk.BytesUnit,
+						Unit:          &dashboards.BytesUnit,
 						DecimalPlaces: 2,
 					},
 				},
@@ -400,7 +400,7 @@ func Top50MemoryUtilizedClusters(datasourceName string, labelMatchers ...promql.
 					Header: "Utilized",
 					Align:  tablePanel.RightAlign,
 					Format: &commonSdk.Format{
-						Unit:          string(commonSdk.PercentUnit),
+						Unit:          &dashboards.PercentUnit,
 						DecimalPlaces: 2,
 					},
 				},
@@ -414,7 +414,7 @@ func Top50MemoryUtilizedClusters(datasourceName string, labelMatchers ...promql.
 					Header: "Prometheus",
 					Align:  tablePanel.RightAlign,
 					Format: &commonSdk.Format{
-						Unit: commonSdk.DecimalUnit,
+						Unit: &dashboards.DecimalUnit,
 					},
 				},
 				{
@@ -422,7 +422,7 @@ func Top50MemoryUtilizedClusters(datasourceName string, labelMatchers ...promql.
 					Header: "Receive",
 					Align:  tablePanel.RightAlign,
 					Format: &commonSdk.Format{
-						Unit: commonSdk.DecimalUnit,
+						Unit: &dashboards.DecimalUnit,
 					},
 				},
 				{
@@ -459,7 +459,7 @@ func Top5MemoryUtilizationGraph(datasourceName string, labelMatchers ...promql.L
 					Header: "Memory Usage %",
 					Align:  tablePanel.RightAlign,
 					Format: &commonSdk.Format{
-						Unit:          string(commonSdk.PercentUnit),
+						Unit:          &dashboards.PercentUnit,
 						DecimalPlaces: 2,
 					},
 				},
@@ -492,7 +492,7 @@ func BandwidthUtilization(datasourceName string, labelMatchers ...promql.LabelMa
 					Header: "Current Bandwidth Received",
 					Align:  tablePanel.RightAlign,
 					Format: &commonSdk.Format{
-						Unit:          commonSdk.BytesUnit,
+						Unit:          &dashboards.BytesUnit,
 						DecimalPlaces: 2,
 					},
 				},
@@ -501,7 +501,7 @@ func BandwidthUtilization(datasourceName string, labelMatchers ...promql.LabelMa
 					Header: "Current Bandwidth Transmitted",
 					Align:  tablePanel.RightAlign,
 					Format: &commonSdk.Format{
-						Unit:          commonSdk.BytesUnit,
+						Unit:          &dashboards.BytesUnit,
 						DecimalPlaces: 2,
 					},
 				},
@@ -510,7 +510,7 @@ func BandwidthUtilization(datasourceName string, labelMatchers ...promql.LabelMa
 					Header: "Rate of Received Packets Dropped",
 					Align:  tablePanel.RightAlign,
 					Format: &commonSdk.Format{
-						Unit:          commonSdk.DecimalUnit,
+						Unit:          &dashboards.DecimalUnit,
 						DecimalPlaces: 2,
 					},
 				},
@@ -519,7 +519,7 @@ func BandwidthUtilization(datasourceName string, labelMatchers ...promql.LabelMa
 					Header: "Rate of Transmitted Packets Dropped",
 					Align:  tablePanel.RightAlign,
 					Format: &commonSdk.Format{
-						Unit:          commonSdk.DecimalUnit,
+						Unit:          &dashboards.DecimalUnit,
 						DecimalPlaces: 2,
 					},
 				},

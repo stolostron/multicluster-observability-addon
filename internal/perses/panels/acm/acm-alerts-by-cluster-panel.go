@@ -1,8 +1,8 @@
 package acm
 
 import (
-	"github.com/perses/community-dashboards/pkg/dashboards"
-	"github.com/perses/community-dashboards/pkg/promql"
+	"github.com/perses/community-mixins/pkg/dashboards"
+	"github.com/perses/community-mixins/pkg/promql"
 	"github.com/perses/perses/go-sdk/panel"
 	panelgroup "github.com/perses/perses/go-sdk/panel-group"
 	"github.com/perses/plugins/prometheus/sdk/go/query"
@@ -43,7 +43,7 @@ func FiringAlertsTrend(datasourceName string, labelMatchers ...promql.LabelMatch
 					ConnectNulls: false,
 					Display:      "line",
 					LineWidth:    1,
-					Palette:      timeSeriesPanel.Palette{Mode: timeSeriesPanel.AutoMode},
+					Palette:      &timeSeriesPanel.Palette{Mode: timeSeriesPanel.AutoMode},
 				},
 			),
 		),
@@ -75,7 +75,7 @@ func PendingAlertsTrend(datasourceName string, labelMatchers ...promql.LabelMatc
 					ConnectNulls: false,
 					Display:      "line",
 					LineWidth:    1,
-					Palette:      timeSeriesPanel.Palette{Mode: timeSeriesPanel.AutoMode},
+					Palette:      &timeSeriesPanel.Palette{Mode: timeSeriesPanel.AutoMode},
 				},
 			),
 		),
@@ -108,7 +108,7 @@ func AlertsOverTime(datasourceName string, labelMatchers ...promql.LabelMatcher)
 					Display:      "bar",
 					LineWidth:    2,
 					Stack:        "all",
-					Palette:      timeSeriesPanel.Palette{Mode: timeSeriesPanel.AutoMode},
+					Palette:      &timeSeriesPanel.Palette{Mode: timeSeriesPanel.AutoMode},
 				},
 			),
 		),

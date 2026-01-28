@@ -48,6 +48,7 @@ import (
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	workv1 "open-cluster-management.io/api/work/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	fakeclient "sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 )
@@ -302,6 +303,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 	assert.NoError(t, addonapiv1alpha1.AddToScheme(scheme))
 	assert.NoError(t, workv1.AddToScheme(scheme))
 	assert.NoError(t, operatorv1.AddToScheme(scheme))
+	assert.NoError(t, hyperv1.AddToScheme(scheme))
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
@@ -452,11 +454,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 
 			// Setup the fake k8s client
 			client := fakeclient.NewClientBuilder().
-				WithInterceptorFuncs(interceptor.Funcs{
-					Patch: func(ctx context.Context, clientww client.WithWatch, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
-						return clientww.Patch(ctx, obj, client.Merge, opts...)
-					},
-				}).
+				WithInterceptorFuncs(ensureGVKIsSet(scheme)).
 				WithScheme(scheme).
 				WithObjects(clientObjects...).
 				Build()
@@ -492,7 +490,12 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			configReferences = append(configReferences, newConfigReference(&promAgents.Items[0]), newConfigReference(&promAgents.Items[1]))
+			// Get updated agents for config references (they have proper GVK after update)
+			updatedPromAgents := cooprometheusv1alpha1.PrometheusAgentList{}
+			err = client.List(context.Background(), &updatedPromAgents)
+			require.NoError(t, err)
+
+			configReferences = append(configReferences, newConfigReference(&updatedPromAgents.Items[0]), newConfigReference(&updatedPromAgents.Items[1]))
 
 			// Register the addon for the managed cluster
 			managedClusterAddOn := addontesting.NewAddon("test", "cluster-1")
@@ -755,11 +758,7 @@ func TestHelmBuild_Metrics_HCP(t *testing.T) {
 
 	// Setup the fake k8s client
 	client := fakeclient.NewClientBuilder().
-		WithInterceptorFuncs(interceptor.Funcs{
-			Patch: func(ctx context.Context, clientww client.WithWatch, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
-				return clientww.Patch(ctx, obj, client.Merge, opts...)
-			},
-		}).
+		WithInterceptorFuncs(ensureGVKIsSet(scheme)).
 		WithScheme(scheme).
 		WithObjects(clientObjects...).
 		Build()
@@ -1043,6 +1042,47 @@ func newManifestWork(name string, isOLMSubscrided bool) *workv1.ManifestWork {
 					},
 				},
 			},
+		},
+	}
+}
+
+func ensureGVKIsSet(scheme *runtime.Scheme) interceptor.Funcs {
+	return interceptor.Funcs{
+		Get: func(ctx context.Context, clientww client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+			err := clientww.Get(ctx, key, obj, opts...)
+			if err != nil {
+				return err
+			}
+			gvk, err := apiutil.GVKForObject(obj, scheme)
+			if err == nil {
+				obj.GetObjectKind().SetGroupVersionKind(gvk)
+			}
+			return nil
+		},
+		Patch: func(ctx context.Context, clientww client.WithWatch, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
+			gvk, _ := apiutil.GVKForObject(obj, scheme)
+			if !gvk.Empty() {
+				obj.GetObjectKind().SetGroupVersionKind(gvk)
+			}
+			err := clientww.Patch(ctx, obj, patch, opts...)
+			if err == nil && !gvk.Empty() {
+				obj.GetObjectKind().SetGroupVersionKind(gvk)
+			}
+			return err
+		},
+		List: func(ctx context.Context, clientww client.WithWatch, obj client.ObjectList, opts ...client.ListOption) error {
+			err := clientww.List(ctx, obj, opts...)
+			if err != nil {
+				return err
+			}
+			return meta.EachListItem(obj, func(object runtime.Object) error {
+				gvk, err := apiutil.GVKForObject(object, scheme)
+				if err != nil {
+					return nil
+				}
+				object.GetObjectKind().SetGroupVersionKind(gvk)
+				return nil
+			})
 		},
 	}
 }
