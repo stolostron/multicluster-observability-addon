@@ -29,6 +29,7 @@ type MetricsValues struct {
 	UserWorkload                   Collector           `json:"userWorkload"`
 	DeployNonOCPStack              bool                `json:"deployNonOCPStack"`
 	DeployCOOResources             bool                `json:"deployCOOResources"`
+	IsHub                          bool                `json:"isHub"`
 	PrometheusOperatorAnnotations  string              `json:"prometheusOperatorAnnotations,omitempty"`
 	AlertManagerEndpoint           string              `json:"alertManagerEndpoint,omitempty"`
 	Tolerations                    []corev1.Toleration `json:"tolerations"`
@@ -82,6 +83,7 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 		AlertManagerEndpoint: opts.AlertManagerEndpoint,
 		NodeSelector:         opts.NodeSelector,
 		Tolerations:          opts.Tolerations,
+		IsHub:                opts.IsHub,
 	}
 
 	if opts.IsOpenShiftVendor {
