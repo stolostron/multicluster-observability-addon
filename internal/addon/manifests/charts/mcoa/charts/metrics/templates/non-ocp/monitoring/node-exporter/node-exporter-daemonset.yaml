@@ -28,15 +28,18 @@ spec:
         image: {{ .Values.images.nodeExporter }}
         name: node-exporter
         resources:
+        {{- $matched := false }}
         {{- if .Values.global.resourceRequirements }}
         {{- $reverseResourceRequirements := reverse .Values.global.resourceRequirements -}}
         {{- range $requirement := $reverseResourceRequirements -}}
-          {{- if regexMatch $requirement.containerIDRegex (printf "daemonsets:%s:%s" (include "node-exporter.fullname" $) "node-exporter") }}
+          {{- if regexMatch $requirement.containerIDRegex (printf "daemonsets:%s:%s" (include "node-exporter.fullname" .) "node-exporter") }}
+            {{- $matched = true }}
             {{- toYaml $requirement.resources | nindent 10 }}
             {{- break -}}
           {{- end -}}
         {{- end }}
-        {{- else }}
+        {{- end }}
+        {{- if not $matched }}
           limits:
             cpu: 250m
             memory: 300Mi
@@ -76,15 +79,18 @@ spec:
         - containerPort: {{ .Values.nodeExporter.hostPort }}
           name: https
         resources:
+        {{- $matched := false }}
         {{- if .Values.global.resourceRequirements }}
         {{- $reverseResourceRequirements := reverse .Values.global.resourceRequirements -}}
         {{- range $requirement := $reverseResourceRequirements -}}
-          {{- if regexMatch $requirement.containerIDRegex (printf "daemonsets:%s:%s" (include "node-exporter.fullname" $) "kube-rbac-proxy") }}
+          {{- if regexMatch $requirement.containerIDRegex (printf "daemonsets:%s:%s" (include "node-exporter.fullname" .) "kube-rbac-proxy") }}
+            {{- $matched = true }}
             {{- toYaml $requirement.resources | nindent 10 }}
             {{- break -}}
           {{- end -}}
         {{- end }}
-        {{- else }}
+        {{- end }}
+        {{- if not $matched }}
           limits:
             cpu: 20m
             memory: 400Mi

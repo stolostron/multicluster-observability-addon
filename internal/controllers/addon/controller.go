@@ -70,7 +70,6 @@ func NewAddonManager(ctx context.Context, kubeConfig *rest.Config, scheme *runti
 	addonConfigValuesFn := addonfactory.GetAddOnDeploymentConfigValues(
 		addonfactory.NewAddOnDeploymentConfigGetter(addonClient),
 		addonfactory.ToAddOnCustomizedVariableValues,
-		// addonfactory.ToAddOnNodePlacementValues,
 		addonfactory.ToAddOnResourceRequirementsValues,
 	)
 
@@ -94,8 +93,7 @@ func NewAddonManager(ctx context.Context, kubeConfig *rest.Config, scheme *runti
 			utils.AgentInstallNamespaceFromDeploymentConfigFunc(
 				utils.NewAddOnDeploymentConfigGetter(addonClient),
 			),
-		).
-		WithScheme(scheme).
+		).WithScheme(scheme).
 		BuildHelmAgentAddon()
 	if err != nil {
 		return nil, fmt.Errorf("failed to build helm agent addon: %w", err)

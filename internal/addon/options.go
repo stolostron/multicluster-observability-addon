@@ -99,10 +99,6 @@ type ProxyConfig struct {
 	NoProxy  string
 }
 
-//type ContainerResourceRequirements struct {
-//	container
-//}
-
 type Options struct {
 	Platform         PlatformOptions
 	UserWorkloads    UserWorkloadOptions

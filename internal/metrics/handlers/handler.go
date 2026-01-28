@@ -254,9 +254,7 @@ func (o *OptionsBuilder) buildPrometheusAgent(ctx context.Context, opts *Options
 	agent.Spec.NodeSelector = opts.NodeSelector
 
 	for _, resReq := range opts.ResourceReqs {
-		o.Logger.Info("Applying resource requirements from addon deployment config", "containerID", resReq.ContainerID)
-		o.Logger.Info("deployments:" + appName + ":prometheus")
-		if resReq.ContainerID == "deployments:"+appName+":prometheus" {
+		if resReq.ContainerID == "statefulsets:"+appName+":prometheus" {
 			agent.Spec.Resources = resReq.Resources
 		}
 	}

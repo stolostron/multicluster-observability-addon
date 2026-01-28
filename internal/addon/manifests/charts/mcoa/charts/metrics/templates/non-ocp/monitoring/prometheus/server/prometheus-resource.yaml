@@ -57,15 +57,18 @@ spec:
       - containerPort: 9091
         name: https
       resources:
+      {{- $matched := false }}
       {{- if .Values.global.resourceRequirements }}
       {{- $reverseResourceRequirements := reverse .Values.global.resourceRequirements -}}
       {{- range $requirement := $reverseResourceRequirements -}}
         {{- if regexMatch $requirement.containerIDRegex (printf "statefulsets:%s:%s" $.Values.prometheusServerName "kube-rbac-proxy") }}
+          {{- $matched = true }}
           {{- toYaml $requirement.resources | nindent 10 }}
           {{- break -}}
         {{- end -}}
       {{- end }}
-      {{- else }}
+      {{- end }}
+      {{- if not $matched }}
         limits:
           cpu: 20m
           memory: 400Mi
