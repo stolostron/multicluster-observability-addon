@@ -397,12 +397,12 @@ func (o *OptionsBuilder) getAvailableConfigResources(ctx context.Context, mcAddo
 }
 
 // cooIsSubscribed returns true if coo is considered installed, preventing conflicting resources creation.
-// It checks the feedback rules for the scrapeconfigs.monitoring.rhobs CRD.
+// It checks the feedback rules for the monitoringstacks.monitoring.rhobs CRD.
 func (o *OptionsBuilder) cooIsSubscribed(ctx context.Context, managedCluster *clusterv1.ManagedCluster) (bool, error) {
 	crdID := workv1.ResourceIdentifier{
 		Group:    apiextensionsv1.GroupName,
 		Resource: crdResourceName,
-		Name:     fmt.Sprintf("%s.%s", cooprometheusv1alpha1.ScrapeConfigName, cooprometheusv1alpha1.SchemeGroupVersion.Group),
+		Name:     config.MonitoringStackCRDName,
 	}
 
 	feedback, err := common.GetFeedbackValuesForResources(ctx, o.Client, managedCluster.Name, addoncfg.Name, crdID)
@@ -412,19 +412,19 @@ func (o *OptionsBuilder) cooIsSubscribed(ctx context.Context, managedCluster *cl
 
 	crdFeedback, ok := feedback[crdID]
 	if !ok || len(crdFeedback) == 0 {
-		o.Logger.V(2).Info("scrapeconfigs.monitoring.rhobs CRD not found in manifestwork status, considering COO as not subscribed")
+		o.Logger.V(2).Info(fmt.Sprintf("%s CRD not found in manifestwork status, considering COO as not subscribed", config.MonitoringStackCRDName))
 		return false, nil
 	}
 
 	olmValues := common.FilterFeedbackValuesByName(crdFeedback, addoncfg.IsOLMManagedFeedbackName)
 	for _, v := range olmValues {
 		if v.Value.String != nil && strings.ToLower(*v.Value.String) == "true" {
-			o.Logger.V(2).Info("found scrapeconfigs.monitoring.rhobs CRD with OLM label, considering COO as subscribed")
+			o.Logger.V(2).Info(fmt.Sprintf("found %s CRD with OLM label, considering COO as subscribed", config.MonitoringStackCRDName))
 			return true, nil
 		}
 	}
 
-	o.Logger.V(2).Info("scrapeconfigs.monitoring.rhobs CRD missing the OLM label, considering COO as not subscribed")
+	o.Logger.V(2).Info(fmt.Sprintf("%s CRD missing the OLM label, considering COO as not subscribed", config.MonitoringStackCRDName))
 	return false, nil
 }
 

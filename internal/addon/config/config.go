@@ -62,9 +62,13 @@ const (
 
 	// Feedback rule names
 	IsEstablishedFeedbackName             = "isEstablished"
+	IsEstablishedFeedbackPath             = ".status.conditions[?(@.type==\"Established\")].status"
 	PrometheusOperatorVersionFeedbackName = "prometheusOperatorVersion"
+	PrometheusOperatorVersionFeedbackPath = `.metadata.annotations.operator\.prometheus\.io/version`
 	LastTransitionTimeFeedbackName        = "lastTransitionTime"
+	LastTransitionTimeFeedbackPath        = ".status.conditions[?(@.type==\"Established\")].lastTransitionTime"
 	IsOLMManagedFeedbackName              = "isOLMManaged"
+	IsOLMManagedFeedbackPath              = `.metadata.labels.olm\.managed`
 
 	VendorOverrideAnnotationKey = "mcoa-override-vendor"
 	AnnotationOriginalResource  = "mcoa.openshift.io/original-resource"
