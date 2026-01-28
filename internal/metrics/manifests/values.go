@@ -83,7 +83,7 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 		AlertManagerEndpoint: opts.AlertManagerEndpoint,
 		NodeSelector:         opts.NodeSelector,
 		Tolerations:          opts.Tolerations,
-		ResourceReqs:		  opts.ResourceReqs,
+		// ResourceReqs:         opts.ResourceReqs,
 	}
 
 	if opts.IsOpenShiftVendor {

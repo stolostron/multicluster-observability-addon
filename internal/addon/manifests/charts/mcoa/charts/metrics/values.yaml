@@ -19,5 +19,5 @@ prometheusOperator:
   rbacProxyPort: 9092
 nodeExporter:
   hostPort: 19100
-resourceRequirements:
-  - containerIDRegex: ^.+:.+:.+$
+global:
+  resourceRequirements: []

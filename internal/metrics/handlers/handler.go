@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"regexp"
 	"slices"
 	"strings"
 
@@ -255,14 +254,10 @@ func (o *OptionsBuilder) buildPrometheusAgent(ctx context.Context, opts *Options
 	agent.Spec.NodeSelector = opts.NodeSelector
 
 	for _, resReq := range opts.ResourceReqs {
-		re, err := regexp.Compile(resReq.ContainerID)
-		if err != nil {
-			return fmt.Errorf("invalid regex pattern %s: %v", resReq.ContainerID, err)
-		}
-
-		if re.MatchString(appName) {
+		o.Logger.Info("Applying resource requirements from addon deployment config", "containerID", resReq.ContainerID)
+		o.Logger.Info("deployments:" + appName + ":prometheus")
+		if resReq.ContainerID == "deployments:"+appName+":prometheus" {
 			agent.Spec.Resources = resReq.Resources
-			break
 		}
 	}
 

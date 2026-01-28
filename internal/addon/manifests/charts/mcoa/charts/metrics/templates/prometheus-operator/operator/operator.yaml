@@ -57,14 +57,34 @@ spec:
             drop:
               - ALL
         resources:
+        {{- if .Values.global.resourceRequirements }}
+        {{- $reverseResourceRequirements := reverse .Values.global.resourceRequirements -}}
+        {{- range $requirement := $reverseResourceRequirements -}}
+          {{- if regexMatch $requirement.containerIDRegex (printf "deployments:%s:%s" (include "prometheus-operator.fullname" $) "prometheus-operator") }}
+            {{- toYaml $requirement.resources | nindent 10 }}
+            {{- break -}}
+          {{- end -}}
+        {{- end }}
+        {{- else }}
           requests:
             cpu: 5m
             memory: 100Mi
+        {{- end }}
       {{- if not .Values.deployNonOCPStack }}
       - resources:
+        {{- if .Values.global.resourceRequirements }}
+        {{- $reverseResourceRequirements := reverse .Values.global.resourceRequirements -}}
+        {{- range $requirement := $reverseResourceRequirements -}}
+          {{- if regexMatch $requirement.containerIDRegex (printf "deployments:%s:%s" (include "prometheus-operator.fullname" $) "kube-rbac-proxy") }}
+            {{- toYaml $requirement.resources | nindent 10 }}
+            {{- break -}}
+          {{- end -}}
+        {{- end }}
+        {{- else }}
           requests:
             cpu: 1m
             memory: 15Mi
+        {{- end }}
         terminationMessagePath: /dev/termination-log
         name: kube-rbac-proxy
         securityContext:

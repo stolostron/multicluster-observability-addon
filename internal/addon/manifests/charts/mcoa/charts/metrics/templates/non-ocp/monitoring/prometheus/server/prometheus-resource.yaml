@@ -57,12 +57,25 @@ spec:
       - containerPort: 9091
         name: https
       resources:
+      {{- if .Values.global.resourceRequirements }}
+      {{- $reverseResourceRequirements := reverse .Values.global.resourceRequirements -}}
+      {{- range $requirement := $reverseResourceRequirements -}}
+        {{- if regexMatch $requirement.containerIDRegex (printf "statefulsets:%s:%s" $.Values.prometheusServerName "kube-rbac-proxy") }}
+          {{- toYaml $requirement.resources | nindent 10 }}
+          {{- break -}}
+        {{- end -}}
+      {{- end }}
+      {{- else }}
         limits:
           cpu: 20m
           memory: 400Mi
         requests:
           cpu: 10m
           memory: 200Mi
+      {{- end }}
+      volumeMounts:
+      - name: proxy-config
+        mountPath: /etc/proxy-config
     - name: config-reloader
       resources:
         requests:
