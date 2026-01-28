@@ -14,8 +14,7 @@ COPY main.go main.go
 COPY internal/ internal/
 
 # Build
-# Enable CGO for FIPS compliance (dynamic linking)
-RUN CGO_ENABLED=1 GOOS=linux GO111MODULE=on go build -mod=readonly -a -o multicluster-observability-addon main.go
+RUN CGO_ENABLED=0 GOOS=linux GO111MODULE=on go build -mod=readonly -a -o multicluster-observability-addon main.go
 
 # Use distroless as minimal base image to package the manager binary
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
