@@ -812,6 +812,17 @@ func newManifestWork(name string, isOLMSubscrided bool) *workv1.ManifestWork {
 										String: ptr.To("12:00"),
 									},
 								},
+							},
+						},
+					},
+					{
+						ResourceMeta: workv1.ManifestResourceMeta{
+							Group:    apiextensionsv1.GroupName,
+							Resource: "customresourcedefinitions",
+							Name:     config.MonitoringStackCRDName,
+						},
+						StatusFeedbacks: workv1.StatusFeedbackResult{
+							Values: []workv1.FeedbackValue{
 								{
 									Name: addoncfg.IsOLMManagedFeedbackName,
 									Value: workv1.FieldValue{

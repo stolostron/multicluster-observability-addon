@@ -103,7 +103,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				assert.Len(t, cooOperator, 1)
 				// ensure that the number of objects is correct
 				// 4 (prom operator) + 5 (agent) + 2 secrets (mTLS to hub) + 1 cm (prom ca) + 2 rule + 2 scrape config + 1 configmap = 17
-				expectedCount := 34
+				expectedCount := 35
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
@@ -141,7 +141,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				assert.Equal(t, "observability-operator", agent[0].Labels["app.kubernetes.io/managed-by"])
 				assert.Empty(t, agent[0].Annotations["operator.prometheus.io/controller-id"])
 				// ensure that the number of objects is correct
-				expectedCount := 26
+				expectedCount := 22
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
@@ -168,7 +168,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				recordingRules := common.FilterResourcesByLabelSelector[*prometheusv1.PrometheusRule](objects, config.UserWorkloadPrometheusMatchLabels)
 				assert.Len(t, recordingRules, 2)
 				assert.Equal(t, "openshift-user-workload-monitoring/prometheus-operator", recordingRules[0].Annotations["operator.prometheus.io/controller-id"])
-				expectedCount := 34
+				expectedCount := 35
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
@@ -188,18 +188,10 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				assert.Empty(t, agent[0].Annotations["operator.prometheus.io/controller-id"])
 
 				crds := common.FilterResourcesByLabelSelector[*apiextensionsv1.CustomResourceDefinition](objects, nil)
-				checkedCRDs := 0
-				for _, crd := range crds {
-					if crd.Spec.Group != "monitoring.rhobs" {
-						continue
-					}
-					checkedCRDs++
-					assert.Contains(t, crd.Annotations, "addon.open-cluster-management.io/deletion-orphan")
-				}
-				assert.NotZero(t, checkedCRDs)
+				assert.Len(t, crds, 1) // Only the monitoringstacks one
 
 				// ensure that the number of objects is correct
-				expectedCount := 26
+				expectedCount := 22
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
@@ -267,7 +259,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				assert.Contains(t, proms[0].Spec.Secrets, config.GetAlertmanagerAccessorSecretName(trimmedID))
 
 				// ensure that the number of objects is correct
-				expectedCount := 70
+				expectedCount := 71
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
@@ -285,7 +277,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				require.Len(t, ns, 1)
 				assert.Equal(t, "custom", ns[0].Name)
 				// ensure that the number of objects is correct
-				expectedCount := 71
+				expectedCount := 72
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
@@ -1031,6 +1023,17 @@ func newManifestWork(name string, isOLMSubscrided bool) *workv1.ManifestWork {
 										String: ptr.To("12:00"),
 									},
 								},
+							},
+						},
+					},
+					{
+						ResourceMeta: workv1.ManifestResourceMeta{
+							Group:    apiextensionsv1.GroupName,
+							Resource: "customresourcedefinitions",
+							Name:     config.MonitoringStackCRDName,
+						},
+						StatusFeedbacks: workv1.StatusFeedbackResult{
+							Values: []workv1.FeedbackValue{
 								{
 									Name: addoncfg.IsOLMManagedFeedbackName,
 									Value: workv1.FieldValue{
