@@ -300,10 +300,11 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 			IsOCP:           true,
 			ResourceReqs:    true,
 			Expects: func(t *testing.T, objects []client.Object) {
+				// Verify prometheus agent has the correct resource requirements
 				agent := common.FilterResourcesByLabelSelector[*cooprometheusv1alpha1.PrometheusAgent](objects, config.PlatformPrometheusMatchLabels)
 				assert.Len(t, agent, 1)
 
-				expectedResources := corev1.ResourceRequirements{
+				expectedPrometheusResources := corev1.ResourceRequirements{
 					Limits: corev1.ResourceList{
 						corev1.ResourceCPU:    resource.MustParse("200m"),
 						corev1.ResourceMemory: resource.MustParse("256Mi"),
@@ -313,7 +314,35 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 						corev1.ResourceMemory: resource.MustParse("128Mi"),
 					},
 				}
-				assert.Equal(t, expectedResources, agent[0].Spec.Resources)
+				assert.Equal(t, expectedPrometheusResources, agent[0].Spec.Resources)
+
+				// Verify prometheus-operator deployment has the correct resource requirements
+				operatorMatchLabels := map[string]string{
+					"app.kubernetes.io/name": "prometheus-operator",
+				}
+				deployments := common.FilterResourcesByLabelSelector[*appsv1.Deployment](objects, operatorMatchLabels)
+				assert.Len(t, deployments, 1, "Should find exactly one prometheus-operator deployment")
+
+				expectedOperatorResources := corev1.ResourceRequirements{
+					Limits: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("150m"),
+						corev1.ResourceMemory: resource.MustParse("192Mi"),
+					},
+					Requests: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("75m"),
+						corev1.ResourceMemory: resource.MustParse("96Mi"),
+					},
+				}
+				// Find the prometheus-operator container in the deployment
+				var operatorContainer *corev1.Container
+				for i := range deployments[0].Spec.Template.Spec.Containers {
+					if deployments[0].Spec.Template.Spec.Containers[i].Name == "prometheus-operator" {
+						operatorContainer = &deployments[0].Spec.Template.Spec.Containers[i]
+						break
+					}
+				}
+				assert.NotNil(t, operatorContainer, "prometheus-operator container not found")
+				assert.Equal(t, expectedOperatorResources, operatorContainer.Resources)
 			},
 		},
 	}
@@ -456,10 +485,11 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 			}
 
 			if tc.ResourceReqs {
-				containerID := "statefulsets:" + config.PlatformMetricsCollectorApp + ":prometheus"
+				prometheusContainerID := "statefulsets:" + config.PlatformMetricsCollectorApp + ":prometheus"
+				operatorContainerID := "deployments:prometheus-operator:prometheus-operator"
 				aodc.Spec.ResourceRequirements = []addonapiv1alpha1.ContainerResourceRequirements{
 					{
-						ContainerID: containerID,
+						ContainerID: prometheusContainerID,
 						Resources: corev1.ResourceRequirements{
 							Limits: corev1.ResourceList{
 								corev1.ResourceCPU:    resource.MustParse("200m"),
@@ -468,6 +498,19 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 							Requests: corev1.ResourceList{
 								corev1.ResourceCPU:    resource.MustParse("100m"),
 								corev1.ResourceMemory: resource.MustParse("128Mi"),
+							},
+						},
+					},
+					{
+						ContainerID: operatorContainerID,
+						Resources: corev1.ResourceRequirements{
+							Limits: corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("150m"),
+								corev1.ResourceMemory: resource.MustParse("192Mi"),
+							},
+							Requests: corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("75m"),
+								corev1.ResourceMemory: resource.MustParse("96Mi"),
 							},
 						},
 					},
@@ -511,6 +554,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 			addonConfigValuesFn := addonfactory.GetAddOnDeploymentConfigValues(
 				addonfactory.NewAddOnDeploymentConfigGetter(addonClient),
 				addonfactory.ToAddOnCustomizedVariableValues,
+				addonfactory.ToAddOnResourceRequirementsValues,
 			)
 
 			// generate default agent resources
