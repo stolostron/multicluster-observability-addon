@@ -59,7 +59,7 @@ func TestManifestsSorting(t *testing.T) {
 
 	mock := &mockAgent{manifests: manifests}
 	// We don't need logger or client for Manifests call as per current implementation
-	prober := &AgentAddonWithDynamicHealthProber{
+	prober := &AgentAddonWithSortedManifests{
 		agent: mock,
 	}
 

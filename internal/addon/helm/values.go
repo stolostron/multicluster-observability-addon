@@ -2,13 +2,11 @@ package helm
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/go-logr/logr"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
-	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	chandlers "github.com/stolostron/multicluster-observability-addon/internal/coo/handlers"
 	cmanifests "github.com/stolostron/multicluster-observability-addon/internal/coo/manifests"
 	lhandlers "github.com/stolostron/multicluster-observability-addon/internal/logging/handlers"
@@ -18,15 +16,9 @@ import (
 	thandlers "github.com/stolostron/multicluster-observability-addon/internal/tracing/handlers"
 	tmanifests "github.com/stolostron/multicluster-observability-addon/internal/tracing/manifests"
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
-	addonutils "open-cluster-management.io/addon-framework/pkg/utils"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-)
-
-var (
-	errMissingAODCRef  = errors.New("missing required AddOnDeploymentConfig reference in addon configuration")
-	errMultipleAODCRef = errors.New("addonmultiple AddOnDeploymentConfig references found - only one is supported")
 )
 
 type HelmChartValues struct {
@@ -45,7 +37,7 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, logger logr.Logger) a
 		logger = logger.WithValues("cluster", cluster.Name)
 		logger.V(2).Info("reconciliation triggered")
 
-		aodc, err := getAddOnDeploymentConfig(ctx, k8s, mcAddon)
+		aodc, err := common.GetAddOnDeploymentConfig(ctx, k8s, mcAddon)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get AddOnDeploymentConfig: %w", err)
 		}
@@ -155,20 +147,4 @@ func getCOOValues(ctx context.Context, k8s client.Client, logger logr.Logger, cl
 	}
 
 	return cmanifests.BuildValues(opts, installCOO, common.IsHubCluster(cluster)), nil
-}
-
-func getAddOnDeploymentConfig(ctx context.Context, k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAddOn) (*addonapiv1alpha1.AddOnDeploymentConfig, error) {
-	aodc := &addonapiv1alpha1.AddOnDeploymentConfig{}
-	keys := common.GetObjectKeys(mcAddon.Status.ConfigReferences, addonutils.AddOnDeploymentConfigGVR.Group, addoncfg.AddonDeploymentConfigResource)
-	switch {
-	case len(keys) == 0:
-		return aodc, errMissingAODCRef
-	case len(keys) > 1:
-		return aodc, errMultipleAODCRef
-	}
-	if err := k8s.Get(ctx, keys[0], aodc, &client.GetOptions{}); err != nil {
-		// TODO(JoaoBraveCoding) Add proper error handling
-		return aodc, err
-	}
-	return aodc, nil
 }

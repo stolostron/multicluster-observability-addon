@@ -33,6 +33,10 @@ func IsHubCluster(cluster *clusterv1.ManagedCluster) bool {
 }
 
 func IsOpenShiftVendor(cluster *clusterv1.ManagedCluster) bool {
+	if cluster == nil {
+		return false
+	}
+
 	// For e2e testing non OCP cases more easily, we use a special annotation to override the cluster vendor
 	if override := VendorIsOverridden(cluster); override != "" {
 		return override == string(clusterinfov1beta1.KubeVendorOpenShift)

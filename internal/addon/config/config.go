@@ -2,12 +2,15 @@ package config
 
 import (
 	"errors"
+	"time"
 )
 
 const (
 	Name              = "multicluster-observability-addon"
 	LabelOCMAddonName = "open-cluster-management.io/addon-name"
 	InstallNamespace  = "open-cluster-management-observability"
+
+	DefaultContextTimeout = 10 * time.Second
 
 	McoaChartDir    = "manifests/charts/mcoa"
 	MetricsChartDir = "manifests/charts/mcoa/charts/metrics"
