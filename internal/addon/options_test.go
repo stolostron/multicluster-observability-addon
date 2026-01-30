@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 )
 
@@ -215,6 +216,45 @@ func TestBuildOptions(t *testing.T) {
 						Key:      "node-role.kubernetes.io/infra",
 						Operator: "Exists",
 						Effect:   "NoSchedule",
+					},
+				},
+			},
+		},
+		{
+			name: "valid resource requirements",
+			addOnDeploy: &addonapiv1alpha1.AddOnDeploymentConfig{
+				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
+					ResourceRequirements: []addonapiv1alpha1.ContainerResourceRequirements{
+						{
+							ContainerID: "deployments:platform-metrics:collector",
+							Resources: corev1.ResourceRequirements{
+								Limits: corev1.ResourceList{
+									corev1.ResourceCPU:    resource.MustParse("100m"),
+									corev1.ResourceMemory: resource.MustParse("3000Mi"),
+								},
+								Requests: corev1.ResourceList{
+									corev1.ResourceCPU:    resource.MustParse("10m"),
+									corev1.ResourceMemory: resource.MustParse("128Mi"),
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedOpts: Options{
+				ResourceReqs: []addonapiv1alpha1.ContainerResourceRequirements{
+					{
+						ContainerID: "deployments:platform-metrics:collector",
+						Resources: corev1.ResourceRequirements{
+							Limits: corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("100m"),
+								corev1.ResourceMemory: resource.MustParse("3000Mi"),
+							},
+							Requests: corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("10m"),
+								corev1.ResourceMemory: resource.MustParse("128Mi"),
+							},
+						},
 					},
 				},
 			},

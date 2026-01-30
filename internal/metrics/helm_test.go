@@ -22,7 +22,7 @@ import (
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/handlers"
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/manifests"
-	"github.com/stolostron/multicluster-observability-addon/internal/metrics/resource"
+	internalres "github.com/stolostron/multicluster-observability-addon/internal/metrics/resource"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/text/cases"
@@ -31,6 +31,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	meta "k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -66,6 +67,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 		COOIsInstalled   bool
 		IsOCP            bool
 		InstallNamespace string
+		ResourceReqs     bool
 		Expects          func(*testing.T, []client.Object)
 	}{
 		"no metrics": {
@@ -292,6 +294,58 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				}
 			},
 		},
+		"resource requests and limits": {
+			PlatformMetrics: true,
+			UserMetrics:     false,
+			COOIsInstalled:  false,
+			IsOCP:           true,
+			ResourceReqs:    true,
+			Expects: func(t *testing.T, objects []client.Object) {
+				// Verify prometheus agent has the correct resource requirements
+				agent := common.FilterResourcesByLabelSelector[*cooprometheusv1alpha1.PrometheusAgent](objects, config.PlatformPrometheusMatchLabels)
+				assert.Len(t, agent, 1)
+
+				expectedPrometheusResources := corev1.ResourceRequirements{
+					Limits: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("200m"),
+						corev1.ResourceMemory: resource.MustParse("256Mi"),
+					},
+					Requests: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("100m"),
+						corev1.ResourceMemory: resource.MustParse("128Mi"),
+					},
+				}
+				assert.Equal(t, expectedPrometheusResources, agent[0].Spec.Resources)
+
+				// Verify prometheus-operator deployment has the correct resource requirements
+				operatorMatchLabels := map[string]string{
+					"app.kubernetes.io/name": "prometheus-operator",
+				}
+				deployments := common.FilterResourcesByLabelSelector[*appsv1.Deployment](objects, operatorMatchLabels)
+				assert.Len(t, deployments, 1, "Should find exactly one prometheus-operator deployment")
+
+				expectedOperatorResources := corev1.ResourceRequirements{
+					Limits: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("150m"),
+						corev1.ResourceMemory: resource.MustParse("192Mi"),
+					},
+					Requests: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("75m"),
+						corev1.ResourceMemory: resource.MustParse("96Mi"),
+					},
+				}
+				// Find the prometheus-operator container in the deployment
+				var operatorContainer *corev1.Container
+				for i := range deployments[0].Spec.Template.Spec.Containers {
+					if deployments[0].Spec.Template.Spec.Containers[i].Name == "prometheus-operator" {
+						operatorContainer = &deployments[0].Spec.Template.Spec.Containers[i]
+						break
+					}
+				}
+				assert.NotNil(t, operatorContainer, "prometheus-operator container not found")
+				assert.Equal(t, expectedOperatorResources, operatorContainer.Resources)
+			},
+		},
 	}
 
 	scheme := runtime.NewScheme()
@@ -431,6 +485,40 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 			if tc.InstallNamespace != "" {
 				aodc.Spec.AgentInstallNamespace = tc.InstallNamespace
 			}
+
+			if tc.ResourceReqs {
+				prometheusContainerID := "statefulsets:" + config.PlatformMetricsCollectorApp + ":prometheus"
+				operatorContainerID := "deployments:prometheus-operator:prometheus-operator"
+				aodc.Spec.ResourceRequirements = []addonapiv1alpha1.ContainerResourceRequirements{
+					{
+						ContainerID: prometheusContainerID,
+						Resources: corev1.ResourceRequirements{
+							Limits: corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("200m"),
+								corev1.ResourceMemory: resource.MustParse("256Mi"),
+							},
+							Requests: corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("100m"),
+								corev1.ResourceMemory: resource.MustParse("128Mi"),
+							},
+						},
+					},
+					{
+						ContainerID: operatorContainerID,
+						Resources: corev1.ResourceRequirements{
+							Limits: corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("150m"),
+								corev1.ResourceMemory: resource.MustParse("192Mi"),
+							},
+							Requests: corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("75m"),
+								corev1.ResourceMemory: resource.MustParse("96Mi"),
+							},
+						},
+					},
+				}
+			}
+
 			clientObjects = append(clientObjects, aodc)
 			configReferences = append(configReferences, newConfigReference(aodc))
 
@@ -464,10 +552,11 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 			addonConfigValuesFn := addonfactory.GetAddOnDeploymentConfigValues(
 				addonfactory.NewAddOnDeploymentConfigGetter(addonClient),
 				addonfactory.ToAddOnCustomizedVariableValues,
+				addonfactory.ToAddOnResourceRequirementsValues,
 			)
 
 			// generate default agent resources
-			defaultStack := resource.DefaultStackResources{
+			defaultStack := internalres.DefaultStackResources{
 				Client:       client,
 				CMAO:         cmao,
 				AddonOptions: newAddonOptions(true, true),
@@ -504,7 +593,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 
 			// Wire everything together to a fake addon instance
 			agentAddon, err := addonfactory.NewAgentAddonFactory(addoncfg.Name, addon.FS, addoncfg.MetricsChartDir).
-				WithGetValuesFuncs(addonConfigValuesFn, fakeGetValues(client, tc.PlatformMetrics, tc.UserMetrics, tc.InstallNamespace)).
+				WithGetValuesFuncs(addonConfigValuesFn, fakeGetValues(client, tc.PlatformMetrics, tc.UserMetrics, tc.InstallNamespace, aodc.Spec.ResourceRequirements)).
 				WithAgentRegistrationOption(&agent.RegistrationOption{}).
 				WithAgentInstallNamespace(
 					// Set agent install namespace from addon deployment config if it exists
@@ -771,7 +860,7 @@ func TestHelmBuild_Metrics_HCP(t *testing.T) {
 	)
 
 	// generate default agent resources
-	defaultStack := resource.DefaultStackResources{
+	defaultStack := internalres.DefaultStackResources{
 		Client:       client,
 		CMAO:         cmao,
 		AddonOptions: newAddonOptions(true, true),
@@ -795,7 +884,7 @@ func TestHelmBuild_Metrics_HCP(t *testing.T) {
 
 	// Wire everything together to a fake addon instance
 	agentAddon, err := addonfactory.NewAgentAddonFactory(addoncfg.Name, addon.FS, addoncfg.MetricsChartDir).
-		WithGetValuesFuncs(addonConfigValuesFn, fakeGetValues(client, false, true, "")).
+		WithGetValuesFuncs(addonConfigValuesFn, fakeGetValues(client, false, true, "", nil)).
 		WithAgentRegistrationOption(&agent.RegistrationOption{}).
 		WithScheme(scheme).
 		BuildHelmAgentAddon()
@@ -855,7 +944,7 @@ func newSecret(name, ns string) *corev1.Secret {
 	}
 }
 
-func fakeGetValues(k8s client.Client, platformMetrics, userWorkloadMetrics bool, installNs string) addonfactory.GetValuesFunc {
+func fakeGetValues(k8s client.Client, platformMetrics, userWorkloadMetrics bool, installNs string, resReqs []addonapiv1alpha1.ContainerResourceRequirements) addonfactory.GetValuesFunc {
 	return func(
 		cluster *clusterv1.ManagedCluster,
 		mcAddon *addonapiv1alpha1.ManagedClusterAddOn,
@@ -877,6 +966,10 @@ func fakeGetValues(k8s client.Client, platformMetrics, userWorkloadMetrics bool,
 
 		if installNs != "" {
 			addonOpts.InstallNamespace = installNs
+		}
+
+		if resReqs != nil {
+			addonOpts.ResourceReqs = resReqs
 		}
 
 		// opts, err := optionsBuilder.Build(context.Background(), mcAddon, cluster, addon.MetricsOptions{CollectionEnabled: platformMetrics, HubEndpoint: hubEp}, addon.MetricsOptions{CollectionEnabled: userWorkloadMetrics})

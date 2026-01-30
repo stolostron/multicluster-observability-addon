@@ -70,6 +70,7 @@ func NewAddonManager(ctx context.Context, kubeConfig *rest.Config, scheme *runti
 	addonConfigValuesFn := addonfactory.GetAddOnDeploymentConfigValues(
 		addonfactory.NewAddOnDeploymentConfigGetter(addonClient),
 		addonfactory.ToAddOnCustomizedVariableValues,
+		addonfactory.ToAddOnResourceRequirementsValues,
 	)
 
 	agentLogger := logger.WithName("agent")

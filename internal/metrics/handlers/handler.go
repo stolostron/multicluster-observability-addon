@@ -53,6 +53,7 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 		InstallNamespace: opts.InstallNamespace,
 		NodeSelector:     opts.NodeSelector,
 		Tolerations:      opts.Tolerations,
+		ResourceReqs:     opts.ResourceReqs,
 		ProxyConfig:      opts.ProxyConfig,
 	}
 
@@ -251,6 +252,12 @@ func (o *OptionsBuilder) buildPrometheusAgent(ctx context.Context, opts *Options
 	// Apply addonDeploymentConfig settings
 	agent.Spec.Tolerations = opts.Tolerations
 	agent.Spec.NodeSelector = opts.NodeSelector
+
+	for _, resReq := range opts.ResourceReqs {
+		if resReq.ContainerID == "statefulsets:"+appName+":prometheus" {
+			agent.Spec.Resources = resReq.Resources
+		}
+	}
 
 	// Set the built agent in the appropriate workload option
 	switch appName {

@@ -27,12 +27,25 @@ spec:
         image: {{ .Values.images.kubeStateMetrics }}
         name: kube-state-metrics
         resources:
+        {{- $matched := false }}
+        {{- if .Values.global.resourceRequirements }}
+        {{- $reverseResourceRequirements := reverse .Values.global.resourceRequirements -}}
+        {{- range $requirement := $reverseResourceRequirements -}}
+          {{- if regexMatch $requirement.containerIDRegex (printf "deployments:%s:%s" (include "kube-state-metrics.fullname" .) "kube-state-metrics") }}
+            {{- $matched = true }}
+            {{- toYaml $requirement.resources | nindent 10 }}
+            {{- break -}}
+          {{- end -}}
+        {{- end }}
+        {{- end }}
+        {{- if not $matched }}
           limits:
             cpu: 100m
             memory: 250Mi
           requests:
             cpu: 10m
             memory: 190Mi
+        {{- end }}
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
@@ -49,12 +62,25 @@ spec:
         - containerPort: 8443
           name: https-main
         resources:
+        {{- $matched := false }}
+        {{- if .Values.global.resourceRequirements }}
+        {{- $reverseResourceRequirements := reverse .Values.global.resourceRequirements -}}
+        {{- range $requirement := $reverseResourceRequirements -}}
+          {{- if regexMatch $requirement.containerIDRegex (printf "deployments:%s:%s" (include "kube-state-metrics.fullname" .) "kube-rbac-proxy-main") }}
+            {{- $matched = true }}
+            {{- toYaml $requirement.resources | nindent 10 }}
+            {{- break -}}
+          {{- end -}}
+        {{- end }}
+        {{- end }}
+        {{- if not $matched }}
           limits:
             cpu: 40m
             memory: 400Mi
           requests:
             cpu: 20m
             memory: 20Mi
+        {{- end }}
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
@@ -71,12 +97,25 @@ spec:
         - containerPort: 9443
           name: https-self
         resources:
+        {{- $matched := false }}
+        {{- if .Values.global.resourceRequirements }}
+        {{- $reverseResourceRequirements := reverse .Values.global.resourceRequirements -}}
+        {{- range $requirement := $reverseResourceRequirements -}}
+          {{- if regexMatch $requirement.containerIDRegex (printf "deployment:%s:%s" (include "kube-state-metrics.fullname" .) "kube-rbac-proxy-self") }}
+            {{- $matched = true }}
+            {{- toYaml $requirement.resources | nindent 10 }}
+            {{- break -}}
+          {{- end -}}
+        {{- end }}
+        {{- end }}
+        {{- if not $matched }}
           limits:
             cpu: 20m
             memory: 400Mi
           requests:
             cpu: 10m
             memory: 20Mi
+        {{- end}}
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:

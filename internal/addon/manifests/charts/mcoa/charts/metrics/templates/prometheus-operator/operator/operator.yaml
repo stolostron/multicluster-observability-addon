@@ -1,4 +1,5 @@
 {{- if  .Values.deployCOOResources }}
+{{- $appName := .Values.prometheusOperator.appName }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -57,14 +58,40 @@ spec:
             drop:
               - ALL
         resources:
+        {{- $matched := false }}
+        {{- if .Values.global.resourceRequirements }}
+        {{- $reverseResourceRequirements := reverse .Values.global.resourceRequirements -}}
+        {{- range $requirement := $reverseResourceRequirements -}}
+          {{- if regexMatch $requirement.containerIDRegex (printf "deployments:%s:%s" $appName "prometheus-operator") }}
+            {{- $matched = true }}
+            {{- toYaml $requirement.resources | nindent 10 }}
+            {{- break -}}
+          {{- end -}}
+        {{- end }}
+        {{- end }}
+        {{- if not $matched }}
           requests:
             cpu: 5m
             memory: 100Mi
+        {{- end }}
       {{- if not .Values.deployNonOCPStack }}
       - resources:
+        {{- $matched := false }}
+        {{- if .Values.global.resourceRequirements }}
+        {{- $reverseResourceRequirements := reverse .Values.global.resourceRequirements -}}
+        {{- range $requirement := $reverseResourceRequirements -}}
+          {{- if regexMatch $requirement.containerIDRegex (printf "deployments:%s:%s" $appName "kube-rbac-proxy") }}
+            {{- $matched = true }}
+            {{- toYaml $requirement.resources | nindent 10 }}
+            {{- break -}}
+          {{- end -}}
+        {{- end }}
+        {{- end }}
+        {{- if not $matched }}
           requests:
             cpu: 1m
             memory: 15Mi
+        {{- end }}
         terminationMessagePath: /dev/termination-log
         name: kube-rbac-proxy
         securityContext:
