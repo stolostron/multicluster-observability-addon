@@ -122,6 +122,7 @@ func (a *AgentAddonWithSortedManifests) Manifests(cluster *clusterv1.ManagedClus
 	if err != nil {
 		return nil, err
 	}
+
 	// Sort the manifests to ensure a stable order of resources, which is crucial for
 	// fields like 'orphaningRules' in ManifestWork to prevent constant reconciliations.
 	slices.SortStableFunc(objects, func(a, b runtime.Object) int {

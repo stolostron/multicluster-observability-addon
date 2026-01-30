@@ -20,7 +20,7 @@ rules:
     resources: ["prometheusrules", "servicemonitors"]
     verbs: ["get", "list", "watch", "create", "update", "delete", "patch"]
   - apiGroups: ["monitoring.rhobs"]
-    resources: ["prometheusagents", "scrapeconfigs", "prometheusrules", "prometheuses"]
+    resources: ["prometheusagents", "scrapeconfigs", "prometheusrules", "prometheuses", "monitoringstacks"]
     verbs: ["get", "list", "watch", "create", "update", "delete", "patch"]
   - apiGroups: ["apiextensions.k8s.io"]
     resources: ["customresourcedefinitions"]
