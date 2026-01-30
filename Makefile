@@ -58,8 +58,12 @@ download-crds: $(CRD_DIR)/observability.openshift.io_clusterlogforwarders.yaml $
 fmt: $(GOFUMPT) ## Run gofumpt on source code.
 	find . -type f -name '*.go' -not -path '**/fake_*.go' -exec $(GOFUMPT) -w {} \;
 
+.PHONY: verify-dockerfile-labels
+verify-dockerfile-labels: ## Verify Dockerfile.Konflux RHEL version consistency
+	@./hack/verify-dockerfile-labels.sh
+
 .PHONY: lint
-lint: $(GOLANGCI_LINT) ## Run golangci-lint on source code.
+lint: $(GOLANGCI_LINT) verify-dockerfile-labels ## Run golangci-lint and dockerfile verification
 	$(GOLANGCI_LINT) config verify
 	$(GOLANGCI_LINT) run --timeout=5m ./...
 
