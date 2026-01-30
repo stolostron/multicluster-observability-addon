@@ -43,9 +43,6 @@ var (
 	serviceMonitorCRDName  = fmt.Sprintf("%s.%s", cooprometheusv1.ServiceMonitorName, cooprometheusv1.SchemeGroupVersion.Group)
 	podMonitorCRDName      = fmt.Sprintf("%s.%s", cooprometheusv1.PodMonitorName, cooprometheusv1.SchemeGroupVersion.Group)
 	probeCRDName           = fmt.Sprintf("%s.%s", cooprometheusv1.ProbeName, cooprometheusv1.SchemeGroupVersion.Group)
-
-	isEstablishedFeedbackPath      = ".status.conditions[?(@.type==\"Established\")].status"
-	lastTransitionTimeFeedbackPath = ".status.conditions[?(@.type==\"Established\")].lastTransitionTime"
 )
 
 func NewRegistrationOption(agentName string) *agent.RegistrationOption {
@@ -128,19 +125,19 @@ func getMetricsProbeFields() []agent.ProbeField {
 					JsonPaths: []workv1.JsonPath{
 						{
 							Name: addoncfg.PrometheusOperatorVersionFeedbackName,
-							Path: `.metadata.annotations.operator\.prometheus\.io/version`,
+							Path: addoncfg.PrometheusOperatorVersionFeedbackPath,
 						},
 						{
 							Name: addoncfg.IsEstablishedFeedbackName,
-							Path: isEstablishedFeedbackPath,
+							Path: addoncfg.IsEstablishedFeedbackPath,
 						},
 						{
 							Name: addoncfg.LastTransitionTimeFeedbackName,
-							Path: lastTransitionTimeFeedbackPath,
+							Path: addoncfg.LastTransitionTimeFeedbackPath,
 						},
 						{
 							Name: addoncfg.IsOLMManagedFeedbackName,
-							Path: `.metadata.labels.olm\.managed`,
+							Path: addoncfg.IsOLMManagedFeedbackPath,
 						},
 					},
 				},
@@ -158,11 +155,29 @@ func getMetricsProbeFields() []agent.ProbeField {
 					JsonPaths: []workv1.JsonPath{
 						{
 							Name: addoncfg.IsEstablishedFeedbackName, // needed for generating the sync annotation on the prometheus operator
-							Path: isEstablishedFeedbackPath,
+							Path: addoncfg.IsEstablishedFeedbackPath,
 						},
 						{
 							Name: addoncfg.LastTransitionTimeFeedbackName,
-							Path: lastTransitionTimeFeedbackPath,
+							Path: addoncfg.LastTransitionTimeFeedbackPath,
+						},
+					},
+				},
+			},
+		},
+		{
+			ResourceIdentifier: workv1.ResourceIdentifier{
+				Group:    apiextensionsv1.GroupName,
+				Resource: crdResourceName,
+				Name:     mconfig.MonitoringStackCRDName,
+			},
+			ProbeRules: []workv1.FeedbackRule{
+				{
+					Type: workv1.JSONPathsType,
+					JsonPaths: []workv1.JsonPath{
+						{
+							Name: addoncfg.IsOLMManagedFeedbackName,
+							Path: addoncfg.IsOLMManagedFeedbackPath,
 						},
 					},
 				},
@@ -255,7 +270,10 @@ func Updaters() []agent.Updater {
 	for i, crdName := range crdNames {
 		updaters[i] = agent.Updater{
 			UpdateStrategy: workv1.UpdateStrategy{
-				Type: workv1.UpdateStrategyTypeCreateOnly,
+				Type: workv1.UpdateStrategyTypeServerSideApply,
+				ServerSideApply: &workv1.ServerSideApplyConfig{
+					Force: false,
+				},
 			},
 			ResourceIdentifier: workv1.ResourceIdentifier{
 				Group:    apiextensionsv1.GroupName,
@@ -283,6 +301,17 @@ func Updaters() []agent.Updater {
 			Name:     mconfig.PrometheusCAConfigMapName,
 		},
 	})
+	updaters = append(updaters, agent.Updater{
+		UpdateStrategy: workv1.UpdateStrategy{
+			Type: workv1.UpdateStrategyTypeCreateOnly,
+		},
+		ResourceIdentifier: workv1.ResourceIdentifier{
+			Group:    apiextensionsv1.GroupName,
+			Resource: crdResourceName,
+			Name:     mconfig.MonitoringStackCRDName,
+		},
+	})
+
 	return updaters
 }
 

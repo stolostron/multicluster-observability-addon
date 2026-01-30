@@ -1,0 +1,30 @@
+{{- if or .Values.platformEnabled .Values.userWorkloadsEnabled }}
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: monitoringstacks.monitoring.rhobs
+  annotations:
+    note.admin/warning: "Placeholder only - waiting for OLM override"
+    {{- if not .Values.deployCOOResources }}
+    addon.open-cluster-management.io/deletion-orphan: ""
+    {{- end }}
+spec:
+  group: monitoring.rhobs
+  names:
+    plural: monitoringstacks
+    singular: monitoringstack
+    kind: MonitoringStack
+    listKind: MonitoringStackList
+  scope: Namespaced
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          description: >-
+            DO NOT USE! This is a placeholder CRD meant to be overwritten 
+            by the Operator Lifecycle Manager (OLM). Any instances created 
+            may be unstable or deleted.
+{{- end }}
