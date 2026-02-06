@@ -118,6 +118,10 @@ func runControllers(ctx context.Context, kubeConfig *rest.Config) error {
 	logger := log.NewLogger("mcoa", log.WithVerbosity(logVerbosity))
 	ctrl.SetLogger(logger)
 
+	// Increase client-side throttling limits to support large number of managed clusters
+	kubeConfig.QPS = 50.0
+	kubeConfig.Burst = 100
+
 	mgr, err := addonctrl.NewAddonManager(ctx, kubeConfig, scheme, logger)
 	if err != nil {
 		return fmt.Errorf("failed to create addon manager: %w", err)
