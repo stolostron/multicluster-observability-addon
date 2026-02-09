@@ -14,6 +14,17 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
+func init() {
+	// These flags are required by the github.com/perses/community-mixins/pkg/dashboards library.
+	// They are looked up in NewExec() which is called by NewDashboardWriter().
+	if flag.Lookup("output") == nil {
+		flag.String("output", "", "output format of the dashboard exec")
+	}
+	if flag.Lookup("output-dir") == nil {
+		flag.String("output-dir", "", "output directory of the dashboard exec")
+	}
+}
+
 func GetClusterVariable(datasource string) dashboard.Option {
 	return dashboard.AddVariable("cluster",
 		listVar.List(
@@ -146,8 +157,6 @@ func GetInstanceVariable(datasource string) dashboard.Option {
 
 // Upstream dashboards imported from the community-dashboards repository. https://github.com/perses/community-dashboards/tree/main/pkg/dashboards/kubernetes
 func BuildK8sDashboards(project string, datasource string, clusterLabelName string) (obj []runtime.Object, err error) {
-	flag.String("output", "", "output format of the dashboard exec")
-	flag.String("output-dir", "", "output directory of the dashboard exec")
 	dashboardWriter := dashboards.NewDashboardWriter()
 
 	dashboardVars := []dashboard.Option{
