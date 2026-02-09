@@ -76,9 +76,6 @@ spec:
           cpu: 10m
           memory: 200Mi
       {{- end }}
-      volumeMounts:
-      - name: proxy-config
-        mountPath: /etc/proxy-config
     - name: config-reloader
       resources:
         requests:
