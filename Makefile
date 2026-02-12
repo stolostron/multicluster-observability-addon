@@ -20,6 +20,7 @@ REGISTRY_BASE ?= $(REGISTRY_BASE_OPENSHIFT)
 
 # Image URL to use all building/pushing image targets
 IMG ?= $(REGISTRY_BASE)/multicluster-observability-addon:$(VERSION)
+PLATFORM ?= linux/amd64
 
 .PHONY: deps
 deps: go.mod go.sum
@@ -85,7 +86,7 @@ addon: deps fmt ## Build addon binary
 
 .PHONY: oci-build
 oci-build: ## Build the image
-	$(CONTAINER_ENGINE) build -t ${IMG} .
+	$(CONTAINER_ENGINE) build --platform $(PLATFORM) -t ${IMG} .
 
 .PHONY: oci-push
 oci-push: ## Push the image

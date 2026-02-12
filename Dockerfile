@@ -1,5 +1,8 @@
 # Build the manager binary
-FROM golang:1.25.3 as builder
+FROM --platform=$BUILDPLATFORM golang:1.25.3 as builder
+
+ARG TARGETOS
+ARG TARGETARCH
 
 WORKDIR /workspace
 # Copy the Go Modules manifests
@@ -14,7 +17,7 @@ COPY main.go main.go
 COPY internal/ internal/
 
 # Build
-RUN CGO_ENABLED=0 GOOS=linux GO111MODULE=on go build -mod=readonly -a -o multicluster-observability-addon main.go
+RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH GO111MODULE=on go build -mod=readonly -a -o multicluster-observability-addon main.go
 
 # Use distroless as minimal base image to package the manager binary
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
