@@ -144,7 +144,7 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 	// Reconcile metrics resources
 	objs := []common.DefaultConfig{}
-	images, err := mconfig.GetImageOverrides(ctx, r.Client)
+	images, err := mconfig.GetImageOverrides(ctx, r.Client, opts.Registries, r.Log)
 	if err != nil && !errors.IsNotFound(err) {
 		return ctrl.Result{}, fmt.Errorf("failed to get image overrides: %w", err)
 	}

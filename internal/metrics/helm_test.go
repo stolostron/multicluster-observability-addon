@@ -70,6 +70,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 		IsHub            bool
 		InstallNamespace string
 		ResourceReqs     bool
+		Registries       []addonapiv1alpha1.ImageMirror
 		Expects          func(*testing.T, []client.Object)
 	}{
 		"no metrics": {
@@ -359,6 +360,33 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				assert.Equal(t, expectedOperatorResources, operatorContainer.Resources)
 			},
 		},
+		"image registry overrides": {
+			PlatformMetrics: true,
+			UserMetrics:     false,
+			COOIsInstalled:  false,
+			IsOCP:           true,
+			Registries: []addonapiv1alpha1.ImageMirror{
+				{
+					Source: "quay.io/prometheus/obo-operator",
+					Mirror: "my-registry.com/prometheus/obo-operator",
+				},
+				{
+					Source: "quay.io/kube/rbac-proxy",
+					Mirror: "my-registry.com/kube/rbac-proxy",
+				},
+			},
+			Expects: func(t *testing.T, objects []client.Object) {
+				// Check Prometheus Agent image
+				agent := common.FilterResourcesByLabelSelector[*cooprometheusv1alpha1.PrometheusAgent](objects, config.PlatformPrometheusMatchLabels)
+				assert.Len(t, agent, 1)
+				assert.Equal(t, "my-registry.com/kube/rbac-proxy", agent[0].Spec.Containers[0].Image)
+
+				// Check COO Operator image
+				cooOperator := common.FilterResourcesByLabelSelector[*appsv1.Deployment](objects, nil)
+				assert.Len(t, cooOperator, 1)
+				assert.Equal(t, "my-registry.com/prometheus/obo-operator", cooOperator[0].Spec.Template.Spec.Containers[0].Image)
+			},
+		},
 	}
 
 	scheme := runtime.NewScheme()
@@ -502,6 +530,10 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				aodc.Spec.AgentInstallNamespace = tc.InstallNamespace
 			}
 
+			if len(tc.Registries) > 0 {
+				aodc.Spec.Registries = tc.Registries
+			}
+
 			if tc.ResourceReqs {
 				prometheusContainerID := "statefulsets:" + config.PlatformMetricsCollectorApp + ":prometheus"
 				operatorContainerID := "deployments:prometheus-operator:prometheus-operator"
@@ -572,11 +604,19 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 			)
 
 			// generate default agent resources
+			images, err := config.GetImageOverrides(context.Background(), client, tc.Registries, klog.Background())
+			require.NoError(t, err)
+
+			addonOpts := newAddonOptions(true, true)
+			addonOpts.Registries = tc.Registries
+
 			defaultStack := internalres.DefaultStackResources{
-				Client:       client,
-				CMAO:         cmao,
-				AddonOptions: newAddonOptions(true, true),
-				Logger:       klog.Background(),
+				Client:             client,
+				CMAO:               cmao,
+				AddonOptions:       addonOpts,
+				Logger:             klog.Background(),
+				KubeRBACProxyImage: images.KubeRBACProxy,
+				PrometheusImage:    images.Prometheus,
 			}
 
 			dc, err := defaultStack.Reconcile(context.Background())
@@ -609,7 +649,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 
 			// Wire everything together to a fake addon instance
 			agentAddon, err := addonfactory.NewAgentAddonFactory(addoncfg.Name, addon.FS, addoncfg.MetricsChartDir).
-				WithGetValuesFuncs(addonConfigValuesFn, fakeGetValues(client, tc.PlatformMetrics, tc.UserMetrics, tc.InstallNamespace, aodc.Spec.ResourceRequirements)).
+				WithGetValuesFuncs(addonConfigValuesFn, fakeGetValues(client, tc.PlatformMetrics, tc.UserMetrics, tc.InstallNamespace, aodc.Spec.ResourceRequirements, tc.Registries)).
 				WithAgentRegistrationOption(&agent.RegistrationOption{}).
 				WithAgentInstallNamespace(
 					// Set agent install namespace from addon deployment config if it exists
@@ -900,7 +940,7 @@ func TestHelmBuild_Metrics_HCP(t *testing.T) {
 
 	// Wire everything together to a fake addon instance
 	agentAddon, err := addonfactory.NewAgentAddonFactory(addoncfg.Name, addon.FS, addoncfg.MetricsChartDir).
-		WithGetValuesFuncs(addonConfigValuesFn, fakeGetValues(client, false, true, "", nil)).
+		WithGetValuesFuncs(addonConfigValuesFn, fakeGetValues(client, false, true, "", nil, nil)).
 		WithAgentRegistrationOption(&agent.RegistrationOption{}).
 		WithScheme(scheme).
 		BuildHelmAgentAddon()
@@ -960,7 +1000,7 @@ func newSecret(name, ns string) *corev1.Secret {
 	}
 }
 
-func fakeGetValues(k8s client.Client, platformMetrics, userWorkloadMetrics bool, installNs string, resReqs []addonapiv1alpha1.ContainerResourceRequirements) addonfactory.GetValuesFunc {
+func fakeGetValues(k8s client.Client, platformMetrics, userWorkloadMetrics bool, installNs string, resReqs []addonapiv1alpha1.ContainerResourceRequirements, registries []addonapiv1alpha1.ImageMirror) addonfactory.GetValuesFunc {
 	return func(
 		cluster *clusterv1.ManagedCluster,
 		mcAddon *addonapiv1alpha1.ManagedClusterAddOn,
@@ -978,6 +1018,7 @@ func fakeGetValues(k8s client.Client, platformMetrics, userWorkloadMetrics bool,
 			UserWorkloads: addon.UserWorkloadOptions{
 				Metrics: addon.MetricsOptions{CollectionEnabled: userWorkloadMetrics},
 			},
+			Registries: registries,
 		}
 
 		if installNs != "" {

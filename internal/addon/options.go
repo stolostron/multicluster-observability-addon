@@ -107,6 +107,7 @@ type Options struct {
 	NodeSelector     map[string]string
 	ResourceReqs     []addonapiv1alpha1.ContainerResourceRequirements
 	ProxyConfig      ProxyConfig
+	Registries       []addonapiv1alpha1.ImageMirror
 }
 
 func (o Options) validate() error {
@@ -154,6 +155,7 @@ func BuildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Opti
 	}
 
 	opts.ProxyConfig.NoProxy = addOnDeployment.Spec.ProxyConfig.NoProxy
+	opts.Registries = addOnDeployment.Spec.Registries
 
 	if addOnDeployment.Spec.CustomizedVariables == nil {
 		return opts, nil

@@ -14,10 +14,12 @@ import (
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	kubescheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
@@ -172,6 +174,70 @@ func TestReconcileAgent(t *testing.T) {
 	// Check uwl specific values: appName and ScrapeConfigNamespaceSelector
 	assert.Equal(t, foundAgent.Spec.ServiceAccountName, config.UserWorkloadMetricsCollectorApp)
 	assert.Equal(t, foundAgent.Spec.ScrapeConfigNamespaceSelector, &metav1.LabelSelector{})
+}
+
+func TestReconcileAgentWithRegistries(t *testing.T) {
+	cmao := newCMAO()
+	registries := []addonv1alpha1.ImageMirror{
+		{
+			Source: "quay.io/prometheus/prometheus",
+			Mirror: "my-registry.com/prometheus/prometheus",
+		},
+		{
+			Source: "quay.io/kube/rbac-proxy",
+			Mirror: "my-registry.com/kube/rbac-proxy",
+		},
+	}
+	opts := newAddonOptions(true, true)
+	opts.Registries = registries
+
+	baseImages := map[string]string{
+		"prometheus_config_reloader":    "quay.io/prometheus/config-reloader",
+		"kube_rbac_proxy":               "quay.io/kube/rbac-proxy",
+		"obo_prometheus_rhel9_operator": "quay.io/prometheus/obo-operator",
+		"kube_state_metrics":            "quay.io/kube/kube-state-metrics",
+		"node_exporter":                 "quay.io/kube/node-exporter",
+		"prometheus":                    "quay.io/prometheus/prometheus",
+	}
+
+	imagesCM := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      config.ImagesConfigMapObjKey.Name,
+			Namespace: config.ImagesConfigMapObjKey.Namespace,
+		},
+		Data: baseImages,
+	}
+
+	scheme := newTestScheme()
+	fakeClient := fake.NewClientBuilder().
+		WithInterceptorFuncs(ensureGVKIsSet(scheme)).
+		WithScheme(scheme).
+		WithObjects(cmao, imagesCM).
+		Build()
+
+	images, err := config.GetImageOverrides(context.Background(), fakeClient, opts.Registries, klog.Background())
+	require.NoError(t, err)
+
+	d := DefaultStackResources{
+		Client:             fakeClient,
+		CMAO:               cmao,
+		AddonOptions:       opts,
+		Logger:             klog.Background(),
+		KubeRBACProxyImage: images.KubeRBACProxy,
+		PrometheusImage:    images.Prometheus,
+	}
+
+	placementRef := addonv1alpha1.PlacementRef{Name: "my-placement", Namespace: "my-namespace"}
+	retAgent, err := d.reconcileAgentForPlacement(context.Background(), placementRef, false)
+	assert.NoError(t, err)
+
+	foundAgent := cooprometheusv1alpha1.PrometheusAgent{}
+	err = fakeClient.Get(context.Background(), types.NamespacedName{Namespace: retAgent.Config.Namespace, Name: retAgent.Config.Name}, &foundAgent)
+	assert.NoError(t, err)
+
+	// Check overridden images
+	assert.Equal(t, "my-registry.com/prometheus/prometheus", *foundAgent.Spec.Image)
+	assert.Equal(t, "my-registry.com/kube/rbac-proxy", foundAgent.Spec.Containers[0].Image)
 }
 
 func TestReconcile(t *testing.T) {
@@ -797,6 +863,7 @@ func TestGetPrometheusRules(t *testing.T) {
 
 func newTestScheme() *runtime.Scheme {
 	s := runtime.NewScheme()
+	_ = kubescheme.AddToScheme(s)
 	_ = addonv1alpha1.AddToScheme(s)
 	_ = cooprometheusv1alpha1.AddToScheme(s)
 	_ = prometheusv1.AddToScheme(s)
