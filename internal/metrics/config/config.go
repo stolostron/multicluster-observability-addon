@@ -12,6 +12,7 @@ import (
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -102,7 +103,7 @@ type ImageOverrides struct {
 	Prometheus                 string `json:"prometheus"`
 }
 
-func GetImageOverrides(ctx context.Context, c client.Client) (ImageOverrides, error) {
+func GetImageOverrides(ctx context.Context, c client.Client, registries []addonapiv1alpha1.ImageMirror, logger logr.Logger) (ImageOverrides, error) {
 	ret := ImageOverrides{}
 	// Get the ACM images overrides
 	imagesList := &corev1.ConfigMap{}
@@ -128,7 +129,42 @@ func GetImageOverrides(ctx context.Context, c client.Client) (ImageOverrides, er
 		return ret, fmt.Errorf("%w: %+v", ErrMissingImageOverride, ret)
 	}
 
+	// Apply registry overrides
+	if len(registries) > 0 {
+		ret.PrometheusConfigReloader = overrideImage(ret.PrometheusConfigReloader, registries, logger)
+		ret.KubeRBACProxy = overrideImage(ret.KubeRBACProxy, registries, logger)
+		ret.CooPrometheusOperatorImage = overrideImage(ret.CooPrometheusOperatorImage, registries, logger)
+		ret.KubeStateMetrics = overrideImage(ret.KubeStateMetrics, registries, logger)
+		ret.NodeExporter = overrideImage(ret.NodeExporter, registries, logger)
+		ret.Prometheus = overrideImage(ret.Prometheus, registries, logger)
+	}
+
 	return ret, nil
+}
+
+func overrideImage(image string, registries []addonapiv1alpha1.ImageMirror, logger logr.Logger) string {
+	for _, registry := range registries {
+		if !strings.HasPrefix(image, registry.Source) {
+			continue
+		}
+
+		// If lengths are equal, it's an exact match (e.g. image has no tag/digest, or source includes them)
+		if len(image) == len(registry.Source) {
+			return strings.Replace(image, registry.Source, registry.Mirror, 1)
+		}
+
+		// Check the character immediately following the match to ensure we matched a full image name component.
+		// Allowed boundaries for an image override are ':' (tag) or '@' (digest).
+		// We explicitly do NOT allow '/' as that would imply a registry or org level override.
+		nextChar := image[len(registry.Source)]
+		if nextChar == ':' || nextChar == '@' {
+			return strings.Replace(image, registry.Source, registry.Mirror, 1)
+		}
+
+		// It matches as a prefix but it is not a full image override (e.g. matched "quay.io/org" against "quay.io/org/repo")
+		logger.Info("Registry override ignored as it does not reference a full image", "source", registry.Source, "mirror", registry.Mirror, "image", image)
+	}
+	return image
 }
 
 func HasHostedCLusters(ctx context.Context, c client.Client, logger logr.Logger) bool {
