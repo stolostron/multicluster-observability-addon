@@ -77,7 +77,7 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 
 	// Fetch image overrides
 	var err error
-	ret.Images, err = config.GetImageOverrides(ctx, o.Client)
+	ret.Images, err = config.GetImageOverrides(ctx, o.Client, opts.Registries, o.Logger)
 	if err != nil {
 		return ret, fmt.Errorf("failed to get image overrides: %w", err)
 	}
