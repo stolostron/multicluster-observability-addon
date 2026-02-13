@@ -69,6 +69,7 @@ func Test_AgentHealthProber_PPA(t *testing.T) {
 							},
 						},
 					},
+					scrapeConfigFieldResult(),
 				}, managedCluster, managedClusterAddOn)
 			if tc.expectedErr != nil {
 				require.ErrorIs(t, err, tc.expectedErr)
@@ -140,6 +141,7 @@ func Test_AgentHealthProber_PPA_UserWorkload(t *testing.T) {
 							},
 						},
 					},
+					scrapeConfigFieldResult(),
 				}, managedCluster, managedClusterAddOn)
 			if tc.expectedErr != nil {
 				require.ErrorIs(t, err, tc.expectedErr)
@@ -290,6 +292,7 @@ func Test_AgentHealthProber_UIPlugin(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			healthProber := HealthProber(fake.NewClientBuilder().WithScheme(scheme).WithObjects(aodc).Build(), logr.Discard())
+			metricsStatus := "True"
 			err := healthProber.WorkProber.HealthChecker([]agent.FieldResult{
 				{
 					ResourceIdentifier: workv1.ResourceIdentifier{
@@ -309,6 +312,26 @@ func Test_AgentHealthProber_UIPlugin(t *testing.T) {
 						},
 					},
 				},
+				{
+					ResourceIdentifier: workv1.ResourceIdentifier{
+						Group:     cooprometheusv1alpha1.SchemeGroupVersion.Group,
+						Resource:  cooprometheusv1alpha1.PrometheusAgentName,
+						Name:      mconfig.PlatformMetricsCollectorApp,
+						Namespace: addonfactory.AddonDefaultInstallNamespace,
+					},
+					FeedbackResult: workv1.StatusFeedbackResult{
+						Values: []workv1.FeedbackValue{
+							{
+								Name: addoncfg.PaProbeKey,
+								Value: workv1.FieldValue{
+									Type:   workv1.String,
+									String: &metricsStatus,
+								},
+							},
+						},
+					},
+				},
+				scrapeConfigFieldResult(),
 			}, managedCluster, managedClusterAddOn)
 			if tc.expectedErr != nil {
 				require.ErrorIs(t, err, tc.expectedErr)
@@ -316,6 +339,117 @@ func Test_AgentHealthProber_UIPlugin(t *testing.T) {
 			}
 			require.NoError(t, err)
 		})
+	}
+}
+
+func Test_AgentHealthProber_MissingResources(t *testing.T) {
+	managedCluster := addontesting.NewManagedCluster("cluster-1")
+	managedClusterAddOn := addontesting.NewAddon("test", "cluster-1")
+	scheme := runtime.NewScheme()
+	require.NoError(t, addonapiv1alpha1.AddToScheme(scheme))
+
+	t.Run("metrics enabled but missing prometheus agent", func(t *testing.T) {
+		aodc := newAddonDeploymentConfig()
+		addPlatformMetricsCustomizedVariables(aodc)
+		addAODCConfigReference(managedClusterAddOn, aodc)
+
+		healthProber := HealthProber(fake.NewClientBuilder().WithScheme(scheme).WithObjects(aodc).Build(), logr.Discard())
+		err := healthProber.WorkProber.HealthChecker(
+			[]agent.FieldResult{scrapeConfigFieldResult()}, // Missing PPA
+			managedCluster, managedClusterAddOn)
+		require.ErrorIs(t, err, errMissingFields)
+	})
+
+	t.Run("metrics enabled but missing scrape config", func(t *testing.T) {
+		aodc := newAddonDeploymentConfig()
+		addPlatformMetricsCustomizedVariables(aodc)
+		addAODCConfigReference(managedClusterAddOn, aodc)
+
+		healthProber := HealthProber(fake.NewClientBuilder().WithScheme(scheme).WithObjects(aodc).Build(), logr.Discard())
+
+		status := "True"
+		ppaField := agent.FieldResult{
+			ResourceIdentifier: workv1.ResourceIdentifier{
+				Group:     cooprometheusv1alpha1.SchemeGroupVersion.Group,
+				Resource:  cooprometheusv1alpha1.PrometheusAgentName,
+				Name:      mconfig.PlatformMetricsCollectorApp,
+				Namespace: addonfactory.AddonDefaultInstallNamespace,
+			},
+			FeedbackResult: workv1.StatusFeedbackResult{
+				Values: []workv1.FeedbackValue{
+					{
+						Name: addoncfg.PaProbeKey,
+						Value: workv1.FieldValue{
+							Type:   workv1.String,
+							String: &status,
+						},
+					},
+				},
+			},
+		}
+
+		err := healthProber.WorkProber.HealthChecker(
+			[]agent.FieldResult{ppaField}, // Missing Scrape Config
+			managedCluster, managedClusterAddOn)
+		require.ErrorIs(t, err, errMissingFields)
+	})
+
+	t.Run("logging enabled but missing clf", func(t *testing.T) {
+		aodc := newAddonDeploymentConfig()
+		addLoggingCustomizedVariables(aodc)
+		addAODCConfigReference(managedClusterAddOn, aodc)
+
+		healthProber := HealthProber(fake.NewClientBuilder().WithScheme(scheme).WithObjects(aodc).Build(), logr.Discard())
+		err := healthProber.WorkProber.HealthChecker(
+			// We pass an unrelated field to bypass the initial check for empty fields
+			// in the healthChecker function.
+			[]agent.FieldResult{scrapeConfigFieldResult()}, // unrelated field to bypass empty check
+			managedCluster, managedClusterAddOn)
+		require.ErrorIs(t, err, errMissingFields)
+	})
+
+	t.Run("tracing enabled but missing otel collector", func(t *testing.T) {
+		aodc := newAddonDeploymentConfig()
+		addTracingCustomizedVariables(aodc)
+		addAODCConfigReference(managedClusterAddOn, aodc)
+
+		healthProber := HealthProber(fake.NewClientBuilder().WithScheme(scheme).WithObjects(aodc).Build(), logr.Discard())
+		err := healthProber.WorkProber.HealthChecker(
+			// We pass an unrelated field to bypass the initial check for empty fields
+			// in the healthChecker function.
+			[]agent.FieldResult{scrapeConfigFieldResult()}, // unrelated field
+			managedCluster, managedClusterAddOn)
+		require.ErrorIs(t, err, errMissingFields)
+	})
+}
+
+func scrapeConfigFieldResult() agent.FieldResult {
+	version := "0.79.0"
+	isEstablished := "True"
+	return agent.FieldResult{
+		ResourceIdentifier: workv1.ResourceIdentifier{
+			Group:    "apiextensions.k8s.io",
+			Resource: "customresourcedefinitions",
+			Name:     "scrapeconfigs.monitoring.rhobs",
+		},
+		FeedbackResult: workv1.StatusFeedbackResult{
+			Values: []workv1.FeedbackValue{
+				{
+					Name: addoncfg.PrometheusOperatorVersionFeedbackName,
+					Value: workv1.FieldValue{
+						Type:   workv1.String,
+						String: &version,
+					},
+				},
+				{
+					Name: addoncfg.IsEstablishedFeedbackName,
+					Value: workv1.FieldValue{
+						Type:   workv1.String,
+						String: &isEstablished,
+					},
+				},
+			},
+		},
 	}
 }
 
