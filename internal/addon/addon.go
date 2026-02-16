@@ -356,7 +356,6 @@ func checkMetrics(fields []agent.FieldResult, opts Options, isOCP bool) error {
 
 	foundPlatformMetrics := false
 	foundUserWorkloadMetrics := false
-	foundScrapeConfigCRD := false
 
 	for _, field := range fields {
 		identifier := field.ResourceIdentifier
@@ -386,7 +385,6 @@ func checkMetrics(fields []agent.FieldResult, opts Options, isOCP bool) error {
 				if err := checkScrapeConfigCRD(field.FeedbackResult.Values); err != nil {
 					return fmt.Errorf("%w: %s with key %s", err, identifier.Resource, identifier.Name)
 				}
-				foundScrapeConfigCRD = true
 			}
 		}
 	}
@@ -397,10 +395,6 @@ func checkMetrics(fields []agent.FieldResult, opts Options, isOCP bool) error {
 
 	if opts.UserWorkloads.Metrics.CollectionEnabled && isOCP && !foundUserWorkloadMetrics {
 		return fmt.Errorf("%w: %s with name %s", errMissingFields, cooprometheusv1alpha1.PrometheusAgentName, mconfig.UserWorkloadMetricsCollectorApp)
-	}
-
-	if !foundScrapeConfigCRD {
-		return fmt.Errorf("%w: %s with name %s", errMissingFields, crdResourceName, scrapeConfigCRDName)
 	}
 
 	return nil
