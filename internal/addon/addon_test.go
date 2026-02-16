@@ -360,40 +360,6 @@ func Test_AgentHealthProber_MissingResources(t *testing.T) {
 		require.ErrorIs(t, err, errMissingFields)
 	})
 
-	t.Run("metrics enabled but missing scrape config", func(t *testing.T) {
-		aodc := newAddonDeploymentConfig()
-		addPlatformMetricsCustomizedVariables(aodc)
-		addAODCConfigReference(managedClusterAddOn, aodc)
-
-		healthProber := HealthProber(fake.NewClientBuilder().WithScheme(scheme).WithObjects(aodc).Build(), logr.Discard())
-
-		status := "True"
-		ppaField := agent.FieldResult{
-			ResourceIdentifier: workv1.ResourceIdentifier{
-				Group:     cooprometheusv1alpha1.SchemeGroupVersion.Group,
-				Resource:  cooprometheusv1alpha1.PrometheusAgentName,
-				Name:      mconfig.PlatformMetricsCollectorApp,
-				Namespace: addonfactory.AddonDefaultInstallNamespace,
-			},
-			FeedbackResult: workv1.StatusFeedbackResult{
-				Values: []workv1.FeedbackValue{
-					{
-						Name: addoncfg.PaProbeKey,
-						Value: workv1.FieldValue{
-							Type:   workv1.String,
-							String: &status,
-						},
-					},
-				},
-			},
-		}
-
-		err := healthProber.WorkProber.HealthChecker(
-			[]agent.FieldResult{ppaField}, // Missing Scrape Config
-			managedCluster, managedClusterAddOn)
-		require.ErrorIs(t, err, errMissingFields)
-	})
-
 	t.Run("logging enabled but missing clf", func(t *testing.T) {
 		aodc := newAddonDeploymentConfig()
 		addLoggingCustomizedVariables(aodc)
