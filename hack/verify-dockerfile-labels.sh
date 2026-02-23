@@ -51,7 +51,7 @@ if [ "$from_rhel" != "$name_rhel" ] || [ "$from_rhel" != "$cpe_rhel" ]; then
   echo ""
   echo "When updating RHEL versions, you must update:"
   echo '  1. FROM registry.access.redhat.com/ubi{VERSION}/ubi-minimal:latest'
-  echo '  2. name="rhacm2/multicluster-observability-addon-rhel{VERSION}"'
+  echo '  2. name="rhacm2/acm-multicluster-observability-addon-rhel{VERSION}"'
   echo '  3. cpe="cpe:/a:redhat:acm:{ACM_VER}::el{VERSION}"'
   exit 1
 fi
