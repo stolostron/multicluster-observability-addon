@@ -7,10 +7,11 @@ import (
 	panelgroup "github.com/perses/perses/go-sdk/panel-group"
 	listVar "github.com/perses/perses/go-sdk/variable/list-variable"
 	labelValuesVar "github.com/perses/plugins/prometheus/sdk/go/variable/label-values"
+	"github.com/prometheus/prometheus/model/labels"
 	panels "github.com/stolostron/multicluster-observability-addon/internal/perses/panels/acm"
 )
 
-func withRealTimeDataGroup(datasource string, labelMatcher promql.LabelMatcher) dashboard.Option {
+func withRealTimeDataGroup(datasource string, labelMatcher *labels.Matcher) dashboard.Option {
 	return dashboard.AddPanelGroup("Real Time Data",
 		panelgroup.PanelsPerLine(1),
 		panels.ClustersWithAlertSeverity(datasource, labelMatcher),
@@ -18,7 +19,7 @@ func withRealTimeDataGroup(datasource string, labelMatcher promql.LabelMatcher) 
 }
 
 func BuildACMClustersByAlert(project string, datasource string, clusterLabelName string) (dashboard.Builder, error) {
-	clusterLabelMatcher := dashboards.GetClusterLabelMatcher(clusterLabelName)
+	clusterLabelMatcher := dashboards.GetClusterLabelMatcherV2(clusterLabelName)
 	return dashboard.New("acm-clusters-by-alert",
 		dashboard.ProjectName(project),
 		dashboard.Name("Clusters by Alert"),

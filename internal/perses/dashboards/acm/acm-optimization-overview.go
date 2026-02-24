@@ -7,10 +7,11 @@ import (
 	panelgroup "github.com/perses/perses/go-sdk/panel-group"
 	listVar "github.com/perses/perses/go-sdk/variable/list-variable"
 	labelValuesVar "github.com/perses/plugins/prometheus/sdk/go/variable/label-values"
+	"github.com/prometheus/prometheus/model/labels"
 	panels "github.com/stolostron/multicluster-observability-addon/internal/perses/panels/acm"
 )
 
-func withCPUGroup(datasource string, labelMatcher promql.LabelMatcher) dashboard.Option {
+func withCPUGroup(datasource string, labelMatcher *labels.Matcher) dashboard.Option {
 	return dashboard.AddPanelGroup("CPU",
 		panelgroup.PanelsPerLine(2),
 		panels.CPUOverestimationPanel(datasource, labelMatcher),
@@ -21,7 +22,7 @@ func withCPUGroup(datasource string, labelMatcher promql.LabelMatcher) dashboard
 	)
 }
 
-func withMemoryGroup(datasource string, labelMatcher promql.LabelMatcher) dashboard.Option {
+func withMemoryGroup(datasource string, labelMatcher *labels.Matcher) dashboard.Option {
 	return dashboard.AddPanelGroup("Memory",
 		panelgroup.PanelsPerLine(2),
 		panels.MemoryOverestimationPanel(datasource, labelMatcher),
@@ -32,7 +33,7 @@ func withMemoryGroup(datasource string, labelMatcher promql.LabelMatcher) dashbo
 	)
 }
 
-func withNetworkingGroup(datasource string, labelMatcher promql.LabelMatcher) dashboard.Option {
+func withNetworkingGroup(datasource string, labelMatcher *labels.Matcher) dashboard.Option {
 	return dashboard.AddPanelGroup("Networking",
 		panelgroup.PanelsPerLine(2),
 		panels.NetworkingCurrentStatusPanel(datasource, labelMatcher),
@@ -40,7 +41,7 @@ func withNetworkingGroup(datasource string, labelMatcher promql.LabelMatcher) da
 }
 
 func BuildACMOptimizationOverview(project string, datasource string, clusterLabelName string) (dashboard.Builder, error) {
-	clusterLabelMatcher := dashboards.GetClusterLabelMatcher(clusterLabelName)
+	clusterLabelMatcher := dashboards.GetClusterLabelMatcherV2(clusterLabelName)
 	return dashboard.New("acm-optimization-overview",
 		dashboard.ProjectName(project),
 		dashboard.Name("ACM Resource Optimization / Cluster"),

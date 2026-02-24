@@ -1,8 +1,6 @@
 package acm
 
 import (
-	"flag"
-
 	dashboards "github.com/perses/community-mixins/pkg/dashboards"
 	k8sEtcd "github.com/perses/community-mixins/pkg/dashboards/etcd"
 	k8sApiServer "github.com/perses/community-mixins/pkg/dashboards/kubernetes/apiserver"
@@ -11,6 +9,8 @@ import (
 	"github.com/perses/perses/go-sdk/dashboard"
 	listVar "github.com/perses/perses/go-sdk/variable/list-variable"
 	labelValuesVar "github.com/perses/plugins/prometheus/sdk/go/variable/label-values"
+	"github.com/perses/promql-builder/vector"
+	"github.com/prometheus/prometheus/model/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -31,10 +31,11 @@ func GetClusterVariable(datasource string) dashboard.Option {
 			labelValuesVar.PrometheusLabelValues("name",
 				dashboards.AddVariableDatasource(datasource),
 				labelValuesVar.Matchers(
-					promql.SetLabelMatchers(
-						"acm_managed_cluster_labels{openshiftVersion_major!=\"3\"}",
-						[]promql.LabelMatcher{},
-					)),
+					promql.SetLabelMatchersV2(
+						vector.New(vector.WithMetricName("acm_managed_cluster_labels{openshiftVersion_major!=\"3\"}")),
+						[]*labels.Matcher{},
+					).Pretty(0),
+				),
 			),
 			listVar.DisplayName("cluster"),
 			listVar.AllowAllValue(false),
@@ -48,10 +49,10 @@ func GetNodeVariable(datasource string) dashboard.Option {
 		listVar.List(
 			labelValuesVar.PrometheusLabelValues("node",
 				labelValuesVar.Matchers(
-					promql.SetLabelMatchers(
-						"kube_pod_info",
-						[]promql.LabelMatcher{{Name: "cluster", Type: "=", Value: "$cluster"}},
-					),
+					promql.SetLabelMatchersV2(
+						vector.New(vector.WithMetricName("kube_pod_info")),
+						[]*labels.Matcher{{Name: "cluster", Type: labels.MatchEqual, Value: "$cluster"}},
+					).Pretty(0),
 				),
 				dashboards.AddVariableDatasource(datasource),
 			),
@@ -65,10 +66,10 @@ func GetNamespaceVariable(datasource string) dashboard.Option {
 		listVar.List(
 			labelValuesVar.PrometheusLabelValues("namespace",
 				labelValuesVar.Matchers(
-					promql.SetLabelMatchers(
-						"kube_pod_info",
-						[]promql.LabelMatcher{{Name: "cluster", Type: "=", Value: "$cluster"}},
-					),
+					promql.SetLabelMatchersV2(
+						vector.New(vector.WithMetricName("kube_pod_info")),
+						[]*labels.Matcher{{Name: "cluster", Type: labels.MatchEqual, Value: "$cluster"}},
+					).Pretty(0),
 				),
 				dashboards.AddVariableDatasource(datasource),
 			),
@@ -82,13 +83,13 @@ func GetPodVariable(datasource string) dashboard.Option {
 		listVar.List(
 			labelValuesVar.PrometheusLabelValues("pod",
 				labelValuesVar.Matchers(
-					promql.SetLabelMatchers(
-						"kube_pod_info",
-						[]promql.LabelMatcher{
-							{Name: "cluster", Type: "=", Value: "$cluster"},
-							{Name: "namespace", Type: "=", Value: "$namespace"},
+					promql.SetLabelMatchersV2(
+						vector.New(vector.WithMetricName("kube_pod_info")),
+						[]*labels.Matcher{
+							{Name: "cluster", Type: labels.MatchEqual, Value: "$cluster"},
+							{Name: "namespace", Type: labels.MatchEqual, Value: "$namespace"},
 						},
-					),
+					).Pretty(0),
 				),
 				dashboards.AddVariableDatasource(datasource),
 			),
@@ -102,13 +103,13 @@ func GetWorkloadVariable(datasource string) dashboard.Option {
 		listVar.List(
 			labelValuesVar.PrometheusLabelValues("workload",
 				labelValuesVar.Matchers(
-					promql.SetLabelMatchers(
-						"namespace_workload_pod:kube_pod_owner:relabel",
-						[]promql.LabelMatcher{
-							{Name: "cluster", Type: "=", Value: "$cluster"},
-							{Name: "namespace", Type: "=", Value: "$namespace"},
+					promql.SetLabelMatchersV2(
+						vector.New(vector.WithMetricName("namespace_workload_pod:kube_pod_owner:relabel")),
+						[]*labels.Matcher{
+							{Name: "cluster", Type: labels.MatchEqual, Value: "$cluster"},
+							{Name: "namespace", Type: labels.MatchEqual, Value: "$namespace"},
 						},
-					),
+					).Pretty(0),
 				),
 				dashboards.AddVariableDatasource(datasource),
 			),
@@ -122,14 +123,14 @@ func GetTypeVariable(datasource string) dashboard.Option {
 		listVar.List(
 			labelValuesVar.PrometheusLabelValues("workload_type",
 				labelValuesVar.Matchers(
-					promql.SetLabelMatchers(
-						"namespace_workload_pod:kube_pod_owner:relabel",
-						[]promql.LabelMatcher{
-							{Name: "cluster", Type: "=", Value: "$cluster"},
-							{Name: "namespace", Type: "=", Value: "$namespace"},
-							{Name: "workload", Type: "=", Value: "$workload"},
+					promql.SetLabelMatchersV2(
+						vector.New(vector.WithMetricName("namespace_workload_pod:kube_pod_owner:relabel")),
+						[]*labels.Matcher{
+							{Name: "cluster", Type: labels.MatchEqual, Value: "$cluster"},
+							{Name: "namespace", Type: labels.MatchEqual, Value: "$namespace"},
+							{Name: "workload", Type: labels.MatchEqual, Value: "$workload"},
 						},
-					),
+					).Pretty(0),
 				),
 				dashboards.AddVariableDatasource(datasource),
 			),
@@ -143,10 +144,10 @@ func GetInstanceVariable(datasource string) dashboard.Option {
 		listVar.List(
 			labelValuesVar.PrometheusLabelValues("instance",
 				labelValuesVar.Matchers(
-					promql.SetLabelMatchers(
-						"process_resident_memory_bytes",
-						[]promql.LabelMatcher{{Name: "cluster", Type: "=", Value: "$cluster"}},
-					),
+					promql.SetLabelMatchersV2(
+						vector.New(vector.WithMetricName("process_resident_memory_bytes")),
+						[]*labels.Matcher{{Name: "cluster", Type: labels.MatchEqual, Value: "$cluster"}},
+					).Pretty(0),
 				),
 				dashboards.AddVariableDatasource(datasource),
 			),
@@ -187,13 +188,13 @@ func BuildK8sDashboards(project string, datasource string, clusterLabelName stri
 		GetTypeVariable(datasource),
 	}
 	dashboardWriter.Add(k8sComputeResources.BuildKubernetesWorkloadOverview(project, datasource, clusterLabelName, dashboardVars...))
+	dashboardWriter.Add(k8sComputeResources.BuildKubernetesWorkloadNamespaceOverview(project, datasource, clusterLabelName, dashboardVars...))
 
 	dashboardVars = []dashboard.Option{
 		GetClusterVariable(datasource),
 		GetNamespaceVariable(datasource),
 		GetTypeVariable(datasource),
 	}
-	dashboardWriter.Add(k8sComputeResources.BuildKubernetesWorkloadNamespaceOverview(project, datasource, clusterLabelName, dashboardVars...))
 	dashboardWriter.Add(k8sComputeResources.BuildKubernetesMultiClusterOverview(project, datasource, clusterLabelName))
 
 	dashboardVars = []dashboard.Option{

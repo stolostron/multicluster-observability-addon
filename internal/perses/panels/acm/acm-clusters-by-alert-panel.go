@@ -7,9 +7,10 @@ import (
 	panelgroup "github.com/perses/perses/go-sdk/panel-group"
 	"github.com/perses/plugins/prometheus/sdk/go/query"
 	timeSeriesPanel "github.com/perses/plugins/timeserieschart/sdk/go"
+	"github.com/prometheus/prometheus/model/labels"
 )
 
-func ClustersWithAlertSeverity(datasourceName string, labelMatchers ...promql.LabelMatcher) panelgroup.Option {
+func ClustersWithAlertSeverity(datasourceName string, labelMatchers ...*labels.Matcher) panelgroup.Option {
 	return panelgroup.AddPanel("Clusters with Alert - Severity ($severity)",
 		panel.Description("Alert: $alert - $description"),
 		timeSeriesPanel.Chart(
@@ -28,10 +29,10 @@ func ClustersWithAlertSeverity(datasourceName string, labelMatchers ...promql.La
 		),
 		panel.AddQuery(
 			query.PromQL(
-				promql.SetLabelMatchers(
-					"sum(ALERTS{alertstate=\"firing\", alertname=~\"$alert\", severity=~\"$severity\"}) by (cluster)",
+				promql.SetLabelMatchersV2(
+					ACMCommonPanelQueries["ClustersWithAlertSeverity"],
 					labelMatchers,
-				),
+				).Pretty(0),
 				query.SeriesNameFormat("{{ cluster }}"),
 				dashboards.AddQueryDataSource(datasourceName),
 			),
