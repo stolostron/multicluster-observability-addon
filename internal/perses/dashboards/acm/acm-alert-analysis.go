@@ -7,10 +7,11 @@ import (
 	panelgroup "github.com/perses/perses/go-sdk/panel-group"
 	listVar "github.com/perses/perses/go-sdk/variable/list-variable"
 	labelValuesVar "github.com/perses/plugins/prometheus/sdk/go/variable/label-values"
+	"github.com/prometheus/prometheus/model/labels"
 	panels "github.com/stolostron/multicluster-observability-addon/internal/perses/panels/acm"
 )
 
-func withAlertSummaryGroup(datasource string, labelMatcher promql.LabelMatcher) dashboard.Option {
+func withAlertSummaryGroup(datasource string, labelMatcher *labels.Matcher) dashboard.Option {
 	return dashboard.AddPanelGroup("Alert Summary",
 		panelgroup.PanelsPerLine(6),
 		panels.TotalAlerts(datasource, labelMatcher),
@@ -22,7 +23,7 @@ func withAlertSummaryGroup(datasource string, labelMatcher promql.LabelMatcher) 
 	)
 }
 
-func withAlertTrendsGroup(datasource string, labelMatcher promql.LabelMatcher) dashboard.Option {
+func withAlertTrendsGroup(datasource string, labelMatcher *labels.Matcher) dashboard.Option {
 	return dashboard.AddPanelGroup("Alert Trends",
 		panelgroup.PanelsPerLine(2),
 		panels.AlertTypeOverTime(datasource, labelMatcher),
@@ -30,14 +31,14 @@ func withAlertTrendsGroup(datasource string, labelMatcher promql.LabelMatcher) d
 	)
 }
 
-func withAlertDetailsGroup(datasource string, labelMatcher promql.LabelMatcher) dashboard.Option {
+func withAlertDetailsGroup(datasource string, labelMatcher *labels.Matcher) dashboard.Option {
 	return dashboard.AddPanelGroup("Alert Details",
 		panelgroup.PanelsPerLine(1),
 		panels.AlertsAndClusters(datasource, labelMatcher),
 	)
 }
 
-func withHistoricalAnalysisGroup(datasource string, labelMatcher promql.LabelMatcher) dashboard.Option {
+func withHistoricalAnalysisGroup(datasource string, labelMatcher *labels.Matcher) dashboard.Option {
 	return dashboard.AddPanelGroup("Historical Analysis",
 		panelgroup.PanelsPerLine(2),
 		panels.MostFiringAlerts(datasource, labelMatcher),
@@ -46,7 +47,7 @@ func withHistoricalAnalysisGroup(datasource string, labelMatcher promql.LabelMat
 }
 
 func BuildACMAlertAnalysis(project string, datasource string, clusterLabelName string) (dashboard.Builder, error) {
-	clusterLabelMatcher := dashboards.GetClusterLabelMatcher(clusterLabelName)
+	clusterLabelMatcher := dashboards.GetClusterLabelMatcherV2(clusterLabelName)
 	return dashboard.New("acm-alert-analysis",
 		dashboard.ProjectName(project),
 		dashboard.Name("ACM Alert Analysis"),
