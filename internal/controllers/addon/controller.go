@@ -93,6 +93,7 @@ func NewAddonManager(ctx context.Context, kubeConfig *rest.Config, scheme *runti
 				utils.NewAddOnDeploymentConfigGetter(addonClient),
 			),
 		).WithScheme(scheme).
+		WithTrimCRDDescription().
 		BuildHelmAgentAddon()
 	if err != nil {
 		return nil, fmt.Errorf("failed to build helm agent addon: %w", err)
