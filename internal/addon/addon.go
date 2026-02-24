@@ -342,8 +342,10 @@ func healthChecker(k8s client.Client, fields []agent.FieldResult, mc *v1.Managed
 	if err := checkTracing(fields, opts); err != nil {
 		return err
 	}
-	if err := checkMetricsUIPlugin(fields, opts); err != nil {
-		return err
+	if common.IsHubCluster(mc) {
+		if err := checkMetricsUIPlugin(fields, opts); err != nil {
+			return err
+		}
 	}
 
 	return nil
