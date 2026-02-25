@@ -8,6 +8,7 @@ import (
 	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
 	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	uiplugin "github.com/rhobs/observability-operator/pkg/apis/uiplugin/v1alpha1"
+	clusterlifecycleconstants "github.com/stolostron/cluster-lifecycle-api/constants"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	"github.com/stretchr/testify/require"
@@ -278,19 +279,33 @@ func Test_AgentHealthProber_UIPlugin(t *testing.T) {
 	for _, tc := range []struct {
 		name        string
 		status      string
+		isHub       bool
 		expectedErr error
 	}{
 		{
-			name:   "healthy",
+			name:   "healthy on hub",
 			status: "True",
+			isHub:  true,
 		},
 		{
-			name:        "unhealthy",
+			name:        "unhealthy on hub",
 			status:      "False",
+			isHub:       true,
 			expectedErr: errProbeConditionNotSatisfied,
+		},
+		{
+			name:   "ignored on spoke",
+			status: "False",
+			isHub:  false,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			if tc.isHub {
+				managedCluster.Labels = map[string]string{clusterlifecycleconstants.SelfManagedClusterLabelKey: "true"}
+			} else {
+				managedCluster.Labels = map[string]string{}
+			}
+
 			healthProber := HealthProber(fake.NewClientBuilder().WithScheme(scheme).WithObjects(aodc).Build(), logr.Discard())
 			metricsStatus := "True"
 			err := healthProber.WorkProber.HealthChecker([]agent.FieldResult{
@@ -386,6 +401,44 @@ func Test_AgentHealthProber_MissingResources(t *testing.T) {
 			[]agent.FieldResult{scrapeConfigFieldResult()}, // unrelated field
 			managedCluster, managedClusterAddOn)
 		require.ErrorIs(t, err, errMissingFields)
+	})
+
+	t.Run("ui plugin enabled on hub but missing resource", func(t *testing.T) {
+		managedCluster.Labels = map[string]string{clusterlifecycleconstants.SelfManagedClusterLabelKey: "true"}
+		defer func() { managedCluster.Labels = nil }()
+
+		aodc := newAddonDeploymentConfig()
+		addPlatformMetricsCustomizedVariables(aodc)
+		addUIPluginCustomizedVariables(aodc)
+		addAODCConfigReference(managedClusterAddOn, aodc)
+
+		healthProber := HealthProber(fake.NewClientBuilder().WithScheme(scheme).WithObjects(aodc).Build(), logr.Discard())
+		metricsStatus := "True"
+		err := healthProber.WorkProber.HealthChecker(
+			[]agent.FieldResult{
+				{
+					ResourceIdentifier: workv1.ResourceIdentifier{
+						Group:     cooprometheusv1alpha1.SchemeGroupVersion.Group,
+						Resource:  cooprometheusv1alpha1.PrometheusAgentName,
+						Name:      mconfig.PlatformMetricsCollectorApp,
+						Namespace: addonfactory.AddonDefaultInstallNamespace,
+					},
+					FeedbackResult: workv1.StatusFeedbackResult{
+						Values: []workv1.FeedbackValue{
+							{
+								Name: addoncfg.PaProbeKey,
+								Value: workv1.FieldValue{
+									Type:   workv1.String,
+									String: &metricsStatus,
+								},
+							},
+						},
+					},
+				},
+				scrapeConfigFieldResult(),
+			}, managedCluster, managedClusterAddOn)
+		require.ErrorIs(t, err, errMissingFields)
+		require.Contains(t, err.Error(), addoncfg.UiPluginsResource)
 	})
 }
 
