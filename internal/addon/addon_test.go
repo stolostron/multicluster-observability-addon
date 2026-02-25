@@ -402,6 +402,44 @@ func Test_AgentHealthProber_MissingResources(t *testing.T) {
 			managedCluster, managedClusterAddOn)
 		require.ErrorIs(t, err, errMissingFields)
 	})
+
+	t.Run("ui plugin enabled on hub but missing resource", func(t *testing.T) {
+		managedCluster.Labels = map[string]string{clusterlifecycleconstants.SelfManagedClusterLabelKey: "true"}
+		defer func() { managedCluster.Labels = nil }()
+
+		aodc := newAddonDeploymentConfig()
+		addPlatformMetricsCustomizedVariables(aodc)
+		addUIPluginCustomizedVariables(aodc)
+		addAODCConfigReference(managedClusterAddOn, aodc)
+
+		healthProber := HealthProber(fake.NewClientBuilder().WithScheme(scheme).WithObjects(aodc).Build(), logr.Discard())
+		metricsStatus := "True"
+		err := healthProber.WorkProber.HealthChecker(
+			[]agent.FieldResult{
+				{
+					ResourceIdentifier: workv1.ResourceIdentifier{
+						Group:     cooprometheusv1alpha1.SchemeGroupVersion.Group,
+						Resource:  cooprometheusv1alpha1.PrometheusAgentName,
+						Name:      mconfig.PlatformMetricsCollectorApp,
+						Namespace: addonfactory.AddonDefaultInstallNamespace,
+					},
+					FeedbackResult: workv1.StatusFeedbackResult{
+						Values: []workv1.FeedbackValue{
+							{
+								Name: addoncfg.PaProbeKey,
+								Value: workv1.FieldValue{
+									Type:   workv1.String,
+									String: &metricsStatus,
+								},
+							},
+						},
+					},
+				},
+				scrapeConfigFieldResult(),
+			}, managedCluster, managedClusterAddOn)
+		require.ErrorIs(t, err, errMissingFields)
+		require.Contains(t, err.Error(), addoncfg.UiPluginsResource)
+	})
 }
 
 func scrapeConfigFieldResult() agent.FieldResult {
