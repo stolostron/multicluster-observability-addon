@@ -43,7 +43,12 @@ func BuildACMAlertsByCluster(project string, datasource string, clusterLabelName
 			listVar.List(
 				labelValuesVar.PrometheusLabelValues("label_name",
 					dashboards.AddVariableDatasource(datasource),
-					labelValuesVar.Matchers("acm_label_names"),
+					labelValuesVar.Matchers(
+						promql.SetLabelMatchers(
+							"acm_label_names",
+							[]promql.LabelMatcher{},
+						),
+					),	
 				),
 				listVar.DisplayName("Label"),
 				listVar.DefaultValue("cloud"),
