@@ -1,0 +1,94 @@
+language: "en-US"
+early_access: false
+tone_instructions: "Act as senior engineer: professional with dry humor, constructive feedback only. Serious about security/performance. Use engineering metaphors. End positively. We're debugging together! 🔍🚨✅"
+
+reviews:
+  profile: chill
+  high_level_summary: true
+  auto_review:
+    enabled: true
+    base_branches:
+      - "main"
+      - "release-2.1[4-6]"
+    drafts: false
+    ignore_title_keywords:
+      - "WIP"
+  path_filters:
+    - "!**/*.deepcopy.go"
+    - "!**/zz_generated.*"
+    - "!**/vendor/**"
+    - "!**/.idea/**"
+    - "!**/*.pb.go"
+  path_instructions:
+    - path: "**/*.go"
+      instructions: |
+        - Focus on Go best practices, error handling, and concurrency patterns
+        - Review Open Cluster Management (OCM) addon-framework usage patterns
+        - Check for proper context propagation and cancellation
+        - Ensure controller-runtime patterns are followed correctly for addon controllers
+        - Verify proper logging using structured logging (logr)
+        - Review Helm chart generation and templating logic
+        - Check for proper resource cleanup and addon lifecycle management
+        - Validate observability signal forwarding configurations (metrics, logs, traces)
+
+    - path: "**/charts/**/*.yaml"
+      instructions: |
+        - Review Helm chart templates for proper syntax and best practices
+        - Check for secure defaults and configuration options
+        - Verify resource limits and requests for addon components
+        - Ensure proper labeling and annotation conventions for OCM
+        - Review observability operator configurations (OTel, Logging, Prometheus)
+        - Validate ClusterLogForwarder and OpenTelemetryCollector configurations
+
+    - path: "**/manifests/**/*.yaml"
+      instructions: |
+        - Validate Kubernetes manifest syntax and resource definitions
+        - Check for security best practices (RBAC, SecurityContext, NetworkPolicies)
+        - Verify addon deployment configurations and spoke cluster resources
+        - Ensure proper OCM ManifestWork patterns
+        - Review operator subscriptions and installations
+
+    - path: "internal/addon/**"
+      instructions: |
+        - Focus on addon-framework integration patterns
+        - Review manifest generation and templating logic
+        - Check for proper addon lifecycle management (install, upgrade, uninstall)
+        - Verify spoke cluster configuration handling
+        - Review secret and configmap management for addons
+
+    - path: "internal/{logging,tracing,metrics}/**"
+      instructions: |
+        - Review signal-specific configuration and forwarding logic
+        - Check for proper integration with respective operators (OTel, CLO, etc.)
+        - Verify endpoint configurations and authentication handling
+        - Review signal processing and transformation logic
+        - Check for performance implications in signal forwarding
+
+    - path: "**/*_test.go"
+      instructions: |
+        - Focus on test coverage and test quality
+        - Review addon integration test scenarios
+        - Check for proper test setup and teardown
+        - Verify Helm chart testing and manifest validation
+        - Ensure tests cover error cases and edge conditions
+
+    - path: "**/values.yaml"
+      instructions: |
+        - Review Helm chart default values for security and best practices
+        - Check for proper configuration options and documentation
+        - Verify observability operator configurations
+        - Review resource defaults and scaling considerations
+
+    - path: "**/Dockerfile*"
+      instructions: |
+        - Review container security best practices
+        - Check for minimal base images and proper layering
+        - Verify proper handling of secrets and environment variables
+        - Review multi-stage build optimizations for addon manager
+
+chat:
+  auto_reply: true
+
+knowledge_base:
+  learnings:
+    scope: "global"
