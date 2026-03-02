@@ -21,4 +21,4 @@ nodeExporter:
   hostPort: 19100
 global:
   resourceRequirements: []
-
+  imagePullSecret: open-cluster-management-image-pull-credentials
