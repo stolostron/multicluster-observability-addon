@@ -6,4 +6,7 @@ metadata:
   labels:
     {{ include "metricshelm.labels" . | nindent 4 }}
     openshift.io/cluster-monitoring: "true"
+    # This label tells the addonsecretcontroller to copy the open-cluster-management-image-pull-credentials
+    # pull request secret to the namespace on the mgd cluster
+    addon.open-cluster-management.io/namespace: "true"
 {{- end }}
