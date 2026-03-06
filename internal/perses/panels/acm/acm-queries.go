@@ -5,69 +5,34 @@ import (
 
 	promqlbuilder "github.com/perses/promql-builder"
 	"github.com/perses/promql-builder/label"
-	"github.com/perses/promql-builder/matrix"
 	"github.com/perses/promql-builder/vector"
 	"github.com/prometheus/prometheus/promql/parser"
 )
 
+func mustParseExpr(expr string) parser.Expr {
+	parsed, err := parser.ParseExpr(expr)
+	if err != nil {
+		panic(err)
+	}
+	return parsed
+}
+
 var ACMCommonPanelQueries = map[string]parser.Expr{
 	// Top50MaxLatencyAPIServer queries from acm-clusters-overview-panel.go
-	"Top50MaxLatencyAPIServer_MaxLatency": promqlbuilder.TopK(
-		promqlbuilder.Max(
-			vector.New(
-				vector.WithMetricName("apiserver_request_duration_seconds:histogram_quantile_99"),
-				vector.WithLabelMatchers(
-					label.New("cluster").EqualRegexp("$cluster"),
-					label.New("clusterType").NotEqual("ocp3"),
-				),
-			),
-		).By("cluster"),
-		50,
-	),
-	"Top50MaxLatencyAPIServer_ErrorRate": promqlbuilder.Sum(
+	"Top50MaxLatencyAPIServer_MaxLatency": mustParseExpr(`topk(50, max(apiserver_request_duration_seconds:histogram_quantile_99{cluster=~"$cluster"}) by (cluster)) * on(cluster) group_left(api_up) count_values without() ("api_up", (sum(up{cluster=~"$cluster",service="kubernetes"} == 1) by (cluster) / count(up{cluster=~"$cluster",service="kubernetes"}) by (cluster)))`),
+	"APIServerRequestTotal_ErrorRate": promqlbuilder.Sum(
 		vector.New(
 			vector.WithMetricName("sum:apiserver_request_total:1h"),
 			vector.WithLabelMatchers(
-				label.New("cluster").EqualRegexp("$cluster"),
+				label.New("cluster").EqualRegexp("local-cluster"),
 				label.New("code").EqualRegexp("5.."),
-				label.New("clusterType").NotEqual("ocp3"),
 			),
 		),
 	).By("cluster"),
 
 	// EtcdHealth query from acm-clusters-overview-panel.go
-	"EtcdHealth_LeaderChanges": promqlbuilder.Sum(
-		promqlbuilder.Changes(
-			matrix.New(
-				vector.New(
-					vector.WithMetricName("etcd_server_leader_changes_seen_total"),
-					vector.WithLabelMatchers(
-						label.New("cluster").EqualRegexp("$cluster"),
-						label.New("job").Equal("etcd"),
-					),
-				),
-				matrix.WithRangeAsVariable("$__range"),
-			),
-		),
-	).By("cluster"),
-	"EtcdHealth_DBSize": promqlbuilder.Max(
-		vector.New(
-			vector.WithMetricName("etcd_debugging_mvcc_db_total_size_in_bytes"),
-			vector.WithLabelMatchers(
-				label.New("cluster").EqualRegexp("$cluster"),
-				label.New("job").Equal("etcd"),
-			),
-		),
-	).By("cluster"),
-	"EtcdHealth_HasLeader": promqlbuilder.Max(
-		vector.New(
-			vector.WithMetricName("etcd_server_has_leader"),
-			vector.WithLabelMatchers(
-				label.New("cluster").EqualRegexp("$cluster"),
-				label.New("job").Equal("etcd"),
-			),
-		),
-	).By("cluster"),
+	"EtcdHealth_LeaderChanges": mustParseExpr( "sum(changes(etcd_server_leader_changes_seen_total{cluster=~\"$cluster\",job=\"etcd\"}[$__range])) by (cluster)\n* on(cluster) group_left(db_size) count_values without() (\"db_size\", max(etcd_mvcc_db_total_size_in_bytes{cluster=~\"$cluster\",job=\"etcd\"}) by (cluster))\n* on(cluster) group_left(has_leader) count_values without() (\"has_leader\", max(etcd_server_has_leader{cluster=~\"$cluster\",job=\"etcd\"}) by (cluster))",),
+
 
 	// Top50CPUOverestimation query from acm-clusters-overview-panel.go
 	"Top50CPUOverestimation": promqlbuilder.TopK(

@@ -49,12 +49,9 @@ func BuildACMClustersOverview(project string, datasource string, clusterLabelNam
 				labelValuesVar.PrometheusLabelValues("label_name",
 					dashboards.AddVariableDatasource(datasource),
 					labelValuesVar.Matchers(
-						promql.SetLabelMatchers(
-							"acm_label_names",
-							[]promql.LabelMatcher{},
+						vector.New(vector.WithMetricName("acm_label_names")).String(),
 						),
 					),
-				),
 				listVar.DisplayName("Label"),
 				listVar.DefaultValue("name"),
 				listVar.AllowAllValue(false),
