@@ -60,7 +60,7 @@ func Top50MaxLatencyAPIServer(datasourceName string, labelMatchers ...*labels.Ma
 		panel.AddQuery(
 			query.PromQL(
 				promql.SetLabelMatchersV2(
-					ACMCommonPanelQueries["Top50MaxLatencyAPIServer_ErrorRate"],
+					ACMCommonPanelQueries["APIServerRequestTotal_ErrorRate"],
 					labelMatchers,
 				).Pretty(0),
 				dashboards.AddQueryDataSource(datasourceName),
@@ -107,24 +107,6 @@ func EtcdHealth(datasourceName string, labelMatchers ...*labels.Matcher) panelgr
 			query.PromQL(
 				promql.SetLabelMatchersV2(
 					ACMCommonPanelQueries["EtcdHealth_LeaderChanges"],
-					labelMatchers,
-				).Pretty(0),
-				dashboards.AddQueryDataSource(datasourceName),
-			),
-		),
-		panel.AddQuery(
-			query.PromQL(
-				promql.SetLabelMatchersV2(
-					ACMCommonPanelQueries["EtcdHealth_DBSize"],
-					labelMatchers,
-				).Pretty(0),
-				dashboards.AddQueryDataSource(datasourceName),
-			),
-		),
-		panel.AddQuery(
-			query.PromQL(
-				promql.SetLabelMatchersV2(
-					ACMCommonPanelQueries["EtcdHealth_HasLeader"],
 					labelMatchers,
 				).Pretty(0),
 				dashboards.AddQueryDataSource(datasourceName),

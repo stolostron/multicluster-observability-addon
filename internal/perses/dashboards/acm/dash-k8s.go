@@ -166,7 +166,7 @@ func BuildK8sDashboards(project string, datasource string, clusterLabelName stri
 	}
 	dashboardWriter.Add(k8sComputeResources.BuildKubernetesNodeResourcesOverview(project, datasource, clusterLabelName, dashboardVars...))
 
-	dashboardWriter.Add(k8sComputeResources.BuildKubernetesMultiClusterOverview(project, datasource, clusterLabelName))
+	dashboardWriter.Add(k8sComputeResources.BuildKubernetesMultiClusterOverview(project, datasource, clusterLabelName, ))
 
 	dashboardVars = []dashboard.Option{
 		GetClusterVariable(datasource),
@@ -189,13 +189,6 @@ func BuildK8sDashboards(project string, datasource string, clusterLabelName stri
 	}
 	dashboardWriter.Add(k8sComputeResources.BuildKubernetesWorkloadOverview(project, datasource, clusterLabelName, dashboardVars...))
 	dashboardWriter.Add(k8sComputeResources.BuildKubernetesWorkloadNamespaceOverview(project, datasource, clusterLabelName, dashboardVars...))
-
-	dashboardVars = []dashboard.Option{
-		GetClusterVariable(datasource),
-		GetNamespaceVariable(datasource),
-		GetTypeVariable(datasource),
-	}
-	dashboardWriter.Add(k8sComputeResources.BuildKubernetesMultiClusterOverview(project, datasource, clusterLabelName))
 
 	dashboardVars = []dashboard.Option{
 		GetClusterVariable(datasource),

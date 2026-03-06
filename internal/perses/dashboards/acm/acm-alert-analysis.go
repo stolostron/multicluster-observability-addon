@@ -66,6 +66,7 @@ func BuildACMAlertAnalysis(project string, datasource string, clusterLabelName s
 				listVar.Description("Policy severity level"),
 				listVar.AllowAllValue(true),
 				listVar.AllowMultiple(true),
+				listVar.DefaultValue("$__all"),
 			),
 		),
 		withAlertSummaryGroup(datasource, clusterLabelMatcher),
