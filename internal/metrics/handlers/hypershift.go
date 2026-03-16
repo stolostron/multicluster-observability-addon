@@ -93,7 +93,7 @@ func (h *Hypershift) GenerateResources(ctx context.Context, etcdConfig, apiServe
 
 	apiserverMetrics, err := h.extractDependentMetrics(apiServerConfig.ScrapeConfigs, apiServerConfig.Rules)
 	if err != nil {
-		return ret, fmt.Errorf("failed to extract etcd dependent metrics: %w", err)
+		return ret, fmt.Errorf("failed to extract api server dependent metrics: %w", err)
 	}
 
 	ret.ServiceMonitors = make([]*prometheusv1.ServiceMonitor, 0, len(hostedClusters.Items))
@@ -119,7 +119,7 @@ func (h *Hypershift) GenerateResources(ctx context.Context, etcdConfig, apiServe
 
 		acmApiserverSm, err := h.generateApiServerServiceMonitor(ctx, namespace, hostedClusterIdentity, apiserverMetrics)
 		if err != nil {
-			return ret, fmt.Errorf("failed to generate etcd ServiceMonitor for namespace %s: %w", namespace, err)
+			return ret, fmt.Errorf("failed to generate api server ServiceMonitor for namespace %s: %w", namespace, err)
 		}
 		if acmApiserverSm != nil {
 			ret.ServiceMonitors = append(ret.ServiceMonitors, acmApiserverSm)
@@ -189,7 +189,7 @@ func (h *Hypershift) generateApiServerServiceMonitor(ctx context.Context, namesp
 	if err := h.Client.Get(ctx, types.NamespacedName{Namespace: namespace, Name: config.HypershiftApiServerServiceMonitorName}, hypershiftApiServerSM); err != nil {
 		if apierrors.IsNotFound(err) {
 			// Permanent error, no need to retry, just log the error
-			h.Logger.Error(err, fmt.Sprintf("the apiserver serviceMonitor %s/%s deployed by hypershift is not found, cannot set observability for etcd", namespace, config.HypershiftApiServerServiceMonitorName), "hostedClusterName", hostedCluster.Name)
+			h.Logger.Error(err, fmt.Sprintf("the apiserver serviceMonitor %s/%s deployed by hypershift is not found, cannot set observability for api server", namespace, config.HypershiftApiServerServiceMonitorName), "hostedClusterName", hostedCluster.Name)
 			return nil, nil
 		}
 		return nil, fmt.Errorf("failed to get hypershift's kube-apiserver ServiceMonitor: %w", err)
@@ -228,7 +228,7 @@ func (h *Hypershift) generateApiServerServiceMonitor(ctx context.Context, namesp
 }
 
 // extractDependentMetrics extracts the list of metrics that the input scrapeConfig and rule are dependent on.
-// It ignores metrics reulting from rules.
+// It ignores metrics resulting from rules.
 // Result is alphabetically sorted.
 // This function is used to extract the list of metrics that must be collected by the in-cluster prometheus.
 func (h *Hypershift) extractDependentMetrics(sc []*cooprometheusv1alpha1.ScrapeConfig, rule []*prometheusv1.PrometheusRule) ([]string, error) {
