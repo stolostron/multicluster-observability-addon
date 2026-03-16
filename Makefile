@@ -47,12 +47,16 @@ $(CRD_DIR)/monitoring.coreos.com_scrapeconfigs.yaml:
 	@mkdir -p $(CRD_DIR)
 	@curl https://raw.githubusercontent.com/rhobs/obo-prometheus-operator/refs/tags/v0.80.1-rhobs1/example/prometheus-operator-crd/monitoring.rhobs_scrapeconfigs.yaml  > $(CRD_DIR)/monitoring.rhobs_scrapeconfigs.yaml
 
+$(CRD_DIR)/core.observatorium.io_observatoria.yaml:
+	@mkdir -p $(CRD_DIR)
+	@curl https://raw.githubusercontent.com/stolostron/observatorium-operator/blob/main/manifests/crds/core.observatorium.io_observatoria.yaml  > $(CRD_DIR)/core.observatorium.io_observatoria.yaml
+
 .PHONY: update-metrics-crds
 update-metrics-crds: ## Update the metrics CRDs from the rhobs/obo-prometheus-operator repository.
 	@./hack/update-metrics-crds.sh
 
 .PHONY: download-crds
-download-crds: $(CRD_DIR)/observability.openshift.io_clusterlogforwarders.yaml $(CRD_DIR)/opentelemetry.io_opentelemetrycollectors.yaml $(CRD_DIR)/opentelemetry.io_instrumentations.yaml $(CRD_DIR)/monitoring.coreos.com_prometheusagents.yaml $(CRD_DIR)/monitoring.coreos.com_scrapeconfigs.yaml
+download-crds: $(CRD_DIR)/observability.openshift.io_clusterlogforwarders.yaml $(CRD_DIR)/opentelemetry.io_opentelemetrycollectors.yaml $(CRD_DIR)/opentelemetry.io_instrumentations.yaml $(CRD_DIR)/monitoring.coreos.com_prometheusagents.yaml $(CRD_DIR)/monitoring.coreos.com_scrapeconfigs.yaml $(CRD_DIR)/core.observatorium.io_observatoria.yaml
 
 .PHONY: fmt
 fmt: $(GOFUMPT) ## Run gofumpt on source code.
