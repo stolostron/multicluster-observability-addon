@@ -2,6 +2,7 @@ package handlers
 
 import (
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	cooprometheusv1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1"
 	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
@@ -37,6 +38,7 @@ type Collector struct {
 	PrometheusAgent *cooprometheusv1alpha1.PrometheusAgent
 	ScrapeConfigs   []*cooprometheusv1alpha1.ScrapeConfig
 	Rules           []*prometheusv1.PrometheusRule
+	COORules        []*cooprometheusv1.PrometheusRule
 	ServiceMonitors []*prometheusv1.ServiceMonitor // For deploying HCPs service monitor (user workloads)
 }
 

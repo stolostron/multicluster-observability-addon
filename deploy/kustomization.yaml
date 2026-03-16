@@ -1,14 +1,14 @@
 images:
 - name: controller
-  newName: quay.io/rhobs/multicluster-observability-addon
-  newTag: v0.0.1
+  newName: quay.io/rh-ee-dbuchana/multicluster-observability-addon
+  newTag: latest
 
 namespace: open-cluster-management-observability
 
+#- resources/manager_deployment.yaml
 resources:
 - resources/cluster_role_binding.yaml
 - resources/cluster_role.yaml
-- resources/manager_deployment.yaml
 - resources/service_account.yaml
 - resources/cluster-management-addon.yaml
 - resources/addondeploymentconfig.yaml

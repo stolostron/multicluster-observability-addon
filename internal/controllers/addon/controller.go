@@ -11,6 +11,7 @@ import (
 	otelv1beta1 "github.com/open-telemetry/opentelemetry-operator/apis/v1beta1"
 	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	coomonitoringv1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1"
 	coomonitoringv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
@@ -82,6 +83,7 @@ func NewAddonManager(ctx context.Context, kubeConfig *rest.Config, scheme *runti
 			schema.GroupVersionResource{Version: coomonitoringv1alpha1.SchemeGroupVersion.Version, Group: coomonitoringv1alpha1.SchemeGroupVersion.Group, Resource: coomonitoringv1alpha1.PrometheusAgentName},
 			schema.GroupVersionResource{Version: coomonitoringv1alpha1.SchemeGroupVersion.Version, Group: coomonitoringv1alpha1.SchemeGroupVersion.Group, Resource: coomonitoringv1alpha1.ScrapeConfigName},
 			schema.GroupVersionResource{Version: monitoringv1.SchemeGroupVersion.Version, Group: monitoringv1.SchemeGroupVersion.Group, Resource: monitoringv1.PrometheusRuleName},
+			schema.GroupVersionResource{Version: coomonitoringv1.SchemeGroupVersion.Version, Group: coomonitoringv1.SchemeGroupVersion.Group, Resource: coomonitoringv1.PrometheusRuleName},
 			utils.AddOnDeploymentConfigGVR,
 		).
 		WithGetValuesFuncs(addonConfigValuesFn, addonhelm.GetValuesFunc(ctx, k8sClient, agentLogger)).

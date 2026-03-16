@@ -1,6 +1,6 @@
 {{- if .Values.userWorkloadsEnabled }}
 {{- range $_, $rule := .Values.userWorkload.rules }}
-apiVersion: monitoring.coreos.com/v1
+apiVersion: {{ $rule.apiVersion | default "monitoring.coreos.com/v1" }}
 kind: PrometheusRule
 metadata:
   name: {{ $rule.name }}
@@ -13,7 +13,14 @@ metadata:
     {{- toYaml $mergedLabels | nindent 4 }}
   annotations:
     {{- $incomingAnnotations := $rule.annotations }}
-    {{- $stdAnnotations := dict "operator.prometheus.io/controller-id" "openshift-user-workload-monitoring/prometheus-operator" }}
+    {{- $stdAnnotations := dict }}
+    {{- if $.Values.deployNonOCPStack }}
+    {{- $_ := set $stdAnnotations "operator.prometheus.io/controller-id" $.Values.prometheusControllerID }}
+    {{- else if $.Values.deployCOOResources }}
+    {{- $_ := set $stdAnnotations "operator.prometheus.io/controller-id" $.Values.prometheusControllerID }}
+    {{- else }}
+    {{- $_ := set $stdAnnotations "operator.prometheus.io/controller-id" "" }}
+    {{- end }}
     {{- $mergedAnnotations := mergeOverwrite $incomingAnnotations $stdAnnotations }}
     {{- toYaml $mergedAnnotations | nindent 4 }}
 spec:

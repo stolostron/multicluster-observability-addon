@@ -61,6 +61,7 @@ type ConfigValue struct {
 	Data        string            `json:"data"`
 	Labels      map[string]string `json:"labels"`
 	Annotations map[string]string `json:"annotations"`
+	APIVersion  string            `json:"apiVersion,omitempty"`
 }
 
 func BuildValues(opts handlers.Options) (*MetricsValues, error) {
@@ -194,6 +195,20 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 		})
 	}
 
+	for _, rule := range opts.Platform.COORules {
+		ruleJson, err := json.Marshal(rule.Spec)
+		if err != nil {
+			return ret, err
+		}
+
+		ret.Platform.Rules = append(ret.Platform.Rules, ConfigValue{
+			Name:       rule.Name,
+			Data:       string(ruleJson),
+			Labels:     rule.Labels,
+			APIVersion: "monitoring.rhobs/v1",
+		})
+	}
+
 	for _, rule := range opts.UserWorkloads.Rules {
 		ruleJson, err := json.Marshal(rule.Spec)
 		if err != nil {
@@ -204,6 +219,25 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 			Name:   rule.Name,
 			Data:   string(ruleJson),
 			Labels: rule.Labels,
+		}
+		targetNamespace := rule.Annotations[config.TargetNamespaceAnnotation]
+		if targetNamespace != "" {
+			configValueItem.Namespace = targetNamespace
+		}
+		ret.UserWorkload.Rules = append(ret.UserWorkload.Rules, configValueItem)
+	}
+
+	for _, rule := range opts.UserWorkloads.COORules {
+		ruleJson, err := json.Marshal(rule.Spec)
+		if err != nil {
+			return ret, err
+		}
+
+		configValueItem := ConfigValue{
+			Name:       rule.Name,
+			Data:       string(ruleJson),
+			Labels:     rule.Labels,
+			APIVersion: "monitoring.rhobs/v1",
 		}
 		targetNamespace := rule.Annotations[config.TargetNamespaceAnnotation]
 		if targetNamespace != "" {

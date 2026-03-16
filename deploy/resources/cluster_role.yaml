@@ -74,7 +74,7 @@
       resources: ["prometheusrules", "servicemonitors"]
       verbs: ["get", "list", "watch", "create", "update", "delete", "patch"]
     - apiGroups: ["monitoring.rhobs"]
-      resources: ["prometheusagents", "scrapeconfigs"]
+      resources: ["prometheusagents", "scrapeconfigs", "prometheusrules"]
       verbs: ["get", "list", "watch", "create", "update", "delete", "patch"]
     - apiGroups: ["hypershift.openshift.io"]
       resources: ["hostedclusters"]

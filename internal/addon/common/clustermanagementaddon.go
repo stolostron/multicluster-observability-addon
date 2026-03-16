@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-logr/logr"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	cooprometheusv1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1"
 	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -128,7 +129,12 @@ func ObjectToAddonConfig(obj client.Object) (addonv1alpha1.AddOnConfig, error) {
 	case cooprometheusv1alpha1.ScrapeConfigsKind:
 		ret.Resource = cooprometheusv1alpha1.ScrapeConfigName
 	case prometheusv1.PrometheusRuleKind:
-		ret.Resource = prometheusv1.PrometheusRuleName
+		switch gvk.Group {
+		case cooprometheusv1.SchemeGroupVersion.Group:
+			ret.Resource = cooprometheusv1.PrometheusRuleName
+		default:
+			ret.Resource = prometheusv1.PrometheusRuleName
+		}
 	case cooprometheusv1alpha1.PrometheusAgentsKind:
 		ret.Resource = cooprometheusv1alpha1.PrometheusAgentName
 	default:

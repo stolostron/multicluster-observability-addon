@@ -193,7 +193,11 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				recordingRules := common.FilterResourcesByLabelSelector[*prometheusv1.PrometheusRule](objects, config.UserWorkloadPrometheusMatchLabels)
 				assert.Len(t, recordingRules, 2)
 				assert.Equal(t, "openshift-user-workload-monitoring/prometheus-operator", recordingRules[0].Annotations["operator.prometheus.io/controller-id"])
-				expectedCount := 35
+				// ensure that COO recording rules are created
+				cooRecordingRules := common.FilterResourcesByLabelSelector[*cooprometheusv1.PrometheusRule](objects, config.UserWorkloadPrometheusMatchLabels)
+				assert.Len(t, cooRecordingRules, 2)
+				assert.Equal(t, "openshift-user-workload-monitoring/prometheus-operator", cooRecordingRules[0].Annotations["operator.prometheus.io/controller-id"])
+				expectedCount := 37
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
@@ -216,7 +220,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				assert.Len(t, crds, 1) // Only the monitoringstacks one
 
 				// ensure that the number of objects is correct
-				expectedCount := 22
+				expectedCount := 24
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
@@ -488,6 +492,24 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 			uwlRulesAdditional.Annotations = map[string]string{config.TargetNamespaceAnnotation: "target-namespace"}
 			configReferences = append(configReferences, newConfigReference(uwlRules), newConfigReference(uwlRulesAdditional))
 			clientObjects = append(clientObjects, uwlRules, uwlRulesAdditional)
+
+			// Add uwl COO rules (monitoring.rhobs)
+			uwlCooRule := &cooprometheusv1.PrometheusRule{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       cooprometheusv1.PrometheusRuleKind,
+					APIVersion: cooprometheusv1.SchemeGroupVersion.Identifier(),
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "uwl-coo-rules",
+					Namespace: hubNamespace,
+					Labels:    config.UserWorkloadPrometheusMatchLabels,
+				},
+				Spec: cooprometheusv1.PrometheusRuleSpec{},
+			}
+			uwlCooRuleAdditional := uwlCooRule.DeepCopy()
+			uwlCooRuleAdditional.Name = "uwl-coo-rules-additional"
+			configReferences = append(configReferences, newConfigReference(uwlCooRule), newConfigReference(uwlCooRuleAdditional))
+			clientObjects = append(clientObjects, uwlCooRule, uwlCooRuleAdditional)
 
 			// Add secrets needed for the agent connection to the hub
 			clientObjects = append(clientObjects, newSecret(config.HubCASecretName, hubNamespace))

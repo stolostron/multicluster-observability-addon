@@ -106,7 +106,7 @@ install-crds: download-crds
 .PHONY: addon-deploy
 addon-deploy: download-crds
 	cd deploy && $(KUSTOMIZE) edit set image controller=${IMG}
-	$(KUSTOMIZE) build ./deploy | kubectl apply --server-side -f -
+	$(KUSTOMIZE) build ./deploy | kubectl apply --server-side --force-conflicts -f -
 
 .PHONY: addon-undeploy
 addon-undeploy: download-crds

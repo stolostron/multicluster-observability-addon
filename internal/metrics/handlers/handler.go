@@ -110,7 +110,8 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 			o.Logger.V(2).Info("No scrape configs found for platform metrics")
 		}
 		ret.Platform.Rules = common.FilterResourcesByLabelSelector[*prometheusv1.PrometheusRule](configResources, config.PlatformPrometheusMatchLabels)
-		if len(ret.Platform.Rules) == 0 {
+		ret.Platform.COORules = common.FilterResourcesByLabelSelector[*cooprometheusv1.PrometheusRule](configResources, config.PlatformPrometheusMatchLabels)
+		if len(ret.Platform.Rules) == 0 && len(ret.Platform.COORules) == 0 {
 			o.Logger.V(2).Info("No rules found for platform metrics")
 		}
 	}
@@ -129,7 +130,8 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 			o.Logger.V(2).Info("No scrape configs found for user workloads")
 		}
 		ret.UserWorkloads.Rules = common.FilterResourcesByLabelSelector[*prometheusv1.PrometheusRule](configResources, config.UserWorkloadPrometheusMatchLabels)
-		if len(ret.UserWorkloads.Rules) == 0 {
+		ret.UserWorkloads.COORules = append(ret.UserWorkloads.COORules, common.FilterResourcesByLabelSelector[*cooprometheusv1.PrometheusRule](configResources, config.UserWorkloadPrometheusMatchLabels)...)
+		if len(ret.UserWorkloads.Rules) == 0 && len(ret.UserWorkloads.COORules) == 0 {
 			o.Logger.V(2).Info("No rules found for user workloads")
 		}
 	}
@@ -291,8 +293,10 @@ func (o *OptionsBuilder) buildPrometheusAgent(ctx context.Context, opts *Options
 func (o *OptionsBuilder) buildHypershiftResources(ctx context.Context, opts *Options, managedCluster *clusterv1.ManagedCluster, configResources []client.Object) error {
 	etcdScrapeConfigs := common.FilterResourcesByLabelSelector[*cooprometheusv1alpha1.ScrapeConfig](configResources, config.EtcdHcpUserWorkloadPrometheusMatchLabels)
 	etcdRules := common.FilterResourcesByLabelSelector[*prometheusv1.PrometheusRule](configResources, config.EtcdHcpUserWorkloadPrometheusMatchLabels)
+	etcdCOORules := common.FilterResourcesByLabelSelector[*cooprometheusv1.PrometheusRule](configResources, config.EtcdHcpUserWorkloadPrometheusMatchLabels)
 	apiserverScrapeConfigs := common.FilterResourcesByLabelSelector[*cooprometheusv1alpha1.ScrapeConfig](configResources, config.ApiserverHcpUserWorkloadPrometheusMatchLabels)
 	apiserverRules := common.FilterResourcesByLabelSelector[*prometheusv1.PrometheusRule](configResources, config.ApiserverHcpUserWorkloadPrometheusMatchLabels)
+	apiserverCOORules := common.FilterResourcesByLabelSelector[*cooprometheusv1.PrometheusRule](configResources, config.ApiserverHcpUserWorkloadPrometheusMatchLabels)
 
 	if len(etcdScrapeConfigs) == 0 {
 		o.Logger.V(1).Info("no scrapeConfigs found in configuration resources for etcd HPCs", "expectedLabel", fmt.Sprintf("%+v", config.EtcdHcpUserWorkloadPrometheusMatchLabels))
@@ -309,8 +313,8 @@ func (o *OptionsBuilder) buildHypershiftResources(ctx context.Context, opts *Opt
 	}
 
 	hyperResources, err := hyper.GenerateResources(ctx,
-		CollectionConfig{ScrapeConfigs: etcdScrapeConfigs, Rules: etcdRules},
-		CollectionConfig{ScrapeConfigs: apiserverScrapeConfigs, Rules: apiserverRules},
+		CollectionConfig{ScrapeConfigs: etcdScrapeConfigs, Rules: etcdRules, COORules: etcdCOORules},
+		CollectionConfig{ScrapeConfigs: apiserverScrapeConfigs, Rules: apiserverRules, COORules: apiserverCOORules},
 	)
 	if err != nil {
 		return fmt.Errorf("failed to generate hypershift resources: %w", err)
@@ -318,6 +322,7 @@ func (o *OptionsBuilder) buildHypershiftResources(ctx context.Context, opts *Opt
 
 	opts.UserWorkloads.ScrapeConfigs = append(opts.UserWorkloads.ScrapeConfigs, hyperResources.ScrapeConfigs...)
 	opts.UserWorkloads.Rules = append(opts.UserWorkloads.Rules, hyperResources.Rules...)
+	opts.UserWorkloads.COORules = append(opts.UserWorkloads.COORules, hyperResources.COORules...)
 	opts.UserWorkloads.ServiceMonitors = append(opts.UserWorkloads.ServiceMonitors, hyperResources.ServiceMonitors...)
 	return nil
 }
@@ -379,7 +384,12 @@ func (o *OptionsBuilder) getAvailableConfigResources(ctx context.Context, mcAddo
 		case cooprometheusv1alpha1.ScrapeConfigName:
 			obj = &cooprometheusv1alpha1.ScrapeConfig{}
 		case prometheusv1.PrometheusRuleName:
-			obj = &prometheusv1.PrometheusRule{}
+			switch cfg.Group {
+			case "monitoring.rhobs":
+				obj = &cooprometheusv1.PrometheusRule{}
+			default:
+				obj = &prometheusv1.PrometheusRule{}
+			}
 		case "configmaps":
 			obj = &corev1.ConfigMap{}
 		default:

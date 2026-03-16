@@ -22,6 +22,9 @@ spec:
       resource: prometheusagents
     - group: monitoring.coreos.com
       resource: prometheusrules
+    # Resource for federating UWL metrics from COO
+    - group: monitoring.rhobs
+      resource: prometheusrules
     # Resources for configuring the deployment of the Log collection
     - group: observability.openshift.io
       resource: clusterlogforwarders
