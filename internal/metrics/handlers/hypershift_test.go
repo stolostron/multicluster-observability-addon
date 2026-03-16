@@ -165,6 +165,8 @@ func TestHypershift_Nominal(t *testing.T) {
 	)
 	assert.NoError(t, err)
 	assert.Len(t, res.ScrapeConfigs, 2)
+	assert.Len(t, res.ScrapeConfigs[0].Spec.MetricRelabelConfigs, 2)
+	assert.Len(t, res.ScrapeConfigs[1].Spec.RelabelConfigs, 2)
 	assert.Len(t, res.Rules, 2)
 	assert.Len(t, res.ServiceMonitors, 2)
 
