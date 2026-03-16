@@ -73,7 +73,7 @@ func (h *Hypershift) GenerateResources(ctx context.Context, etcdConfig, apiServe
 	}
 
 	for _, cfg := range etcdConfig.ScrapeConfigs {
-		cfg.Spec.RelabelConfigs = append(cfg.Spec.RelabelConfigs, scrapeConfigsMetricsFilter...)
+		cfg.Spec.MetricRelabelConfigs = append(cfg.Spec.MetricRelabelConfigs, scrapeConfigsMetricsFilter...)
 	}
 
 	ret.ScrapeConfigs = append(ret.ScrapeConfigs, etcdConfig.ScrapeConfigs...)
