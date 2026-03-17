@@ -15,5 +15,6 @@ import (
 //go:embed manifests/charts/mcoa/charts/metrics/templates/non-ocp/monitoring/node-exporter/_helpers.tpl
 //go:embed manifests/charts/mcoa/charts/metrics/templates/non-ocp/monitoring/prometheus/rules/_helpers.tpl
 //go:embed manifests/charts/mcoa/charts/metrics/templates/non-ocp/monitoring/prometheus/server/_helpers.tpl
+//go:embed manifests/charts/mcoa/charts/obs-api/templates/_helpers.tpl
 
 var FS embed.FS

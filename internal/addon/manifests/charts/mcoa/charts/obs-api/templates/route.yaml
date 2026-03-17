@@ -1,0 +1,22 @@
+{{- if .Values.enabled }}
+kind: Route
+apiVersion: route.openshift.io/v1
+metadata:
+  name: mcoa-observatorium-api
+  namespace: open-cluster-management-observability
+  labels:
+    app: {{ template "obsapihelm.name" . }}
+    chart: {{ template "obsapihelm.chart" . }}
+    release: {{ .Release.Name }}
+spec:
+  to:
+    kind: Service
+    name: mcoa-observability-observatorium-api
+    weight: 100
+  port:
+    targetPort: public
+  tls:
+    termination: passthrough
+    insecureEdgeTerminationPolicy: None
+  wildcardPolicy: None
+{{- end }}

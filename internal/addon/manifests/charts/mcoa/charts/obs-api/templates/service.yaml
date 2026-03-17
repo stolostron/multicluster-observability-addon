@@ -1,0 +1,28 @@
+{{- if .Values.enabled }}
+kind: Service
+apiVersion: v1
+metadata:
+  name: mcoa-observability-observatorium-api
+  namespace: open-cluster-management-observability
+  labels:
+    app: {{ template "obsapihelm.name" . }}
+    chart: {{ template "obsapihelm.chart" . }}
+    release: {{ .Release.Name }}
+spec:
+  type: ClusterIP
+  sessionAffinity: None
+  selector:
+    app.kubernetes.io/component: mcoa-api
+    app.kubernetes.io/instance: mcoa-observability
+    app.kubernetes.io/name: mcoa-observatorium-api
+    app.kubernetes.io/part-of: mcoa-observatorium
+  ports:
+    - name: internal
+      protocol: TCP
+      port: 8081
+      targetPort: 8081
+    - name: public
+      protocol: TCP
+      port: 8080
+      targetPort: 8080
+{{- end }}
