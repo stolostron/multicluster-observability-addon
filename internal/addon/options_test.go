@@ -279,6 +279,60 @@ func TestBuildOptions(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "valid node exporter ports",
+			addOnDeploy: &addonapiv1alpha1.AddOnDeploymentConfig{
+				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
+					CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
+						{Name: KeyNodeExporterHostPort, Value: "19100"},
+						{Name: KeyNodeExporterInternalPort, Value: "19101"},
+					},
+				},
+			},
+			expectedOpts: Options{
+				Platform: PlatformOptions{
+					Metrics: MetricsOptions{
+						NodeExporter: NodeExporterOptions{
+							HostPort:     19100,
+							InternalPort: 19101,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "invalid node exporter host port - format",
+			addOnDeploy: &addonapiv1alpha1.AddOnDeploymentConfig{
+				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
+					CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
+						{Name: KeyNodeExporterHostPort, Value: "abc"},
+					},
+				},
+			},
+			expectedErrMsg: "invalid port format for nodeExporterHostPort",
+		},
+		{
+			name: "invalid node exporter host port - out of bounds high",
+			addOnDeploy: &addonapiv1alpha1.AddOnDeploymentConfig{
+				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
+					CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
+						{Name: KeyNodeExporterHostPort, Value: "65536"},
+					},
+				},
+			},
+			expectedErrMsg: "invalid port: 65536 for nodeExporterHostPort must be between 1 and 65535",
+		},
+		{
+			name: "invalid node exporter port - out of bounds low",
+			addOnDeploy: &addonapiv1alpha1.AddOnDeploymentConfig{
+				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
+					CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
+						{Name: KeyNodeExporterInternalPort, Value: "0"},
+					},
+				},
+			},
+			expectedErrMsg: "invalid port: 0 for nodeExporterInternalPort must be between 1 and 65535",
+		},
 	}
 
 	for _, tc := range testCases {
@@ -286,7 +340,7 @@ func TestBuildOptions(t *testing.T) {
 			opts, err := BuildOptions(tc.addOnDeploy)
 			if tc.expectedErrMsg != "" {
 				assert.Error(t, err)
-				assert.Equal(t, err.Error(), tc.expectedErrMsg)
+				assert.ErrorContains(t, err, tc.expectedErrMsg)
 			} else {
 				assert.NoError(t, err)
 				assert.Equal(t, tc.expectedOpts, opts)
