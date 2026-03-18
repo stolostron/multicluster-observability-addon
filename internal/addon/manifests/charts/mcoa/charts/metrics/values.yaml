@@ -18,7 +18,10 @@ prometheusOperator:
   rbacProxyTlsSecret: prometheus-operator-kube-rbac-proxy-tls
   rbacProxyPort: 9092
 nodeExporter:
+  # hostPort is the port that kube-rbac-proxy will listen on for incoming metric requests from the host.
   hostPort: 19100
+  # internalPort is the port that the node-exporter process itself listens on (localhost only).
+  internalPort: 19101
 global:
   resourceRequirements: []
   imagePullSecret: open-cluster-management-image-pull-credentials

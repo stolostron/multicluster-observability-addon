@@ -55,6 +55,7 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 		Tolerations:      opts.Tolerations,
 		ResourceReqs:     opts.ResourceReqs,
 		ProxyConfig:      opts.ProxyConfig,
+		NodeExporter:     opts.Platform.Metrics.NodeExporter,
 	}
 
 	if !opts.Platform.Metrics.CollectionEnabled && !opts.UserWorkloads.Metrics.CollectionEnabled {

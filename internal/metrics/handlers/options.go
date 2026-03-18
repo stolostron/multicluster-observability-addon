@@ -27,6 +27,7 @@ type Options struct {
 	Tolerations          []corev1.Toleration
 	NodeSelector         map[string]string
 	ResourceReqs         []addonv1alpha1.ContainerResourceRequirements
+	NodeExporter         addon.NodeExporterOptions
 	// CRDEstablishedAnnotation is injected into the Prometheus Operator Deployment to trigger a
 	// restart when optional CRDs (PrometheusAgent, ScrapeConfig) become available. This
 	// prevents synchronization issues by ensuring the operator can watch these resources upon startup.

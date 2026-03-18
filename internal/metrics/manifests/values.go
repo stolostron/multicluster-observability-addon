@@ -34,6 +34,12 @@ type MetricsValues struct {
 	AlertManagerEndpoint           string              `json:"alertManagerEndpoint,omitempty"`
 	Tolerations                    []corev1.Toleration `json:"tolerations"`
 	NodeSelector                   map[string]string   `json:"nodeSelector"`
+	NodeExporter                   NodeExporterValues  `json:"nodeExporter"`
+}
+
+type NodeExporterValues struct {
+	HostPort     int32 `json:"hostPort,omitempty"`
+	InternalPort int32 `json:"internalPort,omitempty"`
 }
 
 type Collector struct {
@@ -85,6 +91,10 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 		NodeSelector:         opts.NodeSelector,
 		Tolerations:          opts.Tolerations,
 		IsHub:                opts.IsHub,
+		NodeExporter: NodeExporterValues{
+			HostPort:     opts.NodeExporter.HostPort,
+			InternalPort: opts.NodeExporter.InternalPort,
+		},
 	}
 
 	if opts.IsOpenShiftVendor {

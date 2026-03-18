@@ -3,6 +3,7 @@ package addon
 import (
 	"fmt"
 	"net/url"
+	"strconv"
 	"strings"
 
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
@@ -20,6 +21,8 @@ const (
 	KeyPlatformIncidentDetection   = "platformIncidentDetection"
 	KeyMetricsHubHostname          = "metricsHubHostname"
 	KeyMetricsAlertManagerHostname = "metricsAlertManagerHostname"
+	KeyNodeExporterHostPort        = "nodeExporterHostPort"
+	KeyNodeExporterInternalPort    = "nodeExporterInternalPort"
 
 	// User Workloads Observability Keys
 	KeyUserWorkloadMetricsCollection = "userWorkloadMetricsCollection"
@@ -55,6 +58,12 @@ type MetricsOptions struct {
 	HubEndpoint          url.URL
 	AlertManagerEndpoint url.URL
 	UI                   MetricsUIOptions
+	NodeExporter         NodeExporterOptions
+}
+
+type NodeExporterOptions struct {
+	HostPort     int32
+	InternalPort int32
 }
 
 type IncidentDetection struct {
@@ -205,6 +214,18 @@ func BuildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Opti
 			}
 
 			opts.Platform.Metrics.AlertManagerEndpoint = *url
+		case KeyNodeExporterHostPort:
+			port, err := parsePort(keyvalue.Name, keyvalue.Value)
+			if err != nil {
+				return opts, err
+			}
+			opts.Platform.Metrics.NodeExporter.HostPort = port
+		case KeyNodeExporterInternalPort:
+			port, err := parsePort(keyvalue.Name, keyvalue.Value)
+			if err != nil {
+				return opts, err
+			}
+			opts.Platform.Metrics.NodeExporter.InternalPort = port
 		case KeyPlatformMetricsCollection:
 			if keyvalue.Value == string(PrometheusAgentV1alpha1) {
 				opts.Platform.Enabled = true
@@ -254,4 +275,15 @@ func BuildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Opti
 	}
 
 	return opts, opts.validate()
+}
+
+func parsePort(name, value string) (int32, error) {
+	port, err := strconv.ParseInt(value, 10, 32)
+	if err != nil {
+		return 0, fmt.Errorf("invalid port format for %s: %w", name, err)
+	}
+	if port < 1 || port > 65535 {
+		return 0, fmt.Errorf("%w: %d for %s must be between 1 and 65535", addoncfg.ErrInvalidPort, port, name)
+	}
+	return int32(port), nil
 }

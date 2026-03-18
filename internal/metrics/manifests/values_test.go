@@ -6,6 +6,7 @@ import (
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	cooprometheusv1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1"
 	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
+	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/handlers"
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/manifests"
@@ -230,6 +231,18 @@ func TestBuildValues(t *testing.T) {
 				trimmedID := config.GetTrimmedClusterID("12345-67890-abcdef")
 				assert.Equal(t, config.GetAlertmanagerRouterCASecretName(trimmedID), values.AlertmanagerRouterCASecretName)
 				assert.Equal(t, config.GetAlertmanagerAccessorSecretName(trimmedID), values.AlertmanagerAccessorSecretName)
+			},
+		},
+		"with node exporter options": {
+			Options: handlers.Options{
+				NodeExporter: addon.NodeExporterOptions{
+					HostPort:     19100,
+					InternalPort: 19101,
+				},
+			},
+			Expect: func(t *testing.T, values *manifests.MetricsValues) {
+				assert.Equal(t, int32(19100), values.NodeExporter.HostPort)
+				assert.Equal(t, int32(19101), values.NodeExporter.InternalPort)
 			},
 		},
 	}
