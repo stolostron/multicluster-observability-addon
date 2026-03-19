@@ -2,7 +2,7 @@
 kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: {{ .Values.platform.appName }}-role
+  name: {{ include "mcoa.globalResourcePrefix" (printf "%s-role" .Values.platform.appName) }}
   labels:
     app.kubernetes.io/component: {{ .Values.platform.component }}
     {{ include "metricshelm.labels" . | nindent 4 }}
