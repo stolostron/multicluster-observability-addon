@@ -29,3 +29,22 @@ app.kubernetes.io/name: kube-state-metrics
 app.kubernetes.io/component: exporter
 app.kubernetes.io/part-of: multicluster-observability-addon
 {{- end -}}
+
+{{/*
+Map of apiGroups to resources for kube-state-metrics.
+*/}}
+{{- define "kube-state-metrics.collectors" -}}
+{
+  "": ["configmaps", "secrets", "nodes", "pods", "services", "resourcequotas", "replicationcontrollers", "limitranges", "persistentvolumeclaims", "persistentvolumes", "namespaces"],
+  "apps": ["statefulsets", "daemonsets", "deployments", "replicasets"],
+  "batch": ["cronjobs", "jobs"],
+  "autoscaling": ["horizontalpodautoscalers"],
+  "policy": ["poddisruptionbudgets"],
+  "certificates.k8s.io": ["certificatesigningrequests"],
+  "storage.k8s.io": ["storageclasses", "volumeattachments"],
+  "admissionregistration.k8s.io": ["mutatingwebhookconfigurations", "validatingwebhookconfigurations"],
+  "networking.k8s.io": ["networkpolicies", "ingresses"],
+  "coordination.k8s.io": ["leases"],
+  "discovery.k8s.io": ["endpointslices"]
+}
+{{- end -}}

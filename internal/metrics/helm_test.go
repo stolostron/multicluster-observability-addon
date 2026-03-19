@@ -304,6 +304,49 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				}
 				assert.False(t, sidecarFound, "kube-rbac-proxy sidecar should not be present")
 
+				// Check that prometheus-operator has kubelet-endpointslice args
+				endpointsliceArgFound := false
+				var operatorContainer *corev1.Container
+				for i := range operatorDep.Spec.Template.Spec.Containers {
+					if operatorDep.Spec.Template.Spec.Containers[i].Name == "prometheus-operator" {
+						operatorContainer = &operatorDep.Spec.Template.Spec.Containers[i]
+						break
+					}
+				}
+				assert.NotNil(t, operatorContainer, "prometheus-operator container not found")
+				for _, arg := range operatorContainer.Args {
+					if arg == "--kubelet-endpointslice=true" {
+						endpointsliceArgFound = true
+						break
+					}
+				}
+				assert.True(t, endpointsliceArgFound, "prometheus-operator should have --kubelet-endpointslice=true")
+
+				// Ensure kube-state-metrics deployment has the resources flag
+				ksmMatchLabels := map[string]string{
+					"app.kubernetes.io/name": "kube-state-metrics",
+				}
+				ksmDeps := common.FilterResourcesByLabelSelector[*appsv1.Deployment](objects, ksmMatchLabels)
+				assert.Len(t, ksmDeps, 1)
+				resourcesFlagFound := false
+				var ksmContainer *corev1.Container
+				for i := range ksmDeps[0].Spec.Template.Spec.Containers {
+					if ksmDeps[0].Spec.Template.Spec.Containers[i].Name == "kube-state-metrics" {
+						ksmContainer = &ksmDeps[0].Spec.Template.Spec.Containers[i]
+						break
+					}
+				}
+				assert.NotNil(t, ksmContainer, "kube-state-metrics container not found")
+				for _, arg := range ksmContainer.Args {
+					if strings.HasPrefix(arg, "--resources=") {
+						resourcesFlagFound = true
+						// Assert the exact string of collected resources
+						assert.Equal(t, "--resources=certificatesigningrequests,configmaps,cronjobs,daemonsets,deployments,endpointslices,horizontalpodautoscalers,ingresses,jobs,leases,limitranges,mutatingwebhookconfigurations,namespaces,networkpolicies,nodes,persistentvolumeclaims,persistentvolumes,poddisruptionbudgets,pods,replicasets,replicationcontrollers,resourcequotas,secrets,services,statefulsets,storageclasses,validatingwebhookconfigurations,volumeattachments", arg)
+						break
+					}
+				}
+				assert.True(t, resourcesFlagFound, "kube-state-metrics should have --resources flag configured")
+
 				// Ensure the Prometheus resource has the correct secrets
 				proms := common.FilterResourcesByLabelSelector[*cooprometheusv1.Prometheus](objects, nil)
 				assert.Len(t, proms, 1)
