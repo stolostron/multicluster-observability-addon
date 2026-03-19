@@ -36,6 +36,8 @@ spec:
           - '--thanos-ruler-instance-namespaces={{ .Release.Namespace }}'
           - '--alertmanager-instance-namespaces={{ .Release.Namespace }}'
           - '--kubelet-service=kube-system/kubelet'
+          - '--kubelet-endpointslice=true'
+          - '--kubelet-endpoints=false'
           - '--config-reloader-cpu-limit=0'
           - '--config-reloader-memory-limit=0'
           - '--config-reloader-cpu-request=1m'
