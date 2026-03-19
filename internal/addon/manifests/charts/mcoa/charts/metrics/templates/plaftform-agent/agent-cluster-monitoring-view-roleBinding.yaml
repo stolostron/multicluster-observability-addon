@@ -2,7 +2,7 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: {{ .Values.platform.appName }}-cluster-monitoring-view-rolebinding
+  name: {{ include "mcoa.globalResourcePrefix" (printf "%s-cluster-monitoring-view-rolebinding" .Values.platform.appName) }}
   labels:
     app.kubernetes.io/component: {{ .Values.platform.component }}
     {{ include "metricshelm.labels" . | nindent 4 }}

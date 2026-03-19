@@ -2,8 +2,8 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: {{ .Values.platform.appName }}-metrics
-  abels:
+  name: {{ include "mcoa.globalResourcePrefix" (printf "%s-metrics" .Values.platform.appName) }}
+  labels:
     app.kubernetes.io/component: {{ .Values.platform.component }}
     app.kubernetes.io/name: {{ .Values.platform.appName }}-metrics
     {{ include "metricshelm.labels" . | nindent 4 }}

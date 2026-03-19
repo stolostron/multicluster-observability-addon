@@ -2,13 +2,13 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: {{ .Values.platform.appName }}-federate
+  name: {{ include "mcoa.globalResourcePrefix" (printf "%s-federate" .Values.platform.appName) }}
   labels:
     {{- include "metricshelm.labels" . | nindent 4 }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: {{ .Values.platform.appName }}-federate
+  name: {{ include "mcoa.globalResourcePrefix" (printf "%s-federate" .Values.platform.appName) }}
 subjects:
 - kind: ServiceAccount
   name: {{ .Values.platform.appName }}
