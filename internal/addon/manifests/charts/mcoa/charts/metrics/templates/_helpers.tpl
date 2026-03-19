@@ -16,3 +16,14 @@ app.kubernetes.io/part-of: multicluster-observability-addon
 app.kubernetes.io/version: {{ .Chart.Version }}
 app.kubernetes.io/managed-by: multicluster-observability-addon-manager
 {{- end }}
+
+{{/*
+Cluster scoped resource name
+*/}}
+{{- define "mcoa.globalResourcePrefix" -}}
+{{- if hasPrefix "acm-" . -}}
+{{- . -}}
+{{- else -}}
+{{- printf "acm-%s" . -}}
+{{- end -}}
+{{- end -}}

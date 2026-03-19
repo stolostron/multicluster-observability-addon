@@ -30,6 +30,7 @@ import (
 	"golang.org/x/text/language"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	meta "k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -61,6 +62,23 @@ const (
 
 func TestHelmBuild_Metrics_All(t *testing.T) {
 	hubNamespace := "open-cluster-management-observability"
+
+	verifyClusterScopedResourcesPrefix := func(t *testing.T, objects []client.Object) {
+		// Ensure all ClusterRoles and ClusterRoleBindings have the 'acm-' prefix to prevent controller fights.
+		clusterRoles := common.FilterResourcesByLabelSelector[*rbacv1.ClusterRole](objects, nil)
+		for _, cr := range clusterRoles {
+			assert.True(t, strings.HasPrefix(cr.Name, "acm-"), "ClusterRole %s is missing the 'acm-' prefix", cr.Name)
+		}
+
+		clusterRoleBindings := common.FilterResourcesByLabelSelector[*rbacv1.ClusterRoleBinding](objects, nil)
+		for _, crb := range clusterRoleBindings {
+			assert.True(t, strings.HasPrefix(crb.Name, "acm-"), "ClusterRoleBinding %s is missing the 'acm-' prefix", crb.Name)
+			// Skip OpenShift built-in roles that we do not manage/prefix
+			if crb.RoleRef.Kind == "ClusterRole" && crb.RoleRef.Name != "cluster-monitoring-view" {
+				assert.True(t, strings.HasPrefix(crb.RoleRef.Name, "acm-"), "ClusterRoleBinding %s refers to a ClusterRole %s missing the 'acm-' prefix", crb.Name, crb.RoleRef.Name)
+			}
+		}
+	}
 
 	testCases := map[string]struct {
 		PlatformMetrics  bool
@@ -133,6 +151,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 					origin := obj.Annotations[addoncfg.AnnotationOriginalResource]
 					assert.NotEmpty(t, origin, "original resource annotation should not be empty", "name", obj.Name, "annotation", origin)
 				}
+				verifyClusterScopedResourcesPrefix(t, objects)
 			},
 		},
 		"platform metrics, no coo, is hub": {
@@ -152,6 +171,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
+				verifyClusterScopedResourcesPrefix(t, objects)
 			},
 		},
 		"platform metrics, coo is installed": {
@@ -170,6 +190,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
+				verifyClusterScopedResourcesPrefix(t, objects)
 			},
 		},
 		"user workload metrics": {
@@ -202,6 +223,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
 				assert.Len(t, common.FilterResourcesByLabelSelector[*corev1.Secret](objects, nil), 4) // 2 secrets (mTLS to hub) + alertmananger secrets (accessor+ca in uwl)
+				verifyClusterScopedResourcesPrefix(t, objects)
 			},
 		},
 		"user workload, coo is installed": {
@@ -224,6 +246,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
+				verifyClusterScopedResourcesPrefix(t, objects)
 			},
 		},
 		"is non ocp": {
@@ -288,6 +311,8 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				assert.Contains(t, proms[0].Spec.Secrets, config.GetAlertmanagerRouterCASecretName(trimmedID))
 				assert.Contains(t, proms[0].Spec.Secrets, config.GetAlertmanagerAccessorSecretName(trimmedID))
 
+				verifyClusterScopedResourcesPrefix(t, objects)
+
 				// ensure that the number of objects is correct
 				expectedCount := 71
 				if len(objects) != expectedCount {
@@ -311,6 +336,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
+				verifyClusterScopedResourcesPrefix(t, objects)
 			},
 		},
 		"resource requests and limits": {
@@ -363,6 +389,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				}
 				assert.NotNil(t, operatorContainer, "prometheus-operator container not found")
 				assert.Equal(t, expectedOperatorResources, operatorContainer.Resources)
+				verifyClusterScopedResourcesPrefix(t, objects)
 			},
 		},
 		"image registry overrides": {
@@ -390,6 +417,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				cooOperator := common.FilterResourcesByLabelSelector[*appsv1.Deployment](objects, nil)
 				assert.Len(t, cooOperator, 1)
 				assert.Equal(t, "my-registry.com/prometheus/obo-operator", cooOperator[0].Spec.Template.Spec.Containers[0].Image)
+				verifyClusterScopedResourcesPrefix(t, objects)
 			},
 		},
 	}

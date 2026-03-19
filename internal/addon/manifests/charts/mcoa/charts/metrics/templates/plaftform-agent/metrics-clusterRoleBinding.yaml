@@ -2,7 +2,7 @@
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: {{ .Values.platform.appName }}-metrics
+  name: {{ include "mcoa.globalResourcePrefix" (printf "%s-metrics" .Values.platform.appName) }}
   labels:
     app.kubernetes.io/component: {{ .Values.platform.component }}
     app.kubernetes.io/name: {{ .Values.platform.appName }}-metrics
@@ -14,5 +14,5 @@ subjects:
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: {{ .Values.platform.appName }}-metrics
+  name: {{ include "mcoa.globalResourcePrefix" (printf "%s-metrics" .Values.platform.appName) }}
 {{- end }}
