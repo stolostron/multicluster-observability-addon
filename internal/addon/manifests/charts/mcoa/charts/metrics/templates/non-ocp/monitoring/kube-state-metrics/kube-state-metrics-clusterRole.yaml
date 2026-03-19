@@ -1,4 +1,5 @@
 {{- if .Values.deployNonOCPStack }}
+{{- $collectorsDict := include "kube-state-metrics.collectors" . | fromJson }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -6,52 +7,19 @@ metadata:
   labels:
     {{- include "kube-state-metrics.labels" . | nindent 4 }}
 rules:
+{{- range $group := keys $collectorsDict | sortAlpha }}
+{{- $resources := index $collectorsDict $group }}
 - apiGroups:
-  - ""
+  - {{ $group | quote }}
   resources:
-  - configmaps
-  - secrets
-  - nodes
-  - pods
-  - services
-  - resourcequotas
-  - replicationcontrollers
-  - limitranges
-  - persistentvolumeclaims
-  - persistentvolumes
-  - namespaces
+{{- range $resources | sortAlpha }}
+  - {{ . }}
+{{- end }}
   verbs:
   - get
   - list
   - watch
-- apiGroups:
-  - apps
-  resources:
-  - statefulsets
-  - daemonsets
-  - deployments
-  - replicasets
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - batch
-  resources:
-  - cronjobs
-  - jobs
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - autoscaling
-  resources:
-  - horizontalpodautoscalers
-  verbs:
-  - get
-  - list
-  - watch
+{{- end }}
 - apiGroups:
   - authentication.k8s.io
   resources:
@@ -64,63 +32,4 @@ rules:
   - subjectaccessreviews
   verbs:
   - create
-- apiGroups:
-  - policy
-  resources:
-  - poddisruptionbudgets
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - certificates.k8s.io
-  resources:
-  - certificatesigningrequests
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - storage.k8s.io
-  resources:
-  - storageclasses
-  - volumeattachments
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - admissionregistration.k8s.io
-  resources:
-  - mutatingwebhookconfigurations
-  - validatingwebhookconfigurations
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - networking.k8s.io
-  resources:
-  - networkpolicies
-  - ingresses
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - coordination.k8s.io
-  resources:
-  - leases
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - discovery.k8s.io
-  resources:
-  - endpointslices
-  verbs:
-  - get
-  - list
-  - watch
 {{- end }}
