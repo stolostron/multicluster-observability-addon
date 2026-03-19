@@ -2,7 +2,7 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: {{ .Values.prometheusOperator.appName }}-metrics
+  name: {{ include "mcoa.globalResourcePrefix" (printf "%s-metrics" .Values.prometheusOperator.appName) }}
   labels:
     app.kubernetes.io/component: {{ .Values.prometheusOperator.component }}
     app.kubernetes.io/name: {{ .Values.prometheusOperator.appName }}-metrics
