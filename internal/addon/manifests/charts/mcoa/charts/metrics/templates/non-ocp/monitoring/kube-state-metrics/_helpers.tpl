@@ -35,7 +35,7 @@ Map of apiGroups to resources for kube-state-metrics.
 */}}
 {{- define "kube-state-metrics.collectors" -}}
 {
-  "": ["configmaps", "secrets", "nodes", "pods", "services", "resourcequotas", "replicationcontrollers", "limitranges", "persistentvolumeclaims", "persistentvolumes", "namespaces"],
+  "": ["configmaps", "nodes", "pods", "services", "resourcequotas", "replicationcontrollers", "limitranges", "persistentvolumeclaims", "persistentvolumes", "namespaces"],
   "apps": ["statefulsets", "daemonsets", "deployments", "replicasets"],
   "batch": ["cronjobs", "jobs"],
   "autoscaling": ["horizontalpodautoscalers"],
