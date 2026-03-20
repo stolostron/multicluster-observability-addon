@@ -89,6 +89,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 		InstallNamespace string
 		ResourceReqs     bool
 		Registries       []addonapiv1alpha1.ImageMirror
+		NodeExporterOpts addon.NodeExporterOptions
 		Expects          func(*testing.T, []client.Object)
 	}{
 		"no metrics": {
@@ -305,7 +306,6 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				assert.False(t, sidecarFound, "kube-rbac-proxy sidecar should not be present")
 
 				// Check that prometheus-operator has kubelet-endpointslice args
-				endpointsliceArgFound := false
 				var operatorContainer *corev1.Container
 				for i := range operatorDep.Spec.Template.Spec.Containers {
 					if operatorDep.Spec.Template.Spec.Containers[i].Name == "prometheus-operator" {
@@ -313,21 +313,15 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 						break
 					}
 				}
-				assert.NotNil(t, operatorContainer, "prometheus-operator container not found")
-				for _, arg := range operatorContainer.Args {
-					if arg == "--kubelet-endpointslice=true" {
-						endpointsliceArgFound = true
-						break
-					}
-				}
-				assert.True(t, endpointsliceArgFound, "prometheus-operator should have --kubelet-endpointslice=true")
+				require.NotNil(t, operatorContainer, "prometheus-operator container not found")
+				assert.Contains(t, operatorContainer.Args, "--kubelet-endpointslice=true", "prometheus-operator should have --kubelet-endpointslice=true")
 
 				// Ensure kube-state-metrics deployment has the resources flag
 				ksmMatchLabels := map[string]string{
 					"app.kubernetes.io/name": "kube-state-metrics",
 				}
 				ksmDeps := common.FilterResourcesByLabelSelector[*appsv1.Deployment](objects, ksmMatchLabels)
-				assert.Len(t, ksmDeps, 1)
+				require.Len(t, ksmDeps, 1)
 				resourcesFlagFound := false
 				var ksmContainer *corev1.Container
 				for i := range ksmDeps[0].Spec.Template.Spec.Containers {
@@ -336,7 +330,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 						break
 					}
 				}
-				assert.NotNil(t, ksmContainer, "kube-state-metrics container not found")
+				require.NotNil(t, ksmContainer, "kube-state-metrics container not found")
 				for _, arg := range ksmContainer.Args {
 					if strings.HasPrefix(arg, "--resources=") {
 						resourcesFlagFound = true
@@ -361,6 +355,60 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
+			},
+		},
+		"node exporter custom ports": {
+			PlatformMetrics: true,
+			UserMetrics:     false,
+			COOIsInstalled:  false,
+			IsOCP:           false,
+			NodeExporterOpts: addon.NodeExporterOptions{
+				HostPort:     29100,
+				InternalPort: 29101,
+			},
+			Expects: func(t *testing.T, objects []client.Object) {
+				matchLabels := map[string]string{
+					"app.kubernetes.io/name": "node-exporter",
+				}
+				dss := common.FilterResourcesByLabelSelector[*appsv1.DaemonSet](objects, matchLabels)
+				assert.Len(t, dss, 1)
+				ds := dss[0]
+
+				// Check ports in the container args
+				var nodeExporterContainer *corev1.Container
+				for i := range ds.Spec.Template.Spec.Containers {
+					if ds.Spec.Template.Spec.Containers[i].Name == "node-exporter" {
+						nodeExporterContainer = &ds.Spec.Template.Spec.Containers[i]
+						break
+					}
+				}
+				require.NotNil(t, nodeExporterContainer, "node-exporter container not found")
+				assert.Contains(t, nodeExporterContainer.Args, "--web.listen-address=127.0.0.1:29101")
+
+				var rbacProxyContainer *corev1.Container
+				for i := range ds.Spec.Template.Spec.Containers {
+					if ds.Spec.Template.Spec.Containers[i].Name == "kube-rbac-proxy" {
+						rbacProxyContainer = &ds.Spec.Template.Spec.Containers[i]
+						break
+					}
+				}
+				require.NotNil(t, rbacProxyContainer, "kube-rbac-proxy container not found")
+				assert.Contains(t, rbacProxyContainer.Args, "--secure-listen-address=$(IP):29100")
+				assert.Contains(t, rbacProxyContainer.Args, "--upstream=http://127.0.0.1:29101/")
+
+				// Check container ports
+				require.NotEmpty(t, rbacProxyContainer.Ports)
+				assert.Equal(t, int32(29100), rbacProxyContainer.Ports[0].ContainerPort)
+				assert.Equal(t, "https", rbacProxyContainer.Ports[0].Name)
+
+				// Check Service port
+				svcs := common.FilterResourcesByLabelSelector[*corev1.Service](objects, matchLabels)
+				require.Len(t, svcs, 1)
+				require.NotEmpty(t, svcs[0].Spec.Ports)
+				assert.Equal(t, int32(29100), svcs[0].Spec.Ports[0].Port)
+				assert.Equal(t, "https", svcs[0].Spec.Ports[0].TargetPort.StrVal)
+
+				verifyClusterScopedResourcesPrefix(t, objects)
 			},
 		},
 		"custom namespace": {
@@ -743,7 +791,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 
 			// Wire everything together to a fake addon instance
 			agentAddon, err := addonfactory.NewAgentAddonFactory(addoncfg.Name, addon.FS, addoncfg.MetricsChartDir).
-				WithGetValuesFuncs(addonConfigValuesFn, fakeGetValues(client, tc.PlatformMetrics, tc.UserMetrics, tc.InstallNamespace, aodc.Spec.ResourceRequirements, tc.Registries)).
+				WithGetValuesFuncs(addonConfigValuesFn, fakeGetValues(client, tc.PlatformMetrics, tc.UserMetrics, tc.InstallNamespace, aodc.Spec.ResourceRequirements, tc.Registries, tc.NodeExporterOpts)).
 				WithAgentRegistrationOption(&agent.RegistrationOption{}).
 				WithAgentInstallNamespace(
 					// Set agent install namespace from addon deployment config if it exists
@@ -1034,7 +1082,7 @@ func TestHelmBuild_Metrics_HCP(t *testing.T) {
 
 	// Wire everything together to a fake addon instance
 	agentAddon, err := addonfactory.NewAgentAddonFactory(addoncfg.Name, addon.FS, addoncfg.MetricsChartDir).
-		WithGetValuesFuncs(addonConfigValuesFn, fakeGetValues(client, false, true, "", nil, nil)).
+		WithGetValuesFuncs(addonConfigValuesFn, fakeGetValues(client, false, true, "", nil, nil, addon.NodeExporterOptions{})).
 		WithAgentRegistrationOption(&agent.RegistrationOption{}).
 		WithScheme(scheme).
 		BuildHelmAgentAddon()
@@ -1094,7 +1142,7 @@ func newSecret(name, ns string) *corev1.Secret {
 	}
 }
 
-func fakeGetValues(k8s client.Client, platformMetrics, userWorkloadMetrics bool, installNs string, resReqs []addonapiv1alpha1.ContainerResourceRequirements, registries []addonapiv1alpha1.ImageMirror) addonfactory.GetValuesFunc {
+func fakeGetValues(k8s client.Client, platformMetrics, userWorkloadMetrics bool, installNs string, resReqs []addonapiv1alpha1.ContainerResourceRequirements, registries []addonapiv1alpha1.ImageMirror, nodeExporterOpts addon.NodeExporterOptions) addonfactory.GetValuesFunc {
 	return func(
 		cluster *clusterv1.ManagedCluster,
 		mcAddon *addonapiv1alpha1.ManagedClusterAddOn,
@@ -1107,7 +1155,11 @@ func fakeGetValues(k8s client.Client, platformMetrics, userWorkloadMetrics bool,
 
 		addonOpts := addon.Options{
 			Platform: addon.PlatformOptions{
-				Metrics: addon.MetricsOptions{CollectionEnabled: platformMetrics, HubEndpoint: *hubEp},
+				Metrics: addon.MetricsOptions{
+					CollectionEnabled: platformMetrics,
+					HubEndpoint:       *hubEp,
+					NodeExporter:      nodeExporterOpts,
+				},
 			},
 			UserWorkloads: addon.UserWorkloadOptions{
 				Metrics: addon.MetricsOptions{CollectionEnabled: userWorkloadMetrics},
