@@ -148,7 +148,6 @@ func TestBuildValues(t *testing.T) {
 				assert.Len(t, values.UserWorkload.Rules, 2)
 				assert.Equal(t, values.UserWorkload.Rules[0].Name, "a")
 				assert.Equal(t, values.UserWorkload.Rules[1].Name, "b")
-				assert.Empty(t, values.UserWorkload.Rules[0].APIVersion, "prometheusv1 rules should not set APIVersion so the template defaults to monitoring.coreos.com/v1")
 			},
 		},
 		"with user workload COO rules": {
@@ -161,8 +160,6 @@ func TestBuildValues(t *testing.T) {
 				assert.Len(t, values.UserWorkload.Rules, 2)
 				assert.Equal(t, "coo-a", values.UserWorkload.Rules[0].Name)
 				assert.Equal(t, "coo-b", values.UserWorkload.Rules[1].Name)
-				assert.Equal(t, "monitoring.rhobs/v1", values.UserWorkload.Rules[0].APIVersion, "COO rules must carry apiVersion so the template renders monitoring.rhobs/v1")
-				assert.Equal(t, "monitoring.rhobs/v1", values.UserWorkload.Rules[1].APIVersion)
 			},
 		},
 		"with mixed user workload rules and COO rules": {
@@ -175,9 +172,7 @@ func TestBuildValues(t *testing.T) {
 			Expect: func(t *testing.T, values *manifests.MetricsValues) {
 				assert.Len(t, values.UserWorkload.Rules, 2)
 				assert.Equal(t, "coreos-a", values.UserWorkload.Rules[0].Name)
-				assert.Empty(t, values.UserWorkload.Rules[0].APIVersion)
 				assert.Equal(t, "rhobs-a", values.UserWorkload.Rules[1].Name)
-				assert.Equal(t, "monitoring.rhobs/v1", values.UserWorkload.Rules[1].APIVersion)
 			},
 		},
 		"with user workload service monitors": {

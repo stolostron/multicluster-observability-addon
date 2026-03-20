@@ -61,7 +61,6 @@ type ConfigValue struct {
 	Data        string            `json:"data"`
 	Labels      map[string]string `json:"labels"`
 	Annotations map[string]string `json:"annotations"`
-	APIVersion  string            `json:"apiVersion,omitempty"`
 }
 
 func BuildValues(opts handlers.Options) (*MetricsValues, error) {
@@ -202,10 +201,9 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 		}
 
 		ret.Platform.Rules = append(ret.Platform.Rules, ConfigValue{
-			Name:       rule.Name,
-			Data:       string(ruleJson),
-			Labels:     rule.Labels,
-			APIVersion: "monitoring.rhobs/v1",
+			Name:   rule.Name,
+			Data:   string(ruleJson),
+			Labels: rule.Labels,
 		})
 	}
 
@@ -234,10 +232,9 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 		}
 
 		configValueItem := ConfigValue{
-			Name:       rule.Name,
-			Data:       string(ruleJson),
-			Labels:     rule.Labels,
-			APIVersion: "monitoring.rhobs/v1",
+			Name:   rule.Name,
+			Data:   string(ruleJson),
+			Labels: rule.Labels,
 		}
 		targetNamespace := rule.Annotations[config.TargetNamespaceAnnotation]
 		if targetNamespace != "" {
