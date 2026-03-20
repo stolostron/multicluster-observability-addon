@@ -278,8 +278,10 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				svcs := common.FilterResourcesByLabelSelector[*corev1.Service](objects, matchLabels)
 				assert.Len(t, svcs, 1)
 				operatorSvc := svcs[0]
-				assert.Equal(t, "metrics", operatorSvc.Spec.Ports[0].TargetPort.StrVal)
-				assert.Equal(t, int32(8080), operatorSvc.Spec.Ports[0].Port)
+				metricsPort := findServicePortByName(operatorSvc.Spec.Ports, "metrics")
+				require.NotNil(t, metricsPort, "metrics port not found in operator service")
+				assert.Equal(t, "metrics", metricsPort.TargetPort.StrVal)
+				assert.Equal(t, int32(8080), metricsPort.Port)
 
 				// Ensure the Deployment has the correct ports and no sidecar
 				deps := common.FilterResourcesByLabelSelector[*appsv1.Deployment](objects, matchLabels)
@@ -397,16 +399,17 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				assert.Contains(t, rbacProxyContainer.Args, "--upstream=http://127.0.0.1:29101/")
 
 				// Check container ports
-				require.NotEmpty(t, rbacProxyContainer.Ports)
-				assert.Equal(t, int32(29100), rbacProxyContainer.Ports[0].ContainerPort)
-				assert.Equal(t, "https", rbacProxyContainer.Ports[0].Name)
+				rbacProxyPort := findContainerPortByName(rbacProxyContainer.Ports, "https")
+				require.NotNil(t, rbacProxyPort, "https port not found in kube-rbac-proxy container")
+				assert.Equal(t, int32(29100), rbacProxyPort.ContainerPort)
 
 				// Check Service port
 				svcs := common.FilterResourcesByLabelSelector[*corev1.Service](objects, matchLabels)
 				require.Len(t, svcs, 1)
-				require.NotEmpty(t, svcs[0].Spec.Ports)
-				assert.Equal(t, int32(29100), svcs[0].Spec.Ports[0].Port)
-				assert.Equal(t, "https", svcs[0].Spec.Ports[0].TargetPort.StrVal)
+				nodeExporterPort := findServicePortByName(svcs[0].Spec.Ports, "https")
+				require.NotNil(t, nodeExporterPort, "https port not found in node-exporter service")
+				assert.Equal(t, int32(29100), nodeExporterPort.Port)
+				assert.Equal(t, "https", nodeExporterPort.TargetPort.StrVal)
 
 				verifyClusterScopedResourcesPrefix(t, objects)
 			},
@@ -1392,4 +1395,22 @@ func ensureGVKIsSet(scheme *runtime.Scheme) interceptor.Funcs {
 			})
 		},
 	}
+}
+
+func findServicePortByName(ports []corev1.ServicePort, name string) *corev1.ServicePort {
+	for i := range ports {
+		if ports[i].Name == name {
+			return &ports[i]
+		}
+	}
+	return nil
+}
+
+func findContainerPortByName(ports []corev1.ContainerPort, name string) *corev1.ContainerPort {
+	for i := range ports {
+		if ports[i].Name == name {
+			return &ports[i]
+		}
+	}
+	return nil
 }
