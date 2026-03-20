@@ -1,10 +1,6 @@
 {{- if .Values.userWorkloadsEnabled }}
 {{- range $_, $rule := .Values.userWorkload.rules }}
-{{- if $.Values.deployNonOCPStack }}
-apiVersion: monitoring.rhobs/v1
-{{- else }}
-apiVersion: monitoring.coreos.com/v1
-{{- end }}
+apiVersion: {{ $rule.apiVersion | default "monitoring.coreos.com/v1" }}
 kind: PrometheusRule
 metadata:
   name: {{ $rule.name }}

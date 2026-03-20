@@ -293,10 +293,8 @@ func (o *OptionsBuilder) buildPrometheusAgent(ctx context.Context, opts *Options
 func (o *OptionsBuilder) buildHypershiftResources(ctx context.Context, opts *Options, managedCluster *clusterv1.ManagedCluster, configResources []client.Object) error {
 	etcdScrapeConfigs := common.FilterResourcesByLabelSelector[*cooprometheusv1alpha1.ScrapeConfig](configResources, config.EtcdHcpUserWorkloadPrometheusMatchLabels)
 	etcdRules := common.FilterResourcesByLabelSelector[*prometheusv1.PrometheusRule](configResources, config.EtcdHcpUserWorkloadPrometheusMatchLabels)
-	etcdCOORules := common.FilterResourcesByLabelSelector[*cooprometheusv1.PrometheusRule](configResources, config.EtcdHcpUserWorkloadPrometheusMatchLabels)
 	apiserverScrapeConfigs := common.FilterResourcesByLabelSelector[*cooprometheusv1alpha1.ScrapeConfig](configResources, config.ApiserverHcpUserWorkloadPrometheusMatchLabels)
 	apiserverRules := common.FilterResourcesByLabelSelector[*prometheusv1.PrometheusRule](configResources, config.ApiserverHcpUserWorkloadPrometheusMatchLabels)
-	apiserverCOORules := common.FilterResourcesByLabelSelector[*cooprometheusv1.PrometheusRule](configResources, config.ApiserverHcpUserWorkloadPrometheusMatchLabels)
 
 	if len(etcdScrapeConfigs) == 0 {
 		o.Logger.V(1).Info("no scrapeConfigs found in configuration resources for etcd HPCs", "expectedLabel", fmt.Sprintf("%+v", config.EtcdHcpUserWorkloadPrometheusMatchLabels))
@@ -313,8 +311,8 @@ func (o *OptionsBuilder) buildHypershiftResources(ctx context.Context, opts *Opt
 	}
 
 	hyperResources, err := hyper.GenerateResources(ctx,
-		CollectionConfig{ScrapeConfigs: etcdScrapeConfigs, Rules: etcdRules, COORules: etcdCOORules},
-		CollectionConfig{ScrapeConfigs: apiserverScrapeConfigs, Rules: apiserverRules, COORules: apiserverCOORules},
+		CollectionConfig{ScrapeConfigs: etcdScrapeConfigs, Rules: etcdRules},
+		CollectionConfig{ScrapeConfigs: apiserverScrapeConfigs, Rules: apiserverRules},
 	)
 	if err != nil {
 		return fmt.Errorf("failed to generate hypershift resources: %w", err)
@@ -322,7 +320,6 @@ func (o *OptionsBuilder) buildHypershiftResources(ctx context.Context, opts *Opt
 
 	opts.UserWorkloads.ScrapeConfigs = append(opts.UserWorkloads.ScrapeConfigs, hyperResources.ScrapeConfigs...)
 	opts.UserWorkloads.Rules = append(opts.UserWorkloads.Rules, hyperResources.Rules...)
-	opts.UserWorkloads.COORules = append(opts.UserWorkloads.COORules, hyperResources.COORules...)
 	opts.UserWorkloads.ServiceMonitors = append(opts.UserWorkloads.ServiceMonitors, hyperResources.ServiceMonitors...)
 	return nil
 }

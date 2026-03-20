@@ -160,6 +160,8 @@ func TestBuildValues(t *testing.T) {
 				assert.Len(t, values.UserWorkload.Rules, 2)
 				assert.Equal(t, "coo-a", values.UserWorkload.Rules[0].Name)
 				assert.Equal(t, "coo-b", values.UserWorkload.Rules[1].Name)
+				assert.Equal(t, "monitoring.rhobs/v1", values.UserWorkload.Rules[0].APIVersion)
+				assert.Equal(t, "monitoring.rhobs/v1", values.UserWorkload.Rules[1].APIVersion)
 			},
 		},
 		"with mixed user workload rules and COO rules": {
@@ -172,7 +174,9 @@ func TestBuildValues(t *testing.T) {
 			Expect: func(t *testing.T, values *manifests.MetricsValues) {
 				assert.Len(t, values.UserWorkload.Rules, 2)
 				assert.Equal(t, "coreos-a", values.UserWorkload.Rules[0].Name)
+				assert.Empty(t, values.UserWorkload.Rules[0].APIVersion)
 				assert.Equal(t, "rhobs-a", values.UserWorkload.Rules[1].Name)
+				assert.Equal(t, "monitoring.rhobs/v1", values.UserWorkload.Rules[1].APIVersion)
 			},
 		},
 		"with user workload service monitors": {

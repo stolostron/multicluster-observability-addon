@@ -33,13 +33,11 @@ type HypershiftResources struct {
 	ServiceMonitors []*prometheusv1.ServiceMonitor
 	ScrapeConfigs   []*cooprometheusv1alpha1.ScrapeConfig
 	Rules           []*prometheusv1.PrometheusRule
-	COORules        []*cooprometheusv1.PrometheusRule
 }
 
 type CollectionConfig struct {
 	ScrapeConfigs []*cooprometheusv1alpha1.ScrapeConfig
 	Rules         []*prometheusv1.PrometheusRule
-	COORules      []*cooprometheusv1.PrometheusRule
 }
 
 type Hypershift struct {
@@ -80,7 +78,6 @@ func (h *Hypershift) GenerateResources(ctx context.Context, etcdConfig, apiServe
 
 	ret.ScrapeConfigs = append(ret.ScrapeConfigs, etcdConfig.ScrapeConfigs...)
 	ret.Rules = append(ret.Rules, etcdConfig.Rules...)
-	ret.COORules = append(ret.COORules, etcdConfig.COORules...)
 
 	etcdMetrics, err := h.extractDependentMetrics(etcdConfig.ScrapeConfigs, etcdConfig.Rules)
 	if err != nil {
@@ -93,7 +90,6 @@ func (h *Hypershift) GenerateResources(ctx context.Context, etcdConfig, apiServe
 
 	ret.ScrapeConfigs = append(ret.ScrapeConfigs, apiServerConfig.ScrapeConfigs...)
 	ret.Rules = append(ret.Rules, apiServerConfig.Rules...)
-	ret.COORules = append(ret.COORules, apiServerConfig.COORules...)
 
 	apiserverMetrics, err := h.extractDependentMetrics(apiServerConfig.ScrapeConfigs, apiServerConfig.Rules)
 	if err != nil {
