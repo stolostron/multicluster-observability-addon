@@ -16,6 +16,8 @@ metadata:
     {{- $stdAnnotations := dict }}
     {{- if $.Values.deployNonOCPStack }}
     {{- $_ := set $stdAnnotations "operator.prometheus.io/controller-id" $.Values.prometheusControllerID }}
+    {{- else if $.Values.deployCOOResources }}
+    {{- $_ := set $stdAnnotations "operator.prometheus.io/controller-id" $.Values.prometheusControllerID }}
     {{- else }}
     {{- $_ := set $stdAnnotations "operator.prometheus.io/controller-id" "openshift-user-workload-monitoring/prometheus-operator" }}
     {{- end }}

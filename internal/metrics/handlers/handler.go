@@ -110,8 +110,7 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 			o.Logger.V(2).Info("No scrape configs found for platform metrics")
 		}
 		ret.Platform.Rules = common.FilterResourcesByLabelSelector[*prometheusv1.PrometheusRule](configResources, config.PlatformPrometheusMatchLabels)
-		ret.Platform.COORules = common.FilterResourcesByLabelSelector[*cooprometheusv1.PrometheusRule](configResources, config.PlatformPrometheusMatchLabels)
-		if len(ret.Platform.Rules) == 0 && len(ret.Platform.COORules) == 0 {
+		if len(ret.Platform.Rules) == 0 {
 			o.Logger.V(2).Info("No rules found for platform metrics")
 		}
 	}

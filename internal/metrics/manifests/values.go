@@ -195,19 +195,6 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 		})
 	}
 
-	for _, rule := range opts.Platform.COORules {
-		ruleJson, err := json.Marshal(rule.Spec)
-		if err != nil {
-			return ret, err
-		}
-
-		ret.Platform.Rules = append(ret.Platform.Rules, ConfigValue{
-			Name:   rule.Name,
-			Data:   string(ruleJson),
-			Labels: rule.Labels,
-		})
-	}
-
 	for _, rule := range opts.UserWorkloads.Rules {
 		ruleJson, err := json.Marshal(rule.Spec)
 		if err != nil {

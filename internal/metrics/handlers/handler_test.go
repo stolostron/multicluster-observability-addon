@@ -102,14 +102,6 @@ func TestBuildOptions(t *testing.T) {
 		},
 	}
 
-	cooPlatformRule := &cooprometheusv1.PrometheusRule{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-prometheus-rule-coo",
-			Namespace: hubNamespace,
-			Labels:    config.PlatformPrometheusMatchLabels,
-		},
-	}
-
 	uwlAgent := &cooprometheusv1alpha1.PrometheusAgent{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-prometheus-agent-uwl",
@@ -206,18 +198,6 @@ func TestBuildOptions(t *testing.T) {
 						},
 					},
 				},
-				{
-					ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
-						Group:    "monitoring.rhobs",
-						Resource: cooprometheusv1.PrometheusRuleName,
-					},
-					DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
-						ConfigReferent: addonapiv1alpha1.ConfigReferent{
-							Name:      cooPlatformRule.Name,
-							Namespace: cooPlatformRule.Namespace,
-						},
-					},
-				},
 			},
 		},
 	}
@@ -297,7 +277,6 @@ func TestBuildOptions(t *testing.T) {
 			platformHAProxyCM.DeepCopy(),
 			platformScrapeConfig.DeepCopy(),
 			platformRule.DeepCopy(),
-			cooPlatformRule.DeepCopy(),
 			uwlAgent.DeepCopy(),
 			uwlHAProxyCM.DeepCopy(),
 			cmao.DeepCopy(),
@@ -438,11 +417,10 @@ func TestBuildOptions(t *testing.T) {
 				assert.Nil(t, opts.UserWorkloads.PrometheusAgent)
 				// Check that scrape configs are set
 				assert.Len(t, opts.Platform.ScrapeConfigs, 1)
-				// Check that both CoreOS and RHOBS PrometheusRules are included (monitoring.coreos.com and monitoring.rhobs)
+				// Check that CoreOS PrometheusRules are included
 				assert.Len(t, opts.Platform.Rules, 1, "expected one monitoring.coreos.com PrometheusRule")
-				assert.Len(t, opts.Platform.COORules, 1, "expected one monitoring.rhobs PrometheusRule")
 				assert.Equal(t, platformRule.Name, opts.Platform.Rules[0].Name, "expected CoreOS PrometheusRule")
-				assert.Equal(t, cooPlatformRule.Name, opts.Platform.COORules[0].Name, "expected RHOBS PrometheusRule for COO federation")
+				assert.Empty(t, opts.Platform.COORules, "platform should not have COO rules")
 				assert.False(t, opts.COOIsSubscribed)
 				assert.NotEmpty(t, opts.CRDEstablishedAnnotation)
 			},
