@@ -7,6 +7,7 @@ import (
 
 	hyperv1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	cooprometheusv1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1"
 	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
@@ -866,6 +867,7 @@ func newTestScheme() *runtime.Scheme {
 	_ = kubescheme.AddToScheme(s)
 	_ = addonv1alpha1.AddToScheme(s)
 	_ = cooprometheusv1alpha1.AddToScheme(s)
+	_ = cooprometheusv1.AddToScheme(s)
 	_ = prometheusv1.AddToScheme(s)
 	_ = hyperv1.AddToScheme(s)
 	return s
