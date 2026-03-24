@@ -109,7 +109,7 @@ require (
 	github.com/mwitkow/go-conntrack v0.0.0-20190716064945-2f068394615f // indirect
 	github.com/nexucis/lamenv v0.5.2 // indirect
 	github.com/openshift/api v0.0.0-20250704153732-ad766c4e6d8e
-	github.com/perses/common v0.30.2 // indirect; indirect // indirect
+	github.com/perses/common v0.30.2 // indirect
 	github.com/perses/plugins/gaugechart v0.10.0 // indirect
 	github.com/perses/plugins/markdown v0.10.0 // indirect
 	github.com/perses/promql-builder v0.2.0
