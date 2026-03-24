@@ -7,7 +7,6 @@ import (
 	panelgroup "github.com/perses/perses/go-sdk/panel-group"
 	listVar "github.com/perses/perses/go-sdk/variable/list-variable"
 	labelValuesVar "github.com/perses/plugins/prometheus/sdk/go/variable/label-values"
-	"github.com/perses/promql-builder/vector"
 	"github.com/prometheus/prometheus/model/labels"
 	panels "github.com/stolostron/multicluster-observability-addon/internal/perses/panels/acm"
 )
@@ -43,8 +42,11 @@ func BuildACMAlertsByCluster(project string, datasource string, clusterLabelName
 			listVar.List(
 				labelValuesVar.PrometheusLabelValues("label_name",
 					dashboards.AddVariableDatasource(datasource),
-					labelValuesVar.LabelName(
-						"acm_label_names",
+					labelValuesVar.Matchers(
+						promql.SetLabelMatchers(
+							"acm_label_names",
+							[]promql.LabelMatcher{},
+						),
 					),
 				),
 				listVar.DisplayName("Label"),
@@ -58,10 +60,10 @@ func BuildACMAlertsByCluster(project string, datasource string, clusterLabelName
 				labelValuesVar.PrometheusLabelValues("$acm_label_names",
 					dashboards.AddVariableDatasource(datasource),
 					labelValuesVar.Matchers(
-						promql.SetLabelMatchersV2(
-							vector.New(vector.WithMetricName("acm_managed_cluster_labels")),
-							[]*labels.Matcher{},
-						).Pretty(0),
+						promql.SetLabelMatchers(
+							"acm_managed_cluster_labels",
+							[]promql.LabelMatcher{},
+						),
 					),
 				),
 				listVar.DisplayName("Value"),

@@ -1,6 +1,6 @@
 groups:
 - name: k8s.rules
-  rules:nod
+  rules:
   - expr: |-
       sum by (cluster, namespace, pod, container) (
         irate(container_cpu_usage_seconds_total{job="kubelet", metrics_path="/metrics/cadvisor", image!=""}[5m])

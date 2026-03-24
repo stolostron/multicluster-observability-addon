@@ -32,8 +32,8 @@ func withCapacityGroup(datasource string, labelMatcher *labels.Matcher) dashboar
 	return dashboard.AddPanelGroup("Capacity",
 		panelgroup.PanelsPerLine(2),
 		panels.Top50MemoryUtilizedClusters(datasource, labelMatcher),
-		panels.Top50CPUUtilizedClusters(datasource, labelMatcher),
 		panels.Top5MemoryUtilizationGraph(datasource, labelMatcher),
+		panels.Top50CPUUtilizedClusters(datasource, labelMatcher),
 		panels.Top5CPUUtilizationGraph(datasource, labelMatcher),
 		panels.BandwidthUtilization(datasource, labelMatcher),
 	)
@@ -48,10 +48,12 @@ func BuildACMClustersOverview(project string, datasource string, clusterLabelNam
 			listVar.List(
 				labelValuesVar.PrometheusLabelValues("label_name",
 					dashboards.AddVariableDatasource(datasource),
-					labelValuesVar.Matchers(
-						vector.New(vector.WithMetricName("acm_label_names")).String(),
-						),
-					),
+						labelValuesVar.Matchers(promql.SetLabelMatchers(
+							"acm_label_names",
+							[]promql.LabelMatcher{},
+						   ),
+						   ),
+				),
 				listVar.DisplayName("Label"),
 				listVar.DefaultValue("name"),
 				listVar.AllowAllValue(false),
@@ -62,11 +64,10 @@ func BuildACMClustersOverview(project string, datasource string, clusterLabelNam
 			listVar.List(
 				labelValuesVar.PrometheusLabelValues("$acm_label_names",
 					dashboards.AddVariableDatasource(datasource),
-					labelValuesVar.Matchers(
-						promql.SetLabelMatchersV2(
-							vector.New(vector.WithMetricName("acm_managed_cluster_labels")),
-							[]*labels.Matcher{},
-						).Pretty(0),
+					labelValuesVar.Matchers(promql.SetLabelMatchers(
+						"acm_managed_cluster_labels",
+						[]promql.LabelMatcher{},
+						),
 					),
 				),
 				listVar.DisplayName("Value"),

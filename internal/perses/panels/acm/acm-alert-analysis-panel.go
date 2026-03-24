@@ -216,6 +216,10 @@ func AlertsAndClusters(datasourceName string, labelMatchers ...*labels.Matcher) 
 		tablePanel.Table(
 			tablePanel.WithColumnSettings([]tablePanel.ColumnSettings{
 				{
+					Name: "timestamp",
+					Hide: true,
+				},
+				{
 					Name:   "value",
 					Header: "",
 				},

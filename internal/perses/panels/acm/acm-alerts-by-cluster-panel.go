@@ -3,18 +3,23 @@ package acm
 import (
 	"github.com/perses/community-mixins/pkg/dashboards"
 	"github.com/perses/community-mixins/pkg/promql"
+	commonSdk "github.com/perses/perses/go-sdk/common"
 	"github.com/perses/perses/go-sdk/panel"
 	panelgroup "github.com/perses/perses/go-sdk/panel-group"
+	piePanel "github.com/perses/plugins/piechart/sdk/go"
 	"github.com/perses/plugins/prometheus/sdk/go/query"
-	statPanel "github.com/perses/plugins/statchart/sdk/go"
 	timeSeriesPanel "github.com/perses/plugins/timeserieschart/sdk/go"
 	"github.com/prometheus/prometheus/model/labels"
 )
 
 func AlertSeverity(datasourceName string, labelMatchers ...*labels.Matcher) panelgroup.Option {
 	return panelgroup.AddPanel("Alert Severity",
-		statPanel.Chart(
-			statPanel.Calculation("last-number"),
+		piePanel.Chart(
+			piePanel.Calculation(commonSdk.LastNumberCalculation),
+			piePanel.WithLegend(piePanel.Legend{
+				Position: piePanel.BottomPosition,
+				Mode:     piePanel.ListMode,
+			}),
 		),
 		panel.AddQuery(
 			query.PromQL(

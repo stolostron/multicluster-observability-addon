@@ -18,7 +18,7 @@ func CPUOverestimationPanel(datasourceName string, labelMatchers ...*labels.Matc
 		panel.Description("Highlights % differences between CPU requests commitments vs utilization. When this difference is large (>20%), it means that resources are reserved but unused."),
 		statPanel.Chart(
 			statPanel.Format(commonSdk.Format{
-				Unit:          &dashboards.PercentUnit,
+				Unit:          &dashboards.PercentDecimalUnit,
 				DecimalPlaces: 2,
 			}),
 			statPanel.ValueFontSize(50),
@@ -40,7 +40,7 @@ func CPUUsagePanel(datasourceName string, labelMatchers ...*labels.Matcher) pane
 		timeSeriesPanel.Chart(
 			timeSeriesPanel.WithYAxis(timeSeriesPanel.YAxis{
 				Format: &commonSdk.Format{
-					Unit: &dashboards.BytesUnit,
+					Unit: &dashboards.DecimalUnit,
 				},
 			}),
 			timeSeriesPanel.WithLegend(timeSeriesPanel.Legend{
@@ -73,7 +73,7 @@ func CPURequestsCommitmentPanel(datasourceName string, labelMatchers ...*labels.
 	return panelgroup.AddPanel("CPU Requests Commitment",
 		statPanel.Chart(
 			statPanel.Format(commonSdk.Format{
-				Unit:          &dashboards.PercentUnit,
+				Unit:          &dashboards.PercentDecimalUnit,
 				DecimalPlaces: 2,
 			}),
 			statPanel.ValueFontSize(50),
@@ -94,7 +94,7 @@ func CPUUtilizationPanel(datasourceName string, labelMatchers ...*labels.Matcher
 	return panelgroup.AddPanel("CPU Utilization",
 		statPanel.Chart(
 			statPanel.Format(commonSdk.Format{
-				Unit:          &dashboards.PercentUnit,
+				Unit:          &dashboards.PercentDecimalUnit,
 				DecimalPlaces: 2,
 			}),
 			statPanel.ValueFontSize(50),
@@ -115,6 +115,38 @@ func CPUQuotaPanel(datasourceName string, labelMatchers ...*labels.Matcher) pane
 	return panelgroup.AddPanel("CPU Quota",
 		tablePanel.Table(
 			tablePanel.WithColumnSettings([]tablePanel.ColumnSettings{
+				{
+					Name: "timestamp",
+					Hide: true,
+				},
+				{
+					Name: "__name__",
+					Hide: true,
+				},
+				{
+					Name: "cluster",
+					Hide: true,
+				},
+				{
+					Name: "clusterID",
+					Hide: true,
+				},
+				{
+					Name: "prometheus",
+					Hide: true,
+				},
+				{
+					Name: "receive",
+					Hide: true,
+				},
+				{
+					Name: "tenant_id",
+					Hide: true,
+				},
+				{
+					Name: "test",
+					Hide: true,
+				},
 				{
 					Name:   "namespace",
 					Header: "Namespace",
@@ -201,7 +233,7 @@ func MemoryOverestimationPanel(datasourceName string, labelMatchers ...*labels.M
 		panel.Description("Highlights % differences between memory requests commitments vs utilization. When this difference is large (>20%), it means that resources are reserved but unused."),
 		statPanel.Chart(
 			statPanel.Format(commonSdk.Format{
-				Unit:          &dashboards.PercentUnit,
+				Unit:          &dashboards.PercentDecimalUnit,
 				DecimalPlaces: 2,
 			}),
 			statPanel.ValueFontSize(50),
@@ -219,7 +251,7 @@ func MemoryOverestimationPanel(datasourceName string, labelMatchers ...*labels.M
 }
 
 func MemoryUsagePanel(datasourceName string, labelMatchers ...*labels.Matcher) panelgroup.Option {
-	return panelgroup.AddPanel("Memory Usage",
+	return panelgroup.AddPanel("Memory Usage (w/o cache)",
 		timeSeriesPanel.Chart(
 			timeSeriesPanel.WithYAxis(timeSeriesPanel.YAxis{
 				Format: &commonSdk.Format{
@@ -300,6 +332,38 @@ func MemoryRequestsByNamespacePanel(datasourceName string, labelMatchers ...*lab
 		tablePanel.Table(
 			tablePanel.WithColumnSettings([]tablePanel.ColumnSettings{
 				{
+					Name: "timestamp",
+					Hide: true,
+				},
+				{
+					Name: "__name__",
+					Hide: true,
+				},
+				{
+					Name: "cluster",
+					Hide: true,
+				},
+				{
+					Name: "clusterID",
+					Hide: true,
+				},
+				{
+					Name: "prometheus",
+					Hide: true,
+				},
+				{
+					Name: "receive",
+					Hide: true,
+				},
+				{
+					Name: "tenant_id",
+					Hide: true,
+				},
+				{
+					Name: "test",
+					Hide: true,
+				},
+				{
 					Name:   "namespace",
 					Header: "Namespace",
 					Align:  tablePanel.LeftAlign,
@@ -318,7 +382,7 @@ func MemoryRequestsByNamespacePanel(datasourceName string, labelMatchers ...*lab
 					Header: "Memory Usage",
 					Align:  tablePanel.LeftAlign,
 					Format: &commonSdk.Format{
-						Unit:          &dashboards.DecimalUnit,
+						Unit:          &dashboards.BytesUnit,
 						DecimalPlaces: 2,
 					},
 				},
@@ -327,7 +391,7 @@ func MemoryRequestsByNamespacePanel(datasourceName string, labelMatchers ...*lab
 					Header: "Memory Requests",
 					Align:  tablePanel.LeftAlign,
 					Format: &commonSdk.Format{
-						Unit:          &dashboards.DecimalUnit,
+						Unit:          &dashboards.BytesUnit,
 						DecimalPlaces: 2,
 					},
 				},
@@ -386,6 +450,38 @@ func NetworkingCurrentStatusPanel(datasourceName string, labelMatchers ...*label
 		tablePanel.Table(
 			tablePanel.WithColumnSettings([]tablePanel.ColumnSettings{
 				{
+					Name: "timestamp",
+					Hide: true,
+				},
+				{
+					Name: "__name__",
+					Hide: true,
+				},
+				{
+					Name: "cluster",
+					Hide: true,
+				},
+				{
+					Name: "clusterID",
+					Hide: true,
+				},
+				{
+					Name: "prometheus",
+					Hide: true,
+				},
+				{
+					Name: "receive",
+					Hide: true,
+				},
+				{
+					Name: "tenant_id",
+					Hide: true,
+				},
+				{
+					Name: "test",
+					Hide: true,
+				},
+				{
 					Name:   "instance",
 					Header: "Instance",
 					Align:  tablePanel.LeftAlign,
@@ -395,7 +491,7 @@ func NetworkingCurrentStatusPanel(datasourceName string, labelMatchers ...*label
 					Header: "Current Bandwidth Received",
 					Align:  tablePanel.LeftAlign,
 					Format: &commonSdk.Format{
-						Unit:          &dashboards.BytesUnit,
+						Unit:          &dashboards.BytesPerSecondsUnit,
 						DecimalPlaces: 2,
 					},
 				},

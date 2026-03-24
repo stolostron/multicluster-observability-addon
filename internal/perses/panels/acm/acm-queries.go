@@ -5,106 +5,277 @@ import (
 
 	promqlbuilder "github.com/perses/promql-builder"
 	"github.com/perses/promql-builder/label"
+	"github.com/perses/promql-builder/matrix"
 	"github.com/perses/promql-builder/vector"
 	"github.com/prometheus/prometheus/promql/parser"
 )
 
-func mustParseExpr(expr string) parser.Expr {
-	parsed, err := parser.ParseExpr(expr)
-	if err != nil {
-		panic(err)
-	}
-	return parsed
-}
-
 var ACMCommonPanelQueries = map[string]parser.Expr{
 	// Top50MaxLatencyAPIServer queries from acm-clusters-overview-panel.go
-	"Top50MaxLatencyAPIServer_MaxLatency": mustParseExpr(`topk(50, max(apiserver_request_duration_seconds:histogram_quantile_99{cluster=~"$cluster"}) by (cluster)) * on(cluster) group_left(api_up) count_values without() ("api_up", (sum(up{cluster=~"$cluster",service="kubernetes"} == 1) by (cluster) / count(up{cluster=~"$cluster",service="kubernetes"}) by (cluster)))`),
+	"Top50MaxLatencyAPIServer_MaxLatency": promqlbuilder.Mul(
+		promqlbuilder.TopK(
+			promqlbuilder.Max(
+				vector.New(
+					vector.WithMetricName("apiserver_request_duration_seconds:histogram_quantile_99"),
+					vector.WithLabelMatchers(
+						label.New("cluster").EqualRegexp("$cluster"),
+					),
+				),
+			).By("cluster"),
+			50,
+		),
+		&parser.AggregateExpr{
+			Op: parser.COUNT_VALUES,
+			Expr: promqlbuilder.Round(promqlbuilder.Mul(promqlbuilder.Div(
+				promqlbuilder.Sum(
+					promqlbuilder.Eql(
+						vector.New(
+							vector.WithMetricName("up"),
+							vector.WithLabelMatchers(
+								label.New("cluster").EqualRegexp("$cluster"),
+								label.New("service").Equal("kubernetes"),
+							),
+						),
+						promqlbuilder.NewNumber(1),
+					),
+				).By("cluster"),
+				promqlbuilder.Count(
+					vector.New(
+						vector.WithMetricName("up"),
+						vector.WithLabelMatchers(
+							label.New("cluster").EqualRegexp("$cluster"),
+							label.New("service").Equal("kubernetes"),
+						),
+					),
+				).By("cluster"),
+			), promqlbuilder.NewNumber(100)), 1),
+			Param:   promqlbuilder.NewString("api_up"),
+			Without: true,
+		},
+	).On("cluster").GroupLeft("api_up"),
 	"APIServerRequestTotal_ErrorRate": promqlbuilder.Sum(
 		vector.New(
 			vector.WithMetricName("sum:apiserver_request_total:1h"),
 			vector.WithLabelMatchers(
-				label.New("cluster").EqualRegexp("local-cluster"),
+				label.New("cluster").EqualRegexp("$cluster"),
 				label.New("code").EqualRegexp("5.."),
 			),
 		),
 	).By("cluster"),
 
 	// EtcdHealth query from acm-clusters-overview-panel.go
-	"EtcdHealth_LeaderChanges": mustParseExpr( "sum(changes(etcd_server_leader_changes_seen_total{cluster=~\"$cluster\",job=\"etcd\"}[$__range])) by (cluster)\n* on(cluster) group_left(db_size) count_values without() (\"db_size\", max(etcd_mvcc_db_total_size_in_bytes{cluster=~\"$cluster\",job=\"etcd\"}) by (cluster))\n* on(cluster) group_left(has_leader) count_values without() (\"has_leader\", max(etcd_server_has_leader{cluster=~\"$cluster\",job=\"etcd\"}) by (cluster))",),
-
-
-	// Top50CPUOverestimation query from acm-clusters-overview-panel.go
-	"Top50CPUOverestimation": promqlbuilder.TopK(
-		promqlbuilder.Sub(
+	"EtcdHealth_LeaderChanges": promqlbuilder.Mul(
+		promqlbuilder.Mul(
 			promqlbuilder.Sum(
-				vector.New(
-					vector.WithMetricName("cluster:cpu_requested:ratio"),
-				),
-			).By("cluster"),
-			promqlbuilder.Sum(
-				vector.New(
-					vector.WithMetricName("cluster:node_cpu:ratio"),
-					vector.WithLabelMatchers(
-						label.New("cluster").Equal("$cluster"),
+				promqlbuilder.Changes(
+					matrix.New(
+						vector.New(
+							vector.WithMetricName("etcd_server_leader_changes_seen_total"),
+							vector.WithLabelMatchers(
+								label.New("cluster").EqualRegexp("$cluster"),
+								label.New("job").Equal("etcd"),
+							),
+						),
+						matrix.WithRangeAsVariable("$__range"),
 					),
 				),
 			).By("cluster"),
-		),
-		50,
-	),
+			&parser.AggregateExpr{
+				Op: parser.COUNT_VALUES,
+				Expr: promqlbuilder.Round(promqlbuilder.Max(
+					vector.New(
+						vector.WithMetricName("etcd_mvcc_db_total_size_in_bytes"),
+						vector.WithLabelMatchers(
+							label.New("cluster").EqualRegexp("$cluster"),
+							label.New("job").Equal("etcd"),
+						),
+					),
+				).By("cluster"), 1),
+				Param:   promqlbuilder.NewString("db_size"),
+				Without: true,
+			},
+		).On("cluster").GroupLeft("db_size"),
+		&parser.AggregateExpr{
+			Op: parser.COUNT_VALUES,
+			Expr: promqlbuilder.Round(promqlbuilder.Max(
+				vector.New(
+					vector.WithMetricName("etcd_server_has_leader"),
+					vector.WithLabelMatchers(
+						label.New("cluster").EqualRegexp("$cluster"),
+						label.New("job").Equal("etcd"),
+					),
+				),
+			).By("cluster"), 1),
+			Param:   promqlbuilder.NewString("has_leader"),
+			Without: true,
+		},
+	).On("cluster").GroupLeft("has_leader"),
+
+
+	// Top50CPUOverestimation query from acm-clusters-overview-panel.go
+	"Top50CPUOverestimation": promqlbuilder.Mul(
+		promqlbuilder.Mul(
+			promqlbuilder.TopK(
+				promqlbuilder.Sub(
+					promqlbuilder.Sum(
+						vector.New(
+							vector.WithMetricName("cluster:cpu_requested:ratio"),
+						),
+					).By("cluster"),
+					promqlbuilder.Sum(
+						vector.New(
+							vector.WithMetricName("cluster:node_cpu:ratio"),
+							vector.WithLabelMatchers(
+								label.New("cluster").EqualRegexp("$cluster"),
+							),
+						),
+					).By("cluster"),
+				),
+				50,
+			),
+			&parser.AggregateExpr{
+				Op: parser.COUNT_VALUES,
+				Expr: promqlbuilder.Round(promqlbuilder.Mul(vector.New(
+					vector.WithMetricName("cluster:cpu_requested:ratio"),
+				), promqlbuilder.NewNumber(100)), 1),
+				Param:   promqlbuilder.NewString("cpu_requested"),
+				Without: true,
+			},
+		).On("cluster").GroupLeft("cpu_requested"),
+		&parser.AggregateExpr{
+			Op: parser.COUNT_VALUES,
+			Expr: promqlbuilder.Round(promqlbuilder.Mul(vector.New(
+				vector.WithMetricName("cluster:node_cpu:ratio"),
+				vector.WithLabelMatchers(
+					label.New("cluster").EqualRegexp("$cluster"),
+				),
+			), promqlbuilder.NewNumber(100)), 1),
+			Param:   promqlbuilder.NewString("cpu_utilized"),
+			Without: true,
+		},
+	).On("cluster").GroupLeft("cpu_utilized"),
 
 	// Top50MemoryOverestimation query from acm-clusters-overview-panel.go
-	"Top50MemoryOverestimation": promqlbuilder.TopK(
-		promqlbuilder.Sub(
-			vector.New(
-				vector.WithMetricName("cluster:memory_requested:ratio"),
-				vector.WithLabelMatchers(
-					label.New("cluster").Equal("$cluster"),
-				),
+	"Top50MemoryOverestimation": promqlbuilder.Mul(
+		promqlbuilder.Mul(
+			promqlbuilder.TopK(
+				promqlbuilder.Sub(
+					vector.New(
+						vector.WithMetricName("cluster:memory_requested:ratio"),
+						vector.WithLabelMatchers(
+							label.New("cluster").EqualRegexp("$cluster"),
+						),
+					),
+					vector.New(
+						vector.WithMetricName("cluster:memory_utilized:ratio"),
+						vector.WithLabelMatchers(
+							label.New("cluster").EqualRegexp("$cluster"),
+						),
+					),
+				).Ignoring("usage"),
+				50,
 			),
-			vector.New(
+			&parser.AggregateExpr{
+				Op: parser.COUNT_VALUES,
+				Expr: promqlbuilder.Round(promqlbuilder.Mul(vector.New(
+					vector.WithMetricName("cluster:memory_requested:ratio"),
+				), promqlbuilder.NewNumber(100)), 1),
+				Param:   promqlbuilder.NewString("memory_requested"),
+				Without: true,
+			},
+		).On("cluster").GroupLeft("memory_requested"),
+		&parser.AggregateExpr{
+			Op: parser.COUNT_VALUES,
+			Expr: promqlbuilder.Round(promqlbuilder.Mul(vector.New(
 				vector.WithMetricName("cluster:memory_utilized:ratio"),
-				vector.WithLabelMatchers(
-					label.New("cluster").Equal("$cluster"),
-				),
-			),
-		),
-		50,
-	),
+			), promqlbuilder.NewNumber(100)), 1),
+			Param:   promqlbuilder.NewString("memory_utilized"),
+			Without: true,
+		},
+	).On("cluster").GroupLeft("memory_utilized"),
 
 	// Top50CPUUtilized query from acm-clusters-overview-panel.go
-	"Top50CPUUtilized": promqlbuilder.TopK(
-		vector.New(
-			vector.WithMetricName("cluster:node_cpu:ratio"),
-			vector.WithLabelMatchers(
-				label.New("cluster").Equal("$cluster"),
-			),
-		),
-		50,
-	),
+	"Top50CPUUtilized": promqlbuilder.Mul(
+		promqlbuilder.Mul(
+			promqlbuilder.Mul(
+				promqlbuilder.TopK(
+					vector.New(
+						vector.WithMetricName("cluster:node_cpu:ratio"),
+						vector.WithLabelMatchers(
+							label.New("cluster").EqualRegexp("$cluster"),
+						),
+					),
+					50,
+				),
+				&parser.AggregateExpr{
+					Op: parser.COUNT_VALUES,
+					Expr: promqlbuilder.Round(vector.New(
+						vector.WithMetricName("cluster:cpu_cores:sum"),
+					), 1),
+					Param:   promqlbuilder.NewString("machine_cpu_cores_sum"),
+					Without: true,
+				},
+			).On("cluster").GroupLeft("machine_cpu_cores_sum"),
+			&parser.AggregateExpr{
+				Op: parser.COUNT_VALUES,
+				Expr: promqlbuilder.Round(vector.New(
+					vector.WithMetricName("cluster:cpu_allocatable:sum"),
+				), 1),
+				Param:   promqlbuilder.NewString("node_allocatable_cpu_cores_sum"),
+				Without: true,
+			},
+		).On("cluster").GroupLeft("node_allocatable_cpu_cores_sum"),
+		&parser.AggregateExpr{
+			Op: parser.COUNT_VALUES,
+			Expr: promqlbuilder.Round(promqlbuilder.Mul(vector.New(
+				vector.WithMetricName("cluster:cpu_requested:ratio"),
+			), promqlbuilder.NewNumber(100)), 1),
+			Param:   promqlbuilder.NewString("cpu_requested"),
+			Without: true,
+		},
+	).On("cluster").GroupLeft("cpu_requested"),
 
 	// Top5CPUUtilized query from acm-clusters-overview-panel.go
 	"Top5CPUUtilized": promqlbuilder.TopK(
 		vector.New(
 			vector.WithMetricName("cluster:node_cpu:ratio"),
 			vector.WithLabelMatchers(
-				label.New("cluster").Equal("$cluster"),
+				label.New("cluster").EqualRegexp("$cluster"),
 			),
 		),
 		5,
 	),
 
 	// Top50MemoryUtilized query from acm-clusters-overview-panel.go
-	"Top50MemoryUtilized": promqlbuilder.TopK(
-		vector.New(
-			vector.WithMetricName("cluster:memory_utilized:ratio"),
-			vector.WithLabelMatchers(
-				label.New("cluster").Equal("$cluster"),
+	"Top50MemoryUtilized": promqlbuilder.Mul(
+		promqlbuilder.Mul(
+			promqlbuilder.TopK(
+				vector.New(
+					vector.WithMetricName("cluster:memory_utilized:ratio"),
+					vector.WithLabelMatchers(
+						label.New("cluster").EqualRegexp("$cluster"),
+					),
+				),
+				50,
 			),
-		),
-		50,
-	),
+			&parser.AggregateExpr{
+				Op: parser.COUNT_VALUES,
+				Expr: promqlbuilder.Round(vector.New(
+					vector.WithMetricName("cluster:machine_memory:sum"),
+				), 1),
+				Param:   promqlbuilder.NewString("machine_memory_sum"),
+				Without: true,
+			},
+		).On("cluster").GroupLeft("machine_memory_sum"),
+		&parser.AggregateExpr{
+			Op: parser.COUNT_VALUES,
+			Expr: promqlbuilder.Round(promqlbuilder.Mul(vector.New(
+				vector.WithMetricName("cluster:memory_requested:ratio"),
+			), promqlbuilder.NewNumber(100)), 1),
+			Param:   promqlbuilder.NewString("machine_memory_requested"),
+			Without: true,
+		},
+	).On("cluster").GroupLeft("machine_memory_requested"),
 
 	// Top5MemoryUtilized query from acm-clusters-overview-panel.go
 	"Top5MemoryUtilized": promqlbuilder.TopK(
@@ -120,7 +291,7 @@ var ACMCommonPanelQueries = map[string]parser.Expr{
 					vector.New(
 						vector.WithMetricName("kube_node_status_allocatable"),
 						vector.WithLabelMatchers(
-							label.New("cluster").Equal("$cluster"),
+							label.New("cluster").EqualRegexp("$cluster"),
 							label.New("resource").Equal("memory"),
 						),
 					),
@@ -130,43 +301,64 @@ var ACMCommonPanelQueries = map[string]parser.Expr{
 		5,
 	),
 
-	// BandwidthUtilization queries from acm-clusters-overview-panel.go
-	"BandwidthUtilization_ReceiveRate": promqlbuilder.Sum(
-		vector.New(
-			vector.WithMetricName("instance:node_network_receive_bytes_excluding_lo:rate1m"),
-			vector.WithLabelMatchers(
-				label.New("cluster").EqualRegexp("$cluster"),
-				label.New("job").Equal("node-exporter"),
-			),
-		),
-	).By("cluster"),
-	"BandwidthUtilization_TransmitRate": promqlbuilder.Sum(
-		vector.New(
-			vector.WithMetricName("instance:node_network_transmit_bytes_excluding_lo:rate1m"),
-			vector.WithLabelMatchers(
-				label.New("cluster").EqualRegexp("$cluster"),
-				label.New("job").Equal("node-exporter"),
-			),
-		),
-	).By("cluster"),
-	"BandwidthUtilization_ReceiveDropRate": promqlbuilder.Sum(
-		vector.New(
-			vector.WithMetricName("instance:node_network_receive_drop_excluding_lo:rate1m"),
-			vector.WithLabelMatchers(
-				label.New("cluster").EqualRegexp("$cluster"),
-				label.New("job").Equal("node-exporter"),
-			),
-		),
-	).By("cluster"),
-	"BandwidthUtilization_TransmitDropRate": promqlbuilder.Sum(
-		vector.New(
-			vector.WithMetricName("instance:node_network_transmit_drop_excluding_lo:rate1m"),
-			vector.WithLabelMatchers(
-				label.New("cluster").EqualRegexp("$cluster"),
-				label.New("job").Equal("node-exporter"),
-			),
-		),
-	).By("cluster"),
+	// BandwidthUtilization combined query from acm-clusters-overview-panel.go
+	"BandwidthUtilization": promqlbuilder.Mul(
+		promqlbuilder.Mul(
+			promqlbuilder.Mul(
+				promqlbuilder.Sum(
+					vector.New(
+						vector.WithMetricName("instance:node_network_receive_bytes_excluding_lo:rate1m"),
+						vector.WithLabelMatchers(
+							label.New("cluster").EqualRegexp("$cluster"),
+							label.New("job").Equal("node-exporter"),
+						),
+					),
+				).By("cluster"),
+				&parser.AggregateExpr{
+					Op: parser.COUNT_VALUES,
+					Expr: promqlbuilder.Round(promqlbuilder.Sum(
+						vector.New(
+							vector.WithMetricName("instance:node_network_transmit_bytes_excluding_lo:rate1m"),
+							vector.WithLabelMatchers(
+								label.New("cluster").EqualRegexp("$cluster"),
+								label.New("job").Equal("node-exporter"),
+							),
+						),
+					).By("cluster"), 1),
+					Param:   promqlbuilder.NewString("node_transmit"),
+					Without: true,
+				},
+			).On("cluster").GroupLeft("node_transmit"),
+			&parser.AggregateExpr{
+				Op: parser.COUNT_VALUES,
+				Expr: promqlbuilder.Round(promqlbuilder.Sum(
+					vector.New(
+						vector.WithMetricName("instance:node_network_receive_drop_excluding_lo:rate1m"),
+						vector.WithLabelMatchers(
+							label.New("cluster").EqualRegexp("$cluster"),
+							label.New("job").Equal("node-exporter"),
+						),
+					),
+				).By("cluster"), 1),
+				Param:   promqlbuilder.NewString("node_receive_drop"),
+				Without: true,
+			},
+		).On("cluster").GroupLeft("node_receive_drop"),
+		&parser.AggregateExpr{
+			Op: parser.COUNT_VALUES,
+			Expr: promqlbuilder.Round(promqlbuilder.Sum(
+				vector.New(
+					vector.WithMetricName("instance:node_network_transmit_drop_excluding_lo:rate1m"),
+					vector.WithLabelMatchers(
+						label.New("cluster").EqualRegexp("$cluster"),
+						label.New("job").Equal("node-exporter"),
+					),
+				),
+			).By("cluster"), 1),
+			Param:   promqlbuilder.NewString("node_transmit_drop"),
+			Without: true,
+		},
+	).On("cluster").GroupLeft("node_transmit_drop"),
 
 	// Alert queries from acm-alert-analysis-panel.go
 	"Top10AlertsFiringByName": promqlbuilder.TopK(
@@ -387,27 +579,36 @@ var ACMCommonPanelQueries = map[string]parser.Expr{
 		promqlbuilder.Sub(
 			promqlbuilder.NewNumber(1),
 			promqlbuilder.Div(
-				vector.New(
-					vector.WithMetricName("node_memory_MemAvailable_bytes"),
-					vector.WithLabelMatchers(
-						label.New("cluster").Equal("$cluster"),
+				promqlbuilder.Sum(
+					vector.New(
+						vector.WithMetricName(":node_memory_MemAvailable_bytes:sum"),
+						vector.WithLabelMatchers(
+							label.New("cluster").Equal("$cluster"),
+						),
 					),
 				),
-				vector.New(
-					vector.WithMetricName("node_memory_MemTotal_bytes"),
-					vector.WithLabelMatchers(
-						label.New("cluster").Equal("$cluster"),
+				promqlbuilder.Sum(
+					vector.New(
+						vector.WithMetricName("kube_node_status_allocatable"),
+						vector.WithLabelMatchers(
+							label.New("cluster").Equal("$cluster"),
+							label.New("resource").Equal("memory"),
+						),
 					),
 				),
 			),
 		),
 	),
-	"MemoryUsageNodeNamespacePod": vector.New(
-		vector.WithMetricName("node_namespace_pod_container:container_memory_working_set_bytes:sum"),
-		vector.WithLabelMatchers(
-			label.New("cluster").Equal("$cluster"),
+	"MemoryUsageNodeNamespacePod": promqlbuilder.Sum(
+		vector.New(
+			vector.WithMetricName("container_memory_rss"),
+			vector.WithLabelMatchers(
+				label.New("cluster").Equal("$cluster"),
+				label.New("container").NotEqual(""),
+				label.New("container").NotEqual("POD"),
+			),
 		),
-	),
+	).By("namespace"),
 	"MemoryRequestsCommitment": promqlbuilder.Div(
 		promqlbuilder.Sum(
 			vector.New(
@@ -430,16 +631,21 @@ var ACMCommonPanelQueries = map[string]parser.Expr{
 	"MemoryUtilization": promqlbuilder.Sub(
 		promqlbuilder.NewNumber(1),
 		promqlbuilder.Div(
-			vector.New(
-				vector.WithMetricName("node_memory_MemAvailable_bytes"),
-				vector.WithLabelMatchers(
-					label.New("cluster").Equal("$cluster"),
+			promqlbuilder.Sum(
+				vector.New(
+					vector.WithMetricName(":node_memory_MemAvailable_bytes:sum"),
+					vector.WithLabelMatchers(
+						label.New("cluster").Equal("$cluster"),
+					),
 				),
 			),
-			vector.New(
-				vector.WithMetricName("node_memory_MemTotal_bytes"),
-				vector.WithLabelMatchers(
-					label.New("cluster").Equal("$cluster"),
+			promqlbuilder.Sum(
+				vector.New(
+					vector.WithMetricName("kube_node_status_allocatable"),
+					vector.WithLabelMatchers(
+						label.New("cluster").Equal("$cluster"),
+						label.New("resource").Equal("memory"),
+					),
 				),
 			),
 		),
@@ -447,9 +653,11 @@ var ACMCommonPanelQueries = map[string]parser.Expr{
 	"MemoryRequestsByNamespace": promqlbuilder.Div(
 		promqlbuilder.Sum(
 			vector.New(
-				vector.WithMetricName("node_namespace_pod_container:container_memory_working_set_bytes:sum"),
+				vector.WithMetricName("container_memory_rss"),
 				vector.WithLabelMatchers(
 					label.New("cluster").Equal("$cluster"),
+					label.New("container").NotEqual(""),
+					label.New("container").NotEqual("POD"),
 				),
 			),
 		).By("namespace"),

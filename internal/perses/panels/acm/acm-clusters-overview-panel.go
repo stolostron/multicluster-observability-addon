@@ -8,6 +8,7 @@ import (
 	panelgroup "github.com/perses/perses/go-sdk/panel-group"
 	"github.com/perses/plugins/prometheus/sdk/go/query"
 	tablePanel "github.com/perses/plugins/table/sdk/go"
+	timeSeriesPanel "github.com/perses/plugins/timeserieschart/sdk/go"
 	"github.com/prometheus/prometheus/model/labels"
 )
 
@@ -17,31 +18,32 @@ func Top50MaxLatencyAPIServer(datasourceName string, labelMatchers ...*labels.Ma
 		tablePanel.Table(
 			tablePanel.WithColumnSettings([]tablePanel.ColumnSettings{
 				{
+					Name: "timestamp",
+					Hide: true,
+				},
+				{
 					Name:   "cluster",
 					Header: "Cluster",
-					Align:  tablePanel.RightAlign,
+					Align:  tablePanel.LeftAlign,
 				},
 				{
 					Name:   "value #1",
 					Header: "Max Latency (99th percentile)",
-					Align:  tablePanel.RightAlign,
+					Align:  tablePanel.LeftAlign,
 					Format: &commonSdk.Format{
-						Unit:          &dashboards.MilliSecondsUnit,
+						Unit:          &dashboards.SecondsUnit,
 						DecimalPlaces: 2,
 					},
 				},
 				{
 					Name:   "api_up",
-					Header: "API Server UP",
-					Align:  tablePanel.RightAlign,
-					Format: &commonSdk.Format{
-						Unit: &dashboards.PercentDecimalUnit,
-					},
+					Header: "API servers up (%)",
+					Align:  tablePanel.LeftAlign,
 				},
 				{
 					Name:   "value #2",
-					Header: "API Error[1h]",
-					Align:  tablePanel.RightAlign,
+					Header: "API Errors [1h]",
+					Align:  tablePanel.LeftAlign,
 					Format: &commonSdk.Format{
 						Unit: &dashboards.DecimalUnit,
 					},
@@ -71,35 +73,35 @@ func Top50MaxLatencyAPIServer(datasourceName string, labelMatchers ...*labels.Ma
 
 func EtcdHealth(datasourceName string, labelMatchers ...*labels.Matcher) panelgroup.Option {
 	return panelgroup.AddPanel("etcd Health",
-		panel.Description("Shows etcd health metrics including leader status, leader changes, and database size."),
+		panel.Description("Leader election changes per cluster over the time range selected for dashboard."),
 		tablePanel.Table(
 			tablePanel.WithColumnSettings([]tablePanel.ColumnSettings{
 				{
+					Name: "timestamp",
+					Hide: true,
+				},
+				{
 					Name:   "cluster",
 					Header: "Cluster",
-					Align:  tablePanel.RightAlign,
+					Align:  tablePanel.LeftAlign,
 				},
 				{
 					Name:   "has_leader",
-					Header: "Has a leader",
-					Align:  tablePanel.RightAlign,
+					Header: "Has a Leader",
+					Align:  tablePanel.LeftAlign,
 				},
 				{
 					Name:   "value",
-					Header: "Leader election change",
-					Align:  tablePanel.RightAlign,
+					Header: "Leader Election Changes",
+					Align:  tablePanel.LeftAlign,
 					Format: &commonSdk.Format{
 						Unit: &dashboards.DecimalUnit,
 					},
 				},
 				{
 					Name:   "db_size",
-					Header: "DB size",
-					Align:  tablePanel.RightAlign,
-					Format: &commonSdk.Format{
-						Unit:          &dashboards.BytesUnit,
-						DecimalPlaces: 2,
-					},
+					Header: "DB Size",
+					Align:  tablePanel.LeftAlign,
 				},
 			}),
 		),
@@ -121,36 +123,32 @@ func Top50CPUOverEstimationClusters(datasourceName string, labelMatchers ...*lab
 		tablePanel.Table(
 			tablePanel.WithColumnSettings([]tablePanel.ColumnSettings{
 				{
-					Name:   "cluster",
-					Header: "Cluster",
-					Align:  tablePanel.RightAlign,
+					Name: "timestamp",
+					Hide: true,
 				},
 				{
-					Name:   "Value",
+					Name:   "cluster",
+					Header: "Cluster",
+					Align:  tablePanel.LeftAlign,
+				},
+				{
+					Name:   "value",
 					Header: "Overestimation",
-					Align:  tablePanel.RightAlign,
+					Align:  tablePanel.LeftAlign,
 					Format: &commonSdk.Format{
-						Unit:          &dashboards.PercentUnit,
+						Unit:          &dashboards.PercentDecimalUnit,
 						DecimalPlaces: 2,
 					},
 				},
 				{
 					Name:   "cpu_requested",
-					Header: "Requested",
-					Align:  tablePanel.RightAlign,
-					Format: &commonSdk.Format{
-						Unit:          &dashboards.PercentUnit,
-						DecimalPlaces: 2,
-					},
+					Header: "Requested (%)",
+					Align:  tablePanel.LeftAlign,
 				},
 				{
 					Name:   "cpu_utilized",
-					Header: "Utilized",
-					Align:  tablePanel.RightAlign,
-					Format: &commonSdk.Format{
-						Unit:          &dashboards.PercentUnit,
-						DecimalPlaces: 2,
-					},
+					Header: "Utilized (%)",
+					Align:  tablePanel.LeftAlign,
 				},
 			}),
 		),
@@ -172,65 +170,32 @@ func Top50MemoryOverEstimationClusters(datasourceName string, labelMatchers ...*
 		tablePanel.Table(
 			tablePanel.WithColumnSettings([]tablePanel.ColumnSettings{
 				{
-					Name:   "cluster",
-					Header: "Cluster",
-					Align:  tablePanel.RightAlign,
+					Name: "timestamp",
+					Hide: true,
 				},
 				{
-					Name:   "Value",
+					Name:   "cluster",
+					Header: "Cluster",
+					Align:  tablePanel.LeftAlign,
+				},
+				{
+					Name:   "value",
 					Header: "Overestimation",
-					Align:  tablePanel.RightAlign,
+					Align:  tablePanel.LeftAlign,
 					Format: &commonSdk.Format{
-						Unit:          &dashboards.PercentUnit,
+						Unit:          &dashboards.PercentDecimalUnit,
 						DecimalPlaces: 2,
 					},
 				},
 				{
 					Name:   "memory_requested",
-					Header: "Requested",
-					Align:  tablePanel.RightAlign,
-					Format: &commonSdk.Format{
-						Unit:          &dashboards.PercentUnit,
-						DecimalPlaces: 2,
-					},
+					Header: "Requested (%)",
+					Align:  tablePanel.LeftAlign,
 				},
 				{
 					Name:   "memory_utilized",
-					Header: "Utilized",
-					Align:  tablePanel.RightAlign,
-					Format: &commonSdk.Format{
-						Unit:          &dashboards.PercentUnit,
-						DecimalPlaces: 2,
-					},
-				},
-				{
-					Name:   "clusterID",
-					Header: "Cluster ID",
-					Align:  tablePanel.RightAlign,
-				},
-				{
-					Name:   "prometheus",
-					Header: "Prometheus",
-					Align:  tablePanel.RightAlign,
-					Format: &commonSdk.Format{
-						Unit: &dashboards.DecimalUnit,
-					},
-				},
-				{
-					Name:   "receive",
-					Header: "Receive",
-					Align:  tablePanel.RightAlign,
-					Format: &commonSdk.Format{
-						Unit: &dashboards.DecimalUnit,
-					},
-				},
-				{
-					Name:   "tenant_id",
-					Header: "Tenant ID",
-					Align:  tablePanel.RightAlign,
-					Format: &commonSdk.Format{
-						Unit: &dashboards.DecimalUnit,
-					},
+					Header: "Utilized (%)",
+					Align:  tablePanel.LeftAlign,
 				},
 			}),
 		),
@@ -252,73 +217,36 @@ func Top50CPUUtilizedClusters(datasourceName string, labelMatchers ...*labels.Ma
 		tablePanel.Table(
 			tablePanel.WithColumnSettings([]tablePanel.ColumnSettings{
 				{
+					Name: "timestamp",
+					Hide: true,
+				},
+				{
 					Name:   "cluster",
 					Header: "Cluster",
-					Align:  tablePanel.RightAlign,
+					Align:  tablePanel.LeftAlign,
 				},
 				{
 					Name:   "machine_cpu_cores_sum",
 					Header: "Total Cores",
-					Align:  tablePanel.RightAlign,
-					Format: &commonSdk.Format{
-						Unit: &dashboards.DecimalUnit,
-					},
+					Align:  tablePanel.LeftAlign,
 				},
 				{
 					Name:   "node_allocatable_cpu_cores_sum",
 					Header: "Allocatable Cores",
-					Align:  tablePanel.RightAlign,
-					Format: &commonSdk.Format{
-						Unit: &dashboards.DecimalUnit,
-					},
+					Align:  tablePanel.LeftAlign,
 				},
 				{
 					Name:   "cpu_requested",
-					Header: "Requested",
-					Align:  tablePanel.RightAlign,
-					Format: &commonSdk.Format{
-						Unit: &dashboards.BytesUnit,
-					},
+					Header: "Requested (%)",
+					Align:  tablePanel.LeftAlign,
 				},
 				{
-					Name:   "Value",
+					Name:   "value",
 					Header: "Utilized",
-					Align:  tablePanel.RightAlign,
+					Align:  tablePanel.LeftAlign,
 					Format: &commonSdk.Format{
-						Unit:          &dashboards.PercentUnit,
+						Unit:          &dashboards.PercentDecimalUnit,
 						DecimalPlaces: 2,
-					},
-				},
-				{
-					Name:   "clusterID",
-					Header: "Cluster ID",
-					Align:  tablePanel.RightAlign,
-					Format: &commonSdk.Format{
-						Unit: &dashboards.DecimalUnit,
-					},
-				},
-				{
-					Name:   "prometheus",
-					Header: "Prometheus",
-					Align:  tablePanel.RightAlign,
-					Format: &commonSdk.Format{
-						Unit: &dashboards.DecimalUnit,
-					},
-				},
-				{
-					Name:   "receive",
-					Header: "Receive",
-					Align:  tablePanel.RightAlign,
-					Format: &commonSdk.Format{
-						Unit: &dashboards.DecimalUnit,
-					},
-				},
-				{
-					Name:   "tenant_id",
-					Header: "Tenant ID",
-					Align:  tablePanel.RightAlign,
-					Format: &commonSdk.Format{
-						Unit: &dashboards.DecimalUnit,
 					},
 				},
 			}),
@@ -338,22 +266,20 @@ func Top50CPUUtilizedClusters(datasourceName string, labelMatchers ...*labels.Ma
 func Top5CPUUtilizationGraph(datasourceName string, labelMatchers ...*labels.Matcher) panelgroup.Option {
 	return panelgroup.AddPanel("Top 5 Utilized Clusters (% CPU usage)",
 		panel.Description("Shows CPU utilization trends for the top 5 clusters."),
-		tablePanel.Table(
-			tablePanel.WithColumnSettings([]tablePanel.ColumnSettings{
-				{
-					Name:   "cluster",
-					Header: "Cluster",
-					Align:  tablePanel.RightAlign,
+		timeSeriesPanel.Chart(
+			timeSeriesPanel.WithVisual(timeSeriesPanel.Visual{
+				Display: timeSeriesPanel.BarDisplay,
+			}),
+			timeSeriesPanel.WithYAxis(timeSeriesPanel.YAxis{
+				Show: true,
+				Format: &commonSdk.Format{
+					Unit: &dashboards.PercentDecimalUnit,
 				},
-				{
-					Name:   "Value",
-					Header: "CPU Usage %",
-					Align:  tablePanel.RightAlign,
-					Format: &commonSdk.Format{
-						Unit:          &dashboards.PercentUnit,
-						DecimalPlaces: 2,
-					},
-				},
+				Min: 0,
+				Max: 1,
+			}),
+			timeSeriesPanel.WithLegend(timeSeriesPanel.Legend{
+				Position: timeSeriesPanel.BottomPosition,
 			}),
 		),
 		panel.AddQuery(
@@ -374,62 +300,32 @@ func Top50MemoryUtilizedClusters(datasourceName string, labelMatchers ...*labels
 		tablePanel.Table(
 			tablePanel.WithColumnSettings([]tablePanel.ColumnSettings{
 				{
+					Name: "timestamp",
+					Hide: true,
+				},
+				{
 					Name:   "cluster",
 					Header: "Cluster",
-					Align:  tablePanel.RightAlign,
+					Align:  tablePanel.LeftAlign,
 				},
 				{
 					Name:   "machine_memory_sum",
 					Header: "Available Memory",
-					Align:  tablePanel.RightAlign,
-					Format: &commonSdk.Format{
-						Unit:          &dashboards.BytesUnit,
-						DecimalPlaces: 2,
-					},
+					Align:  tablePanel.LeftAlign,
 				},
 				{
 					Name:   "machine_memory_requested",
-					Header: "Requested",
-					Align:  tablePanel.RightAlign,
-					Format: &commonSdk.Format{
-						Unit:          &dashboards.BytesUnit,
-						DecimalPlaces: 2,
-					},
+					Header: "Requested (%)",
+					Align:  tablePanel.LeftAlign,
 				},
 				{
-					Name:   "Value",
+					Name:   "value",
 					Header: "Utilized",
-					Align:  tablePanel.RightAlign,
+					Align:  tablePanel.LeftAlign,
 					Format: &commonSdk.Format{
-						Unit:          &dashboards.PercentUnit,
+						Unit:          &dashboards.PercentDecimalUnit,
 						DecimalPlaces: 2,
 					},
-				},
-				{
-					Name:   "clusterID",
-					Header: "Cluster ID",
-					Align:  tablePanel.RightAlign,
-				},
-				{
-					Name:   "prometheus",
-					Header: "Prometheus",
-					Align:  tablePanel.RightAlign,
-					Format: &commonSdk.Format{
-						Unit: &dashboards.DecimalUnit,
-					},
-				},
-				{
-					Name:   "receive",
-					Header: "Receive",
-					Align:  tablePanel.RightAlign,
-					Format: &commonSdk.Format{
-						Unit: &dashboards.DecimalUnit,
-					},
-				},
-				{
-					Name:   "tenant_id",
-					Header: "Tenant ID",
-					Align:  tablePanel.RightAlign,
 				},
 			}),
 		),
@@ -448,22 +344,20 @@ func Top50MemoryUtilizedClusters(datasourceName string, labelMatchers ...*labels
 func Top5MemoryUtilizationGraph(datasourceName string, labelMatchers ...*labels.Matcher) panelgroup.Option {
 	return panelgroup.AddPanel("Top 5 Utilized Clusters (% Memory usage)",
 		panel.Description("Shows memory utilization trends for the top 5 clusters."),
-		tablePanel.Table(
-			tablePanel.WithColumnSettings([]tablePanel.ColumnSettings{
-				{
-					Name:   "cluster",
-					Header: "Cluster",
-					Align:  tablePanel.RightAlign,
+		timeSeriesPanel.Chart(
+			timeSeriesPanel.WithVisual(timeSeriesPanel.Visual{
+				Display: timeSeriesPanel.BarDisplay,
+			}),
+			timeSeriesPanel.WithYAxis(timeSeriesPanel.YAxis{
+				Show: true,
+				Format: &commonSdk.Format{
+					Unit: &dashboards.PercentDecimalUnit,
 				},
-				{
-					Name:   "Value",
-					Header: "Memory Usage %",
-					Align:  tablePanel.RightAlign,
-					Format: &commonSdk.Format{
-						Unit:          &dashboards.PercentUnit,
-						DecimalPlaces: 2,
-					},
-				},
+				Min: 0,
+				Max: 1,
+			}),
+			timeSeriesPanel.WithLegend(timeSeriesPanel.Legend{
+				Position: timeSeriesPanel.BottomPosition,
 			}),
 		),
 		panel.AddQuery(
@@ -484,79 +378,44 @@ func BandwidthUtilization(datasourceName string, labelMatchers ...*labels.Matche
 		tablePanel.Table(
 			tablePanel.WithColumnSettings([]tablePanel.ColumnSettings{
 				{
-					Name:   "cluster",
-					Header: "Cluster",
-					Align:  tablePanel.RightAlign,
+					Name: "timestamp",
+					Hide: true,
 				},
 				{
-					Name:   "Value",
+					Name:   "cluster",
+					Header: "Cluster",
+					Align:  tablePanel.LeftAlign,
+				},
+				{
+					Name:   "value",
 					Header: "Current Bandwidth Received",
-					Align:  tablePanel.RightAlign,
+					Align:  tablePanel.LeftAlign,
 					Format: &commonSdk.Format{
-						Unit:          &dashboards.BytesUnit,
+						Unit:          &dashboards.BytesPerSecondsUnit,
 						DecimalPlaces: 2,
 					},
 				},
 				{
 					Name:   "node_transmit",
 					Header: "Current Bandwidth Transmitted",
-					Align:  tablePanel.RightAlign,
-					Format: &commonSdk.Format{
-						Unit:          &dashboards.BytesUnit,
-						DecimalPlaces: 2,
-					},
+					Align:  tablePanel.LeftAlign,
 				},
 				{
 					Name:   "node_receive_drop",
 					Header: "Rate of Received Packets Dropped",
-					Align:  tablePanel.RightAlign,
-					Format: &commonSdk.Format{
-						Unit:          &dashboards.DecimalUnit,
-						DecimalPlaces: 2,
-					},
+					Align:  tablePanel.LeftAlign,
 				},
 				{
 					Name:   "node_transmit_drop",
 					Header: "Rate of Transmitted Packets Dropped",
-					Align:  tablePanel.RightAlign,
-					Format: &commonSdk.Format{
-						Unit:          &dashboards.DecimalUnit,
-						DecimalPlaces: 2,
-					},
+					Align:  tablePanel.LeftAlign,
 				},
 			}),
 		),
 		panel.AddQuery(
 			query.PromQL(
 				promql.SetLabelMatchersV2(
-					ACMCommonPanelQueries["BandwidthUtilization_ReceiveRate"],
-					labelMatchers,
-				).Pretty(0),
-				dashboards.AddQueryDataSource(datasourceName),
-			),
-		),
-		panel.AddQuery(
-			query.PromQL(
-				promql.SetLabelMatchersV2(
-					ACMCommonPanelQueries["BandwidthUtilization_TransmitRate"],
-					labelMatchers,
-				).Pretty(0),
-				dashboards.AddQueryDataSource(datasourceName),
-			),
-		),
-		panel.AddQuery(
-			query.PromQL(
-				promql.SetLabelMatchersV2(
-					ACMCommonPanelQueries["BandwidthUtilization_ReceiveDropRate"],
-					labelMatchers,
-				).Pretty(0),
-				dashboards.AddQueryDataSource(datasourceName),
-			),
-		),
-		panel.AddQuery(
-			query.PromQL(
-				promql.SetLabelMatchersV2(
-					ACMCommonPanelQueries["BandwidthUtilization_TransmitDropRate"],
+					ACMCommonPanelQueries["BandwidthUtilization"],
 					labelMatchers,
 				).Pretty(0),
 				dashboards.AddQueryDataSource(datasourceName),
