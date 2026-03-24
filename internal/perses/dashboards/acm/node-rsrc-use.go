@@ -107,4 +107,3 @@ func BuildNodeResourceUse(project string, datasource string, clusterLabelName st
 		dashboard.RefreshInterval(time.Minute*5),
 	)
 }
-

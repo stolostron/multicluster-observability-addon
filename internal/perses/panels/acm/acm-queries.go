@@ -111,7 +111,6 @@ var ACMCommonPanelQueries = map[string]parser.Expr{
 		},
 	).On("cluster").GroupLeft("has_leader"),
 
-
 	// Top50CPUOverestimation query from acm-clusters-overview-panel.go
 	"Top50CPUOverestimation": promqlbuilder.Mul(
 		promqlbuilder.Mul(
