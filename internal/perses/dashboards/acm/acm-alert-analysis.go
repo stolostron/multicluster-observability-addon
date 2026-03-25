@@ -50,7 +50,7 @@ func BuildACMAlertAnalysis(project string, datasource string, clusterLabelName s
 	clusterLabelMatcher := dashboards.GetClusterLabelMatcherV2(clusterLabelName)
 	return dashboard.New("acm-alert-analysis",
 		dashboard.ProjectName(project),
-		dashboard.Name("ACM Alert Analysis"),
+		dashboard.Name("Alert Analysis"),
 		dashboard.AddVariable("severity",
 			listVar.List(
 				labelValuesVar.PrometheusLabelValues("severity",

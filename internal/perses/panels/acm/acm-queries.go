@@ -492,6 +492,14 @@ var ACMCommonPanelQueries = map[string]parser.Expr{
 			label.New("cluster").Equal("$cluster"),
 		),
 	),
+	"CPUUsageByNamespace": promqlbuilder.Sum(
+		vector.New(
+			vector.WithMetricName("node_namespace_pod_container:container_cpu_usage_seconds_total:sum"),
+			vector.WithLabelMatchers(
+				label.New("cluster").Equal("$cluster"),
+			),
+		),
+	).By("namespace"),
 	"CPURequestsCommitment": promqlbuilder.Div(
 		promqlbuilder.Sum(
 			vector.New(

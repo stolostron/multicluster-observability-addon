@@ -7,7 +7,6 @@ import (
 	panelgroup "github.com/perses/perses/go-sdk/panel-group"
 	listVar "github.com/perses/perses/go-sdk/variable/list-variable"
 	labelValuesVar "github.com/perses/plugins/prometheus/sdk/go/variable/label-values"
-	"github.com/perses/promql-builder/vector"
 	"github.com/prometheus/prometheus/model/labels"
 	panels "github.com/stolostron/multicluster-observability-addon/internal/perses/panels/acm"
 )
@@ -48,10 +47,11 @@ func BuildACMClustersOverview(project string, datasource string, clusterLabelNam
 			listVar.List(
 				labelValuesVar.PrometheusLabelValues("label_name",
 					dashboards.AddVariableDatasource(datasource),
-					labelValuesVar.Matchers(promql.SetLabelMatchers(
-						"acm_label_names",
-						[]promql.LabelMatcher{},
-					),
+					labelValuesVar.Matchers(
+						promql.SetLabelMatchers(
+							"acm_label_names",
+							[]promql.LabelMatcher{},
+						),
 					),
 				),
 				listVar.DisplayName("Label"),
@@ -64,10 +64,11 @@ func BuildACMClustersOverview(project string, datasource string, clusterLabelNam
 			listVar.List(
 				labelValuesVar.PrometheusLabelValues("$acm_label_names",
 					dashboards.AddVariableDatasource(datasource),
-					labelValuesVar.Matchers(promql.SetLabelMatchers(
-						"acm_managed_cluster_labels",
-						[]promql.LabelMatcher{},
-					),
+					labelValuesVar.Matchers(
+						promql.SetLabelMatchers(
+							"acm_managed_cluster_labels",
+							[]promql.LabelMatcher{},
+						),
 					),
 				),
 				listVar.DisplayName("Value"),
@@ -82,12 +83,12 @@ func BuildACMClustersOverview(project string, datasource string, clusterLabelNam
 				labelValuesVar.PrometheusLabelValues("name",
 					dashboards.AddVariableDatasource(datasource),
 					labelValuesVar.Matchers(
-						promql.SetLabelMatchersV2(
-							vector.New(vector.WithMetricName("acm_managed_cluster_labels")),
-							[]*labels.Matcher{
-								{Name: "$acm_label_names", Type: labels.MatchRegexp, Value: "$value"},
+						promql.SetLabelMatchers(
+							"acm_managed_cluster_labels",
+							[]promql.LabelMatcher{
+								{Name: "$acm_label_names", Type: "=~", Value: "$value"},
 							},
-						).Pretty(0),
+						),
 					),
 				),
 				listVar.DisplayName("Cluster"),

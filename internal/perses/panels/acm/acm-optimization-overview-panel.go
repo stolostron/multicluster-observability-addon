@@ -114,37 +114,23 @@ func CPUUtilizationPanel(datasourceName string, labelMatchers ...*labels.Matcher
 func CPUQuotaPanel(datasourceName string, labelMatchers ...*labels.Matcher) panelgroup.Option {
 	return panelgroup.AddPanel("CPU Quota",
 		tablePanel.Table(
+			tablePanel.Transform([]commonSdk.Transform{
+				{
+					Kind: commonSdk.MergeIndexedColumnsKind,
+					Spec: commonSdk.MergeIndexedColumnsSpec{
+						Column: "namespace",
+					},
+				},
+				{
+					Kind: commonSdk.JoinByColumValueKind,
+					Spec: commonSdk.JoinByColumnValueSpec{
+						Columns: []string{"namespace"},
+					},
+				},
+			}),
 			tablePanel.WithColumnSettings([]tablePanel.ColumnSettings{
 				{
 					Name: "timestamp",
-					Hide: true,
-				},
-				{
-					Name: "__name__",
-					Hide: true,
-				},
-				{
-					Name: "cluster",
-					Hide: true,
-				},
-				{
-					Name: "clusterID",
-					Hide: true,
-				},
-				{
-					Name: "prometheus",
-					Hide: true,
-				},
-				{
-					Name: "receive",
-					Hide: true,
-				},
-				{
-					Name: "tenant_id",
-					Hide: true,
-				},
-				{
-					Name: "test",
 					Hide: true,
 				},
 				{
@@ -201,7 +187,7 @@ func CPUQuotaPanel(datasourceName string, labelMatchers ...*labels.Matcher) pane
 		panel.AddQuery(
 			query.PromQL(
 				promql.SetLabelMatchersV2(
-					ACMCommonPanelQueries["CPUUsageNodeNamespacePod"],
+					ACMCommonPanelQueries["CPUUsageByNamespace"],
 					labelMatchers,
 				).Pretty(0),
 				dashboards.AddQueryDataSource(datasourceName),
@@ -330,37 +316,23 @@ func MemoryRequestsByNamespacePanel(datasourceName string, labelMatchers ...*lab
 	return panelgroup.AddPanel("Memory Requests by Namespace",
 		panel.Description("Shows memory usage, requests, and pod counts per namespace."),
 		tablePanel.Table(
+			tablePanel.Transform([]commonSdk.Transform{
+				{
+					Kind: commonSdk.MergeIndexedColumnsKind,
+					Spec: commonSdk.MergeIndexedColumnsSpec{
+						Column: "namespace",
+					},
+				},
+				{
+					Kind: commonSdk.JoinByColumValueKind,
+					Spec: commonSdk.JoinByColumnValueSpec{
+						Columns: []string{"namespace"},
+					},
+				},
+			}),
 			tablePanel.WithColumnSettings([]tablePanel.ColumnSettings{
 				{
 					Name: "timestamp",
-					Hide: true,
-				},
-				{
-					Name: "__name__",
-					Hide: true,
-				},
-				{
-					Name: "cluster",
-					Hide: true,
-				},
-				{
-					Name: "clusterID",
-					Hide: true,
-				},
-				{
-					Name: "prometheus",
-					Hide: true,
-				},
-				{
-					Name: "receive",
-					Hide: true,
-				},
-				{
-					Name: "tenant_id",
-					Hide: true,
-				},
-				{
-					Name: "test",
 					Hide: true,
 				},
 				{
@@ -448,37 +420,23 @@ func NetworkingCurrentStatusPanel(datasourceName string, labelMatchers ...*label
 	return panelgroup.AddPanel("Current Status",
 		panel.Description("Shows network bandwidth metrics including received/transmitted bytes and packet drops."),
 		tablePanel.Table(
+			tablePanel.Transform([]commonSdk.Transform{
+				{
+					Kind: commonSdk.MergeIndexedColumnsKind,
+					Spec: commonSdk.MergeIndexedColumnsSpec{
+						Column: "instance",
+					},
+				},
+				{
+					Kind: commonSdk.JoinByColumValueKind,
+					Spec: commonSdk.JoinByColumnValueSpec{
+						Columns: []string{"instance"},
+					},
+				},
+			}),
 			tablePanel.WithColumnSettings([]tablePanel.ColumnSettings{
 				{
 					Name: "timestamp",
-					Hide: true,
-				},
-				{
-					Name: "__name__",
-					Hide: true,
-				},
-				{
-					Name: "cluster",
-					Hide: true,
-				},
-				{
-					Name: "clusterID",
-					Hide: true,
-				},
-				{
-					Name: "prometheus",
-					Hide: true,
-				},
-				{
-					Name: "receive",
-					Hide: true,
-				},
-				{
-					Name: "tenant_id",
-					Hide: true,
-				},
-				{
-					Name: "test",
 					Hide: true,
 				},
 				{

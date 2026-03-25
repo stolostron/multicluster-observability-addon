@@ -62,6 +62,17 @@ func BuildK8sDashboards(project string, datasource string, clusterLabelName stri
 	}
 	dashboardWriter.Add(k8sApiServer.BuildAPIServerOverview(project, datasource, clusterLabelName, dashboardVars...))
 
+	// TODO: Add kubernetes networking dashboards
+	//dashboardVars = []dashboard.Option{
+	//	GetClusterVariable(datasource),
+	//	GetNamespaceVariable(datasource),
+	//}
+	//dashboardWriter.Add(k8sNetworking.BuildKubernetesClusterOverview(project, datasource, clusterLabelName, dashboardVars...))
+	//dashboardWriter.Add(k8sNetworking.BuildKubernetesPodOverview(project, datasource, clusterLabelName, dashboardVars...))
+	//dashboardWriter.Add(k8sNetworking.BuildKubernetesWorkloadOverview(project, datasource, clusterLabelName, dashboardVars...))
+	//dashboardWriter.Add(k8sNetworking.BuildKubernetesNamespaceByPodOverview(project, datasource, clusterLabelName, dashboardVars...))
+	//dashboardWriter.Add(k8sNetworking.BuildKubernetesNamespaceByWorkloadOverview(project, datasource, clusterLabelName, dashboardVars...))
+	//
 	objs := dashboardWriter.OperatorResources()
 	return objs, nil
 }
