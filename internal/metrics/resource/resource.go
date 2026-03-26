@@ -8,7 +8,6 @@ import (
 
 	"github.com/go-logr/logr"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
-	cooprometheusv1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1"
 	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
@@ -222,18 +221,6 @@ func (d DefaultStackResources) getPrometheusRules(ctx context.Context, mcoUID ty
 		}
 
 		promRules = append(promRules, &sc)
-	}
-
-	cooPromRuleList := &cooprometheusv1.PrometheusRuleList{}
-	if err = d.Client.List(ctx, cooPromRuleList, client.InNamespace(addoncfg.InstallNamespace), client.MatchingLabelsSelector{Selector: labelSelector}); err != nil {
-		return nil, fmt.Errorf("failed to list coo prometheusRules: %w", err)
-	}
-	for _, cooPromRule := range cooPromRuleList.Items {
-		if !hasControllerUID(cooPromRule.OwnerReferences, mcoUID) {
-			continue
-		}
-
-		promRules = append(promRules, &cooPromRule)
 	}
 
 	configs, err := d.generateConfigsForAllPlacements(promRules)

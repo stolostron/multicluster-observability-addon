@@ -381,7 +381,7 @@ func (o *OptionsBuilder) getAvailableConfigResources(ctx context.Context, mcAddo
 			obj = &cooprometheusv1alpha1.ScrapeConfig{}
 		case prometheusv1.PrometheusRuleName:
 			switch cfg.Group {
-			case "monitoring.rhobs":
+			case cooprometheusv1.SchemeGroupVersion.Group:
 				obj = &cooprometheusv1.PrometheusRule{}
 			default:
 				obj = &prometheusv1.PrometheusRule{}

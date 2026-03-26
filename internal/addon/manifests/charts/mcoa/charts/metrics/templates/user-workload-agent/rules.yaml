@@ -13,12 +13,7 @@ metadata:
     {{- toYaml $mergedLabels | nindent 4 }}
   annotations:
     {{- $incomingAnnotations := $rule.annotations }}
-    {{- $stdAnnotations := dict }}
-    {{- if $.Values.deployNonOCPStack }}
-    {{- $_ := set $stdAnnotations "operator.prometheus.io/controller-id" $.Values.prometheusControllerID }}
-    {{- else }}
-    {{- $_ := set $stdAnnotations "operator.prometheus.io/controller-id" "openshift-user-workload-monitoring/prometheus-operator" }}
-    {{- end }}
+    {{- $stdAnnotations := dict "operator.prometheus.io/controller-id" "openshift-user-workload-monitoring/prometheus-operator" }}
     {{- $mergedAnnotations := mergeOverwrite $incomingAnnotations $stdAnnotations }}
     {{- toYaml $mergedAnnotations | nindent 4 }}
 spec:

@@ -223,7 +223,7 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 			Name:       rule.Name,
 			Data:       string(ruleJson),
 			Labels:     rule.Labels,
-			APIVersion: "monitoring.rhobs/v1",
+			APIVersion: cooprometheusv1.SchemeGroupVersion.Identifier(),
 		}
 		targetNamespace := rule.Annotations[config.TargetNamespaceAnnotation]
 		if targetNamespace != "" {
