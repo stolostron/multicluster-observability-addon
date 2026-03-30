@@ -25,9 +25,9 @@ func addCustomPanelGroup(title string, positions []gridItem, panelOpts ...panelg
 		layoutIdx := len(builder.Dashboard.Spec.Layouts)
 		gridItems := make([]dashboardModel.GridItem, 0, len(pg.Panels))
 
-		for i, p := range pg.Panels {
+		for i := range pg.Panels {
 			panelRef := fmt.Sprintf("%d_%d", layoutIdx, i)
-			builder.Dashboard.Spec.Panels[panelRef] = &p
+			builder.Dashboard.Spec.Panels[panelRef] = &pg.Panels[i]
 
 			gi := positions[i]
 			gridItems = append(gridItems, dashboardModel.GridItem{
