@@ -10,7 +10,7 @@ import (
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	imanifests "github.com/stolostron/multicluster-observability-addon/internal/analytics/incident-detection/manifests"
 	"github.com/stolostron/multicluster-observability-addon/internal/perses/dashboards/acm"
-	hosted_control_plane "github.com/stolostron/multicluster-observability-addon/internal/perses/dashboards/acm/hosted-control-plane"
+	hcp "github.com/stolostron/multicluster-observability-addon/internal/perses/dashboards/acm/hosted-control-plane"
 	incident_management "github.com/stolostron/multicluster-observability-addon/internal/perses/dashboards/incident-management"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -135,8 +135,8 @@ func buildACMDashboards() []DashboardValue {
 		{acm.BuildACMAlertAnalysis, "ACMAlertAnalysis"},
 		{acm.BuildACMAlertsByCluster, "ACMAlertsByCluster"},
 		{acm.BuildACMClustersByAlert, "ACMClustersByAlert"},
-		{hosted_control_plane.BuildACMHCPOverview, "ACMHCPOverview"},
-		{hosted_control_plane.BuildACMHCPResources, "ACMHCPResources"},
+		{hcp.BuildACMHCPOverview, "ACMHCPOverview"},
+		{hcp.BuildACMHCPResources, "ACMHCPResources"},
 	}
 
 	return buildDashboards(builders, dsThanos)

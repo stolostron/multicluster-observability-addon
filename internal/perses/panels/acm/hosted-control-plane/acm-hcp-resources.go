@@ -10,19 +10,23 @@ import (
 	timeSeriesPanel "github.com/perses/plugins/timeserieschart/sdk/go"
 )
 
+var hcpStatThresholds = commonSdk.Thresholds{
+	Steps: []commonSdk.StepOption{
+		{Value: 0, Color: "#73bf69"},
+		{Value: 80, Color: "#f2495c"},
+	},
+}
+
 func HCPPodCount(datasourceName string) panelgroup.Option {
 	return panelgroup.AddPanel("Number of pods",
-		panel.Description("Total number of pods in the HCP namespace."),
 		statPanel.Chart(
 			statPanel.Calculation("last-number"),
-			statPanel.Thresholds(commonSdk.Thresholds{
-				DefaultColor: "blue",
-				Mode:         commonSdk.AbsoluteMode,
-			}),
+			statPanel.WithSparkline(statPanel.Sparkline{}),
+			statPanel.Thresholds(hcpStatThresholds),
 		),
 		panel.AddQuery(
 			query.PromQL(
-				HCPPanelQueries["HCPPodCount"].Pretty(0)+" or vector(0)",
+				HCPPanelQueries["HCPPodCount"].Pretty(0),
 				dashboards.AddQueryDataSource(datasourceName),
 			),
 		),
@@ -31,21 +35,27 @@ func HCPPodCount(datasourceName string) panelgroup.Option {
 
 func HCPCPUUsageGraph(datasourceName string) panelgroup.Option {
 	return panelgroup.AddPanel("CPU usage",
-		panel.Description("CPU usage by pod in the HCP namespace."),
 		timeSeriesPanel.Chart(
 			timeSeriesPanel.WithVisual(timeSeriesPanel.Visual{
-				AreaOpacity: 0.5,
+				AreaOpacity: 0.8,
 				Display:     timeSeriesPanel.LineDisplay,
+				LineWidth:   0.25,
 				Stack:       "all",
 			}),
+			timeSeriesPanel.WithYAxis(timeSeriesPanel.YAxis{
+				Format: &commonSdk.Format{
+					Unit: &dashboards.DecimalUnit,
+				},
+			}),
 			timeSeriesPanel.WithLegend(timeSeriesPanel.Legend{
+				Mode:     "list",
 				Position: timeSeriesPanel.BottomPosition,
 			}),
 		),
 		panel.AddQuery(
 			query.PromQL(
 				HCPPanelQueries["HCPCPUUsageByPod"].Pretty(0),
-				query.SeriesNameFormat("{{ pod }}"),
+				query.SeriesNameFormat("{{pod}}"),
 				dashboards.AddQueryDataSource(datasourceName),
 			),
 		),
@@ -54,12 +64,13 @@ func HCPCPUUsageGraph(datasourceName string) panelgroup.Option {
 
 func HCPCPURequestsPercent(datasourceName string) panelgroup.Option {
 	return panelgroup.AddPanel("CPU Requests %",
-		panel.Description("CPU usage as a percentage of CPU requests in the HCP namespace."),
 		statPanel.Chart(
 			statPanel.Calculation("last-number"),
 			statPanel.Format(commonSdk.Format{
 				Unit: &dashboards.PercentDecimalUnit,
 			}),
+			statPanel.WithSparkline(statPanel.Sparkline{}),
+			statPanel.Thresholds(hcpStatThresholds),
 		),
 		panel.AddQuery(
 			query.PromQL(
@@ -72,17 +83,14 @@ func HCPCPURequestsPercent(datasourceName string) panelgroup.Option {
 
 func HCPCPURequests(datasourceName string) panelgroup.Option {
 	return panelgroup.AddPanel("CPU Requests",
-		panel.Description("Total CPU requests in the HCP namespace."),
 		statPanel.Chart(
 			statPanel.Calculation("last-number"),
-			statPanel.Thresholds(commonSdk.Thresholds{
-				DefaultColor: "blue",
-				Mode:         commonSdk.AbsoluteMode,
-			}),
+			statPanel.WithSparkline(statPanel.Sparkline{}),
+			statPanel.Thresholds(hcpStatThresholds),
 		),
 		panel.AddQuery(
 			query.PromQL(
-				HCPPanelQueries["HCPCPURequests"].Pretty(0)+" or vector(0)",
+				HCPPanelQueries["HCPCPURequests"].Pretty(0),
 				dashboards.AddQueryDataSource(datasourceName),
 			),
 		),
@@ -91,13 +99,10 @@ func HCPCPURequests(datasourceName string) panelgroup.Option {
 
 func HCPCPUUsage(datasourceName string) panelgroup.Option {
 	return panelgroup.AddPanel("CPU Usage",
-		panel.Description("Current CPU usage in the HCP namespace."),
 		statPanel.Chart(
 			statPanel.Calculation("last-number"),
-			statPanel.Thresholds(commonSdk.Thresholds{
-				DefaultColor: "blue",
-				Mode:         commonSdk.AbsoluteMode,
-			}),
+			statPanel.WithSparkline(statPanel.Sparkline{}),
+			statPanel.Thresholds(hcpStatThresholds),
 		),
 		panel.AddQuery(
 			query.PromQL(
@@ -110,12 +115,13 @@ func HCPCPUUsage(datasourceName string) panelgroup.Option {
 
 func HCPMemoryRequestsPercent(datasourceName string) panelgroup.Option {
 	return panelgroup.AddPanel("Memory Requests %",
-		panel.Description("Memory usage as a percentage of memory requests in the HCP namespace."),
 		statPanel.Chart(
 			statPanel.Calculation("last-number"),
 			statPanel.Format(commonSdk.Format{
 				Unit: &dashboards.PercentDecimalUnit,
 			}),
+			statPanel.WithSparkline(statPanel.Sparkline{}),
+			statPanel.Thresholds(hcpStatThresholds),
 		),
 		panel.AddQuery(
 			query.PromQL(
@@ -128,49 +134,48 @@ func HCPMemoryRequestsPercent(datasourceName string) panelgroup.Option {
 
 func HCPMemoryUsageGraph(datasourceName string) panelgroup.Option {
 	return panelgroup.AddPanel("Memory Usage (w/o cache)",
-		panel.Description("Memory RSS usage by pod in the HCP namespace, excluding cache."),
 		timeSeriesPanel.Chart(
 			timeSeriesPanel.WithVisual(timeSeriesPanel.Visual{
-				AreaOpacity: 0.5,
+				AreaOpacity: 0.8,
 				Display:     timeSeriesPanel.LineDisplay,
+				LineWidth:   0.25,
 				Stack:       "all",
 			}),
 			timeSeriesPanel.WithYAxis(timeSeriesPanel.YAxis{
-				Show: true,
 				Format: &commonSdk.Format{
 					Unit: &dashboards.BytesUnit,
 				},
 			}),
 			timeSeriesPanel.WithLegend(timeSeriesPanel.Legend{
+				Mode:     "list",
 				Position: timeSeriesPanel.BottomPosition,
 			}),
 		),
 		panel.AddQuery(
 			query.PromQL(
 				HCPPanelQueries["HCPMemoryUsageByPod"].Pretty(0),
-				query.SeriesNameFormat("{{ pod }}"),
+				query.SeriesNameFormat("{{pod}}"),
 				dashboards.AddQueryDataSource(datasourceName),
 			),
 		),
 	)
 }
 
+var decBytesUnit = string(commonSdk.DecimalBytesUnit)
+
 func HCPMemoryRequests(datasourceName string) panelgroup.Option {
 	return panelgroup.AddPanel("Memory Requests",
-		panel.Description("Total memory requests in the HCP namespace."),
 		statPanel.Chart(
 			statPanel.Calculation("last-number"),
 			statPanel.Format(commonSdk.Format{
 				Unit: &dashboards.BytesUnit,
 			}),
-			statPanel.Thresholds(commonSdk.Thresholds{
-				DefaultColor: "blue",
-				Mode:         commonSdk.AbsoluteMode,
-			}),
+			statPanel.WithSparkline(statPanel.Sparkline{}),
+			statPanel.Thresholds(hcpStatThresholds),
 		),
 		panel.AddQuery(
 			query.PromQL(
-				HCPPanelQueries["HCPMemoryRequests"].Pretty(0)+" or vector(0)",
+				HCPPanelQueries["HCPMemoryRequests"].Pretty(0),
 				dashboards.AddQueryDataSource(datasourceName),
 			),
 		),
@@ -179,20 +184,17 @@ func HCPMemoryRequests(datasourceName string) panelgroup.Option {
 
 func HCPMemoryUsage(datasourceName string) panelgroup.Option {
 	return panelgroup.AddPanel("Memory Usage",
-		panel.Description("Current memory RSS usage in the HCP namespace."),
 		statPanel.Chart(
 			statPanel.Calculation("last-number"),
 			statPanel.Format(commonSdk.Format{
-				Unit: &dashboards.BytesUnit,
+				Unit: &decBytesUnit,
 			}),
-			statPanel.Thresholds(commonSdk.Thresholds{
-				DefaultColor: "blue",
-				Mode:         commonSdk.AbsoluteMode,
-			}),
+			statPanel.WithSparkline(statPanel.Sparkline{}),
+			statPanel.Thresholds(hcpStatThresholds),
 		),
 		panel.AddQuery(
 			query.PromQL(
-				HCPPanelQueries["HCPMemoryUsage"].Pretty(0)+" or vector(0)",
+				HCPPanelQueries["HCPMemoryUsage"].Pretty(0),
 				dashboards.AddQueryDataSource(datasourceName),
 			),
 		),

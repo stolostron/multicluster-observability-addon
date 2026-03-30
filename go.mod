@@ -31,6 +31,7 @@ require (
 	github.com/perses/community-mixins v0.0.0-20251027163913-1d0e405f5169
 	github.com/perses/perses v0.53.0
 	github.com/perses/perses-operator v0.2.0
+	github.com/perses/plugins/barchart v0.11.1
 	github.com/perses/plugins/piechart v0.10.0
 	github.com/perses/plugins/prometheus v0.57.1
 	github.com/perses/plugins/statchart v0.10.0
@@ -111,7 +112,7 @@ require (
 	github.com/openshift/api v0.0.0-20250704153732-ad766c4e6d8e
 	github.com/perses/common v0.30.2 // indirect
 	github.com/perses/plugins/gaugechart v0.10.0 // indirect
-	github.com/perses/plugins/markdown v0.10.0 // indirect
+	github.com/perses/plugins/markdown v0.10.0
 	github.com/perses/promql-builder v0.2.0
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect

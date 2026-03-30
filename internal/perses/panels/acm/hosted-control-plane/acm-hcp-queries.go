@@ -67,7 +67,7 @@ var HCPPanelQueries = map[string]parser.Expr{
 		vector.New(
 			vector.WithMetricName("kube_pod_info"),
 			vector.WithLabelMatchers(
-				label.New("namespace").Equal("$hcp_namespace"),
+				label.New("namespace").Equal("$hcp_ns"),
 			),
 		),
 	),
@@ -75,7 +75,7 @@ var HCPPanelQueries = map[string]parser.Expr{
 		vector.New(
 			vector.WithMetricName("node_namespace_pod_container:container_cpu_usage_seconds_total:sum_rate5m"),
 			vector.WithLabelMatchers(
-				label.New("namespace").Equal("$hcp_namespace"),
+				label.New("namespace").Equal("$hcp_ns"),
 			),
 		),
 	).By("pod"),
@@ -84,7 +84,7 @@ var HCPPanelQueries = map[string]parser.Expr{
 			vector.New(
 				vector.WithMetricName("node_namespace_pod_container:container_cpu_usage_seconds_total:sum"),
 				vector.WithLabelMatchers(
-					label.New("namespace").Equal("$hcp_namespace"),
+					label.New("namespace").Equal("$hcp_ns"),
 				),
 			),
 		).By("namespace"),
@@ -93,7 +93,7 @@ var HCPPanelQueries = map[string]parser.Expr{
 				vector.WithMetricName("kube_pod_container_resource_requests"),
 				vector.WithLabelMatchers(
 					label.New("resource").Equal("cpu"),
-					label.New("namespace").Equal("$hcp_namespace"),
+					label.New("namespace").Equal("$hcp_ns"),
 				),
 			),
 		).By("namespace"),
@@ -102,7 +102,7 @@ var HCPPanelQueries = map[string]parser.Expr{
 		vector.New(
 			vector.WithMetricName("kube_pod_container_resource_requests"),
 			vector.WithLabelMatchers(
-				label.New("namespace").Equal("$hcp_namespace"),
+				label.New("namespace").Equal("$hcp_ns"),
 				label.New("resource").Equal("cpu"),
 			),
 		),
@@ -110,7 +110,7 @@ var HCPPanelQueries = map[string]parser.Expr{
 	"HCPCPUUsage": vector.New(
 		vector.WithMetricName("node_namespace_pod_container:container_cpu_usage_seconds_total:sum"),
 		vector.WithLabelMatchers(
-			label.New("namespace").Equal("$hcp_namespace"),
+			label.New("namespace").Equal("$hcp_ns"),
 		),
 	),
 	"HCPMemoryRequestsPercent": promqlbuilder.Div(
@@ -118,7 +118,7 @@ var HCPPanelQueries = map[string]parser.Expr{
 			vector.New(
 				vector.WithMetricName("container_memory_rss"),
 				vector.WithLabelMatchers(
-					label.New("namespace").Equal("$hcp_namespace"),
+					label.New("namespace").Equal("$hcp_ns"),
 					label.New("container").NotEqual(""),
 				),
 			),
@@ -127,7 +127,7 @@ var HCPPanelQueries = map[string]parser.Expr{
 			vector.New(
 				vector.WithMetricName("kube_pod_container_resource_requests"),
 				vector.WithLabelMatchers(
-					label.New("namespace").Equal("$hcp_namespace"),
+					label.New("namespace").Equal("$hcp_ns"),
 					label.New("resource").Equal("memory"),
 				),
 			),
@@ -138,7 +138,7 @@ var HCPPanelQueries = map[string]parser.Expr{
 			vector.WithMetricName("container_memory_rss"),
 			vector.WithLabelMatchers(
 				label.New("job").Equal("kubelet"),
-				label.New("namespace").EqualRegexp("$hcp_namespace"),
+				label.New("namespace").EqualRegexp("$hcp_ns"),
 			),
 		),
 	).By("pod"),
@@ -146,7 +146,7 @@ var HCPPanelQueries = map[string]parser.Expr{
 		vector.New(
 			vector.WithMetricName("kube_pod_container_resource_requests"),
 			vector.WithLabelMatchers(
-				label.New("namespace").Equal("$hcp_namespace"),
+				label.New("namespace").Equal("$hcp_ns"),
 				label.New("resource").Equal("memory"),
 			),
 		),
@@ -155,7 +155,7 @@ var HCPPanelQueries = map[string]parser.Expr{
 		vector.New(
 			vector.WithMetricName("container_memory_rss"),
 			vector.WithLabelMatchers(
-				label.New("namespace").Equal("$hcp_namespace"),
+				label.New("namespace").Equal("$hcp_ns"),
 				label.New("container").NotEqual(""),
 			),
 		),
