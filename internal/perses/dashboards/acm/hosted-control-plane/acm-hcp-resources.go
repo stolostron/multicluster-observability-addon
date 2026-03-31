@@ -12,23 +12,20 @@ import (
 	v1Common "github.com/perses/perses/pkg/model/api/v1/common"
 	dashboardModel "github.com/perses/perses/pkg/model/api/v1/dashboard"
 	labelValuesVar "github.com/perses/plugins/prometheus/sdk/go/variable/label-values"
+	acm "github.com/stolostron/multicluster-observability-addon/internal/perses/dashboards/acm"
 	panels "github.com/stolostron/multicluster-observability-addon/internal/perses/panels/acm/hosted-control-plane"
 )
 
-type gridItem struct {
-	x, y, w, h int
-}
-
-var hcpResourcesGridItems = []gridItem{
-	{x: 0, y: 0, w: 3, h: 4},    // 0: Number of pods
-	{x: 3, y: 0, w: 21, h: 16},  // 1: CPU usage graph
-	{x: 0, y: 4, w: 3, h: 4},    // 2: CPU Requests %
-	{x: 0, y: 8, w: 3, h: 4},    // 3: CPU Requests
-	{x: 0, y: 12, w: 3, h: 4},   // 4: CPU Usage
-	{x: 0, y: 16, w: 3, h: 4},   // 5: Memory Requests %
-	{x: 3, y: 16, w: 21, h: 14}, // 6: Memory Usage (w/o cache) graph
-	{x: 0, y: 20, w: 3, h: 5},   // 7: Memory Requests
-	{x: 0, y: 25, w: 3, h: 5},   // 8: Memory Usage
+var hcpResourcesGridItems = []acm.GridItem{
+	{X: 0, Y: 0, W: 3, H: 4},    // 0: Number of pods
+	{X: 3, Y: 0, W: 21, H: 16},  // 1: CPU usage graph
+	{X: 0, Y: 4, W: 3, H: 4},    // 2: CPU Requests %
+	{X: 0, Y: 8, W: 3, H: 4},    // 3: CPU Requests
+	{X: 0, Y: 12, W: 3, H: 4},   // 4: CPU Usage
+	{X: 0, Y: 16, W: 3, H: 4},   // 5: Memory Requests %
+	{X: 3, Y: 16, W: 21, H: 14}, // 6: Memory Usage (w/o cache) graph
+	{X: 0, Y: 20, W: 3, H: 5},   // 7: Memory Requests
+	{X: 0, Y: 25, W: 3, H: 5},   // 8: Memory Usage
 }
 
 func withHCPResourcesLayout(datasource string) dashboard.Option {
@@ -61,10 +58,10 @@ func withHCPResourcesLayout(datasource string) dashboard.Option {
 
 			gi := hcpResourcesGridItems[i]
 			gridItems = append(gridItems, dashboardModel.GridItem{
-				X:      gi.x,
-				Y:      gi.y,
-				Width:  gi.w,
-				Height: gi.h,
+				X:      gi.X,
+				Y:      gi.Y,
+				Width:  gi.W,
+				Height: gi.H,
 				Content: &v1Common.JSONRef{
 					Ref: fmt.Sprintf("#/spec/panels/%s", panelRef),
 				},
