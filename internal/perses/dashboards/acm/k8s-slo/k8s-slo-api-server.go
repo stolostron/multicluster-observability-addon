@@ -14,9 +14,9 @@ func withFleetOverviewGroup(datasource string) dashboard.Option {
 	return acm.AddCustomPanelGroup(
 		"Fleet Overview",
 		[]acm.GridItem{
-			{X: 0, Y: 0, W: 12, H: 5},  // Clusters exceeded SLO
-			{X: 12, Y: 0, W: 12, H: 5}, // Clusters meeting SLO
-			{X: 0, Y: 5, W: 24, H: 7},  // Top Clusters table
+			{X: 0, Y: 0, W: 12, H: 5},
+			{X: 12, Y: 0, W: 12, H: 5},
+			{X: 0, Y: 5, W: 24, H: 7},
 		},
 		panels.FleetClustersExceededSLO(datasource),
 		panels.FleetClustersMeetingSLO(datasource),

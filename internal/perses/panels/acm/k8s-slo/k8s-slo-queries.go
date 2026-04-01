@@ -87,32 +87,32 @@ func errorBudget(rangeStr string) parser.Expr {
 
 // Fleet-level SLO queries (use $window variable for range)
 var FleetQueries = map[string]parser.Expr{
-	// Number of clusters exceeding SLO target
+
 	"ClustersExceededSLO": promqlbuilder.Sum(
 		promqlbuilder.Lss(
 			fleetSLO(),
 			promqlbuilder.NewNumber(0.99),
 		).Bool(),
 	),
-	// Number of clusters meeting SLO target
+
 	"ClustersMeetingSLO": promqlbuilder.Sum(
 		promqlbuilder.Gte(
 			fleetSLO(),
 			promqlbuilder.NewNumber(0.99),
 		).Bool(),
 	),
-	// Top clusters sorted by worst SLO
+
 	"TopClustersSLO": promqlbuilder.SortDesc(
 		bottomKVariable("$top", fleetSLO()),
 	),
-	// Top clusters error budget
+
 	"TopClustersErrorBudget": promqlbuilder.Sub(
 		promqlbuilder.NewNumber(0.99),
 		promqlbuilder.SortDesc(
 			bottomKVariable("$top", fleetSLO()),
 		),
 	),
-	// Top clusters SLI trend
+
 	"TopClustersSLITrend": bottomKVariable("$top",
 		vector.New(
 			vector.WithMetricName("sli:apiserver_request_duration_seconds:trend:1m"),
@@ -121,46 +121,44 @@ var FleetQueries = map[string]parser.Expr{
 			),
 		),
 	),
-	// Target threshold line
+
 	"TargetThreshold": promqlbuilder.NewNumber(0.99),
 }
 
-// Cluster-level SLO queries
 var ClusterQueries = map[string]parser.Expr{
-	// SLI bin trend (for Target stat)
 	"SLIBinTrend": vector.New(
 		vector.WithMetricName("sli:apiserver_request_duration_seconds:bin:trend:1m"),
 		vector.WithLabelMatchers(
 			label.New("cluster").Equal("$cluster"),
 		),
 	),
-	// SLO over 7 days
+
 	"SLO7d": clusterSLO("7d"),
-	// SLO over 30 days
+
 	"SLO30d": clusterSLO("30d"),
-	// Day of the week
+
 	"DayOfWeek": &parser.Call{
 		Func: parser.Functions["day_of_week"],
 		Args: parser.Expressions{},
 	},
-	// Day of the month
+
 	"DayOfMonth": &parser.Call{
 		Func: parser.Functions["day_of_month"],
 		Args: parser.Expressions{},
 	},
-	// Error budget consumed (7 days)
+
 	"ErrorBudget7d": errorBudget("7d"),
-	// Error budget consumed (30 days)
+
 	"ErrorBudget30d": errorBudget("30d"),
-	// Downtime remaining (7 days) in minutes: error_budget * total_minutes * -1
+
 	"DowntimeRemaining7d": promqlbuilder.Mul(
 		promqlbuilder.Mul(
 			errorBudget("7d"),
-			promqlbuilder.NewNumber(10080), // 7 * 24 * 60
+			promqlbuilder.NewNumber(10080),
 		),
 		promqlbuilder.NewNumber(-1),
 	),
-	// Downtime remaining (30 days) in minutes: error_budget * total_minutes * -1
+
 	"DowntimeRemaining30d": promqlbuilder.Mul(
 		promqlbuilder.Mul(
 			errorBudget("30d"),
@@ -168,13 +166,13 @@ var ClusterQueries = map[string]parser.Expr{
 		),
 		promqlbuilder.NewNumber(-1),
 	),
-	// SLI trend
+
 	"SLITrend": vector.New(
 		vector.WithMetricName("sli:apiserver_request_duration_seconds:trend:1m"),
 		vector.WithLabelMatchers(
 			label.New("cluster").Equal("$cluster"),
 		),
 	),
-	// Target threshold line
+
 	"TargetThreshold": promqlbuilder.NewNumber(0.99),
 }
