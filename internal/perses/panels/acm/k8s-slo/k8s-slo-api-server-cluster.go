@@ -12,8 +12,6 @@ import (
 	tsPanel "github.com/perses/plugins/timeserieschart/sdk/go"
 )
 
-// Service-Level Overview group panels
-
 func ClusterTarget(datasource string) panelgroup.Option {
 	return panelgroup.AddPanel("Target",
 		panel.Description("The service-level target for the API server request duration service-level objective (SLO)."),
@@ -157,8 +155,6 @@ func ClusterDowntimeRemaining7d(datasource string) panelgroup.Option {
 	)
 }
 
-// Error Budget for 30 Days group panels
-
 func ClusterDayOfMonth(datasource string) panelgroup.Option {
 	return panelgroup.AddPanel("Day of the month",
 		panel.Description("The current day within the month period."),
@@ -232,8 +228,6 @@ func ClusterDowntimeRemaining30d(datasource string) panelgroup.Option {
 	)
 }
 
-// Trend group panels
-
 func ClusterSLITrend(datasource string) panelgroup.Option {
 	return panelgroup.AddPanel("API Server Request Duration - SLI",
 		panel.Description("Trending graph of the service-level indicators (SLI) over relative time period used to compute the service-level objective (SLO)."),
@@ -277,6 +271,18 @@ func ClusterSLITable(datasource string) panelgroup.Option {
 		panel.Description("The collected service-level indicator (SLI) values for the API server request duration service-level objective (SLO), over the relative time range."),
 		tablePanel.Table(
 			tablePanel.WithColumnSettings([]tablePanel.ColumnSettings{
+				{
+					Name: "prometheus",
+					Hide: true,
+				},
+				{
+					Name: "receive",
+					Hide: true,
+				},
+				{
+					Name: "tenant_id",
+					Hide: true,
+				},
 				{
 					Name:   "timestamp",
 					Header: "Time",

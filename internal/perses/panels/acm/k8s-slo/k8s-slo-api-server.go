@@ -122,11 +122,6 @@ func FleetTopClusters(datasource string) panelgroup.Option {
 					Align:  tablePanel.LeftAlign,
 				},
 				{
-					Name:   "target",
-					Header: "Target",
-					Align:  tablePanel.LeftAlign,
-				},
-				{
 					Name:   "value #1",
 					Header: "SLO",
 					Align:  tablePanel.LeftAlign,

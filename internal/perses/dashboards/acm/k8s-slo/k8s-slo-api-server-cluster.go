@@ -45,8 +45,8 @@ func withTrendGroup(datasource string) dashboard.Option {
 	return acm.AddCustomPanelGroup(
 		"Trend",
 		[]acm.GridItem{
-			{X: 0, Y: 0, W: 24, H: 8}, // SLI trend time series
-			{X: 0, Y: 8, W: 24, H: 6}, // SLI table
+			{X: 0, Y: 0, W: 24, H: 8},
+			{X: 0, Y: 8, W: 24, H: 6},
 		},
 		panels.ClusterSLITrend(datasource),
 		panels.ClusterSLITable(datasource),
