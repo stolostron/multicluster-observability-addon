@@ -87,7 +87,6 @@ func errorBudget(rangeStr string) parser.Expr {
 
 // Fleet-level SLO queries (use $window variable for range)
 var FleetQueries = map[string]parser.Expr{
-
 	"ClustersExceededSLO": promqlbuilder.Sum(
 		promqlbuilder.Lss(
 			fleetSLO(),
