@@ -8,7 +8,7 @@ import (
 	listVar "github.com/perses/perses/go-sdk/variable/list-variable"
 	labelValuesVar "github.com/perses/plugins/prometheus/sdk/go/variable/label-values"
 	acm "github.com/stolostron/multicluster-observability-addon/internal/perses/dashboards/acm"
-	panels "github.com/stolostron/multicluster-observability-addon/internal/perses/panels/acm/k8s-slo"
+	panels "github.com/stolostron/multicluster-observability-addon/internal/perses/panels/acm/k8s/slo"
 )
 
 func withSLOOverviewGroup(datasource string) dashboard.Option {

@@ -11,7 +11,8 @@ import (
 	imanifests "github.com/stolostron/multicluster-observability-addon/internal/analytics/incident-detection/manifests"
 	"github.com/stolostron/multicluster-observability-addon/internal/perses/dashboards/acm"
 	hcp "github.com/stolostron/multicluster-observability-addon/internal/perses/dashboards/acm/hosted-control-plane"
-	slo "github.com/stolostron/multicluster-observability-addon/internal/perses/dashboards/acm/k8s-slo"
+	slo "github.com/stolostron/multicluster-observability-addon/internal/perses/dashboards/acm/k8s/slo"
+	networking "github.com/stolostron/multicluster-observability-addon/internal/perses/dashboards/acm/k8s/networking"
 	incident_management "github.com/stolostron/multicluster-observability-addon/internal/perses/dashboards/incident-management"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -140,6 +141,10 @@ func buildACMDashboards() []DashboardValue {
 		{hcp.BuildACMHCPResources, "ACMHCPResources"},
 		{slo.BuildSLOAPIServer, "SLOAPIServer"},
 		{slo.BuildSLOAPIServerCluster, "SLOAPIServerCluster"},
+		{networking.BuildNetworkingCluster, "NetworkingCluster"},
+		{networking.BuildNetworkingNamespacePods, "NetworkingNamespacePods"},
+		{networking.BuildNetworkingNode, "NetworkingNode"},
+		{networking.BuildNetworkingPod, "NetworkingPod"},
 	}
 
 	return buildDashboards(builders, dsThanos)
