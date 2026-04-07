@@ -10,8 +10,10 @@ import (
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
+	rshandlers "github.com/stolostron/multicluster-observability-addon/internal/analytics/rightsizing/handlers"
 	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	mresources "github.com/stolostron/multicluster-observability-addon/internal/metrics/resource"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
@@ -59,6 +61,8 @@ var cmaoPredicate = builder.WithPredicates(predicate.Funcs{
 	DeleteFunc:  func(e event.DeleteEvent) bool { return false },
 	GenericFunc: func(e event.GenericEvent) bool { return false },
 })
+
+var rsConfigMapPredicate = builder.WithPredicates(rshandlers.RSConfigMapPredicate())
 
 var partOfMCOALabelSelector = labels.SelectorFromSet(labels.Set{
 	addoncfg.PartOfK8sLabelKey: addoncfg.Name,
@@ -164,6 +168,14 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 	objs = append(objs, mDefaultConfig...)
 
+	// Reconcile right-sizing resources (hub-wide concern).
+	// Placement and ConfigMap resources are created/updated/deleted here, not per-cluster in handler.go,
+	// to avoid race conditions from concurrent Build() calls.
+	rsBuilder := &rshandlers.OptionsBuilder{Client: r.Client, Logger: r.Log.WithName("rightsizing")}
+	if err := rsBuilder.ReconcileRSResources(ctx, opts); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to reconcile right-sizing resources: %w", err)
+	}
+
 	if err := common.EnsureAddonConfig(ctx, r.Log, r.Client, objs); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to patch default configs of the clustermanageraddon: %w", err)
 	}
@@ -192,6 +204,8 @@ func (r *ResourceCreatorReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(&cooprometheusv1alpha1.PrometheusAgent{}, r.enqueueForMCOAOwnedResources()).
 		Watches(&cooprometheusv1alpha1.ScrapeConfig{}, r.enqueueForMCOControlledResources(), partOfMCOAPredicate).
 		Watches(&prometheusv1.PrometheusRule{}, r.enqueueForMCOControlledResources(), partOfMCOAPredicate).
+		// Trigger reconciliations if right-sizing ConfigMaps change (for placement updates)
+		Watches(&corev1.ConfigMap{}, r.enqueueAODC(), rsConfigMapPredicate).
 		Complete(r)
 }
 
