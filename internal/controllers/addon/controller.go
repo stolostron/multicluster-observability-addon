@@ -75,17 +75,30 @@ func NewAddonManager(ctx context.Context, kubeConfig *rest.Config, scheme *runti
 	)
 
 	agentLogger := logger.WithName("agent")
+
+	configGVRs := []schema.GroupVersionResource{
+		{Version: loggingv1.GroupVersion.Version, Group: loggingv1.GroupVersion.Group, Resource: addoncfg.ClusterLogForwardersResource},
+		{Version: otelv1beta1.GroupVersion.Version, Group: otelv1beta1.GroupVersion.Group, Resource: addoncfg.OpenTelemetryCollectorsResource},
+		{Version: otelv1alpha1.GroupVersion.Version, Group: otelv1alpha1.GroupVersion.Group, Resource: addoncfg.InstrumentationResource},
+		{Version: coomonitoringv1alpha1.SchemeGroupVersion.Version, Group: coomonitoringv1alpha1.SchemeGroupVersion.Group, Resource: coomonitoringv1alpha1.PrometheusAgentName},
+		{Version: coomonitoringv1alpha1.SchemeGroupVersion.Version, Group: coomonitoringv1alpha1.SchemeGroupVersion.Group, Resource: coomonitoringv1alpha1.ScrapeConfigName},
+		{Version: monitoringv1.SchemeGroupVersion.Version, Group: monitoringv1.SchemeGroupVersion.Group, Resource: monitoringv1.PrometheusRuleName},
+		utils.AddOnDeploymentConfigGVR,
+	}
+
+	cooPrometheusRuleGVR := schema.GroupVersionResource{
+		Version:  coomonitoringv1.SchemeGroupVersion.Version,
+		Group:    coomonitoringv1.SchemeGroupVersion.Group,
+		Resource: coomonitoringv1.PrometheusRuleName,
+	}
+	if _, mapErr := mapper.RESTMapping(schema.GroupKind{Group: coomonitoringv1.SchemeGroupVersion.Group, Kind: coomonitoringv1.PrometheusRuleKind}); mapErr == nil {
+		configGVRs = append(configGVRs, cooPrometheusRuleGVR)
+	} else {
+		logger.Info("monitoring.rhobs PrometheusRule CRD not found on hub, skipping config GVR registration", "gvr", cooPrometheusRuleGVR)
+	}
+
 	mcoaAgentAddon, err := addonfactory.NewAgentAddonFactory(addoncfg.Name, addon.FS, "manifests/charts/mcoa").
-		WithConfigGVRs(
-			schema.GroupVersionResource{Version: loggingv1.GroupVersion.Version, Group: loggingv1.GroupVersion.Group, Resource: addoncfg.ClusterLogForwardersResource},
-			schema.GroupVersionResource{Version: otelv1beta1.GroupVersion.Version, Group: otelv1beta1.GroupVersion.Group, Resource: addoncfg.OpenTelemetryCollectorsResource},
-			schema.GroupVersionResource{Version: otelv1alpha1.GroupVersion.Version, Group: otelv1alpha1.GroupVersion.Group, Resource: addoncfg.InstrumentationResource},
-			schema.GroupVersionResource{Version: coomonitoringv1alpha1.SchemeGroupVersion.Version, Group: coomonitoringv1alpha1.SchemeGroupVersion.Group, Resource: coomonitoringv1alpha1.PrometheusAgentName},
-			schema.GroupVersionResource{Version: coomonitoringv1alpha1.SchemeGroupVersion.Version, Group: coomonitoringv1alpha1.SchemeGroupVersion.Group, Resource: coomonitoringv1alpha1.ScrapeConfigName},
-			schema.GroupVersionResource{Version: monitoringv1.SchemeGroupVersion.Version, Group: monitoringv1.SchemeGroupVersion.Group, Resource: monitoringv1.PrometheusRuleName},
-			schema.GroupVersionResource{Version: coomonitoringv1.SchemeGroupVersion.Version, Group: coomonitoringv1.SchemeGroupVersion.Group, Resource: coomonitoringv1.PrometheusRuleName},
-			utils.AddOnDeploymentConfigGVR,
-		).
+		WithConfigGVRs(configGVRs...).
 		WithGetValuesFuncs(addonConfigValuesFn, addonhelm.GetValuesFunc(ctx, k8sClient, agentLogger)).
 		WithUpdaters(addon.Updaters()).
 		WithAgentHealthProber(addon.HealthProber(k8sClient, agentLogger)).

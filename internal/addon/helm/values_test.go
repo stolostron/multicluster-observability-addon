@@ -7,6 +7,8 @@ import (
 	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
 	operatorsv1 "github.com/operator-framework/api/pkg/operators/v1"
 	operatorsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
+	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	uiplugin "github.com/rhobs/observability-operator/pkg/apis/uiplugin/v1alpha1"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
@@ -28,6 +30,8 @@ var (
 	_ = loggingv1.AddToScheme(scheme.Scheme)
 	_ = operatorsv1.AddToScheme(scheme.Scheme)
 	_ = operatorsv1alpha1.AddToScheme(scheme.Scheme)
+	_ = prometheusv1.AddToScheme(scheme.Scheme)
+	_ = cooprometheusv1alpha1.AddToScheme(scheme.Scheme)
 	_ = addonapiv1alpha1.AddToScheme(scheme.Scheme)
 	_ = apiextensionsv1.AddToScheme(scheme.Scheme)
 	_ = uiplugin.AddToScheme(scheme.Scheme)
@@ -195,5 +199,70 @@ func Test_Supported_Vendors(t *testing.T) {
 				require.Empty(t, objects)
 			}
 		})
+	}
+}
+
+// TestRSOnlyBothDisabled_ManifestsNotEmpty verifies that when the only platform
+// features are right-sizing and both are explicitly disabled, the rendering
+// pipeline still produces a non-empty manifest set (so the addon framework can
+// prune stale ManifestWork content). No RS PrometheusRules should be rendered.
+//
+// This is a regression test for the ManifestWork staleness bug where disabling
+// both RS features caused an empty render via the values.go early return,
+// leaving stale PrometheusRules in the ManifestWork.
+func TestRSOnlyBothDisabled_ManifestsNotEmpty(t *testing.T) {
+	managedCluster := addontesting.NewManagedCluster("cluster-1")
+	managedCluster.Labels = map[string]string{"vendor": "OpenShift"}
+
+	managedClusterAddOn := addontesting.NewAddon("test", "cluster-1")
+	managedClusterAddOn.Status.ConfigReferences = []addonapiv1alpha1.ConfigReference{
+		{
+			ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+				Group:    "addon.open-cluster-management.io",
+				Resource: "addondeploymentconfigs",
+			},
+			ConfigReferent: addonapiv1alpha1.ConfigReferent{
+				Name:      "multicluster-observability-addon",
+				Namespace: "open-cluster-management-observability",
+			},
+		},
+	}
+
+	addOnDeploymentConfig := &addonapiv1alpha1.AddOnDeploymentConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "multicluster-observability-addon",
+			Namespace: "open-cluster-management-observability",
+		},
+		Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
+			CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
+				{Name: addon.KeyPlatformNamespaceRightSizing, Value: "disabled"},
+				{Name: addon.KeyPlatformVirtualizationRightSizing, Value: "disabled"},
+			},
+		},
+	}
+
+	fakeKubeClient := fake.NewClientBuilder().
+		WithScheme(scheme.Scheme).
+		WithObjects(addOnDeploymentConfig).
+		Build()
+
+	agentAddon, err := addonfactory.NewAgentAddonFactory(addoncfg.Name, addon.FS, addoncfg.McoaChartDir).
+		WithGetValuesFuncs(GetValuesFunc(t.Context(), fakeKubeClient, logr.Discard())).
+		WithAgentRegistrationOption(&agent.RegistrationOption{}).
+		WithScheme(scheme.Scheme).
+		BuildHelmAgentAddon()
+	require.NoError(t, err)
+
+	objects, err := agentAddon.Manifests(managedCluster, managedClusterAddOn)
+	require.NoError(t, err)
+
+	// Manifests must be non-empty so the addon framework can compare and prune stale content
+	require.NotEmpty(t, objects, "RS-only deployment with both disabled must still produce manifests for framework pruning")
+
+	// No RS PrometheusRules should be rendered
+	for _, obj := range objects {
+		if obj.GetObjectKind().GroupVersionKind().Kind == "PrometheusRule" {
+			t.Errorf("unexpected PrometheusRule in manifests when both RS features are disabled: %s", obj.GetObjectKind())
+		}
 	}
 }
