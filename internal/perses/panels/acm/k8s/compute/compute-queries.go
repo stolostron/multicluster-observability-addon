@@ -356,6 +356,7 @@ var NamespacePodsQueries = map[string]parser.Expr{
 			vector.New(
 				vector.WithMetricName("kube_pod_container_resource_requests"),
 				vector.WithLabelMatchers(
+					label.New("cluster").Equal("$cluster"),
 					label.New("namespace").Equal("$namespace"),
 					label.New("resource").Equal("memory"),
 				),
@@ -378,6 +379,7 @@ var NamespacePodsQueries = map[string]parser.Expr{
 			vector.New(
 				vector.WithMetricName("kube_pod_container_resource_limits"),
 				vector.WithLabelMatchers(
+					label.New("cluster").Equal("$cluster"),
 					label.New("namespace").Equal("$namespace"),
 					label.New("resource").Equal("memory"),
 				),
@@ -562,6 +564,7 @@ var NamespacePodsQueries = map[string]parser.Expr{
 			vector.New(
 				vector.WithMetricName("kube_pod_container_resource_requests"),
 				vector.WithLabelMatchers(
+					label.New("cluster").Equal("$cluster"),
 					label.New("namespace").Equal("$namespace"),
 					label.New("resource").Equal("memory"),
 				),
@@ -594,6 +597,7 @@ var NamespacePodsQueries = map[string]parser.Expr{
 			vector.New(
 				vector.WithMetricName("kube_pod_container_resource_limits"),
 				vector.WithLabelMatchers(
+					label.New("cluster").Equal("$cluster"),
 					label.New("namespace").Equal("$namespace"),
 					label.New("resource").Equal("memory"),
 				),
@@ -935,6 +939,7 @@ var NodePodsQueries = map[string]parser.Expr{
 			vector.New(
 				vector.WithMetricName("kube_pod_container_resource_requests"),
 				vector.WithLabelMatchers(
+					label.New("cluster").Equal("$cluster"),
 					label.New("node").Equal("$node"),
 					label.New("resource").Equal("memory"),
 				),
@@ -970,6 +975,7 @@ var NodePodsQueries = map[string]parser.Expr{
 			vector.New(
 				vector.WithMetricName("kube_pod_container_resource_limits"),
 				vector.WithLabelMatchers(
+					label.New("cluster").Equal("$cluster"),
 					label.New("node").Equal("$node"),
 					label.New("resource").Equal("memory"),
 				),
@@ -1240,6 +1246,7 @@ var PodQueries = map[string]parser.Expr{
 			vector.New(
 				vector.WithMetricName("kube_pod_container_resource_requests"),
 				vector.WithLabelMatchers(
+					label.New("cluster").Equal("$cluster"),
 					label.New("namespace").Equal("$namespace"),
 					label.New("pod").Equal("$pod"),
 					label.New("resource").Equal("memory"),
@@ -1275,6 +1282,7 @@ var PodQueries = map[string]parser.Expr{
 			vector.New(
 				vector.WithMetricName("kube_pod_container_resource_limits"),
 				vector.WithLabelMatchers(
+					label.New("cluster").Equal("$cluster"),
 					label.New("namespace").Equal("$namespace"),
 					label.New("pod").Equal("$pod"),
 					label.New("resource").Equal("memory"),
