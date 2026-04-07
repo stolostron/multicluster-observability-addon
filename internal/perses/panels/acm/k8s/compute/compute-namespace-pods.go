@@ -14,7 +14,7 @@ import (
 // Namespace (Pods) dashboard panels
 
 func NamespacePodsCPUUtilisationFromRequests(datasource string) panelgroup.Option {
-	return panelgroup.AddPanel("CPU Utilisation (from requests)",
+	return panelgroup.AddPanel("CPU Utilization (from requests)",
 		statPanel.Chart(
 			statPanel.Calculation(common.MeanCalculation),
 			statPanel.Format(common.Format{
@@ -38,7 +38,7 @@ func NamespacePodsCPUUtilisationFromRequests(datasource string) panelgroup.Optio
 }
 
 func NamespacePodsCPUUtilisationFromLimits(datasource string) panelgroup.Option {
-	return panelgroup.AddPanel("CPU Utilisation (from limits)",
+	return panelgroup.AddPanel("CPU Utilization (from limits)",
 		statPanel.Chart(
 			statPanel.Calculation(common.MeanCalculation),
 			statPanel.Format(common.Format{
@@ -86,7 +86,7 @@ func NamespacePodsMemoryUtilisationFromRequests(datasource string) panelgroup.Op
 }
 
 func NamespacePodsMemoryUtilisationFromLimits(datasource string) panelgroup.Option {
-	return panelgroup.AddPanel("Memory Utilisation (from limits)",
+	return panelgroup.AddPanel("Memory Utilization (from limits)",
 		statPanel.Chart(
 			statPanel.Calculation(common.MeanCalculation),
 			statPanel.Format(common.Format{

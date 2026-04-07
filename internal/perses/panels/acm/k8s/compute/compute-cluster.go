@@ -14,7 +14,7 @@ import (
 // Cluster dashboard panels
 
 func ClusterCPUUtilisation(datasource string) panelgroup.Option {
-	return panelgroup.AddPanel("CPU Utilisation",
+	return panelgroup.AddPanel("CPU Utilization",
 		statPanel.Chart(
 			statPanel.Calculation(common.MeanCalculation),
 			statPanel.Format(common.Format{
@@ -86,7 +86,7 @@ func ClusterCPULimitsCommitment(datasource string) panelgroup.Option {
 }
 
 func ClusterMemoryUtilisation(datasource string) panelgroup.Option {
-	return panelgroup.AddPanel("Memory Utilisation",
+	return panelgroup.AddPanel("Memory Utilization",
 		statPanel.Chart(
 			statPanel.Calculation(common.MeanCalculation),
 			statPanel.Format(common.Format{
