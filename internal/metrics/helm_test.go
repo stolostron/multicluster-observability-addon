@@ -246,7 +246,8 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				sms := common.FilterResourcesByLabelSelector[*prometheusv1.ServiceMonitor](objects, matchLabels)
 				assert.Len(t, sms, 1)
 				operatorSM := sms[0]
-				assert.Equal(t, "http", operatorSM.Spec.Endpoints[0].Scheme)
+				assert.NotNil(t, operatorSM.Spec.Endpoints[0].Scheme)
+				assert.Equal(t, prometheusv1.Scheme("http"), *operatorSM.Spec.Endpoints[0].Scheme)
 				assert.Nil(t, operatorSM.Spec.Endpoints[0].TLSConfig)
 
 				// Ensure the Service is targeting the correct port
