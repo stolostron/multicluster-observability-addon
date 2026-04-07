@@ -114,6 +114,7 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 		if len(ret.Platform.Rules) == 0 {
 			o.Logger.V(2).Info("No rules found for platform metrics")
 		}
+
 	}
 
 	// Check both if hypershift is enabled and has hosted clusters to limit noisy logs when uwl monitoring is disabled while there is no hostedCluster

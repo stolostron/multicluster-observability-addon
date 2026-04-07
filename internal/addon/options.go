@@ -16,13 +16,15 @@ const (
 	KeyOpenShiftLoggingChannel = "openshiftLoggingChannel"
 
 	// Platform Observability Keys
-	KeyPlatformMetricsCollection   = "platformMetricsCollection"
-	KeyPlatformLogsCollection      = "platformLogsCollection"
-	KeyPlatformIncidentDetection   = "platformIncidentDetection"
-	KeyMetricsHubHostname          = "metricsHubHostname"
-	KeyMetricsAlertManagerHostname = "metricsAlertManagerHostname"
-	KeyNodeExporterHostPort        = "nodeExporterHostPort"
-	KeyNodeExporterInternalPort    = "nodeExporterInternalPort"
+	KeyPlatformMetricsCollection         = "platformMetricsCollection"
+	KeyPlatformLogsCollection            = "platformLogsCollection"
+	KeyPlatformIncidentDetection         = "platformIncidentDetection"
+	KeyPlatformNamespaceRightSizing      = "platformNamespaceRightSizing"
+	KeyPlatformVirtualizationRightSizing = "platformVirtualizationRightSizing"
+	KeyMetricsHubHostname                = "metricsHubHostname"
+	KeyMetricsAlertManagerHostname       = "metricsAlertManagerHostname"
+	KeyNodeExporterHostPort              = "nodeExporterHostPort"
+	KeyNodeExporterInternalPort          = "nodeExporterInternalPort"
 
 	// User Workloads Observability Keys
 	KeyUserWorkloadMetricsCollection = "userWorkloadMetricsCollection"
@@ -88,8 +90,14 @@ type PlatformOptions struct {
 	AnalyticsOptions AnalyticsOptions
 }
 
+type RightSizingOptions struct {
+	NamespaceEnabled      bool
+	VirtualizationEnabled bool
+}
+
 type AnalyticsOptions struct {
 	IncidentDetection IncidentDetection
+	RightSizing       RightSizingOptions
 }
 
 type UserWorkloadOptions struct {
@@ -170,6 +178,10 @@ func BuildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Opti
 		return opts, nil
 	}
 
+	// Track if right-sizing keys were explicitly set
+	nsRSExplicitlySet := false
+	virtRSExplicitlySet := false
+
 	for _, keyvalue := range addOnDeployment.Spec.CustomizedVariables {
 		switch keyvalue.Name {
 		// Operator Subscriptions
@@ -241,6 +253,21 @@ func BuildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Opti
 				opts.Platform.Enabled = true
 				opts.Platform.AnalyticsOptions.IncidentDetection.Enabled = true
 			}
+		case KeyPlatformNamespaceRightSizing:
+			nsRSExplicitlySet = true
+			// Always mark platform as enabled when RS key is present (even "disabled").
+			// This ensures the rendering pipeline runs so the addon framework can prune
+			// stale ManifestWork content when both RS features are disabled.
+			opts.Platform.Enabled = true
+			if keyvalue.Value == "enabled" {
+				opts.Platform.AnalyticsOptions.RightSizing.NamespaceEnabled = true
+			}
+		case KeyPlatformVirtualizationRightSizing:
+			virtRSExplicitlySet = true
+			opts.Platform.Enabled = true
+			if keyvalue.Value == "enabled" {
+				opts.Platform.AnalyticsOptions.RightSizing.VirtualizationEnabled = true
+			}
 		// User Workload Observability Options
 		case KeyUserWorkloadMetricsCollection:
 			if keyvalue.Value == string(PrometheusAgentV1alpha1) {
@@ -268,6 +295,27 @@ func BuildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Opti
 				opts.Platform.Metrics.UI.Enabled = true
 			}
 		}
+	}
+
+	// Auto-enable right-sizing by default when keys are not yet present in ADC.
+	//
+	// This is a bootstrap safety net for the window between ADC creation (by MCO
+	// main controller) and first analytics controller reconcile (which calls
+	// syncRightSizingStateToADC to explicitly set the keys).
+	//
+	// Once syncRightSizingStateToADC runs, the keys are always present:
+	// - MCO mode: both keys set to "disabled" (MCO manages RS via Policy)
+	// - MCOA mode: keys set to "enabled"/"disabled" based on MCO CR spec
+	//
+	// The auto-enable ensures right-sizing works immediately on fresh installs
+	// before the analytics controller has had time to sync state to ADC.
+	if !nsRSExplicitlySet {
+		opts.Platform.Enabled = true
+		opts.Platform.AnalyticsOptions.RightSizing.NamespaceEnabled = true
+	}
+	if !virtRSExplicitlySet {
+		opts.Platform.Enabled = true
+		opts.Platform.AnalyticsOptions.RightSizing.VirtualizationEnabled = true
 	}
 
 	if !opts.Platform.Metrics.CollectionEnabled {
