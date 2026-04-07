@@ -39,7 +39,17 @@ func TestBuildOptions(t *testing.T) {
 					},
 				},
 			},
-			expectedOpts: Options{},
+			expectedOpts: Options{
+				Platform: PlatformOptions{
+					Enabled: true,
+					AnalyticsOptions: AnalyticsOptions{
+						RightSizing: RightSizingOptions{
+							NamespaceEnabled:      true,
+							VirtualizationEnabled: true,
+						},
+					},
+				},
+			},
 		},
 		{
 			name: "valid metrics without scheme for hub",
@@ -67,6 +77,12 @@ func TestBuildOptions(t *testing.T) {
 							Scheme: "https",
 							Host:   "alerts.example.com",
 							Path:   "",
+						},
+					},
+					AnalyticsOptions: AnalyticsOptions{
+						RightSizing: RightSizingOptions{
+							NamespaceEnabled:      true,
+							VirtualizationEnabled: true,
 						},
 					},
 				},
@@ -104,6 +120,12 @@ func TestBuildOptions(t *testing.T) {
 							Scheme: "https",
 							Host:   "alerts.example.com",
 							Path:   "",
+						},
+					},
+					AnalyticsOptions: AnalyticsOptions{
+						RightSizing: RightSizingOptions{
+							NamespaceEnabled:      true,
+							VirtualizationEnabled: true,
 						},
 					},
 				},
@@ -144,6 +166,12 @@ func TestBuildOptions(t *testing.T) {
 						CollectionEnabled:   true,
 						SubscriptionChannel: "stable-6",
 					},
+					AnalyticsOptions: AnalyticsOptions{
+						RightSizing: RightSizingOptions{
+							NamespaceEnabled:      true,
+							VirtualizationEnabled: true,
+						},
+					},
 				},
 				UserWorkloads: UserWorkloadOptions{
 					Enabled: true,
@@ -165,6 +193,15 @@ func TestBuildOptions(t *testing.T) {
 				},
 			},
 			expectedOpts: Options{
+				Platform: PlatformOptions{
+					Enabled: true,
+					AnalyticsOptions: AnalyticsOptions{
+						RightSizing: RightSizingOptions{
+							NamespaceEnabled:      true,
+							VirtualizationEnabled: true,
+						},
+					},
+				},
 				UserWorkloads: UserWorkloadOptions{
 					Enabled: true,
 					Traces: TracesOptions{
@@ -190,8 +227,51 @@ func TestBuildOptions(t *testing.T) {
 						IncidentDetection: IncidentDetection{
 							Enabled: true,
 						},
+						RightSizing: RightSizingOptions{
+							NamespaceEnabled:      true,
+							VirtualizationEnabled: true,
+						},
 					},
 				},
+			},
+		},
+		{
+			name: "right-sizing enabled explicitly",
+			addOnDeploy: &addonapiv1alpha1.AddOnDeploymentConfig{
+				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
+					CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
+						{Name: KeyPlatformNamespaceRightSizing, Value: "enabled"},
+						{Name: KeyPlatformVirtualizationRightSizing, Value: "enabled"},
+					},
+				},
+			},
+			expectedOpts: Options{
+				Platform: PlatformOptions{
+					Enabled: true,
+					AnalyticsOptions: AnalyticsOptions{
+						RightSizing: RightSizingOptions{
+							NamespaceEnabled:      true,
+							VirtualizationEnabled: true,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "right-sizing disabled explicitly",
+			addOnDeploy: &addonapiv1alpha1.AddOnDeploymentConfig{
+				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
+					CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
+						{Name: KeyPlatformNamespaceRightSizing, Value: "disabled"},
+						{Name: KeyPlatformVirtualizationRightSizing, Value: "disabled"},
+					},
+				},
+			},
+			// Platform.Enabled is true because RS keys are present (even "disabled").
+			// This ensures the rendering pipeline runs so the addon framework can prune
+			// stale ManifestWork content when both RS features are disabled.
+			expectedOpts: Options{
+				Platform: PlatformOptions{Enabled: true},
 			},
 		},
 		{
@@ -208,9 +288,14 @@ func TestBuildOptions(t *testing.T) {
 							},
 						},
 					},
+					CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
+						{Name: KeyPlatformNamespaceRightSizing, Value: "disabled"},
+						{Name: KeyPlatformVirtualizationRightSizing, Value: "disabled"},
+					},
 				},
 			},
 			expectedOpts: Options{
+				Platform:     PlatformOptions{Enabled: true},
 				NodeSelector: map[string]string{"node-role.kubernetes.io/infra": ""},
 				Tolerations: []corev1.Toleration{
 					{
@@ -268,9 +353,14 @@ func TestBuildOptions(t *testing.T) {
 						HTTPProxy: "http://proxy.example.com:8080",
 						NoProxy:   "*.example.com",
 					},
+					CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
+						{Name: KeyPlatformNamespaceRightSizing, Value: "disabled"},
+						{Name: KeyPlatformVirtualizationRightSizing, Value: "disabled"},
+					},
 				},
 			},
 			expectedOpts: Options{
+				Platform: PlatformOptions{Enabled: true},
 				ProxyConfig: ProxyConfig{
 					ProxyURL: &url.URL{
 						Scheme: "http",
@@ -292,10 +382,17 @@ func TestBuildOptions(t *testing.T) {
 			},
 			expectedOpts: Options{
 				Platform: PlatformOptions{
+					Enabled: true,
 					Metrics: MetricsOptions{
 						NodeExporter: NodeExporterOptions{
 							HostPort:     19100,
 							InternalPort: 19101,
+						},
+					},
+					AnalyticsOptions: AnalyticsOptions{
+						RightSizing: RightSizingOptions{
+							NamespaceEnabled:      true,
+							VirtualizationEnabled: true,
 						},
 					},
 				},

@@ -7,6 +7,7 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
+	rshandlers "github.com/stolostron/multicluster-observability-addon/internal/analytics/rightsizing/handlers"
 	chandlers "github.com/stolostron/multicluster-observability-addon/internal/coo/handlers"
 	cmanifests "github.com/stolostron/multicluster-observability-addon/internal/coo/manifests"
 	lhandlers "github.com/stolostron/multicluster-observability-addon/internal/logging/handlers"
@@ -23,12 +24,13 @@ import (
 )
 
 type HelmChartValues struct {
-	Enabled bool                      `json:"enabled"`
-	Metrics *mmanifests.MetricsValues `json:"metrics,omitempty"`
-	Logging *lmanifests.LoggingValues `json:"logging,omitempty"`
-	Tracing *tmanifests.TracingValues `json:"tracing,omitempty"`
-	COO     *cmanifests.COOValues     `json:"coo,omitempty"`
-	ObsAPI  *omanifests.ObsAPIValues  `json:"obs-api,omitempty"`
+	Enabled     bool                          `json:"enabled"`
+	Metrics     *mmanifests.MetricsValues     `json:"metrics,omitempty"`
+	Logging     *lmanifests.LoggingValues     `json:"logging,omitempty"`
+	Tracing     *tmanifests.TracingValues     `json:"tracing,omitempty"`
+	COO         *cmanifests.COOValues         `json:"coo,omitempty"`
+	RightSizing *rshandlers.RightSizingValues `json:"rightSizing,omitempty"`
+	ObsAPI      *omanifests.ObsAPIValues      `json:"obs-api,omitempty"`
 }
 
 func GetValuesFunc(ctx context.Context, k8s client.Client, logger logr.Logger) addonfactory.GetValuesFunc {
@@ -75,6 +77,11 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, logger logr.Logger) a
 		userValues.COO, err = getCOOValues(ctx, k8s, logger, cluster, opts)
 		if err != nil {
 			return nil, err
+		}
+
+		userValues.RightSizing, err = getRightSizingValues(ctx, k8s, logger, cluster, opts)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get right-sizing values: %w", err)
 		}
 
 		// WIP: Temporary solution to enable obs-api and will require to delete the mcoa pod to take effect.
@@ -153,4 +160,17 @@ func getCOOValues(ctx context.Context, k8s client.Client, logger logr.Logger, cl
 	}
 
 	return cmanifests.BuildValues(opts, installCOO, common.IsHubCluster(cluster)), nil
+}
+
+func getRightSizingValues(ctx context.Context, k8s client.Client, logger logr.Logger, cluster *clusterv1.ManagedCluster, opts addon.Options) (*rshandlers.RightSizingValues, error) {
+	rsOptsBuilder := rshandlers.OptionsBuilder{
+		Client: k8s,
+		Logger: logger,
+	}
+	rsOpts, err := rsOptsBuilder.Build(ctx, cluster, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	return rshandlers.BuildValues(rsOpts)
 }
