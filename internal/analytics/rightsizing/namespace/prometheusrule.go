@@ -59,6 +59,8 @@ func GeneratePrometheusRule(configData rightsizing.RSConfigMapData) (monitoringv
 	}, nil
 }
 
+// buildNamespaceRules5m builds 5-minute recording rules for namespace-level resource metrics.
+// Uses rb.Rule so the optional label_env join is appended (namespace label is preserved in aggregation).
 func buildNamespaceRules5m(nsFilter string, rb *rightsizing.RuleBuilder) []monitoringv1.Rule {
 	return []monitoringv1.Rule{
 		rb.Rule(
@@ -111,6 +113,8 @@ func buildNamespaceRules5m(nsFilter string, rb *rightsizing.RuleBuilder) []monit
 	}
 }
 
+// buildNamespaceRules1d builds 1-day aggregation recording rules for namespace-level metrics.
+// Aggregates the 5m rules into daily summaries with profile/aggregation labels for dashboard selection.
 func buildNamespaceRules1d(configData rightsizing.RSConfigMapData, rb *rightsizing.RuleBuilder) []monitoringv1.Rule {
 	rp := configData.PrometheusRuleConfig.RecommendationPercentage
 	if rp == 0 {
@@ -128,6 +132,9 @@ func buildNamespaceRules1d(configData rightsizing.RSConfigMapData, rb *rightsizi
 	}
 }
 
+// buildClusterRules5m builds 5-minute recording rules for cluster-level resource metrics.
+// Uses rb.RuleNoJoin because aggregation by (cluster) removes the namespace label,
+// making a post-aggregation "on (namespace)" label join invalid.
 func buildClusterRules5m(nsFilter string, rb *rightsizing.RuleBuilder) []monitoringv1.Rule {
 	return []monitoringv1.Rule{
 		rb.RuleNoJoin(
@@ -180,6 +187,8 @@ func buildClusterRules5m(nsFilter string, rb *rightsizing.RuleBuilder) []monitor
 	}
 }
 
+// buildClusterRules1d builds 1-day aggregation recording rules for cluster-level metrics.
+// Aggregates the 5m cluster rules into daily summaries with profile/aggregation labels for dashboard selection.
 func buildClusterRules1d(configData rightsizing.RSConfigMapData, rb *rightsizing.RuleBuilder) []monitoringv1.Rule {
 	rp := configData.PrometheusRuleConfig.RecommendationPercentage
 	if rp == 0 {
