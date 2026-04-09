@@ -1,4 +1,4 @@
-package namespace
+package virtualization
 
 import (
 	"testing"
@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// TestGeneratePrometheusRule validates namespace PrometheusRule generation across
+// TestGeneratePrometheusRule validates VM PrometheusRule generation across
 // namespace filter configurations: default, inclusion-only, exclusion-only,
 // and the mutually-exclusive error case.
 func TestGeneratePrometheusRule(t *testing.T) {
@@ -77,15 +77,14 @@ func TestGeneratePrometheusRule(t *testing.T) {
 				assert.Error(t, err)
 			} else {
 				assert.NoError(t, err)
-				assert.Equal(t, rightsizing.NamespacePrometheusRuleName, rule.Name)
+				assert.Equal(t, rightsizing.VirtualizationPrometheusRuleName, rule.Name)
 				assert.Equal(t, rightsizing.MonitoringNamespace, rule.Namespace)
 				assert.Len(t, rule.Spec.Groups, 4)
 
-				// Check group names
-				assert.Equal(t, "acm-right-sizing-namespace-5m.rule", rule.Spec.Groups[0].Name)
-				assert.Equal(t, "acm-right-sizing-namespace-1d.rules", rule.Spec.Groups[1].Name)
-				assert.Equal(t, "acm-right-sizing-cluster-5m.rule", rule.Spec.Groups[2].Name)
-				assert.Equal(t, "acm-right-sizing-cluster-1d.rule", rule.Spec.Groups[3].Name)
+				assert.Equal(t, "acm-vm-right-sizing-namespace-5m.rule", rule.Spec.Groups[0].Name)
+				assert.Equal(t, "acm-vm-right-sizing-namespace-1d.rules", rule.Spec.Groups[1].Name)
+				assert.Equal(t, "acm-vm-right-sizing-cluster-5m.rule", rule.Spec.Groups[2].Name)
+				assert.Equal(t, "acm-vm-right-sizing-cluster-1d.rule", rule.Spec.Groups[3].Name)
 			}
 		})
 	}
@@ -96,18 +95,17 @@ func TestGeneratePrometheusRule(t *testing.T) {
 func TestDefaultRecommendationPercentage(t *testing.T) {
 	configData := rightsizing.RSConfigMapData{
 		PrometheusRuleConfig: rightsizing.RSPrometheusRuleConfig{
-			RecommendationPercentage: 0, // Zero should default to 110
+			RecommendationPercentage: 0,
 		},
 	}
 
 	rule, err := GeneratePrometheusRule(configData)
 	assert.NoError(t, err)
 
-	// Check that the 1d rules contain the default recommendation percentage (110)
 	found := false
 	for _, group := range rule.Spec.Groups {
 		for _, r := range group.Rules {
-			if r.Record == "acm_rs:namespace:cpu_recommendation" {
+			if r.Record == "acm_rs_vm:namespace:cpu_recommendation" {
 				assert.Contains(t, r.Expr.String(), "110/100")
 				found = true
 				break
