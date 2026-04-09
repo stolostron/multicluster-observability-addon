@@ -108,7 +108,10 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, logger logr.Logger) a
 }
 
 func getMonitoringValues(ctx context.Context, k8s client.Client, logger logr.Logger, cluster *clusterv1.ManagedCluster, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, opts addon.Options, rsOpts *rshandlers.Options) (*mmanifests.MetricsValues, error) {
-	if !opts.Platform.Metrics.CollectionEnabled && !opts.UserWorkloads.Metrics.CollectionEnabled {
+	hasRSScrapeConfigs := rsOpts != nil &&
+		(len(rsOpts.NamespaceRightSizing.ScrapeConfigs) > 0 || len(rsOpts.VirtualizationRightSizing.ScrapeConfigs) > 0)
+
+	if !opts.Platform.Metrics.CollectionEnabled && !opts.UserWorkloads.Metrics.CollectionEnabled && !hasRSScrapeConfigs {
 		logger.V(2).Info("both platform and userWorkloads metrics are disabled, ignoring cluster")
 		return nil, nil
 	}
