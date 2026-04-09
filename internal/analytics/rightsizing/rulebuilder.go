@@ -48,6 +48,15 @@ func (rb *RuleBuilder) Rule(record, metricExpr string) monitoringv1.Rule {
 	}
 }
 
+// RuleNoJoin creates a basic PrometheusRule rule without appending the label join.
+// Use for cluster-level rules where namespace has been aggregated away.
+func (rb *RuleBuilder) RuleNoJoin(record, metricExpr string) monitoringv1.Rule {
+	return monitoringv1.Rule{
+		Record: record,
+		Expr:   intstr.FromString(metricExpr),
+	}
+}
+
 // RuleWithLabels creates a PrometheusRule rule with profile and aggregation labels
 // These labels are used by dashboards to select the appropriate aggregation level
 func (rb *RuleBuilder) RuleWithLabels(record, expr string) monitoringv1.Rule {

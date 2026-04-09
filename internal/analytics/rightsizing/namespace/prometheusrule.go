@@ -130,14 +130,14 @@ func buildNamespaceRules1d(configData rightsizing.RSConfigMapData, rb *rightsizi
 
 func buildClusterRules5m(nsFilter string, rb *rightsizing.RuleBuilder) []monitoringv1.Rule {
 	return []monitoringv1.Rule{
-		rb.Rule(
+		rb.RuleNoJoin(
 			"acm_rs:cluster:cpu_request_hard:5m",
 			fmt.Sprintf(
 				`max_over_time(sum(kube_resourcequota{resource=~"requests.cpu", type="hard", %s}) by (cluster)[5m:])`,
 				nsFilter,
 			),
 		),
-		rb.Rule(
+		rb.RuleNoJoin(
 			"acm_rs:cluster:cpu_request:5m",
 			fmt.Sprintf(
 				`max_over_time(sum(kube_pod_container_resource_requests{`+
@@ -145,7 +145,7 @@ func buildClusterRules5m(nsFilter string, rb *rightsizing.RuleBuilder) []monitor
 				nsFilter,
 			),
 		),
-		rb.Rule(
+		rb.RuleNoJoin(
 			"acm_rs:cluster:cpu_usage:5m",
 			fmt.Sprintf(
 				`max_over_time(sum(node_namespace_pod_container:`+
@@ -154,14 +154,14 @@ func buildClusterRules5m(nsFilter string, rb *rightsizing.RuleBuilder) []monitor
 				nsFilter,
 			),
 		),
-		rb.Rule(
+		rb.RuleNoJoin(
 			"acm_rs:cluster:memory_request_hard:5m",
 			fmt.Sprintf(
 				`max_over_time(sum(kube_resourcequota{resource=~"requests.memory", type="hard", %s}) by (cluster)[5m:])`,
 				nsFilter,
 			),
 		),
-		rb.Rule(
+		rb.RuleNoJoin(
 			"acm_rs:cluster:memory_request:5m",
 			fmt.Sprintf(
 				`max_over_time(sum(kube_pod_container_resource_requests{`+
@@ -169,7 +169,7 @@ func buildClusterRules5m(nsFilter string, rb *rightsizing.RuleBuilder) []monitor
 				nsFilter,
 			),
 		),
-		rb.Rule(
+		rb.RuleNoJoin(
 			"acm_rs:cluster:memory_usage:5m",
 			fmt.Sprintf(
 				`max_over_time(sum(container_memory_working_set_bytes{`+

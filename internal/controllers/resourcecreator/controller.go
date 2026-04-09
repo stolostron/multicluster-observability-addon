@@ -176,7 +176,7 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	// to avoid race conditions from concurrent Build() calls.
 	rsBuilder := &rshandlers.OptionsBuilder{Client: r.Client, Logger: r.Log.WithName("rightsizing")}
 	if err := rsBuilder.ReconcileRSResources(ctx, opts); err != nil {
-		r.Log.Error(err, "failed to reconcile right-sizing resources, continuing")
+		return ctrl.Result{}, fmt.Errorf("failed to reconcile right-sizing resources: %w", err)
 	}
 
 	if err := common.EnsureAddonConfig(ctx, r.Log, r.Client, objs); err != nil {
