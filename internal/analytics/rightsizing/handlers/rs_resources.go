@@ -7,11 +7,11 @@ import (
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"github.com/stolostron/multicluster-observability-addon/internal/analytics/rightsizing"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
-	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -93,14 +93,14 @@ func (o *OptionsBuilder) ensureRSPlacement(ctx context.Context, placementName st
 			Spec: placementConfig.Spec,
 		}
 
-		if err := o.Client.Create(ctx, placement); err != nil {
-			if apierrors.IsAlreadyExists(err) {
+		if createErr := o.Client.Create(ctx, placement); createErr != nil {
+			if apierrors.IsAlreadyExists(createErr) {
 				// Concurrent create — fall through to update
 				if err := o.Client.Get(ctx, key, placement); err != nil {
 					return fmt.Errorf("failed to re-fetch placement after AlreadyExists: %w", err)
 				}
 			} else {
-				return fmt.Errorf("failed to create placement %s: %w", placementName, err)
+				return fmt.Errorf("failed to create placement %s: %w", placementName, createErr)
 			}
 		} else {
 			o.Logger.V(1).Info("Created right-sizing Placement", "name", placementName, "namespace", rightsizing.PlacementNamespace)

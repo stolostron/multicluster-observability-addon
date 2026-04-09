@@ -24,13 +24,13 @@ import (
 )
 
 type HelmChartValues struct {
-	Enabled     bool                           `json:"enabled"`
-	Metrics     *mmanifests.MetricsValues      `json:"metrics,omitempty"`
-	Logging     *lmanifests.LoggingValues      `json:"logging,omitempty"`
-	Tracing     *tmanifests.TracingValues      `json:"tracing,omitempty"`
-	COO         *cmanifests.COOValues          `json:"coo,omitempty"`
-	RightSizing *rshandlers.RightSizingValues  `json:"rightSizing,omitempty"`
-	ObsAPI      *omanifests.ObsAPIValues       `json:"obs-api,omitempty"`
+	Enabled     bool                          `json:"enabled"`
+	Metrics     *mmanifests.MetricsValues     `json:"metrics,omitempty"`
+	Logging     *lmanifests.LoggingValues     `json:"logging,omitempty"`
+	Tracing     *tmanifests.TracingValues     `json:"tracing,omitempty"`
+	COO         *cmanifests.COOValues         `json:"coo,omitempty"`
+	RightSizing *rshandlers.RightSizingValues `json:"rightSizing,omitempty"`
+	ObsAPI      *omanifests.ObsAPIValues      `json:"obs-api,omitempty"`
 }
 
 func GetValuesFunc(ctx context.Context, k8s client.Client, logger logr.Logger) addonfactory.GetValuesFunc {
@@ -190,7 +190,6 @@ func getCOOValues(ctx context.Context, k8s client.Client, logger logr.Logger, cl
 
 	return cmanifests.BuildValues(opts, installCOO, common.IsHubCluster(cluster)), nil
 }
-
 
 // getRightSizingValuesFromOpts converts already-built right-sizing options to helm values.
 // This is used to avoid rebuilding the options twice (once for ScrapeConfig merging, once for values).
