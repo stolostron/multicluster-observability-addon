@@ -1,11 +1,19 @@
 package rightsizing
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
 	"gopkg.in/yaml.v2"
 	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
+)
+
+var (
+	errMutuallyExclusiveNamespaceFilter = errors.New("only one of inclusion or exclusion criteria allowed for namespacefiltercriteria")
+	errMutuallyExclusiveLabelFilter     = errors.New("only one of inclusion or exclusion allowed for label_env")
+	errUnmarshalPrometheusRuleConfig    = errors.New("failed to unmarshal prometheusRuleConfig")
+	errUnmarshalPlacementConfig         = errors.New("failed to unmarshal placementConfiguration")
 )
 
 // FormatYAML converts a Go data structure to a YAML-formatted string.
@@ -51,7 +59,7 @@ func GetDefaultRSPrometheusRuleConfig() RSPrometheusRuleConfig {
 func BuildNamespaceFilter(nsConfig RSPrometheusRuleConfig) (string, error) {
 	ns := nsConfig.NamespaceFilterCriteria
 	if len(ns.InclusionCriteria) > 0 && len(ns.ExclusionCriteria) > 0 {
-		return "", fmt.Errorf("only one of inclusion or exclusion criteria allowed for namespacefiltercriteria")
+		return "", errMutuallyExclusiveNamespaceFilter
 	}
 	if len(ns.InclusionCriteria) > 0 {
 		return fmt.Sprintf(`namespace=~"%s"`, strings.Join(ns.InclusionCriteria, "|")), nil
@@ -69,7 +77,7 @@ func BuildLabelJoin(labelFilters []RSLabelFilter) (string, error) {
 			continue
 		}
 		if len(l.InclusionCriteria) > 0 && len(l.ExclusionCriteria) > 0 {
-			return "", fmt.Errorf("only one of inclusion or exclusion allowed for label_env")
+			return "", errMutuallyExclusiveLabelFilter
 		}
 		var selector string
 		switch {
@@ -91,13 +99,13 @@ func ParseConfigMapData(data map[string]string) (RSConfigMapData, error) {
 
 	if prometheusRuleConfigYAML, ok := data["prometheusRuleConfig"]; ok {
 		if err := yaml.Unmarshal([]byte(prometheusRuleConfigYAML), &configData.PrometheusRuleConfig); err != nil {
-			return configData, fmt.Errorf("failed to unmarshal prometheusRuleConfig: %v", err)
+			return configData, fmt.Errorf("%w: %w", errUnmarshalPrometheusRuleConfig, err)
 		}
 	}
 
 	if placementYAML, ok := data["placementConfiguration"]; ok {
 		if err := yaml.Unmarshal([]byte(placementYAML), &configData.PlacementConfiguration); err != nil {
-			return configData, fmt.Errorf("failed to unmarshal placementConfiguration: %v", err)
+			return configData, fmt.Errorf("%w: %w", errUnmarshalPlacementConfig, err)
 		}
 	} else {
 		// Default placement selects all clusters

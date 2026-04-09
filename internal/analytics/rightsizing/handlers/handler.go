@@ -227,4 +227,3 @@ func (o *OptionsBuilder) createDefaultConfigMap(ctx context.Context, name string
 	o.Logger.V(1).Info("Created right-sizing ConfigMap", "name", name, "namespace", addoncfg.InstallNamespace)
 	return nil
 }
-
