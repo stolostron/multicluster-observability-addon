@@ -11,11 +11,11 @@ or label_replace(sum(kubevirt_vm_info{cluster="$cluster",namespace="$namespace",
 or label_replace(sum(kubevirt_vm_info{cluster="$cluster",namespace="$namespace",name="$name",status_group="migrating"}>0) * 0 + 1, "status", "Migrating", "", "")
 or label_replace(sum(kubevirt_vm_info{cluster="$cluster",namespace="$namespace",name="$name",status_group="error"}>0) * 0 + 1, "status", "Error", "", "")`
 
-	singleVMCriticalAlertsQuery = `sum(sum by (cluster,alertname,alertstate,severity,namespace,name,operator_health_impact )(ALERTS{cluster=~"$cluster",kubernetes_operator_part_of="kubevirt", alertstate="firing", pod=~"virt-launcher-$name.*", severity="critical"})) or vector(0)`
+	singleVMCriticalAlertsQuery = `sum(sum by (cluster,alertname,alertstate,severity,namespace,name,operator_health_impact)(ALERTS{cluster=~"$cluster",kubernetes_operator_part_of="kubevirt",alertstate="firing",name=~"$name",namespace=~"$namespace",severity="critical"})) or vector(0)`
 
-	singleVMWarningAlertsQuery = `sum(sum by (cluster,alertname,alertstate,severity,namespace,name,operator_health_impact )(ALERTS{cluster=~"$cluster",kubernetes_operator_part_of="kubevirt", alertstate="firing", pod=~"virt-launcher-$name.*", severity="warning"}))  or vector(0)`
+	singleVMWarningAlertsQuery = `sum(sum by (cluster,alertname,alertstate,severity,namespace,name,operator_health_impact)(ALERTS{cluster=~"$cluster",kubernetes_operator_part_of="kubevirt",alertstate="firing",name=~"$name",namespace=~"$namespace",severity="warning"})) or vector(0)`
 
-	singleVMInfoAlertsQuery = `sum(sum by (cluster,alertname,alertstate,severity,namespace,name,operator_health_impact )(ALERTS{cluster=~"$cluster",kubernetes_operator_part_of="kubevirt", alertstate="firing", pod=~"virt-launcher-$name.*", severity="info"})) or vector(0)`
+	singleVMInfoAlertsQuery = `sum(sum by (cluster,alertname,alertstate,severity,namespace,name,operator_health_impact)(ALERTS{cluster=~"$cluster",kubernetes_operator_part_of="kubevirt",alertstate="firing",name=~"$name",namespace=~"$namespace",severity="info"})) or vector(0)`
 )
 
 // Shared allocation expressions: prefer guest_effective, fall back to old source labels.
@@ -57,7 +57,7 @@ const (
 const (
 	singleVMVMInformationNameQuery = `label_replace(sum by (name)(kubevirt_vm_info{cluster="$cluster", namespace="$namespace", name="$name"}), "Field", "Name", "name", ".*")`
 
-	singleVMVMInformationStatusQuery = `label_replace(sum by (status)(label_replace(kubevirt_vm_running_status_last_transition_timestamp_seconds{cluster="$cluster",namespace="$namespace",name="$name"}>0,"status", "Running", "", "") or label_replace(kubevirt_vm_non_running_status_last_transition_timestamp_seconds{cluster="$cluster",namespace="$namespace",name="$name"}>0,"status", "Stopped", "", "") or label_replace(kubevirt_vm_error_status_last_transition_timestamp_seconds{cluster="$cluster",namespace="$namespace",name="$name"}>0,"status", "Error", "", "") or label_replace(kubevirt_vm_starting_status_last_transition_timestamp_seconds{cluster="$cluster",namespace="$namespace",name="$name"}>0,"status", "Starting", "", "") or label_replace(kubevirt_vm_migrating_status_last_transition_timestamp_seconds{cluster="$cluster",namespace="$namespace",name="$name"}>0,"status", "Migrating", "", "") ), "Field", "Status", "name", ".*")`
+	singleVMVMInformationStatusQuery = `label_replace(sum by (status)(label_replace(max by (cluster,namespace,name)(kubevirt_vm_running_status_last_transition_timestamp_seconds{cluster="$cluster",namespace="$namespace",name="$name"})>0,"status", "Running", "", "") or label_replace(max by (cluster,namespace,name)(kubevirt_vm_non_running_status_last_transition_timestamp_seconds{cluster="$cluster",namespace="$namespace",name="$name"})>0,"status", "Stopped", "", "") or label_replace(max by (cluster,namespace,name)(kubevirt_vm_error_status_last_transition_timestamp_seconds{cluster="$cluster",namespace="$namespace",name="$name"})>0,"status", "Error", "", "") or label_replace(max by (cluster,namespace,name)(kubevirt_vm_starting_status_last_transition_timestamp_seconds{cluster="$cluster",namespace="$namespace",name="$name"})>0,"status", "Starting", "", "") or label_replace(max by (cluster,namespace,name)(kubevirt_vm_migrating_status_last_transition_timestamp_seconds{cluster="$cluster",namespace="$namespace",name="$name"})>0,"status", "Migrating", "", "") ), "Field", "Status", "name", ".*")`
 
 	singleVMVMInformationGuestOSQuery = `label_replace(sum by (guest_os_name)(kubevirt_vm_info{cluster="$cluster", namespace="$namespace", name="$name", guest_os_name!=""} or kubevirt_vmi_info{cluster="$cluster", namespace="$namespace", name="$name", guest_os_name!=""}), "Field", "Operating System", "name", ".*")`
 
@@ -102,7 +102,7 @@ const (
 const (
 	singleVMTotalCPUUsageQuery = `sum by (name) (rate(kubevirt_vmi_cpu_usage_seconds_total{cluster=~"$cluster",namespace="$namespace", name="$name"}[10m]))`
 
-	singleVMCPUReadyTimeQuery = `(sum by (name, namespace, cluster)(rate(kubevirt_vmi_vcpu_delay_seconds_total{cluster=~"$cluster", namespace="$namespace", name="$name"}[10m]))>0)
+	singleVMCPUReadyTimeQuery = `(sum by (name)(rate(kubevirt_vmi_vcpu_delay_seconds_total{cluster=~"$cluster", namespace="$namespace", name="$name"}[10m]))>0)
 /` + singleVMAllocatedCPUExpr
 )
 
@@ -141,22 +141,24 @@ const (
   }[10m])
 )`
 
-	singleVMFilesystemUsagePercentQuery = `(max by (disk_name) (
-  avg_over_time(kubevirt_vmi_filesystem_used_bytes{
-    cluster="$cluster", 
-    namespace="$namespace", 
-    name="$name"
-  }[10m])
-))
-/
-(max by (disk_name) (
-  avg_over_time(kubevirt_vmi_filesystem_capacity_bytes{
-    cluster="$cluster", 
-    namespace="$namespace", 
-    name="$name"
-  }[10m])
-))`
+	singleVMFilesystemUsagePercentQuery = `topk(1,
+  (max by (disk_name) (
+    avg_over_time(kubevirt_vmi_filesystem_used_bytes{
+      cluster="$cluster",
+      namespace="$namespace",
+      name="$name"
+    }[10m])
+  ))
+  /
+  (max by (disk_name) (
+    avg_over_time(kubevirt_vmi_filesystem_capacity_bytes{
+      cluster="$cluster",
+      namespace="$namespace",
+      name="$name"
+    }[10m])
+  ))
+)`
 )
 
 // VM Alerts table
-const singleVMVMAlertsTableQuery = `sum by (cluster,alertname,alertstate,severity,namespace,name,operator_health_impact )(ALERTS{cluster=~"$cluster",kubernetes_operator_part_of="kubevirt", alertstate="firing", pod=~"virt-launcher-$name.*"})`
+const singleVMVMAlertsTableQuery = `sum by (cluster,alertname,alertstate,severity,namespace,name,operator_health_impact)(ALERTS{cluster=~"$cluster",kubernetes_operator_part_of="kubevirt",alertstate="firing",name=~"$name",namespace=~"$namespace"})`

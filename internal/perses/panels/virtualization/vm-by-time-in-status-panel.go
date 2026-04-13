@@ -10,15 +10,6 @@ import (
 	tablePanel "github.com/perses/plugins/table/sdk/go"
 )
 
-// Perses table format strings for timestamp columns (Grafana dateTimeAsIso /
-// dateTimeFromNow). community-mixins dashboards helpers do not expose these
-// yet; align with dashboards.DateTimeLocalUnit / dashboards.RelativeTimeUnit
-// when added upstream.
-var (
-	perTableUnitDateTimeLocal = "datetime-local"
-	perTableUnitRelativeTime  = "relative-time"
-)
-
 func TotalAllocatedCPU(datasourceName string) panelgroup.Option {
 	return panelgroup.AddPanel("Total Allocated CPU",
 		panel.Description("The total CPUs of the VMs that are listed in the dashboard"),
@@ -103,11 +94,11 @@ func TimeInStatusTable(datasourceName, project string) panelgroup.Option {
 				},
 				{
 					Name: "value #3", Header: "Time Since Last Migration", EnableSorting: true,
-					Format: &commonSdk.Format{Unit: &perTableUnitRelativeTime},
+					Format: &commonSdk.Format{Unit: strPtr(relativeTimeUnit)},
 				},
 				{
 					Name: "value #4", Header: "Last Migration", Hide: true,
-					Format: &commonSdk.Format{Unit: &perTableUnitDateTimeLocal},
+					Format: &commonSdk.Format{Unit: strPtr(dateTimeLocalUnit)},
 				},
 				{
 					Name: "value #2", Header: "Time in Status", EnableSorting: true,
@@ -124,7 +115,7 @@ func TimeInStatusTable(datasourceName, project string) panelgroup.Option {
 				{Kind: commonSdk.JoinByColumValueKind, Spec: commonSdk.JoinByColumnValueSpec{Columns: []string{"cluster", "name", "namespace"}}},
 			}),
 		),
-		addColumnDataLink("name", vmDetailsDashboardLinkByValue(project)),
+		addColumnDataLink("name", tableDataLink("Virtual Machine Details", vmDetailsDashboardLinkByValueURL(project))),
 		panel.AddQuery(query.PromQL(
 			vmByTimeInStatusTableDiskQuery,
 			dashboards.AddQueryDataSource(datasourceName),

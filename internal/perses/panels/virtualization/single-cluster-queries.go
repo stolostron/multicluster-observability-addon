@@ -42,20 +42,31 @@ or(count by (version)(count by (cluster, version) (csv_abnormal{name=~".*hyperco
 	singleClusterOperatorHealthStatus  = `sum by (cluster)(kubevirt_hyperconverged_operator_health_status{cluster=~"$cluster"})`
 	singleClusterHCOSystemHealthStatus = `sum by (cluster) (kubevirt_hco_system_health_status{cluster=~"$cluster"})`
 	singleClusterRunningVMsByOS1       = `sum by (os)(sum by (cluster, os)(label_replace(kubevirt_vmi_info{cluster=~"$cluster", guest_os_name!="", phase="running"}, "os", "$1", "guest_os_name", "(.*)")
-+ on (cluster, namespace, name) group_left()(0*(kubevirt_vm_running_status_last_transition_timestamp_seconds{cluster=~"$cluster"}>0))))`
++ on (cluster, namespace, name) group_left()(0*(max by (cluster, namespace, name)(kubevirt_vm_running_status_last_transition_timestamp_seconds{cluster=~"$cluster"})>0))))`
 	singleClusterRunningVMsByOS2 = `sum by (os)(sum by (cluster, os)(label_replace(kubevirt_vmi_info{cluster=~"$cluster", guest_os_name="", phase="running"}, "os", "unknown", "guest_os_name", "")
-+ on (cluster, namespace, name) group_left()(0*(kubevirt_vm_running_status_last_transition_timestamp_seconds{cluster=~"$cluster"}>0))))`
-	singleClusterRecentVMsStarted = `bottomk(5, sum by (name, namespace) (sort(time() - (kubevirt_vm_running_status_last_transition_timestamp_seconds{cluster=~"$cluster"}>0)) / 1 ))`
++ on (cluster, namespace, name) group_left()(0*(max by (cluster, namespace, name)(kubevirt_vm_running_status_last_transition_timestamp_seconds{cluster=~"$cluster"})>0))))`
+	singleClusterRecentVMsStarted = `bottomk(5, sum by (name, namespace) (sort(time() - (max by (cluster, name, namespace)(kubevirt_vm_running_status_last_transition_timestamp_seconds{cluster=~"$cluster"})>0)) / 1 ))`
+
+	// VMs not evictable: evictable="false" on kubevirt_vmi_info means
+	// evictionStrategy=None — these VMIs will block node drain entirely.
+	singleClusterVMsNotEvictable = `sum(kubevirt_vmi_info{cluster=~"$cluster", evictable="false"}) or vector(0)`
+
+	// VMs created in the last 24 hours: count VMs whose creation timestamp
+	// is within the last 86400 seconds relative to now.
+	singleClusterVMsCreatedLast24h = `count(time() - kubevirt_vm_create_date_timestamp_seconds{cluster=~"$cluster"} < 86400) or vector(0)`
 )
+
+// singleClusterVMsRunningPercent is a var because it references other consts.
+var singleClusterVMsRunningPercent = `100 * (` + singleClusterVMStatusRunning + `) / (` + totalVMsExpr + ` > 0)`
 
 // VM details
 const (
 	singleClusterVMsRunningByNode     = `topk(20, sum(kubevirt_vmi_phase_count{cluster=~"$cluster",namespace=~".*", phase=~"running"}) by (cluster,phase,node))`
-	singleClusterVMsByStatusStarting  = `sum(count(kubevirt_vm_starting_status_last_transition_timestamp_seconds{cluster=~"$cluster"} > 0)) or vector(0)`
-	singleClusterVMsByStatusRunning   = `sum(count(kubevirt_vm_running_status_last_transition_timestamp_seconds{cluster=~"$cluster"} > 0)) or vector(0)`
-	singleClusterVMsByStatusMigrating = `sum(count(kubevirt_vm_migrating_status_last_transition_timestamp_seconds{cluster=~"$cluster"} > 0)) or vector(0)`
-	singleClusterVMsByStatusError     = `sum(count(kubevirt_vm_error_status_last_transition_timestamp_seconds{cluster=~"$cluster"} > 0)) or vector(0)`
-	singleClusterVMsByStatusStopped   = `sum(count(kubevirt_vm_non_running_status_last_transition_timestamp_seconds{cluster=~"$cluster"} > 0)) or vector(0)`
+	singleClusterVMsByStatusStarting  = `sum(count by (cluster, name, namespace)(kubevirt_vm_starting_status_last_transition_timestamp_seconds{cluster=~"$cluster"} > 0)) or vector(0)`
+	singleClusterVMsByStatusRunning   = `sum(count by (cluster, name, namespace)(kubevirt_vm_running_status_last_transition_timestamp_seconds{cluster=~"$cluster"} > 0)) or vector(0)`
+	singleClusterVMsByStatusMigrating = `sum(count by (cluster, name, namespace)(kubevirt_vm_migrating_status_last_transition_timestamp_seconds{cluster=~"$cluster"} > 0)) or vector(0)`
+	singleClusterVMsByStatusError     = `sum(count by (cluster, name, namespace)(kubevirt_vm_error_status_last_transition_timestamp_seconds{cluster=~"$cluster"} > 0)) or vector(0)`
+	singleClusterVMsByStatusStopped   = `sum(count by (cluster, name, namespace)(kubevirt_vm_non_running_status_last_transition_timestamp_seconds{cluster=~"$cluster"} > 0)) or vector(0)`
 )
 
 // CPU

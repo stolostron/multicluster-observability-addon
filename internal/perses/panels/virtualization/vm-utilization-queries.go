@@ -2,6 +2,10 @@ package virtualization
 
 const utilizationInfoQuery = vmInfoStatusExpr
 
+// All utilization queries append statusFilterJoin, which is a zero-add PromQL
+// join ("+on(...) group_left()(0*(...))") defined in vm-inventory-queries.go.
+// This inner-joins each series to the $status selection without altering
+// numeric values, so queries like utilizationCPUUsageQuery retain their unit.
 const utilizationCPUUsageQuery = `sum by (cluster,namespace,name)(rate(kubevirt_vmi_cpu_usage_seconds_total{cluster=~"$cluster", name=~"$name", namespace=~"$namespace"}[10m]))` + statusFilterJoin
 
 const utilizationAllocatedVCPUQuery = allocatedCPUMultiVMExpr + statusFilterJoin

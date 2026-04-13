@@ -28,7 +28,7 @@ func BuildVMByTimeInStatus(project string, datasource string) (dashboard.Builder
 		VMClusterVariableMulti(datasource),
 		VMNamespaceVariable(datasource),
 		VMNameVariable(datasource),
-		VMStatusVariableJoinExpr(),
+		VMStatusVariableStaticSingleSelect(),
 		AddTextVariable("days_in_status_gt", "0", "Days in Status >",
 			"Filter the Virtual Machines that are in the specific status for more than the selected number of days"),
 		AddTextVariable("days_in_status_lt", "1000", "Days in Status <",

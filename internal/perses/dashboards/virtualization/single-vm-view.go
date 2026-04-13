@@ -17,6 +17,7 @@ func singleVMViewClusterVariable(datasource string) dashboard.Option {
 				labelValuesVar.Matchers("kubevirt_vm_info"),
 			),
 			listVar.DisplayName("Cluster"),
+			listVar.Description("Filter the virtual machine by its cluster"),
 			listVar.AllowAllValue(false),
 			listVar.AllowMultiple(false),
 			listVar.SortingBy(v1variable.SortAlphabeticalAsc),

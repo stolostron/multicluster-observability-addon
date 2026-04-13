@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 
 	"github.com/perses/community-mixins/pkg/dashboards"
+	commonSdk "github.com/perses/perses/go-sdk/common"
 	"github.com/perses/perses/go-sdk/panel"
 	panelgroup "github.com/perses/perses/go-sdk/panel-group"
 	apicommon "github.com/perses/perses/pkg/model/api/v1/common"
@@ -11,7 +12,7 @@ import (
 )
 
 func utilizationVMNameDataLink(project string) panel.Option {
-	return addColumnDataLink("name", vmDetailsDashboardLinkByValue(project))
+	return addColumnDataLink("name", tableDataLink("Virtual Machine Details", vmDetailsDashboardLinkByValueURL(project)))
 }
 
 func addColumnDataLink(columnName string, dataLink map[string]any) panel.Option {
@@ -102,8 +103,8 @@ func VMUtilizationTable(datasourceName, project string) panelgroup.Option {
 					map[string]any{"name": "disk_name", "hide": true},
 				},
 				"transforms": []any{
-					map[string]any{"kind": "MergeSeries", "spec": map[string]any{}},
-					map[string]any{"kind": "JoinByColumnValue", "spec": map[string]any{"columns": []string{"cluster", "name", "namespace"}}},
+					map[string]any{"kind": string(commonSdk.MergeSeriesKind), "spec": map[string]any{}},
+					map[string]any{"kind": string(commonSdk.JoinByColumValueKind), "spec": map[string]any{"columns": []string{"cluster", "name", "namespace"}}},
 				},
 			},
 		}),

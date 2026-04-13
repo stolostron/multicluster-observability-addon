@@ -86,16 +86,28 @@ func VMNameVariable(datasource string) dashboard.Option {
 	)
 }
 
+var vmStatusStaticValues = []StaticListValue{
+	{Label: "Running", Value: "running"},
+	{Label: "Stopped", Value: "non_running"},
+	{Label: "Starting", Value: "starting"},
+	{Label: "Migrating", Value: "migrating"},
+	{Label: "Error", Value: "error"},
+}
+
+// VMStatusVariableStatic is a multi-select status filter used by inventory and
+// utilization dashboards where $status is used as a regex label matcher.
 func VMStatusVariableStatic() dashboard.Option {
-	return AddStaticListVariable("status", "Status",
-		[]StaticListValue{
-			{Label: "Running", Value: "running"},
-			{Label: "Stopped", Value: "non_running"},
-			{Label: "Starting", Value: "starting"},
-			{Label: "Migrating", Value: "migrating"},
-			{Label: "Error", Value: "error"},
-		},
-		"$__all", true, true, ".*",
+	return AddStaticListVariable("status", "Status", "Filter virtual machines by status",
+		vmStatusStaticValues, "$__all", true, true, ".*",
+	)
+}
+
+// VMStatusVariableStaticSingleSelect is a single-select status filter used by
+// the time-in-status dashboard, where $status is matched against status_group
+// and multi-select would produce an invalid "a,b" regex.
+func VMStatusVariableStaticSingleSelect() dashboard.Option {
+	return AddStaticListVariable("status", "Status", "Filter virtual machines by status",
+		vmStatusStaticValues, "$__all", true, false, ".*",
 	)
 }
 
@@ -105,8 +117,11 @@ func VMStatusVariableStatic() dashboard.Option {
 // Perses substitutes ${status:raw} as a raw string without a second pass for
 // nested variables, so $cluster inside a variable value would be sent literally
 // to Prometheus and match nothing. The outer query already filters by cluster.
+//
+// See: https://perses.dev/perses/docs/api/variable/
+// Upstream limitation: https://github.com/perses/perses/issues/2016
 func VMStatusVariableJoinExpr() dashboard.Option {
-	return AddStaticListVariable("status", "Status",
+	return AddStaticListVariable("status", "Status", "Filter virtual machines by status",
 		[]StaticListValue{
 			{Label: "All", Value: `on(cluster,name,namespace) group_left()(0*(sum by(cluster,namespace,name)(kubevirt_vm_info{})))`},
 			{Label: "Stopped", Value: `on(cluster,name,namespace) group_left()(0*(sum by(cluster,namespace,name)(kubevirt_vm_info{status_group="non_running"}>0)))`},
@@ -120,104 +135,52 @@ func VMStatusVariableJoinExpr() dashboard.Option {
 	)
 }
 
-func VMFlavorVariable(datasource string) dashboard.Option {
-	return dashboard.AddVariable("flavor",
+// vmiLabelListVariable builds a multi-select variable that lists distinct values
+// of a VMI label from kubevirt_vmi_info. expr overrides the default
+// per-label query when the variable needs a custom metric union (e.g. guest OS
+// fields that also appear in kubevirt_vm_info).
+func vmiLabelListVariable(name, displayName, datasource, expr string) dashboard.Option {
+	if expr == "" {
+		expr = `sum by (` + name + `)(kubevirt_vmi_info{cluster=~"$cluster", namespace=~"$namespace",` + name + `!="<none>"})`
+	}
+	return dashboard.AddVariable(name,
 		listVar.List(
 			promqlVar.PrometheusPromQL(
-				`sum by (flavor)(kubevirt_vmi_info{cluster=~"$cluster", namespace=~"$namespace",flavor!="<none>"} )`,
-				promqlVar.LabelName("flavor"),
+				expr,
+				promqlVar.LabelName(name),
 				promqlVar.Datasource(datasource),
 			),
-			listVar.DisplayName("Flavor"),
+			listVar.DisplayName(displayName),
 			listVar.AllowAllValue(true),
 			listVar.AllowMultiple(true),
 			listVar.CustomAllValue(".*"),
 			listVar.DefaultValues("$__all"),
 		),
 	)
+}
+
+func VMFlavorVariable(datasource string) dashboard.Option {
+	return vmiLabelListVariable("flavor", "Flavor", datasource, "")
 }
 
 func VMWorkloadVariable(datasource string) dashboard.Option {
-	return dashboard.AddVariable("workload",
-		listVar.List(
-			promqlVar.PrometheusPromQL(
-				`sum by (workload)(kubevirt_vmi_info{cluster=~"$cluster", namespace=~"$namespace",workload!="<none>"})`,
-				promqlVar.LabelName("workload"),
-				promqlVar.Datasource(datasource),
-			),
-			listVar.DisplayName("Workload"),
-			listVar.AllowAllValue(true),
-			listVar.AllowMultiple(true),
-			listVar.CustomAllValue(".*"),
-			listVar.DefaultValues("$__all"),
-		),
-	)
+	return vmiLabelListVariable("workload", "Workload", datasource, "")
 }
 
 func VMInstanceTypeVariable(datasource string) dashboard.Option {
-	return dashboard.AddVariable("instance_type",
-		listVar.List(
-			promqlVar.PrometheusPromQL(
-				`sum by (instance_type)(kubevirt_vmi_info{cluster=~"$cluster", namespace=~"$namespace",instance_type!="<none>"})`,
-				promqlVar.LabelName("instance_type"),
-				promqlVar.Datasource(datasource),
-			),
-			listVar.DisplayName("Instance Type"),
-			listVar.AllowAllValue(true),
-			listVar.AllowMultiple(true),
-			listVar.CustomAllValue(".*"),
-			listVar.DefaultValues("$__all"),
-		),
-	)
+	return vmiLabelListVariable("instance_type", "Instance Type", datasource, "")
 }
 
 func VMPreferenceVariable(datasource string) dashboard.Option {
-	return dashboard.AddVariable("preference",
-		listVar.List(
-			promqlVar.PrometheusPromQL(
-				`sum by (preference)(kubevirt_vmi_info{cluster=~"$cluster", namespace=~"$namespace",preference!="<none>"})`,
-				promqlVar.LabelName("preference"),
-				promqlVar.Datasource(datasource),
-			),
-			listVar.DisplayName("Preference"),
-			listVar.AllowAllValue(true),
-			listVar.AllowMultiple(true),
-			listVar.CustomAllValue(".*"),
-			listVar.DefaultValues("$__all"),
-		),
-	)
+	return vmiLabelListVariable("preference", "Preference", datasource, "")
 }
 
 func VMGuestOSNameVariable(datasource string) dashboard.Option {
-	return dashboard.AddVariable("guest_os_name",
-		listVar.List(
-			promqlVar.PrometheusPromQL(
-				`sum by (guest_os_name)(kubevirt_vm_info{cluster=~"$cluster", namespace=~"$namespace",guest_os_name!="<none>"} or kubevirt_vmi_info{cluster=~"$cluster", namespace=~"$namespace",guest_os_name!="<none>"})`,
-				promqlVar.LabelName("guest_os_name"),
-				promqlVar.Datasource(datasource),
-			),
-			listVar.DisplayName("OS Name"),
-			listVar.AllowAllValue(true),
-			listVar.AllowMultiple(true),
-			listVar.CustomAllValue(".*"),
-			listVar.DefaultValues("$__all"),
-		),
-	)
+	return vmiLabelListVariable("guest_os_name", "OS Name", datasource,
+		`sum by (guest_os_name)(kubevirt_vm_info{cluster=~"$cluster", namespace=~"$namespace",guest_os_name!="<none>"} or kubevirt_vmi_info{cluster=~"$cluster", namespace=~"$namespace",guest_os_name!="<none>"})`)
 }
 
 func VMGuestOSVersionVariable(datasource string) dashboard.Option {
-	return dashboard.AddVariable("guest_os_version_id",
-		listVar.List(
-			promqlVar.PrometheusPromQL(
-				`sum by (guest_os_version_id)(kubevirt_vm_info{cluster=~"$cluster", namespace=~"$namespace",guest_os_version_id!="<none>"} or kubevirt_vmi_info{cluster=~"$cluster", namespace=~"$namespace",guest_os_version_id!="<none>"})`,
-				promqlVar.LabelName("guest_os_version_id"),
-				promqlVar.Datasource(datasource),
-			),
-			listVar.DisplayName("OS Version"),
-			listVar.AllowAllValue(true),
-			listVar.AllowMultiple(true),
-			listVar.CustomAllValue(".*"),
-			listVar.DefaultValues("$__all"),
-		),
-	)
+	return vmiLabelListVariable("guest_os_version_id", "OS Version", datasource,
+		`sum by (guest_os_version_id)(kubevirt_vm_info{cluster=~"$cluster", namespace=~"$namespace",guest_os_version_id!="<none>"} or kubevirt_vmi_info{cluster=~"$cluster", namespace=~"$namespace",guest_os_version_id!="<none>"})`)
 }

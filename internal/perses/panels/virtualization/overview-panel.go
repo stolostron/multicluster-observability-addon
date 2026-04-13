@@ -5,6 +5,7 @@ import (
 
 	"github.com/perses/community-mixins/pkg/dashboards"
 	commonSdk "github.com/perses/perses/go-sdk/common"
+	"github.com/perses/perses/go-sdk/link"
 	"github.com/perses/perses/go-sdk/panel"
 	panelgroup "github.com/perses/perses/go-sdk/panel-group"
 	"github.com/perses/plugins/prometheus/sdk/go/query"
@@ -13,8 +14,11 @@ import (
 	timeSeriesPanel "github.com/perses/plugins/timeserieschart/sdk/go"
 )
 
-var opsPerSecUnit = "ops/sec"
-
+// mergePluginSpecFields JSON-roundtrips the current plugin spec into a map and
+// merges extra fields into it. It must be applied AFTER any typed panel builders
+// (e.g. timeSeriesPanel.Chart) — typed builders overwrite Spec with a fresh
+// struct, so any fields merged before them will be silently dropped.
+// Keep mergePluginSpecFields last in a panel's option list.
 func mergePluginSpecFields(extra map[string]any) panel.Option {
 	return func(b *panel.Builder) error {
 		raw, err := json.Marshal(b.Spec.Plugin.Spec)
@@ -41,6 +45,7 @@ func OverviewTotalClusters(datasourceName string) panelgroup.Option {
 		panel.Description("Total clusters with OpenShift Virtualization."),
 		statPanel.Chart(
 			statPanel.Calculation("last-number"),
+			statPanel.ValueFontSize(20),
 		),
 		mergePluginSpecFields(map[string]any{"colorMode": "none"}),
 		panel.AddQuery(query.PromQL(
@@ -76,6 +81,7 @@ func OverviewTotalAllocatableNodes(datasourceName string) panelgroup.Option {
 		panel.Description("Total number of nodes that are available to host virtual machines."),
 		statPanel.Chart(
 			statPanel.Calculation("last-number"),
+			statPanel.ValueFontSize(20),
 			statPanel.Format(commonSdk.Format{Unit: &dashboards.DecimalUnit}),
 		),
 		mergePluginSpecFields(map[string]any{"colorMode": "none", "metricLabel": ""}),
@@ -87,13 +93,21 @@ func OverviewTotalAllocatableNodes(datasourceName string) panelgroup.Option {
 }
 
 // OverviewTotalVMsStat (0_3)
-func OverviewTotalVMsStat(datasourceName string) panelgroup.Option {
+func OverviewTotalVMsStat(datasourceName, project string) panelgroup.Option {
 	return panelgroup.AddPanel("Total VMs",
 		panel.Description("Total number of virtual machines."),
 		statPanel.Chart(
 			statPanel.Calculation("last-number"),
+			statPanel.ValueFontSize(20),
 		),
-		mergePluginSpecFields(map[string]any{"colorMode": "none", "metricLabel": ""}),
+		mergePluginSpecFields(map[string]any{
+			"colorMode":   "none",
+			"metricLabel": "",
+		}),
+		panel.AddLink(vmsByTimeInStatusLinkURL(project, ""),
+			link.Name("VMs by Time in Status"),
+			link.TargetBlank(true),
+		),
 		panel.AddQuery(query.PromQL(
 			overviewTotalVMs,
 			dashboards.AddQueryDataSource(datasourceName),
@@ -101,35 +115,109 @@ func OverviewTotalVMsStat(datasourceName string) panelgroup.Option {
 	)
 }
 
-// OverviewVMsByStatusStat (0_4)
-func OverviewVMsByStatusStat(datasourceName string) panelgroup.Option {
-	return panelgroup.AddPanel("Virtual Machines by Status",
-		panel.Description("Breakdown of virtual machines by their current status: Running, Stopped, Error, Starting, and Migrating."),
+// OverviewVMsRunning (0_4a)
+func OverviewVMsRunning(datasourceName, project string) panelgroup.Option {
+	return panelgroup.AddPanel("Running VMs",
+		panel.Description("Number of virtual machines currently running."),
 		statPanel.Chart(
 			statPanel.Calculation("last-number"),
-			statPanel.ValueFontSize(30),
+			statPanel.ValueFontSize(20),
 		),
 		mergePluginSpecFields(map[string]any{"colorMode": "none"}),
+		panel.AddLink(vmsByTimeInStatusLinkURL(project, "running"),
+			link.Name("VMs by Time in Status"),
+			link.TargetBlank(true),
+		),
 		panel.AddQuery(query.PromQL(
 			overviewVMsByStatusStatRunning,
 			query.SeriesNameFormat("Running"),
 			dashboards.AddQueryDataSource(datasourceName),
 		)),
-		panel.AddQuery(query.PromQL(
-			overviewVMsByStatusStatStopped,
-			query.SeriesNameFormat("Stopped"),
-			dashboards.AddQueryDataSource(datasourceName),
-		)),
+	)
+}
+
+// OverviewVMsInErrorStat (0_4b) — red when ≥1.
+func OverviewVMsInErrorStat(datasourceName, project string) panelgroup.Option {
+	return panelgroup.AddPanel("VMs in Error",
+		panel.Description("Number of virtual machines currently in an error state. Any value above zero requires attention."),
+		statPanel.Chart(
+			statPanel.Calculation("last-number"),
+			statPanel.ValueFontSize(20),
+			statPanel.Thresholds(commonSdk.Thresholds{
+				DefaultColor: "#808080",
+				Steps: []commonSdk.StepOption{
+					{Value: 1, Color: "#f2495c"},
+				},
+			}),
+		),
+		mergePluginSpecFields(map[string]any{"colorMode": "value"}),
+		panel.AddLink(vmsByTimeInStatusLinkURL(project, "error"),
+			link.Name("VMs by Time in Status"),
+			link.TargetBlank(true),
+		),
 		panel.AddQuery(query.PromQL(
 			overviewVMsByStatusStatError,
 			query.SeriesNameFormat("Error"),
 			dashboards.AddQueryDataSource(datasourceName),
 		)),
+	)
+}
+
+// OverviewVMsStopped (0_4c)
+func OverviewVMsStopped(datasourceName, project string) panelgroup.Option {
+	return panelgroup.AddPanel("Stopped VMs",
+		panel.Description("Number of virtual machines currently stopped."),
+		statPanel.Chart(
+			statPanel.Calculation("last-number"),
+			statPanel.ValueFontSize(20),
+		),
+		mergePluginSpecFields(map[string]any{"colorMode": "none"}),
+		panel.AddLink(vmsByTimeInStatusLinkURL(project, "non_running"),
+			link.Name("VMs by Time in Status"),
+			link.TargetBlank(true),
+		),
+		panel.AddQuery(query.PromQL(
+			overviewVMsByStatusStatStopped,
+			query.SeriesNameFormat("Stopped"),
+			dashboards.AddQueryDataSource(datasourceName),
+		)),
+	)
+}
+
+// OverviewVMsStarting (0_4d)
+func OverviewVMsStarting(datasourceName, project string) panelgroup.Option {
+	return panelgroup.AddPanel("Starting VMs",
+		panel.Description("Number of virtual machines currently starting up."),
+		statPanel.Chart(
+			statPanel.Calculation("last-number"),
+			statPanel.ValueFontSize(20),
+		),
+		mergePluginSpecFields(map[string]any{"colorMode": "none"}),
+		panel.AddLink(vmsByTimeInStatusLinkURL(project, "starting"),
+			link.Name("VMs by Time in Status"),
+			link.TargetBlank(true),
+		),
 		panel.AddQuery(query.PromQL(
 			overviewVMsByStatusStatStarting,
 			query.SeriesNameFormat("Starting"),
 			dashboards.AddQueryDataSource(datasourceName),
 		)),
+	)
+}
+
+// OverviewVMsMigrating (0_4e)
+func OverviewVMsMigrating(datasourceName, project string) panelgroup.Option {
+	return panelgroup.AddPanel("Migrating VMs",
+		panel.Description("Number of virtual machines currently being migrated."),
+		statPanel.Chart(
+			statPanel.Calculation("last-number"),
+			statPanel.ValueFontSize(20),
+		),
+		mergePluginSpecFields(map[string]any{"colorMode": "none"}),
+		panel.AddLink(vmsByTimeInStatusLinkURL(project, "migrating"),
+			link.Name("VMs by Time in Status"),
+			link.TargetBlank(true),
+		),
 		panel.AddQuery(query.PromQL(
 			overviewVMsByStatusStatMigrating,
 			query.SeriesNameFormat("Migrating"),
@@ -144,6 +232,7 @@ func OverviewClustersWarningHealth(datasourceName string) panelgroup.Option {
 		panel.Description("Total number of clusters with warning level issues that impact the operator health, which are based on alerts and the operator conditions. This means there is a risk of core functionality loss for your clusters."),
 		statPanel.Chart(
 			statPanel.Calculation("last-number"),
+			statPanel.ValueFontSize(20),
 			statPanel.Thresholds(commonSdk.Thresholds{
 				Steps: []commonSdk.StepOption{
 					{Value: 0, Color: "#ff9830"},
@@ -167,7 +256,11 @@ func OverviewVMsStartedLast7Days(datasourceName, project string) panelgroup.Opti
 				map[string]any{
 					"name":          "cluster",
 					"enableSorting": true,
-					"dataLink":      clusterDetailsDashboardLink(project),
+					"dataLink": map[string]any{
+						"openNewTab": true,
+						"title":      "Cluster Details",
+						"url":        clusterDetailsDashboardLinkURL(project),
+					},
 				},
 				map[string]any{"name": "timestamp", "hide": true},
 				map[string]any{"name": "value", "header": "Total VMs Started", "enableSorting": true},
@@ -270,7 +363,11 @@ func OverviewOperatorHealthByCluster(datasourceName, project string) panelgroup.
 				},
 				map[string]any{
 					"name": "cluster", "header": "Cluster", "enableSorting": true,
-					"dataLink": clusterDetailsDashboardLink(project),
+					"dataLink": map[string]any{
+						"openNewTab": true,
+						"title":      "Cluster Details",
+						"url":        clusterDetailsDashboardLinkURL(project),
+					},
 				},
 				map[string]any{"name": "openshiftVersion", "hide": true},
 				map[string]any{
@@ -587,14 +684,13 @@ func OverviewMemoryUsagePercentByCluster(datasourceName string) panelgroup.Optio
 
 // OverviewNetworkReceivedByCluster (5_0)
 func OverviewNetworkReceivedByCluster(datasourceName string) panelgroup.Option {
-	u := string(commonSdk.BytesDecPerSecondsUnit)
 	return panelgroup.AddPanel("Clusters by Network Received Bytes",
 		panel.Description("This panel displays the top 20 clusters by network received bytes per second over the past 10 minutes. The query measures the rate of incoming network traffic, helping identify clusters with the highest network activity. Use this information to monitor and optimize resource usage for workloads with significant data reception."),
 		timeSeriesPanel.Chart(
 			timeSeriesPanel.WithLegend(overviewTSChartLegendLastMax()),
 			timeSeriesPanel.WithYAxis(timeSeriesPanel.YAxis{
 				Show:   true,
-				Format: &commonSdk.Format{Unit: &u},
+				Format: &commonSdk.Format{Unit: &decBytesPerSecUnit},
 			}),
 			timeSeriesPanel.WithVisual(timeSeriesPanel.Visual{
 				Display:      timeSeriesPanel.LineDisplay,
@@ -613,14 +709,13 @@ func OverviewNetworkReceivedByCluster(datasourceName string) panelgroup.Option {
 
 // OverviewNetworkTransmittedByCluster (5_1)
 func OverviewNetworkTransmittedByCluster(datasourceName string) panelgroup.Option {
-	u := string(commonSdk.BytesDecPerSecondsUnit)
 	return panelgroup.AddPanel("Clusters by Network Transmitted Bytes",
 		panel.Description("This panel displays the top 20 clusters by network transmitted bytes per second over the past 10 minutes. The query measures the rate of outgoing network traffic, helping identify clusters with the highest network activity. Use this information to monitor and optimize resource usage for workloads with significant data transmission."),
 		timeSeriesPanel.Chart(
 			timeSeriesPanel.WithLegend(overviewTSChartLegendLastMax()),
 			timeSeriesPanel.WithYAxis(timeSeriesPanel.YAxis{
 				Show:   true,
-				Format: &commonSdk.Format{Unit: &u},
+				Format: &commonSdk.Format{Unit: &decBytesPerSecUnit},
 			}),
 			timeSeriesPanel.WithVisual(timeSeriesPanel.Visual{
 				Display:      timeSeriesPanel.LineDisplay,
@@ -639,14 +734,13 @@ func OverviewNetworkTransmittedByCluster(datasourceName string) panelgroup.Optio
 
 // OverviewStorageTrafficByCluster (6_0)
 func OverviewStorageTrafficByCluster(datasourceName string) panelgroup.Option {
-	u := string(commonSdk.BytesDecPerSecondsUnit)
 	return panelgroup.AddPanel("Storage Traffic by Cluster",
 		panel.Description("This panel displays the top 20 clusters based on their combined storage traffic (read + write) over the past 10 minutes."),
 		timeSeriesPanel.Chart(
 			timeSeriesPanel.WithLegend(overviewTSChartLegendLastMax()),
 			timeSeriesPanel.WithYAxis(timeSeriesPanel.YAxis{
 				Show:   true,
-				Format: &commonSdk.Format{Unit: &u},
+				Format: &commonSdk.Format{Unit: &decBytesPerSecUnit},
 			}),
 			timeSeriesPanel.WithVisual(timeSeriesPanel.Visual{
 				Display:      timeSeriesPanel.LineDisplay,

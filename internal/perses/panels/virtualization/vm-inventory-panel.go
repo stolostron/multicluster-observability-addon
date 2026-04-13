@@ -2,6 +2,7 @@ package virtualization
 
 import (
 	"github.com/perses/community-mixins/pkg/dashboards"
+	commonSdk "github.com/perses/perses/go-sdk/common"
 	"github.com/perses/perses/go-sdk/panel"
 	panelgroup "github.com/perses/perses/go-sdk/panel-group"
 	apicommon "github.com/perses/perses/pkg/model/api/v1/common"
@@ -23,6 +24,15 @@ func VMInventoryTable(datasourceName, project string) panelgroup.Option {
 					map[string]any{"name": "preference", "header": "Preference", "enableSorting": true},
 					map[string]any{"name": "workload", "header": "Workload", "enableSorting": true},
 					map[string]any{"name": "flavor", "header": "Flavor", "enableSorting": true},
+					map[string]any{
+						"name": "live_migratable", "header": "Live Migratable", "enableSorting": true,
+						"cellSettings": []any{
+							map[string]any{
+								"condition": map[string]any{"kind": "Value", "spec": map[string]any{"value": "false"}},
+								"textColor": "#f2495c",
+							},
+						},
+					},
 					map[string]any{"name": "evictable", "header": "Evictable", "enableSorting": true},
 					map[string]any{"name": "outdated", "header": "Outdated", "enableSorting": true},
 					map[string]any{"name": "guest_os_name", "header": "OS Name", "enableSorting": true},
@@ -69,12 +79,26 @@ func VMInventoryTable(datasourceName, project string) panelgroup.Option {
 					map[string]any{"name": "disk_name", "hide": true},
 				},
 				"transforms": []any{
-					map[string]any{"kind": "MergeSeries", "spec": map[string]any{}},
-					map[string]any{"kind": "JoinByColumnValue", "spec": map[string]any{"columns": []string{"cluster", "name", "namespace"}}},
+					map[string]any{"kind": string(commonSdk.MergeSeriesKind), "spec": map[string]any{}},
+					map[string]any{"kind": string(commonSdk.JoinByColumValueKind), "spec": map[string]any{"columns": []string{"cluster", "name", "namespace"}}},
 				},
 			},
 		}),
-		addColumnDataLink("name", vmDetailsDashboardLinkByValue(project)),
+		addColumnDataLink("name", tableDataLink("Virtual Machine Details", vmDetailsDashboardLinkByValueURL(project))),
+		// Column "value #N" → query N mapping (positional; keep in sync with columns above):
+		//   value #1  → (hidden) Query 1: VM info series value
+		//   value #2  → CPU            Query 2: inventoryCPUQuery
+		//   value #3  → Memory         Query 3: inventoryMemoryQuery
+		//   value #4  → Guest Agent    Query 4: inventoryGuestAgentQuery
+		//   value #5  → Create Date    Query 5: inventoryCreateDateQuery
+		//   value #6  → Disk           Query 6: inventoryDiskQuery
+		//   value #7  → (hidden)       Query 7: inventoryFlavorQuery
+		//   value #8  → (hidden)       Query 8: inventoryWorkloadQuery
+		//   value #9  → (hidden)       Query 9: inventoryInstanceTypeQuery
+		//   value #10 → (hidden)       Query 10: inventoryPreferenceQuery
+		//   value #11 → (hidden)       Query 11: inventoryGuestOSQuery
+		//   value #12 → (hidden)       Query 12: inventoryEvictableOutdatedQuery
+		//   value #13 → Live Migratable Query 13: inventoryLiveMigratableQuery
 		// Query 1: VM info with status
 		panel.AddQuery(query.PromQL(
 			inventoryInfoQuery,
@@ -133,6 +157,11 @@ func VMInventoryTable(datasourceName, project string) panelgroup.Option {
 		// Query 12: Evictable/Outdated
 		panel.AddQuery(query.PromQL(
 			inventoryEvictableOutdatedQuery,
+			dashboards.AddQueryDataSource(datasourceName),
+		)),
+		// Query 13: Live Migratable (derived from kubevirt_vmi_non_evictable)
+		panel.AddQuery(query.PromQL(
+			inventoryLiveMigratableQuery,
 			dashboards.AddQueryDataSource(datasourceName),
 		)),
 	)

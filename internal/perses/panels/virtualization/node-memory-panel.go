@@ -210,12 +210,12 @@ func NodeMemoryPlanMinmax(datasourceName string) panelgroup.Option {
 		),
 		panel.AddQuery(query.PromQL(
 			nodeMemoryPlanMinVirtualCommitLevel,
-			query.SeriesNameFormat("{{node}}"),
+			query.SeriesNameFormat("min {{node}}"),
 			dashboards.AddQueryDataSource(datasourceName),
 		)),
 		panel.AddQuery(query.PromQL(
 			nodeMemoryPlanMaxVirtualCommitLevel,
-			query.SeriesNameFormat("{{node}}"),
+			query.SeriesNameFormat("max {{node}}"),
 			dashboards.AddQueryDataSource(datasourceName),
 		)),
 	)
@@ -679,6 +679,7 @@ func NodeMemoryNumberOfRunningVMs(datasourceName string) panelgroup.Option {
 		timeSeriesPanel.Chart(),
 		panel.AddQuery(query.PromQL(
 			nodeMemoryNumberOfRunningVMs,
+			query.SeriesNameFormat("{{node}}"),
 			dashboards.AddQueryDataSource(datasourceName),
 		)),
 	)

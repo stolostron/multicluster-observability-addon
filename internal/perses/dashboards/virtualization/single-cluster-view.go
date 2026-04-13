@@ -16,7 +16,7 @@ func singleClusterClusterVariable(datasource string) dashboard.Option {
 		listVar.List(
 			labelValuesVar.PrometheusLabelValues("cluster",
 				dashboards.AddVariableDatasource(datasource),
-				labelValuesVar.Matchers(`kubevirt_hyperconverged_operator_health_status{name=~".*hyperconverged.*"}`),
+				labelValuesVar.Matchers("kubevirt_hyperconverged_operator_health_status"),
 			),
 			listVar.DisplayName("Cluster"),
 			listVar.AllowAllValue(false),
@@ -63,17 +63,27 @@ func singleClusterSeverityVariable(datasource string) dashboard.Option {
 func withSingleClusterGeneralInformation(datasource, project string) dashboard.Option {
 	return addCustomPanelGroupWithCollapse("General Information", true,
 		[]GridItem{
-			{X: 0, Y: 0, W: 4, H: 3},   // Cluster Name
-			{X: 4, Y: 0, W: 4, H: 3},   // OpenShift Virt Version
-			{X: 8, Y: 0, W: 4, H: 3},   // Provider
-			{X: 12, Y: 0, W: 4, H: 3},  // OpenShift Version
-			{X: 16, Y: 0, W: 4, H: 3},  // Operator Status
-			{X: 20, Y: 0, W: 4, H: 3},  // Operator Conditions
-			{X: 0, Y: 3, W: 4, H: 3},   // Total Nodes
-			{X: 0, Y: 6, W: 4, H: 3},   // Total VMs
-			{X: 4, Y: 3, W: 20, H: 6},  // Virtual Machines by Status
-			{X: 0, Y: 9, W: 12, H: 7},  // Running VMs by OS
-			{X: 12, Y: 9, W: 12, H: 7}, // Recent VMs Started
+			// Row 1: eight equal stat panels (W:3 each = 24)
+			{X: 0, Y: 0, W: 3, H: 3},  // Cluster Name
+			{X: 3, Y: 0, W: 3, H: 3},  // OpenShift Virt Version
+			{X: 6, Y: 0, W: 3, H: 3},  // Provider
+			{X: 9, Y: 0, W: 3, H: 3},  // OpenShift Version
+			{X: 12, Y: 0, W: 3, H: 3}, // Operator Status
+			{X: 15, Y: 0, W: 3, H: 3}, // Operator Conditions
+			{X: 18, Y: 0, W: 3, H: 3}, // Total Nodes
+			{X: 21, Y: 0, W: 3, H: 3}, // Total VMs
+			// Row 2: VM status + operational stats, W:3 each (matching top row)
+			{X: 0, Y: 3, W: 3, H: 3},  // Running VMs
+			{X: 3, Y: 3, W: 3, H: 3},  // VMs in Error
+			{X: 6, Y: 3, W: 3, H: 3},  // Stopped VMs
+			{X: 9, Y: 3, W: 3, H: 3},  // Starting VMs
+			{X: 12, Y: 3, W: 3, H: 3}, // Migrating VMs
+			{X: 15, Y: 3, W: 3, H: 3}, // VMs Running (%)
+			{X: 18, Y: 3, W: 3, H: 3}, // VMs Live Migration Disabled
+			{X: 21, Y: 3, W: 3, H: 3}, // VMs Created (24h)
+			// Row 3: tables
+			{X: 0, Y: 6, W: 12, H: 7},  // Running VMs by OS
+			{X: 12, Y: 6, W: 12, H: 7}, // Recent VMs Started
 		},
 		panels.SingleClusterClusterName(datasource),
 		panels.SingleClusterOpenshiftVirtVersion(datasource),
@@ -82,8 +92,15 @@ func withSingleClusterGeneralInformation(datasource, project string) dashboard.O
 		panels.SingleClusterOperatorStatus(datasource),
 		panels.SingleClusterOperatorConditions(datasource),
 		panels.SingleClusterTotalNodes(datasource),
-		panels.SingleClusterTotalVMs(datasource),
-		panels.SingleClusterVirtualMachinesByStatus(datasource),
+		panels.SingleClusterTotalVMs(datasource, project),
+		panels.SingleClusterVMsRunning(datasource, project),
+		panels.SingleClusterVMsInError(datasource, project),
+		panels.SingleClusterVMsStopped(datasource, project),
+		panels.SingleClusterVMsStarting(datasource, project),
+		panels.SingleClusterVMsMigrating(datasource, project),
+		panels.SingleClusterVMsRunningPercent(datasource, project),
+		panels.SingleClusterVMsNotEvictable(datasource, project),
+		panels.SingleClusterVMsCreatedLast24h(datasource),
 		panels.SingleClusterRunningVMsByOS(datasource),
 		panels.SingleClusterRecentVMsStarted(datasource, project),
 	)

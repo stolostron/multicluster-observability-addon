@@ -1,113 +1,164 @@
 package virtualization
 
-// Join suffix: filter VMs by time-in-status window and optional status template,
-// and attach the printable status label for group_left merges (see ACM Grafana
-// dash-acm-virtual-machines-by-time-in-status).
+// vmStatusLastTransitionExpr deduplicates kubevirt_vm_*_status_last_transition_timestamp_seconds
+// with max by (cluster, name, namespace) before label_replace to avoid many-to-many
+// join errors when multiple virt-controller pods emit the same series simultaneously.
+const (
+	vmStartingLastTransitionExpr  = `label_replace(max by (cluster, name, namespace)(kubevirt_vm_starting_status_last_transition_timestamp_seconds{cluster=~"$cluster", name=~"$name", namespace=~"$namespace"}) > 0, "status", "Starting", "", "")`
+	vmRunningLastTransitionExpr   = `label_replace(max by (cluster, name, namespace)(kubevirt_vm_running_status_last_transition_timestamp_seconds{cluster=~"$cluster", name=~"$name", namespace=~"$namespace"}) > 0, "status", "Running", "", "")`
+	vmStoppedLastTransitionExpr   = `label_replace(max by (cluster, name, namespace)(kubevirt_vm_non_running_status_last_transition_timestamp_seconds{cluster=~"$cluster", name=~"$name", namespace=~"$namespace"}) > 0, "status", "Stopped", "", "")`
+	vmErrorLastTransitionExpr     = `label_replace(max by (cluster, name, namespace)(kubevirt_vm_error_status_last_transition_timestamp_seconds{cluster=~"$cluster", name=~"$name", namespace=~"$namespace"}) > 0, "status", "Error", "", "")`
+	vmMigratingLastTransitionExpr = `label_replace(max by (cluster, name, namespace)(kubevirt_vm_migrating_status_last_transition_timestamp_seconds{cluster=~"$cluster", name=~"$name", namespace=~"$namespace"}) > 0, "status", "Migrating", "", "")`
+)
+
 const vmByTimeInStatusStatusJoin = `
   + on(cluster, name, namespace) group_left(status)
-  0*(
+  (
     (
-      (time() - label_replace(kubevirt_vm_starting_status_last_transition_timestamp_seconds{cluster=~"$cluster", name=~"$name", namespace=~"$namespace"} > 0, "status", "starting", "", ""))
-      > ($days_in_status_gt * 24 * 60 * 60)
-    ) and (
-      (time() - label_replace(kubevirt_vm_starting_status_last_transition_timestamp_seconds{cluster=~"$cluster", name=~"$name", namespace=~"$namespace"} > 0, "status", "starting", "", ""))
-      < ($days_in_status_lt * 24 * 60 * 60)
+      (
+        (time() - ` + vmStartingLastTransitionExpr + `)
+        > ($days_in_status_gt * 24 * 60 * 60)
+      ) and (
+        (time() - ` + vmStartingLastTransitionExpr + `)
+        < ($days_in_status_lt * 24 * 60 * 60)
+      ) and on(cluster, name, namespace)
+      (kubevirt_vm_info{cluster=~"$cluster", name=~"$name", namespace=~"$namespace", status_group="starting"} > 0)
+      unless on(cluster, name, namespace)
+      (kubevirt_vm_info{cluster=~"$cluster", name=~"$name", namespace=~"$namespace", status_group=~"running|non_running|error|migrating"} > 0)
     )
     or
     (
-      (time() - label_replace(kubevirt_vm_running_status_last_transition_timestamp_seconds{cluster=~"$cluster", name=~"$name", namespace=~"$namespace"} > 0, "status", "running", "", ""))
-      > ($days_in_status_gt * 24 * 60 * 60)
-    ) and (
-      (time() - label_replace(kubevirt_vm_running_status_last_transition_timestamp_seconds{cluster=~"$cluster", name=~"$name", namespace=~"$namespace"} > 0, "status", "running", "", ""))
-      < ($days_in_status_lt * 24 * 60 * 60)
+      (
+        (time() - ` + vmRunningLastTransitionExpr + `)
+        > ($days_in_status_gt * 24 * 60 * 60)
+      ) and (
+        (time() - ` + vmRunningLastTransitionExpr + `)
+        < ($days_in_status_lt * 24 * 60 * 60)
+      ) and on(cluster, name, namespace)
+      (kubevirt_vm_info{cluster=~"$cluster", name=~"$name", namespace=~"$namespace", status_group="running"} > 0)
+      unless on(cluster, name, namespace)
+      (kubevirt_vm_info{cluster=~"$cluster", name=~"$name", namespace=~"$namespace", status_group=~"starting|non_running|error|migrating"} > 0)
     )
     or
     (
-      (time() - label_replace(kubevirt_vm_non_running_status_last_transition_timestamp_seconds{cluster=~"$cluster", name=~"$name", namespace=~"$namespace"} > 0, "status", "stopped", "", ""))
-      > ($days_in_status_gt * 24 * 60 * 60)
-    ) and (
-      (time() - label_replace(kubevirt_vm_non_running_status_last_transition_timestamp_seconds{cluster=~"$cluster", name=~"$name", namespace=~"$namespace"} > 0, "status", "stopped", "", ""))
-      < ($days_in_status_lt * 24 * 60 * 60)
+      (
+        (time() - ` + vmStoppedLastTransitionExpr + `)
+        > ($days_in_status_gt * 24 * 60 * 60)
+      ) and (
+        (time() - ` + vmStoppedLastTransitionExpr + `)
+        < ($days_in_status_lt * 24 * 60 * 60)
+      ) and on(cluster, name, namespace)
+      (kubevirt_vm_info{cluster=~"$cluster", name=~"$name", namespace=~"$namespace", status_group="non_running"} > 0)
+      unless on(cluster, name, namespace)
+      (kubevirt_vm_info{cluster=~"$cluster", name=~"$name", namespace=~"$namespace", status_group=~"starting|running|error|migrating"} > 0)
     )
     or
     (
-      (time() - label_replace(kubevirt_vm_error_status_last_transition_timestamp_seconds{cluster=~"$cluster", name=~"$name", namespace=~"$namespace"} > 0, "status", "error", "", ""))
-      > ($days_in_status_gt * 24 * 60 * 60)
-    ) and (
-      (time() - label_replace(kubevirt_vm_error_status_last_transition_timestamp_seconds{cluster=~"$cluster", name=~"$name", namespace=~"$namespace"} > 0, "status", "error", "", ""))
-      < ($days_in_status_lt * 24 * 60 * 60)
+      (
+        (time() - ` + vmErrorLastTransitionExpr + `)
+        > ($days_in_status_gt * 24 * 60 * 60)
+      ) and (
+        (time() - ` + vmErrorLastTransitionExpr + `)
+        < ($days_in_status_lt * 24 * 60 * 60)
+      ) and on(cluster, name, namespace)
+      (kubevirt_vm_info{cluster=~"$cluster", name=~"$name", namespace=~"$namespace", status_group="error"} > 0)
+      unless on(cluster, name, namespace)
+      (kubevirt_vm_info{cluster=~"$cluster", name=~"$name", namespace=~"$namespace", status_group=~"starting|running|non_running|migrating"} > 0)
     )
     or
     (
-      (time() - label_replace(kubevirt_vm_migrating_status_last_transition_timestamp_seconds{cluster=~"$cluster", name=~"$name", namespace=~"$namespace"} > 0, "status", "migrating", "", ""))
-      > ($days_in_status_gt * 24 * 60 * 60)
-    ) and (
-      (time() - label_replace(kubevirt_vm_migrating_status_last_transition_timestamp_seconds{cluster=~"$cluster", name=~"$name", namespace=~"$namespace"} > 0, "status", "migrating", "", ""))
-      < ($days_in_status_lt * 24 * 60 * 60)
+      (
+        (time() - ` + vmMigratingLastTransitionExpr + `)
+        > ($days_in_status_gt * 24 * 60 * 60)
+      ) and (
+        (time() - ` + vmMigratingLastTransitionExpr + `)
+        < ($days_in_status_lt * 24 * 60 * 60)
+      ) and on(cluster, name, namespace)
+      (kubevirt_vm_info{cluster=~"$cluster", name=~"$name", namespace=~"$namespace", status_group="migrating"} > 0)
+      unless on(cluster, name, namespace)
+      (kubevirt_vm_info{cluster=~"$cluster", name=~"$name", namespace=~"$namespace", status_group=~"starting|running|non_running|error"} > 0)
     )
-  )
-  +${status:raw}`
+  ) and on(cluster, name, namespace)
+  (kubevirt_vm_info{cluster=~"$cluster", name=~"$name", namespace=~"$namespace", status_group=~"$status"} > 0)`
 
 const vmByTimeInStatusTotalAllocatedCPUStatQuery = `sum (
-` + allocatedCPUMultiVMExpr + `
+(` + allocatedCPUMultiVMExpr + `)
 ` + vmByTimeInStatusStatusJoin + `
-)`
+) or vector(0)`
 
 const vmByTimeInStatusTotalAllocatedMemoryStatQuery = `sum(
 max by (cluster, namespace, name, status)(
-  ` + allocatedMemoryMultiVMExpr + `
+  (` + allocatedMemoryMultiVMExpr + `)
 ` + vmByTimeInStatusStatusJoin + `
-))`
+)) or vector(0)`
 
 const vmByTimeInStatusTotalAllocatedDiskStatQuery = `sum (
   (kubevirt_vm_disk_allocated_size_bytes{cluster=~"$cluster", name=~"$name", namespace=~"$namespace"})
 ` + vmByTimeInStatusStatusJoin + `
-)`
+) or vector(0)`
 
 const vmByTimeInStatusTableDiskQuery = `sum by (cluster, namespace, name, status)(
   (kubevirt_vm_disk_allocated_size_bytes{cluster=~"$cluster", name=~"$name", namespace=~"$namespace"})
 ` + vmByTimeInStatusStatusJoin + `
 )`
 
-const vmByTimeInStatusTableTimeInStatusQuery = `  (
+const vmByTimeInStatusTableTimeInStatusQuery = `(
+  (
     (
-      (time() - label_replace(kubevirt_vm_starting_status_last_transition_timestamp_seconds{cluster=~"$cluster", name=~"$name", namespace=~"$namespace"} > 0, "status", "starting", "", "")) > $days_in_status_gt * 24 * 60 * 60
+      (time() - ` + vmStartingLastTransitionExpr + `) > $days_in_status_gt * 24 * 60 * 60
     ) and (
-      (time() - label_replace(kubevirt_vm_starting_status_last_transition_timestamp_seconds{cluster=~"$cluster", name=~"$name", namespace=~"$namespace"} > 0, "status", "starting", "", "")) < $days_in_status_lt * 24 * 60 * 60
-    )
-  ) +${status:raw}
+      (time() - ` + vmStartingLastTransitionExpr + `) < $days_in_status_lt * 24 * 60 * 60
+    ) and on(cluster, name, namespace)
+    (kubevirt_vm_info{cluster=~"$cluster", name=~"$name", namespace=~"$namespace", status_group="starting"} > 0)
+    unless on(cluster, name, namespace)
+    (kubevirt_vm_info{cluster=~"$cluster", name=~"$name", namespace=~"$namespace", status_group=~"running|non_running|error|migrating"} > 0)
+  )
   or
   (
     (
-      (time() - label_replace(kubevirt_vm_running_status_last_transition_timestamp_seconds{cluster=~"$cluster", name=~"$name", namespace=~"$namespace"} > 0, "status", "running", "", "")) > $days_in_status_gt * 24 * 60 * 60
+      (time() - ` + vmRunningLastTransitionExpr + `) > $days_in_status_gt * 24 * 60 * 60
     ) and (
-      (time() - label_replace(kubevirt_vm_running_status_last_transition_timestamp_seconds{cluster=~"$cluster", name=~"$name", namespace=~"$namespace"} > 0, "status", "running", "", "")) < $days_in_status_lt * 24 * 60 * 60
-    )
-  ) +${status:raw}
+      (time() - ` + vmRunningLastTransitionExpr + `) < $days_in_status_lt * 24 * 60 * 60
+    ) and on(cluster, name, namespace)
+    (kubevirt_vm_info{cluster=~"$cluster", name=~"$name", namespace=~"$namespace", status_group="running"} > 0)
+    unless on(cluster, name, namespace)
+    (kubevirt_vm_info{cluster=~"$cluster", name=~"$name", namespace=~"$namespace", status_group=~"starting|non_running|error|migrating"} > 0)
+  )
   or
   (
     (
-      (time() - label_replace(kubevirt_vm_non_running_status_last_transition_timestamp_seconds{cluster=~"$cluster", name=~"$name", namespace=~"$namespace"} > 0, "status", "stopped", "", "")) > $days_in_status_gt * 24 * 60 * 60
+      (time() - ` + vmStoppedLastTransitionExpr + `) > $days_in_status_gt * 24 * 60 * 60
     ) and (
-      (time() - label_replace(kubevirt_vm_non_running_status_last_transition_timestamp_seconds{cluster=~"$cluster", name=~"$name", namespace=~"$namespace"} > 0, "status", "stopped", "", "")) < $days_in_status_lt * 24 * 60 * 60
-    )
-  ) +${status:raw}
+      (time() - ` + vmStoppedLastTransitionExpr + `) < $days_in_status_lt * 24 * 60 * 60
+    ) and on(cluster, name, namespace)
+    (kubevirt_vm_info{cluster=~"$cluster", name=~"$name", namespace=~"$namespace", status_group="non_running"} > 0)
+    unless on(cluster, name, namespace)
+    (kubevirt_vm_info{cluster=~"$cluster", name=~"$name", namespace=~"$namespace", status_group=~"starting|running|error|migrating"} > 0)
+  )
   or
   (
     (
-      (time() - label_replace(kubevirt_vm_error_status_last_transition_timestamp_seconds{cluster=~"$cluster", name=~"$name", namespace=~"$namespace"} > 0, "status", "error", "", "")) > $days_in_status_gt * 24 * 60 * 60
+      (time() - ` + vmErrorLastTransitionExpr + `) > $days_in_status_gt * 24 * 60 * 60
     ) and (
-      (time() - label_replace(kubevirt_vm_error_status_last_transition_timestamp_seconds{cluster=~"$cluster", name=~"$name", namespace=~"$namespace"} > 0, "status", "error", "", "")) < $days_in_status_lt * 24 * 60 * 60
-    )
-  ) +${status:raw}
+      (time() - ` + vmErrorLastTransitionExpr + `) < $days_in_status_lt * 24 * 60 * 60
+    ) and on(cluster, name, namespace)
+    (kubevirt_vm_info{cluster=~"$cluster", name=~"$name", namespace=~"$namespace", status_group="error"} > 0)
+    unless on(cluster, name, namespace)
+    (kubevirt_vm_info{cluster=~"$cluster", name=~"$name", namespace=~"$namespace", status_group=~"starting|running|non_running|migrating"} > 0)
+  )
   or
   (
     (
-      (time() - label_replace(kubevirt_vm_migrating_status_last_transition_timestamp_seconds{cluster=~"$cluster", name=~"$name", namespace=~"$namespace"} > 0, "status", "migrating", "", "")) > $days_in_status_gt * 24 * 60 * 60
+      (time() - ` + vmMigratingLastTransitionExpr + `) > $days_in_status_gt * 24 * 60 * 60
     ) and (
-      (time() - label_replace(kubevirt_vm_migrating_status_last_transition_timestamp_seconds{cluster=~"$cluster", name=~"$name", namespace=~"$namespace"} > 0, "status", "migrating", "", "")) < $days_in_status_lt * 24 * 60 * 60
-    )
-  ) +${status:raw}`
+      (time() - ` + vmMigratingLastTransitionExpr + `) < $days_in_status_lt * 24 * 60 * 60
+    ) and on(cluster, name, namespace)
+    (kubevirt_vm_info{cluster=~"$cluster", name=~"$name", namespace=~"$namespace", status_group="migrating"} > 0)
+    unless on(cluster, name, namespace)
+    (kubevirt_vm_info{cluster=~"$cluster", name=~"$name", namespace=~"$namespace", status_group=~"starting|running|non_running|error"} > 0)
+  )
+) and on(cluster, name, namespace)
+(kubevirt_vm_info{cluster=~"$cluster", name=~"$name", namespace=~"$namespace", status_group=~"$status"} > 0)`
 
 const vmByTimeInStatusTableTimeSinceLastMigrationQuery = `sum by (cluster, namespace, name, status)(
   (time() - kubevirt_vmi_migration_end_time_seconds{cluster=~"$cluster", name=~"$name", namespace=~"$namespace"})
@@ -120,9 +171,9 @@ const vmByTimeInStatusTableMigrationEndMsQuery = `sum by (cluster, namespace, na
 )`
 
 const vmByTimeInStatusTableMemoryQuery = `max by (cluster, namespace, name, status)(
-  ` + allocatedMemoryMultiVMExpr + `
+  (` + allocatedMemoryMultiVMExpr + `)
 ` + vmByTimeInStatusStatusJoin + `
 )`
 
-const vmByTimeInStatusTableCPUQuery = allocatedCPUMultiVMExpr + `
+const vmByTimeInStatusTableCPUQuery = `(` + allocatedCPUMultiVMExpr + `)
 ` + vmByTimeInStatusStatusJoin
