@@ -5,6 +5,7 @@ import (
 
 	"github.com/stolostron/multicluster-observability-addon/internal/analytics/rightsizing"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestGeneratePrometheusRule validates VM PrometheusRule generation across
@@ -76,10 +77,10 @@ func TestGeneratePrometheusRule(t *testing.T) {
 			if tt.expectError {
 				assert.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, rightsizing.VirtualizationPrometheusRuleName, rule.Name)
 				assert.Equal(t, rightsizing.MonitoringNamespace, rule.Namespace)
-				assert.Len(t, rule.Spec.Groups, 4)
+				require.Len(t, rule.Spec.Groups, 4)
 
 				assert.Equal(t, "acm-vm-right-sizing-namespace-5m.rule", rule.Spec.Groups[0].Name)
 				assert.Equal(t, "acm-vm-right-sizing-namespace-1d.rules", rule.Spec.Groups[1].Name)
@@ -100,7 +101,7 @@ func TestDefaultRecommendationPercentage(t *testing.T) {
 	}
 
 	rule, err := GeneratePrometheusRule(configData)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	found := false
 	for _, group := range rule.Spec.Groups {
