@@ -87,7 +87,7 @@ func (o *OptionsBuilder) ensureRSPlacement(ctx context.Context, placementName st
 				Namespace: rightsizing.PlacementNamespace,
 				Labels: map[string]string{
 					"app.kubernetes.io/component":  "right-sizing",
-					"app.kubernetes.io/managed-by": "multicluster-observability-addon",
+					"app.kubernetes.io/managed-by": addoncfg.Name,
 				},
 			},
 			Spec: placementConfig.Spec,
