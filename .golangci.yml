@@ -16,6 +16,8 @@ linters:
         - shadow
     misspell:
       locale: US
+      ignore-rules:
+        - utilisation
     revive:
       rules:
         - name: package-comments
