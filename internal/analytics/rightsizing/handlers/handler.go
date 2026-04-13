@@ -19,10 +19,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-const (
-	// MCOAClusterManagementAddOnName is the name of the MCOA ClusterManagementAddOn
-	MCOAClusterManagementAddOnName = "multicluster-observability-addon"
-)
 
 // OptionsBuilder builds right-sizing options for the helm chart
 type OptionsBuilder struct {
@@ -214,7 +210,7 @@ func (o *OptionsBuilder) createDefaultConfigMap(ctx context.Context, name string
 			Namespace: addoncfg.InstallNamespace,
 			Labels: map[string]string{
 				"app.kubernetes.io/component":  "right-sizing",
-				"app.kubernetes.io/managed-by": "multicluster-observability-addon",
+				"app.kubernetes.io/managed-by": addoncfg.Name,
 			},
 		},
 		Data: data,
