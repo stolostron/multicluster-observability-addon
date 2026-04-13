@@ -237,7 +237,7 @@ sum by (node) ((kube_node_status_allocatable{resource="memory", cluster=~"$clust
 )`
 
 // NumberofrunningVMs
-const nodeMemoryNumberOfRunningVMs = `count(kubevirt_vmi_memory_domain_bytes{cluster=~"$cluster"} * on(node) kube_node_role{cluster=~"$cluster", node=~"$node", role=~"$role"})`
+const nodeMemoryNumberOfRunningVMs = `count(max by (cluster, namespace, name, node)(kubevirt_vmi_memory_domain_bytes{cluster=~"$cluster"}) * on(node) group_left() kube_node_role{cluster=~"$cluster", node=~"$node", role=~"$role"})`
 
 // PlanMinmax (virtual commit level per node)
 const (
@@ -336,7 +336,7 @@ sum by (node) (kubevirt_vmi_memory_domain_bytes{cluster=~"$cluster"})
 (kube_node_status_allocatable{cluster=~"$cluster", resource="memory"} * on (node) kube_node_role{cluster=~"$cluster", node=~"$node", role=~"$role"})`
 
 // VMs (VM overcommit ratio)
-const nodeMemoryVMsOvercommitRatio = `(label_replace(kubevirt_vmi_memory_domain_bytes{cluster=~"$cluster"}, "label_vm_kubevirt_io_name", "$1", "name", "(.+)"))
+const nodeMemoryVMsOvercommitRatio = `(label_replace(max by (cluster, namespace, name)(kubevirt_vmi_memory_domain_bytes{cluster=~"$cluster"}), "label_vm_kubevirt_io_name", "$1", "name", "(.+)"))
 
 / on (namespace, label_vm_kubevirt_io_name) group_left()
 
@@ -349,7 +349,7 @@ max by (namespace, label_vm_kubevirt_io_name) (
 )`
 
 // VMvirtualmemoryutiliztaionhostvmurilization (top 10 VM memory used ratio)
-const nodeMemoryVMVirtualMemoryUtilizationHostVMRatio = `topk(10, (label_replace(kubevirt_vmi_memory_used_bytes{cluster=~"$cluster"}@end(), "label_vm_kubevirt_io_name", "$1", "name", "(.+)"))
+const nodeMemoryVMVirtualMemoryUtilizationHostVMRatio = `topk(10, (label_replace(max by (cluster, namespace, name)(kubevirt_vmi_memory_used_bytes{cluster=~"$cluster"}@end()), "label_vm_kubevirt_io_name", "$1", "name", "(.+)"))
 
 / on (namespace, label_vm_kubevirt_io_name) group_left()
 
@@ -365,8 +365,8 @@ sum by (namespace, label_vm_kubevirt_io_name) (
 // VmVirtualCommittedNow (average VM overcommit ratio)
 const nodeMemoryVMVirtualCommittedNowAvgOvercommit = `avg(
 (
-(label_replace(kubevirt_vmi_memory_domain_bytes{cluster=~"$cluster"}, "label_vm_kubevirt_io_name", "$1", "name", "(.+)"))
-+ on(name, namespace) group_left() kubevirt_vmi_launcher_memory_overhead_bytes{cluster=~"$cluster"}
+(label_replace(max by (cluster, namespace, name)(kubevirt_vmi_memory_domain_bytes{cluster=~"$cluster"}), "label_vm_kubevirt_io_name", "$1", "name", "(.+)"))
++ on(name, namespace) group_left() max by (cluster, name, namespace)(kubevirt_vmi_launcher_memory_overhead_bytes{cluster=~"$cluster"})
 )
 
 / on (namespace, label_vm_kubevirt_io_name) group_left()

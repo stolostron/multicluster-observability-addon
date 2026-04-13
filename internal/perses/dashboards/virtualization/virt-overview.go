@@ -4,8 +4,6 @@ import (
 	"github.com/perses/community-mixins/pkg/dashboards"
 	"github.com/perses/perses/go-sdk/dashboard"
 	listVar "github.com/perses/perses/go-sdk/variable/list-variable"
-	v1Common "github.com/perses/perses/pkg/model/api/v1/common"
-	dashboardModel "github.com/perses/perses/pkg/model/api/v1/dashboard"
 	"github.com/perses/perses/pkg/model/api/v1/variable"
 	labelValuesVar "github.com/perses/plugins/prometheus/sdk/go/variable/label-values"
 	panels "github.com/stolostron/multicluster-observability-addon/internal/perses/panels/virtualization"
@@ -29,61 +27,61 @@ func virtOverviewClusterVariable(datasource string) dashboard.Option {
 	)
 }
 
+// NOTE: The "operator_health" variable values are literal PromQL comparison
+// operator strings (e.g. "==0", "==1", "==2", "<3"). Consuming queries
+// concatenate these directly into metric selectors, e.g.:
+//
+//	kubevirt_hyperconverged_operator_health_status{...}$operator_health
+//
+// Normalizing, trimming, or altering these values will silently break all
+// panels that depend on this variable.
 func virtOverviewOperatorHealthVariable() dashboard.Option {
-	return func(builder *dashboard.Builder) error {
-		spec := dashboardModel.ListVariableSpec{
-			ListSpec: variable.ListSpec{
-				Display: &variable.Display{
-					Name:        "Operator Health",
-					Description: "Filter the clusters by the health of the OpenShift Virtualization operator",
-					Hidden:      false,
-				},
-				DefaultValue: &variable.DefaultValue{
-					SliceValues: []string{"$__all"},
-				},
-				AllowAllValue:  true,
-				AllowMultiple:  false,
-				CustomAllValue: "<3",
-				Plugin: v1Common.Plugin{
-					Kind: "StaticListVariable",
-					Spec: map[string]any{
-						"values": []map[string]any{
-							{"label": "Healthy", "value": "==0"},
-							{"label": "Warning", "value": "==1"},
-							{"label": "Critical", "value": "==2"},
-						},
-					},
-				},
-			},
-			Name: "operator_health",
-		}
-		builder.Dashboard.Spec.Variables = append(builder.Dashboard.Spec.Variables, dashboardModel.Variable{
-			Kind: variable.KindList,
-			Spec: &spec,
-		})
-		return nil
-	}
+	return AddStaticListVariable(
+		"operator_health",
+		"Operator Health",
+		"Filter the clusters by the health of the OpenShift Virtualization operator",
+		[]StaticListValue{
+			{Label: "Healthy", Value: "==0"},
+			{Label: "Warning", Value: "==1"},
+			{Label: "Critical", Value: "==2"},
+		},
+		"$__all",
+		true,  // allowAll — "<3" matches all health states
+		false, // allowMultiple — single selection maps to one PromQL operator
+		"<3",
+	)
 }
 
 func withVirtOverviewGeneralInformation(datasource, project string) dashboard.Option {
 	return addCustomPanelGroupWithCollapse("General Information", true,
 		[]GridItem{
-			{X: 0, Y: 1, W: 3, H: 6},
-			{X: 3, Y: 1, W: 3, H: 3},
-			{X: 6, Y: 1, W: 3, H: 6},
-			{X: 9, Y: 1, W: 3, H: 6},
-			{X: 12, Y: 1, W: 12, H: 6},
-			{X: 3, Y: 4, W: 3, H: 3},
+			// Row 1: five stat panels, W:4 each
+			{X: 0, Y: 1, W: 4, H: 3},
+			{X: 4, Y: 1, W: 4, H: 3},
+			{X: 8, Y: 1, W: 4, H: 3},
+			{X: 12, Y: 1, W: 4, H: 3},
+			{X: 16, Y: 1, W: 4, H: 3},
+			// Row 2: one panel per VM status, W:4 each
+			{X: 0, Y: 4, W: 4, H: 3},
+			{X: 4, Y: 4, W: 4, H: 3},
+			{X: 8, Y: 4, W: 4, H: 3},
+			{X: 12, Y: 4, W: 4, H: 3},
+			{X: 16, Y: 4, W: 4, H: 3},
+			// Row 3: tables
 			{X: 0, Y: 7, W: 6, H: 7},
 			{X: 6, Y: 7, W: 9, H: 7},
 			{X: 15, Y: 7, W: 9, H: 7},
 		},
 		panels.OverviewTotalClusters(datasource),
 		panels.OverviewClustersCriticalHealth(datasource),
-		panels.OverviewTotalAllocatableNodes(datasource),
-		panels.OverviewTotalVMsStat(datasource),
-		panels.OverviewVMsByStatusStat(datasource),
 		panels.OverviewClustersWarningHealth(datasource),
+		panels.OverviewTotalAllocatableNodes(datasource),
+		panels.OverviewTotalVMsStat(datasource, project),
+		panels.OverviewVMsRunning(datasource, project),
+		panels.OverviewVMsInErrorStat(datasource, project),
+		panels.OverviewVMsStopped(datasource, project),
+		panels.OverviewVMsStarting(datasource, project),
+		panels.OverviewVMsMigrating(datasource, project),
 		panels.OverviewVMsStartedLast7Days(datasource, project),
 		panels.OverviewClustersByOperatorVersion(datasource),
 		panels.OverviewClustersByOpenShiftVersion(datasource),

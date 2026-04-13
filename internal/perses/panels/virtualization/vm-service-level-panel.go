@@ -178,7 +178,7 @@ func ServiceLevelTable(datasourceName, project string) panelgroup.Option {
 				{Kind: commonSdk.JoinByColumValueKind, Spec: commonSdk.JoinByColumnValueSpec{Columns: []string{"cluster", "name", "namespace"}}},
 			}),
 		),
-		addColumnDataLink("name", vmDetailsDashboardLinkByValue(project)),
+		addColumnDataLink("name", tableDataLink("Virtual Machine Details", vmDetailsDashboardLinkByValueURL(project))),
 		panel.AddQuery(query.PromQL(
 			serviceLevelTableVMInfoQuery,
 			dashboards.AddQueryDataSource(datasourceName),

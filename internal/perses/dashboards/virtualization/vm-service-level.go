@@ -34,7 +34,7 @@ func BuildVMServiceLevel(project string, datasource string) (dashboard.Builder, 
 		VMClusterVariableMulti(datasource),
 		VMNamespaceVariable(datasource),
 		VMNameVariable(datasource),
-		VMStatusVariableJoinExpr(),
+		VMStatusVariableStaticSingleSelect(),
 
 		withServiceLevelStatsAndTable(datasource, project),
 	)

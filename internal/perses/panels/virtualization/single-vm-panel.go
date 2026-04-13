@@ -5,6 +5,7 @@ import (
 	commonSdk "github.com/perses/perses/go-sdk/common"
 	"github.com/perses/perses/go-sdk/panel"
 	panelgroup "github.com/perses/perses/go-sdk/panel-group"
+	apicommon "github.com/perses/perses/pkg/model/api/v1/common"
 	gaugePanel "github.com/perses/plugins/gaugechart/sdk/go"
 	"github.com/perses/plugins/prometheus/sdk/go/query"
 	statPanel "github.com/perses/plugins/statchart/sdk/go"
@@ -13,7 +14,6 @@ import (
 )
 
 // Perses unit string not exported by community-mixins.
-var singleVMDecBytesPerSecUnit = "decbytes/sec"
 
 func singleVMTimeSeriesLegend() timeSeriesPanel.Legend {
 	return timeSeriesPanel.Legend{
@@ -255,7 +255,7 @@ func SingleVMFilesystemUsagePercentGauge(datasourceName string) panelgroup.Optio
 		),
 		panel.AddQuery(query.PromQL(
 			singleVMFilesystemUsagePercentQuery,
-			query.SeriesNameFormat("{{disk_name}}"),
+			query.SeriesNameFormat("{{disk_name}} (highest)"),
 			dashboards.AddQueryDataSource(datasourceName),
 		)),
 	)
@@ -517,7 +517,7 @@ func SingleVMNetworkTransmit(datasourceName string) panelgroup.Option {
 			timeSeriesPanel.WithYAxis(timeSeriesPanel.YAxis{
 				Show: true,
 				Format: &commonSdk.Format{
-					Unit: &singleVMDecBytesPerSecUnit,
+					Unit: &decBytesPerSecUnit,
 				},
 			}),
 			timeSeriesPanel.WithVisual(timeSeriesPanel.Visual{
@@ -543,7 +543,7 @@ func SingleVMNetworkReceive(datasourceName string) panelgroup.Option {
 			timeSeriesPanel.WithYAxis(timeSeriesPanel.YAxis{
 				Show: true,
 				Format: &commonSdk.Format{
-					Unit: &singleVMDecBytesPerSecUnit,
+					Unit: &decBytesPerSecUnit,
 				},
 			}),
 			timeSeriesPanel.WithVisual(timeSeriesPanel.Visual{
@@ -622,7 +622,7 @@ func SingleVMStorageTraffic(datasourceName string) panelgroup.Option {
 			timeSeriesPanel.WithYAxis(timeSeriesPanel.YAxis{
 				Show: true,
 				Format: &commonSdk.Format{
-					Unit: &singleVMDecBytesPerSecUnit,
+					Unit: &decBytesPerSecUnit,
 				},
 			}),
 			timeSeriesPanel.WithVisual(timeSeriesPanel.Visual{
@@ -722,20 +722,37 @@ func SingleVMFilesystemUsagePercentTimeSeries(datasourceName string) panelgroup.
 // SingleVMVMAlertsTable lists firing alerts for the VM.
 func SingleVMVMAlertsTable(datasourceName string) panelgroup.Option {
 	return panelgroup.AddPanel("VM Alerts",
-		tablePanel.Table(
-			tablePanel.WithColumnSettings([]tablePanel.ColumnSettings{
-				{Name: "severity", Header: "Severity", EnableSorting: true, Width: 150},
-				{Name: "alertstate", Header: "State", EnableSorting: true, Hide: false, Width: 150},
-				{Name: "pod", EnableSorting: true, Width: 330},
-				{Name: "timestamp", Hide: true},
-				{Name: "value", Hide: true},
-				{Name: "cluster", Header: "Cluster", Hide: true},
-				{Name: "alertname", Header: "Name", EnableSorting: true},
-				{Name: "name", Header: "VM Name", EnableSorting: true},
-				{Name: "namespace", Header: "Namespace", EnableSorting: true},
-				{Name: "operator_health_impact", Header: "Operator Health Impact", EnableSorting: true},
-			}),
-		),
+		panel.Plugin(apicommon.Plugin{
+			Kind: "Table",
+			Spec: map[string]any{
+				"columnSettings": []any{
+					map[string]any{
+						"name": "alertname", "header": "Name", "enableSorting": true,
+						"dataLink": map[string]any{
+							"openNewTab": true,
+							"title":      "Alert Runbook",
+							"url":        `https://kubevirt.io/monitoring/runbooks/${__data.fields["alertname"]}`,
+						},
+					},
+					map[string]any{
+						"name": "severity", "header": "Severity", "enableSorting": true, "width": 150,
+						"cellSettings": []any{
+							map[string]any{"condition": map[string]any{"kind": "Value", "spec": map[string]any{"value": "critical"}}, "textColor": "#f2495c"},
+							map[string]any{"condition": map[string]any{"kind": "Value", "spec": map[string]any{"value": "warning"}}, "textColor": "#ff9830"},
+							map[string]any{"condition": map[string]any{"kind": "Value", "spec": map[string]any{"value": "info"}}, "textColor": "#6ed0e0"},
+						},
+					},
+					map[string]any{"name": "operator_health_impact", "header": "Operator Health Impact", "enableSorting": true},
+					map[string]any{"name": "namespace", "header": "Namespace", "enableSorting": true},
+					map[string]any{"name": "pod", "enableSorting": true, "width": 330},
+					map[string]any{"name": "alertstate", "hide": true},
+					map[string]any{"name": "name", "hide": true},
+					map[string]any{"name": "timestamp", "hide": true},
+					map[string]any{"name": "value", "hide": true},
+					map[string]any{"name": "cluster", "hide": true},
+				},
+			},
+		}),
 		panel.AddQuery(query.PromQL(
 			singleVMVMAlertsTableQuery,
 			dashboards.AddQueryDataSource(datasourceName),

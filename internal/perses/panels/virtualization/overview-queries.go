@@ -52,7 +52,7 @@ const overviewVMsByStatusStatMigrating = `sum(sum by (cluster, status_group)(kub
 const overviewClustersWarningHealth = `count(kubevirt_hyperconverged_operator_health_status{cluster=~"$cluster"} == 1` + overviewHealthAnd + `) or vector(0)`
 
 // VMsStartedLast7Days (0_6)
-const overviewVMsStartedLast7Days = `count by (cluster)(time() - (label_replace(kubevirt_vm_running_status_last_transition_timestamp_seconds{cluster=~"$cluster"}>0 ,"status","starting","","")) < 604800)` + overviewHealthAnd
+const overviewVMsStartedLast7Days = `count by (cluster)(time() - (label_replace(max by (cluster, name, namespace)(kubevirt_vm_running_status_last_transition_timestamp_seconds{cluster=~"$cluster"})>0 ,"status","starting","","")) < 604800)` + overviewHealthAnd
 
 // ClustersByOperatorVersion — counts (0_7, query 1)
 const overviewClustersByOperatorVersionCounts = `count by (version)((count by (cluster, version) (csv_succeeded{name=~".*hyperconverged.*",cluster=~"$cluster"}>0))` + overviewHealthJoin + `) or (count by (version,phase, reason)((count by (cluster, version,phase, reason) (csv_abnormal{name=~".*hyperconverged.*",cluster=~"$cluster"}>0))` + overviewHealthJoin + `))`

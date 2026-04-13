@@ -44,7 +44,8 @@ type StaticListValue struct {
 }
 
 // AddStaticListVariable adds a list variable backed by static values.
-func AddStaticListVariable(name string, displayName string, values []StaticListValue, defaultValue string, allowAll bool, allowMultiple bool, customAllValue string) dashboard.Option {
+// description is optional (pass "" to omit).
+func AddStaticListVariable(name string, displayName string, description string, values []StaticListValue, defaultValue string, allowAll bool, allowMultiple bool, customAllValue string) dashboard.Option {
 	return func(builder *dashboard.Builder) error {
 		staticValues := make([]map[string]any, 0, len(values))
 		for _, v := range values {
@@ -56,7 +57,8 @@ func AddStaticListVariable(name string, displayName string, values []StaticListV
 		}
 
 		display := &variable.Display{
-			Name: displayName,
+			Name:        displayName,
+			Description: description,
 		}
 
 		spec := dashboardModel.ListVariableSpec{

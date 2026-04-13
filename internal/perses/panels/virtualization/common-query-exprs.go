@@ -3,15 +3,16 @@ package virtualization
 // Shared PromQL sub-expressions used across multiple dashboards.
 
 // vmInfoStatusExpr converts status_group to a human-readable status label.
+// Each label_replace step capitalizes and renames to match the Status filter options.
 // Used by: inventory, utilization dashboards.
 const vmInfoStatusExpr = `sum by (cluster, namespace, name, status) (
-  label_replace(
-    label_replace(
-      kubevirt_vm_info{cluster=~"$cluster", name=~"$name", namespace=~"$namespace", status_group=~"$status"} > 0,
-      "status", "$1", "status_group", "(.*)"
-    ),
-    "status", "stopped", "status", "non_running"
-  )
+  label_replace(label_replace(label_replace(label_replace(label_replace(
+    kubevirt_vm_info{cluster=~"$cluster", name=~"$name", namespace=~"$namespace", status_group=~"$status"} > 0,
+    "status", "Running",   "status_group", "running"),
+    "status", "Stopped",   "status_group", "non_running"),
+    "status", "Starting",  "status_group", "starting"),
+    "status", "Migrating", "status_group", "migrating"),
+    "status", "Error",     "status_group", "error")
 )`
 
 // totalVMsExpr counts the total number of distinct VMs.

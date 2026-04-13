@@ -5,6 +5,7 @@ import (
 
 	"github.com/perses/community-mixins/pkg/dashboards"
 	commonSdk "github.com/perses/perses/go-sdk/common"
+	"github.com/perses/perses/go-sdk/link"
 	"github.com/perses/perses/go-sdk/panel"
 	panelgroup "github.com/perses/perses/go-sdk/panel-group"
 	apicommon "github.com/perses/perses/pkg/model/api/v1/common"
@@ -53,14 +54,27 @@ func singleClusterRecentVMsColumnSettings(project string) []any {
 			"name":          "name",
 			"header":        "VM Name",
 			"enableSorting": true,
-			"dataLink":      vmDetailsDashboardLinkByField(project),
+			"dataLink": map[string]any{
+				"openNewTab": true,
+				"title":      "Virtual Machine Details",
+				"url":        vmDetailsDashboardLinkByFieldURL(project),
+			},
 		},
 		map[string]any{"name": "timestamp", "hide": true},
-		map[string]any{"name": "value", "header": "Uptime ", "enableSorting": true},
 		map[string]any{"name": "namespace", "header": "Namespace", "enableSorting": true},
+		map[string]any{"name": "value", "header": "Uptime", "enableSorting": true, "format": map[string]any{"unit": "seconds"}},
 	}
 }
 
+// mergeTimeSeriesVisual performs an untyped JSON patch on b.Spec.Plugin.Spec,
+// merging patch keys into the "visual" sub-object. It MUST be applied after
+// timeSeriesPanel.Chart (which overwrites Spec with a typed struct) and before
+// panel.AddQuery or any option that reads the finalized Spec.
+//
+// This workaround is required because the timeSeriesPanel.Visual struct does not
+// expose the lineStyle field. TODO: open an upstream PR against
+// github.com/perses/plugins/timeserieschart to add LineStyle to the Visual
+// struct so this untyped patch (and mergeTimeSeriesVisual) can be removed.
 func mergeTimeSeriesVisual(patch map[string]any) panel.Option {
 	return func(b *panel.Builder) error {
 		data, err := json.Marshal(b.Spec.Plugin.Spec)
@@ -106,6 +120,7 @@ func SingleClusterClusterName(datasourceName string) panelgroup.Option {
 	return panelgroup.AddPanel("Cluster Name",
 		statPanel.Chart(
 			statPanel.Calculation("last-number"),
+			statPanel.ValueFontSize(20),
 		),
 		mergePluginSpecFields(map[string]any{
 			"colorMode":   "none",
@@ -123,6 +138,7 @@ func SingleClusterOpenshiftVirtVersion(datasourceName string) panelgroup.Option 
 	return panelgroup.AddPanel("OpenShift Virt Version",
 		statPanel.Chart(
 			statPanel.Calculation("last-number"),
+			statPanel.ValueFontSize(20),
 		),
 		mergePluginSpecFields(map[string]any{
 			"colorMode":   "none",
@@ -137,10 +153,11 @@ func SingleClusterOpenshiftVirtVersion(datasourceName string) panelgroup.Option 
 
 // SingleClusterTotalNodes shows allocatable nodes exposing kubevirt resources.
 func SingleClusterTotalNodes(datasourceName string) panelgroup.Option {
-	return panelgroup.AddPanel("Total Nodes",
+	return panelgroup.AddPanel("Total Allocatable Nodes",
 		panel.Description("Total node count in OpenShift Virtualization clusters"),
 		statPanel.Chart(
 			statPanel.Calculation("last-number"),
+			statPanel.ValueFontSize(20),
 			statPanel.Format(commonSdk.Format{Unit: &dashboards.DecimalUnit}),
 		),
 		mergePluginSpecFields(map[string]any{"colorMode": "none"}),
@@ -152,17 +169,22 @@ func SingleClusterTotalNodes(datasourceName string) panelgroup.Option {
 }
 
 // SingleClusterTotalVMs counts the total number of distinct VMs in the selected cluster.
-func SingleClusterTotalVMs(datasourceName string) panelgroup.Option {
+func SingleClusterTotalVMs(datasourceName, project string) panelgroup.Option {
 	return panelgroup.AddPanel("Total VMs",
 		panel.Description("Total number of virtual machines in the selected cluster."),
 		statPanel.Chart(
 			statPanel.Calculation("last-number"),
+			statPanel.ValueFontSize(20),
 			statPanel.Format(commonSdk.Format{Unit: &dashboards.DecimalUnit}),
 		),
 		mergePluginSpecFields(map[string]any{
 			"colorMode":   "none",
 			"metricLabel": "",
 		}),
+		panel.AddLink(vmsByTimeInStatusLinkURL(project, ""),
+			link.Name("VMs by Time in Status"),
+			link.TargetBlank(true),
+		),
 		panel.AddQuery(query.PromQL(
 			singleClusterTotalVMs,
 			dashboards.AddQueryDataSource(datasourceName),
@@ -170,34 +192,170 @@ func SingleClusterTotalVMs(datasourceName string) panelgroup.Option {
 	)
 }
 
-// SingleClusterVirtualMachinesByStatus shows running / stopped / error / starting / migrating counts.
-func SingleClusterVirtualMachinesByStatus(datasourceName string) panelgroup.Option {
-	return panelgroup.AddPanel("Virtual Machines by Status",
-		panel.Description("Breakdown of virtual machines by their current status: Running, Stopped, Error, Starting, and Migrating."),
+// SingleClusterVMsRunningPercent shows the percentage of VMs currently running.
+func SingleClusterVMsRunningPercent(datasourceName, project string) panelgroup.Option {
+	return panelgroup.AddPanel("VMs Running (%)",
+		panel.Description("Percentage of virtual machines that are currently running out of all VMs in the cluster."),
 		statPanel.Chart(
 			statPanel.Calculation("last-number"),
+			statPanel.ValueFontSize(20),
+			statPanel.Format(commonSdk.Format{Unit: &dashboards.PercentUnit}),
 		),
 		mergePluginSpecFields(map[string]any{"colorMode": "none"}),
+		panel.AddLink(vmServiceLevelLinkURL(project),
+			link.Name("VM Service Level"),
+			link.TargetBlank(true),
+		),
+		panel.AddQuery(query.PromQL(
+			singleClusterVMsRunningPercent,
+			dashboards.AddQueryDataSource(datasourceName),
+		)),
+	)
+}
+
+// SingleClusterVMsNotEvictable shows VMIs with evictionStrategy=None that will
+// block node drain entirely. A non-zero value requires admin action before any
+// node drain or update can complete.
+func SingleClusterVMsNotEvictable(datasourceName, project string) panelgroup.Option {
+	return panelgroup.AddPanel("VMs Not Evictable",
+		panel.Description("Number of running virtual machines with eviction strategy set to None. These VMs will block node drain and cluster updates entirely."),
+		panel.AddLink(vmInventoryLinkURL(project),
+			link.Name("VM Inventory"),
+			link.TargetBlank(true),
+		),
+		statPanel.Chart(
+			statPanel.Calculation("last-number"),
+			statPanel.ValueFontSize(20),
+			statPanel.Thresholds(commonSdk.Thresholds{
+				DefaultColor: "#808080",
+				Steps: []commonSdk.StepOption{
+					{Value: 1, Color: "#f2495c"},
+				},
+			}),
+		),
+		mergePluginSpecFields(map[string]any{"colorMode": "value"}),
+		panel.AddQuery(query.PromQL(
+			singleClusterVMsNotEvictable,
+			dashboards.AddQueryDataSource(datasourceName),
+		)),
+	)
+}
+
+// SingleClusterVMsCreatedLast24h shows VMs created in the last 24 hours.
+func SingleClusterVMsCreatedLast24h(datasourceName string) panelgroup.Option {
+	return panelgroup.AddPanel("VMs Created (24h)",
+		panel.Description("Number of virtual machines created in the last 24 hours."),
+		statPanel.Chart(
+			statPanel.Calculation("last-number"),
+			statPanel.ValueFontSize(20),
+		),
+		mergePluginSpecFields(map[string]any{"colorMode": "none"}),
+		panel.AddQuery(query.PromQL(
+			singleClusterVMsCreatedLast24h,
+			dashboards.AddQueryDataSource(datasourceName),
+		)),
+	)
+}
+
+// SingleClusterVirtualMachinesByStatus shows running / stopped / error / starting / migrating counts.
+func SingleClusterVMsRunning(datasourceName, project string) panelgroup.Option {
+	return panelgroup.AddPanel("Running VMs",
+		panel.Description("Number of virtual machines currently running."),
+		statPanel.Chart(
+			statPanel.Calculation("last-number"),
+			statPanel.ValueFontSize(20),
+		),
+		mergePluginSpecFields(map[string]any{"colorMode": "none"}),
+		panel.AddLink(vmsByTimeInStatusLinkURL(project, "running"),
+			link.Name("VMs by Time in Status"),
+			link.TargetBlank(true),
+		),
 		panel.AddQuery(query.PromQL(
 			singleClusterVMStatusRunning,
 			query.SeriesNameFormat("Running"),
 			dashboards.AddQueryDataSource(datasourceName),
 		)),
-		panel.AddQuery(query.PromQL(
-			singleClusterVMStatusStopped,
-			query.SeriesNameFormat("Stopped"),
-			dashboards.AddQueryDataSource(datasourceName),
-		)),
+	)
+}
+
+func SingleClusterVMsInError(datasourceName, project string) panelgroup.Option {
+	return panelgroup.AddPanel("VMs in Error",
+		panel.Description("Number of virtual machines currently in an error state. Any value above zero requires attention."),
+		statPanel.Chart(
+			statPanel.Calculation("last-number"),
+			statPanel.ValueFontSize(20),
+			statPanel.Thresholds(commonSdk.Thresholds{
+				DefaultColor: "#808080",
+				Steps: []commonSdk.StepOption{
+					{Value: 1, Color: "#f2495c"},
+				},
+			}),
+		),
+		mergePluginSpecFields(map[string]any{"colorMode": "value"}),
+		panel.AddLink(vmsByTimeInStatusLinkURL(project, "error"),
+			link.Name("VMs by Time in Status"),
+			link.TargetBlank(true),
+		),
 		panel.AddQuery(query.PromQL(
 			singleClusterVMStatusError,
 			query.SeriesNameFormat("Error"),
 			dashboards.AddQueryDataSource(datasourceName),
 		)),
+	)
+}
+
+func SingleClusterVMsStopped(datasourceName, project string) panelgroup.Option {
+	return panelgroup.AddPanel("Stopped VMs",
+		panel.Description("Number of virtual machines currently stopped."),
+		statPanel.Chart(
+			statPanel.Calculation("last-number"),
+			statPanel.ValueFontSize(20),
+		),
+		mergePluginSpecFields(map[string]any{"colorMode": "none"}),
+		panel.AddLink(vmsByTimeInStatusLinkURL(project, "non_running"),
+			link.Name("VMs by Time in Status"),
+			link.TargetBlank(true),
+		),
+		panel.AddQuery(query.PromQL(
+			singleClusterVMStatusStopped,
+			query.SeriesNameFormat("Stopped"),
+			dashboards.AddQueryDataSource(datasourceName),
+		)),
+	)
+}
+
+func SingleClusterVMsStarting(datasourceName, project string) panelgroup.Option {
+	return panelgroup.AddPanel("Starting VMs",
+		panel.Description("Number of virtual machines currently starting up."),
+		statPanel.Chart(
+			statPanel.Calculation("last-number"),
+			statPanel.ValueFontSize(20),
+		),
+		mergePluginSpecFields(map[string]any{"colorMode": "none"}),
+		panel.AddLink(vmsByTimeInStatusLinkURL(project, "starting"),
+			link.Name("VMs by Time in Status"),
+			link.TargetBlank(true),
+		),
 		panel.AddQuery(query.PromQL(
 			singleClusterVMStatusStarting,
 			query.SeriesNameFormat("Starting"),
 			dashboards.AddQueryDataSource(datasourceName),
 		)),
+	)
+}
+
+func SingleClusterVMsMigrating(datasourceName, project string) panelgroup.Option {
+	return panelgroup.AddPanel("Migrating VMs",
+		panel.Description("Number of virtual machines currently being migrated."),
+		statPanel.Chart(
+			statPanel.Calculation("last-number"),
+			statPanel.ValueFontSize(20),
+		),
+		mergePluginSpecFields(map[string]any{"colorMode": "none"}),
+		panel.AddLink(vmsByTimeInStatusLinkURL(project, "migrating"),
+			link.Name("VMs by Time in Status"),
+			link.TargetBlank(true),
+		),
 		panel.AddQuery(query.PromQL(
 			singleClusterVMStatusMigrating,
 			query.SeriesNameFormat("Migrating"),
@@ -211,6 +369,7 @@ func SingleClusterProvider(datasourceName string) panelgroup.Option {
 	return panelgroup.AddPanel("Provider",
 		statPanel.Chart(
 			statPanel.Calculation("last-number"),
+			statPanel.ValueFontSize(20),
 		),
 		mergePluginSpecFields(map[string]any{
 			"colorMode":   "none",
@@ -228,6 +387,7 @@ func SingleClusterOpenshiftVersion(datasourceName string) panelgroup.Option {
 	return panelgroup.AddPanel("OpenShift Version",
 		statPanel.Chart(
 			statPanel.Calculation("last-number"),
+			statPanel.ValueFontSize(20),
 		),
 		mergePluginSpecFields(map[string]any{
 			"colorMode":   "none",
@@ -246,6 +406,7 @@ func SingleClusterOperatorStatus(datasourceName string) panelgroup.Option {
 		panel.Description("Inspect the Operator Conditions and the Alerts tab for additional details"),
 		statPanel.Chart(
 			statPanel.Calculation("last-number"),
+			statPanel.ValueFontSize(20),
 		),
 		mergePluginSpecFields(map[string]any{
 			"colorMode": "value",
@@ -264,6 +425,7 @@ func SingleClusterOperatorConditions(datasourceName string) panelgroup.Option {
 		panel.Description("Status of HCO conditions - Check the HCO Conditions in the cluster"),
 		statPanel.Chart(
 			statPanel.Calculation("last-number"),
+			statPanel.ValueFontSize(20),
 		),
 		mergePluginSpecFields(map[string]any{
 			"colorMode": "value",
@@ -815,8 +977,9 @@ func SingleClusterCriticalSeverityAlerts(datasourceName string) panelgroup.Optio
 		mergePluginSpecFields(map[string]any{
 			"colorMode": "value",
 			"thresholds": map[string]any{
+				"defaultColor": "#808080",
 				"steps": []map[string]any{
-					{"value": 0, "color": "#f2495c"},
+					{"value": 1, "color": "#f2495c"},
 				},
 			},
 		}),
@@ -837,8 +1000,9 @@ func SingleClusterWarningSeverityAlerts(datasourceName string) panelgroup.Option
 		mergePluginSpecFields(map[string]any{
 			"colorMode": "value",
 			"thresholds": map[string]any{
+				"defaultColor": "#808080",
 				"steps": []map[string]any{
-					{"value": 0, "color": "#ff9830"},
+					{"value": 1, "color": "#ff9830"},
 				},
 			},
 		}),
@@ -859,8 +1023,9 @@ func SingleClusterInfoSeverityAlerts(datasourceName string) panelgroup.Option {
 		mergePluginSpecFields(map[string]any{
 			"colorMode": "value",
 			"thresholds": map[string]any{
+				"defaultColor": "#808080",
 				"steps": []map[string]any{
-					{"value": 0, "color": "#6ed0e0"},
+					{"value": 1, "color": "#6ed0e0"},
 				},
 			},
 		}),
@@ -878,7 +1043,14 @@ func SingleClusterOperatorHealthImpactAlertsTable(datasourceName string) panelgr
 			Kind: "Table",
 			Spec: map[string]any{
 				"columnSettings": []any{
-					map[string]any{"name": "alertname", "header": "Name", "enableSorting": true},
+					map[string]any{
+						"name": "alertname", "header": "Name", "enableSorting": true,
+						"dataLink": map[string]any{
+							"openNewTab": true,
+							"title":      "Alert Runbook",
+							"url":        `https://kubevirt.io/monitoring/runbooks/${__data.fields["alertname"]}`,
+						},
+					},
 					map[string]any{"name": "operator_health_impact", "header": "Operator Health Impact", "enableSorting": true},
 					map[string]any{
 						"name": "severity", "header": "Severity", "enableSorting": true,
@@ -930,7 +1102,14 @@ func SingleClusterAllAlertsTable(datasourceName string) panelgroup.Option {
 			Kind: "Table",
 			Spec: map[string]any{
 				"columnSettings": []any{
-					map[string]any{"name": "alertname", "header": "Name", "enableSorting": true},
+					map[string]any{
+						"name": "alertname", "header": "Name", "enableSorting": true,
+						"dataLink": map[string]any{
+							"openNewTab": true,
+							"title":      "Alert Runbook",
+							"url":        `https://kubevirt.io/monitoring/runbooks/${__data.fields["alertname"]}`,
+						},
+					},
 					map[string]any{"name": "namespace", "header": "Namespace", "enableSorting": true},
 					map[string]any{"name": "operator_health_impact", "header": "Operator Health Impact", "enableSorting": true},
 					map[string]any{

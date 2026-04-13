@@ -2,13 +2,22 @@ package virtualization
 
 const statusFilterJoin = `+on(cluster,name,namespace) group_left()(0*(sum by(cluster,namespace,name)(kubevirt_vm_info{status_group=~"$status"})))`
 
-const inventoryDimensionFilterJoin = `+on(cluster, namespace, name) group_left(_blah)(0*sum by (cluster, namespace, name)(kubevirt_vm_info{cluster=~"$cluster", name=~"$name", namespace=~"$namespace",flavor=~"$flavor",workload=~"$workload", instance_type=~"$instance_type", preference=~"$preference",guest_os_name=~"$guest_os_name" ,guest_os_version_id=~"$guest_os_version_id"} or kubevirt_vmi_info{cluster=~"$cluster", name=~"$name", namespace=~"$namespace",flavor=~"$flavor",workload=~"$workload", instance_type=~"$instance_type", preference=~"$preference",guest_os_name=~"$guest_os_name" ,guest_os_version_id=~"$guest_os_version_id"}))`
+const inventoryDimensionFilterJoin = `+on(cluster, namespace, name) group_left()(0*sum by (cluster, namespace, name)(kubevirt_vm_info{cluster=~"$cluster", name=~"$name", namespace=~"$namespace",flavor=~"$flavor",workload=~"$workload", instance_type=~"$instance_type", preference=~"$preference",guest_os_name=~"$guest_os_name" ,guest_os_version_id=~"$guest_os_version_id"} or kubevirt_vmi_info{cluster=~"$cluster", name=~"$name", namespace=~"$namespace",flavor=~"$flavor",workload=~"$workload", instance_type=~"$instance_type", preference=~"$preference",guest_os_name=~"$guest_os_name" ,guest_os_version_id=~"$guest_os_version_id"}))`
 
 const inventoryStatusAndDimensionFilterJoin = statusFilterJoin + `
 ` + inventoryDimensionFilterJoin
 
 const inventoryInfoQuery = vmInfoStatusExpr + `
 ` + inventoryDimensionFilterJoin
+
+// inventoryLiveMigratableQuery derives live_migratable from
+// kubevirt_vmi_non_evictable: 1 = not migratable (false), 0 = migratable (true).
+// Only running VMIs expose this metric; stopped VMs will show null in the column.
+const inventoryLiveMigratableQuery = `(
+  label_replace(sum by (cluster, namespace, name)(kubevirt_vmi_non_evictable{cluster=~"$cluster", name=~"$name", namespace=~"$namespace"} == 1), "live_migratable", "false", "__name__", ".*")
+  or
+  label_replace(sum by (cluster, namespace, name)(kubevirt_vmi_non_evictable{cluster=~"$cluster", name=~"$name", namespace=~"$namespace"} == 0), "live_migratable", "true",  "__name__", ".*")
+)` + inventoryStatusAndDimensionFilterJoin
 
 const inventoryCPUQuery = allocatedCPUMultiVMExpr + `
 ` + inventoryStatusAndDimensionFilterJoin
