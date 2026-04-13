@@ -91,7 +91,7 @@ func NewAddonManager(ctx context.Context, kubeConfig *rest.Config, scheme *runti
 		Group:    coomonitoringv1.SchemeGroupVersion.Group,
 		Resource: coomonitoringv1.PrometheusRuleName,
 	}
-	if _, err := mapper.RESTMapping(schema.GroupKind{Group: coomonitoringv1.SchemeGroupVersion.Group, Kind: coomonitoringv1.PrometheusRuleKind}); err == nil {
+	if _, mapErr := mapper.RESTMapping(schema.GroupKind{Group: coomonitoringv1.SchemeGroupVersion.Group, Kind: coomonitoringv1.PrometheusRuleKind}); mapErr == nil {
 		configGVRs = append(configGVRs, cooPrometheusRuleGVR)
 	} else {
 		logger.Info("monitoring.rhobs PrometheusRule CRD not found on hub, skipping config GVR registration", "gvr", cooPrometheusRuleGVR)
