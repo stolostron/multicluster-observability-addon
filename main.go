@@ -28,6 +28,7 @@ import (
 	addonctrl "github.com/stolostron/multicluster-observability-addon/internal/controllers/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/controllers/resourcecreator"
 	"github.com/stolostron/multicluster-observability-addon/internal/controllers/watcher"
+	thanosv1alpha1 "github.com/thanos-community/thanos-operator/api/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -69,6 +70,7 @@ func init() {
 	utilruntime.Must(persesv1.AddToScheme(scheme))
 	utilruntime.Must(routev1.AddToScheme(scheme))
 	utilruntime.Must(addonv1beta1.Install(scheme))
+	utilruntime.Must(thanosv1alpha1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 }
 

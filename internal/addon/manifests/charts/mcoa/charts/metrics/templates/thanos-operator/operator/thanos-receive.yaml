@@ -1,0 +1,13 @@
+{{- if and .Values.thanosOperator.enabled .Values.thanosOperator.receiveSpec.data }}
+apiVersion: monitoring.thanos.io/v1alpha1
+kind: ThanosReceive
+metadata:
+  name: {{ .Values.thanosOperator.appName }}-receive
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "metricshelm.labels" . | nindent 4 }}
+    app.kubernetes.io/component: receive
+    app.kubernetes.io/part-of: thanos
+spec:
+{{- fromJson .Values.thanosOperator.receiveSpec.data | toYaml | nindent 2 }}
+{{- end }}
