@@ -1,0 +1,13 @@
+{{- if and .Values.thanosOperator.enabled .Values.thanosOperator.storeSpec.data }}
+apiVersion: monitoring.thanos.io/v1alpha1
+kind: ThanosStore
+metadata:
+  name: {{ .Values.thanosOperator.appName }}-store
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "metricshelm.labels" . | nindent 4 }}
+    app.kubernetes.io/component: store
+    app.kubernetes.io/part-of: thanos
+spec:
+{{- fromJson .Values.thanosOperator.storeSpec.data | toYaml | nindent 2 }}
+{{- end }}

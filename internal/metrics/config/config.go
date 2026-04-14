@@ -59,12 +59,50 @@ const (
 	ScrapeClassUWLTarget      = "prometheus-user-workload.openshift-user-workload-monitoring.svc:9092"
 	MonitoringStackCRDName    = "monitoringstacks.monitoring.rhobs"
 
+	// Thanos Operator
+	ThanosOperatorAppName = "thanos-operator"
+	// TODO: replace with image from ACM image overrides ConfigMap once available.
+	ThanosOperatorImage   = "quay.io/thanos/thanos-operator:main-2026-04-09-a4dc024"
+
+	// Object storage secret used by Thanos components on the hub.
+	// This matches the MCO convention for the metric object storage secret.
+	ObjectStorageSecretName = "thanos-object-storage"
+	ObjectStorageSecretKey  = "thanos.yaml"
+
+	// Default Thanos component configuration matching MCO defaults.
+	DefaultReceiveReplicas            = 3
+	DefaultReceiveReplicationFactor   = 3
+	DefaultReceiveStorageSize         = "100Gi"
+	DefaultRetentionInLocal           = "24h"
+	DefaultQueryReplicas              = 2
+	DefaultCompactStorageSize         = "100Gi"
+	DefaultRetentionResolutionRaw     = "30d"
+	DefaultRetentionResolution5m      = "180d"
+	DefaultRetentionResolution1h      = "0d"
+	DefaultStoreShards                = 1
+	DefaultStoreStorageSize           = "10Gi"
+	DefaultRulerReplicas              = 2
+	DefaultRulerStorageSize           = "1Gi"
+	DefaultQueryFrontendReplicas      = 2
+	DefaultRulerEvalInterval          = "1m"
+	DefaultAlertmanagerURL            = "dnssrv+http://alertmanager-operated.open-cluster-management-observability.svc:9093"
+
 	AlertmanagerAccessorSecretName = "observability-alertmanager-accessor"
 	AlertmanagerRouterCASecretName = "hub-alertmanager-router-ca"
 	AlertmanagerRouteBYOCAName     = "alertmanager-byo-ca"
 	AlertmanagerRouteBYOCERTName   = "alertmanager-byo-cert"
 	AlertmanagerPlatformNamespace  = "openshift-monitoring"
 	AlertmanagerUWLNamespace       = "openshift-user-workload-monitoring"
+
+	// ContainerIDs for Thanos components used to match AddOnDeploymentConfig resource requirements.
+	// Format: "<resourceType>:<name>:<containerName>"
+	ThanosReceiveRouterContainerID   = "deployments:thanos-operator-receive:thanos"
+	ThanosReceiveIngesterContainerID = "statefulsets:thanos-operator-receive:thanos"
+	ThanosQueryContainerID           = "deployments:thanos-operator-query:thanos"
+	ThanosQueryFrontendContainerID   = "deployments:thanos-operator-query-frontend:thanos"
+	ThanosCompactContainerID         = "statefulsets:thanos-operator-compact:thanos"
+	ThanosStoreContainerID           = "statefulsets:thanos-operator-store:thanos"
+	ThanosRulerContainerID           = "statefulsets:thanos-operator-ruler:thanos"
 )
 
 var (
@@ -101,6 +139,7 @@ type ImageOverrides struct {
 	KubeStateMetrics           string `json:"kube_state_metrics"`
 	NodeExporter               string `json:"node_exporter"`
 	Prometheus                 string `json:"prometheus"`
+	ThanosOperator             string `json:"thanos_operator,omitempty"`
 }
 
 func GetImageOverrides(ctx context.Context, c client.Client, registries []addonapiv1alpha1.ImageMirror, logger logr.Logger) (ImageOverrides, error) {

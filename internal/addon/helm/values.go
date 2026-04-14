@@ -55,6 +55,9 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, logger logr.Logger) a
 			return addonfactory.JsonStructToValues(HelmChartValues{})
 		}
 
+		// WIP: Temporary solution to enable thanos-operator and will require to delete the mcoa pod to take effect.
+		opts.ThanosOperatorEnabled = aodc.Annotations["mcoa-thanos-operator"] == "true"
+
 		userValues := HelmChartValues{
 			Enabled: true,
 		}
@@ -87,6 +90,11 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, logger logr.Logger) a
 		// WIP: Temporary solution to enable obs-api and will require to delete the mcoa pod to take effect.
 		obsAPIEnabled := aodc.Annotations["mcoa-obs-api"] == "true"
 		userValues.ObsAPI = omanifests.BuildValues(common.IsHubCluster(cluster), obsAPIEnabled)
+
+		// WIP: Temporary solution to enable thanos-operator and will require to delete the mcoa pod to take effect.
+		if userValues.Metrics != nil {
+			userValues.Metrics.ThanosOperator.Enabled = opts.ThanosOperatorEnabled && common.IsHubCluster(cluster)
+		}
 
 		return addonfactory.JsonStructToValues(userValues)
 	}

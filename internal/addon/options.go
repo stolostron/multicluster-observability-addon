@@ -117,14 +117,15 @@ type ProxyConfig struct {
 }
 
 type Options struct {
-	Platform         PlatformOptions
-	UserWorkloads    UserWorkloadOptions
-	InstallNamespace string
-	Tolerations      []corev1.Toleration
-	NodeSelector     map[string]string
-	ResourceReqs     []addonapiv1alpha1.ContainerResourceRequirements
-	ProxyConfig      ProxyConfig
-	Registries       []addonapiv1alpha1.ImageMirror
+	Platform              PlatformOptions
+	UserWorkloads         UserWorkloadOptions
+	InstallNamespace      string
+	Tolerations           []corev1.Toleration
+	NodeSelector          map[string]string
+	ResourceReqs          []addonapiv1alpha1.ContainerResourceRequirements
+	ProxyConfig           ProxyConfig
+	Registries            []addonapiv1alpha1.ImageMirror
+	ThanosOperatorEnabled bool
 }
 
 func (o Options) validate() error {
