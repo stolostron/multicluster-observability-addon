@@ -17,9 +17,11 @@ import (
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
+	thanosv1alpha1 "github.com/thanos-community/thanos-operator/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
@@ -198,6 +200,13 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1beta1.Man
 				}
 				ret.CRDEstablishedAnnotation = string(jsonBytes)
 			}
+		}
+	}
+
+	if ret.IsHub && opts.ThanosOperatorEnabled {
+		// Build thanos components
+		if err = o.buildThanosComponents(ctx, &ret); err != nil {
+			return ret, fmt.Errorf("failed to build thanos components: %w", err)
 		}
 	}
 
@@ -575,4 +584,188 @@ func getClusterID(ctx context.Context, c client.Client) (string, error) {
 	}
 
 	return string(clusterVersion.Spec.ClusterID), nil
+}
+
+func (o *OptionsBuilder) buildThanosComponents(ctx context.Context, opts *Options) error {
+	// Fetch the object storage secret reference from config resources.
+	// This is required by Receive, Compact, Store, and Ruler.
+	objStoreSecret, err := o.getObjectStorageConfig(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get object storage config: %w", err)
+	}
+
+	// Add the object storage secret to the list of secrets to be forwarded
+	if err := o.addSecret(ctx, &opts.Secrets, objStoreSecret.Name, objStoreSecret.Namespace, objStoreSecret.Name, ""); err != nil {
+		return fmt.Errorf("failed to add object storage secret: %w", err)
+	}
+
+	objStoreCfg := thanosv1alpha1.ObjectStorageConfig{
+		LocalObjectReference: corev1.LocalObjectReference{Name: objStoreSecret.Name},
+		Key:                  config.ObjectStorageSecretKey,
+	}
+
+	o.buildThanosReceiver(opts, objStoreCfg)
+	o.buildThanosQuery(opts)
+	o.buildThanosCompact(opts, objStoreCfg)
+	o.buildThanosStore(opts, objStoreCfg)
+	o.buildThanosRuler(opts, objStoreCfg)
+	return nil
+}
+
+// getObjectStorageConfig fetches the thanos object storage secret from the hub namespace.
+func (o *OptionsBuilder) getObjectStorageConfig(ctx context.Context) (*corev1.Secret, error) {
+	secret := &corev1.Secret{}
+	if err := o.Client.Get(ctx, types.NamespacedName{
+		Name:      config.ObjectStorageSecretName,
+		Namespace: config.HubInstallNamespace,
+	}, secret); err != nil {
+		return nil, fmt.Errorf("failed to get object storage secret %s/%s: %w", config.HubInstallNamespace, config.ObjectStorageSecretName, err)
+	}
+	return secret, nil
+}
+
+func (o *OptionsBuilder) buildThanosReceiver(opts *Options, objStore thanosv1alpha1.ObjectStorageConfig) {
+	// Unmanaged defaults: replicas, retention, storage size — users can modify these on the CR directly.
+	replicas := int32(config.DefaultReceiveReplicas)
+	replicationFactor := int32(config.DefaultReceiveReplicationFactor)
+	if replicas < replicationFactor {
+		replicationFactor = replicas
+	}
+
+	opts.Thanos.Receive = &thanosv1alpha1.ThanosReceive{
+		Spec: thanosv1alpha1.ThanosReceiveSpec{
+			Router: thanosv1alpha1.RouterSpec{
+				Replicas:          replicas,
+				ReplicationFactor: replicationFactor,
+				ExternalLabels:    thanosv1alpha1.ExternalLabels{"receive": "true"},
+			},
+			Ingester: thanosv1alpha1.IngesterSpec{
+				DefaultObjectStorageConfig: objStore,
+				Hashrings: []thanosv1alpha1.IngesterHashringSpec{
+					{
+						Name:     "default",
+						Replicas: replicas,
+						TSDBConfig: thanosv1alpha1.TSDBConfig{
+							Retention: thanosv1alpha1.Duration(config.DefaultRetentionInLocal),
+						},
+						StorageConfiguration: thanosv1alpha1.StorageConfiguration{
+							Size: thanosv1alpha1.StorageSize(config.DefaultReceiveStorageSize),
+						},
+						ExternalLabels: thanosv1alpha1.ExternalLabels{"replica": "$(POD_NAME)"},
+					},
+				},
+			},
+		},
+	}
+
+	// Managed fields: node selectors, tolerations, and resource requirements from AddOnDeploymentConfig.
+	o.applyCommonThanosFields(&opts.Thanos.Receive.Spec.Router.CommonFields, opts, config.ThanosReceiveRouterContainerID)
+	o.applyCommonThanosFields(&opts.Thanos.Receive.Spec.Ingester.Hashrings[0].CommonFields, opts, config.ThanosReceiveIngesterContainerID)
+}
+
+func (o *OptionsBuilder) buildThanosQuery(opts *Options) {
+	opts.Thanos.Query = &thanosv1alpha1.ThanosQuery{
+		Spec: thanosv1alpha1.ThanosQuerySpec{
+			// Unmanaged defaults: replicas — users can modify these on the CR directly.
+			Replicas:      int32(config.DefaultQueryReplicas),
+			ReplicaLabels: []string{"replica"},
+			QueryFrontend: &thanosv1alpha1.QueryFrontendSpec{
+				Replicas:          int32(config.DefaultQueryFrontendReplicas),
+				CompressResponses: true,
+			},
+		},
+	}
+
+	// Managed fields: node selectors, tolerations, and resource requirements from AddOnDeploymentConfig.
+	o.applyCommonThanosFields(&opts.Thanos.Query.Spec.CommonFields, opts, config.ThanosQueryContainerID)
+	o.applyCommonThanosFields(&opts.Thanos.Query.Spec.QueryFrontend.CommonFields, opts, config.ThanosQueryFrontendContainerID)
+}
+
+func (o *OptionsBuilder) buildThanosCompact(opts *Options, objStore thanosv1alpha1.ObjectStorageConfig) {
+	opts.Thanos.Compact = &thanosv1alpha1.ThanosCompact{
+		Spec: thanosv1alpha1.ThanosCompactSpec{
+			ObjectStorageConfig: objStore,
+			StorageConfiguration: thanosv1alpha1.StorageConfiguration{
+				Size: thanosv1alpha1.StorageSize(config.DefaultCompactStorageSize),
+			},
+			// Unmanaged defaults: retention — users can modify these on the CR directly.
+			RetentionConfig: thanosv1alpha1.RetentionResolutionConfig{
+				Raw:         thanosv1alpha1.Duration(config.DefaultRetentionResolutionRaw),
+				FiveMinutes: thanosv1alpha1.Duration(config.DefaultRetentionResolution5m),
+				OneHour:     thanosv1alpha1.Duration(config.DefaultRetentionResolution1h),
+			},
+		},
+	}
+
+	// Managed fields: node selectors, tolerations, and resource requirements from AddOnDeploymentConfig.
+	o.applyCommonThanosFields(&opts.Thanos.Compact.Spec.CommonFields, opts, config.ThanosCompactContainerID)
+}
+
+func (o *OptionsBuilder) buildThanosStore(opts *Options, objStore thanosv1alpha1.ObjectStorageConfig) {
+	// Unmanaged defaults: shards, storage size — users can modify these on the CR directly.
+	shards := int32(config.DefaultStoreShards)
+
+	opts.Thanos.Store = &thanosv1alpha1.ThanosStore{
+		Spec: thanosv1alpha1.ThanosStoreSpec{
+			Replicas:            shards,
+			ObjectStorageConfig: objStore,
+			StorageConfiguration: thanosv1alpha1.StorageConfiguration{
+				Size: thanosv1alpha1.StorageSize(config.DefaultStoreStorageSize),
+			},
+			ShardingStrategy: thanosv1alpha1.ShardingStrategy{
+				Type:   thanosv1alpha1.Block,
+				Shards: shards,
+			},
+		},
+	}
+
+	// Managed fields: node selectors, tolerations, and resource requirements from AddOnDeploymentConfig.
+	o.applyCommonThanosFields(&opts.Thanos.Store.Spec.CommonFields, opts, config.ThanosStoreContainerID)
+}
+
+func (o *OptionsBuilder) buildThanosRuler(opts *Options, objStore thanosv1alpha1.ObjectStorageConfig) {
+	opts.Thanos.Ruler = &thanosv1alpha1.ThanosRuler{
+		Spec: thanosv1alpha1.ThanosRulerSpec{
+			// Unmanaged defaults: replicas, retention, eval interval, storage size — users can modify these on the CR directly.
+			Replicas:            int32(config.DefaultRulerReplicas),
+			ObjectStorageConfig: objStore,
+			AlertmanagerURL:     config.DefaultAlertmanagerURL,
+			EvaluationInterval:  thanosv1alpha1.Duration(config.DefaultRulerEvalInterval),
+			Retention:           thanosv1alpha1.Duration(config.DefaultRetentionInLocal),
+			StorageConfiguration: thanosv1alpha1.StorageConfiguration{
+				Size: thanosv1alpha1.StorageSize(config.DefaultRulerStorageSize),
+			},
+			ExternalLabels: thanosv1alpha1.ExternalLabels{"rule_replica": "$(NAME)"},
+			RuleConfigSelector: metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"operator.thanos.io/prometheus-rule": "true",
+				},
+			},
+		},
+	}
+
+	// Managed fields: node selectors, tolerations, and resource requirements from AddOnDeploymentConfig.
+	o.applyCommonThanosFields(&opts.Thanos.Ruler.Spec.CommonFields, opts, config.ThanosRulerContainerID)
+}
+
+// applyCommonThanosFields sets node selectors, tolerations, and resource requirements from the addon config.
+func (o *OptionsBuilder) applyCommonThanosFields(fields *thanosv1alpha1.CommonFields, opts *Options, containerID string) {
+	if len(opts.NodeSelector) > 0 {
+		fields.NodeSelector = opts.NodeSelector
+	}
+	if len(opts.Tolerations) > 0 {
+		fields.Tolerations = opts.Tolerations
+	}
+	for _, resReq := range opts.ResourceReqs {
+		if resReq.ContainerID == containerID {
+			fields.ResourceRequirements = &resReq.Resources
+		}
+	}
+	// Override the operator default of FSGroup=1001 which is rejected by OpenShift's
+	// restricted-v2 SCC. Setting an empty SecurityContext lets OpenShift assign the
+	// FSGroup from the namespace's allocated range.
+	runAsNonRoot := true
+	fields.SecurityContext = &corev1.PodSecurityContext{
+		RunAsNonRoot: &runAsNonRoot,
+	}
 }

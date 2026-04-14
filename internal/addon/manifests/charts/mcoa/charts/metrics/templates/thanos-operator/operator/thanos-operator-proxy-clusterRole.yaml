@@ -1,0 +1,24 @@
+{{- if .Values.thanosOperator.enabled }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ .Values.thanosOperator.appName }}-proxy-role
+  labels:
+    app.kubernetes.io/component: kube-rbac-proxy
+    app.kubernetes.io/name: {{ .Values.thanosOperator.appName }}
+    app.kubernetes.io/part-of: {{ .Values.thanosOperator.appName }}
+    {{- include "metricshelm.labels" . | nindent 4 }}
+rules:
+- apiGroups:
+  - authentication.k8s.io
+  resources:
+  - tokenreviews
+  verbs:
+  - create
+- apiGroups:
+  - authorization.k8s.io
+  resources:
+  - subjectaccessreviews
+  verbs:
+  - create
+{{- end }}

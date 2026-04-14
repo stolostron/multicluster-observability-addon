@@ -1,0 +1,13 @@
+{{- if and .Values.thanosOperator.enabled .Values.thanosOperator.querySpec.data }}
+apiVersion: monitoring.thanos.io/v1alpha1
+kind: ThanosQuery
+metadata:
+  name: {{ .Values.thanosOperator.appName }}-query
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "metricshelm.labels" . | nindent 4 }}
+    app.kubernetes.io/component: query
+    app.kubernetes.io/part-of: thanos
+spec:
+{{- fromJson .Values.thanosOperator.querySpec.data | toYaml | nindent 2 }}
+{{- end }}
