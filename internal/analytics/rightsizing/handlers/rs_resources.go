@@ -19,9 +19,9 @@ import (
 // created for enabled features and cleaned up for disabled features.
 // Called from ResourceCreator (hub-wide, not per-cluster) to avoid race conditions.
 func (o *OptionsBuilder) ReconcileRSResources(ctx context.Context, opts addon.Options) error {
-	if !opts.Platform.Enabled {
-		return nil
-	}
+	// NOTE: Do NOT gate on opts.Platform.Enabled here.
+	// When both RS features are disabled and no other platform key is set,
+	// Platform.Enabled is false — but we still need to run cleanup below.
 
 	if opts.Platform.AnalyticsOptions.RightSizing.NamespaceEnabled {
 		configData, err := o.getConfigData(ctx, rightsizing.NamespaceConfigMapName)
@@ -68,7 +68,7 @@ func (o *OptionsBuilder) ReconcileRSResources(ctx context.Context, opts addon.Op
 	return nil
 }
 
-// ensureRSPlacement creates or updates a right-sizing Placement resource with owner reference.
+// ensureRSPlacement creates or updates a right-sizing Placement resource.
 // Handles AlreadyExists race condition gracefully.
 func (o *OptionsBuilder) ensureRSPlacement(ctx context.Context, placementName string, placementConfig clusterv1beta1.Placement) error {
 	key := types.NamespacedName{Name: placementName, Namespace: rightsizing.PlacementNamespace}
@@ -85,10 +85,7 @@ func (o *OptionsBuilder) ensureRSPlacement(ctx context.Context, placementName st
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      placementName,
 				Namespace: rightsizing.PlacementNamespace,
-				Labels: map[string]string{
-					"app.kubernetes.io/component":  "right-sizing",
-					"app.kubernetes.io/managed-by": addoncfg.Name,
-				},
+				Labels:    rightsizing.RSLabels(),
 			},
 			Spec: placementConfig.Spec,
 		}

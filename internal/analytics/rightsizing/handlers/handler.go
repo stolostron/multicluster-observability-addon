@@ -202,15 +202,17 @@ func (o *OptionsBuilder) ensureVirtualizationConfigMap(ctx context.Context) erro
 
 // createDefaultConfigMap creates a ConfigMap with the provided data.
 // The ConfigMap is labeled to indicate it's managed by MCOA for right-sizing.
+//
+// NOTE: We do not delete existing ConfigMaps during mode switches (MCO <=> MCOA)
+// to preserve user customizations (namespace filters, recommendation %, etc.).
+// To support this, ownership (labels) should be updated when the new owner takes over.
+// In the future when only MCOA mode is supported, ownership transfer will not be needed.
 func (o *OptionsBuilder) createDefaultConfigMap(ctx context.Context, name string, data map[string]string) error {
 	cm := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: addoncfg.InstallNamespace,
-			Labels: map[string]string{
-				"app.kubernetes.io/component":  "right-sizing",
-				"app.kubernetes.io/managed-by": addoncfg.Name,
-			},
+			Labels:    rightsizing.RSLabels(),
 		},
 		Data: data,
 	}
