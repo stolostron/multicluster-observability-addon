@@ -267,7 +267,12 @@ func TestBuildOptions(t *testing.T) {
 					},
 				},
 			},
-			expectedOpts: Options{},
+			// Platform.Enabled is true because RS keys are present (even "disabled").
+			// This ensures the rendering pipeline runs so the addon framework can prune
+			// stale ManifestWork content when both RS features are disabled.
+			expectedOpts: Options{
+				Platform: PlatformOptions{Enabled: true},
+			},
 		},
 		{
 			name: "valid node selector and tolerations",
@@ -290,6 +295,7 @@ func TestBuildOptions(t *testing.T) {
 				},
 			},
 			expectedOpts: Options{
+				Platform:     PlatformOptions{Enabled: true},
 				NodeSelector: map[string]string{"node-role.kubernetes.io/infra": ""},
 				Tolerations: []corev1.Toleration{
 					{
@@ -354,6 +360,7 @@ func TestBuildOptions(t *testing.T) {
 				},
 			},
 			expectedOpts: Options{
+				Platform: PlatformOptions{Enabled: true},
 				ProxyConfig: ProxyConfig{
 					ProxyURL: &url.URL{
 						Scheme: "http",
