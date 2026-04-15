@@ -190,22 +190,23 @@ func TestReconcileRSResources_CleanupIdempotent(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestReconcileRSResources_PlatformDisabledSkipsCleanup(t *testing.T) {
+func TestReconcileRSResources_PlatformDisabledCleansUp(t *testing.T) {
 	nsPlacement := createTestPlacement(rightsizing.NamespacePlacementName)
 
 	ob := newTestOptionsBuilder(t, nsPlacement)
 	ctx := context.TODO()
 
-	// Platform disabled — early return, no cleanup
+	// Platform disabled with both RS features disabled — cleanup still runs.
+	// ReconcileRSResources does NOT gate on Platform.Enabled (see NOTE in code).
 	opts := addon.Options{
 		Platform: addon.PlatformOptions{Enabled: false},
 	}
 	err := ob.ReconcileRSResources(ctx, opts)
 	require.NoError(t, err)
 
-	// Placement should still exist (no cleanup when platform is disabled)
+	// Placement should be deleted (cleanup runs regardless of Platform.Enabled)
 	err = ob.Client.Get(ctx, types.NamespacedName{
 		Name: rightsizing.NamespacePlacementName, Namespace: rightsizing.PlacementNamespace,
 	}, &clusterv1beta1.Placement{})
-	assert.NoError(t, err, "placement should still exist when platform is disabled")
+	assert.True(t, apierrors.IsNotFound(err), "placement should be deleted when both RS features are disabled")
 }
