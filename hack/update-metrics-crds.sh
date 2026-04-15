@@ -17,7 +17,7 @@ echo "Using obo-prometheus-operator version: ${VERSION}"
 BASE_URL="https://raw.githubusercontent.com/rhobs/obo-prometheus-operator/refs/tags/${VERSION}/example/prometheus-operator-crd"
 
 # Destination directory for the CRDs in the Helm chart.
-DEST_DIR="internal/addon/manifests/charts/mcoa/charts/metrics/templates/coo/crds"
+DEST_DIR="internal/addon/manifests/charts/mcoa/charts/metrics/templates/prometheus-operator/crds"
 
 if [ ! -d "${DEST_DIR}" ]; then
     echo "Error: Destination directory ${DEST_DIR} not found."
@@ -31,6 +31,10 @@ for dest_path in "${DEST_DIR}"/*.yaml; do
     fi
 
     local_file=$(basename "${dest_path}")
+    if [[ "${local_file}" == *"monitoringstacks"* ]]; then
+        echo "Skipping placeholder ${local_file}"
+        continue
+    fi
     # The remote repository uses 'rhobs' instead of 'coreos.com' in the filenames.
     remote_file=${local_file/coreos.com/rhobs}
     url="${BASE_URL}/${remote_file}"
@@ -43,6 +47,9 @@ for dest_path in "${DEST_DIR}"/*.yaml; do
         echo "Error: Failed to download CRD from ${url}"
         exit 1
     fi
+
+    # Remove the '---' line if it exists at the beginning of the content.
+    crd_content=$(echo "${crd_content}" | sed '/^---$/d')
 
     # Preserve the first and last lines (Helm directives).
     first_line=$(head -n 1 "${dest_path}")

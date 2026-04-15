@@ -4,4 +4,4 @@
 /.vscode
 tmp/
 .env
-.gocache
+.gocache/
