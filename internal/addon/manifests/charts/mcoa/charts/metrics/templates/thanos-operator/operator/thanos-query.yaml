@@ -2,7 +2,7 @@
 apiVersion: monitoring.thanos.io/v1alpha1
 kind: ThanosQuery
 metadata:
-  name: {{ .Values.thanosOperator.appName }}-query
+  name: mcoa-query
   namespace: {{ .Release.Namespace }}
   labels:
     {{- include "metricshelm.labels" . | nindent 4 }}

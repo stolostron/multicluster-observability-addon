@@ -56,9 +56,6 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, getter addonutils.Add
 			return addonfactory.JsonStructToValues(HelmChartValues{})
 		}
 
-		// WIP: Temporary solution to enable thanos-operator and will require to delete the mcoa pod to take effect.
-		opts.ThanosOperatorEnabled = aodc.Annotations["mcoa-thanos-operator"] == "true"
-
 		userValues := HelmChartValues{
 			Enabled: true,
 		}

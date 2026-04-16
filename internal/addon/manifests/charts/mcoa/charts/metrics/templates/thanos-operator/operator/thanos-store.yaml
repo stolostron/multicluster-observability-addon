@@ -2,7 +2,7 @@
 apiVersion: monitoring.thanos.io/v1alpha1
 kind: ThanosStore
 metadata:
-  name: {{ .Values.thanosOperator.appName }}-store
+  name: mcoa-store
   namespace: {{ .Release.Namespace }}
   labels:
     {{- include "metricshelm.labels" . | nindent 4 }}

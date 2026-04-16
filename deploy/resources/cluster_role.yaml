@@ -82,5 +82,9 @@
     - apiGroups: ["hypershift.openshift.io"]
       resources: ["hostedclusters"]
       verbs: ["get", "list", "watch"]
+    # Role for addon to read routes to discover MCOA obs-api endpoint
+    - apiGroups: ["route.openshift.io"]
+      resources: ["routes"]
+      verbs: ["get", "list", "watch"]
 
 

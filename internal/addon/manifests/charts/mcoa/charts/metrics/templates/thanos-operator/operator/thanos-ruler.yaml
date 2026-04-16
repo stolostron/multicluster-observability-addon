@@ -2,7 +2,7 @@
 apiVersion: monitoring.thanos.io/v1alpha1
 kind: ThanosRuler
 metadata:
-  name: {{ .Values.thanosOperator.appName }}-ruler
+  name: mcoa-ruler
   namespace: {{ .Release.Namespace }}
   labels:
     {{- include "metricshelm.labels" . | nindent 4 }}

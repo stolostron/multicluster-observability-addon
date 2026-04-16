@@ -177,6 +177,7 @@ func BuildOptions(addOnDeployment *addonapiv1beta1.AddOnDeploymentConfig) (Optio
 
 	opts.ProxyConfig.NoProxy = addOnDeployment.Spec.ProxyConfig.NoProxy
 	opts.Registries = addOnDeployment.Spec.Registries
+	opts.ThanosOperatorEnabled = addOnDeployment.Annotations["mcoa-thanos-operator"] == "true"
 
 	// Do NOT return early when CustomizedVariables is nil. The for-range
 	// loop below is a safe no-op on a nil slice, and we must always fall
