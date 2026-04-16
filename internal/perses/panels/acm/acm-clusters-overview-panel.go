@@ -25,6 +25,10 @@ func Top50MaxLatencyAPIServer(datasourceName string, labelMatchers ...*labels.Ma
 					Name:   "cluster",
 					Header: "Cluster",
 					Align:  tablePanel.LeftAlign,
+					DataLink: &tablePanel.DataLink{
+						URL:   "/monitoring/v2/dashboards/view?dashboard=acm-optimization-overview&project=$__project&var-cluster=${__data.fields[\"cluster\"]}",
+						Title: "Drill down to cluster",
+					},
 				},
 				{
 					Name:   "value #1",
@@ -84,6 +88,10 @@ func EtcdHealth(datasourceName string, labelMatchers ...*labels.Matcher) panelgr
 					Name:   "cluster",
 					Header: "Cluster",
 					Align:  tablePanel.LeftAlign,
+					DataLink: &tablePanel.DataLink{
+						URL:   "/monitoring/v2/dashboards/view?dashboard=acm-optimization-overview&project=$__project&var-cluster=${__data.fields[\"cluster\"]}",
+						Title: "Drill down to cluster",
+					},
 				},
 				{
 					Name:   "has_leader",
@@ -130,6 +138,10 @@ func Top50CPUOverEstimationClusters(datasourceName string, labelMatchers ...*lab
 					Name:   "cluster",
 					Header: "Cluster",
 					Align:  tablePanel.LeftAlign,
+					DataLink: &tablePanel.DataLink{
+						URL:   "/monitoring/v2/dashboards/view?dashboard=acm-optimization-overview&project=$__project&var-cluster=${__data.fields[\"cluster\"]}",
+						Title: "Drill down to cluster",
+					},
 				},
 				{
 					Name:   "value",
@@ -177,6 +189,10 @@ func Top50MemoryOverEstimationClusters(datasourceName string, labelMatchers ...*
 					Name:   "cluster",
 					Header: "Cluster",
 					Align:  tablePanel.LeftAlign,
+					DataLink: &tablePanel.DataLink{
+						URL:   "/monitoring/v2/dashboards/view?dashboard=acm-optimization-overview&project=$__project&var-cluster=${__data.fields[\"cluster\"]}",
+						Title: "Drill down to cluster",
+					},
 				},
 				{
 					Name:   "value",
@@ -224,6 +240,10 @@ func Top50CPUUtilizedClusters(datasourceName string, labelMatchers ...*labels.Ma
 					Name:   "cluster",
 					Header: "Cluster",
 					Align:  tablePanel.LeftAlign,
+					DataLink: &tablePanel.DataLink{
+						URL:   "/monitoring/v2/dashboards/view?dashboard=acm-optimization-overview&project=$__project&var-cluster=${__data.fields[\"cluster\"]}",
+						Title: "Drill down to cluster",
+					},
 				},
 				{
 					Name:   "machine_cpu_cores_sum",
@@ -307,6 +327,10 @@ func Top50MemoryUtilizedClusters(datasourceName string, labelMatchers ...*labels
 					Name:   "cluster",
 					Header: "Cluster",
 					Align:  tablePanel.LeftAlign,
+					DataLink: &tablePanel.DataLink{
+						URL:   "/monitoring/v2/dashboards/view?dashboard=acm-optimization-overview&project=$__project&var-cluster=${__data.fields[\"cluster\"]}",
+						Title: "Drill down to cluster",
+					},
 				},
 				{
 					Name:   "machine_memory_sum",
@@ -385,6 +409,10 @@ func BandwidthUtilization(datasourceName string, labelMatchers ...*labels.Matche
 					Name:   "cluster",
 					Header: "Cluster",
 					Align:  tablePanel.LeftAlign,
+					DataLink: &tablePanel.DataLink{
+						URL:   "/monitoring/v2/dashboards/view?dashboard=k8s-networking-cluster&project=$__project&var-cluster=${__data.fields[\"cluster\"]}",
+						Title: "Drill down to cluster",
+					},
 				},
 				{
 					Name:   "value",

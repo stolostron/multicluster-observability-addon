@@ -67,6 +67,10 @@ func NamespaceWorkloadsCPUQuota(datasource string) panelgroup.Option {
 					Name:   "workload",
 					Header: "Workload",
 					Align:  tablePanel.LeftAlign,
+					DataLink: &tablePanel.DataLink{
+						URL:   "/monitoring/v2/dashboards/view?dashboard=k8s-compute-resources-workload&project=$__project&var-workload=${__data.fields[\"workload\"]}",
+						Title: "Drill down to workload",
+					},
 				},
 				{
 					Name:   "value #1",
@@ -218,6 +222,10 @@ func NamespaceWorkloadsMemoryQuota(datasource string) panelgroup.Option {
 					Name:   "workload",
 					Header: "Workload",
 					Align:  tablePanel.LeftAlign,
+					DataLink: &tablePanel.DataLink{
+						URL:   "/monitoring/v2/dashboards/view?dashboard=k8s-compute-resources-workload&project=$__project&var-workload=${__data.fields[\"workload\"]}",
+						Title: "Drill down to workload",
+					},
 				},
 				{
 					Name:   "value #1",

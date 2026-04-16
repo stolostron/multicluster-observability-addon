@@ -89,6 +89,10 @@ func NamespacePodsCurrentStatus(datasource string) panelgroup.Option {
 					Name:   "pod",
 					Header: "Pod",
 					Align:  tablePanel.LeftAlign,
+					DataLink: &tablePanel.DataLink{
+						URL:   "/monitoring/v2/dashboards/view?dashboard=k8s-networking-pod&project=$__project&var-pod=${__data.fields[\"pod\"]}",
+						Title: "Drill down",
+					},
 				},
 				{
 					Name:   "value #1",

@@ -236,6 +236,10 @@ func ClusterCPUQuota(datasource string) panelgroup.Option {
 					Name:   "namespace",
 					Header: "Namespace",
 					Align:  tablePanel.LeftAlign,
+					DataLink: &tablePanel.DataLink{
+						URL:   "/monitoring/v2/dashboards/view?dashboard=k8s-compute-resources-namespace-pods&project=$__project&var-namespace=${__data.fields[\"namespace\"]}",
+						Title: "Drill down to pods",
+					},
 				},
 				{
 					Name:   "value #1",
@@ -427,6 +431,10 @@ func ClusterMemoryQuota(datasource string) panelgroup.Option {
 					Name:   "namespace",
 					Header: "Namespace",
 					Align:  tablePanel.LeftAlign,
+					DataLink: &tablePanel.DataLink{
+						URL:   "/monitoring/v2/dashboards/view?dashboard=k8s-compute-resources-namespace-pods&project=$__project&var-namespace=${__data.fields[\"namespace\"]}",
+						Title: "Drill down to pods",
+					},
 				},
 				{
 					Name:   "value #1",
