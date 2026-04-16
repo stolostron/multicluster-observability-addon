@@ -120,6 +120,11 @@ func FleetTopClusters(datasource string) panelgroup.Option {
 					Name:   "cluster",
 					Header: "Cluster",
 					Align:  tablePanel.LeftAlign,
+					DataLink: &tablePanel.DataLink{
+						URL:        "/monitoring/v2/dashboards/view?dashboard=k8s-slo-api-server-cluster&project=$__project&var-cluster=${__data.fields[\"cluster\"]}",
+						Title:      "Kubernetes / Service-Level Overview / API Server / Cluster",
+						OpenNewTab: true,
+					},
 				},
 				{
 					Name:   "value #1",

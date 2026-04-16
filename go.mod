@@ -15,11 +15,11 @@ require (
 	github.com/spf13/pflag v1.0.10
 	github.com/stolostron/cluster-lifecycle-api v0.0.0-20250625062343-7394aeb3186c
 	github.com/stretchr/testify v1.11.1
-	k8s.io/api v0.35.2
+	k8s.io/api v0.35.3
 	k8s.io/apiextensions-apiserver v0.35.2
 	k8s.io/apimachinery v0.35.3
-	k8s.io/client-go v0.35.2
-	k8s.io/component-base v0.35.2
+	k8s.io/client-go v0.35.3
+	k8s.io/component-base v0.35.3
 	k8s.io/klog/v2 v2.140.0
 	k8s.io/utils v0.0.0-20260210185600-b8788abfbbc2
 	open-cluster-management.io/addon-framework v1.1.2
@@ -32,10 +32,10 @@ require (
 	github.com/perses/perses v0.53.1
 	github.com/perses/perses-operator v0.2.0
 	github.com/perses/plugins/barchart v0.11.1
-	github.com/perses/plugins/piechart v0.10.0
+	github.com/perses/plugins/piechart v0.13.2-0.20260326134814-37e86f6b1c58
 	github.com/perses/plugins/prometheus v0.57.1
 	github.com/perses/plugins/statchart v0.12.1
-	github.com/perses/plugins/table v0.7.1
+	github.com/perses/plugins/table v0.11.3-0.20260416092358-50d24073dacc
 	github.com/perses/plugins/timeserieschart v0.12.1
 	github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring v0.83.0-rhobs1
 	github.com/rhobs/observability-operator/pkg/apis v0.0.0-20250902133632-f98bd8a20a80
@@ -142,7 +142,7 @@ require (
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasttemplate v1.2.2 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
-	github.com/zitadel/oidc/v3 v3.45.4 // indirect
+	github.com/zitadel/oidc/v3 v3.45.5 // indirect
 	github.com/zitadel/schema v1.3.2 // indirect
 	go.etcd.io/etcd/api/v3 v3.6.5 // indirect
 	go.etcd.io/etcd/client/pkg/v3 v3.6.5 // indirect
@@ -178,7 +178,7 @@ require (
 	golang.org/x/crypto v0.49.0 // indirect
 	golang.org/x/exp v0.0.0-20260218203240-3dfff04db8fa // indirect
 	golang.org/x/net v0.52.0 // indirect
-	golang.org/x/oauth2 v0.35.0 // indirect
+	golang.org/x/oauth2 v0.36.0 // indirect
 	golang.org/x/sync v0.20.0 // indirect
 	golang.org/x/sys v0.42.0 // indirect
 	golang.org/x/term v0.41.0 // indirect
@@ -193,8 +193,8 @@ require (
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	helm.sh/helm/v3 v3.18.6 // indirect
-	k8s.io/apiserver v0.35.2 // indirect
-	k8s.io/kms v0.35.2 // indirect
+	k8s.io/apiserver v0.35.3 // indirect
+	k8s.io/kms v0.35.3 // indirect
 	k8s.io/kube-openapi v0.0.0-20260317180543-43fb72c5454a // indirect
 	open-cluster-management.io/sdk-go v1.1.0 // indirect
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.33.0 // indirect
@@ -205,12 +205,3 @@ require (
 )
 
 replace github.com/google/cel-go => github.com/google/cel-go v0.23.2
-
-// remove after latest tag for table plugin is available
-replace github.com/perses/plugins/table => github.com/perses/plugins/table v0.0.0-20250709083656-34e29fed0083
-
-// remove after https://github.com/perses/plugins/pull/XXX is merged
-replace github.com/perses/plugins/prometheus => github.com/coleenquadros/plugins/prometheus v0.0.0-20260323153128-20b716b8e708
-
-// remove after Calculation option is added upstream to piechart plugin
-replace github.com/perses/plugins/piechart => github.com/coleenquadros/plugins/piechart v0.0.0-20260324153710-cd6e47926e96
