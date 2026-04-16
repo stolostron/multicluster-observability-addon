@@ -52,7 +52,9 @@ const (
 	AcmEtcdServiceMonitorName             = "acm-etcd"
 	AcmApiServerServiceMonitorName        = "acm-kube-apiserver"
 
-	RemoteWriteCfgName        = "acm-observability"
+	RemoteWriteCfgName     = "acm-observability"
+	McoaRemoteWriteCfgName = "mcoa-observability"
+	McoaObsApiRouteName    = "mcoa-observatorium-api"
 	ScrapeClassCfgName        = "ocp-monitoring"
 	NonOCPScrapeClassName     = "non-ocp-monitoring"
 	ScrapeClassPlatformTarget = "prometheus-k8s.openshift-monitoring.svc:9091"
@@ -99,13 +101,13 @@ const (
 
 	// ContainerIDs for Thanos components used to match AddOnDeploymentConfig resource requirements.
 	// Format: "<resourceType>:<name>:<containerName>"
-	ThanosReceiveRouterContainerID   = "deployments:thanos-operator-receive:thanos"
-	ThanosReceiveIngesterContainerID = "statefulsets:thanos-operator-receive:thanos"
-	ThanosQueryContainerID           = "deployments:thanos-operator-query:thanos"
-	ThanosQueryFrontendContainerID   = "deployments:thanos-operator-query-frontend:thanos"
-	ThanosCompactContainerID         = "statefulsets:thanos-operator-compact:thanos"
-	ThanosStoreContainerID           = "statefulsets:thanos-operator-store:thanos"
-	ThanosRulerContainerID           = "statefulsets:thanos-operator-ruler:thanos"
+	ThanosReceiveRouterContainerID   = "deployments:mcoa-receive:thanos"
+	ThanosReceiveIngesterContainerID = "statefulsets:mcoa-receive:thanos"
+	ThanosQueryContainerID           = "deployments:mcoa-query:thanos"
+	ThanosQueryFrontendContainerID   = "deployments:mcoa-query-frontend:thanos"
+	ThanosCompactContainerID         = "statefulsets:mcoa-compact:thanos"
+	ThanosStoreContainerID           = "statefulsets:mcoa-store:thanos"
+	ThanosRulerContainerID           = "statefulsets:mcoa-ruler:thanos"
 )
 
 var (

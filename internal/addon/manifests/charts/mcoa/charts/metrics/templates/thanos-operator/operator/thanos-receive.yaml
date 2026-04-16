@@ -2,7 +2,7 @@
 apiVersion: monitoring.thanos.io/v1alpha1
 kind: ThanosReceive
 metadata:
-  name: {{ .Values.thanosOperator.appName }}-receive
+  name: mcoa-receive
   namespace: {{ .Release.Namespace }}
   labels:
     {{- include "metricshelm.labels" . | nindent 4 }}

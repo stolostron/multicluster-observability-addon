@@ -126,8 +126,8 @@ spec:
           args:
             - '--web.listen=0.0.0.0:8080'
             - '--web.internal.listen=0.0.0.0:8081'
-            - '--metrics.read.endpoint=http://thanos-query-frontend-thanos-operator-query.open-cluster-management-agent-addon.svc.cluster.local:9090'
-            - '--metrics.write.endpoint=http://thanos-receive-ingester-thanos-operator-receive-default.open-cluster-management-agent-addon.svc.cluster.local:10902'
+            - '--metrics.read.endpoint=http://thanos-query-frontend-mcoa-query.open-cluster-management-agent-addon.svc.cluster.local:9090'
+            - '--metrics.write.endpoint=http://thanos-receive-router-mcoa-receive.open-cluster-management-agent-addon.svc.cluster.local:19291'
             - '--log.level=warn'
             - '--rbac.config=/etc/observatorium/rbac.yaml'
             - '--tenants.config=/etc/observatorium/tenants.yaml'
