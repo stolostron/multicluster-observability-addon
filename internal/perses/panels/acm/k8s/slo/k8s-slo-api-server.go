@@ -118,9 +118,9 @@ func FleetTopClusters(datasource string) panelgroup.Option {
 					Hide: true,
 				},
 				{
-					Name:   "cluster",
-					Header: "Cluster",
-					Align:  tablePanel.LeftAlign,
+					Name:     "cluster",
+					Header:   "Cluster",
+					Align:    tablePanel.LeftAlign,
 					DataLink: dl.NewTableLinkNewTab("k8s-slo-api-server-cluster", "cluster", "Kubernetes / Service-Level Overview / API Server / Cluster"),
 				},
 				{
