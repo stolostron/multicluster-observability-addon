@@ -8,7 +8,8 @@ import (
 const (
 	Name              = "multicluster-observability-addon"
 	LabelOCMAddonName = "open-cluster-management.io/addon-name"
-	InstallNamespace  = "open-cluster-management-observability"
+	InstallNamespace   = "open-cluster-management-observability"
+	AnalyticsNamespace = "observability-analytics"
 
 	DefaultContextTimeout = 10 * time.Second
 

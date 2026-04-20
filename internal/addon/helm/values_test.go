@@ -50,7 +50,7 @@ func Test_Supported_Vendors(t *testing.T) {
 				"vendor": "OpenShift",
 			},
 			addonDeploymentConfig: []addonapiv1alpha1.CustomizedVariable{},
-			expectedObjects:       false,
+			expectedObjects:       true,
 		},
 		{
 			name: "ManagedCluster with correct labels and platform log configuration",
