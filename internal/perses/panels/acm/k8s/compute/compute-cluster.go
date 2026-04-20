@@ -9,6 +9,7 @@ import (
 	statPanel "github.com/perses/plugins/statchart/sdk/go"
 	tablePanel "github.com/perses/plugins/table/sdk/go"
 	tsPanel "github.com/perses/plugins/timeserieschart/sdk/go"
+	dl "github.com/stolostron/multicluster-observability-addon/internal/perses/panels/datalinks"
 )
 
 // Cluster dashboard panels
@@ -236,10 +237,7 @@ func ClusterCPUQuota(datasource string) panelgroup.Option {
 					Name:   "namespace",
 					Header: "Namespace",
 					Align:  tablePanel.LeftAlign,
-					DataLink: &tablePanel.DataLink{
-						URL:   "/monitoring/v2/dashboards/view?dashboard=k8s-compute-resources-namespace-pods&project=$__project&var-namespace=${__data.fields[\"namespace\"]}",
-						Title: "Drill down to pods",
-					},
+					DataLink: dl.NewTableLink("k8s-compute-resources-namespace-pods", "namespace", "Drill down to pods"),
 				},
 				{
 					Name:   "value #1",
@@ -431,10 +429,7 @@ func ClusterMemoryQuota(datasource string) panelgroup.Option {
 					Name:   "namespace",
 					Header: "Namespace",
 					Align:  tablePanel.LeftAlign,
-					DataLink: &tablePanel.DataLink{
-						URL:   "/monitoring/v2/dashboards/view?dashboard=k8s-compute-resources-namespace-pods&project=$__project&var-namespace=${__data.fields[\"namespace\"]}",
-						Title: "Drill down to pods",
-					},
+					DataLink: dl.NewTableLink("k8s-compute-resources-namespace-pods", "namespace", "Drill down to pods"),
 				},
 				{
 					Name:   "value #1",

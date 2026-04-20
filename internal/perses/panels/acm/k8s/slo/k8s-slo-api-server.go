@@ -9,6 +9,7 @@ import (
 	statPanel "github.com/perses/plugins/statchart/sdk/go"
 	tablePanel "github.com/perses/plugins/table/sdk/go"
 	tsPanel "github.com/perses/plugins/timeserieschart/sdk/go"
+	dl "github.com/stolostron/multicluster-observability-addon/internal/perses/panels/datalinks"
 )
 
 func FleetClustersExceededSLO(datasource string) panelgroup.Option {
@@ -120,11 +121,7 @@ func FleetTopClusters(datasource string) panelgroup.Option {
 					Name:   "cluster",
 					Header: "Cluster",
 					Align:  tablePanel.LeftAlign,
-					DataLink: &tablePanel.DataLink{
-						URL:        "/monitoring/v2/dashboards/view?dashboard=k8s-slo-api-server-cluster&project=$__project&var-cluster=${__data.fields[\"cluster\"]}",
-						Title:      "Kubernetes / Service-Level Overview / API Server / Cluster",
-						OpenNewTab: true,
-					},
+					DataLink: dl.NewTableLinkNewTab("k8s-slo-api-server-cluster", "cluster", "Kubernetes / Service-Level Overview / API Server / Cluster"),
 				},
 				{
 					Name:   "value #1",

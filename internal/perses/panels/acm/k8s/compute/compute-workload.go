@@ -8,6 +8,7 @@ import (
 	"github.com/perses/plugins/prometheus/sdk/go/query"
 	tablePanel "github.com/perses/plugins/table/sdk/go"
 	tsPanel "github.com/perses/plugins/timeserieschart/sdk/go"
+	dl "github.com/stolostron/multicluster-observability-addon/internal/perses/panels/datalinks"
 )
 
 // Workload dashboard panels
@@ -67,11 +68,7 @@ func WorkloadCPUQuota(datasource string) panelgroup.Option {
 					Name:   "pod",
 					Header: "Pod",
 					Align:  tablePanel.LeftAlign,
-					DataLink: &tablePanel.DataLink{
-						URL:        "/monitoring/v2/dashboards/view?dashboard=k8s-compute-resources-pod&project=$__project&var-pod=${__data.fields[\"pod\"]}",
-						Title:      "Drill down to pod",
-						OpenNewTab: true,
-					},
+					DataLink: dl.NewTableLinkNewTab("k8s-compute-resources-pod", "pod", "Drill down to pod"),
 				},
 				{
 					Name:   "value #1",
@@ -209,11 +206,7 @@ func WorkloadMemoryQuota(datasource string) panelgroup.Option {
 					Name:   "pod",
 					Header: "Pod",
 					Align:  tablePanel.LeftAlign,
-					DataLink: &tablePanel.DataLink{
-						URL:        "/monitoring/v2/dashboards/view?dashboard=k8s-compute-resources-pod&project=$__project&var-pod=${__data.fields[\"pod\"]}",
-						Title:      "Drill down to pod",
-						OpenNewTab: true,
-					},
+					DataLink: dl.NewTableLinkNewTab("k8s-compute-resources-pod", "pod", "Drill down to pod"),
 				},
 				{
 					Name:   "value #1",

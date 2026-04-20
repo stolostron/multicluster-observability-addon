@@ -9,6 +9,7 @@ import (
 	"github.com/perses/plugins/prometheus/sdk/go/query"
 	tablePanel "github.com/perses/plugins/table/sdk/go"
 	tsPanel "github.com/perses/plugins/timeserieschart/sdk/go"
+	dl "github.com/stolostron/multicluster-observability-addon/internal/perses/panels/datalinks"
 )
 
 // Cluster dashboard panels
@@ -77,10 +78,7 @@ func ClusterCurrentStatus(datasource string) panelgroup.Option {
 					Name:   "namespace",
 					Header: "Namespace",
 					Align:  tablePanel.LeftAlign,
-					DataLink: &tablePanel.DataLink{
-						URL:   "/monitoring/v2/dashboards/view?dashboard=k8s-networking-namespace-pods&project=$__project&var-namespace=${__data.fields[\"namespace\"]}",
-						Title: "Drill down to pods",
-					},
+					DataLink: dl.NewTableLink("k8s-networking-namespace-pods", "namespace", "Drill down to pods"),
 				},
 				{
 					Name:   "value #1",

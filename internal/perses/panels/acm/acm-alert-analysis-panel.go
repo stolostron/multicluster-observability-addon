@@ -12,12 +12,13 @@ import (
 	tablePanel "github.com/perses/plugins/table/sdk/go"
 	timeSeriesPanel "github.com/perses/plugins/timeserieschart/sdk/go"
 	"github.com/prometheus/prometheus/model/labels"
+	dl "github.com/stolostron/multicluster-observability-addon/internal/perses/panels/datalinks"
 )
 
 func TotalAlerts(datasourceName string, labelMatchers ...*labels.Matcher) panelgroup.Option {
 	return panelgroup.AddPanel("Total Alerts",
 		panel.Description("Total number of alerts that are firing."),
-		panel.AddLink("/monitoring/v2/dashboards/view?dashboard=acm-clusters-by-alert&project=$__project&var-alert=$__all&var-severity=$__all", link.TargetBlank(true)),
+		panel.AddLink(dl.DashboardURL("acm-clusters-by-alert", dl.StaticParam("alert", "$__all"), dl.StaticParam("severity", "$__all")), link.TargetBlank(true)),
 		statPanel.Chart(
 			statPanel.Calculation("last-number"),
 			statPanel.Thresholds(commonSdk.Thresholds{
@@ -40,7 +41,7 @@ func TotalAlerts(datasourceName string, labelMatchers ...*labels.Matcher) panelg
 func TotalCriticalAlerts(datasourceName string, labelMatchers ...*labels.Matcher) panelgroup.Option {
 	return panelgroup.AddPanel("Total Critical Alerts",
 		panel.Description("Total number of alerts that are firing with the severity level: critical."),
-		panel.AddLink("/monitoring/v2/dashboards/view?dashboard=acm-clusters-by-alert&project=$__project&var-alert=$__all&var-severity=critical", link.TargetBlank(true)),
+		panel.AddLink(dl.DashboardURL("acm-clusters-by-alert", dl.StaticParam("alert", "$__all"), dl.StaticParam("severity", "critical")), link.TargetBlank(true)),
 		statPanel.Chart(
 			statPanel.Calculation("last-number"),
 			statPanel.Thresholds(commonSdk.Thresholds{
@@ -63,7 +64,7 @@ func TotalCriticalAlerts(datasourceName string, labelMatchers ...*labels.Matcher
 func TotalWarningAlerts(datasourceName string, labelMatchers ...*labels.Matcher) panelgroup.Option {
 	return panelgroup.AddPanel("Total Warning Alerts",
 		panel.Description("Total number of alerts that are firing with the severity level: warning."),
-		panel.AddLink("/monitoring/v2/dashboards/view?dashboard=acm-clusters-by-alert&project=$__project&var-alert=$__all&var-severity=warning", link.TargetBlank(true)),
+		panel.AddLink(dl.DashboardURL("acm-clusters-by-alert", dl.StaticParam("alert", "$__all"), dl.StaticParam("severity", "warning")), link.TargetBlank(true)),
 		statPanel.Chart(
 			statPanel.Calculation("last-number"),
 			statPanel.Thresholds(commonSdk.Thresholds{
@@ -86,7 +87,7 @@ func TotalWarningAlerts(datasourceName string, labelMatchers ...*labels.Matcher)
 func TotalModerateAlerts(datasourceName string, labelMatchers ...*labels.Matcher) panelgroup.Option {
 	return panelgroup.AddPanel("Total Moderate Alerts",
 		panel.Description("Total number of alerts that are firing with the severity level: moderate."),
-		panel.AddLink("/monitoring/v2/dashboards/view?dashboard=acm-clusters-by-alert&project=$__project&var-alert=$__all&var-severity=moderate", link.TargetBlank(true)),
+		panel.AddLink(dl.DashboardURL("acm-clusters-by-alert", dl.StaticParam("alert", "$__all"), dl.StaticParam("severity", "moderate")), link.TargetBlank(true)),
 		statPanel.Chart(
 			statPanel.Calculation("last-number"),
 			statPanel.Thresholds(commonSdk.Thresholds{
@@ -109,7 +110,7 @@ func TotalModerateAlerts(datasourceName string, labelMatchers ...*labels.Matcher
 func TotalLowAlerts(datasourceName string, labelMatchers ...*labels.Matcher) panelgroup.Option {
 	return panelgroup.AddPanel("Total Low Alerts",
 		panel.Description("Total number of alerts that are firing with the severity level: low."),
-		panel.AddLink("/monitoring/v2/dashboards/view?dashboard=acm-clusters-by-alert&project=$__project&var-alert=$__all&var-severity=low", link.TargetBlank(true)),
+		panel.AddLink(dl.DashboardURL("acm-clusters-by-alert", dl.StaticParam("alert", "$__all"), dl.StaticParam("severity", "low")), link.TargetBlank(true)),
 		statPanel.Chart(
 			statPanel.Calculation("last-number"),
 			statPanel.Thresholds(commonSdk.Thresholds{
@@ -132,7 +133,7 @@ func TotalLowAlerts(datasourceName string, labelMatchers ...*labels.Matcher) pan
 func TotalImportantAlerts(datasourceName string, labelMatchers ...*labels.Matcher) panelgroup.Option {
 	return panelgroup.AddPanel("Total Important Alerts",
 		panel.Description("Total number of alerts that are firing with the severity level: important."),
-		panel.AddLink("/monitoring/v2/dashboards/view?dashboard=acm-clusters-by-alert&project=$__project&var-alert=$__all&var-severity=important", link.TargetBlank(true)),
+		panel.AddLink(dl.DashboardURL("acm-clusters-by-alert", dl.StaticParam("alert", "$__all"), dl.StaticParam("severity", "important")), link.TargetBlank(true)),
 		statPanel.Chart(
 			statPanel.Calculation("last-number"),
 			statPanel.Thresholds(commonSdk.Thresholds{
@@ -231,22 +232,14 @@ func AlertsAndClusters(datasourceName string, labelMatchers ...*labels.Matcher) 
 					Header: "",
 				},
 				{
-					Name:   "alertname",
-					Header: "Alert",
-					DataLink: &tablePanel.DataLink{
-						URL:        "/monitoring/v2/dashboards/view?dashboard=acm-clusters-by-alert&project=$__project&var-alert=${__data.fields[\"alertname\"]}",
-						Title:      "Drill down to Clusters with this Alert",
-						OpenNewTab: true,
-					},
+					Name:     "alertname",
+					Header:   "Alert",
+					DataLink: dl.NewTableLinkCustomVar("acm-clusters-by-alert", "alert", "alertname", "Drill down to Clusters with this Alert"),
 				},
 				{
-					Name:   "cluster",
-					Header: "Cluster",
-					DataLink: &tablePanel.DataLink{
-						URL:        "/monitoring/v2/dashboards/view?dashboard=acm-alerts-by-cluster&project=$__project&var-cluster=${__data.fields[\"cluster\"]}",
-						Title:      "Drill down to Alerts on this Cluster",
-						OpenNewTab: true,
-					},
+					Name:     "cluster",
+					Header:   "Cluster",
+					DataLink: dl.NewTableLinkNewTab("acm-alerts-by-cluster", "cluster", "Drill down to Alerts on this Cluster"),
 				},
 				{
 					Name:   "severity",
