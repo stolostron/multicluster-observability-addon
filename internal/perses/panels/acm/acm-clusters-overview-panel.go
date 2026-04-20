@@ -23,9 +23,9 @@ func Top50MaxLatencyAPIServer(datasourceName string, labelMatchers ...*labels.Ma
 					Hide: true,
 				},
 				{
-					Name:   "cluster",
-					Header: "Cluster",
-					Align:  tablePanel.LeftAlign,
+					Name:     "cluster",
+					Header:   "Cluster",
+					Align:    tablePanel.LeftAlign,
 					DataLink: dl.NewTableLink("acm-optimization-overview", "cluster", "Drill down to cluster"),
 				},
 				{
@@ -83,9 +83,9 @@ func EtcdHealth(datasourceName string, labelMatchers ...*labels.Matcher) panelgr
 					Hide: true,
 				},
 				{
-					Name:   "cluster",
-					Header: "Cluster",
-					Align:  tablePanel.LeftAlign,
+					Name:     "cluster",
+					Header:   "Cluster",
+					Align:    tablePanel.LeftAlign,
 					DataLink: dl.NewTableLink("acm-optimization-overview", "cluster", "Drill down to cluster"),
 				},
 				{
@@ -130,9 +130,9 @@ func Top50CPUOverEstimationClusters(datasourceName string, labelMatchers ...*lab
 					Hide: true,
 				},
 				{
-					Name:   "cluster",
-					Header: "Cluster",
-					Align:  tablePanel.LeftAlign,
+					Name:     "cluster",
+					Header:   "Cluster",
+					Align:    tablePanel.LeftAlign,
 					DataLink: dl.NewTableLink("acm-optimization-overview", "cluster", "Drill down to cluster"),
 				},
 				{
@@ -178,9 +178,9 @@ func Top50MemoryOverEstimationClusters(datasourceName string, labelMatchers ...*
 					Hide: true,
 				},
 				{
-					Name:   "cluster",
-					Header: "Cluster",
-					Align:  tablePanel.LeftAlign,
+					Name:     "cluster",
+					Header:   "Cluster",
+					Align:    tablePanel.LeftAlign,
 					DataLink: dl.NewTableLink("acm-optimization-overview", "cluster", "Drill down to cluster"),
 				},
 				{
@@ -226,9 +226,9 @@ func Top50CPUUtilizedClusters(datasourceName string, labelMatchers ...*labels.Ma
 					Hide: true,
 				},
 				{
-					Name:   "cluster",
-					Header: "Cluster",
-					Align:  tablePanel.LeftAlign,
+					Name:     "cluster",
+					Header:   "Cluster",
+					Align:    tablePanel.LeftAlign,
 					DataLink: dl.NewTableLink("acm-optimization-overview", "cluster", "Drill down to cluster"),
 				},
 				{
@@ -310,9 +310,9 @@ func Top50MemoryUtilizedClusters(datasourceName string, labelMatchers ...*labels
 					Hide: true,
 				},
 				{
-					Name:   "cluster",
-					Header: "Cluster",
-					Align:  tablePanel.LeftAlign,
+					Name:     "cluster",
+					Header:   "Cluster",
+					Align:    tablePanel.LeftAlign,
 					DataLink: dl.NewTableLink("acm-optimization-overview", "cluster", "Drill down to cluster"),
 				},
 				{
@@ -389,9 +389,9 @@ func BandwidthUtilization(datasourceName string, labelMatchers ...*labels.Matche
 					Hide: true,
 				},
 				{
-					Name:   "cluster",
-					Header: "Cluster",
-					Align:  tablePanel.LeftAlign,
+					Name:     "cluster",
+					Header:   "Cluster",
+					Align:    tablePanel.LeftAlign,
 					DataLink: dl.NewTableLink("k8s-networking-cluster", "cluster", "Drill down to cluster"),
 				},
 				{

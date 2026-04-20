@@ -75,9 +75,9 @@ func ClusterCurrentStatus(datasource string) panelgroup.Option {
 					Hide: true,
 				},
 				{
-					Name:   "namespace",
-					Header: "Namespace",
-					Align:  tablePanel.LeftAlign,
+					Name:     "namespace",
+					Header:   "Namespace",
+					Align:    tablePanel.LeftAlign,
 					DataLink: dl.NewTableLink("k8s-networking-namespace-pods", "namespace", "Drill down to pods"),
 				},
 				{

@@ -65,9 +65,9 @@ func NamespaceWorkloadsCPUQuota(datasource string) panelgroup.Option {
 					Hide: true,
 				},
 				{
-					Name:   "workload",
-					Header: "Workload",
-					Align:  tablePanel.LeftAlign,
+					Name:     "workload",
+					Header:   "Workload",
+					Align:    tablePanel.LeftAlign,
 					DataLink: dl.NewTableLink("k8s-compute-resources-workload", "workload", "Drill down to workload"),
 				},
 				{
@@ -217,9 +217,9 @@ func NamespaceWorkloadsMemoryQuota(datasource string) panelgroup.Option {
 					Hide: true,
 				},
 				{
-					Name:   "workload",
-					Header: "Workload",
-					Align:  tablePanel.LeftAlign,
+					Name:     "workload",
+					Header:   "Workload",
+					Align:    tablePanel.LeftAlign,
 					DataLink: dl.NewTableLink("k8s-compute-resources-workload", "workload", "Drill down to workload"),
 				},
 				{

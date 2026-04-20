@@ -176,9 +176,9 @@ func NamespacePodsCPUQuota(datasource string) panelgroup.Option {
 					Hide: true,
 				},
 				{
-					Name:   "pod",
-					Header: "Pod",
-					Align:  tablePanel.LeftAlign,
+					Name:     "pod",
+					Header:   "Pod",
+					Align:    tablePanel.LeftAlign,
 					DataLink: dl.NewTableLink("k8s-compute-resources-pod", "pod", "Drill down"),
 				},
 				{
@@ -323,9 +323,9 @@ func NamespacePodsMemoryQuota(datasource string) panelgroup.Option {
 					Hide: true,
 				},
 				{
-					Name:   "pod",
-					Header: "Pod",
-					Align:  tablePanel.LeftAlign,
+					Name:     "pod",
+					Header:   "Pod",
+					Align:    tablePanel.LeftAlign,
 					DataLink: dl.NewTableLink("k8s-compute-resources-pod", "pod", "Drill down"),
 				},
 				{
