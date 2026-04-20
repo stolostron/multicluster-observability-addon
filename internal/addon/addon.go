@@ -312,6 +312,19 @@ func Updaters() []agent.Updater {
 		},
 	})
 
+	updaters = append(updaters, agent.Updater{
+		UpdateStrategy: workv1.UpdateStrategy{
+			Type: workv1.UpdateStrategyTypeServerSideApply,
+			ServerSideApply: &workv1.ServerSideApplyConfig{
+				Force: false,
+			},
+		},
+		ResourceIdentifier: workv1.ResourceIdentifier{
+			Group:    "",
+			Resource: "namespaces",
+		},
+	})
+
 	return updaters
 }
 
