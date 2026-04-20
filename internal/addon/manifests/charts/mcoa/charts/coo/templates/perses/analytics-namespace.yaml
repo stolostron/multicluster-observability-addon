@@ -1,0 +1,10 @@
+{{- if .Values.analyticsDashboards }}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: observability-analytics
+  labels:
+    app: {{ template "coohelm.name" . }}
+    chart: {{ template "coohelm.chart" . }}
+    release: {{ .Release.Name }}
+{{- end }}
