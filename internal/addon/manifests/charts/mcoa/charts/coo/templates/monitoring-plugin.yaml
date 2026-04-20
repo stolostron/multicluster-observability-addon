@@ -9,14 +9,12 @@ metadata:
     release: {{ .Release.Name }}
 spec:
   monitoring:
-{{- if .Values.metrics.enabled }}
     acm:
       enabled: true
       alertmanager:
         url: 'https://alertmanager.open-cluster-management-observability.svc:9095'
       thanosQuerier:
         url: 'https://rbac-query-proxy.open-cluster-management-observability.svc:8443'
-{{- end }}
     perses:
       enabled: {{ .Values.perses }}
 {{- if .Values.incidentDetection.enabled }}

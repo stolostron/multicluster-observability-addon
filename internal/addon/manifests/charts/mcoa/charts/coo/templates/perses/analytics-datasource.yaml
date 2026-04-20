@@ -1,9 +1,9 @@
-{{- if and .Values.enabled .Values.monitoringUIPlugin }}
+{{- if .Values.analyticsDashboards }}
 apiVersion: perses.dev/v1alpha1
 kind: PersesDatasource
 metadata:
   name: rbac-query-proxy-datasource
-  namespace: open-cluster-management-observability
+  namespace: observability-analytics
 spec:
   client:
     tls:
@@ -21,4 +21,3 @@ spec:
           spec:
             url: 'http://rbac-query-proxy.open-cluster-management-observability.svc.cluster.local:8080'
 {{- end }}
-

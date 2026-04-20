@@ -57,6 +57,7 @@ require (
 	github.com/go-openapi/swag/yamlutils v0.25.4 // indirect
 	github.com/golang-jwt/jwt/v5 v5.3.1 // indirect
 	github.com/hashicorp/go-version v1.8.0 // indirect
+	github.com/perses/plugins/staticlistvariable v0.8.1 // indirect
 	github.com/prometheus/otlptranslator v1.0.0 // indirect
 	go.opentelemetry.io/collector/featuregate v1.51.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
