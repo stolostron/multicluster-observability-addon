@@ -78,12 +78,12 @@ const (
 	DefaultRetentionInLocal           = "24h"
 	DefaultQueryReplicas              = 2
 	DefaultCompactStorageSize         = "100Gi"
-	DefaultRetentionResolutionRaw     = "30d"
-	DefaultRetentionResolution5m      = "180d"
-	DefaultRetentionResolution1h      = "0d"
-	DefaultStoreShards                = 1
+	DefaultRetentionResolutionRaw     = "365d"
+	DefaultRetentionResolution5m      = "365d"
+	DefaultRetentionResolution1h      = "365d"
+	DefaultStoreShards                = 3
 	DefaultStoreStorageSize           = "10Gi"
-	DefaultRulerReplicas              = 2
+	DefaultRulerReplicas              = 3
 	DefaultRulerStorageSize           = "1Gi"
 	DefaultQueryFrontendReplicas      = 2
 	DefaultRulerEvalInterval          = "1m"
