@@ -127,11 +127,19 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				cooOperator := common.FilterResourcesByLabelSelector[*appsv1.Deployment](objects, nil)
 				assert.Len(t, cooOperator, 1)
 				// ensure that the number of objects is correct
-				// 4 (prom operator) + 5 (agent) + 2 secrets (mTLS to hub) + 1 cm (prom ca) + 2 rule + 2 scrape config + 1 configmap = 17
-				expectedCount := 35
+				// 4 (prom operator) + 5 (agent) + 2 secrets (mTLS to hub) + 1 cm (prom ca) + 2 rule + 2 scrape config + 1 configmap + 1 namespace = 17
+				expectedCount := 36
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
+
+				// ensure the namespace has the correct labels
+				ns := common.FilterResourcesByLabelSelector[*corev1.Namespace](objects, nil)
+				require.Len(t, ns, 1)
+				assert.Equal(t, addonfactory.AddonDefaultInstallNamespace, ns[0].Name)
+				assert.Equal(t, "true", ns[0].Labels["openshift.io/cluster-monitoring"])
+				assert.Empty(t, ns[0].Labels["app"])
+
 				secrets := common.FilterResourcesByLabelSelector[*corev1.Secret](objects, nil)
 				assert.Len(t, secrets, 4) // 4 secrets (mTLS to hub) + alertmananger secrets (accessor+ca in platform)
 
@@ -168,7 +176,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 					t.Fatalf("expected %d objects, but got %d", expectedCount, len(crds))
 				}
 				// ensure that the number of objects is correct
-				expectedCount = 33
+				expectedCount = 34
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
@@ -187,7 +195,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				assert.Equal(t, "observability-operator", agent[0].Labels["app.kubernetes.io/managed-by"])
 				assert.Empty(t, agent[0].Annotations["operator.prometheus.io/controller-id"])
 				// ensure that the number of objects is correct
-				expectedCount := 22
+				expectedCount := 23
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
@@ -219,10 +227,11 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				cooRecordingRules := common.FilterResourcesByLabelSelector[*cooprometheusv1.PrometheusRule](objects, config.UserWorkloadPrometheusMatchLabels)
 				assert.Len(t, cooRecordingRules, 2)
 				assert.Equal(t, "openshift-user-workload-monitoring/prometheus-operator", cooRecordingRules[0].Annotations["operator.prometheus.io/controller-id"])
-				expectedCount := 37
+				expectedCount := 38
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
+
 				assert.Len(t, common.FilterResourcesByLabelSelector[*corev1.Secret](objects, nil), 4) // 2 secrets (mTLS to hub) + alertmananger secrets (accessor+ca in uwl)
 				verifyClusterScopedResourcesPrefix(t, objects)
 			},
@@ -243,7 +252,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				assert.Len(t, crds, 1) // Only the monitoringstacks one
 
 				// ensure that the number of objects is correct
-				expectedCount := 24
+				expectedCount := 25
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
@@ -353,7 +362,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				verifyClusterScopedResourcesPrefix(t, objects)
 
 				// ensure that the number of objects is correct
-				expectedCount := 71
+				expectedCount := 72
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
@@ -425,6 +434,10 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				ns := common.FilterResourcesByLabelSelector[*corev1.Namespace](objects, nil)
 				require.Len(t, ns, 1)
 				assert.Equal(t, "custom", ns[0].Name)
+				assert.Equal(t, "true", ns[0].Labels["openshift.io/cluster-monitoring"])
+				// For custom namespaces, chart labels SHOULD be present
+				assert.Equal(t, "metrics", ns[0].Labels["app"])
+
 				// ensure that the number of objects is correct
 				expectedCount := 72
 				if len(objects) != expectedCount {
