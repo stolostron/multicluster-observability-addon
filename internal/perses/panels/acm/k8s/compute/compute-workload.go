@@ -65,9 +65,9 @@ func WorkloadCPUQuota(datasource string) panelgroup.Option {
 					Hide: true,
 				},
 				{
-					Name:   "pod",
-					Header: "Pod",
-					Align:  tablePanel.LeftAlign,
+					Name:     "pod",
+					Header:   "Pod",
+					Align:    tablePanel.LeftAlign,
 					DataLink: dl.NewTableLinkNewTab("k8s-compute-resources-pod", "pod", "Drill down to pod"),
 				},
 				{
@@ -203,9 +203,9 @@ func WorkloadMemoryQuota(datasource string) panelgroup.Option {
 					Hide: true,
 				},
 				{
-					Name:   "pod",
-					Header: "Pod",
-					Align:  tablePanel.LeftAlign,
+					Name:     "pod",
+					Header:   "Pod",
+					Align:    tablePanel.LeftAlign,
 					DataLink: dl.NewTableLinkNewTab("k8s-compute-resources-pod", "pod", "Drill down to pod"),
 				},
 				{
