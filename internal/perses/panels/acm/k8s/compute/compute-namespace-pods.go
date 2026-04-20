@@ -9,6 +9,7 @@ import (
 	statPanel "github.com/perses/plugins/statchart/sdk/go"
 	tablePanel "github.com/perses/plugins/table/sdk/go"
 	tsPanel "github.com/perses/plugins/timeserieschart/sdk/go"
+	dl "github.com/stolostron/multicluster-observability-addon/internal/perses/panels/datalinks"
 )
 
 // Namespace (Pods) dashboard panels
@@ -178,10 +179,7 @@ func NamespacePodsCPUQuota(datasource string) panelgroup.Option {
 					Name:   "pod",
 					Header: "Pod",
 					Align:  tablePanel.LeftAlign,
-					DataLink: &tablePanel.DataLink{
-						URL:   "/monitoring/v2/dashboards/view?dashboard=k8s-compute-resources-pod&project=$__project&var-pod=${__data.fields[\"pod\"]}",
-						Title: "Drill down",
-					},
+					DataLink: dl.NewTableLink("k8s-compute-resources-pod", "pod", "Drill down"),
 				},
 				{
 					Name:   "value #1",
@@ -328,10 +326,7 @@ func NamespacePodsMemoryQuota(datasource string) panelgroup.Option {
 					Name:   "pod",
 					Header: "Pod",
 					Align:  tablePanel.LeftAlign,
-					DataLink: &tablePanel.DataLink{
-						URL:   "/monitoring/v2/dashboards/view?dashboard=k8s-compute-resources-pod&project=$__project&var-pod=${__data.fields[\"pod\"]}",
-						Title: "Drill down",
-					},
+					DataLink: dl.NewTableLink("k8s-compute-resources-pod", "pod", "Drill down"),
 				},
 				{
 					Name:   "value #1",

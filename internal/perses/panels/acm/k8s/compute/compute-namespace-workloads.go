@@ -8,6 +8,7 @@ import (
 	"github.com/perses/plugins/prometheus/sdk/go/query"
 	tablePanel "github.com/perses/plugins/table/sdk/go"
 	tsPanel "github.com/perses/plugins/timeserieschart/sdk/go"
+	dl "github.com/stolostron/multicluster-observability-addon/internal/perses/panels/datalinks"
 )
 
 // Namespace (Workloads) dashboard panels
@@ -67,10 +68,7 @@ func NamespaceWorkloadsCPUQuota(datasource string) panelgroup.Option {
 					Name:   "workload",
 					Header: "Workload",
 					Align:  tablePanel.LeftAlign,
-					DataLink: &tablePanel.DataLink{
-						URL:   "/monitoring/v2/dashboards/view?dashboard=k8s-compute-resources-workload&project=$__project&var-workload=${__data.fields[\"workload\"]}",
-						Title: "Drill down to workload",
-					},
+					DataLink: dl.NewTableLink("k8s-compute-resources-workload", "workload", "Drill down to workload"),
 				},
 				{
 					Name:   "value #1",
@@ -222,10 +220,7 @@ func NamespaceWorkloadsMemoryQuota(datasource string) panelgroup.Option {
 					Name:   "workload",
 					Header: "Workload",
 					Align:  tablePanel.LeftAlign,
-					DataLink: &tablePanel.DataLink{
-						URL:   "/monitoring/v2/dashboards/view?dashboard=k8s-compute-resources-workload&project=$__project&var-workload=${__data.fields[\"workload\"]}",
-						Title: "Drill down to workload",
-					},
+					DataLink: dl.NewTableLink("k8s-compute-resources-workload", "workload", "Drill down to workload"),
 				},
 				{
 					Name:   "value #1",
