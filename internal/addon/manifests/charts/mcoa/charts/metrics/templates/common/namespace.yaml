@@ -1,12 +1,14 @@
-{{- if and (or .Values.platformEnabled .Values.userWorkloadsEnabled) (ne .Release.Namespace "open-cluster-management-agent-addon") }}
+{{- if or .Values.platformEnabled .Values.userWorkloadsEnabled }}
 apiVersion: v1
 kind: Namespace
 metadata:
   name: {{ .Release.Namespace }}
   labels:
+    {{- if ne .Release.Namespace "open-cluster-management-agent-addon" }}
     {{ include "metricshelm.labels" . | nindent 4 }}
-    openshift.io/cluster-monitoring: "true"
     # This label tells the addonsecretcontroller to copy the open-cluster-management-image-pull-credentials
     # pull request secret to the namespace on the mgd cluster
     addon.open-cluster-management.io/namespace: "true"
+    {{- end }}
+    openshift.io/cluster-monitoring: "true"
 {{- end }}
