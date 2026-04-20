@@ -27,7 +27,17 @@ func TestBuildOptions(t *testing.T) {
 			addOnDeploy: &addonapiv1alpha1.AddOnDeploymentConfig{
 				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{},
 			},
-			expectedOpts: Options{},
+			expectedOpts: Options{
+				Platform: PlatformOptions{
+					Enabled: true,
+					AnalyticsOptions: AnalyticsOptions{
+						RightSizing: RightSizingOptions{
+							NamespaceEnabled:      true,
+							VirtualizationEnabled: true,
+						},
+					},
+				},
+			},
 		},
 		{
 			name: "invalid name key",
@@ -339,6 +349,15 @@ func TestBuildOptions(t *testing.T) {
 								corev1.ResourceCPU:    resource.MustParse("10m"),
 								corev1.ResourceMemory: resource.MustParse("128Mi"),
 							},
+						},
+					},
+				},
+				Platform: PlatformOptions{
+					Enabled: true,
+					AnalyticsOptions: AnalyticsOptions{
+						RightSizing: RightSizingOptions{
+							NamespaceEnabled:      true,
+							VirtualizationEnabled: true,
 						},
 					},
 				},
