@@ -62,10 +62,7 @@ var cmaoPredicate = builder.WithPredicates(predicate.Funcs{
 	GenericFunc: func(e event.GenericEvent) bool { return false },
 })
 
-var rsConfigMapPredicate = builder.WithPredicates(predicate.NewPredicateFuncs(func(obj client.Object) bool {
-	return obj.GetNamespace() == addoncfg.InstallNamespace &&
-		(obj.GetName() == "rs-namespace-config" || obj.GetName() == "rs-virt-config")
-}))
+var rsConfigMapPredicate = builder.WithPredicates(rshandlers.RSConfigMapPredicate())
 
 var partOfMCOALabelSelector = labels.SelectorFromSet(labels.Set{
 	addoncfg.PartOfK8sLabelKey: addoncfg.Name,
