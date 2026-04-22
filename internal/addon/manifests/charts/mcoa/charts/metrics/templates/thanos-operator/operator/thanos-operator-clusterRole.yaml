@@ -6,8 +6,7 @@ metadata:
   labels:
     app.kubernetes.io/component: {{ .Values.thanosOperator.component }}
     app.kubernetes.io/name: {{ .Values.thanosOperator.appName }}
-    app.kubernetes.io/part-of: {{ .Values.thanosOperator.appName }}
-    {{- include "metricshelm.labels" . | nindent 4 }}
+    {{ include "metricshelm.labels" . | nindent 4 }}
 rules:
 - apiGroups:
   - ""

@@ -6,9 +6,8 @@ metadata:
   labels:
     app.kubernetes.io/component: {{ .Values.thanosOperator.component }}
     app.kubernetes.io/name: {{ .Values.thanosOperator.appName }}
-    app.kubernetes.io/part-of: {{ .Values.thanosOperator.appName }}
     control-plane: controller-manager
-    {{- include "metricshelm.labels" . | nindent 4 }}
+    {{ include "metricshelm.labels" . | nindent 4 }}
   name: {{ .Values.thanosOperator.appName }}-controller-manager
   namespace: {{ .Release.Namespace }}
 spec:
@@ -24,7 +23,7 @@ spec:
       labels:
         control-plane: controller-manager
         app.kubernetes.io/name: {{ .Values.thanosOperator.appName }}
-        app.kubernetes.io/part-of: {{ .Values.thanosOperator.appName }}
+        app.kubernetes.io/part-of: multicluster-observability-addon
     spec:
       containers:
       - name: kube-rbac-proxy
