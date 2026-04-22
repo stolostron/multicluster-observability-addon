@@ -738,7 +738,7 @@ func (o *OptionsBuilder) buildThanosStore(opts *Options, objStore thanosv1alpha1
 
 	opts.Thanos.Store = &thanosv1alpha1.ThanosStore{
 		Spec: thanosv1alpha1.ThanosStoreSpec{
-			Replicas:            shards,
+			Replicas:            1,
 			ObjectStorageConfig: objStore,
 			StorageConfiguration: thanosv1alpha1.StorageConfiguration{
 				Size: thanosv1alpha1.StorageSize(config.DefaultStoreStorageSize),
