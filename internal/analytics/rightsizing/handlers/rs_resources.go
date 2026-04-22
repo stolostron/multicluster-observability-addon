@@ -13,7 +13,30 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
+
+// RSConfigMapPredicate returns a predicate that filters ConfigMap watch events
+// to only RS ConfigMaps. Delete and generic events are ignored to prevent
+// MCOA from reconciling when MCO deletes ConfigMaps during its finalizer cleanup.
+func RSConfigMapPredicate() predicate.Funcs {
+	return predicate.Funcs{
+		CreateFunc: func(e event.CreateEvent) bool {
+			return isRSConfigMap(e.Object.GetNamespace(), e.Object.GetName())
+		},
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			return isRSConfigMap(e.ObjectNew.GetNamespace(), e.ObjectNew.GetName())
+		},
+		DeleteFunc:  func(e event.DeleteEvent) bool { return false },
+		GenericFunc: func(e event.GenericEvent) bool { return false },
+	}
+}
+
+func isRSConfigMap(namespace, name string) bool {
+	return namespace == addoncfg.InstallNamespace &&
+		(name == rightsizing.NamespaceConfigMapName || name == rightsizing.VirtualizationConfigMapName)
+}
 
 // ReconcileRSResources ensures right-sizing Placement and ConfigMap resources are
 // created for enabled features and cleaned up for disabled features.
