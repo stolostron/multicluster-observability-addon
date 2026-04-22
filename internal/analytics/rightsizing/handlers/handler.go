@@ -118,22 +118,6 @@ func (o *OptionsBuilder) Build(ctx context.Context, cluster *clusterv1.ManagedCl
 		}
 	}
 
-	// Generate ScrapeConfig for metrics federation if any right-sizing is enabled
-	if namespaceEnabled || virtualizationEnabled {
-		scrapeConfig := rightsizing.GenerateScrapeConfig(namespaceEnabled, virtualizationEnabled)
-		if scrapeConfig != nil {
-			// Add ScrapeConfig to namespace options (it will be merged with platform ScrapeConfigs)
-			if namespaceEnabled {
-				ret.NamespaceRightSizing.ScrapeConfigs = append(ret.NamespaceRightSizing.ScrapeConfigs, scrapeConfig)
-			} else {
-				ret.VirtualizationRightSizing.ScrapeConfigs = append(ret.VirtualizationRightSizing.ScrapeConfigs, scrapeConfig)
-			}
-			o.Logger.V(2).Info("Generated right-sizing ScrapeConfig for metrics federation",
-				"namespaceEnabled", namespaceEnabled,
-				"virtualizationEnabled", virtualizationEnabled)
-		}
-	}
-
 	return ret, nil
 }
 

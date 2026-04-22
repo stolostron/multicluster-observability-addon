@@ -59,21 +59,7 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, logger logr.Logger) a
 			Enabled: true,
 		}
 
-		// Build right-sizing options first (needed for ScrapeConfig merging into metrics)
-		var rsOpts *rshandlers.Options
-		rsOptsBuilder := rshandlers.OptionsBuilder{
-			Client: k8s,
-			Logger: logger,
-		}
-		rsOptsBuilt, err := rsOptsBuilder.Build(ctx, cluster, opts)
-		if err != nil {
-			return nil, fmt.Errorf("failed to build right-sizing options: %w", err)
-		}
-		if rsOptsBuilt.NamespaceRightSizing.Enabled || rsOptsBuilt.VirtualizationRightSizing.Enabled {
-			rsOpts = &rsOptsBuilt
-		}
-
-		userValues.Metrics, err = getMonitoringValues(ctx, k8s, logger, cluster, mcAddon, opts, rsOpts)
+		userValues.Metrics, err = getMonitoringValues(ctx, k8s, logger, cluster, mcAddon, opts)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get monitoring values: %w", err)
 		}
@@ -93,8 +79,7 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, logger logr.Logger) a
 			return nil, err
 		}
 
-		// Use already-built right-sizing options for values
-		userValues.RightSizing, err = getRightSizingValuesFromOpts(rsOpts)
+		userValues.RightSizing, err = getRightSizingValues(ctx, k8s, logger, cluster, opts)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get right-sizing values: %w", err)
 		}
@@ -107,11 +92,8 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, logger logr.Logger) a
 	}
 }
 
-func getMonitoringValues(ctx context.Context, k8s client.Client, logger logr.Logger, cluster *clusterv1.ManagedCluster, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, opts addon.Options, rsOpts *rshandlers.Options) (*mmanifests.MetricsValues, error) {
-	hasRSScrapeConfigs := rsOpts != nil &&
-		(len(rsOpts.NamespaceRightSizing.ScrapeConfigs) > 0 || len(rsOpts.VirtualizationRightSizing.ScrapeConfigs) > 0)
-
-	if !opts.Platform.Metrics.CollectionEnabled && !opts.UserWorkloads.Metrics.CollectionEnabled && !hasRSScrapeConfigs {
+func getMonitoringValues(ctx context.Context, k8s client.Client, logger logr.Logger, cluster *clusterv1.ManagedCluster, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, opts addon.Options) (*mmanifests.MetricsValues, error) {
+	if !opts.Platform.Metrics.CollectionEnabled && !opts.UserWorkloads.Metrics.CollectionEnabled {
 		logger.V(2).Info("both platform and userWorkloads metrics are disabled, ignoring cluster")
 		return nil, nil
 	}
@@ -123,20 +105,6 @@ func getMonitoringValues(ctx context.Context, k8s client.Client, logger logr.Log
 	metricsOpts, err := optsBuilder.Build(ctx, mcAddon, cluster, opts)
 	if err != nil {
 		return nil, err
-	}
-
-	// Merge right-sizing ScrapeConfigs into platform ScrapeConfigs
-	if rsOpts != nil {
-		if len(rsOpts.NamespaceRightSizing.ScrapeConfigs) > 0 {
-			metricsOpts.Platform.ScrapeConfigs = append(metricsOpts.Platform.ScrapeConfigs, rsOpts.NamespaceRightSizing.ScrapeConfigs...)
-			logger.V(2).Info("Merged namespace right-sizing ScrapeConfigs into platform",
-				"count", len(rsOpts.NamespaceRightSizing.ScrapeConfigs))
-		}
-		if len(rsOpts.VirtualizationRightSizing.ScrapeConfigs) > 0 {
-			metricsOpts.Platform.ScrapeConfigs = append(metricsOpts.Platform.ScrapeConfigs, rsOpts.VirtualizationRightSizing.ScrapeConfigs...)
-			logger.V(2).Info("Merged virtualization right-sizing ScrapeConfigs into platform",
-				"count", len(rsOpts.VirtualizationRightSizing.ScrapeConfigs))
-		}
 	}
 
 	return mmanifests.BuildValues(metricsOpts)
@@ -194,12 +162,15 @@ func getCOOValues(ctx context.Context, k8s client.Client, logger logr.Logger, cl
 	return cmanifests.BuildValues(opts, installCOO, common.IsHubCluster(cluster)), nil
 }
 
-// getRightSizingValuesFromOpts converts already-built right-sizing options to helm values.
-// This is used to avoid rebuilding the options twice (once for ScrapeConfig merging, once for values).
-func getRightSizingValuesFromOpts(rsOpts *rshandlers.Options) (*rshandlers.RightSizingValues, error) {
-	if rsOpts == nil {
-		return nil, nil
+func getRightSizingValues(ctx context.Context, k8s client.Client, logger logr.Logger, cluster *clusterv1.ManagedCluster, opts addon.Options) (*rshandlers.RightSizingValues, error) {
+	rsOptsBuilder := rshandlers.OptionsBuilder{
+		Client: k8s,
+		Logger: logger,
+	}
+	rsOpts, err := rsOptsBuilder.Build(ctx, cluster, opts)
+	if err != nil {
+		return nil, err
 	}
 
-	return rshandlers.BuildValues(*rsOpts)
+	return rshandlers.BuildValues(rsOpts)
 }
