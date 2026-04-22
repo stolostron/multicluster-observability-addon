@@ -17,6 +17,7 @@ import (
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
+	"github.com/stolostron/multicluster-observability-addon/internal/analytics/rightsizing"
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -56,6 +57,7 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 		ResourceReqs:     opts.ResourceReqs,
 		ProxyConfig:      opts.ProxyConfig,
 		NodeExporter:     opts.Platform.Metrics.NodeExporter,
+		RightSizing:      opts.Platform.AnalyticsOptions.RightSizing,
 	}
 
 	if !opts.Platform.Metrics.CollectionEnabled && !opts.UserWorkloads.Metrics.CollectionEnabled {
@@ -113,6 +115,13 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 		ret.Platform.Rules = common.FilterResourcesByLabelSelector[*prometheusv1.PrometheusRule](configResources, config.PlatformPrometheusMatchLabels)
 		if len(ret.Platform.Rules) == 0 {
 			o.Logger.V(2).Info("No rules found for platform metrics")
+		}
+
+		if rsScrapeConfig := rightsizing.GenerateScrapeConfig(ret.RightSizing.NamespaceEnabled, ret.RightSizing.VirtualizationEnabled); rsScrapeConfig != nil {
+			ret.Platform.ScrapeConfigs = append(ret.Platform.ScrapeConfigs, rsScrapeConfig)
+			o.Logger.V(2).Info("Added right-sizing ScrapeConfig to platform metrics",
+				"namespaceEnabled", ret.RightSizing.NamespaceEnabled,
+				"virtualizationEnabled", ret.RightSizing.VirtualizationEnabled)
 		}
 	}
 
