@@ -5,9 +5,9 @@ metadata:
   name: mcoa-query
   namespace: {{ .Release.Namespace }}
   labels:
-    {{- include "metricshelm.labels" . | nindent 4 }}
     app.kubernetes.io/component: query
-    app.kubernetes.io/part-of: thanos
+    app.kubernetes.io/name: {{ .Values.thanosOperator.appName }}
+    {{ include "metricshelm.labels" . | nindent 4 }}
 spec:
 {{- fromJson .Values.thanosOperator.querySpec.data | toYaml | nindent 2 }}
 {{- end }}
