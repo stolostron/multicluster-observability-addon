@@ -324,6 +324,31 @@ func ManifestConfigs() []workv1.ManifestConfigOption {
 		},
 	})
 
+	thanosGroup := "monitoring.thanos.io"
+	thanosSSAStrategy := &workv1.UpdateStrategy{
+		Type: workv1.UpdateStrategyTypeServerSideApply,
+		ServerSideApply: &workv1.ServerSideApplyConfig{
+			IgnoreFields: []workv1.IgnoreField{
+				{
+					Condition: "OnSpokeChange",
+					JSONPaths: []string{".spec"},
+				},
+			},
+		},
+	}
+	for _, res := range []struct{ resource, name string }{
+		{"thanosqueries", "mcoa-query"},
+		{"thanosreceives", "mcoa-receive"},
+		{"thanoscompacts", "mcoa-compact"},
+		{"thanosstores", "mcoa-store"},
+		{"thanosrulers", "mcoa-ruler"},
+	} {
+		manifestConfigs = append(manifestConfigs, workv1.ManifestConfigOption{
+			ResourceIdentifier: workv1.ResourceIdentifier{Group: thanosGroup, Resource: res.resource, Name: res.name},
+			UpdateStrategy:     thanosSSAStrategy,
+		})
+	}
+
 	return manifestConfigs
 }
 
