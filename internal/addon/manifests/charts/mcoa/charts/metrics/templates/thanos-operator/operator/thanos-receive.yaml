@@ -5,9 +5,9 @@ metadata:
   name: mcoa-receive
   namespace: {{ .Release.Namespace }}
   labels:
-    {{- include "metricshelm.labels" . | nindent 4 }}
     app.kubernetes.io/component: receive
-    app.kubernetes.io/part-of: thanos
+    app.kubernetes.io/name: {{ .Values.thanosOperator.appName }}
+    {{ include "metricshelm.labels" . | nindent 4 }}
 spec:
 {{- fromJson .Values.thanosOperator.receiveSpec.data | toYaml | nindent 2 }}
 {{- end }}
