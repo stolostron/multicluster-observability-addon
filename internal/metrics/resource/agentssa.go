@@ -80,13 +80,13 @@ func makeConfigResourceLabels(isUWL bool, placementRef addonv1beta1.PlacementRef
 // PrometheusAgentSSA applies configuration and invariants to an existing PrometheusAgent
 // It is used to enforce mandatory fields with server-side apply.
 type PrometheusAgentSSA struct {
-	ExistingAgent            *cooprometheusv1alpha1.PrometheusAgent
-	IsUwl                    bool
-	PrometheusImage          string
-	KubeRBACProxyImage       string
-	Labels                   map[string]string
-	RemoteWriteEndpoint      string
-	McoaRemoteWriteEndpoint  string
+	ExistingAgent           *cooprometheusv1alpha1.PrometheusAgent
+	IsUwl                   bool
+	PrometheusImage         string
+	KubeRBACProxyImage      string
+	Labels                  map[string]string
+	RemoteWriteEndpoint     string
+	McoaRemoteWriteEndpoint string
 
 	desiredAgent *cooprometheusv1alpha1.PrometheusAgent
 }
