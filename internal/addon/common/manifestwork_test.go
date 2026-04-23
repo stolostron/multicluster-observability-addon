@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/utils/ptr"
@@ -19,7 +20,7 @@ const (
 
 func newTestScheme(t *testing.T) *runtime.Scheme {
 	scheme := runtime.NewScheme()
-	assert.NoError(t, workv1.AddToScheme(scheme))
+	require.NoError(t, workv1.AddToScheme(scheme))
 	return scheme
 }
 
@@ -71,7 +72,7 @@ func TestListAddonManifestWorks(t *testing.T) {
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(works...).Build()
 
 	workList, err := ListAddonManifestWorks(t.Context(), fakeClient, testClusterName, testAddonName)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Len(t, workList.Items, 1)
 	assert.Equal(t, "addon-work-1", workList.Items[0].Name)
 }
@@ -139,7 +140,7 @@ func TestGetFeedbackValuesForResources(t *testing.T) {
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(works...).Build()
 
 	results, err := GetFeedbackValuesForResources(t.Context(), fakeClient, testClusterName, testAddonName, resID1, resID2, resID3)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Len(t, results, 3)
 
 	// Check resID1

@@ -5,6 +5,7 @@ import (
 
 	operatorv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -128,10 +129,10 @@ func TestShouldInstallCLO(t *testing.T) {
 			result, err := shouldInstallCLO(tc.opts, testChannel)
 
 			if tc.expectedError != nil {
-				assert.Error(t, err)
+				require.Error(t, err)
 				assert.Equal(t, tc.expectedError, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 
 			assert.Equal(t, tc.expectedResult, result)

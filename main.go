@@ -4,9 +4,7 @@ import (
 	"context"
 	goflag "flag"
 	"fmt"
-	"math/rand"
 	"os"
-	"time"
 
 	"github.com/ViaQ/logerr/v2/log"
 	otelv1alpha1 "github.com/open-telemetry/opentelemetry-operator/apis/v1alpha1"
@@ -67,8 +65,6 @@ func init() {
 var logVerbosity int
 
 func main() {
-	rand.Seed(time.Now().UTC().UnixNano()) // nolint:staticcheck
-
 	pflag.CommandLine.SetNormalizeFunc(utilflag.WordSepNormalizeFunc)
 	pflag.CommandLine.AddGoFlagSet(goflag.CommandLine)
 

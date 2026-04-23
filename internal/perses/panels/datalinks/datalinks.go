@@ -2,6 +2,7 @@ package datalinks
 
 import (
 	"fmt"
+	"strings"
 
 	tablePanel "github.com/perses/plugins/table/sdk/go"
 )
@@ -9,11 +10,12 @@ import (
 const dashboardViewBase = "/monitoring/v2/dashboards/view"
 
 func DashboardURL(dashboard string, params ...string) string {
-	url := fmt.Sprintf("%s?dashboard=%s&project=$__project", dashboardViewBase, dashboard)
+	var url strings.Builder
+	fmt.Fprintf(&url, "%s?dashboard=%s&project=$__project", dashboardViewBase, dashboard)
 	for _, p := range params {
-		url += "&" + p
+		url.WriteString("&" + p)
 	}
-	return url
+	return url.String()
 }
 
 func FieldParam(varName, fieldName string) string {

@@ -116,17 +116,17 @@ func getVolumeMount(otelCol *otelv1beta1.OpenTelemetryCollector, secretName stri
 }
 
 // searchVolumeMountInExporter checks if the VolumeMount is used in any exporter
-func searchVolumeMountInExporter(vm v1.VolumeMount, exporters map[string]interface{}) (string, error) {
+func searchVolumeMountInExporter(vm v1.VolumeMount, exporters map[string]any) (string, error) {
 	for name, eMap := range exporters {
 		if eMap == nil {
 			continue
 		}
 
-		t, ok := eMap.(map[string]interface{})["tls"]
+		t, ok := eMap.(map[string]any)["tls"]
 		if !ok {
 			continue
 		}
-		tls := t.(map[string]interface{})
+		tls := t.(map[string]any)
 		if strings.HasPrefix(tls["cert_file"].(string), vm.MountPath) ||
 			strings.HasPrefix(tls["key_file"].(string), vm.MountPath) ||
 			strings.HasPrefix(tls["ca_file"].(string), vm.MountPath) {

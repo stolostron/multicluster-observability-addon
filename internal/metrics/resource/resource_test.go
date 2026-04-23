@@ -41,12 +41,12 @@ func TestGetOrCreateDefaultAgent(t *testing.T) {
 	}
 	platformAppName := config.PlatformMetricsCollectorApp
 	existingPlatformAgent := NewDefaultPrometheusAgent(config.HubInstallNamespace, makeAgentName(platformAppName, placementRef.Name), false, placementRef)
-	assert.NoError(t, controllerutil.SetControllerReference(cmao, existingPlatformAgent, newTestScheme()))
+	require.NoError(t, controllerutil.SetControllerReference(cmao, existingPlatformAgent, newTestScheme()))
 
 	// Existing UWL Agent
 	uwlAppName := config.UserWorkloadMetricsCollectorApp
 	existingUWLAgent := NewDefaultPrometheusAgent(config.HubInstallNamespace, makeAgentName(uwlAppName, placementRef.Name), true, placementRef)
-	assert.NoError(t, controllerutil.SetControllerReference(cmao, existingUWLAgent, newTestScheme()))
+	require.NoError(t, controllerutil.SetControllerReference(cmao, existingUWLAgent, newTestScheme()))
 
 	testCases := []struct {
 		name         string
@@ -96,14 +96,14 @@ func TestGetOrCreateDefaultAgent(t *testing.T) {
 			}
 
 			gotAgent, err := d.getOrCreateDefaultAgent(context.Background(), tc.placementRef, tc.isUWL)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.True(t, controllerutil.HasControllerReference(gotAgent))
 
 			// ensure there is only one agent
 			if err == nil {
 				res := &cooprometheusv1alpha1.PrometheusAgentList{}
 				err := fakeClient.List(context.Background(), res)
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Len(t, res.Items, 1)
 			}
 
@@ -140,11 +140,11 @@ func TestReconcileAgent(t *testing.T) {
 
 	// >>> Platform agent
 	retAgent, err := d.reconcileAgentForPlacement(context.Background(), placementRef, false)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	foundAgent := cooprometheusv1alpha1.PrometheusAgent{}
 	err = fakeClient.Get(context.Background(), types.NamespacedName{Namespace: retAgent.Config.Namespace, Name: retAgent.Config.Name}, &foundAgent)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Check default fields
 	assert.EqualValues(t, 1, *foundAgent.Spec.Replicas)
@@ -155,26 +155,26 @@ func TestReconcileAgent(t *testing.T) {
 	// Check placement labels
 	assert.Equal(t, foundAgent.Labels[addoncfg.PlacementRefNameLabelKey], placementRef.Name)
 	// Check platform specific values: appName and ScrapeConfigNamespaceSelector
-	assert.Equal(t, foundAgent.Spec.ServiceAccountName, config.PlatformMetricsCollectorApp)
+	assert.Equal(t, config.PlatformMetricsCollectorApp, foundAgent.Spec.ServiceAccountName)
 	assert.Nil(t, foundAgent.Spec.ScrapeConfigNamespaceSelector)
 
 	// Subsequent reconcile does not trigger update
 	previousPatchCalls := patchCalls
 	_, err = d.reconcileAgentForPlacement(context.Background(), placementRef, false)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, previousPatchCalls, patchCalls)
 
 	// >>> UWL agent
 	retAgent, err = d.reconcileAgentForPlacement(context.Background(), placementRef, true)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	foundAgent = cooprometheusv1alpha1.PrometheusAgent{}
 	err = fakeClient.Get(context.Background(), types.NamespacedName{Namespace: retAgent.Config.Namespace, Name: retAgent.Config.Name}, &foundAgent)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Check uwl specific values: appName and ScrapeConfigNamespaceSelector
-	assert.Equal(t, foundAgent.Spec.ServiceAccountName, config.UserWorkloadMetricsCollectorApp)
-	assert.Equal(t, foundAgent.Spec.ScrapeConfigNamespaceSelector, &metav1.LabelSelector{})
+	assert.Equal(t, config.UserWorkloadMetricsCollectorApp, foundAgent.Spec.ServiceAccountName)
+	assert.Equal(t, &metav1.LabelSelector{}, foundAgent.Spec.ScrapeConfigNamespaceSelector)
 }
 
 func TestReconcileAgentWithRegistries(t *testing.T) {
@@ -230,11 +230,11 @@ func TestReconcileAgentWithRegistries(t *testing.T) {
 
 	placementRef := addonv1alpha1.PlacementRef{Name: "my-placement", Namespace: "my-namespace"}
 	retAgent, err := d.reconcileAgentForPlacement(context.Background(), placementRef, false)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	foundAgent := cooprometheusv1alpha1.PrometheusAgent{}
 	err = fakeClient.Get(context.Background(), types.NamespacedName{Namespace: retAgent.Config.Namespace, Name: retAgent.Config.Name}, &foundAgent)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Check overridden images
 	assert.Equal(t, "my-registry.com/prometheus/prometheus", *foundAgent.Spec.Image)
@@ -500,17 +500,17 @@ func TestReconcile(t *testing.T) {
 			}
 
 			dc, err := d.Reconcile(context.Background())
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			err = common.EnsureAddonConfig(context.Background(), klog.Background(), fakeClient, dc)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			foundAgents := cooprometheusv1alpha1.PrometheusAgentList{}
 			err = fakeClient.List(context.Background(), &foundAgents)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Len(t, foundAgents.Items, tc.expectAgentsCount)
 
 			err = fakeClient.Get(context.Background(), client.ObjectKeyFromObject(cmao), cmao)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			for _, placement := range cmao.Spec.InstallStrategy.Placements {
 				assert.Len(t, placement.Configs, tc.expectConfigsCount)
@@ -554,7 +554,7 @@ func TestReconcileScrapeConfigs(t *testing.T) {
 				},
 			},
 			expects: func(t *testing.T, objs []cooprometheusv1alpha1.ScrapeConfig) {
-				assert.Len(t, objs, 0)
+				assert.Empty(t, objs)
 			},
 		},
 		{
@@ -608,7 +608,7 @@ func TestReconcileScrapeConfigs(t *testing.T) {
 			isUWL: true,
 			expects: func(t *testing.T, objs []cooprometheusv1alpha1.ScrapeConfig) {
 				assert.Len(t, objs, 1)
-				assert.Equal(t, *objs[0].Spec.ScrapeClassName, "custom")
+				assert.Equal(t, "custom", *objs[0].Spec.ScrapeClassName)
 				assert.Contains(t, objs[0].Labels, addoncfg.BackupLabelKey, "backup label key should be present")
 				assert.Equal(t, addoncfg.BackupLabelValue, objs[0].Labels[addoncfg.BackupLabelKey])
 			},
@@ -656,13 +656,13 @@ func TestReconcileScrapeConfigs(t *testing.T) {
 			}
 
 			dc, err := d.reconcileScrapeConfigs(context.Background(), mcoUID, tc.isUWL, tc.hasHostedClusters)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			scrapeConfigs := []cooprometheusv1alpha1.ScrapeConfig{}
 			for _, config := range dc {
 				sc := cooprometheusv1alpha1.ScrapeConfig{}
 				err = fakeClient.Get(context.Background(), client.ObjectKey(config.Config.ConfigReferent), &sc)
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				scrapeConfigs = append(scrapeConfigs, sc)
 			}
 			if tc.expects != nil {
@@ -709,7 +709,7 @@ func TestGetPrometheusRules(t *testing.T) {
 			},
 			platformEnabled: true,
 			expects: func(t *testing.T, objs []prometheusv1.PrometheusRule) {
-				assert.Len(t, objs, 0)
+				assert.Empty(t, objs)
 			},
 		},
 		{
@@ -739,7 +739,7 @@ func TestGetPrometheusRules(t *testing.T) {
 				},
 			},
 			expects: func(t *testing.T, objs []prometheusv1.PrometheusRule) {
-				assert.Len(t, objs, 0)
+				assert.Empty(t, objs)
 			},
 		},
 		{
@@ -846,13 +846,13 @@ func TestGetPrometheusRules(t *testing.T) {
 			}
 
 			dc, err := d.getPrometheusRules(context.Background(), mcoUID, tc.hasHostedClusters)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			rules := []prometheusv1.PrometheusRule{}
 			for _, config := range dc {
 				rule := prometheusv1.PrometheusRule{}
 				err = fakeClient.Get(context.Background(), client.ObjectKey(config.Config.ConfigReferent), &rule)
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				rules = append(rules, rule)
 			}
 			if tc.expects != nil {

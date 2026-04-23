@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -64,7 +65,7 @@ func TestManifestsSorting(t *testing.T) {
 	}
 
 	sorted, err := prober.Manifests(nil, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Len(t, sorted, 4)
 
 	// Expected order:

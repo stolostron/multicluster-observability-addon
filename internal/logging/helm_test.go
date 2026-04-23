@@ -327,7 +327,7 @@ func Test_Logging_Unmanaged_CLF(t *testing.T) {
 	// Render manifests and return them as k8s runtime objects
 	objects, err := loggingAgentAddon.Manifests(managedCluster, managedClusterAddOn)
 	require.NoError(t, err)
-	require.Equal(t, 11, len(objects))
+	require.Len(t, objects, 11)
 
 	for _, obj := range objects {
 		switch obj := obj.(type) {
@@ -435,7 +435,7 @@ func Test_Logging_Unmanaged(t *testing.T) {
 			// Render manifests and return them as k8s runtime objects
 			objects, err := logginAgentAddon.Manifests(managedCluster, managedClusterAddOn)
 			require.NoError(t, err)
-			require.Equal(t, tc.nbExptedObjects, len(objects))
+			require.Len(t, objects, tc.nbExptedObjects)
 		})
 	}
 }

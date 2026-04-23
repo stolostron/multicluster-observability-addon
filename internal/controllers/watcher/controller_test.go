@@ -510,7 +510,7 @@ func TestUpdateCache(t *testing.T) {
 			r.Cache.RUnlock()
 
 			assert.True(t, exists, "ManifestWork key should exist in cache")
-			assert.Equal(t, len(tt.expectedKeys), len(configs), "Number of config keys should match")
+			assert.Len(t, configs, len(tt.expectedKeys), "Number of config keys should match")
 
 			for _, k := range tt.expectedKeys {
 				_, ok := configs[k]
@@ -520,7 +520,7 @@ func TestUpdateCache(t *testing.T) {
 	}
 }
 
-func mustMarshal(obj interface{}) []byte {
+func mustMarshal(obj any) []byte {
 	b, err := json.Marshal(obj)
 	if err != nil {
 		panic(err)

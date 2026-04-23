@@ -133,11 +133,11 @@ func Test_Tracing_AllConfigsTogether_AllResources(t *testing.T) {
 		Spec: otelv1beta1.OpenTelemetryCollectorSpec{
 			Config: otelv1beta1.Config{
 				Exporters: otelv1beta1.AnyConfig{
-					Object: map[string]interface{}{
-						"otlp": map[string]interface{}{
-							"protocols": map[string]interface{}{
-								"otlp":     map[string]interface{}{},
-								"otlphttp": map[string]interface{}{},
+					Object: map[string]any{
+						"otlp": map[string]any{
+							"protocols": map[string]any{
+								"otlp":     map[string]any{},
+								"otlphttp": map[string]any{},
 							},
 						},
 					},
@@ -214,7 +214,7 @@ func Test_Tracing_AllConfigsTogether_AllResources(t *testing.T) {
 	// Render manifests and return them as k8s runtime objects
 	objects, err := tracingAgentAddon.Manifests(managedCluster, managedClusterAddOn)
 	require.NoError(t, err)
-	require.Equal(t, 6, len(objects))
+	require.Len(t, objects, 6)
 
 	for _, obj := range objects {
 		switch obj := obj.(type) {

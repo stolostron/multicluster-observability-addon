@@ -6,6 +6,7 @@ import (
 
 	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGetOutputSecretNames(t *testing.T) {
@@ -172,10 +173,10 @@ func TestGetOutputSecretNames(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			extractedSecretsNames, extractedConfigMapNames, err := getOutputResourcesNames(tt.output)
 			if tt.wantErr != nil {
-				assert.Error(t, err)
+				require.Error(t, err)
 				assert.Equal(t, tt.wantErr.Error(), err.Error())
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.ElementsMatch(t, tt.extractedSecretNames, extractedSecretsNames)
 				assert.ElementsMatch(t, tt.extractedConfigMapNames, extractedConfigMapNames)
 			}

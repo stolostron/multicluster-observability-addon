@@ -342,7 +342,7 @@ func TestBuildOptions(t *testing.T) {
 				return res
 			},
 			expects: func(t *testing.T, opts Options, err error) {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, spokeName, opts.ClusterID) // Cluster ID should be set to the cluster name
 			},
 		},
@@ -364,7 +364,7 @@ func TestBuildOptions(t *testing.T) {
 				return res
 			},
 			expects: func(t *testing.T, opts Options, err error) {
-				assert.Error(t, err)
+				require.Error(t, err)
 				assert.ErrorIs(t, err, config.ErrMissingImageOverride)
 			},
 		},
@@ -378,7 +378,7 @@ func TestBuildOptions(t *testing.T) {
 			platformEnabled: true,
 			resources:       createResources,
 			expects: func(t *testing.T, opts Options, err error) {
-				assert.Error(t, err)
+				require.Error(t, err)
 				assert.ErrorIs(t, err, errInvalidConfigResourcesCount)
 			},
 		},
@@ -434,7 +434,7 @@ func TestBuildOptions(t *testing.T) {
 			addon:           platformManagedClusterAddOn,
 			platformEnabled: true,
 			expects: func(t *testing.T, opts Options, err error) {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.True(t, opts.COOIsSubscribed)
 				assert.Empty(t, opts.CRDEstablishedAnnotation)
 			},
@@ -477,7 +477,7 @@ func TestBuildOptions(t *testing.T) {
 			},
 			userWorkloadsEnabled: true,
 			expects: func(t *testing.T, opts Options, err error) {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.NotNil(t, opts.UserWorkloads.PrometheusAgent)
 				assert.Nil(t, opts.Platform.PrometheusAgent)
 				assert.Equal(t, uwlAgent.Spec.LogLevel, opts.UserWorkloads.PrometheusAgent.Spec.LogLevel)
@@ -540,7 +540,7 @@ func TestBuildOptions(t *testing.T) {
 			},
 			userWorkloadsEnabled: true,
 			expects: func(t *testing.T, opts Options, err error) {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.NotNil(t, opts.UserWorkloads.PrometheusAgent)
 				assert.Nil(t, opts.Platform.PrometheusAgent)
 				// When federating UWL metrics from COO, users define PrometheusRules with monitoring.rhobs API; MCOA must include them.
@@ -651,7 +651,7 @@ func TestBuildOptions(t *testing.T) {
 			},
 			userWorkloadsEnabled: true,
 			expects: func(t *testing.T, opts Options, err error) {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.NotNil(t, opts.UserWorkloads.ServiceMonitors)
 				assert.Len(t, opts.UserWorkloads.ServiceMonitors, 2)
 				assert.NotNil(t, opts.UserWorkloads.ScrapeConfigs)
@@ -695,7 +695,7 @@ func TestBuildOptions(t *testing.T) {
 			nodeSelector: map[string]string{"node-role.kubernetes.io/infra": ""},
 			resources:    createResources,
 			expects: func(t *testing.T, opts Options, err error) {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				require.NotNil(t, opts.Platform.PrometheusAgent)
 				require.NotEmpty(t, opts.Platform.PrometheusAgent.Spec.RemoteWrite)
 
@@ -756,7 +756,7 @@ func TestBuildOptions(t *testing.T) {
 				return res
 			},
 			expects: func(t *testing.T, opts Options, err error) {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				require.NotNil(t, opts.Platform.PrometheusAgent)
 				require.Len(t, opts.Platform.PrometheusAgent.Spec.RemoteWrite, 2)
 				for _, rw := range opts.Platform.PrometheusAgent.Spec.RemoteWrite {

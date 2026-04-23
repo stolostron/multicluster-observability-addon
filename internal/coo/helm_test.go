@@ -109,7 +109,7 @@ func Test_IncidentDetection_AllConfigsTogether_AllResources(t *testing.T) {
 		{
 			name: "no config",
 			expectedFunc: func(t *testing.T, objects []runtime.Object) {
-				require.Equal(t, 0, len(objects))
+				require.Empty(t, objects)
 			},
 		},
 		{

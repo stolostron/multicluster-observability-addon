@@ -10,6 +10,7 @@ import (
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"github.com/stolostron/multicluster-observability-addon/internal/coo/manifests"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -184,7 +185,7 @@ func TestInstallCOO(t *testing.T) {
 				assert.EqualError(t, err, tc.expectedErrMsg)
 				return
 			}
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, tc.expectedUIPluginInstall, cooValues.Enabled)
 			assert.Equal(t, tc.expectedCOOInstall, cooValues.InstallCOO)
 		})

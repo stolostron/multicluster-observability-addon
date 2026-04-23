@@ -1,4 +1,3 @@
-//nolint:gci,gofumpt,goimports
 package handlers
 
 import (
@@ -42,7 +41,7 @@ func TestHypershift_Nominal(t *testing.T) {
 			Params: map[string][]string{
 				"match[]": {
 					`{__name__=":node_memory_MemAvailable_bytes:sum"}`, // ignore rules
-					`{__name__=~"acm_"}`,                               // ignore regex
+					`{__name__=~"acm_"}`, // ignore regex
 					`{__name__="acm_managed_cluster_labels"}`,
 				},
 			},
@@ -69,7 +68,7 @@ func TestHypershift_Nominal(t *testing.T) {
 			Params: map[string][]string{
 				"match[]": {
 					`{__name__=":node_memory_MemAvailable_bytes:sum"}`, // ignore rules
-					`{__name__=~"acm_"}`,                               // ignore regex
+					`{__name__=~"acm_"}`, // ignore regex
 					`{__name__="grpc_server_handled_total"}`,
 				},
 			},
@@ -163,7 +162,7 @@ func TestHypershift_Nominal(t *testing.T) {
 		CollectionConfig{ScrapeConfigs: []*cooprometheusv1alpha1.ScrapeConfig{etcdScrapeConfig}, Rules: []*prometheusv1.PrometheusRule{etcdRule}},
 		CollectionConfig{ScrapeConfigs: []*cooprometheusv1alpha1.ScrapeConfig{apiserverScrapeConfig}, Rules: []*prometheusv1.PrometheusRule{apiserverRule}},
 	)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Len(t, res.ScrapeConfigs, 2)
 	assert.Len(t, res.ScrapeConfigs[0].Spec.MetricRelabelConfigs, 2)
 	assert.Len(t, res.ScrapeConfigs[1].Spec.MetricRelabelConfigs, 2)
@@ -199,10 +198,10 @@ func TestHypershift_NoHCP(t *testing.T) {
 	}
 
 	res, err := hype.GenerateResources(context.Background(), CollectionConfig{}, CollectionConfig{})
-	assert.NoError(t, err)
-	assert.Len(t, res.Rules, 0)
-	assert.Len(t, res.ScrapeConfigs, 0)
-	assert.Len(t, res.ServiceMonitors, 0)
+	require.NoError(t, err)
+	assert.Empty(t, res.Rules)
+	assert.Empty(t, res.ScrapeConfigs)
+	assert.Empty(t, res.ServiceMonitors)
 }
 
 func TestHypershift_NoScrapeConfigsAndRules(t *testing.T) {
@@ -233,10 +232,10 @@ func TestHypershift_NoScrapeConfigsAndRules(t *testing.T) {
 	}
 
 	res, err := hype.GenerateResources(context.Background(), CollectionConfig{}, CollectionConfig{})
-	assert.NoError(t, err)
-	assert.Len(t, res.Rules, 0)
-	assert.Len(t, res.ScrapeConfigs, 0)
-	assert.Len(t, res.ServiceMonitors, 0)
+	require.NoError(t, err)
+	assert.Empty(t, res.Rules)
+	assert.Empty(t, res.ScrapeConfigs)
+	assert.Empty(t, res.ServiceMonitors)
 }
 
 func TestHypershift_NoHypershiftServiceMonitors(t *testing.T) {
@@ -264,7 +263,7 @@ func TestHypershift_NoHypershiftServiceMonitors(t *testing.T) {
 			Params: map[string][]string{
 				"match[]": {
 					`{__name__=":node_memory_MemAvailable_bytes:sum"}`, // ignore rules
-					`{__name__=~"acm_"}`,                               // ignore regex
+					`{__name__=~"acm_"}`, // ignore regex
 					`{__name__="grpc_server_handled_total"}`,
 				},
 			},
@@ -276,7 +275,7 @@ func TestHypershift_NoHypershiftServiceMonitors(t *testing.T) {
 			Params: map[string][]string{
 				"match[]": {
 					`{__name__=":node_memory_MemAvailable_bytes:sum"}`, // ignore rules
-					`{__name__=~"acm_"}`,                               // ignore regex
+					`{__name__=~"acm_"}`, // ignore regex
 					`{__name__="acm_managed_cluster_labels"}`,
 				},
 			},
@@ -294,10 +293,10 @@ func TestHypershift_NoHypershiftServiceMonitors(t *testing.T) {
 		CollectionConfig{ScrapeConfigs: []*cooprometheusv1alpha1.ScrapeConfig{etcdScrapeConfig}},
 		CollectionConfig{ScrapeConfigs: []*cooprometheusv1alpha1.ScrapeConfig{apiserverScrapeConfig}},
 	)
-	assert.NoError(t, err)
-	assert.Len(t, res.Rules, 0)
+	require.NoError(t, err)
+	assert.Empty(t, res.Rules)
 	assert.Len(t, res.ScrapeConfigs, 2)
-	assert.Len(t, res.ServiceMonitors, 0)
+	assert.Empty(t, res.ServiceMonitors)
 }
 
 func TestHypershift_ExtractDependentMetrics(t *testing.T) {
@@ -326,7 +325,7 @@ func TestHypershift_ExtractDependentMetrics(t *testing.T) {
 					Params: map[string][]string{
 						"match[]": {
 							`{__name__=":node_memory_MemAvailable_bytes:sum"}`, // ignore rules
-							`{__name__=~"acm_"}`,                               // ignore regex
+							`{__name__=~"acm_"}`, // ignore regex
 							`{__name__="acm_managed_cluster_labels"}`,
 							`{__name__="active_streams_lease:grpc_server_handled_total:sum"}`,
 						},
@@ -435,11 +434,10 @@ func TestHypershift_ExtractDependentMetrics(t *testing.T) {
 			rules := []*prometheusv1.PrometheusRule{tc.rule}
 			res, err := hype.extractDependentMetrics(scs, rules)
 			if tc.expectError {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
+				require.Error(t, err)
+				return
 			}
-
+			require.NoError(t, err)
 			assert.Equal(t, tc.expectResult, res)
 		})
 	}

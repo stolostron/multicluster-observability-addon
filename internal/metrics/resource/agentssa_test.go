@@ -33,7 +33,7 @@ func TestPrometheusAgentSSA(t *testing.T) {
 			Expect: func(t *testing.T, agent *cooprometheusv1alpha1.PrometheusAgent) {
 				assert.NotEmpty(t, agent.Spec.ServiceAccountName)
 				assert.Empty(t, agent.Spec.Image)                                         // is set by the obo-prometheus operator
-				assert.Equal(t, agent.Spec.Containers[0].Image, "kube-rbac-proxy:latest") // kube-rbac-proxy image
+				assert.Equal(t, "kube-rbac-proxy:latest", agent.Spec.Containers[0].Image) // kube-rbac-proxy image
 				assert.NotEmpty(t, agent.Spec.RemoteWrite)
 				assert.NotEmpty(t, agent.Spec.RemoteWrite[0].URL)
 			},
@@ -145,7 +145,7 @@ func TestPrometheusAgentSSA(t *testing.T) {
 				},
 			},
 			Expect: func(t *testing.T, agent *cooprometheusv1alpha1.PrometheusAgent) {
-				assert.Equal(t, agent.Spec.ConfigMaps, []string{"cm"})
+				assert.Equal(t, []string{"cm"}, agent.Spec.ConfigMaps)
 				assert.Len(t, agent.Spec.ScrapeClasses, 2)
 				index := slices.IndexFunc(agent.Spec.ScrapeClasses, func(e cooprometheusv1.ScrapeClass) bool {
 					return e.Name == config.ScrapeClassCfgName

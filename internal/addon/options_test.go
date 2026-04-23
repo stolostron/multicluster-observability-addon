@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
@@ -339,10 +340,10 @@ func TestBuildOptions(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			opts, err := BuildOptions(tc.addOnDeploy)
 			if tc.expectedErrMsg != "" {
-				assert.Error(t, err)
+				require.Error(t, err)
 				assert.ErrorContains(t, err, tc.expectedErrMsg)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, tc.expectedOpts, opts)
 			}
 		})

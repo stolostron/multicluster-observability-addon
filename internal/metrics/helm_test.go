@@ -97,7 +97,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 			UserMetrics:     false,
 			IsOCP:           true,
 			Expects: func(t *testing.T, objects []client.Object) {
-				assert.Len(t, objects, 0)
+				assert.Empty(t, objects)
 			},
 		},
 		"platform metrics, no coo": {
@@ -116,7 +116,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				scrapeCfgs := common.FilterResourcesByLabelSelector[*cooprometheusv1alpha1.ScrapeConfig](objects, config.PlatformPrometheusMatchLabels)
 				assert.Len(t, scrapeCfgs, 2)
 				assert.Equal(t, config.PrometheusControllerID, scrapeCfgs[0].Annotations["operator.prometheus.io/controller-id"])
-				assert.GreaterOrEqual(t, len(agent[0].Spec.ScrapeConfigSelector.MatchLabels), 0)
+				assert.NotEmpty(t, agent[0].Spec.ScrapeConfigSelector.MatchLabels)
 				scrapeConfigsSelector := labels.SelectorFromSet(labels.Set(agent[0].Spec.ScrapeConfigSelector.MatchLabels))
 				assert.True(t, scrapeConfigsSelector.Matches(labels.Set(scrapeCfgs[0].Labels)))
 				// ensure that recording rules are created
@@ -216,7 +216,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				scrapeCfgs := common.FilterResourcesByLabelSelector[*cooprometheusv1alpha1.ScrapeConfig](objects, config.UserWorkloadPrometheusMatchLabels)
 				assert.Len(t, scrapeCfgs, 2)
 				assert.Equal(t, config.PrometheusControllerID, scrapeCfgs[0].Annotations["operator.prometheus.io/controller-id"])
-				assert.GreaterOrEqual(t, len(agent[0].Spec.ScrapeConfigSelector.MatchLabels), 0)
+				assert.NotEmpty(t, agent[0].Spec.ScrapeConfigSelector.MatchLabels)
 				scrapeConfigsSelector := labels.SelectorFromSet(labels.Set(agent[0].Spec.ScrapeConfigSelector.MatchLabels))
 				assert.True(t, scrapeConfigsSelector.Matches(labels.Set(scrapeCfgs[0].Labels)))
 				// ensure that recording rules are created
@@ -823,7 +823,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 
 			// Render manifests and return them as k8s runtime objects
 			objects, err := agentAddon.Manifests(managedCluster, managedClusterAddOn)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			clientObjs := runtimeToClientObjects(t, objects)
 
 			tc.Expects(t, clientObjs)
@@ -831,20 +831,20 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 			// Check common properties of the objects
 			for _, obj := range objects {
 				accessor, err := meta.Accessor(obj)
-				assert.NoError(t, err)
+				require.NoError(t, err)
 
 				// if not a global object, check namespace
 				// secrets are possible to install in multiple namespaces (such as openshift-monitoring)
 				// and are therefore also ignored.
 				if !slices.Contains([]string{"ClusterRole", "ClusterRoleBinding", "CustomResourceDefinition", "Secret", "Namespace"}, obj.GetObjectKind().GroupVersionKind().Kind) {
 					if obj.GetObjectKind().GroupVersionKind().Kind == "PrometheusRule" && accessor.GetName() == "uwl-rules-additional" {
-						assert.Equal(t, "target-namespace", accessor.GetNamespace(), fmt.Sprintf("Object: %s/%s", obj.GetObjectKind().GroupVersionKind(), accessor.GetName()))
+						assert.Equal(t, "target-namespace", accessor.GetNamespace(), "Object: %s/%s", obj.GetObjectKind().GroupVersionKind(), accessor.GetName())
 					} else {
 						installNamespace := addonfactory.AddonDefaultInstallNamespace
 						if tc.InstallNamespace != "" {
 							installNamespace = tc.InstallNamespace
 						}
-						assert.Equal(t, installNamespace, accessor.GetNamespace(), fmt.Sprintf("Object: %s/%s", obj.GetObjectKind().GroupVersionKind(), accessor.GetName()))
+						assert.Equal(t, installNamespace, accessor.GetNamespace(), "Object: %s/%s", obj.GetObjectKind().GroupVersionKind(), accessor.GetName())
 					}
 				}
 			}
@@ -1108,7 +1108,7 @@ func TestHelmBuild_Metrics_HCP(t *testing.T) {
 
 	// Render manifests and return them as k8s runtime objects
 	objects, err := agentAddon.Manifests(managedCluster, managedClusterAddOn)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	clientObjs := runtimeToClientObjects(t, objects)
 
 	recordingRules := common.FilterResourcesByLabelSelector[*prometheusv1.PrometheusRule](clientObjs, nil)

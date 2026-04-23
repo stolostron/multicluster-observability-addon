@@ -108,8 +108,8 @@ func TestBuildValues(t *testing.T) {
 			},
 			Expect: func(t *testing.T, values *manifests.MetricsValues) {
 				assert.Len(t, values.Platform.ScrapeConfigs, 2)
-				assert.Equal(t, values.Platform.ScrapeConfigs[0].Name, "a")
-				assert.Equal(t, values.Platform.ScrapeConfigs[1].Name, "b")
+				assert.Equal(t, "a", values.Platform.ScrapeConfigs[0].Name)
+				assert.Equal(t, "b", values.Platform.ScrapeConfigs[1].Name)
 			},
 		},
 		"with user workload scrape configs": {
@@ -123,8 +123,8 @@ func TestBuildValues(t *testing.T) {
 			},
 			Expect: func(t *testing.T, values *manifests.MetricsValues) {
 				assert.Len(t, values.UserWorkload.ScrapeConfigs, 2)
-				assert.Equal(t, values.UserWorkload.ScrapeConfigs[0].Name, "a")
-				assert.Equal(t, values.UserWorkload.ScrapeConfigs[1].Name, "b")
+				assert.Equal(t, "a", values.UserWorkload.ScrapeConfigs[0].Name)
+				assert.Equal(t, "b", values.UserWorkload.ScrapeConfigs[1].Name)
 			},
 		},
 		"with platform rules": {
@@ -135,8 +135,8 @@ func TestBuildValues(t *testing.T) {
 			},
 			Expect: func(t *testing.T, values *manifests.MetricsValues) {
 				assert.Len(t, values.Platform.Rules, 2)
-				assert.Equal(t, values.Platform.Rules[0].Name, "a")
-				assert.Equal(t, values.Platform.Rules[1].Name, "b")
+				assert.Equal(t, "a", values.Platform.Rules[0].Name)
+				assert.Equal(t, "b", values.Platform.Rules[1].Name)
 			},
 		},
 		"with user workload rules": {
@@ -147,8 +147,8 @@ func TestBuildValues(t *testing.T) {
 			},
 			Expect: func(t *testing.T, values *manifests.MetricsValues) {
 				assert.Len(t, values.UserWorkload.Rules, 2)
-				assert.Equal(t, values.UserWorkload.Rules[0].Name, "a")
-				assert.Equal(t, values.UserWorkload.Rules[1].Name, "b")
+				assert.Equal(t, "a", values.UserWorkload.Rules[0].Name)
+				assert.Equal(t, "b", values.UserWorkload.Rules[1].Name)
 			},
 		},
 		"with user workload COO rules": {
@@ -188,8 +188,8 @@ func TestBuildValues(t *testing.T) {
 			},
 			Expect: func(t *testing.T, values *manifests.MetricsValues) {
 				assert.Len(t, values.UserWorkload.ServiceMonitors, 2)
-				assert.Equal(t, values.UserWorkload.ServiceMonitors[0].Name, "a")
-				assert.Equal(t, values.UserWorkload.ServiceMonitors[1].Name, "b")
+				assert.Equal(t, "a", values.UserWorkload.ServiceMonitors[0].Name)
+				assert.Equal(t, "b", values.UserWorkload.ServiceMonitors[1].Name)
 			},
 		},
 		"with deploy non ocp stack": {
