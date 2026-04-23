@@ -12,16 +12,16 @@ jobs:
     steps:
     - name: Install make
       run: sudo apt-get install make
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - name: Set up Go 1.x
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@v6
       with:
         go-version-file: 'go.mod'
       id: go  
     - name: Lint
-      uses: golangci/golangci-lint-action@v8
+      uses: golangci/golangci-lint-action@v9
       with:
-        version: v2.5.0
+        version: v2.11.4
         args: --timeout=4m
 
   test:
@@ -30,9 +30,9 @@ jobs:
     steps:
     - name: Install make
       run: sudo apt-get install make
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - name: Set up Go 1.x
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@v6
       with:
         go-version-file: 'go.mod'
       id: go
@@ -42,5 +42,5 @@ jobs:
       uses: shogo82148/actions-goveralls@v1
       with:
         path-to-profile: profile.cov
-        flag-name: Go-1.23
+        flag-name: Go-1.25
         shallow: true

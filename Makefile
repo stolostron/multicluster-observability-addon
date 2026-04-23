@@ -63,10 +63,6 @@ update-metrics-crds: ## Update the metrics CRDs from the rhobs/obo-prometheus-op
 .PHONY: download-crds
 download-crds: $(CRD_DIR)/observability.openshift.io_clusterlogforwarders.yaml $(CRD_DIR)/opentelemetry.io_opentelemetrycollectors.yaml $(CRD_DIR)/opentelemetry.io_instrumentations.yaml $(CRD_DIR)/monitoring.coreos.com_prometheusagents.yaml $(CRD_DIR)/monitoring.coreos.com_scrapeconfigs.yaml $(CRD_DIR)/monitoring.rhobs_prometheusrules.yaml $(CRD_DIR)/core.observatorium.io_observatoria.yaml
 
-.PHONY: fmt
-fmt: $(GOFUMPT) ## Run gofumpt on source code.
-	find . -type f -name '*.go' -not -path '**/fake_*.go' -exec $(GOFUMPT) -w {} \;
-
 .PHONY: verify-dockerfile-labels
 verify-dockerfile-labels: ## Verify Dockerfile.Konflux RHEL version consistency
 	@./hack/verify-dockerfile-labels.sh
@@ -79,6 +75,9 @@ lint: $(GOLANGCI_LINT) verify-dockerfile-labels ## Run golangci-lint and dockerf
 .PHONY: lint-fix
 lint-fix: $(GOLANGCI_LINT) ## Attempt to automatically fix lint issues in source code.
 	$(GOLANGCI_LINT) run --fix --timeout=5m ./...
+
+.PHONY: fmt
+fmt: lint-fix
 
 .PHONY: test
 test:
