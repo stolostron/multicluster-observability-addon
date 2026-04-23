@@ -10,8 +10,8 @@ import (
 
 // RightSizingValues contains the helm values for right-sizing
 type RightSizingValues struct {
-	NamespaceRightSizing      *ComponentValues  `json:"namespaceRightSizing,omitempty"`
-	VirtualizationRightSizing *ComponentValues  `json:"virtRightSizing,omitempty"`
+	NamespaceRightSizing      *ComponentValues   `json:"namespaceRightSizing,omitempty"`
+	VirtualizationRightSizing *ComponentValues   `json:"virtRightSizing,omitempty"`
 	ScrapeConfig              *ScrapeConfigValue `json:"scrapeConfig,omitempty"`
 }
 
