@@ -25,6 +25,8 @@ const (
 	// PlacementNamespace is where RS Placements are created.
 	// Uses global-set namespace which already has a ManagedClusterSetBinding,
 	// enabling Placements to select clusters from the default ManagedClusterSet.
+	// ReconcileRSResources cleans up RS Placements in other namespaces to handle
+	// mode switches where MCO used a custom NamespaceBinding.
 	PlacementNamespace = "open-cluster-management-global-set"
 
 	// Namespace right-sizing constants
