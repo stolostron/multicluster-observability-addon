@@ -8,14 +8,7 @@ installCOO: false
 metrics:
     enabled: false
 
-dashboards:
-  - name: acm-cluster-rsrc-use
-    data: |
-      {
-        "spec": {
-          "panels": []
-        }
-      }
+dashboards: []
 
 analyticsDashboards: []
 
