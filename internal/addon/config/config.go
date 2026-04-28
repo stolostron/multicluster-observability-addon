@@ -6,8 +6,8 @@ import (
 )
 
 const (
-	Name              = "multicluster-observability-addon"
-	LabelOCMAddonName = "open-cluster-management.io/addon-name"
+	Name               = "multicluster-observability-addon"
+	LabelOCMAddonName  = "open-cluster-management.io/addon-name"
 	InstallNamespace   = "open-cluster-management-observability"
 	AnalyticsNamespace = "observability-analytics"
 

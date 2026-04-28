@@ -130,22 +130,22 @@ func VMCPUOverestimationTablePanel(datasourceName string, project string) panelg
 				{ColumnSettings: tablePanel.ColumnSettings{
 					Name: "value #2", Header: "CPU Usage", HeaderDescription: "Actual CPU cores consumed by the VM",
 					EnableSorting: true,
-					Format: &commonSdk.Format{Unit: &dashboards.DecimalUnit, DecimalPlaces: 2},
+					Format:        &commonSdk.Format{Unit: &dashboards.DecimalUnit, DecimalPlaces: 2},
 				}},
 				{ColumnSettings: tablePanel.ColumnSettings{
 					Name: "value #3", Header: "CPU Request", HeaderDescription: "CPU cores requested/allocated for the VM",
 					EnableSorting: true,
-					Format: &commonSdk.Format{Unit: &dashboards.DecimalUnit, DecimalPlaces: 2},
+					Format:        &commonSdk.Format{Unit: &dashboards.DecimalUnit, DecimalPlaces: 2},
 				}},
 				{ColumnSettings: tablePanel.ColumnSettings{
 					Name: "value #4", Header: "CPU Recommendation", HeaderDescription: "Recommended CPU cores based on usage profile",
 					EnableSorting: true,
-					Format: &commonSdk.Format{Unit: &dashboards.DecimalUnit, DecimalPlaces: 0},
+					Format:        &commonSdk.Format{Unit: &dashboards.DecimalUnit, DecimalPlaces: 0},
 				}},
 				{ColumnSettings: tablePanel.ColumnSettings{
 					Name: "value #5", Header: "CPU Overestimation", HeaderDescription: "Excess CPU cores allocated beyond recommendation (Request - Recommendation)",
 					EnableSorting: true,
-					Format: &commonSdk.Format{Unit: &dashboards.DecimalUnit, DecimalPlaces: 0},
+					Format:        &commonSdk.Format{Unit: &dashboards.DecimalUnit, DecimalPlaces: 0},
 				}},
 			},
 			CellSettings: []tablePanel.CellSettings{
@@ -183,22 +183,22 @@ func VMCPUUnderestimationTablePanel(datasourceName string, project string) panel
 				{ColumnSettings: tablePanel.ColumnSettings{
 					Name: "value #2", Header: "CPU Usage", HeaderDescription: "Actual CPU cores consumed by the VM",
 					EnableSorting: true,
-					Format: &commonSdk.Format{Unit: &dashboards.DecimalUnit, DecimalPlaces: 2},
+					Format:        &commonSdk.Format{Unit: &dashboards.DecimalUnit, DecimalPlaces: 2},
 				}},
 				{ColumnSettings: tablePanel.ColumnSettings{
 					Name: "value #3", Header: "CPU Request", HeaderDescription: "CPU cores requested/allocated for the VM",
 					EnableSorting: true,
-					Format: &commonSdk.Format{Unit: &dashboards.DecimalUnit, DecimalPlaces: 2},
+					Format:        &commonSdk.Format{Unit: &dashboards.DecimalUnit, DecimalPlaces: 2},
 				}},
 				{ColumnSettings: tablePanel.ColumnSettings{
 					Name: "value #4", Header: "CPU Recommendation", HeaderDescription: "Recommended CPU cores based on usage profile",
 					EnableSorting: true,
-					Format: &commonSdk.Format{Unit: &dashboards.DecimalUnit, DecimalPlaces: 0},
+					Format:        &commonSdk.Format{Unit: &dashboards.DecimalUnit, DecimalPlaces: 0},
 				}},
 				{ColumnSettings: tablePanel.ColumnSettings{
 					Name: "value #5", Header: "CPU Underestimation", HeaderDescription: "Deficit of CPU cores below recommendation (Recommendation - Request)",
 					EnableSorting: true,
-					Format: &commonSdk.Format{Unit: &dashboards.DecimalUnit, DecimalPlaces: 0},
+					Format:        &commonSdk.Format{Unit: &dashboards.DecimalUnit, DecimalPlaces: 0},
 				}},
 			},
 			CellSettings: []tablePanel.CellSettings{
@@ -236,22 +236,22 @@ func VMMemOverestimationTablePanel(datasourceName string, project string) panelg
 				{ColumnSettings: tablePanel.ColumnSettings{
 					Name: "value #2", Header: "Memory Usage", HeaderDescription: "Actual memory consumed by the VM",
 					EnableSorting: true,
-					Format: &commonSdk.Format{Unit: &dashboards.BytesUnit, DecimalPlaces: 2},
+					Format:        &commonSdk.Format{Unit: &dashboards.BytesUnit, DecimalPlaces: 2},
 				}},
 				{ColumnSettings: tablePanel.ColumnSettings{
 					Name: "value #3", Header: "Memory Request", HeaderDescription: "Memory requested/allocated for the VM",
 					EnableSorting: true,
-					Format: &commonSdk.Format{Unit: &dashboards.BytesUnit, DecimalPlaces: 2},
+					Format:        &commonSdk.Format{Unit: &dashboards.BytesUnit, DecimalPlaces: 2},
 				}},
 				{ColumnSettings: tablePanel.ColumnSettings{
 					Name: "value #4", Header: "Memory Recommendation", HeaderDescription: "Recommended memory allocation based on usage profile",
 					EnableSorting: true,
-					Format: &commonSdk.Format{Unit: &dashboards.BytesUnit, DecimalPlaces: 2},
+					Format:        &commonSdk.Format{Unit: &dashboards.BytesUnit, DecimalPlaces: 2},
 				}},
 				{ColumnSettings: tablePanel.ColumnSettings{
 					Name: "value #5", Header: "Memory Overestimation", HeaderDescription: "Excess memory allocated beyond recommendation (Request - Recommendation)",
 					EnableSorting: true,
-					Format: &commonSdk.Format{Unit: &dashboards.BytesUnit, DecimalPlaces: 2},
+					Format:        &commonSdk.Format{Unit: &dashboards.BytesUnit, DecimalPlaces: 2},
 				}},
 			},
 			CellSettings: []tablePanel.CellSettings{
@@ -289,22 +289,22 @@ func VMMemUnderestimationTablePanel(datasourceName string, project string) panel
 				{ColumnSettings: tablePanel.ColumnSettings{
 					Name: "value #2", Header: "Memory Usage", HeaderDescription: "Actual memory consumed by the VM",
 					EnableSorting: true,
-					Format: &commonSdk.Format{Unit: &dashboards.BytesUnit, DecimalPlaces: 2},
+					Format:        &commonSdk.Format{Unit: &dashboards.BytesUnit, DecimalPlaces: 2},
 				}},
 				{ColumnSettings: tablePanel.ColumnSettings{
 					Name: "value #3", Header: "Memory Request", HeaderDescription: "Memory requested/allocated for the VM",
 					EnableSorting: true,
-					Format: &commonSdk.Format{Unit: &dashboards.BytesUnit, DecimalPlaces: 2},
+					Format:        &commonSdk.Format{Unit: &dashboards.BytesUnit, DecimalPlaces: 2},
 				}},
 				{ColumnSettings: tablePanel.ColumnSettings{
 					Name: "value #4", Header: "Memory Recommendation", HeaderDescription: "Recommended memory allocation based on usage profile",
 					EnableSorting: true,
-					Format: &commonSdk.Format{Unit: &dashboards.BytesUnit, DecimalPlaces: 2},
+					Format:        &commonSdk.Format{Unit: &dashboards.BytesUnit, DecimalPlaces: 2},
 				}},
 				{ColumnSettings: tablePanel.ColumnSettings{
 					Name: "value #5", Header: "Memory Underestimation", HeaderDescription: "Deficit of memory below recommendation (Recommendation - Request)",
 					EnableSorting: true,
-					Format: &commonSdk.Format{Unit: &dashboards.BytesUnit, DecimalPlaces: 2},
+					Format:        &commonSdk.Format{Unit: &dashboards.BytesUnit, DecimalPlaces: 2},
 				}},
 			},
 			CellSettings: []tablePanel.CellSettings{
