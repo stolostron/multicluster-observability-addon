@@ -29,8 +29,8 @@ func TestGeneratePrometheusRule(t *testing.T) {
 			configData: rightsizing.RSConfigMapData{
 				PrometheusRuleConfig: rightsizing.RSPrometheusRuleConfig{
 					NamespaceFilterCriteria: struct {
-						InclusionCriteria []string `yaml:"inclusionCriteria" json:"inclusionCriteria"`
-						ExclusionCriteria []string `yaml:"exclusionCriteria" json:"exclusionCriteria"`
+						InclusionCriteria []string `json:"inclusionCriteria"`
+						ExclusionCriteria []string `json:"exclusionCriteria"`
 					}{
 						InclusionCriteria: []string{"default", "my-namespace"},
 					},
@@ -44,8 +44,8 @@ func TestGeneratePrometheusRule(t *testing.T) {
 			configData: rightsizing.RSConfigMapData{
 				PrometheusRuleConfig: rightsizing.RSPrometheusRuleConfig{
 					NamespaceFilterCriteria: struct {
-						InclusionCriteria []string `yaml:"inclusionCriteria" json:"inclusionCriteria"`
-						ExclusionCriteria []string `yaml:"exclusionCriteria" json:"exclusionCriteria"`
+						InclusionCriteria []string `json:"inclusionCriteria"`
+						ExclusionCriteria []string `json:"exclusionCriteria"`
 					}{
 						ExclusionCriteria: []string{"openshift.*", "kube-.*"},
 					},
@@ -59,8 +59,8 @@ func TestGeneratePrometheusRule(t *testing.T) {
 			configData: rightsizing.RSConfigMapData{
 				PrometheusRuleConfig: rightsizing.RSPrometheusRuleConfig{
 					NamespaceFilterCriteria: struct {
-						InclusionCriteria []string `yaml:"inclusionCriteria" json:"inclusionCriteria"`
-						ExclusionCriteria []string `yaml:"exclusionCriteria" json:"exclusionCriteria"`
+						InclusionCriteria []string `json:"inclusionCriteria"`
+						ExclusionCriteria []string `json:"exclusionCriteria"`
 					}{
 						InclusionCriteria: []string{"default"},
 						ExclusionCriteria: []string{"openshift.*"},

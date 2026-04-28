@@ -22,8 +22,8 @@ func TestBuildNamespaceFilter(t *testing.T) {
 			name: "inclusion filter",
 			config: RSPrometheusRuleConfig{
 				NamespaceFilterCriteria: struct {
-					InclusionCriteria []string `yaml:"inclusionCriteria" json:"inclusionCriteria"`
-					ExclusionCriteria []string `yaml:"exclusionCriteria" json:"exclusionCriteria"`
+				InclusionCriteria []string `json:"inclusionCriteria"`
+				ExclusionCriteria []string `json:"exclusionCriteria"`
 				}{
 					InclusionCriteria: []string{"default", "kube-system"},
 				},
@@ -34,8 +34,8 @@ func TestBuildNamespaceFilter(t *testing.T) {
 			name: "exclusion filter",
 			config: RSPrometheusRuleConfig{
 				NamespaceFilterCriteria: struct {
-					InclusionCriteria []string `yaml:"inclusionCriteria" json:"inclusionCriteria"`
-					ExclusionCriteria []string `yaml:"exclusionCriteria" json:"exclusionCriteria"`
+				InclusionCriteria []string `json:"inclusionCriteria"`
+				ExclusionCriteria []string `json:"exclusionCriteria"`
 				}{
 					ExclusionCriteria: []string{"openshift.*", "kube-.*"},
 				},
@@ -46,8 +46,8 @@ func TestBuildNamespaceFilter(t *testing.T) {
 			name: "both inclusion and exclusion returns error",
 			config: RSPrometheusRuleConfig{
 				NamespaceFilterCriteria: struct {
-					InclusionCriteria []string `yaml:"inclusionCriteria" json:"inclusionCriteria"`
-					ExclusionCriteria []string `yaml:"exclusionCriteria" json:"exclusionCriteria"`
+				InclusionCriteria []string `json:"inclusionCriteria"`
+				ExclusionCriteria []string `json:"exclusionCriteria"`
 				}{
 					InclusionCriteria: []string{"default"},
 					ExclusionCriteria: []string{"openshift.*"},
@@ -146,12 +146,7 @@ func TestGetDefaultRSPrometheusRuleConfig(t *testing.T) {
 func TestParseConfigMapData(t *testing.T) {
 	t.Run("valid config", func(t *testing.T) {
 		data := map[string]string{
-			"prometheusRuleConfig": `
-namespaceFilterCriteria:
-  exclusionCriteria:
-    - openshift.*
-recommendationPercentage: 120
-`,
+			"prometheusRuleConfig": `{"namespaceFilterCriteria":{"exclusionCriteria":["openshift.*"]},"recommendationPercentage":120}`,
 		}
 		result, err := ParseConfigMapData(data)
 		assert.NoError(t, err)
@@ -169,9 +164,9 @@ recommendationPercentage: 120
 		assert.Equal(t, GetDefaultRSPlacement(), result.PlacementConfiguration)
 	})
 
-	t.Run("invalid yaml", func(t *testing.T) {
+	t.Run("invalid json", func(t *testing.T) {
 		data := map[string]string{
-			"prometheusRuleConfig": "invalid: yaml: content:",
+			"prometheusRuleConfig": "{invalid json}",
 		}
 		_, err := ParseConfigMapData(data)
 		assert.Error(t, err)

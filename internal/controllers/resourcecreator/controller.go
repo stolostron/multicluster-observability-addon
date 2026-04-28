@@ -204,7 +204,7 @@ func (r *ResourceCreatorReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(&cooprometheusv1alpha1.PrometheusAgent{}, r.enqueueForMCOAOwnedResources()).
 		Watches(&cooprometheusv1alpha1.ScrapeConfig{}, r.enqueueForMCOControlledResources(), partOfMCOAPredicate).
 		Watches(&prometheusv1.PrometheusRule{}, r.enqueueForMCOControlledResources(), partOfMCOAPredicate).
-		// Trigger reconciliations if right-sizing ConfigMaps change (for placement updates)
+		// Trigger reconciliations if right-sizing ConfigMaps change
 		Watches(&corev1.ConfigMap{}, r.enqueueAODC(), rsConfigMapPredicate).
 		Complete(r)
 }
