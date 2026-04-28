@@ -176,6 +176,12 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, fmt.Errorf("failed to reconcile right-sizing resources: %w", err)
 	}
 
+	// Sync placement hash to ADC so that the addon-deploy-controller re-generates
+	// ManifestWorks when placement ConfigMaps change (no manual pod restart needed).
+	if err := rsBuilder.SyncPlacementHash(ctx, aodc); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to sync RS placement hash: %w", err)
+	}
+
 	if err := common.EnsureAddonConfig(ctx, r.Log, r.Client, objs); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to patch default configs of the clustermanageraddon: %w", err)
 	}
@@ -204,7 +210,7 @@ func (r *ResourceCreatorReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(&cooprometheusv1alpha1.PrometheusAgent{}, r.enqueueForMCOAOwnedResources()).
 		Watches(&cooprometheusv1alpha1.ScrapeConfig{}, r.enqueueForMCOControlledResources(), partOfMCOAPredicate).
 		Watches(&prometheusv1.PrometheusRule{}, r.enqueueForMCOControlledResources(), partOfMCOAPredicate).
-		// Trigger reconciliations if right-sizing ConfigMaps change (for placement updates)
+		// Trigger reconciliations if right-sizing ConfigMaps change
 		Watches(&corev1.ConfigMap{}, r.enqueueAODC(), rsConfigMapPredicate).
 		Complete(r)
 }

@@ -15,6 +15,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/event"
@@ -24,7 +26,9 @@ func setupTestScheme(t *testing.T) *runtime.Scheme {
 	t.Helper()
 	scheme := runtime.NewScheme()
 	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, clusterv1.Install(scheme))
 	require.NoError(t, clusterv1beta1.Install(scheme))
+	require.NoError(t, addonv1alpha1.Install(scheme))
 	return scheme
 }
 
@@ -61,16 +65,6 @@ func newPlatformOpts(nsEnabled, virtEnabled bool) addon.Options {
 	}
 }
 
-func createTestPlacement(name string) *clusterv1beta1.Placement {
-	return &clusterv1beta1.Placement{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: rightsizing.PlacementNamespace,
-		},
-		Spec: rightsizing.GetDefaultRSPlacement().Spec,
-	}
-}
-
 func createTestConfigMap(name string) *corev1.ConfigMap {
 	return &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
@@ -97,9 +91,18 @@ func TestRSConfigMapPredicate(t *testing.T) {
 		Name: rightsizing.NamespaceConfigMapName, Namespace: "other-namespace",
 	}}
 
-	// Create: accepts RS ConfigMaps, rejects others
+	rsNsPlacementCM := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
+		Name: rightsizing.NamespacePlacementCMName, Namespace: addoncfg.InstallNamespace,
+	}}
+	rsVirtPlacementCM := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
+		Name: rightsizing.VirtualizationPlacementCMName, Namespace: addoncfg.InstallNamespace,
+	}}
+
+	// Create: accepts RS ConfigMaps and placement ConfigMaps, rejects others
 	assert.True(t, pred.CreateFunc(event.CreateEvent{Object: rsNsCM}))
 	assert.True(t, pred.CreateFunc(event.CreateEvent{Object: rsVirtCM}))
+	assert.True(t, pred.CreateFunc(event.CreateEvent{Object: rsNsPlacementCM}))
+	assert.True(t, pred.CreateFunc(event.CreateEvent{Object: rsVirtPlacementCM}))
 	assert.False(t, pred.CreateFunc(event.CreateEvent{Object: unrelatedCM}))
 	assert.False(t, pred.CreateFunc(event.CreateEvent{Object: wrongNsCM}))
 
@@ -116,98 +119,64 @@ func TestRSConfigMapPredicate(t *testing.T) {
 }
 
 func TestReconcileRSResources_CleanupNamespace(t *testing.T) {
-	nsPlacement := createTestPlacement(rightsizing.NamespacePlacementName)
 	nsCM := createTestConfigMap(rightsizing.NamespaceConfigMapName)
-	virtPlacement := createTestPlacement(rightsizing.VirtualizationPlacementName)
 	virtCM := createTestConfigMap(rightsizing.VirtualizationConfigMapName)
 
-	ob := newTestOptionsBuilder(t, nsPlacement, nsCM, virtPlacement, virtCM)
+	ob := newTestOptionsBuilder(t, nsCM, virtCM)
 	ctx := context.TODO()
 
-	// Disable namespace RS, keep virt enabled
 	opts := newPlatformOpts(false, true)
 	err := ob.ReconcileRSResources(ctx, opts)
 	require.NoError(t, err)
-
-	// Namespace placement and configmap should be deleted
-	err = ob.Client.Get(ctx, types.NamespacedName{
-		Name: rightsizing.NamespacePlacementName, Namespace: rightsizing.PlacementNamespace,
-	}, &clusterv1beta1.Placement{})
-	assert.True(t, apierrors.IsNotFound(err), "namespace placement should be deleted")
 
 	err = ob.Client.Get(ctx, types.NamespacedName{
 		Name: rightsizing.NamespaceConfigMapName, Namespace: addoncfg.InstallNamespace,
 	}, &corev1.ConfigMap{})
 	assert.True(t, apierrors.IsNotFound(err), "namespace configmap should be deleted")
 
-	// Virt placement should still exist (updated, not deleted)
 	err = ob.Client.Get(ctx, types.NamespacedName{
-		Name: rightsizing.VirtualizationPlacementName, Namespace: rightsizing.PlacementNamespace,
-	}, &clusterv1beta1.Placement{})
-	assert.NoError(t, err, "virtualization placement should still exist")
+		Name: rightsizing.VirtualizationConfigMapName, Namespace: addoncfg.InstallNamespace,
+	}, &corev1.ConfigMap{})
+	assert.NoError(t, err, "virtualization configmap should still exist")
 }
 
 func TestReconcileRSResources_CleanupVirtualization(t *testing.T) {
-	nsPlacement := createTestPlacement(rightsizing.NamespacePlacementName)
 	nsCM := createTestConfigMap(rightsizing.NamespaceConfigMapName)
-	virtPlacement := createTestPlacement(rightsizing.VirtualizationPlacementName)
 	virtCM := createTestConfigMap(rightsizing.VirtualizationConfigMapName)
 
-	ob := newTestOptionsBuilder(t, nsPlacement, nsCM, virtPlacement, virtCM)
+	ob := newTestOptionsBuilder(t, nsCM, virtCM)
 	ctx := context.TODO()
 
-	// Enable namespace RS, disable virt
 	opts := newPlatformOpts(true, false)
 	err := ob.ReconcileRSResources(ctx, opts)
 	require.NoError(t, err)
-
-	// Virt placement and configmap should be deleted
-	err = ob.Client.Get(ctx, types.NamespacedName{
-		Name: rightsizing.VirtualizationPlacementName, Namespace: rightsizing.PlacementNamespace,
-	}, &clusterv1beta1.Placement{})
-	assert.True(t, apierrors.IsNotFound(err), "virtualization placement should be deleted")
 
 	err = ob.Client.Get(ctx, types.NamespacedName{
 		Name: rightsizing.VirtualizationConfigMapName, Namespace: addoncfg.InstallNamespace,
 	}, &corev1.ConfigMap{})
 	assert.True(t, apierrors.IsNotFound(err), "virtualization configmap should be deleted")
 
-	// Namespace placement should still exist
 	err = ob.Client.Get(ctx, types.NamespacedName{
-		Name: rightsizing.NamespacePlacementName, Namespace: rightsizing.PlacementNamespace,
-	}, &clusterv1beta1.Placement{})
-	assert.NoError(t, err, "namespace placement should still exist")
+		Name: rightsizing.NamespaceConfigMapName, Namespace: addoncfg.InstallNamespace,
+	}, &corev1.ConfigMap{})
+	assert.NoError(t, err, "namespace configmap should still exist")
 }
 
 func TestReconcileRSResources_CleanupBoth(t *testing.T) {
-	nsPlacement := createTestPlacement(rightsizing.NamespacePlacementName)
 	nsCM := createTestConfigMap(rightsizing.NamespaceConfigMapName)
-	virtPlacement := createTestPlacement(rightsizing.VirtualizationPlacementName)
 	virtCM := createTestConfigMap(rightsizing.VirtualizationConfigMapName)
 
-	ob := newTestOptionsBuilder(t, nsPlacement, nsCM, virtPlacement, virtCM)
+	ob := newTestOptionsBuilder(t, nsCM, virtCM)
 	ctx := context.TODO()
 
-	// Disable both
 	opts := newPlatformOpts(false, false)
 	err := ob.ReconcileRSResources(ctx, opts)
 	require.NoError(t, err)
-
-	// All RS resources should be deleted
-	err = ob.Client.Get(ctx, types.NamespacedName{
-		Name: rightsizing.NamespacePlacementName, Namespace: rightsizing.PlacementNamespace,
-	}, &clusterv1beta1.Placement{})
-	assert.True(t, apierrors.IsNotFound(err), "namespace placement should be deleted")
 
 	err = ob.Client.Get(ctx, types.NamespacedName{
 		Name: rightsizing.NamespaceConfigMapName, Namespace: addoncfg.InstallNamespace,
 	}, &corev1.ConfigMap{})
 	assert.True(t, apierrors.IsNotFound(err), "namespace configmap should be deleted")
-
-	err = ob.Client.Get(ctx, types.NamespacedName{
-		Name: rightsizing.VirtualizationPlacementName, Namespace: rightsizing.PlacementNamespace,
-	}, &clusterv1beta1.Placement{})
-	assert.True(t, apierrors.IsNotFound(err), "virtualization placement should be deleted")
 
 	err = ob.Client.Get(ctx, types.NamespacedName{
 		Name: rightsizing.VirtualizationConfigMapName, Namespace: addoncfg.InstallNamespace,
@@ -216,7 +185,6 @@ func TestReconcileRSResources_CleanupBoth(t *testing.T) {
 }
 
 func TestReconcileRSResources_CleanupIdempotent(t *testing.T) {
-	// No resources exist — cleanup should succeed without error
 	ob := newTestOptionsBuilder(t)
 	ctx := context.TODO()
 
@@ -225,115 +193,309 @@ func TestReconcileRSResources_CleanupIdempotent(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func createTestPlacementInNamespace(name, namespace string) *clusterv1beta1.Placement {
-	return &clusterv1beta1.Placement{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
-			Labels:    rightsizing.RSLabels(),
-		},
-		Spec: rightsizing.GetDefaultRSPlacement().Spec,
+func TestClusterMatchesPlacement_EmptyPredicates(t *testing.T) {
+	cluster := &clusterv1.ManagedCluster{
+		ObjectMeta: metav1.ObjectMeta{Name: "cluster1"},
 	}
+	placement := rightsizing.GetDefaultRSPlacement()
+	assert.True(t, clusterMatchesPlacement(cluster, placement))
 }
 
-func TestReconcileRSResources_CleansOrphanPlacements(t *testing.T) {
-	customNS := "custom-namespace-binding"
-
-	// Simulate MCO-mode leftovers in a custom namespace
-	orphanNS := createTestPlacementInNamespace(rightsizing.NamespacePlacementName, customNS)
-	orphanVirt := createTestPlacementInNamespace(rightsizing.VirtualizationPlacementName, customNS)
-	// Canonical placements in the expected namespace
-	canonicalNS := createTestPlacement(rightsizing.NamespacePlacementName)
-	canonicalVirt := createTestPlacement(rightsizing.VirtualizationPlacementName)
-
-	ob := newTestOptionsBuilder(t, orphanNS, orphanVirt, canonicalNS, canonicalVirt)
-	ctx := context.TODO()
-
-	opts := newPlatformOpts(true, true)
-	err := ob.ReconcileRSResources(ctx, opts)
-	require.NoError(t, err)
-
-	// Orphans in custom namespace should be deleted
-	err = ob.Client.Get(ctx, types.NamespacedName{
-		Name: rightsizing.NamespacePlacementName, Namespace: customNS,
-	}, &clusterv1beta1.Placement{})
-	assert.True(t, apierrors.IsNotFound(err), "orphan namespace placement should be deleted")
-
-	err = ob.Client.Get(ctx, types.NamespacedName{
-		Name: rightsizing.VirtualizationPlacementName, Namespace: customNS,
-	}, &clusterv1beta1.Placement{})
-	assert.True(t, apierrors.IsNotFound(err), "orphan virt placement should be deleted")
-
-	// Canonical placements should still exist
-	err = ob.Client.Get(ctx, types.NamespacedName{
-		Name: rightsizing.NamespacePlacementName, Namespace: rightsizing.PlacementNamespace,
-	}, &clusterv1beta1.Placement{})
-	assert.NoError(t, err, "canonical namespace placement should still exist")
-
-	err = ob.Client.Get(ctx, types.NamespacedName{
-		Name: rightsizing.VirtualizationPlacementName, Namespace: rightsizing.PlacementNamespace,
-	}, &clusterv1beta1.Placement{})
-	assert.NoError(t, err, "canonical virt placement should still exist")
-}
-
-func TestReconcileRSResources_IgnoresNonRSPlacements(t *testing.T) {
-	// Placement in another namespace WITHOUT RS labels should not be touched
-	unrelated := &clusterv1beta1.Placement{
+func TestClusterMatchesPlacement_LabelMatch(t *testing.T) {
+	cluster := &clusterv1.ManagedCluster{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "unrelated-placement",
-			Namespace: "some-other-ns",
-			Labels:    map[string]string{"team": "infra"},
+			Name:   "cluster1",
+			Labels: map[string]string{"env": "prod", "region": "us-east"},
 		},
 	}
-	ob := newTestOptionsBuilder(t, unrelated)
-	ctx := context.TODO()
 
-	opts := newPlatformOpts(false, false)
-	err := ob.ReconcileRSResources(ctx, opts)
-	require.NoError(t, err)
-
-	err = ob.Client.Get(ctx, types.NamespacedName{
-		Name: "unrelated-placement", Namespace: "some-other-ns",
-	}, &clusterv1beta1.Placement{})
-	assert.NoError(t, err, "non-RS placement should not be deleted")
-}
-
-func TestReconcileRSResources_OrphanCleanupWithDisabledFeatures(t *testing.T) {
-	customNS := "mco-custom-ns"
-
-	// MCO orphans exist, but both RS features are now disabled
-	orphan := createTestPlacementInNamespace(rightsizing.NamespacePlacementName, customNS)
-	ob := newTestOptionsBuilder(t, orphan)
-	ctx := context.TODO()
-
-	opts := newPlatformOpts(false, false)
-	err := ob.ReconcileRSResources(ctx, opts)
-	require.NoError(t, err)
-
-	// Orphan should still be cleaned up even when features are disabled
-	err = ob.Client.Get(ctx, types.NamespacedName{
-		Name: rightsizing.NamespacePlacementName, Namespace: customNS,
-	}, &clusterv1beta1.Placement{})
-	assert.True(t, apierrors.IsNotFound(err), "orphan should be deleted even when features are disabled")
-}
-
-func TestReconcileRSResources_PlatformDisabledCleansUp(t *testing.T) {
-	nsPlacement := createTestPlacement(rightsizing.NamespacePlacementName)
-
-	ob := newTestOptionsBuilder(t, nsPlacement)
-	ctx := context.TODO()
-
-	// Platform disabled with both RS features disabled — cleanup still runs.
-	// ReconcileRSResources does NOT gate on Platform.Enabled (see NOTE in code).
-	opts := addon.Options{
-		Platform: addon.PlatformOptions{Enabled: false},
+	placement := clusterv1beta1.Placement{
+		Spec: clusterv1beta1.PlacementSpec{
+			Predicates: []clusterv1beta1.ClusterPredicate{{
+				RequiredClusterSelector: clusterv1beta1.ClusterSelector{
+					LabelSelector: metav1.LabelSelector{
+						MatchLabels: map[string]string{"env": "prod"},
+					},
+				},
+			}},
+		},
 	}
-	err := ob.ReconcileRSResources(ctx, opts)
-	require.NoError(t, err)
+	assert.True(t, clusterMatchesPlacement(cluster, placement))
+}
 
-	// Placement should be deleted (cleanup runs regardless of Platform.Enabled)
-	err = ob.Client.Get(ctx, types.NamespacedName{
-		Name: rightsizing.NamespacePlacementName, Namespace: rightsizing.PlacementNamespace,
-	}, &clusterv1beta1.Placement{})
-	assert.True(t, apierrors.IsNotFound(err), "placement should be deleted when both RS features are disabled")
+func TestClusterMatchesPlacement_LabelNoMatch(t *testing.T) {
+	cluster := &clusterv1.ManagedCluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   "cluster1",
+			Labels: map[string]string{"env": "staging"},
+		},
+	}
+
+	placement := clusterv1beta1.Placement{
+		Spec: clusterv1beta1.PlacementSpec{
+			Predicates: []clusterv1beta1.ClusterPredicate{{
+				RequiredClusterSelector: clusterv1beta1.ClusterSelector{
+					LabelSelector: metav1.LabelSelector{
+						MatchLabels: map[string]string{"env": "prod"},
+					},
+				},
+			}},
+		},
+	}
+	assert.False(t, clusterMatchesPlacement(cluster, placement))
+}
+
+func TestClusterMatchesPlacement_LabelExpressions(t *testing.T) {
+	cluster := &clusterv1.ManagedCluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   "cluster1",
+			Labels: map[string]string{"env": "prod"},
+		},
+	}
+
+	placement := clusterv1beta1.Placement{
+		Spec: clusterv1beta1.PlacementSpec{
+			Predicates: []clusterv1beta1.ClusterPredicate{{
+				RequiredClusterSelector: clusterv1beta1.ClusterSelector{
+					LabelSelector: metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{{
+							Key:      "env",
+							Operator: metav1.LabelSelectorOpIn,
+							Values:   []string{"prod", "staging"},
+						}},
+					},
+				},
+			}},
+		},
+	}
+	assert.True(t, clusterMatchesPlacement(cluster, placement))
+}
+
+func TestClusterMatchesPlacement_ClaimMatch(t *testing.T) {
+	cluster := &clusterv1.ManagedCluster{
+		ObjectMeta: metav1.ObjectMeta{Name: "cluster1"},
+		Status: clusterv1.ManagedClusterStatus{
+			ClusterClaims: []clusterv1.ManagedClusterClaim{
+				{Name: "platform.open-cluster-management.io", Value: "AWS"},
+			},
+		},
+	}
+
+	placement := clusterv1beta1.Placement{
+		Spec: clusterv1beta1.PlacementSpec{
+			Predicates: []clusterv1beta1.ClusterPredicate{{
+				RequiredClusterSelector: clusterv1beta1.ClusterSelector{
+					ClaimSelector: clusterv1beta1.ClusterClaimSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{{
+							Key:      "platform.open-cluster-management.io",
+							Operator: metav1.LabelSelectorOpIn,
+							Values:   []string{"AWS", "GCP"},
+						}},
+					},
+				},
+			}},
+		},
+	}
+	assert.True(t, clusterMatchesPlacement(cluster, placement))
+}
+
+func TestClusterMatchesPlacement_ClaimNoMatch(t *testing.T) {
+	cluster := &clusterv1.ManagedCluster{
+		ObjectMeta: metav1.ObjectMeta{Name: "cluster1"},
+		Status: clusterv1.ManagedClusterStatus{
+			ClusterClaims: []clusterv1.ManagedClusterClaim{
+				{Name: "platform.open-cluster-management.io", Value: "Azure"},
+			},
+		},
+	}
+
+	placement := clusterv1beta1.Placement{
+		Spec: clusterv1beta1.PlacementSpec{
+			Predicates: []clusterv1beta1.ClusterPredicate{{
+				RequiredClusterSelector: clusterv1beta1.ClusterSelector{
+					ClaimSelector: clusterv1beta1.ClusterClaimSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{{
+							Key:      "platform.open-cluster-management.io",
+							Operator: metav1.LabelSelectorOpIn,
+							Values:   []string{"AWS", "GCP"},
+						}},
+					},
+				},
+			}},
+		},
+	}
+	assert.False(t, clusterMatchesPlacement(cluster, placement))
+}
+
+func TestClusterMatchesPlacement_PredicatesORed(t *testing.T) {
+	cluster := &clusterv1.ManagedCluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   "cluster1",
+			Labels: map[string]string{"region": "eu-west"},
+		},
+	}
+
+	placement := clusterv1beta1.Placement{
+		Spec: clusterv1beta1.PlacementSpec{
+			Predicates: []clusterv1beta1.ClusterPredicate{
+				{
+					RequiredClusterSelector: clusterv1beta1.ClusterSelector{
+						LabelSelector: metav1.LabelSelector{
+							MatchLabels: map[string]string{"region": "us-east"},
+						},
+					},
+				},
+				{
+					RequiredClusterSelector: clusterv1beta1.ClusterSelector{
+						LabelSelector: metav1.LabelSelector{
+							MatchLabels: map[string]string{"region": "eu-west"},
+						},
+					},
+				},
+			},
+		},
+	}
+	assert.True(t, clusterMatchesPlacement(cluster, placement), "second predicate should match (ORed)")
+}
+
+func TestClusterMatchesPlacement_ClaimDoesNotExist(t *testing.T) {
+	cluster := &clusterv1.ManagedCluster{
+		ObjectMeta: metav1.ObjectMeta{Name: "cluster1"},
+		Status: clusterv1.ManagedClusterStatus{
+			ClusterClaims: []clusterv1.ManagedClusterClaim{
+				{Name: "platform.open-cluster-management.io", Value: "AWS"},
+			},
+		},
+	}
+
+	placement := clusterv1beta1.Placement{
+		Spec: clusterv1beta1.PlacementSpec{
+			Predicates: []clusterv1beta1.ClusterPredicate{{
+				RequiredClusterSelector: clusterv1beta1.ClusterSelector{
+					ClaimSelector: clusterv1beta1.ClusterClaimSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{{
+							Key:      "customclaim",
+							Operator: metav1.LabelSelectorOpDoesNotExist,
+						}},
+					},
+				},
+			}},
+		},
+	}
+	assert.True(t, clusterMatchesPlacement(cluster, placement))
+}
+
+func TestClusterMatchesPlacement_CombinedLabelAndClaim(t *testing.T) {
+	cluster := &clusterv1.ManagedCluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   "cluster1",
+			Labels: map[string]string{"env": "prod"},
+		},
+		Status: clusterv1.ManagedClusterStatus{
+			ClusterClaims: []clusterv1.ManagedClusterClaim{
+				{Name: "platform.open-cluster-management.io", Value: "AWS"},
+			},
+		},
+	}
+
+	placement := clusterv1beta1.Placement{
+		Spec: clusterv1beta1.PlacementSpec{
+			Predicates: []clusterv1beta1.ClusterPredicate{{
+				RequiredClusterSelector: clusterv1beta1.ClusterSelector{
+					LabelSelector: metav1.LabelSelector{
+						MatchLabels: map[string]string{"env": "prod"},
+					},
+					ClaimSelector: clusterv1beta1.ClusterClaimSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{{
+							Key:      "platform.open-cluster-management.io",
+							Operator: metav1.LabelSelectorOpIn,
+							Values:   []string{"AWS"},
+						}},
+					},
+				},
+			}},
+		},
+	}
+	assert.True(t, clusterMatchesPlacement(cluster, placement), "both label and claim match (ANDed)")
+
+	cluster.Labels["env"] = "staging"
+	assert.False(t, clusterMatchesPlacement(cluster, placement), "label no longer matches")
+}
+
+func TestSyncPlacementHash_UpdatesCustomizedVariable(t *testing.T) {
+	aodc := &addonv1alpha1.AddOnDeploymentConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      addoncfg.Name,
+			Namespace: addoncfg.InstallNamespace,
+		},
+	}
+
+	ob := newTestOptionsBuilder(t, aodc)
+	ctx := context.TODO()
+
+	require.NoError(t, ob.SyncPlacementHash(ctx, aodc))
+
+	updated := &addonv1alpha1.AddOnDeploymentConfig{}
+	require.NoError(t, ob.Client.Get(ctx, types.NamespacedName{
+		Name: addoncfg.Name, Namespace: addoncfg.InstallNamespace,
+	}, updated))
+
+	var hashVal string
+	for _, v := range updated.Spec.CustomizedVariables {
+		if v.Name == rsPlacementHashVar {
+			hashVal = v.Value
+		}
+	}
+	assert.NotEmpty(t, hashVal, "placement hash should be set in CustomizedVariables")
+
+	// Calling again with same state should be a no-op (hash matches)
+	aodc = updated
+	require.NoError(t, ob.SyncPlacementHash(ctx, aodc))
+}
+
+func TestSyncPlacementHash_ChangesWhenConfigMapChanges(t *testing.T) {
+	aodc := &addonv1alpha1.AddOnDeploymentConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      addoncfg.Name,
+			Namespace: addoncfg.InstallNamespace,
+		},
+	}
+	ob := newTestOptionsBuilder(t, aodc)
+	ctx := context.TODO()
+
+	require.NoError(t, ob.SyncPlacementHash(ctx, aodc))
+
+	refetched := &addonv1alpha1.AddOnDeploymentConfig{}
+	require.NoError(t, ob.Client.Get(ctx, types.NamespacedName{
+		Name: addoncfg.Name, Namespace: addoncfg.InstallNamespace,
+	}, refetched))
+	hash1 := getCustomizedVar(refetched, rsPlacementHashVar)
+
+	// Add a placement ConfigMap and re-sync
+	cm := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      rightsizing.NamespacePlacementCMName,
+			Namespace: addoncfg.InstallNamespace,
+		},
+		Data: map[string]string{"placementConfiguration": "predicates: [{requiredClusterSelector: {labelSelector: {matchLabels: {env: prod}}}}]"},
+	}
+	require.NoError(t, ob.Client.Create(ctx, cm))
+	require.NoError(t, ob.SyncPlacementHash(ctx, refetched))
+
+	refetched2 := &addonv1alpha1.AddOnDeploymentConfig{}
+	require.NoError(t, ob.Client.Get(ctx, types.NamespacedName{
+		Name: addoncfg.Name, Namespace: addoncfg.InstallNamespace,
+	}, refetched2))
+	hash2 := getCustomizedVar(refetched2, rsPlacementHashVar)
+
+	assert.NotEqual(t, hash1, hash2, "hash should change when placement ConfigMap is created")
+}
+
+func getCustomizedVar(aodc *addonv1alpha1.AddOnDeploymentConfig, name string) string {
+	for _, v := range aodc.Spec.CustomizedVariables {
+		if v.Name == name {
+			return v.Value
+		}
+	}
+	return ""
 }

@@ -22,8 +22,8 @@ func TestBuildNamespaceFilter(t *testing.T) {
 			name: "inclusion filter",
 			config: RSPrometheusRuleConfig{
 				NamespaceFilterCriteria: struct {
-					InclusionCriteria []string `yaml:"inclusionCriteria" json:"inclusionCriteria"`
-					ExclusionCriteria []string `yaml:"exclusionCriteria" json:"exclusionCriteria"`
+					InclusionCriteria []string `json:"inclusionCriteria"`
+					ExclusionCriteria []string `json:"exclusionCriteria"`
 				}{
 					InclusionCriteria: []string{"default", "kube-system"},
 				},
@@ -34,8 +34,8 @@ func TestBuildNamespaceFilter(t *testing.T) {
 			name: "exclusion filter",
 			config: RSPrometheusRuleConfig{
 				NamespaceFilterCriteria: struct {
-					InclusionCriteria []string `yaml:"inclusionCriteria" json:"inclusionCriteria"`
-					ExclusionCriteria []string `yaml:"exclusionCriteria" json:"exclusionCriteria"`
+					InclusionCriteria []string `json:"inclusionCriteria"`
+					ExclusionCriteria []string `json:"exclusionCriteria"`
 				}{
 					ExclusionCriteria: []string{"openshift.*", "kube-.*"},
 				},
@@ -46,8 +46,8 @@ func TestBuildNamespaceFilter(t *testing.T) {
 			name: "both inclusion and exclusion returns error",
 			config: RSPrometheusRuleConfig{
 				NamespaceFilterCriteria: struct {
-					InclusionCriteria []string `yaml:"inclusionCriteria" json:"inclusionCriteria"`
-					ExclusionCriteria []string `yaml:"exclusionCriteria" json:"exclusionCriteria"`
+					InclusionCriteria []string `json:"inclusionCriteria"`
+					ExclusionCriteria []string `json:"exclusionCriteria"`
 				}{
 					InclusionCriteria: []string{"default"},
 					ExclusionCriteria: []string{"openshift.*"},
@@ -146,12 +146,7 @@ func TestGetDefaultRSPrometheusRuleConfig(t *testing.T) {
 func TestParseConfigMapData(t *testing.T) {
 	t.Run("valid config", func(t *testing.T) {
 		data := map[string]string{
-			"prometheusRuleConfig": `
-namespaceFilterCriteria:
-  exclusionCriteria:
-    - openshift.*
-recommendationPercentage: 120
-`,
+			"prometheusRuleConfig": `{"namespaceFilterCriteria":{"exclusionCriteria":["openshift.*"]},"recommendationPercentage":120}`,
 		}
 		result, err := ParseConfigMapData(data)
 		assert.NoError(t, err)
@@ -169,9 +164,33 @@ recommendationPercentage: 120
 		assert.Equal(t, GetDefaultRSPlacement(), result.PlacementConfiguration)
 	})
 
-	t.Run("invalid yaml", func(t *testing.T) {
+	t.Run("YAML format from MCO", func(t *testing.T) {
 		data := map[string]string{
-			"prometheusRuleConfig": "invalid: yaml: content:",
+			"prometheusRuleConfig":   "namespaceFilterCriteria:\n  inclusionCriteria: []\n  exclusionCriteria:\n  - openshift.*\nlabelFilterCriteria: []\nrecommendationPercentage: 110\n",
+			"placementConfiguration": "spec:\n  predicates:\n  - requiredClusterSelector:\n      labelSelector:\n        matchLabels:\n          env: prod\n",
+		}
+		result, err := ParseConfigMapData(data)
+		assert.NoError(t, err)
+		assert.Equal(t, 110, result.PrometheusRuleConfig.RecommendationPercentage)
+		assert.Equal(t, []string{"openshift.*"}, result.PrometheusRuleConfig.NamespaceFilterCriteria.ExclusionCriteria)
+		assert.Len(t, result.PlacementConfiguration.Spec.Predicates, 1)
+		assert.Equal(t, "prod", result.PlacementConfiguration.Spec.Predicates[0].RequiredClusterSelector.LabelSelector.MatchLabels["env"])
+	})
+
+	t.Run("MCO placement with intstr.IntOrString as object (graceful fallback)", func(t *testing.T) {
+		data := map[string]string{
+			"prometheusRuleConfig":   `{"namespaceFilterCriteria":{"exclusionCriteria":["openshift.*"]},"recommendationPercentage":110}`,
+			"placementConfiguration": "spec:\n  predicates: []\n  decisionstrategy:\n    groupstrategy:\n      clustersperdecisiongroup:\n        type: 0\n        intval: 0\n        strval: \"\"\n",
+		}
+		result, err := ParseConfigMapData(data)
+		assert.NoError(t, err)
+		assert.Equal(t, 110, result.PrometheusRuleConfig.RecommendationPercentage)
+		assert.Empty(t, result.PlacementConfiguration.Spec.Predicates)
+	})
+
+	t.Run("invalid data", func(t *testing.T) {
+		data := map[string]string{
+			"prometheusRuleConfig": "{{invalid",
 		}
 		_, err := ParseConfigMapData(data)
 		assert.Error(t, err)
