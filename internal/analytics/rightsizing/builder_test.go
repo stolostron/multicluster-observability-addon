@@ -22,8 +22,8 @@ func TestBuildNamespaceFilter(t *testing.T) {
 			name: "inclusion filter",
 			config: RSPrometheusRuleConfig{
 				NamespaceFilterCriteria: struct {
-				InclusionCriteria []string `json:"inclusionCriteria"`
-				ExclusionCriteria []string `json:"exclusionCriteria"`
+					InclusionCriteria []string `json:"inclusionCriteria"`
+					ExclusionCriteria []string `json:"exclusionCriteria"`
 				}{
 					InclusionCriteria: []string{"default", "kube-system"},
 				},
@@ -34,8 +34,8 @@ func TestBuildNamespaceFilter(t *testing.T) {
 			name: "exclusion filter",
 			config: RSPrometheusRuleConfig{
 				NamespaceFilterCriteria: struct {
-				InclusionCriteria []string `json:"inclusionCriteria"`
-				ExclusionCriteria []string `json:"exclusionCriteria"`
+					InclusionCriteria []string `json:"inclusionCriteria"`
+					ExclusionCriteria []string `json:"exclusionCriteria"`
 				}{
 					ExclusionCriteria: []string{"openshift.*", "kube-.*"},
 				},
@@ -46,8 +46,8 @@ func TestBuildNamespaceFilter(t *testing.T) {
 			name: "both inclusion and exclusion returns error",
 			config: RSPrometheusRuleConfig{
 				NamespaceFilterCriteria: struct {
-				InclusionCriteria []string `json:"inclusionCriteria"`
-				ExclusionCriteria []string `json:"exclusionCriteria"`
+					InclusionCriteria []string `json:"inclusionCriteria"`
+					ExclusionCriteria []string `json:"exclusionCriteria"`
 				}{
 					InclusionCriteria: []string{"default"},
 					ExclusionCriteria: []string{"openshift.*"},
