@@ -165,18 +165,11 @@ func Test_IncidentDetection_AllConfigsTogether_AllResources(t *testing.T) {
 			isHub: true,
 			expectedFunc: func(t *testing.T, objects []runtime.Object) {
 				require.GreaterOrEqual(t, len(objects), 4)
+				// ACM block is only rendered when metrics are enabled;
+				// this test only enables incident detection.
 				expectedUIPluginSpec := uiplugin.UIPluginSpec{
 					Type: "Monitoring",
 					Monitoring: &uiplugin.MonitoringConfig{
-						ACM: &uiplugin.AdvancedClusterManagementReference{
-							Enabled: true,
-							Alertmanager: uiplugin.AlertmanagerReference{
-								Url: "https://alertmanager.open-cluster-management-observability.svc:9095",
-							},
-							ThanosQuerier: uiplugin.ThanosQuerierReference{
-								Url: "https://rbac-query-proxy.open-cluster-management-observability.svc:8443",
-							},
-						},
 						Perses: &uiplugin.PersesReference{
 							Enabled: true,
 						},
