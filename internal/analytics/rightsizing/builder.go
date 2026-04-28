@@ -1,12 +1,13 @@
 package rightsizing
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
 
-	"gopkg.in/yaml.v2"
 	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
+	sigYaml "sigs.k8s.io/yaml"
 )
 
 var (
@@ -16,19 +17,18 @@ var (
 	errUnmarshalPlacementConfig         = errors.New("failed to unmarshal placementConfiguration")
 )
 
-// FormatYAML converts a Go data structure to a YAML-formatted string.
-// Accepts RSPrometheusRuleConfig, Placement, or any YAML-serializable struct.
-func FormatYAML(data interface{}) string {
-	yamlData, err := yaml.Marshal(data)
+// FormatJSON marshals a Go data structure to a JSON string for ConfigMap storage.
+func FormatJSON(data interface{}) string {
+	jsonData, err := json.Marshal(data)
 	if err != nil {
 		return ""
 	}
-	return string(yamlData)
+	return string(jsonData)
 }
 
 // GetDefaultRSPlacement creates a default placement configuration for right-sizing.
-// Empty predicates + tolerations for unreachable/unavailable = selects ALL clusters.
-// Matches MCO's rs-utility/placement.go GetDefaultRSPlacement().
+// Empty predicates = selects ALL clusters (evaluated in-memory during Build).
+// Tolerations are retained for backward compatibility with existing ConfigMaps.
 func GetDefaultRSPlacement() clusterv1beta1.Placement {
 	return clusterv1beta1.Placement{
 		Spec: clusterv1beta1.PlacementSpec{
@@ -93,26 +93,50 @@ func BuildLabelJoin(labelFilters []RSLabelFilter) (string, error) {
 	return "", nil
 }
 
-// ParseConfigMapData parses configmap data into RSConfigMapData
+// ParseConfigMapData parses ConfigMap data into RSConfigMapData.
+// Uses sigs.k8s.io/yaml for unmarshaling because MCO writes ConfigMap values
+// in YAML format while MCOA writes JSON. sigs.k8s.io/yaml handles both
+// transparently and respects json struct tags.
+//
+// Placement parsing is best-effort: MCO serializes Placement using
+// gopkg.in/yaml.v2 which writes intstr.IntOrString fields as objects
+// ({type,intval,strval}) instead of scalars, causing unmarshal failures.
+// Since MCO always writes empty predicates and real placement comes from
+// dedicated placement ConfigMaps, we fall back to the default on error.
 func ParseConfigMapData(data map[string]string) (RSConfigMapData, error) {
 	var configData RSConfigMapData
 
-	if prometheusRuleConfigYAML, ok := data["prometheusRuleConfig"]; ok {
-		if err := yaml.Unmarshal([]byte(prometheusRuleConfigYAML), &configData.PrometheusRuleConfig); err != nil {
+	if ruleConfigRaw, ok := data["prometheusRuleConfig"]; ok {
+		if err := sigYaml.Unmarshal([]byte(ruleConfigRaw), &configData.PrometheusRuleConfig); err != nil {
 			return configData, fmt.Errorf("%w: %w", errUnmarshalPrometheusRuleConfig, err)
 		}
 	}
 
-	if placementYAML, ok := data["placementConfiguration"]; ok {
-		if err := yaml.Unmarshal([]byte(placementYAML), &configData.PlacementConfiguration); err != nil {
-			return configData, fmt.Errorf("%w: %w", errUnmarshalPlacementConfig, err)
+	configData.PlacementConfiguration = GetDefaultRSPlacement()
+	if placementRaw, ok := data["placementConfiguration"]; ok {
+		var placement clusterv1beta1.Placement
+		if err := sigYaml.Unmarshal([]byte(placementRaw), &placement); err == nil {
+			configData.PlacementConfiguration = placement
 		}
-	} else {
-		// Default placement selects all clusters
-		configData.PlacementConfiguration = GetDefaultRSPlacement()
 	}
 
 	return configData, nil
+}
+
+// ParsePlacementConfigMap parses a dedicated placement ConfigMap.
+// The ConfigMap stores the Placement in a "placementConfiguration" key
+// (JSON or YAML format). Returns the Placement and true if found, or
+// an empty Placement and false if the key is missing.
+func ParsePlacementConfigMap(data map[string]string) (clusterv1beta1.Placement, bool, error) {
+	raw, ok := data["placementConfiguration"]
+	if !ok {
+		return clusterv1beta1.Placement{}, false, nil
+	}
+	var placement clusterv1beta1.Placement
+	if err := sigYaml.Unmarshal([]byte(raw), &placement); err != nil {
+		return placement, false, fmt.Errorf("%w: %w", errUnmarshalPlacementConfig, err)
+	}
+	return placement, true, nil
 }
 
 // GetDefaultNamespaceConfigData returns default config data for namespace right-sizing
@@ -120,8 +144,8 @@ func GetDefaultNamespaceConfigData() map[string]string {
 	ruleConfig := GetDefaultRSPrometheusRuleConfig()
 	placement := GetDefaultRSPlacement()
 	return map[string]string{
-		"prometheusRuleConfig":   FormatYAML(ruleConfig),
-		"placementConfiguration": FormatYAML(placement),
+		"prometheusRuleConfig":   FormatJSON(ruleConfig),
+		"placementConfiguration": FormatJSON(placement),
 	}
 }
 
@@ -130,7 +154,7 @@ func GetDefaultVirtualizationConfigData() map[string]string {
 	ruleConfig := GetDefaultRSPrometheusRuleConfig()
 	placement := GetDefaultRSPlacement()
 	return map[string]string{
-		"prometheusRuleConfig":   FormatYAML(ruleConfig),
-		"placementConfiguration": FormatYAML(placement),
+		"prometheusRuleConfig":   FormatJSON(ruleConfig),
+		"placementConfiguration": FormatJSON(placement),
 	}
 }

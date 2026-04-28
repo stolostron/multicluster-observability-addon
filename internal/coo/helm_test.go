@@ -15,6 +15,7 @@ import (
 	"github.com/stolostron/multicluster-observability-addon/internal/coo/handlers"
 	"github.com/stolostron/multicluster-observability-addon/internal/coo/manifests"
 	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -26,7 +27,6 @@ import (
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	fakeaddon "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
-	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
@@ -139,9 +139,10 @@ func Test_IncidentDetection_AllConfigsTogether_AllResources(t *testing.T) {
 							analyticsDatasource = true
 						}
 					case *persesv1.PersesDashboard:
-						if obj.Namespace == addoncfg.AnalyticsNamespace {
+						switch obj.Namespace {
+						case addoncfg.AnalyticsNamespace:
 							analyticsDashboards = append(analyticsDashboards, obj.Name)
-						} else if obj.Namespace == addoncfg.InstallNamespace {
+						case addoncfg.InstallNamespace:
 							obsDashboards = append(obsDashboards, obj.Name)
 						}
 					}
@@ -164,18 +165,11 @@ func Test_IncidentDetection_AllConfigsTogether_AllResources(t *testing.T) {
 			isHub: true,
 			expectedFunc: func(t *testing.T, objects []runtime.Object) {
 				require.GreaterOrEqual(t, len(objects), 4)
+				// ACM block is only rendered when metrics are enabled;
+				// this test only enables incident detection.
 				expectedUIPluginSpec := uiplugin.UIPluginSpec{
 					Type: "Monitoring",
 					Monitoring: &uiplugin.MonitoringConfig{
-						ACM: &uiplugin.AdvancedClusterManagementReference{
-							Enabled: true,
-							Alertmanager: uiplugin.AlertmanagerReference{
-								Url: "https://alertmanager.open-cluster-management-observability.svc:9095",
-							},
-							ThanosQuerier: uiplugin.ThanosQuerierReference{
-								Url: "https://rbac-query-proxy.open-cluster-management-observability.svc:8443",
-							},
-						},
 						Perses: &uiplugin.PersesReference{
 							Enabled: true,
 						},
