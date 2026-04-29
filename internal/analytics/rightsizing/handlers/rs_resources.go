@@ -31,8 +31,15 @@ func RSConfigMapPredicate() predicate.Funcs {
 }
 
 func isRSConfigMap(namespace, name string) bool {
-	return namespace == addoncfg.InstallNamespace &&
-		(name == rightsizing.NamespaceConfigMapName || name == rightsizing.VirtualizationConfigMapName)
+	if namespace != addoncfg.InstallNamespace {
+		return false
+	}
+	switch name {
+	case rightsizing.NamespaceConfigMapName, rightsizing.VirtualizationConfigMapName,
+		rightsizing.NamespacePlacementCMName, rightsizing.VirtualizationPlacementCMName:
+		return true
+	}
+	return false
 }
 
 // ReconcileRSResources ensures right-sizing ConfigMap resources are cleaned up
