@@ -166,7 +166,7 @@ func TestParseConfigMapData(t *testing.T) {
 
 	t.Run("YAML format from MCO", func(t *testing.T) {
 		data := map[string]string{
-			"prometheusRuleConfig": "namespaceFilterCriteria:\n  inclusionCriteria: []\n  exclusionCriteria:\n  - openshift.*\nlabelFilterCriteria: []\nrecommendationPercentage: 110\n",
+			"prometheusRuleConfig":   "namespaceFilterCriteria:\n  inclusionCriteria: []\n  exclusionCriteria:\n  - openshift.*\nlabelFilterCriteria: []\nrecommendationPercentage: 110\n",
 			"placementConfiguration": "spec:\n  predicates:\n  - requiredClusterSelector:\n      labelSelector:\n        matchLabels:\n          env: prod\n",
 		}
 		result, err := ParseConfigMapData(data)
