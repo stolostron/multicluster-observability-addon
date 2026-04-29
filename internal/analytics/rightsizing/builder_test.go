@@ -177,6 +177,17 @@ func TestParseConfigMapData(t *testing.T) {
 		assert.Equal(t, "prod", result.PlacementConfiguration.Spec.Predicates[0].RequiredClusterSelector.LabelSelector.MatchLabels["env"])
 	})
 
+	t.Run("MCO placement with intstr.IntOrString as object (graceful fallback)", func(t *testing.T) {
+		data := map[string]string{
+			"prometheusRuleConfig":   `{"namespaceFilterCriteria":{"exclusionCriteria":["openshift.*"]},"recommendationPercentage":110}`,
+			"placementConfiguration": "spec:\n  predicates: []\n  decisionstrategy:\n    groupstrategy:\n      clustersperdecisiongroup:\n        type: 0\n        intval: 0\n        strval: \"\"\n",
+		}
+		result, err := ParseConfigMapData(data)
+		assert.NoError(t, err)
+		assert.Equal(t, 110, result.PrometheusRuleConfig.RecommendationPercentage)
+		assert.Empty(t, result.PlacementConfiguration.Spec.Predicates)
+	})
+
 	t.Run("invalid data", func(t *testing.T) {
 		data := map[string]string{
 			"prometheusRuleConfig": "{{invalid",
