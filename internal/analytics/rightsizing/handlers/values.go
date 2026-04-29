@@ -80,7 +80,9 @@ func BuildValues(opts Options) (*RightSizingValues, error) {
 	}
 
 	if opts.ScrapeConfig != nil {
-		enrichScrapeConfigForPlatform(opts.ScrapeConfig)
+		if len(opts.ScrapeConfig.Spec.Params["match[]"]) > 0 {
+			enrichScrapeConfigForPlatform(opts.ScrapeConfig)
+		}
 		scJSON, err := json.Marshal(opts.ScrapeConfig.Spec)
 		if err != nil {
 			return nil, err
