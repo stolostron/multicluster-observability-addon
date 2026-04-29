@@ -164,9 +164,22 @@ func TestParseConfigMapData(t *testing.T) {
 		assert.Equal(t, GetDefaultRSPlacement(), result.PlacementConfiguration)
 	})
 
-	t.Run("invalid json", func(t *testing.T) {
+	t.Run("YAML format from MCO", func(t *testing.T) {
 		data := map[string]string{
-			"prometheusRuleConfig": "{invalid json}",
+			"prometheusRuleConfig": "namespaceFilterCriteria:\n  inclusionCriteria: []\n  exclusionCriteria:\n  - openshift.*\nlabelFilterCriteria: []\nrecommendationPercentage: 110\n",
+			"placementConfiguration": "spec:\n  predicates:\n  - requiredClusterSelector:\n      labelSelector:\n        matchLabels:\n          env: prod\n",
+		}
+		result, err := ParseConfigMapData(data)
+		assert.NoError(t, err)
+		assert.Equal(t, 110, result.PrometheusRuleConfig.RecommendationPercentage)
+		assert.Equal(t, []string{"openshift.*"}, result.PrometheusRuleConfig.NamespaceFilterCriteria.ExclusionCriteria)
+		assert.Len(t, result.PlacementConfiguration.Spec.Predicates, 1)
+		assert.Equal(t, "prod", result.PlacementConfiguration.Spec.Predicates[0].RequiredClusterSelector.LabelSelector.MatchLabels["env"])
+	})
+
+	t.Run("invalid data", func(t *testing.T) {
+		data := map[string]string{
+			"prometheusRuleConfig": "{{invalid",
 		}
 		_, err := ParseConfigMapData(data)
 		assert.Error(t, err)
