@@ -97,6 +97,12 @@ func BuildLabelJoin(labelFilters []RSLabelFilter) (string, error) {
 // Uses sigs.k8s.io/yaml for unmarshaling because MCO writes ConfigMap values
 // in YAML format while MCOA writes JSON. sigs.k8s.io/yaml handles both
 // transparently and respects json struct tags.
+//
+// Placement parsing is best-effort: MCO serializes Placement using
+// gopkg.in/yaml.v2 which writes intstr.IntOrString fields as objects
+// ({type,intval,strval}) instead of scalars, causing unmarshal failures.
+// Since MCO always writes empty predicates and real placement comes from
+// dedicated placement ConfigMaps, we fall back to the default on error.
 func ParseConfigMapData(data map[string]string) (RSConfigMapData, error) {
 	var configData RSConfigMapData
 
@@ -106,12 +112,12 @@ func ParseConfigMapData(data map[string]string) (RSConfigMapData, error) {
 		}
 	}
 
+	configData.PlacementConfiguration = GetDefaultRSPlacement()
 	if placementRaw, ok := data["placementConfiguration"]; ok {
-		if err := sigYaml.Unmarshal([]byte(placementRaw), &configData.PlacementConfiguration); err != nil {
-			return configData, fmt.Errorf("%w: %w", errUnmarshalPlacementConfig, err)
+		var placement clusterv1beta1.Placement
+		if err := sigYaml.Unmarshal([]byte(placementRaw), &placement); err == nil {
+			configData.PlacementConfiguration = placement
 		}
-	} else {
-		configData.PlacementConfiguration = GetDefaultRSPlacement()
 	}
 
 	return configData, nil

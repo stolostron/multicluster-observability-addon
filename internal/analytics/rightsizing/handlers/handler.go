@@ -45,6 +45,9 @@ func (o *OptionsBuilder) Build(ctx context.Context, cluster *clusterv1.ManagedCl
 	namespaceEnabled := opts.Platform.AnalyticsOptions.RightSizing.NamespaceEnabled
 	virtualizationEnabled := opts.Platform.AnalyticsOptions.RightSizing.VirtualizationEnabled
 
+	nsMatched := false
+	virtMatched := false
+
 	// Build namespace right-sizing options
 	if namespaceEnabled {
 		if err := o.ensureNamespaceConfigMap(ctx); err != nil {
@@ -71,8 +74,10 @@ func (o *OptionsBuilder) Build(ctx context.Context, cluster *clusterv1.ManagedCl
 				return ret, fmt.Errorf("failed to build namespace right-sizing options: %w", err)
 			}
 			ret.NamespaceRightSizing = nsOpts
+			nsMatched = true
 		} else {
 			o.Logger.V(1).Info("Cluster not selected for namespace right-sizing", "cluster", cluster.Name)
+			ret.NamespaceRightSizing = emptyComponentOptions(rightsizing.NamespacePrometheusRuleName)
 		}
 	}
 
@@ -102,14 +107,43 @@ func (o *OptionsBuilder) Build(ctx context.Context, cluster *clusterv1.ManagedCl
 				return ret, fmt.Errorf("failed to build virtualization right-sizing options: %w", err)
 			}
 			ret.VirtualizationRightSizing = virtOpts
+			virtMatched = true
 		} else {
 			o.Logger.V(1).Info("Cluster not selected for virtualization right-sizing", "cluster", cluster.Name)
+			ret.VirtualizationRightSizing = emptyComponentOptions(rightsizing.VirtualizationPrometheusRuleName)
 		}
 	}
 
-	ret.ScrapeConfig = rightsizing.GenerateScrapeConfig(ret.NamespaceRightSizing.Enabled, ret.VirtualizationRightSizing.Enabled)
+	ret.ScrapeConfig = rightsizing.GenerateScrapeConfig(nsMatched, virtMatched)
 
 	return ret, nil
+}
+
+// emptyComponentOptions returns a ComponentOptions with an empty PrometheusRule
+// (spec.groups: []). The work agent reliably updates existing resources but
+// does not delete resources removed from a ManifestWork spec. By always
+// including the PrometheusRule (empty when the cluster doesn't match
+// placement), we convert a delete into an update — the work agent overwrites
+// the existing rule with an empty one, guaranteeing cleanup.
+func emptyComponentOptions(ruleName string) ComponentOptions {
+	return ComponentOptions{
+		Enabled: true,
+		PrometheusRules: []*monitoringv1.PrometheusRule{
+			{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "PrometheusRule",
+					APIVersion: "monitoring.coreos.com/v1",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      ruleName,
+					Namespace: rightsizing.MonitoringNamespace,
+				},
+				Spec: monitoringv1.PrometheusRuleSpec{
+					Groups: []monitoringv1.RuleGroup{},
+				},
+			},
+		},
+	}
 }
 
 func (o *OptionsBuilder) buildNamespaceOptionsFromConfig(configData rightsizing.RSConfigMapData) (ComponentOptions, error) {
