@@ -206,11 +206,12 @@ PlacementDecisionLabel     = "cluster.open-cluster-management.io/placement"
 
 **Updated comment** on ConfigMap watch — removed "(for placement updates)" since Placement resources no longer exist.
 
-## Non-Matching PrometheusRules
+## Non-Matching Resources
 
-When a feature is globally enabled but a cluster does not match the placement predicate, `Build()` simply omits the non-matching PrometheusRule from the generated ManifestWork. The ManifestWork only contains the PrometheusRule for the feature the cluster is selected for.
+The OCM work agent reliably **updates** existing resources but does not reliably **delete** resources removed from a ManifestWork spec. To guarantee cleanup when a cluster no longer matches placement, `Build()` always includes all RS resources in the ManifestWork — using empty/no-op versions for non-matching features. This converts every potential delete into an update, which the work agent handles correctly.
 
-The OCM work agent is responsible for reconciling the ManifestWork with the spoke cluster. When a resource is removed from the ManifestWork spec, the agent detects the diff via its `AppliedManifestWork` tracking and deletes the resource from the spoke.
+- **PrometheusRules**: `emptyComponentOptions()` returns a PrometheusRule with `spec.groups: []`. The work agent overwrites the existing rule with the empty one, effectively disabling it.
+- **ScrapeConfig**: `GenerateScrapeConfig()` always returns a valid ScrapeConfig. When no features match, the ScrapeConfig has no `match[]` params and no `staticConfigs` — it exists on the spoke but scrapes nothing.
 
 ## Backward Compatibility
 
