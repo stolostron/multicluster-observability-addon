@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestBuildNamespaceFilter(t *testing.T) {
@@ -63,7 +64,7 @@ func TestBuildNamespaceFilter(t *testing.T) {
 			if tt.expectError {
 				assert.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, tt.expected, result)
 			}
 		})
@@ -128,7 +129,7 @@ func TestBuildLabelJoin(t *testing.T) {
 			if tt.expectError {
 				assert.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, tt.expected, result)
 			}
 		})
@@ -149,7 +150,7 @@ func TestParseConfigMapData(t *testing.T) {
 			"prometheusRuleConfig": `{"namespaceFilterCriteria":{"exclusionCriteria":["openshift.*"]},"recommendationPercentage":120}`,
 		}
 		result, err := ParseConfigMapData(data)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, 120, result.PrometheusRuleConfig.RecommendationPercentage)
 		assert.Equal(t, []string{"openshift.*"}, result.PrometheusRuleConfig.NamespaceFilterCriteria.ExclusionCriteria)
 		assert.Empty(t, result.PrometheusRuleConfig.NamespaceFilterCriteria.InclusionCriteria)
@@ -157,7 +158,7 @@ func TestParseConfigMapData(t *testing.T) {
 
 	t.Run("empty data", func(t *testing.T) {
 		result, err := ParseConfigMapData(map[string]string{})
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, 0, result.PrometheusRuleConfig.RecommendationPercentage)
 		assert.Empty(t, result.PrometheusRuleConfig.NamespaceFilterCriteria.InclusionCriteria)
 		assert.Empty(t, result.PrometheusRuleConfig.NamespaceFilterCriteria.ExclusionCriteria)
@@ -170,7 +171,7 @@ func TestParseConfigMapData(t *testing.T) {
 			"placementConfiguration": "spec:\n  predicates:\n  - requiredClusterSelector:\n      labelSelector:\n        matchLabels:\n          env: prod\n",
 		}
 		result, err := ParseConfigMapData(data)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, 110, result.PrometheusRuleConfig.RecommendationPercentage)
 		assert.Equal(t, []string{"openshift.*"}, result.PrometheusRuleConfig.NamespaceFilterCriteria.ExclusionCriteria)
 		assert.Len(t, result.PlacementConfiguration.Spec.Predicates, 1)
@@ -183,7 +184,7 @@ func TestParseConfigMapData(t *testing.T) {
 			"placementConfiguration": "spec:\n  predicates: []\n  decisionstrategy:\n    groupstrategy:\n      clustersperdecisiongroup:\n        type: 0\n        intval: 0\n        strval: \"\"\n",
 		}
 		result, err := ParseConfigMapData(data)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, 110, result.PrometheusRuleConfig.RecommendationPercentage)
 		assert.Empty(t, result.PlacementConfiguration.Spec.Predicates)
 	})

@@ -60,9 +60,9 @@ func TestBuildNamespaceRightSizing(t *testing.T) {
 	t.Run("spec serializes to valid JSON", func(t *testing.T) {
 		data, err := json.Marshal(spec)
 		require.NoError(t, err)
-		assert.Greater(t, len(data), 0)
+		assert.NotEmpty(t, data)
 
-		var roundTrip map[string]interface{}
+		var roundTrip map[string]any
 		require.NoError(t, json.Unmarshal(data, &roundTrip))
 	})
 }
@@ -296,14 +296,14 @@ func TestVMDashboards_DrillDownLinksUseCorrectProject(t *testing.T) {
 
 // --- helpers ---
 
-func extractVarNames(vars interface{}) []string {
+func extractVarNames(vars any) []string {
 	data, _ := json.Marshal(vars)
-	var rawVars []map[string]interface{}
+	var rawVars []map[string]any
 	_ = json.Unmarshal(data, &rawVars)
 
 	var names []string
 	for _, v := range rawVars {
-		if spec, ok := v["spec"].(map[string]interface{}); ok {
+		if spec, ok := v["spec"].(map[string]any); ok {
 			if name, ok := spec["name"].(string); ok {
 				names = append(names, name)
 			}
