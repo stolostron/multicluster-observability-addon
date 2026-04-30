@@ -36,8 +36,7 @@ func NodeCPUUtilization(datasourceName string, labelMatchers ...promql.LabelMatc
 		panel.AddQuery(
 			query.PromQL(
 				promql.SetLabelMatchers(
-					//nolint:misspell
-					"instance:node_cpu_utilisation:rate1m{cluster=\"$cluster\", job=\"node-exporter\", instance=~\"$instance\"}",
+				"instance:node_cpu_utilisation:rate1m{cluster=\"$cluster\", job=\"node-exporter\", instance=~\"$instance\"}",
 					labelMatchers,
 				),
 				query.SeriesNameFormat("{{ instance }}"),
@@ -110,8 +109,7 @@ func NodeMemoryUtilization(datasourceName string, labelMatchers ...promql.LabelM
 		panel.AddQuery(
 			query.PromQL(
 				promql.SetLabelMatchers(
-					//nolint:misspell
-					"instance:node_memory_utilisation:ratio{cluster=\"$cluster\", job=\"node-exporter\", instance=~\"$instance\"}",
+				"instance:node_memory_utilisation:ratio{cluster=\"$cluster\", job=\"node-exporter\", instance=~\"$instance\"}",
 					labelMatchers,
 				),
 				query.SeriesNameFormat("{{ instance }}"),
