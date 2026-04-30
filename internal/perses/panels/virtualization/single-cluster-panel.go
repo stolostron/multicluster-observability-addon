@@ -2,6 +2,7 @@ package virtualization
 
 import (
 	"encoding/json"
+	"maps"
 
 	"github.com/perses/community-mixins/pkg/dashboards"
 	commonSdk "github.com/perses/perses/go-sdk/common"
@@ -89,9 +90,7 @@ func mergeTimeSeriesVisual(patch map[string]any) panel.Option {
 		if existing == nil {
 			existing = map[string]any{}
 		}
-		for k, v := range patch {
-			existing[k] = v
-		}
+		maps.Copy(existing, patch)
 		m["visual"] = existing
 		b.Spec.Plugin.Spec = m
 		return nil
