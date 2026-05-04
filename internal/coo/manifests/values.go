@@ -4,19 +4,19 @@ import (
 	"encoding/json"
 	"log"
 
+	persesv1 "github.com/perses/perses-operator/api/v1alpha1"
 	"github.com/perses/perses/go-sdk/dashboard"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	imanifests "github.com/stolostron/multicluster-observability-addon/internal/analytics/incident-detection/manifests"
-	"github.com/stolostron/multicluster-observability-addon/internal/perses/dashboards/acm"
-	hcp "github.com/stolostron/multicluster-observability-addon/internal/perses/dashboards/acm/hosted-control-plane"
-	apiserver "github.com/stolostron/multicluster-observability-addon/internal/perses/dashboards/acm/k8s/apiserver"
-	compute "github.com/stolostron/multicluster-observability-addon/internal/perses/dashboards/acm/k8s/compute"
-	etcd "github.com/stolostron/multicluster-observability-addon/internal/perses/dashboards/acm/k8s/etcd"
-	networking "github.com/stolostron/multicluster-observability-addon/internal/perses/dashboards/acm/k8s/networking"
-	slo "github.com/stolostron/multicluster-observability-addon/internal/perses/dashboards/acm/k8s/slo"
-	incident_management "github.com/stolostron/multicluster-observability-addon/internal/perses/dashboards/incident-management"
 	rsperses "github.com/stolostron/multicluster-observability-addon/internal/perses/dashboards/rightsizing"
+	"github.com/stolostron/multicluster-observability-addon/pkg/perses/dashboards/acm"
+	hcp "github.com/stolostron/multicluster-observability-addon/pkg/perses/dashboards/acm/hosted-control-plane"
+	compute "github.com/stolostron/multicluster-observability-addon/pkg/perses/dashboards/acm/k8s/compute"
+	networking "github.com/stolostron/multicluster-observability-addon/pkg/perses/dashboards/acm/k8s/networking"
+	slo "github.com/stolostron/multicluster-observability-addon/pkg/perses/dashboards/acm/k8s/slo"
+	incident_management "github.com/stolostron/multicluster-observability-addon/pkg/perses/dashboards/incident-management"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 var (
@@ -62,6 +62,7 @@ func BuildValues(opts addon.Options, installOfCOOOnTheHubIsNeeded bool, isHubClu
 	if metricsUI != nil {
 		if metricsUI.Enabled {
 			dashboards = append(dashboards, buildACMDashboards()...)
+			dashboards = append(dashboards, buildK8sDashboards()...)
 		}
 	}
 
@@ -156,8 +157,6 @@ func buildACMDashboards() []DashboardValue {
 		{acm.BuildACMClustersByAlert, "ACMClustersByAlert"},
 		{hcp.BuildACMHCPOverview, "ACMHCPOverview"},
 		{hcp.BuildACMHCPResources, "ACMHCPResources"},
-		{apiserver.BuildAPIServerOverview, "APIServerOverview"},
-		{etcd.BuildETCDOverview, "ETCDOverview"},
 		{slo.BuildSLOAPIServer, "SLOAPIServer"},
 		{slo.BuildSLOAPIServerCluster, "SLOAPIServerCluster"},
 		{networking.BuildNetworkingCluster, "NetworkingCluster"},
@@ -181,6 +180,43 @@ func buildIncidentDetetctionDashboards() []DashboardValue {
 	}
 
 	return buildDashboards(builders, dsThanos, config.AnalyticsNamespace)
+}
+
+func buildK8sDashboards() []DashboardValue {
+	type dashboardBuilder struct {
+		fn   func(string, string, string) ([]runtime.Object, error)
+		name string
+	}
+	builders := []dashboardBuilder{
+		{acm.BuildK8sDashboards, "Kubernetes"},
+		{acm.BuildETCDDashboards, "ETCD"},
+	}
+
+	var dashboards []DashboardValue
+	for _, builder := range builders {
+		objs, err := builder.fn(config.InstallNamespace, dsThanos, clusterLabelName)
+		if err != nil {
+			log.Printf("Failed to build %s dashboards: %v", builder.name, err)
+			continue
+		}
+		for _, obj := range objs {
+			db, ok := obj.(*persesv1.PersesDashboard)
+			if !ok {
+				log.Printf("Failed to convert object to PersesDashboard: %v", obj)
+				continue
+			}
+			data, err := json.Marshal(db.Spec)
+			if err != nil {
+				log.Printf("Failed to marshal %s dashboard: %v", builder.name, err)
+				continue
+			}
+			dashboards = append(dashboards, DashboardValue{
+				Name: db.Name,
+				Data: string(data),
+			})
+		}
+	}
+	return dashboards
 }
 
 func buildNamespaceRSDashboards() []DashboardValue {

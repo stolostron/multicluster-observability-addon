@@ -15,6 +15,7 @@ RUN go mod download
 # Copy the go source
 COPY main.go main.go
 COPY internal/ internal/
+COPY pkg/ pkg/
 
 # Build
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH GO111MODULE=on go build -mod=readonly -a -o multicluster-observability-addon main.go

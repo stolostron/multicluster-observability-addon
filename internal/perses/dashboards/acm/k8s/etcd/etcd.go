@@ -3,8 +3,8 @@ package etcd
 import (
 	"github.com/perses/perses/go-sdk/dashboard"
 	panelgroup "github.com/perses/perses/go-sdk/panel-group"
-	acm "github.com/stolostron/multicluster-observability-addon/internal/perses/dashboards/acm"
 	panels "github.com/stolostron/multicluster-observability-addon/internal/perses/panels/acm/k8s/etcd"
+	acm "github.com/stolostron/multicluster-observability-addon/pkg/perses/dashboards/acm"
 )
 
 func withOverviewGroup(datasource string) dashboard.Option {
