@@ -32,6 +32,7 @@ var (
 	errTooManyConfigResources    = errors.New("too many configuration resources")
 	errMissingHubEndpoint        = errors.New("hub endpoint is missing")
 	errInvalidPlacementReference = errors.New("invalid placement reference")
+	errMissingRouteHost          = errors.New("MCOA obs-api route has no host")
 )
 
 // DefaultStackResources reconciles the configuration resources needed for metrics collection
@@ -307,9 +308,9 @@ func (d DefaultStackResources) reconcileAgentForPlacement(ctx context.Context, p
 
 	// When thanos operator is enabled, add a second remote write to the MCOA obs-api
 	if d.AddonOptions.ThanosOperatorEnabled {
-		mcoaEndpoint, err := d.getMcoaRemoteWriteEndpoint(ctx)
-		if err != nil {
-			d.Logger.Error(err, "failed to get MCOA remote write endpoint, skipping mcoa remote write")
+		mcoaEndpoint, mcoaErr := d.getMcoaRemoteWriteEndpoint(ctx)
+		if mcoaErr != nil {
+			d.Logger.Error(mcoaErr, "failed to get MCOA remote write endpoint, skipping mcoa remote write")
 		} else {
 			promBuilder.McoaRemoteWriteEndpoint = mcoaEndpoint
 		}
@@ -448,7 +449,7 @@ func (d DefaultStackResources) getMcoaRemoteWriteEndpoint(ctx context.Context) (
 
 	host := route.Spec.Host
 	if host == "" {
-		return "", fmt.Errorf("MCOA obs-api route %s/%s has no host", key.Namespace, key.Name)
+		return "", errMissingRouteHost
 	}
 
 	return fmt.Sprintf("https://%s/api/metrics/v1/default/api/v1/receive", host), nil
