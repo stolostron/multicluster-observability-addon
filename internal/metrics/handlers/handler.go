@@ -165,9 +165,9 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 				Name:     fmt.Sprintf("%s.%s", cooprometheusv1alpha1.ScrapeConfigName, cooprometheusv1alpha1.SchemeGroupVersion.Group),
 			}
 
-			feedback, err := common.GetFeedbackValuesForResources(ctx, o.Client, managedCluster.Name, addoncfg.Name, promAgentCRD, scrapeConfigCRD)
-			if err != nil {
-				return ret, fmt.Errorf("failed to get feedback for CRDs: %w", err)
+			feedback, feedbackErr := common.GetFeedbackValuesForResources(ctx, o.Client, managedCluster.Name, addoncfg.Name, promAgentCRD, scrapeConfigCRD)
+			if feedbackErr != nil {
+				return ret, fmt.Errorf("failed to get feedback for CRDs: %w", feedbackErr)
 			}
 
 			type CrdTimestamps struct {
@@ -197,9 +197,9 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.Ma
 			}
 
 			if timestamps.PrometheusAgent != "" && timestamps.ScrapeConfig != "" {
-				jsonBytes, err := json.Marshal(timestamps)
-				if err != nil {
-					return ret, fmt.Errorf("failed to marshal CRD timestamps: %w", err)
+				jsonBytes, marshalErr := json.Marshal(timestamps)
+				if marshalErr != nil {
+					return ret, fmt.Errorf("failed to marshal CRD timestamps: %w", marshalErr)
 				}
 				ret.CRDEstablishedAnnotation = string(jsonBytes)
 			}
