@@ -14,6 +14,7 @@ RUN go mod download
 # Copy the go source
 COPY main.go main.go
 COPY internal/ internal/
+COPY pkg/ pkg/
 
 # Build
 # Enable CGO for FIPS compliance (dynamic linking)
