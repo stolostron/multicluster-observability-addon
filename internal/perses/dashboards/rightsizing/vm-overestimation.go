@@ -109,7 +109,7 @@ func BuildVMOverestimation(project string, datasource string, clusterLabelName s
 
 		dashboard.AddPanelGroup("",
 			panelgroup.PanelsPerLine(4),
-			panelgroup.PanelHeight(3),
+			panelgroup.PanelHeight(4),
 			panels.VMCPUOverestimationStatPanel(datasource),
 			panels.VMCPUUsageStatPanel(datasource),
 			panels.VMCPURequestStatPanel(datasource),
@@ -124,7 +124,7 @@ func BuildVMOverestimation(project string, datasource string, clusterLabelName s
 
 		dashboard.AddPanelGroup("",
 			panelgroup.PanelsPerLine(4),
-			panelgroup.PanelHeight(3),
+			panelgroup.PanelHeight(4),
 			panels.VMMemoryOverestimationStatPanel(datasource),
 			panels.VMMemoryUsageStatPanel(datasource),
 			panels.VMMemoryRequestStatPanel(datasource),

@@ -33,7 +33,7 @@ func nsTblCol(name, header string, align tablePanel.Align, format *commonSdk.For
 
 var greenThreshold = &commonSdk.Thresholds{
 	Steps: []commonSdk.StepOption{
-		{Value: 0, Color: "green"},
+		{Value: 0, Color: "#73BF69"},
 	},
 }
 
