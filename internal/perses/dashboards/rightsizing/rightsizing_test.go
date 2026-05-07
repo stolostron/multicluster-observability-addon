@@ -272,9 +272,9 @@ func TestVMDashboards_DrillDownLinksUseCorrectProject(t *testing.T) {
 	customProject := "my-analytics-ns"
 
 	for _, tc := range []struct {
-		name   string
-		fn     func(string, string, string) (dashboard.Builder, error)
-		linkID string
+		name    string
+		fn      func(string, string, string) (dashboard.Builder, error)
+		linkID  string
 	}{
 		{"VMOverview drill-down to overestimation", BuildVMOverview, "acm-rightsizing-vm-overestimation"},
 		{"VMOverview drill-down to underestimation", BuildVMOverview, "acm-rightsizing-vm-underestimation"},

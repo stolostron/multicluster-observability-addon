@@ -138,13 +138,13 @@ func Test_IncidentDetection_AllConfigsTogether_AllResources(t *testing.T) {
 						if obj.Namespace == addoncfg.AnalyticsNamespace {
 							analyticsDatasource = true
 						}
-					case *persesv1.PersesDashboard:
-						switch obj.Namespace {
-						case addoncfg.AnalyticsNamespace:
-							analyticsDashboards = append(analyticsDashboards, obj.Name)
-						case addoncfg.InstallNamespace:
-							obsDashboards = append(obsDashboards, obj.Name)
-						}
+				case *persesv1.PersesDashboard:
+					switch obj.Namespace {
+					case addoncfg.AnalyticsNamespace:
+						analyticsDashboards = append(analyticsDashboards, obj.Name)
+					case addoncfg.InstallNamespace:
+						obsDashboards = append(obsDashboards, obj.Name)
+					}
 					}
 				}
 

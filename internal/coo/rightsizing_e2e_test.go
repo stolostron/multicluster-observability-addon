@@ -11,8 +11,8 @@ import (
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
