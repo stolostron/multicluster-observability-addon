@@ -3,7 +3,6 @@ package handlers
 import (
 	"context"
 	"fmt"
-	"slices"
 
 	"github.com/go-logr/logr"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
@@ -305,5 +304,10 @@ func clusterMatchesClaimSelector(cluster *clusterv1.ManagedCluster, cs clusterv1
 }
 
 func stringInSlice(s string, slice []string) bool {
-	return slices.Contains(slice, s)
+	for _, v := range slice {
+		if v == s {
+			return true
+		}
+	}
+	return false
 }

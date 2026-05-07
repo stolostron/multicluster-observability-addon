@@ -18,7 +18,7 @@ var (
 )
 
 // FormatJSON marshals a Go data structure to a JSON string for ConfigMap storage.
-func FormatJSON(data any) string {
+func FormatJSON(data interface{}) string {
 	jsonData, err := json.Marshal(data)
 	if err != nil {
 		return ""

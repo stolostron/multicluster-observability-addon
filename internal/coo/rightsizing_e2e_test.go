@@ -2,7 +2,6 @@ package coo
 
 import (
 	"encoding/json"
-	"slices"
 	"testing"
 
 	persesv1 "github.com/perses/perses-operator/api/v1alpha1"
@@ -274,40 +273,40 @@ func TestRightSizing_DashboardSpecStructure(t *testing.T) {
 			raw, err := json.Marshal(db.Spec)
 			require.NoError(t, err)
 
-			var spec map[string]any
+			var spec map[string]interface{}
 			require.NoError(t, json.Unmarshal(raw, &spec))
 
 			layouts, ok := spec["layouts"]
 			require.True(t, ok, "dashboard spec must have layouts")
-			layoutSlice, ok := layouts.([]any)
+			layoutSlice, ok := layouts.([]interface{})
 			require.True(t, ok)
-			assert.NotEmpty(t, layoutSlice, "dashboard must have at least one layout")
+			assert.Greater(t, len(layoutSlice), 0, "dashboard must have at least one layout")
 		})
 
 		t.Run(db.Name+"/spec_has_panels", func(t *testing.T) {
 			raw, err := json.Marshal(db.Spec)
 			require.NoError(t, err)
 
-			var spec map[string]any
+			var spec map[string]interface{}
 			require.NoError(t, json.Unmarshal(raw, &spec))
 
 			panels, ok := spec["panels"]
 			require.True(t, ok, "dashboard spec must have panels")
-			panelMap, ok := panels.(map[string]any)
+			panelMap, ok := panels.(map[string]interface{})
 			require.True(t, ok)
-			assert.NotEmpty(t, panelMap, "dashboard must have at least one panel")
+			assert.Greater(t, len(panelMap), 0, "dashboard must have at least one panel")
 		})
 
 		t.Run(db.Name+"/spec_has_variables", func(t *testing.T) {
 			raw, err := json.Marshal(db.Spec)
 			require.NoError(t, err)
 
-			var spec map[string]any
+			var spec map[string]interface{}
 			require.NoError(t, json.Unmarshal(raw, &spec))
 
 			variables, ok := spec["variables"]
 			require.True(t, ok, "dashboard spec must have variables")
-			varSlice, ok := variables.([]any)
+			varSlice, ok := variables.([]interface{})
 			require.True(t, ok)
 			assert.GreaterOrEqual(t, len(varSlice), 3, "all RS dashboards have at least cluster, profile, days")
 		})
@@ -368,5 +367,10 @@ func dashboardNames(dbs []*persesv1.PersesDashboard) []string {
 }
 
 func contains(slice []string, val string) bool {
-	return slices.Contains(slice, val)
+	for _, s := range slice {
+		if s == val {
+			return true
+		}
+	}
+	return false
 }

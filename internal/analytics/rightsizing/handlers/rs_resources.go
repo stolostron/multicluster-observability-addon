@@ -118,7 +118,7 @@ func (o *OptionsBuilder) computePlacementHash(ctx context.Context) string {
 		cm := &corev1.ConfigMap{}
 		key := types.NamespacedName{Name: cmName, Namespace: addoncfg.InstallNamespace}
 		if err := o.Client.Get(ctx, key, cm); err != nil {
-			_, _ = fmt.Fprintf(h, "%s=absent;", cmName)
+			fmt.Fprintf(h, "%s=absent;", cmName)
 			continue
 		}
 		keys := make([]string, 0, len(cm.Data))
@@ -127,7 +127,7 @@ func (o *OptionsBuilder) computePlacementHash(ctx context.Context) string {
 		}
 		sort.Strings(keys)
 		for _, k := range keys {
-			_, _ = fmt.Fprintf(h, "%s/%s=%s;", cmName, k, cm.Data[k])
+			fmt.Fprintf(h, "%s/%s=%s;", cmName, k, cm.Data[k])
 		}
 	}
 

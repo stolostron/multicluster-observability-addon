@@ -151,7 +151,7 @@ func Test_IncidentDetection_AllConfigsTogether_AllResources(t *testing.T) {
 				require.True(t, analyticsNS, "observability-analytics namespace should be created")
 				require.True(t, analyticsDatasource, "datasource should exist in observability-analytics")
 				require.GreaterOrEqual(t, len(analyticsDashboards), 2, "expected at least 2 RS dashboards in observability-analytics")
-				require.Empty(t, obsDashboards, "no RS dashboards should be in obs namespace")
+				require.Equal(t, 0, len(obsDashboards), "no RS dashboards should be in obs namespace")
 			},
 		},
 		{
