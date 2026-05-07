@@ -117,22 +117,6 @@ func ParseConfigMapData(data map[string]string) (RSConfigMapData, error) {
 	return configData, nil
 }
 
-// ParsePlacementConfigMap parses a dedicated placement ConfigMap.
-// The ConfigMap stores the Placement in a "placementConfiguration" key
-// (JSON or YAML format). Returns the Placement and true if found, or
-// an empty Placement and false if the key is missing.
-func ParsePlacementConfigMap(data map[string]string) (clusterv1beta1.Placement, bool, error) {
-	raw, ok := data["placementConfiguration"]
-	if !ok {
-		return clusterv1beta1.Placement{}, false, nil
-	}
-	var placement clusterv1beta1.Placement
-	if err := sigYaml.Unmarshal([]byte(raw), &placement); err != nil {
-		return placement, false, fmt.Errorf("%w: %w", errUnmarshalPlacementConfig, err)
-	}
-	return placement, true, nil
-}
-
 // GetDefaultNamespaceConfigData returns default config data for namespace right-sizing
 func GetDefaultNamespaceConfigData() map[string]string {
 	ruleConfig := GetDefaultRSPrometheusRuleConfig()

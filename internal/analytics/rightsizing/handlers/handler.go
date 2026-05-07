@@ -63,9 +63,7 @@ func (o *OptionsBuilder) Build(ctx context.Context, cluster *clusterv1.ManagedCl
 			}
 		}
 
-		nsPlacement := o.getPlacementOverride(ctx, rightsizing.NamespacePlacementCMName, nsConfigData.PlacementConfiguration)
-
-		if clusterMatchesPlacement(cluster, nsPlacement) {
+		if clusterMatchesPlacement(cluster, nsConfigData.PlacementConfiguration) {
 			nsOpts, err := o.buildNamespaceOptionsFromConfig(nsConfigData)
 			if err != nil {
 				return ret, fmt.Errorf("failed to build namespace right-sizing options: %w", err)
@@ -94,9 +92,7 @@ func (o *OptionsBuilder) Build(ctx context.Context, cluster *clusterv1.ManagedCl
 			}
 		}
 
-		virtPlacement := o.getPlacementOverride(ctx, rightsizing.VirtualizationPlacementCMName, virtConfigData.PlacementConfiguration)
-
-		if clusterMatchesPlacement(cluster, virtPlacement) {
+		if clusterMatchesPlacement(cluster, virtConfigData.PlacementConfiguration) {
 			virtOpts, err := o.buildVirtualizationOptionsFromConfig(virtConfigData)
 			if err != nil {
 				return ret, fmt.Errorf("failed to build virtualization right-sizing options: %w", err)
@@ -198,31 +194,6 @@ func (o *OptionsBuilder) createDefaultConfigMap(ctx context.Context, name string
 
 	o.Logger.V(1).Info("Created right-sizing ConfigMap", "name", name, "namespace", addoncfg.InstallNamespace)
 	return nil
-}
-
-// getPlacementOverride checks for a dedicated MCOA-owned placement ConfigMap.
-// MCO periodically overwrites the RS ConfigMaps (rs-namespace-config, rs-virt-config),
-// resetting any custom placement predicates. Dedicated placement ConfigMaps
-// (rs-namespace-placement, rs-virt-placement) are owned only by MCOA and are
-// never overwritten by MCO, so user-configured placement predicates persist.
-// Falls back to the placement from the RS ConfigMap if no override exists.
-func (o *OptionsBuilder) getPlacementOverride(ctx context.Context, placementCMName string, fallback clusterv1beta1.Placement) clusterv1beta1.Placement {
-	cm, err := common.GetConfigMap(ctx, o.Client, addoncfg.InstallNamespace, placementCMName)
-	if err != nil {
-		return fallback
-	}
-
-	placement, found, err := rightsizing.ParsePlacementConfigMap(cm.Data)
-	if err != nil {
-		o.Logger.Error(err, "Failed to parse placement ConfigMap, using fallback", "name", placementCMName)
-		return fallback
-	}
-	if !found {
-		return fallback
-	}
-
-	o.Logger.V(2).Info("Using placement override from dedicated ConfigMap", "name", placementCMName)
-	return placement
 }
 
 // clusterMatchesPlacement evaluates placement predicates in-memory against

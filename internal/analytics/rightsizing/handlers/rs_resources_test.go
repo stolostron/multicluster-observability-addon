@@ -88,18 +88,9 @@ func TestRSConfigMapPredicate(t *testing.T) {
 		Name: rightsizing.NamespaceConfigMapName, Namespace: "other-namespace",
 	}}
 
-	rsNsPlacementCM := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
-		Name: rightsizing.NamespacePlacementCMName, Namespace: addoncfg.InstallNamespace,
-	}}
-	rsVirtPlacementCM := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
-		Name: rightsizing.VirtualizationPlacementCMName, Namespace: addoncfg.InstallNamespace,
-	}}
-
-	// Create: accepts RS ConfigMaps and placement ConfigMaps, rejects others
+	// Create: accepts RS ConfigMaps, rejects others
 	assert.True(t, pred.CreateFunc(event.CreateEvent{Object: rsNsCM}))
 	assert.True(t, pred.CreateFunc(event.CreateEvent{Object: rsVirtCM}))
-	assert.True(t, pred.CreateFunc(event.CreateEvent{Object: rsNsPlacementCM}))
-	assert.True(t, pred.CreateFunc(event.CreateEvent{Object: rsVirtPlacementCM}))
 	assert.False(t, pred.CreateFunc(event.CreateEvent{Object: unrelatedCM}))
 	assert.False(t, pred.CreateFunc(event.CreateEvent{Object: wrongNsCM}))
 
