@@ -12,7 +12,7 @@ type RightSizingValues struct {
 
 // ComponentValues contains the helm values for a single right-sizing component
 type ComponentValues struct {
-	Enabled bool                  `json:"enabled"`
+	Enabled bool                `json:"enabled"`
 	Rules   []PrometheusRuleValue `json:"rules,omitempty"`
 }
 
