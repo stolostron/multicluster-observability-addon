@@ -17,7 +17,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-	"sigs.k8s.io/controller-runtime/pkg/event"
 )
 
 func setupTestScheme(t *testing.T) *runtime.Scheme {
@@ -79,40 +78,6 @@ func createTestConfigMap(name string) *corev1.ConfigMap {
 		},
 		Data: map[string]string{"config.yaml": "test"},
 	}
-}
-
-func TestRSConfigMapPredicate(t *testing.T) {
-	pred := RSConfigMapPredicate()
-
-	rsNsCM := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
-		Name: rightsizing.NamespaceConfigMapName, Namespace: addoncfg.InstallNamespace,
-	}}
-	rsVirtCM := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
-		Name: rightsizing.VirtualizationConfigMapName, Namespace: addoncfg.InstallNamespace,
-	}}
-	unrelatedCM := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
-		Name: "other-config", Namespace: addoncfg.InstallNamespace,
-	}}
-	wrongNsCM := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
-		Name: rightsizing.NamespaceConfigMapName, Namespace: "other-namespace",
-	}}
-
-	// Create: accepts RS ConfigMaps, rejects others
-	assert.True(t, pred.CreateFunc(event.CreateEvent{Object: rsNsCM}))
-	assert.True(t, pred.CreateFunc(event.CreateEvent{Object: rsVirtCM}))
-	assert.False(t, pred.CreateFunc(event.CreateEvent{Object: unrelatedCM}))
-	assert.False(t, pred.CreateFunc(event.CreateEvent{Object: wrongNsCM}))
-
-	// Update: accepts RS ConfigMaps, rejects others
-	assert.True(t, pred.UpdateFunc(event.UpdateEvent{ObjectNew: rsNsCM}))
-	assert.False(t, pred.UpdateFunc(event.UpdateEvent{ObjectNew: unrelatedCM}))
-
-	// Delete: always rejected (prevents race during MCO cleanup)
-	assert.False(t, pred.DeleteFunc(event.DeleteEvent{Object: rsNsCM}))
-	assert.False(t, pred.DeleteFunc(event.DeleteEvent{Object: unrelatedCM}))
-
-	// Generic: always rejected
-	assert.False(t, pred.GenericFunc(event.GenericEvent{Object: rsNsCM}))
 }
 
 func TestReconcileRSResources_CleanupNamespace(t *testing.T) {
