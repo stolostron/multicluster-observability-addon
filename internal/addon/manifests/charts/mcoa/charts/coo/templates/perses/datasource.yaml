@@ -12,7 +12,7 @@ spec:
         type: file
       enable: true
   config:
-    default: false
+    default: true
     plugin:
       kind: PrometheusDatasource
       spec:

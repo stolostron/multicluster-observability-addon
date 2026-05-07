@@ -396,8 +396,6 @@ github.com/perses/plugins/statchart v0.12.1 h1:C1/WjA5jmvU8h+vWvOy4M0BAAncKflSDo
 github.com/perses/plugins/statchart v0.12.1/go.mod h1:2dqCAyTL5p7OfPxfcdRUJ/GDb1OvaC2AggtNauGJH5g=
 github.com/perses/plugins/table v0.11.3-0.20260416092358-50d24073dacc h1:AVb53iw4Az+iT7srZnVk2jLzywpWd4Dz0w3Z2Owq6eU=
 github.com/perses/plugins/table v0.11.3-0.20260416092358-50d24073dacc/go.mod h1:Kb4mV70tdKt/rEwPAeam9AXfkOag7Z8GW31u5b2eM70=
-github.com/perses/plugins/staticlistvariable v0.8.1 h1:0Xb8TbcjjOsqS3qEXdrGymmffLqP3dNC9gCgJW9skG8=
-github.com/perses/plugins/staticlistvariable v0.8.1/go.mod h1:5IBVVtEeAXPRSEnpHjCCpF4x3fC2Iw+bn4894KdVoEQ=
 github.com/perses/plugins/timeserieschart v0.12.1 h1:3OxNZw8FROg2oJKgP0lLMjsG/olU27K1ppeTLX9k+CY=
 github.com/perses/plugins/timeserieschart v0.12.1/go.mod h1:xKetTjF9DYdg0wIIDjcLNddxvHfbRoxzz2Vq7XoEAHM=
 github.com/perses/promql-builder v0.2.1-0.20260106092606-e4909fea9c57 h1:BLMC16NTbXCrJt4ej78Kf1EStW6zemI85St5gRtLLGY=

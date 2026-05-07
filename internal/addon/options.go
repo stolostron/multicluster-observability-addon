@@ -174,6 +174,10 @@ func BuildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Opti
 	opts.ProxyConfig.NoProxy = addOnDeployment.Spec.ProxyConfig.NoProxy
 	opts.Registries = addOnDeployment.Spec.Registries
 
+	if addOnDeployment.Spec.CustomizedVariables == nil {
+		return opts, nil
+	}
+
 	// Track if right-sizing keys were explicitly set
 	nsRSExplicitlySet := false
 	virtRSExplicitlySet := false

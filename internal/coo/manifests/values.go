@@ -15,7 +15,6 @@ import (
 	networking "github.com/stolostron/multicluster-observability-addon/internal/perses/dashboards/acm/k8s/networking"
 	slo "github.com/stolostron/multicluster-observability-addon/internal/perses/dashboards/acm/k8s/slo"
 	incident_management "github.com/stolostron/multicluster-observability-addon/internal/perses/dashboards/incident-management"
-	rsperses "github.com/stolostron/multicluster-observability-addon/internal/perses/dashboards/rightsizing"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -37,14 +36,13 @@ type DashboardBuilder struct {
 }
 
 type COOValues struct {
-	Enabled             bool                                `json:"enabled"`
-	InstallCOO          bool                                `json:"installCOO"`
-	MonitoringUIPlugin  bool                                `json:"monitoringUIPlugin"`
-	Perses              bool                                `json:"perses"`
-	Dashboards          []DashboardValue                    `json:"dashboards,omitempty"`
-	AnalyticsDashboards []DashboardValue                    `json:"analyticsDashboards,omitempty"`
-	Metrics             *UIValues                           `json:"metrics,omitempty"`
-	IncidentDetection   *imanifests.IncidentDetectionValues `json:"incidentDetection,omitempty"`
+	Enabled            bool                                `json:"enabled"`
+	InstallCOO         bool                                `json:"installCOO"`
+	MonitoringUIPlugin bool                                `json:"monitoringUIPlugin"`
+	Perses             bool                                `json:"perses"`
+	Dashboards         []DashboardValue                    `json:"dashboards,omitempty"`
+	Metrics            *UIValues                           `json:"metrics,omitempty"`
+	IncidentDetection  *imanifests.IncidentDetectionValues `json:"incidentDetection,omitempty"`
 }
 
 type UIValues struct {
@@ -54,7 +52,6 @@ type UIValues struct {
 func BuildValues(opts addon.Options, installOfCOOOnTheHubIsNeeded bool, isHubCluster bool) *COOValues {
 	var dashboards []DashboardValue
 	var incidentDetectionEnabled bool
-	var rightSizingEnabled bool
 	metricsUI := enableUI(opts.Platform.Metrics, isHubCluster)
 	if metricsUI != nil {
 		if metricsUI.Enabled {
@@ -67,26 +64,14 @@ func BuildValues(opts addon.Options, installOfCOOOnTheHubIsNeeded bool, isHubClu
 	if incidentDetection != nil {
 		if incidentDetection.Enabled {
 			incidentDetectionEnabled = true
-		}
-	}
-
-	var analyticsDashboards []DashboardValue
-	if isHubCluster {
-		if incidentDetectionEnabled {
-			analyticsDashboards = append(analyticsDashboards, buildIncidentDetetctionDashboards()...)
-		}
-		if opts.Platform.AnalyticsOptions.RightSizing.NamespaceEnabled {
-			rightSizingEnabled = true
-			analyticsDashboards = append(analyticsDashboards, buildNamespaceRSDashboards()...)
-		}
-		if opts.Platform.AnalyticsOptions.RightSizing.VirtualizationEnabled {
-			rightSizingEnabled = true
-			analyticsDashboards = append(analyticsDashboards, buildVMRSDashboards()...)
+			if isHubCluster {
+				dashboards = append(dashboards, buildIncidentDetetctionDashboards()...)
+			}
 		}
 	}
 
 	var installCOO bool
-	if (metricsUI != nil && metricsUI.Enabled) || incidentDetectionEnabled || rightSizingEnabled {
+	if (metricsUI != nil && metricsUI.Enabled) || incidentDetectionEnabled {
 		if isHubCluster {
 			installCOO = installOfCOOOnTheHubIsNeeded
 		} else {
@@ -95,14 +80,15 @@ func BuildValues(opts addon.Options, installOfCOOOnTheHubIsNeeded bool, isHubClu
 	}
 
 	return &COOValues{
-		Enabled:             len(dashboards) > 0 || len(analyticsDashboards) > 0 || incidentDetectionEnabled,
-		InstallCOO:          installCOO,
-		MonitoringUIPlugin:  len(dashboards) > 0 || len(analyticsDashboards) > 0 || incidentDetectionEnabled,
-		Perses:              len(dashboards) > 0 || len(analyticsDashboards) > 0,
-		Dashboards:          dashboards,
-		AnalyticsDashboards: analyticsDashboards,
-		Metrics:             metricsUI,
-		IncidentDetection:   incidentDetection,
+		// Decide if this chart is needed
+		Enabled: len(dashboards) > 0 || incidentDetectionEnabled,
+		// Decide if COO chart is needs to be installed
+		InstallCOO:         installCOO,
+		MonitoringUIPlugin: len(dashboards) > 0 || incidentDetectionEnabled,
+		Perses:             len(dashboards) > 0,
+		Dashboards:         dashboards,
+		Metrics:            metricsUI,
+		IncidentDetection:  incidentDetection,
 	}
 }
 
@@ -120,11 +106,11 @@ func enableUI(opts addon.MetricsOptions, isHub bool) *UIValues {
 	}
 }
 
-func buildDashboards(builders []DashboardBuilder, datasource string, project string) []DashboardValue {
+func buildDashboards(builders []DashboardBuilder, datasource string) []DashboardValue {
 	var dashboards []DashboardValue
 
 	for _, builder := range builders {
-		db, err := builder.fn(project, datasource, clusterLabelName)
+		db, err := builder.fn(config.InstallNamespace, datasource, clusterLabelName)
 		if err != nil {
 			log.Printf("Failed to build %s dashboard: %v", builder.name, err)
 			continue
@@ -168,7 +154,7 @@ func buildACMDashboards() []DashboardValue {
 		{compute.BuildComputeWorkload, "ComputeWorkload"},
 	}
 
-	return buildDashboards(builders, dsThanos, config.InstallNamespace)
+	return buildDashboards(builders, dsThanos)
 }
 
 func buildIncidentDetetctionDashboards() []DashboardValue {
@@ -176,7 +162,7 @@ func buildIncidentDetetctionDashboards() []DashboardValue {
 		{incident_management.BuildACMIncidentsOverview, "IncidentDetectionOverview"},
 	}
 
-	return buildDashboards(builders, dsThanos, config.AnalyticsNamespace)
+	return buildDashboards(builders, dsThanos)
 }
 
 func buildK8sDashboards() []DashboardValue {
@@ -214,22 +200,4 @@ func buildK8sDashboards() []DashboardValue {
 		}
 	}
 	return dashboards
-}
-
-func buildNamespaceRSDashboards() []DashboardValue {
-	builders := []DashboardBuilder{
-		{rsperses.BuildNamespaceRightSizing, "NamespaceRightSizing"},
-	}
-
-	return buildDashboards(builders, dsThanos, config.AnalyticsNamespace)
-}
-
-func buildVMRSDashboards() []DashboardValue {
-	builders := []DashboardBuilder{
-		{rsperses.BuildVMOverview, "VMRightSizingOverview"},
-		{rsperses.BuildVMOverestimation, "VMOverestimation"},
-		{rsperses.BuildVMUnderestimation, "VMUnderestimation"},
-	}
-
-	return buildDashboards(builders, dsThanos, config.AnalyticsNamespace)
 }

@@ -17,8 +17,6 @@ dashboards:
         }
       }
 
-analyticsDashboards: []
-
 incidentDetection:
   enabled: false
 

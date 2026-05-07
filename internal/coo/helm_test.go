@@ -26,7 +26,6 @@ import (
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	fakeaddon "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
-	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
@@ -114,47 +113,7 @@ func Test_IncidentDetection_AllConfigsTogether_AllResources(t *testing.T) {
 			},
 		},
 		{
-			name:  "right-sizing dashboards in observability-analytics namespace",
-			isHub: true,
-			cv: []addonapiv1alpha1.CustomizedVariable{
-				{Name: addon.KeyPlatformNamespaceRightSizing, Value: "enabled"},
-				{Name: addon.KeyPlatformVirtualizationRightSizing, Value: "enabled"},
-			},
-			expectedFunc: func(t *testing.T, objects []runtime.Object) {
-				require.GreaterOrEqual(t, len(objects), 3, "expected at least namespace + datasource + dashboards")
-
-				var analyticsNS bool
-				var analyticsDatasource bool
-				var analyticsDashboards []string
-				var obsDashboards []string
-
-				for _, o := range objects {
-					switch obj := o.(type) {
-					case *corev1.Namespace:
-						if obj.Name == addoncfg.AnalyticsNamespace {
-							analyticsNS = true
-						}
-					case *persesv1.PersesDatasource:
-						if obj.Namespace == addoncfg.AnalyticsNamespace {
-							analyticsDatasource = true
-						}
-					case *persesv1.PersesDashboard:
-						if obj.Namespace == addoncfg.AnalyticsNamespace {
-							analyticsDashboards = append(analyticsDashboards, obj.Name)
-						} else if obj.Namespace == addoncfg.InstallNamespace {
-							obsDashboards = append(obsDashboards, obj.Name)
-						}
-					}
-				}
-
-				require.True(t, analyticsNS, "observability-analytics namespace should be created")
-				require.True(t, analyticsDatasource, "datasource should exist in observability-analytics")
-				require.GreaterOrEqual(t, len(analyticsDashboards), 2, "expected at least 2 RS dashboards in observability-analytics")
-				require.Equal(t, 0, len(obsDashboards), "no RS dashboards should be in obs namespace")
-			},
-		},
-		{
-			name: "incident detection dashboards in observability-analytics namespace",
+			name: "incident detection",
 			cv: []addonapiv1alpha1.CustomizedVariable{
 				{
 					Name:  "platformIncidentDetection",
@@ -167,15 +126,6 @@ func Test_IncidentDetection_AllConfigsTogether_AllResources(t *testing.T) {
 				expectedUIPluginSpec := uiplugin.UIPluginSpec{
 					Type: "Monitoring",
 					Monitoring: &uiplugin.MonitoringConfig{
-						ACM: &uiplugin.AdvancedClusterManagementReference{
-							Enabled: true,
-							Alertmanager: uiplugin.AlertmanagerReference{
-								Url: "https://alertmanager.open-cluster-management-observability.svc:9095",
-							},
-							ThanosQuerier: uiplugin.ThanosQuerierReference{
-								Url: "https://rbac-query-proxy.open-cluster-management-observability.svc:8443",
-							},
-						},
 						Perses: &uiplugin.PersesReference{
 							Enabled: true,
 						},
@@ -185,26 +135,13 @@ func Test_IncidentDetection_AllConfigsTogether_AllResources(t *testing.T) {
 					},
 				}
 
-				var analyticsNS bool
-				var analyticsDashboards int
-
 				for _, o := range objects {
-					switch obj := o.(type) {
+					switch o := o.(type) {
 					case *uiplugin.UIPlugin:
-						require.Equal(t, "monitoring", obj.Name)
-						require.Equal(t, expectedUIPluginSpec, obj.Spec)
-					case *corev1.Namespace:
-						if obj.Name == addoncfg.AnalyticsNamespace {
-							analyticsNS = true
-						}
-					case *persesv1.PersesDashboard:
-						require.Equal(t, addoncfg.AnalyticsNamespace, obj.Namespace, "incident detection dashboard should be in analytics namespace")
-						analyticsDashboards++
+						require.Equal(t, "monitoring", o.Name)
+						require.Equal(t, expectedUIPluginSpec, o.Spec)
 					}
 				}
-
-				require.True(t, analyticsNS, "observability-analytics namespace should be created")
-				require.GreaterOrEqual(t, analyticsDashboards, 1, "expected at least 1 incident detection dashboard in analytics namespace")
 			},
 		},
 		{
