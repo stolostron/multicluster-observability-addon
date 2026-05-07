@@ -69,11 +69,8 @@ func ClusterCurrentStatus(datasource string) panelgroup.Option {
 					},
 				},
 			}),
+			tablePanel.WithDefaultColumnHidden(true),
 			tablePanel.WithColumnSettings([]tablePanel.ColumnSettings{
-				{
-					Name: "timestamp",
-					Hide: true,
-				},
 				{
 					Name:     "namespace",
 					Header:   "Namespace",

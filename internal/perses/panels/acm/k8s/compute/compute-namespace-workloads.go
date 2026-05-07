@@ -59,11 +59,8 @@ func NamespaceWorkloadsCPUQuota(datasource string) panelgroup.Option {
 					},
 				},
 			}),
+			tablePanel.WithDefaultColumnHidden(true),
 			tablePanel.WithColumnSettings([]tablePanel.ColumnSettings{
-				{
-					Name: "timestamp",
-					Hide: true,
-				},
 				{
 					Name:     "workload",
 					Header:   "Workload",
@@ -211,11 +208,8 @@ func NamespaceWorkloadsMemoryQuota(datasource string) panelgroup.Option {
 					},
 				},
 			}),
+			tablePanel.WithDefaultColumnHidden(true),
 			tablePanel.WithColumnSettings([]tablePanel.ColumnSettings{
-				{
-					Name: "timestamp",
-					Hide: true,
-				},
 				{
 					Name:     "workload",
 					Header:   "Workload",

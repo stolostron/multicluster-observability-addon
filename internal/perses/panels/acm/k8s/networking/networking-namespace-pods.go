@@ -81,11 +81,8 @@ func NamespacePodsCurrentStatus(datasource string) panelgroup.Option {
 					},
 				},
 			}),
+			tablePanel.WithDefaultColumnHidden(true),
 			tablePanel.WithColumnSettings([]tablePanel.ColumnSettings{
-				{
-					Name: "timestamp",
-					Hide: true,
-				},
 				{
 					Name:     "pod",
 					Header:   "Pod",

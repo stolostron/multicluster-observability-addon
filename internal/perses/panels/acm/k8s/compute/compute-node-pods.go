@@ -58,11 +58,8 @@ func NodePodsCPUQuota(datasource string) panelgroup.Option {
 					},
 				},
 			}),
+			tablePanel.WithDefaultColumnHidden(true),
 			tablePanel.WithColumnSettings([]tablePanel.ColumnSettings{
-				{
-					Name: "timestamp",
-					Hide: true,
-				},
 				{
 					Name:   "pod",
 					Header: "Pod",
@@ -195,11 +192,8 @@ func NodePodsMemoryQuota(datasource string) panelgroup.Option {
 					},
 				},
 			}),
+			tablePanel.WithDefaultColumnHidden(true),
 			tablePanel.WithColumnSettings([]tablePanel.ColumnSettings{
-				{
-					Name: "timestamp",
-					Hide: true,
-				},
 				{
 					Name:   "pod",
 					Header: "Pod",
