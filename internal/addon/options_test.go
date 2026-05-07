@@ -375,17 +375,10 @@ func TestBuildOptions(t *testing.T) {
 			},
 			expectedOpts: Options{
 				Platform: PlatformOptions{
-					Enabled: true,
 					Metrics: MetricsOptions{
 						NodeExporter: NodeExporterOptions{
 							HostPort:     19100,
 							InternalPort: 19101,
-						},
-					},
-					AnalyticsOptions: AnalyticsOptions{
-						RightSizing: RightSizingOptions{
-							NamespaceEnabled:      true,
-							VirtualizationEnabled: true,
 						},
 					},
 				},
