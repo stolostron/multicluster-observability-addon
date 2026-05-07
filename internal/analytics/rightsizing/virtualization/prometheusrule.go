@@ -120,7 +120,7 @@ func buildNamespaceRules1d(configData rightsizing.RSConfigMapData, rb *rightsizi
 
 func buildClusterRules5m(nsFilter string, rb *rightsizing.RuleBuilder) []monitoringv1.Rule {
 	return []monitoringv1.Rule{
-		rb.RuleNoJoin(
+		rb.Rule(
 			"acm_rs_vm:cluster:cpu_request:5m",
 			fmt.Sprintf(
 				`max_over_time(
@@ -131,7 +131,7 @@ func buildClusterRules5m(nsFilter string, rb *rightsizing.RuleBuilder) []monitor
 				nsFilter,
 			),
 		),
-		rb.RuleNoJoin(
+		rb.Rule(
 			"acm_rs_vm:cluster:cpu_usage:5m",
 			fmt.Sprintf(
 				`max_over_time(sum (
@@ -140,7 +140,7 @@ func buildClusterRules5m(nsFilter string, rb *rightsizing.RuleBuilder) []monitor
 				nsFilter,
 			),
 		),
-		rb.RuleNoJoin(
+		rb.Rule(
 			"acm_rs_vm:cluster:memory_request:5m",
 			fmt.Sprintf(
 				`max_over_time(sum (
@@ -149,7 +149,7 @@ func buildClusterRules5m(nsFilter string, rb *rightsizing.RuleBuilder) []monitor
 				nsFilter,
 			),
 		),
-		rb.RuleNoJoin(
+		rb.Rule(
 			"acm_rs_vm:cluster:memory_usage:5m",
 			fmt.Sprintf(
 				`max_over_time(sum (
