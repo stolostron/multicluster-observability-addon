@@ -37,14 +37,11 @@ type DashboardBuilder struct {
 }
 
 type COOValues struct {
-	Enabled            bool `json:"enabled"`
-	InstallCOO         bool `json:"installCOO"`
-	MonitoringUIPlugin bool `json:"monitoringUIPlugin"`
-	Perses             bool `json:"perses"`
-	// omitempty removed: when no regular dashboards are needed, the key must
-	// still appear in the serialized JSON so Helm uses the empty list instead
-	// of falling back to the default in values.yaml.
-	Dashboards          []DashboardValue                    `json:"dashboards"`
+	Enabled             bool                                `json:"enabled"`
+	InstallCOO          bool                                `json:"installCOO"`
+	MonitoringUIPlugin  bool                                `json:"monitoringUIPlugin"`
+	Perses              bool                                `json:"perses"`
+	Dashboards          []DashboardValue                    `json:"dashboards,omitempty"`
 	AnalyticsDashboards []DashboardValue                    `json:"analyticsDashboards,omitempty"`
 	Metrics             *UIValues                           `json:"metrics,omitempty"`
 	IncidentDetection   *imanifests.IncidentDetectionValues `json:"incidentDetection,omitempty"`

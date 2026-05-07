@@ -174,9 +174,9 @@ func BuildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Opti
 	opts.ProxyConfig.NoProxy = addOnDeployment.Spec.ProxyConfig.NoProxy
 	opts.Registries = addOnDeployment.Spec.Registries
 
-	// Do NOT return early when CustomizedVariables is nil. The for-range
-	// loop below is a safe no-op on a nil slice, and we must always fall
-	// through to the auto-enable right-sizing logic that follows it.
+	if addOnDeployment.Spec.CustomizedVariables == nil {
+		return opts, nil
+	}
 
 	// Track if right-sizing keys were explicitly set
 	nsRSExplicitlySet := false
