@@ -46,12 +46,6 @@ func (o *OptionsBuilder) ReconcileRSResources(ctx context.Context, opts addon.Op
 	// When both RS features are disabled and no other platform key is set,
 	// Platform.Enabled is false — but we still need to run cleanup below.
 
-	// Clean up RS Placements orphaned in non-canonical namespaces.
-	// This handles mode switches where MCO used a custom NamespaceBinding.
-	if err := o.deleteOrphanRSPlacements(ctx); err != nil {
-		return fmt.Errorf("failed to cleanup orphan RS placements: %w", err)
-	}
-
 	if opts.Platform.AnalyticsOptions.RightSizing.NamespaceEnabled {
 		configData, err := o.getConfigData(ctx, rightsizing.NamespaceConfigMapName)
 		if err != nil {
@@ -175,31 +169,6 @@ func (o *OptionsBuilder) isClusterSelectedByRSPlacement(ctx context.Context, pla
 	o.Logger.V(1).Info("Cluster not selected by placement",
 		"placement", placementName, "cluster", clusterName)
 	return false, nil
-}
-
-// deleteOrphanRSPlacements finds and deletes RS Placements that exist outside
-// PlacementNamespace. This cleans up orphans left by MCO when it was using a
-// custom NamespaceBinding namespace and the user switches to MCOA mode.
-func (o *OptionsBuilder) deleteOrphanRSPlacements(ctx context.Context) error {
-	placementList := &clusterv1beta1.PlacementList{}
-	if err := o.Client.List(ctx, placementList,
-		client.MatchingLabels(rightsizing.RSLabels()),
-	); err != nil {
-		return fmt.Errorf("failed to list RS placements: %w", err)
-	}
-
-	for i := range placementList.Items {
-		p := &placementList.Items[i]
-		if p.Namespace == rightsizing.PlacementNamespace {
-			continue
-		}
-		if err := o.Client.Delete(ctx, p); err != nil && !apierrors.IsNotFound(err) {
-			return fmt.Errorf("failed to delete orphan RS placement %s/%s: %w", p.Namespace, p.Name, err)
-		}
-		o.Logger.Info("Deleted orphan right-sizing Placement from non-canonical namespace",
-			"name", p.Name, "namespace", p.Namespace)
-	}
-	return nil
 }
 
 // deleteRSPlacement deletes a right-sizing Placement resource if it exists.
