@@ -459,31 +459,31 @@ var ACMCommonPanelQueries = map[string]parser.Expr{
 	).By("cluster"),
 
 	// Queries from acm-optimization-overview-panel.go
-	"CPUOverestimation": promqlbuilder.Sub(
-		promqlbuilder.Div(
-			promqlbuilder.Sum(
-				vector.New(
-					vector.WithMetricName("cluster:kube_pod_container_resource_requests:cpu:sum"),
-					vector.WithLabelMatchers(
-						label.New("cluster").Equal("$cluster"),
-					),
-				),
-			),
-			promqlbuilder.Sum(
-				vector.New(
-					vector.WithMetricName("kube_node_status_allocatable"),
-					vector.WithLabelMatchers(
-						label.New("cluster").Equal("$cluster"),
-						label.New("resource").Equal("cpu"),
-					),
-				),
-			),
-		),
+	"CPUOverestimation": promqlbuilder.Add(
 		promqlbuilder.Sub(
-			promqlbuilder.NewNumber(1),
-			vector.New(
-				vector.WithMetricName("node_cpu_seconds_total:mode_idle:avg_rate5m"),
+			promqlbuilder.Div(
+				promqlbuilder.Sum(
+					vector.New(
+						vector.WithMetricName("cluster:kube_pod_container_resource_requests:cpu:sum"),
+						vector.WithLabelMatchers(
+							label.New("cluster").Equal("$cluster"),
+						),
+					),
+				),
+				promqlbuilder.Sum(
+					vector.New(
+						vector.WithMetricName("kube_node_status_allocatable"),
+						vector.WithLabelMatchers(
+							label.New("cluster").Equal("$cluster"),
+							label.New("resource").Equal("cpu"),
+						),
+					),
+				),
 			),
+			promqlbuilder.NewNumber(1),
+		),
+		vector.New(
+			vector.WithMetricName("node_cpu_seconds_total:mode_idle:avg_rate5m"),
 		),
 	),
 	"CPUUsageNodeNamespacePod": vector.New(
@@ -563,32 +563,12 @@ var ACMCommonPanelQueries = map[string]parser.Expr{
 	).By("namespace"),
 
 	// Memory queries from acm-optimization-overview-panel.go
-	"MemoryOverestimation": promqlbuilder.Sub(
-		promqlbuilder.Div(
-			promqlbuilder.Sum(
-				vector.New(
-					vector.WithMetricName("cluster:kube_pod_container_resource_requests:memory:sum"),
-					vector.WithLabelMatchers(
-						label.New("cluster").Equal("$cluster"),
-					),
-				),
-			),
-			promqlbuilder.Sum(
-				vector.New(
-					vector.WithMetricName("kube_node_status_allocatable"),
-					vector.WithLabelMatchers(
-						label.New("cluster").Equal("$cluster"),
-						label.New("resource").Equal("memory"),
-					),
-				),
-			),
-		),
+	"MemoryOverestimation": promqlbuilder.Add(
 		promqlbuilder.Sub(
-			promqlbuilder.NewNumber(1),
 			promqlbuilder.Div(
 				promqlbuilder.Sum(
 					vector.New(
-						vector.WithMetricName(":node_memory_MemAvailable_bytes:sum"),
+						vector.WithMetricName("cluster:kube_pod_container_resource_requests:memory:sum"),
 						vector.WithLabelMatchers(
 							label.New("cluster").Equal("$cluster"),
 						),
@@ -601,6 +581,26 @@ var ACMCommonPanelQueries = map[string]parser.Expr{
 							label.New("cluster").Equal("$cluster"),
 							label.New("resource").Equal("memory"),
 						),
+					),
+				),
+			),
+			promqlbuilder.NewNumber(1),
+		),
+		promqlbuilder.Div(
+			promqlbuilder.Sum(
+				vector.New(
+					vector.WithMetricName(":node_memory_MemAvailable_bytes:sum"),
+					vector.WithLabelMatchers(
+						label.New("cluster").Equal("$cluster"),
+					),
+				),
+			),
+			promqlbuilder.Sum(
+				vector.New(
+					vector.WithMetricName("kube_node_status_allocatable"),
+					vector.WithLabelMatchers(
+						label.New("cluster").Equal("$cluster"),
+						label.New("resource").Equal("memory"),
 					),
 				),
 			),
