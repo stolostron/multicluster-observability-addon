@@ -7,9 +7,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// TestGeneratePrometheusRule validates namespace PrometheusRule generation across
-// namespace filter configurations: default, inclusion-only, exclusion-only,
-// and the mutually-exclusive error case.
 func TestGeneratePrometheusRule(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -91,8 +88,6 @@ func TestGeneratePrometheusRule(t *testing.T) {
 	}
 }
 
-// TestDefaultRecommendationPercentage verifies that a zero RecommendationPercentage
-// falls back to the default (110%) in the generated 1d recommendation rules.
 func TestDefaultRecommendationPercentage(t *testing.T) {
 	configData := rightsizing.RSConfigMapData{
 		PrometheusRuleConfig: rightsizing.RSPrometheusRuleConfig{
