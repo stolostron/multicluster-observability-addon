@@ -45,15 +45,12 @@ func Test_Supported_Vendors(t *testing.T) {
 		expectedObjects       bool
 	}{
 		{
-			// Right-sizing auto-enables by default when no RS keys are present
-			// in the ADC, so even an empty CustomizedVariables produces objects
-			// (ClusterRole + RS resources).
 			name: "ManagedCluster with correct labels but no configuration",
 			managedClusterLabels: map[string]string{
 				"vendor": "OpenShift",
 			},
 			addonDeploymentConfig: []addonapiv1alpha1.CustomizedVariable{},
-			expectedObjects:       true,
+			expectedObjects:       false,
 		},
 		{
 			name: "ManagedCluster with correct labels and platform log configuration",
