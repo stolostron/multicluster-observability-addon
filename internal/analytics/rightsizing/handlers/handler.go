@@ -118,8 +118,6 @@ func (o *OptionsBuilder) Build(ctx context.Context, cluster *clusterv1.ManagedCl
 		}
 	}
 
-	ret.ScrapeConfig = rightsizing.GenerateScrapeConfig(ret.NamespaceRightSizing.Enabled, ret.VirtualizationRightSizing.Enabled)
-
 	return ret, nil
 }
 
