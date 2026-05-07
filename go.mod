@@ -35,6 +35,7 @@ require (
 	github.com/perses/plugins/piechart v0.13.2-0.20260326134814-37e86f6b1c58
 	github.com/perses/plugins/prometheus v0.57.1
 	github.com/perses/plugins/statchart v0.12.1
+	github.com/perses/plugins/staticlistvariable v0.8.1
 	github.com/perses/plugins/table v0.11.3-0.20260416092358-50d24073dacc
 	github.com/perses/plugins/timeserieschart v0.12.1
 	github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring v0.83.0-rhobs1
@@ -202,7 +203,7 @@ require (
 	sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect
 	sigs.k8s.io/structured-merge-diff/v6 v6.3.2 // indirect
-	sigs.k8s.io/yaml v1.6.0 // indirect
+	sigs.k8s.io/yaml v1.6.0
 )
 
 replace github.com/google/cel-go => github.com/google/cel-go v0.23.2
