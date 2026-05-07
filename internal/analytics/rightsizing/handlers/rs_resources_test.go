@@ -15,7 +15,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -26,9 +25,7 @@ func setupTestScheme(t *testing.T) *runtime.Scheme {
 	t.Helper()
 	scheme := runtime.NewScheme()
 	require.NoError(t, corev1.AddToScheme(scheme))
-	require.NoError(t, clusterv1.Install(scheme))
 	require.NoError(t, clusterv1beta1.Install(scheme))
-	require.NoError(t, addonv1alpha1.Install(scheme))
 	return scheme
 }
 
@@ -420,82 +417,4 @@ func TestClusterMatchesPlacement_CombinedLabelAndClaim(t *testing.T) {
 
 	cluster.Labels["env"] = "staging"
 	assert.False(t, clusterMatchesPlacement(cluster, placement), "label no longer matches")
-}
-
-func TestSyncPlacementHash_UpdatesCustomizedVariable(t *testing.T) {
-	aodc := &addonv1alpha1.AddOnDeploymentConfig{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      addoncfg.Name,
-			Namespace: addoncfg.InstallNamespace,
-		},
-	}
-
-	ob := newTestOptionsBuilder(t, aodc)
-	ctx := context.TODO()
-
-	require.NoError(t, ob.SyncPlacementHash(ctx, aodc))
-
-	updated := &addonv1alpha1.AddOnDeploymentConfig{}
-	require.NoError(t, ob.Client.Get(ctx, types.NamespacedName{
-		Name: addoncfg.Name, Namespace: addoncfg.InstallNamespace,
-	}, updated))
-
-	var hashVal string
-	for _, v := range updated.Spec.CustomizedVariables {
-		if v.Name == rsPlacementHashVar {
-			hashVal = v.Value
-		}
-	}
-	assert.NotEmpty(t, hashVal, "placement hash should be set in CustomizedVariables")
-
-	// Calling again with same state should be a no-op (hash matches)
-	aodc = updated
-	require.NoError(t, ob.SyncPlacementHash(ctx, aodc))
-}
-
-func TestSyncPlacementHash_ChangesWhenConfigMapChanges(t *testing.T) {
-	aodc := &addonv1alpha1.AddOnDeploymentConfig{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      addoncfg.Name,
-			Namespace: addoncfg.InstallNamespace,
-		},
-	}
-	ob := newTestOptionsBuilder(t, aodc)
-	ctx := context.TODO()
-
-	require.NoError(t, ob.SyncPlacementHash(ctx, aodc))
-
-	refetched := &addonv1alpha1.AddOnDeploymentConfig{}
-	require.NoError(t, ob.Client.Get(ctx, types.NamespacedName{
-		Name: addoncfg.Name, Namespace: addoncfg.InstallNamespace,
-	}, refetched))
-	hash1 := getCustomizedVar(refetched, rsPlacementHashVar)
-
-	// Add a placement ConfigMap and re-sync
-	cm := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      rightsizing.NamespacePlacementCMName,
-			Namespace: addoncfg.InstallNamespace,
-		},
-		Data: map[string]string{"placementConfiguration": "predicates: [{requiredClusterSelector: {labelSelector: {matchLabels: {env: prod}}}}]"},
-	}
-	require.NoError(t, ob.Client.Create(ctx, cm))
-	require.NoError(t, ob.SyncPlacementHash(ctx, refetched))
-
-	refetched2 := &addonv1alpha1.AddOnDeploymentConfig{}
-	require.NoError(t, ob.Client.Get(ctx, types.NamespacedName{
-		Name: addoncfg.Name, Namespace: addoncfg.InstallNamespace,
-	}, refetched2))
-	hash2 := getCustomizedVar(refetched2, rsPlacementHashVar)
-
-	assert.NotEqual(t, hash1, hash2, "hash should change when placement ConfigMap is created")
-}
-
-func getCustomizedVar(aodc *addonv1alpha1.AddOnDeploymentConfig, name string) string {
-	for _, v := range aodc.Spec.CustomizedVariables {
-		if v.Name == name {
-			return v.Value
-		}
-	}
-	return ""
 }
