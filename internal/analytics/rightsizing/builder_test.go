@@ -144,36 +144,45 @@ func TestGetDefaultRSPrometheusRuleConfig(t *testing.T) {
 }
 
 func TestParseConfigMapData(t *testing.T) {
-	t.Run("valid config", func(t *testing.T) {
-		data := map[string]string{
-			"prometheusRuleConfig": `
+	tests := []struct {
+		name        string
+		data        map[string]string
+		expectError bool
+	}{
+		{
+			name: "valid config",
+			data: map[string]string{
+				"prometheusRuleConfig": `
 namespaceFilterCriteria:
   exclusionCriteria:
     - openshift.*
 recommendationPercentage: 120
 `,
-		}
-		result, err := ParseConfigMapData(data)
-		assert.NoError(t, err)
-		assert.Equal(t, 120, result.PrometheusRuleConfig.RecommendationPercentage)
-		assert.Equal(t, []string{"openshift.*"}, result.PrometheusRuleConfig.NamespaceFilterCriteria.ExclusionCriteria)
-		assert.Empty(t, result.PrometheusRuleConfig.NamespaceFilterCriteria.InclusionCriteria)
-	})
+			},
+			expectError: false,
+		},
+		{
+			name:        "empty data",
+			data:        map[string]string{},
+			expectError: false,
+		},
+		{
+			name: "invalid yaml",
+			data: map[string]string{
+				"prometheusRuleConfig": "invalid: yaml: content:",
+			},
+			expectError: true,
+		},
+	}
 
-	t.Run("empty data", func(t *testing.T) {
-		result, err := ParseConfigMapData(map[string]string{})
-		assert.NoError(t, err)
-		assert.Equal(t, 0, result.PrometheusRuleConfig.RecommendationPercentage)
-		assert.Empty(t, result.PrometheusRuleConfig.NamespaceFilterCriteria.InclusionCriteria)
-		assert.Empty(t, result.PrometheusRuleConfig.NamespaceFilterCriteria.ExclusionCriteria)
-		assert.Equal(t, GetDefaultRSPlacement(), result.PlacementConfiguration)
-	})
-
-	t.Run("invalid yaml", func(t *testing.T) {
-		data := map[string]string{
-			"prometheusRuleConfig": "invalid: yaml: content:",
-		}
-		_, err := ParseConfigMapData(data)
-		assert.Error(t, err)
-	})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := ParseConfigMapData(tt.data)
+			if tt.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
 }

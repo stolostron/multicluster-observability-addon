@@ -5,7 +5,6 @@ import (
 
 	"github.com/stolostron/multicluster-observability-addon/internal/analytics/rightsizing"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 // TestGeneratePrometheusRule validates namespace PrometheusRule generation across
@@ -77,10 +76,10 @@ func TestGeneratePrometheusRule(t *testing.T) {
 			if tt.expectError {
 				assert.Error(t, err)
 			} else {
-				require.NoError(t, err)
+				assert.NoError(t, err)
 				assert.Equal(t, rightsizing.NamespacePrometheusRuleName, rule.Name)
 				assert.Equal(t, rightsizing.MonitoringNamespace, rule.Namespace)
-				require.Len(t, rule.Spec.Groups, 4)
+				assert.Len(t, rule.Spec.Groups, 4)
 
 				// Check group names
 				assert.Equal(t, "acm-right-sizing-namespace-5m.rule", rule.Spec.Groups[0].Name)
@@ -102,7 +101,7 @@ func TestDefaultRecommendationPercentage(t *testing.T) {
 	}
 
 	rule, err := GeneratePrometheusRule(configData)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 
 	// Check that the 1d rules contain the default recommendation percentage (110)
 	found := false
