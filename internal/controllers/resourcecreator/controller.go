@@ -169,11 +169,17 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	objs = append(objs, mDefaultConfig...)
 
 	// Reconcile right-sizing resources (hub-wide concern).
-	// ConfigMap resources are created/updated/deleted here, not per-cluster in handler.go,
+	// Placement and ConfigMap resources are created/updated/deleted here, not per-cluster in handler.go,
 	// to avoid race conditions from concurrent Build() calls.
 	rsBuilder := &rshandlers.OptionsBuilder{Client: r.Client, Logger: r.Log.WithName("rightsizing")}
 	if err := rsBuilder.ReconcileRSResources(ctx, opts); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to reconcile right-sizing resources: %w", err)
+	}
+
+	// Sync placement hash to ADC so that the addon-deploy-controller re-generates
+	// ManifestWorks when placement ConfigMaps change (no manual pod restart needed).
+	if err := rsBuilder.SyncPlacementHash(ctx, aodc); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to sync RS placement hash: %w", err)
 	}
 
 	if err := common.EnsureAddonConfig(ctx, r.Log, r.Client, objs); err != nil {

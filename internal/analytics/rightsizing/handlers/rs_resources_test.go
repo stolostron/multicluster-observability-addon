@@ -91,9 +91,18 @@ func TestRSConfigMapPredicate(t *testing.T) {
 		Name: rightsizing.NamespaceConfigMapName, Namespace: "other-namespace",
 	}}
 
-	// Create: accepts RS ConfigMaps, rejects placement ConfigMaps and others
+	rsNsPlacementCM := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
+		Name: rightsizing.NamespacePlacementCMName, Namespace: addoncfg.InstallNamespace,
+	}}
+	rsVirtPlacementCM := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
+		Name: rightsizing.VirtualizationPlacementCMName, Namespace: addoncfg.InstallNamespace,
+	}}
+
+	// Create: accepts RS ConfigMaps and placement ConfigMaps, rejects others
 	assert.True(t, pred.CreateFunc(event.CreateEvent{Object: rsNsCM}))
 	assert.True(t, pred.CreateFunc(event.CreateEvent{Object: rsVirtCM}))
+	assert.True(t, pred.CreateFunc(event.CreateEvent{Object: rsNsPlacementCM}))
+	assert.True(t, pred.CreateFunc(event.CreateEvent{Object: rsVirtPlacementCM}))
 	assert.False(t, pred.CreateFunc(event.CreateEvent{Object: unrelatedCM}))
 	assert.False(t, pred.CreateFunc(event.CreateEvent{Object: wrongNsCM}))
 
@@ -411,4 +420,82 @@ func TestClusterMatchesPlacement_CombinedLabelAndClaim(t *testing.T) {
 
 	cluster.Labels["env"] = "staging"
 	assert.False(t, clusterMatchesPlacement(cluster, placement), "label no longer matches")
+}
+
+func TestSyncPlacementHash_UpdatesCustomizedVariable(t *testing.T) {
+	aodc := &addonv1alpha1.AddOnDeploymentConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      addoncfg.Name,
+			Namespace: addoncfg.InstallNamespace,
+		},
+	}
+
+	ob := newTestOptionsBuilder(t, aodc)
+	ctx := context.TODO()
+
+	require.NoError(t, ob.SyncPlacementHash(ctx, aodc))
+
+	updated := &addonv1alpha1.AddOnDeploymentConfig{}
+	require.NoError(t, ob.Client.Get(ctx, types.NamespacedName{
+		Name: addoncfg.Name, Namespace: addoncfg.InstallNamespace,
+	}, updated))
+
+	var hashVal string
+	for _, v := range updated.Spec.CustomizedVariables {
+		if v.Name == rsPlacementHashVar {
+			hashVal = v.Value
+		}
+	}
+	assert.NotEmpty(t, hashVal, "placement hash should be set in CustomizedVariables")
+
+	// Calling again with same state should be a no-op (hash matches)
+	aodc = updated
+	require.NoError(t, ob.SyncPlacementHash(ctx, aodc))
+}
+
+func TestSyncPlacementHash_ChangesWhenConfigMapChanges(t *testing.T) {
+	aodc := &addonv1alpha1.AddOnDeploymentConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      addoncfg.Name,
+			Namespace: addoncfg.InstallNamespace,
+		},
+	}
+	ob := newTestOptionsBuilder(t, aodc)
+	ctx := context.TODO()
+
+	require.NoError(t, ob.SyncPlacementHash(ctx, aodc))
+
+	refetched := &addonv1alpha1.AddOnDeploymentConfig{}
+	require.NoError(t, ob.Client.Get(ctx, types.NamespacedName{
+		Name: addoncfg.Name, Namespace: addoncfg.InstallNamespace,
+	}, refetched))
+	hash1 := getCustomizedVar(refetched, rsPlacementHashVar)
+
+	// Add a placement ConfigMap and re-sync
+	cm := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      rightsizing.NamespacePlacementCMName,
+			Namespace: addoncfg.InstallNamespace,
+		},
+		Data: map[string]string{"placementConfiguration": "predicates: [{requiredClusterSelector: {labelSelector: {matchLabels: {env: prod}}}}]"},
+	}
+	require.NoError(t, ob.Client.Create(ctx, cm))
+	require.NoError(t, ob.SyncPlacementHash(ctx, refetched))
+
+	refetched2 := &addonv1alpha1.AddOnDeploymentConfig{}
+	require.NoError(t, ob.Client.Get(ctx, types.NamespacedName{
+		Name: addoncfg.Name, Namespace: addoncfg.InstallNamespace,
+	}, refetched2))
+	hash2 := getCustomizedVar(refetched2, rsPlacementHashVar)
+
+	assert.NotEqual(t, hash1, hash2, "hash should change when placement ConfigMap is created")
+}
+
+func getCustomizedVar(aodc *addonv1alpha1.AddOnDeploymentConfig, name string) string {
+	for _, v := range aodc.Spec.CustomizedVariables {
+		if v.Name == name {
+			return v.Value
+		}
+	}
+	return ""
 }
