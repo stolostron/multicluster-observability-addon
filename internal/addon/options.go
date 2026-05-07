@@ -16,15 +16,15 @@ const (
 	KeyOpenShiftLoggingChannel = "openshiftLoggingChannel"
 
 	// Platform Observability Keys
-	KeyPlatformMetricsCollection         = "platformMetricsCollection"
-	KeyPlatformLogsCollection            = "platformLogsCollection"
-	KeyPlatformIncidentDetection         = "platformIncidentDetection"
+	KeyPlatformMetricsCollection   = "platformMetricsCollection"
+	KeyPlatformLogsCollection      = "platformLogsCollection"
+	KeyPlatformIncidentDetection   = "platformIncidentDetection"
 	KeyPlatformNamespaceRightSizing      = "platformNamespaceRightSizing"
 	KeyPlatformVirtualizationRightSizing = "platformVirtualizationRightSizing"
-	KeyMetricsHubHostname                = "metricsHubHostname"
-	KeyMetricsAlertManagerHostname       = "metricsAlertManagerHostname"
-	KeyNodeExporterHostPort              = "nodeExporterHostPort"
-	KeyNodeExporterInternalPort          = "nodeExporterInternalPort"
+	KeyMetricsHubHostname          = "metricsHubHostname"
+	KeyMetricsAlertManagerHostname = "metricsAlertManagerHostname"
+	KeyNodeExporterHostPort        = "nodeExporterHostPort"
+	KeyNodeExporterInternalPort    = "nodeExporterInternalPort"
 
 	// User Workloads Observability Keys
 	KeyUserWorkloadMetricsCollection = "userWorkloadMetricsCollection"
