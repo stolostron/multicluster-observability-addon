@@ -1,19 +1,15 @@
 package virtualization
 
-import (
-	"fmt"
-	"strings"
-)
+import "fmt"
 
 const dashboardLinkBasePath = "/monitoring/v2/dashboards/view"
 
 func dashboardLinkURL(dashboard, project string, vars ...string) string {
-	var b strings.Builder
-	fmt.Fprintf(&b, "%s?dashboard=%s&project=%s", dashboardLinkBasePath, dashboard, project)
+	url := fmt.Sprintf("%s?dashboard=%s&project=%s", dashboardLinkBasePath, dashboard, project)
 	for i := 0; i+1 < len(vars); i += 2 {
-		fmt.Fprintf(&b, "&var-%s=%s", vars[i], vars[i+1])
+		url += fmt.Sprintf("&var-%s=%s", vars[i], vars[i+1])
 	}
-	return b.String()
+	return url
 }
 
 func clusterDetailsDashboardLinkURL(project string) string {

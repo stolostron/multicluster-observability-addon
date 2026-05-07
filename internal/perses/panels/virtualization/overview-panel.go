@@ -2,7 +2,6 @@ package virtualization
 
 import (
 	"encoding/json"
-	"maps"
 
 	"github.com/perses/community-mixins/pkg/dashboards"
 	commonSdk "github.com/perses/perses/go-sdk/common"
@@ -32,7 +31,9 @@ func mergePluginSpecFields(extra map[string]any) panel.Option {
 				return err
 			}
 		}
-		maps.Copy(base, extra)
+		for k, v := range extra {
+			base[k] = v
+		}
 		b.Spec.Plugin.Spec = base
 		return nil
 	}

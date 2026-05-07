@@ -35,9 +35,9 @@ func CPUUtilization(datasourceName string, labelMatchers ...promql.LabelMatcher)
 		),
 		panel.AddQuery(
 			query.PromQL(
-			promql.SetLabelMatchers(
+				promql.SetLabelMatchers(
 				"(instance:node_cpu_utilisation:rate1m{cluster=\"$cluster\",job=\"node-exporter\"} * instance:node_num_cpu:sum{cluster=\"$cluster\",job=\"node-exporter\"}) / scalar(sum(instance:node_num_cpu:sum{cluster=\"$cluster\",job=\"node-exporter\"}))",
-				labelMatchers,
+					labelMatchers,
 				),
 				query.SeriesNameFormat("{{ instance }}"),
 				dashboards.AddQueryDataSource(datasourceName),
@@ -107,9 +107,9 @@ func MemoryUtilization(datasourceName string, labelMatchers ...promql.LabelMatch
 		),
 		panel.AddQuery(
 			query.PromQL(
-			promql.SetLabelMatchers(
+				promql.SetLabelMatchers(
 				"instance:node_memory_utilisation:ratio{cluster=\"$cluster\",job=\"node-exporter\"} / scalar(count(instance:node_memory_utilisation:ratio{cluster=\"$cluster\",job=\"node-exporter\"}))",
-				labelMatchers,
+					labelMatchers,
 				),
 				query.SeriesNameFormat("{{ instance }}"),
 				dashboards.AddQueryDataSource(datasourceName),
