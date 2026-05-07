@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
-	sigYaml "sigs.k8s.io/yaml"
 )
 
 var (
@@ -94,20 +93,17 @@ func BuildLabelJoin(labelFilters []RSLabelFilter) (string, error) {
 }
 
 // ParseConfigMapData parses ConfigMap data into RSConfigMapData.
-// Uses sigs.k8s.io/yaml for unmarshaling because MCO writes ConfigMap values
-// in YAML format while MCOA writes JSON. sigs.k8s.io/yaml handles both
-// transparently and respects json struct tags.
 func ParseConfigMapData(data map[string]string) (RSConfigMapData, error) {
 	var configData RSConfigMapData
 
-	if ruleConfigRaw, ok := data["prometheusRuleConfig"]; ok {
-		if err := sigYaml.Unmarshal([]byte(ruleConfigRaw), &configData.PrometheusRuleConfig); err != nil {
+	if ruleConfigJSON, ok := data["prometheusRuleConfig"]; ok {
+		if err := json.Unmarshal([]byte(ruleConfigJSON), &configData.PrometheusRuleConfig); err != nil {
 			return configData, fmt.Errorf("%w: %w", errUnmarshalPrometheusRuleConfig, err)
 		}
 	}
 
-	if placementRaw, ok := data["placementConfiguration"]; ok {
-		if err := sigYaml.Unmarshal([]byte(placementRaw), &configData.PlacementConfiguration); err != nil {
+	if placementJSON, ok := data["placementConfiguration"]; ok {
+		if err := json.Unmarshal([]byte(placementJSON), &configData.PlacementConfiguration); err != nil {
 			return configData, fmt.Errorf("%w: %w", errUnmarshalPlacementConfig, err)
 		}
 	} else {
