@@ -20,7 +20,7 @@ import (
 func withCPUStatsAndChart(datasource string) dashboard.Option {
 	return dashboard.AddPanelGroup("",
 		panelgroup.PanelsPerLine(4),
-		panelgroup.PanelHeight(4),
+		panelgroup.PanelHeight(5),
 		panels.CPURecommendationPanel(datasource),
 		panels.CPUUsagePanel(datasource),
 		panels.CPURequestPanel(datasource),
@@ -39,7 +39,7 @@ func withCPUTopNamespaces(datasource string) dashboard.Option {
 func withCPUQuotaTable(datasource string) dashboard.Option {
 	return dashboard.AddPanelGroup("",
 		panelgroup.PanelsPerLine(1),
-		panelgroup.PanelHeight(8),
+		panelgroup.PanelHeight(9),
 		panels.CPUQuotaTablePanel(datasource),
 	)
 }
@@ -47,7 +47,7 @@ func withCPUQuotaTable(datasource string) dashboard.Option {
 func withMemStatsAndChart(datasource string) dashboard.Option {
 	return dashboard.AddPanelGroup("",
 		panelgroup.PanelsPerLine(4),
-		panelgroup.PanelHeight(4),
+		panelgroup.PanelHeight(5),
 		panels.MemRecommendationPanel(datasource),
 		panels.MemUsagePanel(datasource),
 		panels.MemRequestPanel(datasource),
@@ -66,7 +66,7 @@ func withMemTopNamespaces(datasource string) dashboard.Option {
 func withMemQuotaTable(datasource string) dashboard.Option {
 	return dashboard.AddPanelGroup("",
 		panelgroup.PanelsPerLine(1),
-		panelgroup.PanelHeight(8),
+		panelgroup.PanelHeight(9),
 		panels.MemQuotaTablePanel(datasource),
 	)
 }
