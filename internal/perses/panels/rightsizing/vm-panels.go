@@ -47,12 +47,12 @@ func VMTotalCPUOverestimationPanel(datasourceName string) panelgroup.Option {
 	return BuildStatPanel(datasourceName, StatPanelConfig{
 		Title:       "Total CPU Overestimation",
 		Description: "Total number of overestimated CPU cores across all VMs in the selected namespace(s).\nRepresents the total CPU cores that can be reclaimed.",
-		Query: `sum(floor((max by (name, namespace) (max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:cpu_request{cluster="$cluster", namespace=~"$namespace"}` +
+		Query: `sum(floor((max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:cpu_request{cluster="$cluster", namespace=~"$namespace"}` +
 			"\n" + `+ on(cluster, namespace, name) group_left(_blah)(0 * max by (cluster, namespace, name) (kubevirt_vm_running_status_last_transition_timestamp_seconds{cluster="$cluster", namespace=~"$namespace"} > 0))` +
-			"\n" + `)[$days:]))-` +
-			"\n" + `max by (name, namespace) (max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:cpu_recommendation{cluster="$cluster", namespace=~"$namespace"}` +
+			"\n" + `)[$days:])-` +
+			"\n" + `max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:cpu_recommendation{cluster="$cluster", namespace=~"$namespace"}` +
 			"\n" + `+ on(cluster, namespace, name) group_left(_blah)(0 * max by (cluster, namespace, name) (kubevirt_vm_running_status_last_transition_timestamp_seconds{cluster="$cluster", namespace=~"$namespace"} > 0))` +
-			"\n" + `)[$days:]))))>0)`,
+			"\n" + `)[$days:])))>0)`,
 		Unit:       &dashboards.DecimalUnit,
 		Decimals:   0,
 		FontSize:   48,
@@ -64,12 +64,12 @@ func VMTotalCPUUnderestimationPanel(datasourceName string) panelgroup.Option {
 	return BuildStatPanel(datasourceName, StatPanelConfig{
 		Title:       "Total CPU Underestimation",
 		Description: "Total number of underestimated CPU cores across all VMs in the selected namespace(s).\nRepresents the total additional CPU cores needed.",
-		Query: `sum(floor((max by (name, namespace) (max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:cpu_request{cluster="$cluster", namespace=~"$namespace"}` +
+		Query: `sum(floor((max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:cpu_request{cluster="$cluster", namespace=~"$namespace"}` +
 			"\n" + `+ on(cluster, namespace, name) group_left(_blah)(0 * max by (cluster, namespace, name) (kubevirt_vm_running_status_last_transition_timestamp_seconds{cluster="$cluster", namespace=~"$namespace"} > 0))` +
-			"\n" + `)[$days:]))-` +
-			"\n" + `max by (name, namespace) (max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:cpu_recommendation{cluster="$cluster", namespace=~"$namespace"}` +
+			"\n" + `)[$days:])-` +
+			"\n" + `max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:cpu_recommendation{cluster="$cluster", namespace=~"$namespace"}` +
 			"\n" + `+ on(cluster, namespace, name) group_left(_blah)(0 * max by (cluster, namespace, name) (kubevirt_vm_running_status_last_transition_timestamp_seconds{cluster="$cluster", namespace=~"$namespace"} > 0))` +
-			"\n" + `)[$days:]))))<0) * (-1)`,
+			"\n" + `)[$days:])))<0) * (-1)`,
 		Unit:       &dashboards.DecimalUnit,
 		Decimals:   0,
 		FontSize:   48,
@@ -81,12 +81,12 @@ func VMTotalMemOverestimationPanel(datasourceName string) panelgroup.Option {
 	return BuildStatPanel(datasourceName, StatPanelConfig{
 		Title:       "Total Memory Overestimation",
 		Description: "Total overestimated memory across all VMs in the selected namespace(s).\nRepresents the total memory that can be reclaimed.",
-		Query: `sum(floor((max by (name, namespace) (max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:memory_request{cluster="$cluster", namespace=~"$namespace"}` +
+		Query: `sum(floor((max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:memory_request{cluster="$cluster", namespace=~"$namespace"}` +
 			"\n" + `+ on(cluster, namespace, name) group_left(_blah)(0 * max by (cluster, namespace, name) (kubevirt_vm_running_status_last_transition_timestamp_seconds{cluster="$cluster", namespace=~"$namespace"} > 0))` +
 			"\n" + `)[$days:]))-` +
-			"\n" + `max by (name, namespace) (max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:memory_recommendation{cluster="$cluster", namespace=~"$namespace"}` +
+			"\n" + `(max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:memory_recommendation{cluster="$cluster", namespace=~"$namespace"}` +
 			"\n" + `+ on(cluster, namespace, name) group_left(_blah)(0 * max by (cluster, namespace, name) (kubevirt_vm_running_status_last_transition_timestamp_seconds{cluster="$cluster", namespace=~"$namespace"} > 0))` +
-			"\n" + `)[$days:]))))>0)`,
+			"\n" + `)[$days:])))>0)`,
 		Unit:       &dashboards.BytesUnit,
 		Decimals:   2,
 		FontSize:   48,
@@ -98,12 +98,12 @@ func VMTotalMemUnderestimationPanel(datasourceName string) panelgroup.Option {
 	return BuildStatPanel(datasourceName, StatPanelConfig{
 		Title:       "Total Memory Underestimation",
 		Description: "Total underestimated memory across all VMs in the selected namespace(s).\nRepresents the total additional memory needed.",
-		Query: `sum(floor((max by (name, namespace) (max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:memory_request{cluster="$cluster", namespace=~"$namespace"}` +
+		Query: `sum(floor((max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:memory_request{cluster="$cluster", namespace=~"$namespace"}` +
 			"\n" + `+ on(cluster, namespace, name) group_left(_blah)(0 * max by (cluster, namespace, name) (kubevirt_vm_running_status_last_transition_timestamp_seconds{cluster="$cluster", namespace=~"$namespace"} > 0))` +
 			"\n" + `)[$days:]))-` +
-			"\n" + `max by (name, namespace) (max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:memory_recommendation{cluster="$cluster", namespace=~"$namespace"}` +
+			"\n" + `(max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:memory_recommendation{cluster="$cluster", namespace=~"$namespace"}` +
 			"\n" + `+ on(cluster, namespace, name) group_left(_blah)(0 * max by (cluster, namespace, name) (kubevirt_vm_running_status_last_transition_timestamp_seconds{cluster="$cluster", namespace=~"$namespace"} > 0))` +
-			"\n" + `)[$days:]))))<0) * (-1)`,
+			"\n" + `)[$days:])))<0) * (-1)`,
 		Unit:       &dashboards.BytesUnit,
 		Decimals:   2,
 		FontSize:   48,
@@ -156,11 +156,11 @@ func VMCPUOverestimationTablePanel(datasourceName string, project string) panelg
 			},
 			EnableFiltering: true,
 		}),
-		panel.AddQuery(query.PromQL(`label_join(`+"\n"+`    (`+"\n"+`        max by (name, namespace) (max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:cpu_usage{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:])) / max by (name, namespace) (max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:cpu_request{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:]))`+"\n"+`    ) > 0,`+"\n"+`  "name_namespace", "-", "name", "namespace"`+"\n"+`)`, dashboards.AddQueryDataSource(datasourceName))),
-		panel.AddQuery(query.PromQL(`label_join(`+"\n"+`    max by (name, namespace) (max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:cpu_usage{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:])),`+"\n"+`    "name_namespace", "-", "name", "namespace"`+"\n"+`)`, dashboards.AddQueryDataSource(datasourceName))),
-		panel.AddQuery(query.PromQL(`label_join(`+"\n"+`    max by (name, namespace) (max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:cpu_request{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:])),`+"\n"+`    "name_namespace", "-", "name", "namespace"`+"\n"+`)`, dashboards.AddQueryDataSource(datasourceName))),
-		panel.AddQuery(query.PromQL(`label_join(`+"\n"+`    ceil(max by (name, namespace) (max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:cpu_recommendation{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:]))),`+"\n"+`    "name_namespace", "-", "name", "namespace"`+"\n"+`)`, dashboards.AddQueryDataSource(datasourceName))),
-		panel.AddQuery(query.PromQL(`label_join(`+"\n"+`    (`+"\n"+`        floor(max by (name, namespace) (max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:cpu_request{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:]))-`+"\n"+`        max by (name, namespace) (max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:cpu_recommendation{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:])))`+"\n"+`    ),`+"\n"+`    "name_namespace", "-", "name", "namespace"`+"\n"+`)`, dashboards.AddQueryDataSource(datasourceName))),
+		panel.AddQuery(query.PromQL(`label_join(`+"\n"+`    (`+"\n"+`        max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:cpu_usage{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:]) / max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:cpu_request{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:])`+"\n"+`    ) > 0,`+"\n"+`  "name_namespace", "-", "name", "namespace"`+"\n"+`)`, dashboards.AddQueryDataSource(datasourceName))),
+		panel.AddQuery(query.PromQL(`label_join(`+"\n"+`    (max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:cpu_usage{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:])),`+"\n"+`    "name_namespace", "-", "name", "namespace"`+"\n"+`)`, dashboards.AddQueryDataSource(datasourceName))),
+		panel.AddQuery(query.PromQL(`label_join(`+"\n"+`    max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:cpu_request{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:]),`+"\n"+`    "name_namespace", "-", "name", "namespace"`+"\n"+`)`, dashboards.AddQueryDataSource(datasourceName))),
+		panel.AddQuery(query.PromQL(`label_join(`+"\n"+`    ceil(max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:cpu_recommendation{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:])),`+"\n"+`    "name_namespace", "-", "name", "namespace"`+"\n"+`)`, dashboards.AddQueryDataSource(datasourceName))),
+		panel.AddQuery(query.PromQL(`label_join(`+"\n"+`    (`+"\n"+`        floor(max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:cpu_request{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:])-`+"\n"+`        max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:cpu_recommendation{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:]))`+"\n"+`    ),`+"\n"+`    "name_namespace", "-", "name", "namespace"`+"\n"+`)`, dashboards.AddQueryDataSource(datasourceName))),
 	)
 }
 
@@ -209,11 +209,11 @@ func VMCPUUnderestimationTablePanel(datasourceName string, project string) panel
 			},
 			EnableFiltering: true,
 		}),
-		panel.AddQuery(query.PromQL(`label_join(`+"\n"+`    (`+"\n"+`        max by (name, namespace) (max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:cpu_usage{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:])) / max by (name, namespace) (max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:cpu_request{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:]))`+"\n"+`    ) > 0,`+"\n"+`    "name_namespace", "-", "name", "namespace"`+"\n"+`)`, dashboards.AddQueryDataSource(datasourceName))),
-		panel.AddQuery(query.PromQL(`label_join(`+"\n"+`    max by (name, namespace) (max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:cpu_usage{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:])),`+"\n"+`    "name_namespace", "-", "name", "namespace"`+"\n"+`)`, dashboards.AddQueryDataSource(datasourceName))),
-		panel.AddQuery(query.PromQL(`label_join(`+"\n"+`    max by (name, namespace) (max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:cpu_request{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:])),`+"\n"+`    "name_namespace", "-", "name", "namespace"`+"\n"+`)`, dashboards.AddQueryDataSource(datasourceName))),
-		panel.AddQuery(query.PromQL(`label_join(`+"\n"+`    ceil(max by (name, namespace) (max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:cpu_recommendation{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:]))),`+"\n"+`    "name_namespace", "-", "name", "namespace"`+"\n"+`)`, dashboards.AddQueryDataSource(datasourceName))),
-		panel.AddQuery(query.PromQL(`label_join(`+"\n"+`    (floor(max by (name, namespace) (max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:cpu_request{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:]))- max by (name, namespace) (max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:cpu_recommendation{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:]))) * (-1)),`+"\n"+`    "name_namespace", "-", "name", "namespace"`+"\n"+`)`, dashboards.AddQueryDataSource(datasourceName))),
+		panel.AddQuery(query.PromQL(`label_join(`+"\n"+`    (`+"\n"+`        max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:cpu_usage{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:]) / max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:cpu_request{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:])`+"\n"+`    ) > 0,`+"\n"+`    "name_namespace", "-", "name", "namespace"`+"\n"+`)`, dashboards.AddQueryDataSource(datasourceName))),
+		panel.AddQuery(query.PromQL(`label_join(`+"\n"+`    max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:cpu_usage{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:]),`+"\n"+`    "name_namespace", "-", "name", "namespace"`+"\n"+`)`, dashboards.AddQueryDataSource(datasourceName))),
+		panel.AddQuery(query.PromQL(`label_join(`+"\n"+`    max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:cpu_request{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:]),`+"\n"+`    "name_namespace", "-", "name", "namespace"`+"\n"+`)`, dashboards.AddQueryDataSource(datasourceName))),
+		panel.AddQuery(query.PromQL(`label_join(`+"\n"+`    ceil(max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:cpu_recommendation{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:])),`+"\n"+`    "name_namespace", "-", "name", "namespace"`+"\n"+`)`, dashboards.AddQueryDataSource(datasourceName))),
+		panel.AddQuery(query.PromQL(`label_join(`+"\n"+`    (floor(max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:cpu_request{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:])- max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:cpu_recommendation{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:])) * (-1)),`+"\n"+`    "name_namespace", "-", "name", "namespace"`+"\n"+`)`, dashboards.AddQueryDataSource(datasourceName))),
 	)
 }
 
@@ -262,11 +262,11 @@ func VMMemOverestimationTablePanel(datasourceName string, project string) panelg
 			},
 			EnableFiltering: true,
 		}),
-		panel.AddQuery(query.PromQL(`label_join(`+"\n"+`    max by (name, namespace) (max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:memory_usage{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:])) / max by (name, namespace) (max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:memory_request{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:])),`+"\n"+`    "name_namespace", "-", "name", "namespace"`+"\n"+`)`, dashboards.AddQueryDataSource(datasourceName))),
-		panel.AddQuery(query.PromQL(`label_join(`+"\n"+`    max by (name, namespace) (max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:memory_usage{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:])),`+"\n"+`    "name_namespace", "-", "name", "namespace"`+"\n"+`)`, dashboards.AddQueryDataSource(datasourceName))),
-		panel.AddQuery(query.PromQL(`label_join(`+"\n"+`    max by (name, namespace) (max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:memory_request{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:])),`+"\n"+`    "name_namespace", "-", "name", "namespace"`+"\n"+`)`, dashboards.AddQueryDataSource(datasourceName))),
-		panel.AddQuery(query.PromQL(`label_join(`+"\n"+`    max by (name, namespace) (max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:memory_recommendation{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:])),`+"\n"+`    "name_namespace", "-", "name", "namespace"`+"\n"+`)`, dashboards.AddQueryDataSource(datasourceName))),
-		panel.AddQuery(query.PromQL(`label_join(`+"\n"+`    (max by (name, namespace) (max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:memory_request{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:])) - max by (name, namespace) (max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:memory_recommendation{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:]))),`+"\n"+`    "name_namespace", "-", "name", "namespace"`+"\n"+`)`, dashboards.AddQueryDataSource(datasourceName))),
+		panel.AddQuery(query.PromQL(`label_join(`+"\n"+`    max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:memory_usage{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:]) / max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:memory_request{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:]),`+"\n"+`    "name_namespace", "-", "name", "namespace"`+"\n"+`)`, dashboards.AddQueryDataSource(datasourceName))),
+		panel.AddQuery(query.PromQL(`label_join(`+"\n"+`    (max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:memory_usage{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:])),`+"\n"+`    "name_namespace", "-", "name", "namespace"`+"\n"+`)`, dashboards.AddQueryDataSource(datasourceName))),
+		panel.AddQuery(query.PromQL(`label_join(`+"\n"+`    (max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:memory_request{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:])),`+"\n"+`    "name_namespace", "-", "name", "namespace"`+"\n"+`)`, dashboards.AddQueryDataSource(datasourceName))),
+		panel.AddQuery(query.PromQL(`label_join(`+"\n"+`    (max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:memory_recommendation{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:])),`+"\n"+`    "name_namespace", "-", "name", "namespace"`+"\n"+`)`, dashboards.AddQueryDataSource(datasourceName))),
+		panel.AddQuery(query.PromQL(`label_join(`+"\n"+`    ((max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:memory_request{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:])) - (max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:memory_recommendation{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:]))),`+"\n"+`    "name_namespace", "-", "name", "namespace"`+"\n"+`)`, dashboards.AddQueryDataSource(datasourceName))),
 	)
 }
 
@@ -315,11 +315,11 @@ func VMMemUnderestimationTablePanel(datasourceName string, project string) panel
 			},
 			EnableFiltering: true,
 		}),
-		panel.AddQuery(query.PromQL(`label_join(`+"\n"+`    (max by (name, namespace) (max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:memory_usage{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:])) / max by (name, namespace) (max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:memory_request{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:]))),`+"\n"+`    "name_namespace", "-", "name", "namespace"`+"\n"+`)`, dashboards.AddQueryDataSource(datasourceName))),
-		panel.AddQuery(query.PromQL(`label_join(`+"\n"+`    max by (name, namespace) (max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:memory_usage{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:])),`+"\n"+`    "name_namespace", "-", "name", "namespace"`+"\n"+`)`, dashboards.AddQueryDataSource(datasourceName))),
-		panel.AddQuery(query.PromQL(`label_join(`+"\n"+`    max by (name, namespace) (max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:memory_request{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:])),`+"\n"+`    "name_namespace", "-", "name", "namespace"`+"\n"+`)`, dashboards.AddQueryDataSource(datasourceName))),
-		panel.AddQuery(query.PromQL(`label_join(`+"\n"+`    max by (name, namespace) (max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:memory_recommendation{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:])),`+"\n"+`    "name_namespace", "-", "name", "namespace"`+"\n"+`)`, dashboards.AddQueryDataSource(datasourceName))),
-		panel.AddQuery(query.PromQL(`label_join(`+"\n"+`    (max by (name, namespace) (max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:memory_request{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:])) - max by (name, namespace) (max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:memory_recommendation{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:]))) * (-1),`+"\n"+`    "name_namespace", "-", "name", "namespace"`+"\n"+`)`, dashboards.AddQueryDataSource(datasourceName))),
+		panel.AddQuery(query.PromQL(`label_join(`+"\n"+`    (max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:memory_usage{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:]) / max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:memory_request{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:])),`+"\n"+`    "name_namespace", "-", "name", "namespace"`+"\n"+`)`, dashboards.AddQueryDataSource(datasourceName))),
+		panel.AddQuery(query.PromQL(`label_join(`+"\n"+`    (max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:memory_usage{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:])),`+"\n"+`    "name_namespace", "-", "name", "namespace"`+"\n"+`)`, dashboards.AddQueryDataSource(datasourceName))),
+		panel.AddQuery(query.PromQL(`label_join(`+"\n"+`    (max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:memory_request{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:])),`+"\n"+`    "name_namespace", "-", "name", "namespace"`+"\n"+`)`, dashboards.AddQueryDataSource(datasourceName))),
+		panel.AddQuery(query.PromQL(`label_join(`+"\n"+`    (max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:memory_recommendation{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:])),`+"\n"+`    "name_namespace", "-", "name", "namespace"`+"\n"+`)`, dashboards.AddQueryDataSource(datasourceName))),
+		panel.AddQuery(query.PromQL(`label_join(`+"\n"+`    ((max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:memory_request{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:])) - (max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:memory_recommendation{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:]))) * (-1),`+"\n"+`    "name_namespace", "-", "name", "namespace"`+"\n"+`)`, dashboards.AddQueryDataSource(datasourceName))),
 	)
 }
 
@@ -371,7 +371,7 @@ func VMCPUOverestimationStatPanel(datasourceName string) panelgroup.Option {
 	return BuildStatPanel(datasourceName, StatPanelConfig{
 		Title:       "CPU Overestimation",
 		Description: "Overestimated CPU Cores for the selected VM.\n- CPU cores you can save that are not being utilized.\n- A negative value indicates underestimation.",
-		Query:       `floor(max by (name, namespace) (max_over_time(acm_rs_vm:namespace:cpu_request{cluster="$cluster", profile="$profile", namespace=~"$namespace", name=~"$vm"}[$days:]))-` + "\n" + `max by (name, namespace) (max_over_time(acm_rs_vm:namespace:cpu_recommendation{cluster="$cluster", profile="$profile", namespace=~"$namespace", name=~"$vm"}[$days:])))`,
+		Query:       `floor(max_over_time(acm_rs_vm:namespace:cpu_request{cluster="$cluster", profile="$profile", namespace=~"$namespace", name=~"$vm"}[$days:])-` + "\n" + `max_over_time(acm_rs_vm:namespace:cpu_recommendation{cluster="$cluster", profile="$profile", namespace=~"$namespace", name=~"$vm"}[$days:]))`,
 		Unit:        &dashboards.DecimalUnit,
 		Decimals:    0,
 		FontSize:    48,
@@ -383,7 +383,7 @@ func VMCPUUsageStatPanel(datasourceName string) panelgroup.Option {
 	return BuildStatPanel(datasourceName, StatPanelConfig{
 		Title:       "CPU Usage",
 		Description: "Actual CPU cores consumed by the selected VM over the aggregation period.\nBased on max_over_time of the CPU usage metric.",
-		Query:       `max by (name, namespace) (max_over_time(acm_rs_vm:namespace:cpu_usage{cluster="$cluster", profile="$profile", namespace=~"$namespace", name=~"$vm"}[$days:]))`,
+		Query:       `max_over_time(acm_rs_vm:namespace:cpu_usage{cluster="$cluster", profile="$profile", namespace=~"$namespace", name=~"$vm"}[$days:])`,
 		Unit:        &dashboards.DecimalUnit,
 		Decimals:    0,
 		FontSize:    48,
@@ -395,7 +395,7 @@ func VMCPURequestStatPanel(datasourceName string) panelgroup.Option {
 	return BuildStatPanel(datasourceName, StatPanelConfig{
 		Title:       "CPU Request",
 		Description: "CPU cores requested (allocated) for the selected VM.\nThis is the resource request configured for the VM.",
-		Query:       `max by (name, namespace) (max_over_time(acm_rs_vm:namespace:cpu_request{cluster="$cluster", profile="$profile", namespace=~"$namespace", name=~"$vm"}[$days:]))`,
+		Query:       `max_over_time(acm_rs_vm:namespace:cpu_request{cluster="$cluster", profile="$profile", namespace=~"$namespace", name=~"$vm"}[$days:])`,
 		Unit:        &dashboards.DecimalUnit,
 		Decimals:    0,
 		FontSize:    48,
@@ -407,7 +407,7 @@ func VMCPUUtilizationStatPanel(datasourceName string) panelgroup.Option {
 	return BuildStatPanel(datasourceName, StatPanelConfig{
 		Title:       "CPU Utilization",
 		Description: "CPU utilization ratio for the selected VM.\nCalculated as CPU Usage / CPU Request.",
-		Query:       `max by (name, namespace) (max_over_time(acm_rs_vm:namespace:cpu_usage{cluster="$cluster", profile="$profile", namespace=~"$namespace", name=~"$vm"}[$days:])) / max by (name, namespace) (max_over_time(acm_rs_vm:namespace:cpu_request{cluster="$cluster", profile="$profile", namespace=~"$namespace", name=~"$vm"}[$days:]))`,
+		Query:       `max_over_time(acm_rs_vm:namespace:cpu_usage{cluster="$cluster", profile="$profile", namespace=~"$namespace", name=~"$vm"}[$days:]) / max_over_time(acm_rs_vm:namespace:cpu_request{cluster="$cluster", profile="$profile", namespace=~"$namespace", name=~"$vm"}[$days:])`,
 		Unit:        &dashboards.PercentDecimalUnit,
 		Decimals:    0,
 		FontSize:    48,
@@ -436,9 +436,9 @@ func VMCPUUtilizationTimeSeriesPanel(datasourceName string) panelgroup.Option {
 		),
 		panel.AddQuery(query.PromQL(
 			"(\n"+
-				`  max by (name, namespace) (acm_rs_vm:namespace:cpu_usage{cluster="$cluster", profile="$profile", namespace=~"$namespace", name=~"$vm"})`+"\n"+
+				`  acm_rs_vm:namespace:cpu_usage{cluster="$cluster", profile="$profile", namespace=~"$namespace", name=~"$vm"}`+"\n"+
 				"  / \n"+
-				`  max by (name, namespace) (acm_rs_vm:namespace:cpu_request{cluster="$cluster", profile="$profile", namespace=~"$namespace", name=~"$vm"})`+"\n"+
+				`  acm_rs_vm:namespace:cpu_request{cluster="$cluster", profile="$profile", namespace=~"$namespace", name=~"$vm"}`+"\n"+
 				")",
 			dashboards.AddQueryDataSource(datasourceName),
 			query.SeriesNameFormat("{{name}} ({{namespace}})"),
@@ -450,7 +450,7 @@ func VMMemoryOverestimationStatPanel(datasourceName string) panelgroup.Option {
 	return BuildStatPanel(datasourceName, StatPanelConfig{
 		Title:       "Memory Overestimation",
 		Description: "Overestimated Memory for the selected VM.\n- Memory you can save that is not being utilized.\n- A negative value indicates underestimation.",
-		Query:       `max by (name, namespace) (max_over_time(acm_rs_vm:namespace:memory_request{cluster="$cluster", profile="$profile", namespace=~"$namespace", name=~"$vm"}[$days:])) -` + "\n" + `max by (name, namespace) (max_over_time(acm_rs_vm:namespace:memory_recommendation{cluster="$cluster", profile="$profile", namespace=~"$namespace", name=~"$vm"}[$days:]))`,
+		Query:       `(max_over_time(acm_rs_vm:namespace:memory_request{cluster="$cluster", profile="$profile", namespace=~"$namespace", name=~"$vm"}[$days:])) -` + "\n" + `(max_over_time(acm_rs_vm:namespace:memory_recommendation{cluster="$cluster", profile="$profile", namespace=~"$namespace", name=~"$vm"}[$days:]))`,
 		Unit:        &dashboards.BytesUnit,
 		FontSize:    48,
 		Thresholds:  memOverestDetailThreshold,
@@ -461,7 +461,7 @@ func VMMemoryUsageStatPanel(datasourceName string) panelgroup.Option {
 	return BuildStatPanel(datasourceName, StatPanelConfig{
 		Title:       "Memory Usage",
 		Description: "Actual memory consumed by the selected VM over the aggregation period.\nBased on max_over_time of the memory usage metric.",
-		Query:       `max by (name, namespace) (max_over_time(acm_rs_vm:namespace:memory_usage{cluster="$cluster", profile="$profile", namespace=~"$namespace", name=~"$vm"}[$days:]))`,
+		Query:       `max_over_time(acm_rs_vm:namespace:memory_usage{cluster="$cluster", profile="$profile", namespace=~"$namespace", name=~"$vm"}[$days:])`,
 		Unit:        &dashboards.BytesUnit,
 		FontSize:    48,
 		Thresholds:  detailGrayThreshold,
@@ -472,7 +472,7 @@ func VMMemoryRequestStatPanel(datasourceName string) panelgroup.Option {
 	return BuildStatPanel(datasourceName, StatPanelConfig{
 		Title:       "Memory Request",
 		Description: "Memory requested (allocated) for the selected VM.\nThis is the resource request configured for the VM.",
-		Query:       `max by (name, namespace) (max_over_time(acm_rs_vm:namespace:memory_request{cluster="$cluster", profile="$profile", namespace=~"$namespace", name=~"$vm"}[$days:]))`,
+		Query:       `max_over_time(acm_rs_vm:namespace:memory_request{cluster="$cluster", profile="$profile", namespace=~"$namespace", name=~"$vm"}[$days:])`,
 		Unit:        &dashboards.BytesUnit,
 		FontSize:    48,
 		Thresholds:  detailGrayThreshold,
@@ -483,7 +483,7 @@ func VMMemoryUtilizationStatPanel(datasourceName string) panelgroup.Option {
 	return BuildStatPanel(datasourceName, StatPanelConfig{
 		Title:       "Memory Utilization",
 		Description: "Memory utilization ratio for the selected VM.\nCalculated as Memory Usage / Memory Request.",
-		Query:       `max by (name, namespace) (max_over_time(acm_rs_vm:namespace:memory_usage{cluster="$cluster", profile="$profile", namespace=~"$namespace", name=~"$vm"}[$days:])) / max by (name, namespace) (max_over_time(acm_rs_vm:namespace:memory_request{cluster="$cluster", profile="$profile", namespace=~"$namespace", name=~"$vm"}[$days:]))`,
+		Query:       `max_over_time(acm_rs_vm:namespace:memory_usage{cluster="$cluster", profile="$profile", namespace=~"$namespace", name=~"$vm"}[$days:]) / max_over_time(acm_rs_vm:namespace:memory_request{cluster="$cluster", profile="$profile", namespace=~"$namespace", name=~"$vm"}[$days:])`,
 		Unit:        &dashboards.PercentDecimalUnit,
 		FontSize:    48,
 		Thresholds:  detailPercentThreshold,
@@ -511,9 +511,9 @@ func VMMemoryUtilizationTimeSeriesPanel(datasourceName string) panelgroup.Option
 		),
 		panel.AddQuery(query.PromQL(
 			"(\n"+
-				`  max by (name, namespace) (acm_rs_vm:namespace:memory_usage{cluster="$cluster", profile="$profile", namespace=~"$namespace", name=~"$vm"})`+"\n"+
+				`  acm_rs_vm:namespace:memory_usage{cluster="$cluster", profile="$profile", namespace=~"$namespace", name=~"$vm"}`+"\n"+
 				"  / \n"+
-				`  max by (name, namespace) (acm_rs_vm:namespace:memory_request{cluster="$cluster", profile="$profile", namespace=~"$namespace", name=~"$vm"})`+"\n"+
+				`  acm_rs_vm:namespace:memory_request{cluster="$cluster", profile="$profile", namespace=~"$namespace", name=~"$vm"}`+"\n"+
 				")",
 			dashboards.AddQueryDataSource(datasourceName),
 			query.SeriesNameFormat("{{name}} ({{namespace}})"),
@@ -527,7 +527,7 @@ func VMCPUUnderestimationStatPanel(datasourceName string) panelgroup.Option {
 	return BuildStatPanel(datasourceName, StatPanelConfig{
 		Title:       "CPU Underestimation",
 		Description: "Underestimated CPU Cores for the selected VM.\n- CPU cores that need more resources.\n- A negative value indicates overestimation.",
-		Query:       `floor(max by (name, namespace) (max_over_time(acm_rs_vm:namespace:cpu_request{cluster="$cluster", profile="$profile", namespace=~"$namespace", name=~"$vm"}[$days:]))-` + "\n" + `max by (name, namespace) (max_over_time(acm_rs_vm:namespace:cpu_recommendation{cluster="$cluster", profile="$profile", namespace=~"$namespace", name=~"$vm"}[$days:])))* (-1)`,
+		Query:       `floor(max_over_time(acm_rs_vm:namespace:cpu_request{cluster="$cluster", profile="$profile", namespace=~"$namespace", name=~"$vm"}[$days:])-` + "\n" + `max_over_time(acm_rs_vm:namespace:cpu_recommendation{cluster="$cluster", profile="$profile", namespace=~"$namespace", name=~"$vm"}[$days:]))* (-1)`,
 		Unit:        &dashboards.DecimalUnit,
 		Decimals:    0,
 		FontSize:    48,
@@ -539,7 +539,7 @@ func VMMemoryUnderestimationStatPanel(datasourceName string) panelgroup.Option {
 	return BuildStatPanel(datasourceName, StatPanelConfig{
 		Title:       "Memory Underestimation",
 		Description: "Underestimated Memory for the selected VM.\n- Memory that needs more resources.\n- A negative value indicates overestimation.",
-		Query:       `(max by (name, namespace) (max_over_time(acm_rs_vm:namespace:memory_request{cluster="$cluster", profile="$profile", namespace=~"$namespace", name=~"$vm"}[$days:])) -` + "\n" + `max by (name, namespace) (max_over_time(acm_rs_vm:namespace:memory_recommendation{cluster="$cluster", profile="$profile", namespace=~"$namespace", name=~"$vm"}[$days:])))* (-1)`,
+		Query:       `((max_over_time(acm_rs_vm:namespace:memory_request{cluster="$cluster", profile="$profile", namespace=~"$namespace", name=~"$vm"}[$days:])) -` + "\n" + `(max_over_time(acm_rs_vm:namespace:memory_recommendation{cluster="$cluster", profile="$profile", namespace=~"$namespace", name=~"$vm"}[$days:])))* (-1)`,
 		Unit:        &dashboards.BytesUnit,
 		FontSize:    48,
 		Thresholds:  memUnderestDetailThreshold,
