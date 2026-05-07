@@ -19,6 +19,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+
 // OptionsBuilder builds right-sizing options for the helm chart
 type OptionsBuilder struct {
 	Client client.Client
