@@ -54,6 +54,9 @@ func (o *OptionsBuilder) Build(ctx context.Context, cluster *clusterv1.ManagedCl
 		if err := o.ensureNamespaceConfigMap(ctx); err != nil {
 			o.Logger.Error(err, "Failed to ensure namespace ConfigMap exists, continuing with defaults")
 		}
+		if err := o.ensurePlacementConfigMap(ctx, rightsizing.NamespacePlacementCMName); err != nil {
+			o.Logger.Error(err, "Failed to ensure namespace placement ConfigMap exists, continuing with defaults")
+		}
 
 		nsConfigData, err := o.getConfigData(ctx, rightsizing.NamespaceConfigMapName)
 		if err != nil {
@@ -85,6 +88,9 @@ func (o *OptionsBuilder) Build(ctx context.Context, cluster *clusterv1.ManagedCl
 	if virtualizationEnabled {
 		if err := o.ensureVirtualizationConfigMap(ctx); err != nil {
 			o.Logger.Error(err, "Failed to ensure virtualization ConfigMap exists, continuing with defaults")
+		}
+		if err := o.ensurePlacementConfigMap(ctx, rightsizing.VirtualizationPlacementCMName); err != nil {
+			o.Logger.Error(err, "Failed to ensure virtualization placement ConfigMap exists, continuing with defaults")
 		}
 
 		virtConfigData, err := o.getConfigData(ctx, rightsizing.VirtualizationConfigMapName)
@@ -205,6 +211,23 @@ func (o *OptionsBuilder) createDefaultConfigMap(ctx context.Context, name string
 	}
 
 	o.Logger.V(1).Info("Created right-sizing ConfigMap", "name", name, "namespace", addoncfg.InstallNamespace)
+	return nil
+}
+
+// ensurePlacementConfigMap ensures a dedicated placement ConfigMap exists on the hub.
+// Created with default empty predicates (selects all clusters) so users can
+// simply `kubectl edit` it later to add label/claim filters.
+func (o *OptionsBuilder) ensurePlacementConfigMap(ctx context.Context, name string) error {
+	_, err := common.GetConfigMap(ctx, o.Client, addoncfg.InstallNamespace, name)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			o.Logger.Info("Creating dedicated placement ConfigMap with defaults",
+				"name", name,
+				"namespace", addoncfg.InstallNamespace)
+			return o.createDefaultConfigMap(ctx, name, rightsizing.GetDefaultPlacementConfigData())
+		}
+		return err
+	}
 	return nil
 }
 
