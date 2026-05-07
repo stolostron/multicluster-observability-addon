@@ -77,6 +77,7 @@ func (o *OptionsBuilder) Build(ctx context.Context, cluster *clusterv1.ManagedCl
 			nsMatched = true
 		} else {
 			o.Logger.V(1).Info("Cluster not selected for namespace right-sizing", "cluster", cluster.Name)
+			ret.NamespaceRightSizing = emptyComponentOptions(rightsizing.NamespacePrometheusRuleName)
 		}
 	}
 
@@ -109,14 +110,40 @@ func (o *OptionsBuilder) Build(ctx context.Context, cluster *clusterv1.ManagedCl
 			virtMatched = true
 		} else {
 			o.Logger.V(1).Info("Cluster not selected for virtualization right-sizing", "cluster", cluster.Name)
+			ret.VirtualizationRightSizing = emptyComponentOptions(rightsizing.VirtualizationPrometheusRuleName)
 		}
 	}
 
-	if opts.Platform.Metrics.CollectionEnabled {
-		ret.ScrapeConfig = rightsizing.GenerateScrapeConfig(nsMatched, virtMatched)
-	}
+	ret.ScrapeConfig = rightsizing.GenerateScrapeConfig(nsMatched, virtMatched)
 
 	return ret, nil
+}
+
+// emptyComponentOptions returns a ComponentOptions with an empty PrometheusRule
+// (spec.groups: []). The work agent reliably updates existing resources but
+// does not delete resources removed from a ManifestWork spec. By always
+// including the PrometheusRule (empty when the cluster doesn't match
+// placement), we convert a delete into an update — the work agent overwrites
+// the existing rule with an empty one, guaranteeing cleanup.
+func emptyComponentOptions(ruleName string) ComponentOptions {
+	return ComponentOptions{
+		Enabled: true,
+		PrometheusRules: []*monitoringv1.PrometheusRule{
+			{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "PrometheusRule",
+					APIVersion: "monitoring.coreos.com/v1",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      ruleName,
+					Namespace: rightsizing.MonitoringNamespace,
+				},
+				Spec: monitoringv1.PrometheusRuleSpec{
+					Groups: []monitoringv1.RuleGroup{},
+				},
+			},
+		},
+	}
 }
 
 func (o *OptionsBuilder) buildNamespaceOptionsFromConfig(configData rightsizing.RSConfigMapData) (ComponentOptions, error) {

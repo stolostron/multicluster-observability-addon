@@ -208,9 +208,10 @@ PlacementDecisionLabel     = "cluster.open-cluster-management.io/placement"
 
 ## Non-Matching Resources
 
-When a feature is globally enabled but a cluster does not match the placement predicate, `Build()` omits the non-matching resources from the ManifestWork. The OCM work agent detects resources tracked in `AppliedManifestWork` that are absent from the current ManifestWork spec (`FindUntrackedResources`) and deletes them from the spoke (`DeleteAppliedResources`).
+The OCM work agent reliably **updates** existing resources but does not reliably **delete** resources removed from a ManifestWork spec. To guarantee cleanup when a cluster no longer matches placement, `Build()` always includes all RS resources in the ManifestWork — using empty/no-op versions for non-matching features. This converts every potential delete into an update, which the work agent handles correctly.
 
-**Important:** This deletion mechanism only works when the ManifestWork reaches `Applied: True`. If any resource in the ManifestWork fails to apply (e.g., a missing CRD), the work agent does not perform untracked resource cleanup. For this reason, the ScrapeConfig is only included when `Platform.Metrics.CollectionEnabled` is true — metrics collection guarantees the `scrapeconfigs.monitoring.rhobs` CRD exists on the spoke (deployed by the bundled operator or by COO). Without this gate, the ScrapeConfig would permanently fail to apply, blocking the ManifestWork and preventing PrometheusRule cleanup on label changes.
+- **PrometheusRules**: `emptyComponentOptions()` returns a PrometheusRule with `spec.groups: []`. The work agent overwrites the existing rule with the empty one, effectively disabling it.
+- **ScrapeConfig**: `GenerateScrapeConfig()` always returns a valid ScrapeConfig. When no features match, the ScrapeConfig has no `match[]` params and no `staticConfigs` — it exists on the spoke but scrapes nothing.
 
 ## Backward Compatibility
 

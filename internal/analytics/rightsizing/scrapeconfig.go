@@ -60,10 +60,11 @@ var VirtualizationMetrics = []string{
 }
 
 // GenerateScrapeConfig generates a ScrapeConfig for right-sizing metrics federation.
-// Returns nil when no features are selected for the cluster. The caller gates
-// invocation on metrics collection being enabled, which guarantees the ScrapeConfig
-// CRD exists on the spoke. The work agent then tracks the resource via
-// AppliedManifestWork and deletes it when it disappears from the ManifestWork spec.
+// Always returns a valid ScrapeConfig, even when no features match placement.
+// The work agent reliably updates existing resources but does not delete
+// resources removed from a ManifestWork spec. By always including the
+// ScrapeConfig (empty when no features match), we convert a delete into an
+// update — the work agent overwrites the existing resource with a no-op one.
 func GenerateScrapeConfig(includeNamespace, includeVirtualization bool) *cooprometheusv1alpha1.ScrapeConfig {
 	var matchParams []string
 
@@ -79,11 +80,7 @@ func GenerateScrapeConfig(includeNamespace, includeVirtualization bool) *cooprom
 		}
 	}
 
-	if len(matchParams) == 0 {
-		return nil
-	}
-
-	return &cooprometheusv1alpha1.ScrapeConfig{
+	sc := &cooprometheusv1alpha1.ScrapeConfig{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "ScrapeConfig",
 			APIVersion: "monitoring.rhobs/v1alpha1",
@@ -99,15 +96,20 @@ func GenerateScrapeConfig(includeNamespace, includeVirtualization bool) *cooprom
 		Spec: cooprometheusv1alpha1.ScrapeConfigSpec{
 			JobName:     ptr.To(ScrapeConfigJobName),
 			MetricsPath: ptr.To("/federate"),
-			Params: map[string][]string{
-				"match[]": matchParams,
-			},
-			MetricRelabelConfigs: []cooprometheusv1.RelabelConfig{
-				{
-					Action: "labeldrop",
-					Regex:  "managed_cluster|id",
-				},
-			},
 		},
 	}
+
+	if len(matchParams) > 0 {
+		sc.Spec.Params = map[string][]string{
+			"match[]": matchParams,
+		}
+		sc.Spec.MetricRelabelConfigs = []cooprometheusv1.RelabelConfig{
+			{
+				Action: "labeldrop",
+				Regex:  "managed_cluster|id",
+			},
+		}
+	}
+
+	return sc
 }
