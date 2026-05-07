@@ -14,10 +14,8 @@ import (
 	rsvirtualization "github.com/stolostron/multicluster-observability-addon/internal/analytics/rightsizing/virtualization"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/labels"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
-	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -47,6 +45,7 @@ func (o *OptionsBuilder) Build(ctx context.Context, cluster *clusterv1.ManagedCl
 
 	// Build namespace right-sizing options
 	if namespaceEnabled {
+		// Ensure ConfigMap exists on hub (MCOA owns all RS resources)
 		if err := o.ensureNamespaceConfigMap(ctx); err != nil {
 			o.Logger.Error(err, "Failed to ensure namespace ConfigMap exists, continuing with defaults")
 		}
@@ -63,7 +62,15 @@ func (o *OptionsBuilder) Build(ctx context.Context, cluster *clusterv1.ManagedCl
 			}
 		}
 
-		if clusterMatchesPlacement(cluster, nsConfigData.PlacementConfiguration) {
+		// Check if this cluster is selected by the namespace Placement
+		// (Placement resource is created/updated by ResourceCreator)
+		nsSelected, err := o.isClusterSelectedByRSPlacement(ctx, rightsizing.NamespacePlacementName, cluster.Name)
+		if err != nil {
+			o.Logger.Error(err, "Failed to check namespace placement selection, defaulting to selected")
+			nsSelected = true
+		}
+
+		if nsSelected {
 			nsOpts, err := o.buildNamespaceOptionsFromConfig(nsConfigData)
 			if err != nil {
 				return ret, fmt.Errorf("failed to build namespace right-sizing options: %w", err)
@@ -76,6 +83,7 @@ func (o *OptionsBuilder) Build(ctx context.Context, cluster *clusterv1.ManagedCl
 
 	// Build virtualization right-sizing options
 	if virtualizationEnabled {
+		// Ensure ConfigMap exists on hub (MCOA owns all RS resources)
 		if err := o.ensureVirtualizationConfigMap(ctx); err != nil {
 			o.Logger.Error(err, "Failed to ensure virtualization ConfigMap exists, continuing with defaults")
 		}
@@ -92,7 +100,14 @@ func (o *OptionsBuilder) Build(ctx context.Context, cluster *clusterv1.ManagedCl
 			}
 		}
 
-		if clusterMatchesPlacement(cluster, virtConfigData.PlacementConfiguration) {
+		// Check if this cluster is selected by the virtualization Placement
+		virtSelected, err := o.isClusterSelectedByRSPlacement(ctx, rightsizing.VirtualizationPlacementName, cluster.Name)
+		if err != nil {
+			o.Logger.Error(err, "Failed to check virtualization placement selection, defaulting to selected")
+			virtSelected = true
+		}
+
+		if virtSelected {
 			virtOpts, err := o.buildVirtualizationOptionsFromConfig(virtConfigData)
 			if err != nil {
 				return ret, fmt.Errorf("failed to build virtualization right-sizing options: %w", err)
@@ -194,84 +209,4 @@ func (o *OptionsBuilder) createDefaultConfigMap(ctx context.Context, name string
 
 	o.Logger.V(1).Info("Created right-sizing ConfigMap", "name", name, "namespace", addoncfg.InstallNamespace)
 	return nil
-}
-
-// clusterMatchesPlacement evaluates placement predicates in-memory against
-// a ManagedCluster, avoiding the need to create Placement resources and rely
-// on the OCM scheduler for PlacementDecisions.
-// Predicates are ORed (any match selects the cluster). Empty predicates match all.
-func clusterMatchesPlacement(cluster *clusterv1.ManagedCluster, placement clusterv1beta1.Placement) bool {
-	if len(placement.Spec.Predicates) == 0 {
-		return true
-	}
-
-	for _, predicate := range placement.Spec.Predicates {
-		if clusterMatchesPredicate(cluster, predicate) {
-			return true
-		}
-	}
-	return false
-}
-
-func clusterMatchesPredicate(cluster *clusterv1.ManagedCluster, pred clusterv1beta1.ClusterPredicate) bool {
-	sel := pred.RequiredClusterSelector
-
-	if !clusterMatchesLabelSelector(cluster, sel.LabelSelector) {
-		return false
-	}
-	if !clusterMatchesClaimSelector(cluster, sel.ClaimSelector) {
-		return false
-	}
-	return true
-}
-
-func clusterMatchesLabelSelector(cluster *clusterv1.ManagedCluster, ls metav1.LabelSelector) bool {
-	selector, err := metav1.LabelSelectorAsSelector(&ls)
-	if err != nil {
-		return false
-	}
-	return selector.Matches(labels.Set(cluster.Labels))
-}
-
-func clusterMatchesClaimSelector(cluster *clusterv1.ManagedCluster, cs clusterv1beta1.ClusterClaimSelector) bool {
-	if len(cs.MatchExpressions) == 0 {
-		return true
-	}
-
-	claimMap := make(map[string]string, len(cluster.Status.ClusterClaims))
-	for _, claim := range cluster.Status.ClusterClaims {
-		claimMap[claim.Name] = claim.Value
-	}
-
-	for _, req := range cs.MatchExpressions {
-		val, exists := claimMap[req.Key]
-		switch req.Operator {
-		case metav1.LabelSelectorOpIn:
-			if !exists || !stringInSlice(val, req.Values) {
-				return false
-			}
-		case metav1.LabelSelectorOpNotIn:
-			if exists && stringInSlice(val, req.Values) {
-				return false
-			}
-		case metav1.LabelSelectorOpExists:
-			if !exists {
-				return false
-			}
-		case metav1.LabelSelectorOpDoesNotExist:
-			if exists {
-				return false
-			}
-		}
-	}
-	return true
-}
-
-func stringInSlice(s string, slice []string) bool {
-	for _, v := range slice {
-		if v == s {
-			return true
-		}
-	}
-	return false
 }

@@ -394,10 +394,10 @@ github.com/perses/plugins/prometheus v0.57.1 h1:/axcuH29Gmi7cHydJPqmpFp+MWJsKMS6
 github.com/perses/plugins/prometheus v0.57.1/go.mod h1:YIXpyIvVG61t1jCiWFayKRiUc5TRNfUvOEb3+0wrNnE=
 github.com/perses/plugins/statchart v0.12.1 h1:C1/WjA5jmvU8h+vWvOy4M0BAAncKflSDoy1uiW6p4Qg=
 github.com/perses/plugins/statchart v0.12.1/go.mod h1:2dqCAyTL5p7OfPxfcdRUJ/GDb1OvaC2AggtNauGJH5g=
-github.com/perses/plugins/staticlistvariable v0.8.1 h1:0Xb8TbcjjOsqS3qEXdrGymmffLqP3dNC9gCgJW9skG8=
-github.com/perses/plugins/staticlistvariable v0.8.1/go.mod h1:5IBVVtEeAXPRSEnpHjCCpF4x3fC2Iw+bn4894KdVoEQ=
 github.com/perses/plugins/table v0.11.3-0.20260416092358-50d24073dacc h1:AVb53iw4Az+iT7srZnVk2jLzywpWd4Dz0w3Z2Owq6eU=
 github.com/perses/plugins/table v0.11.3-0.20260416092358-50d24073dacc/go.mod h1:Kb4mV70tdKt/rEwPAeam9AXfkOag7Z8GW31u5b2eM70=
+github.com/perses/plugins/staticlistvariable v0.8.1 h1:0Xb8TbcjjOsqS3qEXdrGymmffLqP3dNC9gCgJW9skG8=
+github.com/perses/plugins/staticlistvariable v0.8.1/go.mod h1:5IBVVtEeAXPRSEnpHjCCpF4x3fC2Iw+bn4894KdVoEQ=
 github.com/perses/plugins/timeserieschart v0.12.1 h1:3OxNZw8FROg2oJKgP0lLMjsG/olU27K1ppeTLX9k+CY=
 github.com/perses/plugins/timeserieschart v0.12.1/go.mod h1:xKetTjF9DYdg0wIIDjcLNddxvHfbRoxzz2Vq7XoEAHM=
 github.com/perses/promql-builder v0.2.1-0.20260106092606-e4909fea9c57 h1:BLMC16NTbXCrJt4ej78Kf1EStW6zemI85St5gRtLLGY=
@@ -411,7 +411,6 @@ github.com/planetscale/vtprotobuf v0.6.1-0.20240319094008-0393e58bdf10/go.mod h1
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 h1:Jamvg5psRIccs7FGNTlIRMkT8wgtp5eCXdBlqhYGL6U=
 github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
-github.com/prometheus-operator/prometheus-operator v0.80.1 h1:jeqy9C8ku5coMThZh/cVrB5FwJHlV98jvnSeVnQKCQw=
 github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.87.0 h1:QK37j5ZUtBwbyZkF4BBAs3bQQ1gYKG8e+g1BdNZBr/M=
 github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.87.0/go.mod h1:WHiLZmOWVop/MoYvRD58LfnPeyE+dcITby/jQjg83Hw=
 github.com/prometheus/client_golang v1.23.2 h1:Je96obch5RDVy3FDMndoUsjAhG5Edi49h0RJWRi/o0o=
