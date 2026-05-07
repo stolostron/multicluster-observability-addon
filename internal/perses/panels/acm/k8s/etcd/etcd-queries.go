@@ -19,20 +19,8 @@ var Queries = map[string]parser.Expr{
 		),
 	),
 
-	"RPCRate": promqlbuilder.Sum(
-		promqlbuilder.Rate(
-			matrix.New(
-				vector.New(
-					vector.WithMetricName("grpc_server_started_total"),
-					vector.WithLabelMatchers(
-						label.New("cluster").Equal("$cluster"),
-						label.New("job").Equal("etcd"),
-						label.New("grpc_type").Equal("unary"),
-					),
-				),
-				matrix.WithRangeAsVariable("$__rate_interval"),
-			),
-		),
+	"RPCRate": vector.New(
+		vector.WithMetricName("grpc_server_started_total:etcd_unary:sum_rate"),
 	),
 	"RPCFailedRate": vector.New(
 		vector.WithMetricName("rpc_rate:grpc_server_handled_total:sum_rate"),
@@ -55,7 +43,7 @@ var Queries = map[string]parser.Expr{
 	),
 
 	"DBSize": vector.New(
-		vector.WithMetricName("etcd_debugging_mvcc_db_total_size_in_bytes"),
+		vector.WithMetricName("etcd_mvcc_db_total_size_in_bytes"),
 		vector.WithLabelMatchers(
 			label.New("cluster").Equal("$cluster"),
 			label.New("job").Equal("etcd"),

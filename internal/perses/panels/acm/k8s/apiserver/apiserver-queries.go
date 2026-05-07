@@ -20,9 +20,7 @@ func upVector() parser.Expr {
 
 var Queries = map[string]parser.Expr{
 	"APIServersUp": promqlbuilder.Div(
-		promqlbuilder.Sum(
-			promqlbuilder.Eql(upVector(), promqlbuilder.NewNumber(1)),
-		),
+		promqlbuilder.Sum(upVector()),
 		promqlbuilder.Count(upVector()),
 	),
 

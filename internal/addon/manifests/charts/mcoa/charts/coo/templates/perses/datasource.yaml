@@ -16,6 +16,7 @@ spec:
     plugin:
       kind: PrometheusDatasource
       spec:
+        scrapeInterval: "5m"
         proxy:
           kind: HTTPProxy
           spec:

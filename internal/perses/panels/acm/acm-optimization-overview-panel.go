@@ -63,6 +63,7 @@ func CPUUsagePanel(datasourceName string, labelMatchers ...*labels.Matcher) pane
 					ACMCommonPanelQueries["CPUUsageNodeNamespacePod"],
 					labelMatchers,
 				).Pretty(0),
+				query.SeriesNameFormat("{{ namespace }}"),
 				dashboards.AddQueryDataSource(datasourceName),
 			),
 		),
