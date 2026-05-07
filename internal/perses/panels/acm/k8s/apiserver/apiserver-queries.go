@@ -76,22 +76,12 @@ var Queries = map[string]parser.Expr{
 		),
 	),
 
-	"WorkQueueLatency": promqlbuilder.HistogramQuantile(0.99,
-		promqlbuilder.Sum(
-			promqlbuilder.Rate(
-				matrix.New(
-					vector.New(
-						vector.WithMetricName("workqueue_queue_duration_seconds_bucket"),
-						vector.WithLabelMatchers(
-							label.New("job").Equal("apiserver"),
-							label.New("instance").EqualRegexp("$instance"),
-							label.New("cluster").Equal("$cluster"),
-						),
-					),
-					matrix.WithRangeAsVariable("$__rate_interval"),
-				),
-			),
-		).By("instance", "name", "le"),
+	"WorkQueueLatency": vector.New(
+		vector.WithMetricName("workqueue_queue_duration_seconds_bucket:apiserver:histogram_quantile_99"),
+		vector.WithLabelMatchers(
+			label.New("instance").EqualRegexp("$instance"),
+			label.New("cluster").Equal("$cluster"),
+		),
 	),
 
 	"QueueDepth": promqlbuilder.Sum(
