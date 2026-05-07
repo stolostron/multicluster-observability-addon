@@ -65,7 +65,7 @@ type ColumnSettingsWithLink struct {
 // TablePluginSpec mirrors the SDK's PluginSpec but uses ColumnSettingsWithLink.
 type TablePluginSpec struct {
 	Density         tablePanel.Density        `json:"density,omitempty"`
-	ColumnSettings  []ColumnSettingsWithLink  `json:"columnSettings,omitempty"`
+	ColumnSettings  []ColumnSettingsWithLink   `json:"columnSettings,omitempty"`
 	CellSettings    []tablePanel.CellSettings `json:"cellSettings,omitempty"`
 	Transforms      []commonSdk.Transform     `json:"transforms,omitempty"`
 	EnableFiltering bool                      `json:"enableFiltering,omitempty"`
