@@ -111,9 +111,11 @@ func TestRSConfigMapPredicate(t *testing.T) {
 
 func TestReconcileRSResources_CleanupNamespace(t *testing.T) {
 	nsCM := createTestConfigMap(rightsizing.NamespaceConfigMapName)
+	nsPlacementCM := createTestConfigMap(rightsizing.NamespacePlacementCMName)
 	virtCM := createTestConfigMap(rightsizing.VirtualizationConfigMapName)
+	virtPlacementCM := createTestConfigMap(rightsizing.VirtualizationPlacementCMName)
 
-	ob := newTestOptionsBuilder(t, nsCM, virtCM)
+	ob := newTestOptionsBuilder(t, nsCM, nsPlacementCM, virtCM, virtPlacementCM)
 	ctx := context.TODO()
 
 	opts := newPlatformOpts(false, true)
@@ -126,16 +128,28 @@ func TestReconcileRSResources_CleanupNamespace(t *testing.T) {
 	assert.True(t, apierrors.IsNotFound(err), "namespace configmap should be deleted")
 
 	err = ob.Client.Get(ctx, types.NamespacedName{
+		Name: rightsizing.NamespacePlacementCMName, Namespace: addoncfg.InstallNamespace,
+	}, &corev1.ConfigMap{})
+	assert.True(t, apierrors.IsNotFound(err), "namespace placement configmap should be deleted")
+
+	err = ob.Client.Get(ctx, types.NamespacedName{
 		Name: rightsizing.VirtualizationConfigMapName, Namespace: addoncfg.InstallNamespace,
 	}, &corev1.ConfigMap{})
-	assert.NoError(t, err, "virtualization configmap should still exist")
+	require.NoError(t, err, "virtualization configmap should still exist")
+
+	err = ob.Client.Get(ctx, types.NamespacedName{
+		Name: rightsizing.VirtualizationPlacementCMName, Namespace: addoncfg.InstallNamespace,
+	}, &corev1.ConfigMap{})
+	require.NoError(t, err, "virtualization placement configmap should still exist")
 }
 
 func TestReconcileRSResources_CleanupVirtualization(t *testing.T) {
 	nsCM := createTestConfigMap(rightsizing.NamespaceConfigMapName)
+	nsPlacementCM := createTestConfigMap(rightsizing.NamespacePlacementCMName)
 	virtCM := createTestConfigMap(rightsizing.VirtualizationConfigMapName)
+	virtPlacementCM := createTestConfigMap(rightsizing.VirtualizationPlacementCMName)
 
-	ob := newTestOptionsBuilder(t, nsCM, virtCM)
+	ob := newTestOptionsBuilder(t, nsCM, nsPlacementCM, virtCM, virtPlacementCM)
 	ctx := context.TODO()
 
 	opts := newPlatformOpts(true, false)
@@ -148,16 +162,28 @@ func TestReconcileRSResources_CleanupVirtualization(t *testing.T) {
 	assert.True(t, apierrors.IsNotFound(err), "virtualization configmap should be deleted")
 
 	err = ob.Client.Get(ctx, types.NamespacedName{
+		Name: rightsizing.VirtualizationPlacementCMName, Namespace: addoncfg.InstallNamespace,
+	}, &corev1.ConfigMap{})
+	assert.True(t, apierrors.IsNotFound(err), "virtualization placement configmap should be deleted")
+
+	err = ob.Client.Get(ctx, types.NamespacedName{
 		Name: rightsizing.NamespaceConfigMapName, Namespace: addoncfg.InstallNamespace,
 	}, &corev1.ConfigMap{})
-	assert.NoError(t, err, "namespace configmap should still exist")
+	require.NoError(t, err, "namespace configmap should still exist")
+
+	err = ob.Client.Get(ctx, types.NamespacedName{
+		Name: rightsizing.NamespacePlacementCMName, Namespace: addoncfg.InstallNamespace,
+	}, &corev1.ConfigMap{})
+	require.NoError(t, err, "namespace placement configmap should still exist")
 }
 
 func TestReconcileRSResources_CleanupBoth(t *testing.T) {
 	nsCM := createTestConfigMap(rightsizing.NamespaceConfigMapName)
+	nsPlacementCM := createTestConfigMap(rightsizing.NamespacePlacementCMName)
 	virtCM := createTestConfigMap(rightsizing.VirtualizationConfigMapName)
+	virtPlacementCM := createTestConfigMap(rightsizing.VirtualizationPlacementCMName)
 
-	ob := newTestOptionsBuilder(t, nsCM, virtCM)
+	ob := newTestOptionsBuilder(t, nsCM, nsPlacementCM, virtCM, virtPlacementCM)
 	ctx := context.TODO()
 
 	opts := newPlatformOpts(false, false)
@@ -170,9 +196,19 @@ func TestReconcileRSResources_CleanupBoth(t *testing.T) {
 	assert.True(t, apierrors.IsNotFound(err), "namespace configmap should be deleted")
 
 	err = ob.Client.Get(ctx, types.NamespacedName{
+		Name: rightsizing.NamespacePlacementCMName, Namespace: addoncfg.InstallNamespace,
+	}, &corev1.ConfigMap{})
+	assert.True(t, apierrors.IsNotFound(err), "namespace placement configmap should be deleted")
+
+	err = ob.Client.Get(ctx, types.NamespacedName{
 		Name: rightsizing.VirtualizationConfigMapName, Namespace: addoncfg.InstallNamespace,
 	}, &corev1.ConfigMap{})
 	assert.True(t, apierrors.IsNotFound(err), "virtualization configmap should be deleted")
+
+	err = ob.Client.Get(ctx, types.NamespacedName{
+		Name: rightsizing.VirtualizationPlacementCMName, Namespace: addoncfg.InstallNamespace,
+	}, &corev1.ConfigMap{})
+	assert.True(t, apierrors.IsNotFound(err), "virtualization placement configmap should be deleted")
 }
 
 func TestReconcileRSResources_CleanupIdempotent(t *testing.T) {
@@ -182,6 +218,58 @@ func TestReconcileRSResources_CleanupIdempotent(t *testing.T) {
 	opts := newPlatformOpts(false, false)
 	err := ob.ReconcileRSResources(ctx, opts)
 	require.NoError(t, err)
+}
+
+func TestEnsurePlacementConfigMap_CreatesWhenMissing(t *testing.T) {
+	ob := newTestOptionsBuilder(t)
+	ctx := context.TODO()
+
+	err := ob.ensurePlacementConfigMap(ctx, rightsizing.NamespacePlacementCMName)
+	require.NoError(t, err)
+
+	cm := &corev1.ConfigMap{}
+	err = ob.Client.Get(ctx, types.NamespacedName{
+		Name: rightsizing.NamespacePlacementCMName, Namespace: addoncfg.InstallNamespace,
+	}, cm)
+	require.NoError(t, err, "placement configmap should be created")
+
+	assert.Contains(t, cm.Data, "placementConfiguration")
+	assert.Equal(t, rightsizing.RSLabels(), cm.Labels)
+
+	placement, found, err := rightsizing.ParsePlacementConfigMap(cm.Data)
+	require.NoError(t, err)
+	assert.True(t, found)
+	assert.Empty(t, placement.Spec.Predicates, "default placement should have empty predicates")
+}
+
+func TestEnsurePlacementConfigMap_PreservesExisting(t *testing.T) {
+	existingCM := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      rightsizing.NamespacePlacementCMName,
+			Namespace: addoncfg.InstallNamespace,
+		},
+		Data: map[string]string{
+			"placementConfiguration": `{"spec":{"predicates":[{"requiredClusterSelector":{"labelSelector":{"matchLabels":{"env":"prod"}}}}]}}`,
+		},
+	}
+
+	ob := newTestOptionsBuilder(t, existingCM)
+	ctx := context.TODO()
+
+	err := ob.ensurePlacementConfigMap(ctx, rightsizing.NamespacePlacementCMName)
+	require.NoError(t, err)
+
+	cm := &corev1.ConfigMap{}
+	err = ob.Client.Get(ctx, types.NamespacedName{
+		Name: rightsizing.NamespacePlacementCMName, Namespace: addoncfg.InstallNamespace,
+	}, cm)
+	require.NoError(t, err)
+
+	placement, found, err := rightsizing.ParsePlacementConfigMap(cm.Data)
+	require.NoError(t, err)
+	assert.True(t, found)
+	assert.Len(t, placement.Spec.Predicates, 1, "existing predicates should be preserved")
+	assert.Equal(t, "prod", placement.Spec.Predicates[0].RequiredClusterSelector.LabelSelector.MatchLabels["env"])
 }
 
 func TestClusterMatchesPlacement_EmptyPredicates(t *testing.T) {

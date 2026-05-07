@@ -151,7 +151,8 @@ func CPUTopNamespacesPanel(datasourceName string) panelgroup.Option {
 		timeSeriesPanel.Chart(
 			timeSeriesPanel.WithYAxis(timeSeriesPanel.YAxis{
 				Format: &commonSdk.Format{
-					Unit: &dashboards.PercentDecimalUnit,
+					Unit:          &dashboards.PercentDecimalUnit,
+					DecimalPlaces: 2,
 				},
 			}),
 			timeSeriesPanel.WithLegend(timeSeriesPanel.Legend{
@@ -182,7 +183,8 @@ func MemTopNamespacesPanel(datasourceName string) panelgroup.Option {
 		timeSeriesPanel.Chart(
 			timeSeriesPanel.WithYAxis(timeSeriesPanel.YAxis{
 				Format: &commonSdk.Format{
-					Unit: &dashboards.PercentDecimalUnit,
+					Unit:          &dashboards.PercentDecimalUnit,
+					DecimalPlaces: 2,
 				},
 			}),
 			timeSeriesPanel.WithLegend(timeSeriesPanel.Legend{

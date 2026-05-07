@@ -139,6 +139,16 @@ func ParsePlacementConfigMap(data map[string]string) (clusterv1beta1.Placement, 
 	return placement, true, nil
 }
 
+// GetDefaultPlacementConfigData returns default placement data for a dedicated
+// placement ConfigMap. Empty predicates = selects ALL clusters. Users can later
+// edit this ConfigMap to add label/claim filters.
+func GetDefaultPlacementConfigData() map[string]string {
+	placement := GetDefaultRSPlacement()
+	return map[string]string{
+		"placementConfiguration": FormatJSON(placement),
+	}
+}
+
 // GetDefaultNamespaceConfigData returns default config data for namespace right-sizing
 func GetDefaultNamespaceConfigData() map[string]string {
 	ruleConfig := GetDefaultRSPrometheusRuleConfig()

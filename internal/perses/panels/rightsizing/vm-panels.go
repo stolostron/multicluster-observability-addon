@@ -23,7 +23,7 @@ func vmDataLink(project, targetDashboard, title string) *DataLink {
 		OpenNewTab: false,
 		Title:      title,
 		URL: fmt.Sprintf(
-			"/monitoring/v2/dashboards/view?dashboard=%s&project=%s&var-cluster=${__data.fields[\"cluster\"]}&var-namespace=${__data.fields[\"namespace\"]}&var-vm=${__data.fields[\"name\"]}&var-days=${__data.fields[\"days\"]}&var-profile=${__data.fields[\"profile\"]}",
+			"/monitoring/v2/dashboards/view?dashboard=%s&project=%s&var-cluster=${__data.fields[\"cluster\"]}&var-namespace=${__data.fields[\"namespace\"]}&var-vm=${__data.fields[\"name\"]}&var-days=$days&var-profile=${__data.fields[\"profile\"]}",
 			targetDashboard, project,
 		),
 	}
@@ -148,7 +148,7 @@ func VMCPUOverestimationTablePanel(datasourceName string, project string) panelg
 				{ColumnSettings: tablePanel.ColumnSettings{Name: "namespace", Header: "Namespace", HeaderDescription: "Kubernetes namespace where the VM is deployed", EnableSorting: true}, DataLink: overestLink},
 				{ColumnSettings: tablePanel.ColumnSettings{
 					Name: "value #1", Header: "CPU Utilization %", HeaderDescription: "Ratio of CPU usage to CPU request as a percentage",
-					EnableSorting: true, Sort: tablePanel.AscSort,
+					EnableSorting: true, Sort: tablePanel.DescSort,
 					Format: &commonSdk.Format{Unit: &dashboards.PercentDecimalUnit, DecimalPlaces: 2},
 				}},
 				{ColumnSettings: tablePanel.ColumnSettings{
@@ -254,7 +254,7 @@ func VMMemOverestimationTablePanel(datasourceName string, project string) panelg
 				{ColumnSettings: tablePanel.ColumnSettings{Name: "namespace", Header: "Namespace", HeaderDescription: "Kubernetes namespace where the VM is deployed", EnableSorting: true}, DataLink: overestLink},
 				{ColumnSettings: tablePanel.ColumnSettings{
 					Name: "value #1", Header: "Memory Utilization %", HeaderDescription: "Ratio of memory usage to memory request as a percentage",
-					EnableSorting: true, Sort: tablePanel.AscSort,
+					EnableSorting: true, Sort: tablePanel.DescSort,
 					Format: &commonSdk.Format{Unit: &dashboards.PercentDecimalUnit, DecimalPlaces: 2},
 				}},
 				{ColumnSettings: tablePanel.ColumnSettings{
@@ -444,7 +444,7 @@ func VMCPUUtilizationTimeSeriesPanel(datasourceName string) panelgroup.Option {
 		panel.Description("CPU Utilization percentage over time for the selected VM.\nShows the ratio of actual CPU usage to CPU request as a time series."),
 		timeSeriesPanel.Chart(
 			timeSeriesPanel.WithYAxis(timeSeriesPanel.YAxis{
-				Format: &commonSdk.Format{Unit: &dashboards.PercentDecimalUnit},
+				Format: &commonSdk.Format{Unit: &dashboards.PercentDecimalUnit, DecimalPlaces: 2},
 			}),
 			timeSeriesPanel.WithLegend(timeSeriesPanel.Legend{
 				Position: timeSeriesPanel.BottomPosition,
@@ -519,7 +519,7 @@ func VMMemoryUtilizationTimeSeriesPanel(datasourceName string) panelgroup.Option
 		panel.Description("Memory Utilization percentage over time for the selected VM.\nShows the ratio of actual memory usage to memory request as a time series."),
 		timeSeriesPanel.Chart(
 			timeSeriesPanel.WithYAxis(timeSeriesPanel.YAxis{
-				Format: &commonSdk.Format{Unit: &dashboards.PercentDecimalUnit},
+				Format: &commonSdk.Format{Unit: &dashboards.PercentDecimalUnit, DecimalPlaces: 2},
 			}),
 			timeSeriesPanel.WithLegend(timeSeriesPanel.Legend{
 				Position: timeSeriesPanel.BottomPosition,
