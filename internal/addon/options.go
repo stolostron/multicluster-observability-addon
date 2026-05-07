@@ -255,17 +255,14 @@ func BuildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Opti
 			}
 		case KeyPlatformNamespaceRightSizing:
 			nsRSExplicitlySet = true
-			// Always mark platform as enabled when RS key is present (even "disabled").
-			// This ensures the rendering pipeline runs so the addon framework can prune
-			// stale ManifestWork content when both RS features are disabled.
-			opts.Platform.Enabled = true
 			if keyvalue.Value == "enabled" {
+				opts.Platform.Enabled = true
 				opts.Platform.AnalyticsOptions.RightSizing.NamespaceEnabled = true
 			}
 		case KeyPlatformVirtualizationRightSizing:
 			virtRSExplicitlySet = true
-			opts.Platform.Enabled = true
 			if keyvalue.Value == "enabled" {
+				opts.Platform.Enabled = true
 				opts.Platform.AnalyticsOptions.RightSizing.VirtualizationEnabled = true
 			}
 		// User Workload Observability Options

@@ -4,19 +4,6 @@ import (
 	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 )
 
-// RS resource labels — must match MCO's rsutility.RSLabels() so that MCO can
-// discover and manage these resources during mode switches and cleanup.
-// In the future when only MCOA mode is supported, these can use MCOA-specific labels.
-const (
-	RSManagedByLabel = "observability.open-cluster-management.io/managed-by"
-	RSManagedByValue = "analytics-rightsizing"
-)
-
-// RSLabels returns the standard labels applied to all right-sizing hub resources.
-func RSLabels() map[string]string {
-	return map[string]string{RSManagedByLabel: RSManagedByValue}
-}
-
 // Common constants
 const (
 	DefaultRecommendationPercentage = 110
