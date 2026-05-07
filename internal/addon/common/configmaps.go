@@ -9,18 +9,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// GetConfigMap fetches a single Kubernetes ConfigMap by name and namespace.
-// Returns the ConfigMap and any error encountered.
-// Use apierrors.IsNotFound(err) to check if the ConfigMap doesn't exist.
-func GetConfigMap(ctx context.Context, k8s client.Client, namespace, name string) (*corev1.ConfigMap, error) {
-	configMap := &corev1.ConfigMap{}
-	key := client.ObjectKey{Name: name, Namespace: namespace}
-	if err := k8s.Get(ctx, key, configMap); err != nil {
-		return nil, err
-	}
-	return configMap, nil
-}
-
 // GetConfigMaps fetches Kubernetes configMaps based on the specified
 // configMap name for each target in `configMapNames`.
 // If a configMap doesn't exist in the `addonNamespace` (addon refers to `ManagedClusterAddon` resource) this

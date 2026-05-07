@@ -39,17 +39,7 @@ func TestBuildOptions(t *testing.T) {
 					},
 				},
 			},
-			expectedOpts: Options{
-				Platform: PlatformOptions{
-					Enabled: true,
-					AnalyticsOptions: AnalyticsOptions{
-						RightSizing: RightSizingOptions{
-							NamespaceEnabled:      true,
-							VirtualizationEnabled: true,
-						},
-					},
-				},
-			},
+			expectedOpts: Options{},
 		},
 		{
 			name: "valid metrics without scheme for hub",
@@ -77,12 +67,6 @@ func TestBuildOptions(t *testing.T) {
 							Scheme: "https",
 							Host:   "alerts.example.com",
 							Path:   "",
-						},
-					},
-					AnalyticsOptions: AnalyticsOptions{
-						RightSizing: RightSizingOptions{
-							NamespaceEnabled:      true,
-							VirtualizationEnabled: true,
 						},
 					},
 				},
@@ -120,12 +104,6 @@ func TestBuildOptions(t *testing.T) {
 							Scheme: "https",
 							Host:   "alerts.example.com",
 							Path:   "",
-						},
-					},
-					AnalyticsOptions: AnalyticsOptions{
-						RightSizing: RightSizingOptions{
-							NamespaceEnabled:      true,
-							VirtualizationEnabled: true,
 						},
 					},
 				},
@@ -166,12 +144,6 @@ func TestBuildOptions(t *testing.T) {
 						CollectionEnabled:   true,
 						SubscriptionChannel: "stable-6",
 					},
-					AnalyticsOptions: AnalyticsOptions{
-						RightSizing: RightSizingOptions{
-							NamespaceEnabled:      true,
-							VirtualizationEnabled: true,
-						},
-					},
 				},
 				UserWorkloads: UserWorkloadOptions{
 					Enabled: true,
@@ -193,15 +165,6 @@ func TestBuildOptions(t *testing.T) {
 				},
 			},
 			expectedOpts: Options{
-				Platform: PlatformOptions{
-					Enabled: true,
-					AnalyticsOptions: AnalyticsOptions{
-						RightSizing: RightSizingOptions{
-							NamespaceEnabled:      true,
-							VirtualizationEnabled: true,
-						},
-					},
-				},
 				UserWorkloads: UserWorkloadOptions{
 					Enabled: true,
 					Traces: TracesOptions{
@@ -227,47 +190,9 @@ func TestBuildOptions(t *testing.T) {
 						IncidentDetection: IncidentDetection{
 							Enabled: true,
 						},
-						RightSizing: RightSizingOptions{
-							NamespaceEnabled:      true,
-							VirtualizationEnabled: true,
-						},
 					},
 				},
 			},
-		},
-		{
-			name: "right-sizing enabled explicitly",
-			addOnDeploy: &addonapiv1alpha1.AddOnDeploymentConfig{
-				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
-					CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
-						{Name: KeyPlatformNamespaceRightSizing, Value: "enabled"},
-						{Name: KeyPlatformVirtualizationRightSizing, Value: "enabled"},
-					},
-				},
-			},
-			expectedOpts: Options{
-				Platform: PlatformOptions{
-					Enabled: true,
-					AnalyticsOptions: AnalyticsOptions{
-						RightSizing: RightSizingOptions{
-							NamespaceEnabled:      true,
-							VirtualizationEnabled: true,
-						},
-					},
-				},
-			},
-		},
-		{
-			name: "right-sizing disabled explicitly",
-			addOnDeploy: &addonapiv1alpha1.AddOnDeploymentConfig{
-				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
-					CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
-						{Name: KeyPlatformNamespaceRightSizing, Value: "disabled"},
-						{Name: KeyPlatformVirtualizationRightSizing, Value: "disabled"},
-					},
-				},
-			},
-			expectedOpts: Options{},
 		},
 		{
 			name: "valid node selector and tolerations",
@@ -282,10 +207,6 @@ func TestBuildOptions(t *testing.T) {
 								Effect:   "NoSchedule",
 							},
 						},
-					},
-					CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
-						{Name: KeyPlatformNamespaceRightSizing, Value: "disabled"},
-						{Name: KeyPlatformVirtualizationRightSizing, Value: "disabled"},
 					},
 				},
 			},
@@ -346,10 +267,6 @@ func TestBuildOptions(t *testing.T) {
 					ProxyConfig: addonapiv1alpha1.ProxyConfig{
 						HTTPProxy: "http://proxy.example.com:8080",
 						NoProxy:   "*.example.com",
-					},
-					CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
-						{Name: KeyPlatformNamespaceRightSizing, Value: "disabled"},
-						{Name: KeyPlatformVirtualizationRightSizing, Value: "disabled"},
 					},
 				},
 			},
