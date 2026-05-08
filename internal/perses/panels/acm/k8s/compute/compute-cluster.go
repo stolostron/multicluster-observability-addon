@@ -204,35 +204,8 @@ func ClusterCPUQuota(datasource string) panelgroup.Option {
 					},
 				},
 			}),
+			tablePanel.WithDefaultColumnHidden(true),
 			tablePanel.WithColumnSettings([]tablePanel.ColumnSettings{
-				{
-					Name: "timestamp",
-					Hide: true,
-				},
-				{
-					Name: "__name__",
-					Hide: true,
-				},
-				{
-					Name: "cluster",
-					Hide: true,
-				},
-				{
-					Name: "clusterID",
-					Hide: true,
-				},
-				{
-					Name: "prometheus",
-					Hide: true,
-				},
-				{
-					Name: "receive",
-					Hide: true,
-				},
-				{
-					Name: "tenant_id",
-					Hide: true,
-				},
 				{
 					Name:     "namespace",
 					Header:   "Namespace",
@@ -396,35 +369,8 @@ func ClusterMemoryQuota(datasource string) panelgroup.Option {
 					},
 				},
 			}),
+			tablePanel.WithDefaultColumnHidden(true),
 			tablePanel.WithColumnSettings([]tablePanel.ColumnSettings{
-				{
-					Name: "timestamp",
-					Hide: true,
-				},
-				{
-					Name: "__name__",
-					Hide: true,
-				},
-				{
-					Name: "cluster",
-					Hide: true,
-				},
-				{
-					Name: "clusterID",
-					Hide: true,
-				},
-				{
-					Name: "prometheus",
-					Hide: true,
-				},
-				{
-					Name: "receive",
-					Hide: true,
-				},
-				{
-					Name: "tenant_id",
-					Hide: true,
-				},
 				{
 					Name:     "namespace",
 					Header:   "Namespace",
