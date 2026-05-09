@@ -239,6 +239,66 @@ func TestBuildVMUnderestimation_Idempotent(t *testing.T) {
 	assert.Equal(t, string(data1), string(data2))
 }
 
+// --- Workload-Pod Right-Sizing Dashboard ---
+
+func TestBuildWorkloadPodRightSizing(t *testing.T) {
+	db, err := BuildWorkloadPodRightSizing(testProject, testDatasource, testClusterLbl)
+	require.NoError(t, err)
+
+	spec := db.Dashboard.Spec
+	assert.Equal(t, "acm-rs-workload-pod-overview", db.Dashboard.Metadata.Name)
+	assert.Equal(t, "ACM Right-Sizing Workloads & Pods", spec.Display.Name)
+
+	t.Run("has expected variables", func(t *testing.T) {
+		require.Len(t, spec.Variables, 3, "expected cluster, profile, days")
+		varNames := extractVarNames(spec.Variables)
+		assert.Contains(t, varNames, "cluster")
+		assert.Contains(t, varNames, "profile")
+		assert.Contains(t, varNames, "days")
+	})
+
+	t.Run("has expected panel groups", func(t *testing.T) {
+		require.Len(t, spec.Layouts, 6, "CPU stats + CPU topK + CPU table + Mem stats + Mem topK + Mem table")
+	})
+
+	t.Run("panels reference the datasource", func(t *testing.T) {
+		raw, err := json.Marshal(spec)
+		require.NoError(t, err)
+		assert.Contains(t, string(raw), testDatasource)
+	})
+
+	t.Run("panels query acm_rs workload metrics", func(t *testing.T) {
+		raw, err := json.Marshal(spec)
+		require.NoError(t, err)
+		specStr := string(raw)
+		assert.Contains(t, specStr, "acm_rs:workload:cpu_recommendation")
+		assert.Contains(t, specStr, "acm_rs:workload:cpu_usage")
+		assert.Contains(t, specStr, "acm_rs:workload:memory_usage")
+		assert.Contains(t, specStr, "acm_rs:workload:cpu_limit")
+	})
+
+	t.Run("spec serializes to valid JSON", func(t *testing.T) {
+		data, err := json.Marshal(spec)
+		require.NoError(t, err)
+		assert.NotEmpty(t, data)
+
+		var roundTrip map[string]any
+		require.NoError(t, json.Unmarshal(data, &roundTrip))
+	})
+}
+
+func TestBuildWorkloadPodRightSizing_Idempotent(t *testing.T) {
+	db1, err := BuildWorkloadPodRightSizing(testProject, testDatasource, testClusterLbl)
+	require.NoError(t, err)
+
+	db2, err := BuildWorkloadPodRightSizing(testProject, testDatasource, testClusterLbl)
+	require.NoError(t, err)
+
+	data1, _ := json.Marshal(db1.Dashboard.Spec)
+	data2, _ := json.Marshal(db2.Dashboard.Spec)
+	assert.Equal(t, string(data1), string(data2), "repeated builds should produce identical specs")
+}
+
 // --- Cross-Dashboard Consistency ---
 
 func TestAllDashboards_ProjectAndDatasourceThreading(t *testing.T) {
@@ -250,6 +310,7 @@ func TestAllDashboards_ProjectAndDatasourceThreading(t *testing.T) {
 		fn   func(string, string, string) (dashboard.Builder, error)
 	}{
 		{"NamespaceRightSizing", BuildNamespaceRightSizing},
+		{"WorkloadPodRightSizing", BuildWorkloadPodRightSizing},
 		{"VMOverview", BuildVMOverview},
 		{"VMOverestimation", BuildVMOverestimation},
 		{"VMUnderestimation", BuildVMUnderestimation},

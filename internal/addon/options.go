@@ -21,6 +21,7 @@ const (
 	KeyPlatformIncidentDetection         = "platformIncidentDetection"
 	KeyPlatformNamespaceRightSizing      = "platformNamespaceRightSizing"
 	KeyPlatformVirtualizationRightSizing = "platformVirtualizationRightSizing"
+	KeyPlatformWorkloadPodRightSizing    = "platformWorkloadPodRightSizing"
 	KeyMetricsHubHostname                = "metricsHubHostname"
 	KeyMetricsAlertManagerHostname       = "metricsAlertManagerHostname"
 	KeyNodeExporterHostPort              = "nodeExporterHostPort"
@@ -93,6 +94,7 @@ type PlatformOptions struct {
 type RightSizingOptions struct {
 	NamespaceEnabled      bool
 	VirtualizationEnabled bool
+	WorkloadPodEnabled    bool
 }
 
 type AnalyticsOptions struct {
@@ -267,6 +269,11 @@ func BuildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Opti
 			opts.Platform.Enabled = true
 			if keyvalue.Value == "enabled" {
 				opts.Platform.AnalyticsOptions.RightSizing.VirtualizationEnabled = true
+			}
+		case KeyPlatformWorkloadPodRightSizing:
+			opts.Platform.Enabled = true
+			if keyvalue.Value == "enabled" {
+				opts.Platform.AnalyticsOptions.RightSizing.WorkloadPodEnabled = true
 			}
 		// User Workload Observability Options
 		case KeyUserWorkloadMetricsCollection:

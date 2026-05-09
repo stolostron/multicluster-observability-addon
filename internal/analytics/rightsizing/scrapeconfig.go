@@ -41,6 +41,26 @@ var NamespaceMetrics = []string{
 	"acm_rs:cluster:memory_recommendation",
 }
 
+// WorkloadPodMetrics are the metrics to federate for workload-pod right-sizing
+var WorkloadPodMetrics = []string{
+	"acm_rs:pod:cpu_request",
+	"acm_rs:pod:cpu_limit",
+	"acm_rs:pod:cpu_usage",
+	"acm_rs:pod:cpu_recommendation",
+	"acm_rs:pod:memory_request",
+	"acm_rs:pod:memory_limit",
+	"acm_rs:pod:memory_usage",
+	"acm_rs:pod:memory_recommendation",
+	"acm_rs:workload:cpu_request",
+	"acm_rs:workload:cpu_limit",
+	"acm_rs:workload:cpu_usage",
+	"acm_rs:workload:cpu_recommendation",
+	"acm_rs:workload:memory_request",
+	"acm_rs:workload:memory_limit",
+	"acm_rs:workload:memory_usage",
+	"acm_rs:workload:memory_recommendation",
+}
+
 // VirtualizationMetrics are the metrics to federate for virtualization right-sizing
 // Uses 1d aggregated metrics matching MCO Grafana dashboard patterns
 var VirtualizationMetrics = []string{
@@ -64,11 +84,17 @@ var VirtualizationMetrics = []string{
 // invocation on metrics collection being enabled, which guarantees the ScrapeConfig
 // CRD exists on the spoke. The work agent then tracks the resource via
 // AppliedManifestWork and deletes it when it disappears from the ManifestWork spec.
-func GenerateScrapeConfig(includeNamespace, includeVirtualization bool) *cooprometheusv1alpha1.ScrapeConfig {
+func GenerateScrapeConfig(includeNamespace, includeVirtualization, includeWorkloadPod bool) *cooprometheusv1alpha1.ScrapeConfig {
 	var matchParams []string
 
 	if includeNamespace {
 		for _, metric := range NamespaceMetrics {
+			matchParams = append(matchParams, "{__name__=\""+metric+"\"}")
+		}
+	}
+
+	if includeWorkloadPod {
+		for _, metric := range WorkloadPodMetrics {
 			matchParams = append(matchParams, "{__name__=\""+metric+"\"}")
 		}
 	}

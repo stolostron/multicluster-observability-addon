@@ -9,6 +9,7 @@ import (
 type Options struct {
 	NamespaceRightSizing      ComponentOptions
 	VirtualizationRightSizing ComponentOptions
+	WorkloadPodRightSizing    ComponentOptions
 	ScrapeConfig              *cooprometheusv1alpha1.ScrapeConfig
 }
 
