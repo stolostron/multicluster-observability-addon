@@ -92,6 +92,9 @@ func TestRSConfigMapPredicate(t *testing.T) {
 	rsWlCM := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
 		Name: rightsizing.WorkloadConfigMapName, Namespace: addoncfg.InstallNamespace,
 	}}
+	rsGpuCM := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
+		Name: rightsizing.GPUConfigMapName, Namespace: addoncfg.InstallNamespace,
+	}}
 	unrelatedCM := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
 		Name: "other-config", Namespace: addoncfg.InstallNamespace,
 	}}
@@ -103,6 +106,7 @@ func TestRSConfigMapPredicate(t *testing.T) {
 	assert.True(t, pred.CreateFunc(event.CreateEvent{Object: rsNsCM}))
 	assert.True(t, pred.CreateFunc(event.CreateEvent{Object: rsVirtCM}))
 	assert.True(t, pred.CreateFunc(event.CreateEvent{Object: rsWlCM}))
+	assert.True(t, pred.CreateFunc(event.CreateEvent{Object: rsGpuCM}))
 	assert.False(t, pred.CreateFunc(event.CreateEvent{Object: unrelatedCM}))
 	assert.False(t, pred.CreateFunc(event.CreateEvent{Object: wrongNsCM}))
 
@@ -204,6 +208,28 @@ func TestReconcileRSResources_CleanupWorkload(t *testing.T) {
 		Name: rightsizing.WorkloadPlacementCMName, Namespace: addoncfg.InstallNamespace,
 	}, &corev1.ConfigMap{})
 	assert.True(t, apierrors.IsNotFound(err), "workload placement configmap should be deleted")
+}
+
+func TestReconcileRSResources_CleanupGPU(t *testing.T) {
+	gpuCM := createTestConfigMap(rightsizing.GPUConfigMapName)
+	gpuPlacementCM := createTestConfigMap(rightsizing.GPUPlacementCMName)
+
+	ob := newTestOptionsBuilder(t, gpuCM, gpuPlacementCM)
+	ctx := context.TODO()
+
+	opts := newPlatformOptsAll(false, false, false)
+	err := ob.ReconcileRSResources(ctx, opts)
+	require.NoError(t, err)
+
+	err = ob.Client.Get(ctx, types.NamespacedName{
+		Name: rightsizing.GPUConfigMapName, Namespace: addoncfg.InstallNamespace,
+	}, &corev1.ConfigMap{})
+	assert.True(t, apierrors.IsNotFound(err), "GPU configmap should be deleted")
+
+	err = ob.Client.Get(ctx, types.NamespacedName{
+		Name: rightsizing.GPUPlacementCMName, Namespace: addoncfg.InstallNamespace,
+	}, &corev1.ConfigMap{})
+	assert.True(t, apierrors.IsNotFound(err), "GPU placement configmap should be deleted")
 }
 
 func TestReconcileRSResources_CleanupIdempotent(t *testing.T) {

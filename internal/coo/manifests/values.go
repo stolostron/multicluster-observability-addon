@@ -89,6 +89,10 @@ func BuildValues(opts addon.Options, installOfCOOOnTheHubIsNeeded bool, isHubClu
 			rightSizingEnabled = true
 			analyticsDashboards = append(analyticsDashboards, buildWorkloadPodRSDashboards()...)
 		}
+		if opts.Platform.AnalyticsOptions.RightSizing.GPUEnabled {
+			rightSizingEnabled = true
+			analyticsDashboards = append(analyticsDashboards, buildGPURSDashboards()...)
+		}
 	}
 
 	var installCOO bool
@@ -198,6 +202,14 @@ func buildNamespaceRSDashboards() []DashboardValue {
 func buildWorkloadPodRSDashboards() []DashboardValue {
 	builders := []DashboardBuilder{
 		{rsperses.BuildWorkloadPodRightSizing, "WorkloadPodRightSizing"},
+	}
+
+	return buildDashboards(builders, dsThanos, config.AnalyticsNamespace)
+}
+
+func buildGPURSDashboards() []DashboardValue {
+	builders := []DashboardBuilder{
+		{rsperses.BuildGPUUtilization, "GPUUtilization"},
 	}
 
 	return buildDashboards(builders, dsThanos, config.AnalyticsNamespace)

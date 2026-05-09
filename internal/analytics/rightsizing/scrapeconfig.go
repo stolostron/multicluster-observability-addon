@@ -79,12 +79,57 @@ var VirtualizationMetrics = []string{
 	"kubevirt_vm_running_status_last_transition_timestamp_seconds",
 }
 
+// GPUMetrics are the metrics to federate for GPU right-sizing
+var GPUMetrics = []string{
+	"acm_rs:namespace:gpu_request",
+	"acm_rs:namespace:gpu_usage",
+	"acm_rs:namespace:gpu_recommendation",
+	"acm_rs:namespace:gpu_memory_used",
+	"acm_rs:namespace:gpu_memory_recommendation",
+	"acm_rs:namespace:gpu_memory_total",
+	"acm_rs:namespace:gpu_power_usage_watts",
+	"acm_rs:namespace:gpu_temperature_celsius",
+	"acm_rs:namespace:gpu_sm_clock_hertz",
+	"acm_rs:namespace:gpu_memory_clock_hertz",
+	"acm_rs:namespace:gpu_type",
+	"acm_rs:pod:gpu_request",
+	"acm_rs:pod:gpu_usage",
+	"acm_rs:pod:gpu_recommendation",
+	"acm_rs:pod:gpu_memory_used",
+	"acm_rs:pod:gpu_memory_recommendation",
+	"acm_rs:pod:gpu_memory_total",
+	"acm_rs:pod:gpu_power_usage_watts",
+	"acm_rs:pod:gpu_temperature_celsius",
+	"acm_rs:pod:gpu_sm_clock_hertz",
+	"acm_rs:pod:gpu_memory_clock_hertz",
+	"acm_rs:workload:gpu_request",
+	"acm_rs:workload:gpu_usage",
+	"acm_rs:workload:gpu_recommendation",
+	"acm_rs:workload:gpu_memory_used",
+	"acm_rs:workload:gpu_memory_recommendation",
+	"acm_rs:workload:gpu_memory_total",
+	"acm_rs:workload:gpu_power_usage_watts",
+	"acm_rs:workload:gpu_temperature_celsius",
+	"acm_rs:workload:gpu_sm_clock_hertz",
+	"acm_rs:workload:gpu_memory_clock_hertz",
+	"acm_rs:cluster:gpu_request",
+	"acm_rs:cluster:gpu_usage",
+	"acm_rs:cluster:gpu_recommendation",
+	"acm_rs:cluster:gpu_memory_used",
+	"acm_rs:cluster:gpu_memory_recommendation",
+	"acm_rs:cluster:gpu_memory_total",
+	"acm_rs:cluster:gpu_power_usage_watts",
+	"acm_rs:cluster:gpu_temperature_celsius",
+	"acm_rs:cluster:gpu_sm_clock_hertz",
+	"acm_rs:cluster:gpu_memory_clock_hertz",
+}
+
 // GenerateScrapeConfig generates a ScrapeConfig for right-sizing metrics federation.
 // Returns nil when no features are selected for the cluster. The caller gates
 // invocation on metrics collection being enabled, which guarantees the ScrapeConfig
 // CRD exists on the spoke. The work agent then tracks the resource via
 // AppliedManifestWork and deletes it when it disappears from the ManifestWork spec.
-func GenerateScrapeConfig(includeNamespace, includeVirtualization, includeWorkloadPod bool) *cooprometheusv1alpha1.ScrapeConfig {
+func GenerateScrapeConfig(includeNamespace, includeVirtualization, includeWorkloadPod, includeGPU bool) *cooprometheusv1alpha1.ScrapeConfig {
 	var matchParams []string
 
 	if includeNamespace {
@@ -95,6 +140,12 @@ func GenerateScrapeConfig(includeNamespace, includeVirtualization, includeWorklo
 
 	if includeWorkloadPod {
 		for _, metric := range WorkloadPodMetrics {
+			matchParams = append(matchParams, "{__name__=\""+metric+"\"}")
+		}
+	}
+
+	if includeGPU {
+		for _, metric := range GPUMetrics {
 			matchParams = append(matchParams, "{__name__=\""+metric+"\"}")
 		}
 	}

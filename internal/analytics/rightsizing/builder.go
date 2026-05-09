@@ -168,3 +168,13 @@ func GetDefaultWorkloadConfigData() map[string]string {
 		"placementConfiguration": FormatJSON(placement),
 	}
 }
+
+// GetDefaultGPUConfigData returns default config data for GPU right-sizing
+func GetDefaultGPUConfigData() map[string]string {
+	ruleConfig := GetDefaultRSPrometheusRuleConfig()
+	placement := GetDefaultRSPlacement()
+	return map[string]string{
+		"prometheusRuleConfig":   FormatJSON(ruleConfig),
+		"placementConfiguration": FormatJSON(placement),
+	}
+}

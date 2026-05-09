@@ -299,6 +299,66 @@ func TestBuildWorkloadPodRightSizing_Idempotent(t *testing.T) {
 	assert.Equal(t, string(data1), string(data2), "repeated builds should produce identical specs")
 }
 
+// --- GPU Right-Sizing Dashboard ---
+
+func TestBuildGPUUtilization(t *testing.T) {
+	db, err := BuildGPUUtilization(testProject, testDatasource, testClusterLbl)
+	require.NoError(t, err)
+
+	spec := db.Dashboard.Spec
+	assert.Equal(t, "acm-rs-gpu-utilization", db.Dashboard.Metadata.Name)
+	assert.Equal(t, "ACM GPU Right-Sizing", spec.Display.Name)
+
+	t.Run("has expected variables", func(t *testing.T) {
+		require.Len(t, spec.Variables, 3, "expected cluster, profile, days")
+		varNames := extractVarNames(spec.Variables)
+		assert.Contains(t, varNames, "cluster")
+		assert.Contains(t, varNames, "profile")
+		assert.Contains(t, varNames, "days")
+	})
+
+	t.Run("has expected panel groups", func(t *testing.T) {
+		require.Len(t, spec.Layouts, 7, "cluster stats + ns stats + ns details + trends + topK + ns table + wl table")
+	})
+
+	t.Run("panels reference the datasource", func(t *testing.T) {
+		raw, err := json.Marshal(spec)
+		require.NoError(t, err)
+		assert.Contains(t, string(raw), testDatasource)
+	})
+
+	t.Run("panels query acm_rs GPU metrics", func(t *testing.T) {
+		raw, err := json.Marshal(spec)
+		require.NoError(t, err)
+		specStr := string(raw)
+		assert.Contains(t, specStr, "acm_rs:namespace:gpu_request")
+		assert.Contains(t, specStr, "acm_rs:namespace:gpu_usage")
+		assert.Contains(t, specStr, "acm_rs:cluster:gpu_request")
+		assert.Contains(t, specStr, "acm_rs:workload:gpu_usage")
+	})
+
+	t.Run("spec serializes to valid JSON", func(t *testing.T) {
+		data, err := json.Marshal(spec)
+		require.NoError(t, err)
+		assert.NotEmpty(t, data)
+
+		var roundTrip map[string]any
+		require.NoError(t, json.Unmarshal(data, &roundTrip))
+	})
+}
+
+func TestBuildGPUUtilization_Idempotent(t *testing.T) {
+	db1, err := BuildGPUUtilization(testProject, testDatasource, testClusterLbl)
+	require.NoError(t, err)
+
+	db2, err := BuildGPUUtilization(testProject, testDatasource, testClusterLbl)
+	require.NoError(t, err)
+
+	data1, _ := json.Marshal(db1.Dashboard.Spec)
+	data2, _ := json.Marshal(db2.Dashboard.Spec)
+	assert.Equal(t, string(data1), string(data2), "repeated builds should produce identical specs")
+}
+
 // --- Cross-Dashboard Consistency ---
 
 func TestAllDashboards_ProjectAndDatasourceThreading(t *testing.T) {
@@ -311,6 +371,7 @@ func TestAllDashboards_ProjectAndDatasourceThreading(t *testing.T) {
 	}{
 		{"NamespaceRightSizing", BuildNamespaceRightSizing},
 		{"WorkloadPodRightSizing", BuildWorkloadPodRightSizing},
+		{"GPUUtilization", BuildGPUUtilization},
 		{"VMOverview", BuildVMOverview},
 		{"VMOverestimation", BuildVMOverestimation},
 		{"VMUnderestimation", BuildVMUnderestimation},

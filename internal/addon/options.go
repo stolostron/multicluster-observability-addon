@@ -22,6 +22,7 @@ const (
 	KeyPlatformNamespaceRightSizing      = "platformNamespaceRightSizing"
 	KeyPlatformVirtualizationRightSizing = "platformVirtualizationRightSizing"
 	KeyPlatformWorkloadPodRightSizing    = "platformWorkloadPodRightSizing"
+	KeyPlatformGPURightSizing            = "platformGPURightSizing"
 	KeyMetricsHubHostname                = "metricsHubHostname"
 	KeyMetricsAlertManagerHostname       = "metricsAlertManagerHostname"
 	KeyNodeExporterHostPort              = "nodeExporterHostPort"
@@ -95,6 +96,7 @@ type RightSizingOptions struct {
 	NamespaceEnabled      bool
 	VirtualizationEnabled bool
 	WorkloadPodEnabled    bool
+	GPUEnabled            bool
 }
 
 type AnalyticsOptions struct {
@@ -274,6 +276,11 @@ func BuildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Opti
 			opts.Platform.Enabled = true
 			if keyvalue.Value == "enabled" {
 				opts.Platform.AnalyticsOptions.RightSizing.WorkloadPodEnabled = true
+			}
+		case KeyPlatformGPURightSizing:
+			opts.Platform.Enabled = true
+			if keyvalue.Value == "enabled" {
+				opts.Platform.AnalyticsOptions.RightSizing.GPUEnabled = true
 			}
 		// User Workload Observability Options
 		case KeyUserWorkloadMetricsCollection:

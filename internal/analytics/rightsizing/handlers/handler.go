@@ -13,6 +13,7 @@ import (
 	"github.com/stolostron/multicluster-observability-addon/internal/analytics/rightsizing"
 	rsnamespace "github.com/stolostron/multicluster-observability-addon/internal/analytics/rightsizing/namespace"
 	rsvirtualization "github.com/stolostron/multicluster-observability-addon/internal/analytics/rightsizing/virtualization"
+	rsgpu "github.com/stolostron/multicluster-observability-addon/internal/analytics/rightsizing/gpu"
 	rsworkload "github.com/stolostron/multicluster-observability-addon/internal/analytics/rightsizing/workload"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -47,10 +48,12 @@ func (o *OptionsBuilder) Build(ctx context.Context, cluster *clusterv1.ManagedCl
 	namespaceEnabled := opts.Platform.AnalyticsOptions.RightSizing.NamespaceEnabled
 	virtualizationEnabled := opts.Platform.AnalyticsOptions.RightSizing.VirtualizationEnabled
 	workloadPodEnabled := opts.Platform.AnalyticsOptions.RightSizing.WorkloadPodEnabled
+	gpuEnabled := opts.Platform.AnalyticsOptions.RightSizing.GPUEnabled
 
 	nsMatched := false
 	virtMatched := false
 	wlMatched := false
+	gpuMatched := false
 
 	// Build namespace right-sizing options
 	if namespaceEnabled {
@@ -147,8 +150,43 @@ func (o *OptionsBuilder) Build(ctx context.Context, cluster *clusterv1.ManagedCl
 		}
 	}
 
+	// Build GPU right-sizing options
+	if gpuEnabled {
+		if err := o.ensureGPUConfigMap(ctx); err != nil {
+			o.Logger.Error(err, "Failed to ensure GPU ConfigMap exists, continuing with defaults")
+		}
+		if err := o.ensurePlacementConfigMap(ctx, rightsizing.GPUPlacementCMName); err != nil {
+			o.Logger.Error(err, "Failed to ensure GPU placement ConfigMap exists, continuing with defaults")
+		}
+
+		gpuConfigData, err := o.getConfigData(ctx, rightsizing.GPUConfigMapName)
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				gpuConfigData = rightsizing.RSConfigMapData{
+					PrometheusRuleConfig:   rightsizing.GetDefaultRSPrometheusRuleConfig(),
+					PlacementConfiguration: rightsizing.GetDefaultRSPlacement(),
+				}
+			} else {
+				return ret, fmt.Errorf("failed to get GPU config: %w", err)
+			}
+		}
+
+		gpuPlacement := o.getPlacementOverride(ctx, rightsizing.GPUPlacementCMName, gpuConfigData.PlacementConfiguration)
+
+		if clusterMatchesPlacement(cluster, gpuPlacement) {
+			gpuOpts, err := o.buildGPUOptionsFromConfig(gpuConfigData, wlMatched)
+			if err != nil {
+				return ret, fmt.Errorf("failed to build GPU right-sizing options: %w", err)
+			}
+			ret.GPURightSizing = gpuOpts
+			gpuMatched = true
+		} else {
+			o.Logger.V(1).Info("Cluster not selected for GPU right-sizing", "cluster", cluster.Name)
+		}
+	}
+
 	if opts.Platform.Metrics.CollectionEnabled {
-		ret.ScrapeConfig = rightsizing.GenerateScrapeConfig(nsMatched, virtMatched, wlMatched)
+		ret.ScrapeConfig = rightsizing.GenerateScrapeConfig(nsMatched, virtMatched, wlMatched, gpuMatched)
 	}
 
 	return ret, nil
@@ -179,6 +217,20 @@ func (o *OptionsBuilder) buildWorkloadOptionsFromConfig(configData rightsizing.R
 	rule, err := rsworkload.GeneratePrometheusRule(configData)
 	if err != nil {
 		return opts, fmt.Errorf("failed to generate workload PrometheusRule: %w", err)
+	}
+	opts.PrometheusRules = []*monitoringv1.PrometheusRule{&rule}
+	return opts, nil
+}
+
+// buildGPUOptionsFromConfig builds the GPU right-sizing component options.
+// When workload-pod RS is also matched, the pod-workload mapping rule is omitted
+// from the GPU PrometheusRule to avoid duplicate recording rules.
+func (o *OptionsBuilder) buildGPUOptionsFromConfig(configData rightsizing.RSConfigMapData, workloadPodAlsoEnabled bool) (ComponentOptions, error) {
+	opts := ComponentOptions{Enabled: true}
+	includePodWorkloadMapping := !workloadPodAlsoEnabled
+	rule, err := rsgpu.GeneratePrometheusRuleWithMapping(configData, includePodWorkloadMapping)
+	if err != nil {
+		return opts, fmt.Errorf("failed to generate GPU PrometheusRule: %w", err)
 	}
 	opts.PrometheusRules = []*monitoringv1.PrometheusRule{&rule}
 	return opts, nil
@@ -236,6 +288,21 @@ func (o *OptionsBuilder) ensureWorkloadConfigMap(ctx context.Context) error {
 				"name", rightsizing.WorkloadConfigMapName,
 				"namespace", addoncfg.InstallNamespace)
 			return o.createDefaultConfigMap(ctx, rightsizing.WorkloadConfigMapName, rightsizing.GetDefaultWorkloadConfigData())
+		}
+		return err
+	}
+	return nil
+}
+
+// ensureGPUConfigMap ensures the GPU right-sizing ConfigMap exists on the hub.
+func (o *OptionsBuilder) ensureGPUConfigMap(ctx context.Context) error {
+	_, err := common.GetConfigMap(ctx, o.Client, addoncfg.InstallNamespace, rightsizing.GPUConfigMapName)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			o.Logger.Info("Creating GPU right-sizing ConfigMap with defaults",
+				"name", rightsizing.GPUConfigMapName,
+				"namespace", addoncfg.InstallNamespace)
+			return o.createDefaultConfigMap(ctx, rightsizing.GPUConfigMapName, rightsizing.GetDefaultGPUConfigData())
 		}
 		return err
 	}

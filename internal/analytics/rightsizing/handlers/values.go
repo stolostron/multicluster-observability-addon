@@ -13,6 +13,7 @@ type RightSizingValues struct {
 	NamespaceRightSizing      *ComponentValues   `json:"namespaceRightSizing,omitempty"`
 	VirtualizationRightSizing *ComponentValues   `json:"virtRightSizing,omitempty"`
 	WorkloadPodRightSizing    *ComponentValues   `json:"workloadPodRightSizing,omitempty"`
+	GPURightSizing            *ComponentValues   `json:"gpuRightSizing,omitempty"`
 	ScrapeConfig              *ScrapeConfigValue `json:"scrapeConfig,omitempty"`
 }
 
@@ -38,7 +39,7 @@ type PrometheusRuleValue struct {
 
 // BuildValues builds the helm values from the right-sizing options
 func BuildValues(opts Options) (*RightSizingValues, error) {
-	if !opts.NamespaceRightSizing.Enabled && !opts.VirtualizationRightSizing.Enabled && !opts.WorkloadPodRightSizing.Enabled {
+	if !opts.NamespaceRightSizing.Enabled && !opts.VirtualizationRightSizing.Enabled && !opts.WorkloadPodRightSizing.Enabled && !opts.GPURightSizing.Enabled {
 		return nil, nil
 	}
 
@@ -96,6 +97,24 @@ func BuildValues(opts Options) (*RightSizingValues, error) {
 			})
 		}
 		ret.WorkloadPodRightSizing = wlValues
+	}
+
+	// Build GPU right-sizing values
+	if opts.GPURightSizing.Enabled {
+		gpuValues := &ComponentValues{
+			Enabled: true,
+		}
+		for _, rule := range opts.GPURightSizing.PrometheusRules {
+			ruleJSON, err := json.Marshal(rule.Spec)
+			if err != nil {
+				return nil, err
+			}
+			gpuValues.Rules = append(gpuValues.Rules, PrometheusRuleValue{
+				Name: rule.Name,
+				Data: string(ruleJSON),
+			})
+		}
+		ret.GPURightSizing = gpuValues
 	}
 
 	if opts.ScrapeConfig != nil {
