@@ -40,7 +40,7 @@ func WorkloadCPURecommendationPanel(datasourceName string) panelgroup.Option {
 	return BuildStatPanel(datasourceName, StatPanelConfig{
 		Title:       "CPU Recommendation",
 		Description: "CPU recommendation across all workloads in the selected cluster",
-		Query:       `max_over_time(sum by (cluster)(acm_rs:workload:cpu_recommendation{cluster="$cluster", profile="$profile"})[$days:])`,
+		Query:       `max_over_time(sum by (cluster)(acm_rs:workload:cpu_recommendation{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:])`,
 		Unit:        &dashboards.DecimalUnit,
 		Decimals:    2,
 		FontSize:    48,
@@ -52,7 +52,7 @@ func WorkloadCPUUsagePanel(datasourceName string) panelgroup.Option {
 	return BuildStatPanel(datasourceName, StatPanelConfig{
 		Title:       "CPU Usage",
 		Description: "CPU usage across all workloads in the selected cluster",
-		Query:       `max_over_time(sum by (cluster)(acm_rs:workload:cpu_usage{cluster="$cluster", profile="$profile"})[$days:])`,
+		Query:       `max_over_time(sum by (cluster)(acm_rs:workload:cpu_usage{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:])`,
 		Unit:        &dashboards.DecimalUnit,
 		Decimals:    2,
 		FontSize:    48,
@@ -64,7 +64,7 @@ func WorkloadCPURequestPanel(datasourceName string) panelgroup.Option {
 	return BuildStatPanel(datasourceName, StatPanelConfig{
 		Title:       "CPU Request",
 		Description: "CPU request across all workloads in the selected cluster",
-		Query:       `max_over_time(sum by (cluster)(acm_rs:workload:cpu_request{cluster="$cluster", profile="$profile"})[$days:])`,
+		Query:       `max_over_time(sum by (cluster)(acm_rs:workload:cpu_request{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:])`,
 		Unit:        &dashboards.DecimalUnit,
 		Decimals:    2,
 		FontSize:    48,
@@ -76,7 +76,7 @@ func WorkloadCPUUtilizationPanel(datasourceName string) panelgroup.Option {
 	return BuildStatPanel(datasourceName, StatPanelConfig{
 		Title:       "CPU Utilization",
 		Description: "CPU utilization percentage across all workloads",
-		Query:       `max_over_time(sum by (cluster)(acm_rs:workload:cpu_usage{cluster="$cluster", profile="$profile"})[$days:]) / max_over_time(sum by (cluster)(acm_rs:workload:cpu_request{cluster="$cluster", profile="$profile"})[$days:])`,
+		Query:       `max_over_time(sum by (cluster)(acm_rs:workload:cpu_usage{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:]) / max_over_time(sum by (cluster)(acm_rs:workload:cpu_request{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:])`,
 		Unit:        &dashboards.PercentDecimalUnit,
 		Decimals:    1,
 		FontSize:    48,
@@ -88,7 +88,7 @@ func WorkloadMemRecommendationPanel(datasourceName string) panelgroup.Option {
 	return BuildStatPanel(datasourceName, StatPanelConfig{
 		Title:       "Mem Recommendation",
 		Description: "Memory recommendation across all workloads in the selected cluster",
-		Query:       `max_over_time(sum by (cluster)(acm_rs:workload:memory_recommendation{cluster="$cluster", profile="$profile"})[$days:])`,
+		Query:       `max_over_time(sum by (cluster)(acm_rs:workload:memory_recommendation{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:])`,
 		Unit:        &dashboards.BytesUnit,
 		Decimals:    1,
 		FontSize:    40,
@@ -100,7 +100,7 @@ func WorkloadMemUsagePanel(datasourceName string) panelgroup.Option {
 	return BuildStatPanel(datasourceName, StatPanelConfig{
 		Title:       "Mem Usage",
 		Description: "Memory usage across all workloads in the selected cluster",
-		Query:       `max_over_time(sum by (cluster)(acm_rs:workload:memory_usage{cluster="$cluster", profile="$profile"})[$days:])`,
+		Query:       `max_over_time(sum by (cluster)(acm_rs:workload:memory_usage{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:])`,
 		Unit:        &dashboards.BytesUnit,
 		Decimals:    1,
 		FontSize:    40,
@@ -112,7 +112,7 @@ func WorkloadMemRequestPanel(datasourceName string) panelgroup.Option {
 	return BuildStatPanel(datasourceName, StatPanelConfig{
 		Title:       "Mem Request",
 		Description: "Memory request across all workloads in the selected cluster",
-		Query:       `max_over_time(sum by (cluster)(acm_rs:workload:memory_request{cluster="$cluster", profile="$profile"})[$days:])`,
+		Query:       `max_over_time(sum by (cluster)(acm_rs:workload:memory_request{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:])`,
 		Unit:        &dashboards.BytesUnit,
 		Decimals:    1,
 		FontSize:    40,
@@ -124,7 +124,7 @@ func WorkloadMemUtilizationPanel(datasourceName string) panelgroup.Option {
 	return BuildStatPanel(datasourceName, StatPanelConfig{
 		Title:       "Mem Utilization",
 		Description: "Memory utilization percentage across all workloads",
-		Query:       `max_over_time(sum by (cluster)(acm_rs:workload:memory_usage{cluster="$cluster", profile="$profile"})[$days:]) / max_over_time(sum by (cluster)(acm_rs:workload:memory_request{cluster="$cluster", profile="$profile"})[$days:])`,
+		Query:       `max_over_time(sum by (cluster)(acm_rs:workload:memory_usage{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:]) / max_over_time(sum by (cluster)(acm_rs:workload:memory_request{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:])`,
 		Unit:        &dashboards.PercentDecimalUnit,
 		Decimals:    1,
 		FontSize:    40,
@@ -158,7 +158,7 @@ func WorkloadCPUTopWorkloadsPanel(datasourceName string) panelgroup.Option {
 		),
 		panel.AddQuery(
 			query.PromQL(
-				`topk(20, sum by (namespace, workload, workload_type) (acm_rs:workload:cpu_usage{cluster="$cluster", profile="$profile"}) / sum by (namespace, workload, workload_type) (acm_rs:workload:cpu_request{cluster="$cluster", profile="$profile"}))`,
+				`topk(20, sum by (namespace, workload, workload_type) (acm_rs:workload:cpu_usage{cluster="$cluster", profile="$profile", namespace=~"$namespace"}) / sum by (namespace, workload, workload_type) (acm_rs:workload:cpu_request{cluster="$cluster", profile="$profile", namespace=~"$namespace"}))`,
 				dashboards.AddQueryDataSource(datasourceName),
 				query.SeriesNameFormat("{{namespace}}/{{workload}} ({{workload_type}})"),
 			),
@@ -190,7 +190,7 @@ func WorkloadMemTopWorkloadsPanel(datasourceName string) panelgroup.Option {
 		),
 		panel.AddQuery(
 			query.PromQL(
-				`topk(20, sum by (namespace, workload, workload_type) (acm_rs:workload:memory_usage{cluster="$cluster", profile="$profile"}) / sum by (namespace, workload, workload_type) (acm_rs:workload:memory_request{cluster="$cluster", profile="$profile"}))`,
+				`topk(20, sum by (namespace, workload, workload_type) (acm_rs:workload:memory_usage{cluster="$cluster", profile="$profile", namespace=~"$namespace"}) / sum by (namespace, workload, workload_type) (acm_rs:workload:memory_request{cluster="$cluster", profile="$profile", namespace=~"$namespace"}))`,
 				dashboards.AddQueryDataSource(datasourceName),
 				query.SeriesNameFormat("{{namespace}}/{{workload}} ({{workload_type}})"),
 			),
@@ -231,19 +231,19 @@ func WorkloadCPUTablePanel(datasourceName string, project string) panelgroup.Opt
 			EnableFiltering: true,
 		}),
 		panel.AddQuery(query.PromQL(
-			`max_over_time(sum by (namespace, workload, workload_type) (acm_rs:workload:cpu_usage{cluster="$cluster", profile="$profile"})[$days:]) / max_over_time(sum by (namespace, workload, workload_type) (acm_rs:workload:cpu_request{cluster="$cluster", profile="$profile"})[$days:])`,
+			`max_over_time(sum by (namespace, workload, workload_type) (acm_rs:workload:cpu_usage{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:]) / max_over_time(sum by (namespace, workload, workload_type) (acm_rs:workload:cpu_request{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:])`,
 			dashboards.AddQueryDataSource(datasourceName))),
 		panel.AddQuery(query.PromQL(
-			`max_over_time(sum by (namespace, workload, workload_type) (acm_rs:workload:cpu_usage{cluster="$cluster", profile="$profile"})[$days:])`,
+			`max_over_time(sum by (namespace, workload, workload_type) (acm_rs:workload:cpu_usage{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:])`,
 			dashboards.AddQueryDataSource(datasourceName))),
 		panel.AddQuery(query.PromQL(
-			`max_over_time(sum by (namespace, workload, workload_type) (acm_rs:workload:cpu_request{cluster="$cluster", profile="$profile"})[$days:])`,
+			`max_over_time(sum by (namespace, workload, workload_type) (acm_rs:workload:cpu_request{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:])`,
 			dashboards.AddQueryDataSource(datasourceName))),
 		panel.AddQuery(query.PromQL(
-			`max_over_time(sum by (namespace, workload, workload_type) (acm_rs:workload:cpu_limit{cluster="$cluster", profile="$profile"})[$days:])`,
+			`max_over_time(sum by (namespace, workload, workload_type) (acm_rs:workload:cpu_limit{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:])`,
 			dashboards.AddQueryDataSource(datasourceName))),
 		panel.AddQuery(query.PromQL(
-			`max_over_time(sum by (namespace, workload, workload_type) (acm_rs:workload:cpu_recommendation{cluster="$cluster", profile="$profile"})[$days:])`,
+			`max_over_time(sum by (namespace, workload, workload_type) (acm_rs:workload:cpu_recommendation{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:])`,
 			dashboards.AddQueryDataSource(datasourceName))),
 	)
 }
@@ -279,19 +279,19 @@ func WorkloadMemTablePanel(datasourceName string, project string) panelgroup.Opt
 			EnableFiltering: true,
 		}),
 		panel.AddQuery(query.PromQL(
-			`max_over_time(sum by (namespace, workload, workload_type) (acm_rs:workload:memory_usage{cluster="$cluster", profile="$profile"})[$days:]) / max_over_time(sum by (namespace, workload, workload_type) (acm_rs:workload:memory_request{cluster="$cluster", profile="$profile"})[$days:])`,
+			`max_over_time(sum by (namespace, workload, workload_type) (acm_rs:workload:memory_usage{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:]) / max_over_time(sum by (namespace, workload, workload_type) (acm_rs:workload:memory_request{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:])`,
 			dashboards.AddQueryDataSource(datasourceName))),
 		panel.AddQuery(query.PromQL(
-			`max_over_time(sum by (namespace, workload, workload_type) (acm_rs:workload:memory_usage{cluster="$cluster", profile="$profile"})[$days:])`,
+			`max_over_time(sum by (namespace, workload, workload_type) (acm_rs:workload:memory_usage{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:])`,
 			dashboards.AddQueryDataSource(datasourceName))),
 		panel.AddQuery(query.PromQL(
-			`max_over_time(sum by (namespace, workload, workload_type) (acm_rs:workload:memory_request{cluster="$cluster", profile="$profile"})[$days:])`,
+			`max_over_time(sum by (namespace, workload, workload_type) (acm_rs:workload:memory_request{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:])`,
 			dashboards.AddQueryDataSource(datasourceName))),
 		panel.AddQuery(query.PromQL(
-			`max_over_time(sum by (namespace, workload, workload_type) (acm_rs:workload:memory_limit{cluster="$cluster", profile="$profile"})[$days:])`,
+			`max_over_time(sum by (namespace, workload, workload_type) (acm_rs:workload:memory_limit{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:])`,
 			dashboards.AddQueryDataSource(datasourceName))),
 		panel.AddQuery(query.PromQL(
-			`max_over_time(sum by (namespace, workload, workload_type) (acm_rs:workload:memory_recommendation{cluster="$cluster", profile="$profile"})[$days:])`,
+			`max_over_time(sum by (namespace, workload, workload_type) (acm_rs:workload:memory_recommendation{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:])`,
 			dashboards.AddQueryDataSource(datasourceName))),
 	)
 }

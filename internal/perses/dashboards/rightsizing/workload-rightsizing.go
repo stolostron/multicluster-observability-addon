@@ -124,6 +124,23 @@ func BuildWorkloadPodRightSizing(project string, datasource string, clusterLabel
 			),
 		),
 
+		dashboard.AddVariable("namespace",
+			listVar.List(
+				labelValuesVar.PrometheusLabelValues("namespace",
+					dashboards.AddVariableDatasource(datasource),
+					labelValuesVar.Matchers(
+						promql.SetLabelMatchers(
+							`acm_rs:workload:cpu_usage{cluster="$cluster", profile="$profile"}`,
+							[]promql.LabelMatcher{},
+						)),
+				),
+				listVar.DisplayName("Namespace"),
+				listVar.DefaultValue("$__all"),
+				listVar.AllowAllValue(true),
+				listVar.AllowMultiple(true),
+			),
+		),
+
 		withWorkloadCPUStats(datasource),
 		withWorkloadCPUTopWorkloads(datasource),
 		withWorkloadCPUTable(datasource, project),

@@ -57,6 +57,14 @@ func TestBuildNamespaceRightSizing(t *testing.T) {
 		assert.Contains(t, specStr, "acm_rs:namespace:memory_usage")
 	})
 
+	t.Run("table panels contain drill-down links to workload overview", func(t *testing.T) {
+		raw, err := json.Marshal(spec)
+		require.NoError(t, err)
+		specStr := string(raw)
+		assert.Contains(t, specStr, "acm-rs-workload-pod-overview")
+		assert.Contains(t, specStr, "project="+testProject)
+	})
+
 	t.Run("spec serializes to valid JSON", func(t *testing.T) {
 		data, err := json.Marshal(spec)
 		require.NoError(t, err)
@@ -250,11 +258,12 @@ func TestBuildWorkloadPodRightSizing(t *testing.T) {
 	assert.Equal(t, "ACM Right-Sizing Workloads & Pods", spec.Display.Name)
 
 	t.Run("has expected variables", func(t *testing.T) {
-		require.Len(t, spec.Variables, 3, "expected cluster, profile, days")
+		require.Len(t, spec.Variables, 4, "expected cluster, profile, days, namespace")
 		varNames := extractVarNames(spec.Variables)
 		assert.Contains(t, varNames, "cluster")
 		assert.Contains(t, varNames, "profile")
 		assert.Contains(t, varNames, "days")
+		assert.Contains(t, varNames, "namespace")
 	})
 
 	t.Run("has expected panel groups", func(t *testing.T) {
@@ -467,6 +476,7 @@ func TestDrillDownLinksUseCorrectProject(t *testing.T) {
 		{"VMOverview drill-down to underestimation", BuildVMOverview, "acm-rightsizing-vm-underestimation"},
 		{"VMOverestimation back link", BuildVMOverestimation, "acm-rightsizing-openshift-virtualization"},
 		{"VMUnderestimation back link", BuildVMUnderestimation, "acm-rightsizing-openshift-virtualization"},
+		{"NamespaceOverview drill-down to workload", BuildNamespaceRightSizing, "acm-rs-workload-pod-overview"},
 		{"WorkloadOverview drill-down to detail", BuildWorkloadPodRightSizing, "acm-rs-workload-detail"},
 		{"WorkloadDetail back link", BuildWorkloadDetail, "acm-rs-workload-pod-overview"},
 	} {

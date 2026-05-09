@@ -17,7 +17,7 @@ import (
 	panels "github.com/stolostron/multicluster-observability-addon/internal/perses/panels/rightsizing"
 )
 
-func withCPUSection(datasource string) dashboard.Option {
+func withCPUSection(datasource string, project string) dashboard.Option {
 	return acmHelpers.AddCustomPanelGroup("CPU",
 		[]acmHelpers.GridItem{
 			{X: 0, Y: 0, W: 6, H: 4},
@@ -32,11 +32,11 @@ func withCPUSection(datasource string) dashboard.Option {
 		panels.CPURequestPanel(datasource),
 		panels.CPUUtilizationPanel(datasource),
 		panels.CPUTopNamespacesPanel(datasource),
-		panels.CPUQuotaTablePanel(datasource),
+		panels.CPUQuotaTablePanel(datasource, project),
 	)
 }
 
-func withMemSection(datasource string) dashboard.Option {
+func withMemSection(datasource string, project string) dashboard.Option {
 	return acmHelpers.AddCustomPanelGroup("Memory",
 		[]acmHelpers.GridItem{
 			{X: 0, Y: 0, W: 6, H: 4},
@@ -51,7 +51,7 @@ func withMemSection(datasource string) dashboard.Option {
 		panels.MemRequestPanel(datasource),
 		panels.MemUtilizationPanel(datasource),
 		panels.MemTopNamespacesPanel(datasource),
-		panels.MemQuotaTablePanel(datasource),
+		panels.MemQuotaTablePanel(datasource, project),
 	)
 }
 
@@ -108,7 +108,7 @@ func BuildNamespaceRightSizing(project string, datasource string, clusterLabelNa
 			),
 		),
 
-		withCPUSection(datasource),
-		withMemSection(datasource),
+		withCPUSection(datasource, project),
+		withMemSection(datasource, project),
 	)
 }
