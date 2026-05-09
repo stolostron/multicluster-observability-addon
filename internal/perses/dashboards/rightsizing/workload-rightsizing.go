@@ -36,11 +36,11 @@ func withWorkloadCPUTopWorkloads(datasource string) dashboard.Option {
 	)
 }
 
-func withWorkloadCPUTable(datasource string) dashboard.Option {
+func withWorkloadCPUTable(datasource string, project string) dashboard.Option {
 	return dashboard.AddPanelGroup("",
 		panelgroup.PanelsPerLine(1),
 		panelgroup.PanelHeight(8),
-		panels.WorkloadCPUTablePanel(datasource),
+		panels.WorkloadCPUTablePanel(datasource, project),
 	)
 }
 
@@ -63,11 +63,11 @@ func withWorkloadMemTopWorkloads(datasource string) dashboard.Option {
 	)
 }
 
-func withWorkloadMemTable(datasource string) dashboard.Option {
+func withWorkloadMemTable(datasource string, project string) dashboard.Option {
 	return dashboard.AddPanelGroup("",
 		panelgroup.PanelsPerLine(1),
 		panelgroup.PanelHeight(8),
-		panels.WorkloadMemTablePanel(datasource),
+		panels.WorkloadMemTablePanel(datasource, project),
 	)
 }
 
@@ -126,9 +126,9 @@ func BuildWorkloadPodRightSizing(project string, datasource string, clusterLabel
 
 		withWorkloadCPUStats(datasource),
 		withWorkloadCPUTopWorkloads(datasource),
-		withWorkloadCPUTable(datasource),
+		withWorkloadCPUTable(datasource, project),
 		withWorkloadMemStats(datasource),
 		withWorkloadMemTopWorkloads(datasource),
-		withWorkloadMemTable(datasource),
+		withWorkloadMemTable(datasource, project),
 	)
 }

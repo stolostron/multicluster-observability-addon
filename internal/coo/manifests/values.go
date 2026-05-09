@@ -202,6 +202,7 @@ func buildNamespaceRSDashboards() []DashboardValue {
 func buildWorkloadPodRSDashboards() []DashboardValue {
 	builders := []DashboardBuilder{
 		{rsperses.BuildWorkloadPodRightSizing, "WorkloadPodRightSizing"},
+		{rsperses.BuildWorkloadDetail, "WorkloadDetail"},
 	}
 
 	return buildDashboards(builders, dsThanos, config.AnalyticsNamespace)

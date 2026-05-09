@@ -277,6 +277,14 @@ func TestBuildWorkloadPodRightSizing(t *testing.T) {
 		assert.Contains(t, specStr, "acm_rs:workload:cpu_limit")
 	})
 
+	t.Run("table panels contain drill-down links", func(t *testing.T) {
+		raw, err := json.Marshal(spec)
+		require.NoError(t, err)
+		specStr := string(raw)
+		assert.Contains(t, specStr, "acm-rs-workload-detail")
+		assert.Contains(t, specStr, "project="+testProject)
+	})
+
 	t.Run("spec serializes to valid JSON", func(t *testing.T) {
 		data, err := json.Marshal(spec)
 		require.NoError(t, err)
@@ -297,6 +305,62 @@ func TestBuildWorkloadPodRightSizing_Idempotent(t *testing.T) {
 	data1, _ := json.Marshal(db1.Dashboard.Spec)
 	data2, _ := json.Marshal(db2.Dashboard.Spec)
 	assert.Equal(t, string(data1), string(data2), "repeated builds should produce identical specs")
+}
+
+// --- Workload Detail Dashboard ---
+
+func TestBuildWorkloadDetail(t *testing.T) {
+	db, err := BuildWorkloadDetail(testProject, testDatasource, testClusterLbl)
+	require.NoError(t, err)
+
+	spec := db.Dashboard.Spec
+	assert.Equal(t, "acm-rs-workload-detail", db.Dashboard.Metadata.Name)
+	assert.Equal(t, "ACM Right-Sizing Workload Detail", spec.Display.Name)
+
+	t.Run("has expected variables", func(t *testing.T) {
+		require.Len(t, spec.Variables, 6, "expected cluster, profile, days, namespace, workload, workload_type")
+		varNames := extractVarNames(spec.Variables)
+		assert.Contains(t, varNames, "cluster")
+		assert.Contains(t, varNames, "profile")
+		assert.Contains(t, varNames, "days")
+		assert.Contains(t, varNames, "namespace")
+		assert.Contains(t, varNames, "workload")
+		assert.Contains(t, varNames, "workload_type")
+	})
+
+	t.Run("has expected panel groups", func(t *testing.T) {
+		require.Len(t, spec.Layouts, 5, "back-to-main + CPU stats + CPU timeseries + Mem stats + Mem timeseries")
+	})
+
+	t.Run("contains back to main dashboard link", func(t *testing.T) {
+		raw, err := json.Marshal(spec)
+		require.NoError(t, err)
+		assert.Contains(t, string(raw), "acm-rs-workload-pod-overview")
+	})
+
+	t.Run("detail queries use acm_rs workload metrics", func(t *testing.T) {
+		raw, err := json.Marshal(spec)
+		require.NoError(t, err)
+		specStr := string(raw)
+		assert.Contains(t, specStr, "acm_rs:workload:cpu_request")
+		assert.Contains(t, specStr, "acm_rs:workload:cpu_usage")
+		assert.Contains(t, specStr, "acm_rs:workload:cpu_recommendation")
+		assert.Contains(t, specStr, "acm_rs:workload:memory_request")
+		assert.Contains(t, specStr, "acm_rs:workload:memory_usage")
+		assert.Contains(t, specStr, "acm_rs:workload:memory_recommendation")
+	})
+}
+
+func TestBuildWorkloadDetail_Idempotent(t *testing.T) {
+	db1, err := BuildWorkloadDetail(testProject, testDatasource, testClusterLbl)
+	require.NoError(t, err)
+
+	db2, err := BuildWorkloadDetail(testProject, testDatasource, testClusterLbl)
+	require.NoError(t, err)
+
+	data1, _ := json.Marshal(db1.Dashboard.Spec)
+	data2, _ := json.Marshal(db2.Dashboard.Spec)
+	assert.Equal(t, string(data1), string(data2))
 }
 
 // --- GPU Right-Sizing Dashboard ---
@@ -371,6 +435,7 @@ func TestAllDashboards_ProjectAndDatasourceThreading(t *testing.T) {
 	}{
 		{"NamespaceRightSizing", BuildNamespaceRightSizing},
 		{"WorkloadPodRightSizing", BuildWorkloadPodRightSizing},
+		{"WorkloadDetail", BuildWorkloadDetail},
 		{"GPUUtilization", BuildGPUUtilization},
 		{"VMOverview", BuildVMOverview},
 		{"VMOverestimation", BuildVMOverestimation},
@@ -390,7 +455,7 @@ func TestAllDashboards_ProjectAndDatasourceThreading(t *testing.T) {
 	}
 }
 
-func TestVMDashboards_DrillDownLinksUseCorrectProject(t *testing.T) {
+func TestDrillDownLinksUseCorrectProject(t *testing.T) {
 	customProject := "my-analytics-ns"
 
 	for _, tc := range []struct {
@@ -402,6 +467,8 @@ func TestVMDashboards_DrillDownLinksUseCorrectProject(t *testing.T) {
 		{"VMOverview drill-down to underestimation", BuildVMOverview, "acm-rightsizing-vm-underestimation"},
 		{"VMOverestimation back link", BuildVMOverestimation, "acm-rightsizing-openshift-virtualization"},
 		{"VMUnderestimation back link", BuildVMUnderestimation, "acm-rightsizing-openshift-virtualization"},
+		{"WorkloadOverview drill-down to detail", BuildWorkloadPodRightSizing, "acm-rs-workload-detail"},
+		{"WorkloadDetail back link", BuildWorkloadDetail, "acm-rs-workload-pod-overview"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			db, err := tc.fn(customProject, testDatasource, "")

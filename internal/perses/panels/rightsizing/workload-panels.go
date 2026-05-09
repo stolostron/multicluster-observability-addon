@@ -5,14 +5,34 @@
 package rightsizing
 
 import (
+	"fmt"
+
 	"github.com/perses/community-mixins/pkg/dashboards"
 	commonSdk "github.com/perses/perses/go-sdk/common"
+	"github.com/perses/perses/go-sdk/link"
 	"github.com/perses/perses/go-sdk/panel"
 	panelgroup "github.com/perses/perses/go-sdk/panel-group"
+	markdownPanel "github.com/perses/plugins/markdown/sdk/go"
 	"github.com/perses/plugins/prometheus/sdk/go/query"
 	tablePanel "github.com/perses/plugins/table/sdk/go"
 	timeSeriesPanel "github.com/perses/plugins/timeserieschart/sdk/go"
 )
+
+func workloadDataLink(project, title string) *DataLink {
+	return &DataLink{
+		OpenNewTab: false,
+		Title:      title,
+		URL: fmt.Sprintf(
+			"/monitoring/v2/dashboards/view?dashboard=acm-rs-workload-detail&project=%s"+
+				"&var-cluster=${__data.fields[\"cluster\"]}"+
+				"&var-namespace=${__data.fields[\"namespace\"]}"+
+				"&var-workload=${__data.fields[\"workload\"]}"+
+				"&var-workload_type=${__data.fields[\"workload_type\"]}"+
+				"&var-days=$days&var-profile=${__data.fields[\"profile\"]}",
+			project,
+		),
+	}
+}
 
 // --- Workload-level stat panels ---
 
@@ -180,14 +200,15 @@ func WorkloadMemTopWorkloadsPanel(datasourceName string) panelgroup.Option {
 
 // --- Workload table ---
 
-func WorkloadCPUTablePanel(datasourceName string) panelgroup.Option {
+func WorkloadCPUTablePanel(datasourceName string, project string) panelgroup.Option {
+	detailLink := workloadDataLink(project, "Workload Detailed View")
 	return panelgroup.AddPanel("Workload CPU Table",
-		panel.Description("CPU utilization, usage, request, limit, and recommendation per workload"),
+		panel.Description("CPU utilization, usage, request, limit, and recommendation per workload.\nClick Workload or Namespace to see detailed view."),
 		TableWithLinks(TablePluginSpec{
 			ColumnSettings: []ColumnSettingsWithLink{
 				{ColumnSettings: tablePanel.ColumnSettings{Name: "timestamp", Hide: true}},
-				nsTblCol("namespace", "Namespace", tablePanel.LeftAlign, nil),
-				nsTblCol("workload", "Workload", tablePanel.LeftAlign, nil),
+				{ColumnSettings: tablePanel.ColumnSettings{Name: "namespace", Header: "Namespace", Align: tablePanel.LeftAlign, EnableSorting: true}, DataLink: detailLink},
+				{ColumnSettings: tablePanel.ColumnSettings{Name: "workload", Header: "Workload", Align: tablePanel.LeftAlign, EnableSorting: true}, DataLink: detailLink},
 				nsTblCol("workload_type", "Type", tablePanel.LeftAlign, nil),
 				nsTblCol("value #1", "CPU Utilization %", tablePanel.RightAlign,
 					&commonSdk.Format{Unit: &dashboards.PercentDecimalUnit, DecimalPlaces: 2},
@@ -227,14 +248,15 @@ func WorkloadCPUTablePanel(datasourceName string) panelgroup.Option {
 	)
 }
 
-func WorkloadMemTablePanel(datasourceName string) panelgroup.Option {
+func WorkloadMemTablePanel(datasourceName string, project string) panelgroup.Option {
+	detailLink := workloadDataLink(project, "Workload Detailed View")
 	return panelgroup.AddPanel("Workload Memory Table",
-		panel.Description("Memory utilization, usage, request, limit, and recommendation per workload"),
+		panel.Description("Memory utilization, usage, request, limit, and recommendation per workload.\nClick Workload or Namespace to see detailed view."),
 		TableWithLinks(TablePluginSpec{
 			ColumnSettings: []ColumnSettingsWithLink{
 				{ColumnSettings: tablePanel.ColumnSettings{Name: "timestamp", Hide: true}},
-				nsTblCol("namespace", "Namespace", tablePanel.LeftAlign, nil),
-				nsTblCol("workload", "Workload", tablePanel.LeftAlign, nil),
+				{ColumnSettings: tablePanel.ColumnSettings{Name: "namespace", Header: "Namespace", Align: tablePanel.LeftAlign, EnableSorting: true}, DataLink: detailLink},
+				{ColumnSettings: tablePanel.ColumnSettings{Name: "workload", Header: "Workload", Align: tablePanel.LeftAlign, EnableSorting: true}, DataLink: detailLink},
 				nsTblCol("workload_type", "Type", tablePanel.LeftAlign, nil),
 				nsTblCol("value #1", "Memory Utilization %", tablePanel.RightAlign,
 					&commonSdk.Format{Unit: &dashboards.PercentDecimalUnit, DecimalPlaces: 2},
@@ -271,5 +293,201 @@ func WorkloadMemTablePanel(datasourceName string) panelgroup.Option {
 		panel.AddQuery(query.PromQL(
 			`max_over_time(sum by (namespace, workload, workload_type) (acm_rs:workload:memory_recommendation{cluster="$cluster", profile="$profile"})[$days:])`,
 			dashboards.AddQueryDataSource(datasourceName))),
+	)
+}
+
+// --- Workload Detail Dashboard Panels ---
+
+const wlDetailFilter = `cluster="$cluster", profile="$profile", namespace="$namespace", workload="$workload", workload_type="$workload_type"`
+
+func WorkloadDetailCPURecommendationStatPanel(datasourceName string) panelgroup.Option {
+	return BuildStatPanel(datasourceName, StatPanelConfig{
+		Title:       "CPU Recommendation",
+		Description: "Recommended CPU cores for the selected workload based on usage profile.",
+		Query:       `max by (cluster, profile, namespace, workload, workload_type)(max_over_time(acm_rs:workload:cpu_recommendation{` + wlDetailFilter + `}[$days:]))`,
+		Unit:        &dashboards.DecimalUnit,
+		Decimals:    2,
+		FontSize:    48,
+		Thresholds:  greenThreshold,
+	})
+}
+
+func WorkloadDetailCPUUsageStatPanel(datasourceName string) panelgroup.Option {
+	return BuildStatPanel(datasourceName, StatPanelConfig{
+		Title:       "CPU Usage",
+		Description: "Actual CPU cores consumed by the selected workload over the aggregation period.",
+		Query:       `max by (cluster, profile, namespace, workload, workload_type)(max_over_time(acm_rs:workload:cpu_usage{` + wlDetailFilter + `}[$days:]))`,
+		Unit:        &dashboards.DecimalUnit,
+		Decimals:    2,
+		FontSize:    48,
+		Thresholds:  detailGrayThreshold,
+	})
+}
+
+func WorkloadDetailCPURequestStatPanel(datasourceName string) panelgroup.Option {
+	return BuildStatPanel(datasourceName, StatPanelConfig{
+		Title:       "CPU Request",
+		Description: "CPU cores requested (allocated) for the selected workload.",
+		Query:       `max by (cluster, profile, namespace, workload, workload_type)(max_over_time(acm_rs:workload:cpu_request{` + wlDetailFilter + `}[$days:]))`,
+		Unit:        &dashboards.DecimalUnit,
+		Decimals:    2,
+		FontSize:    48,
+		Thresholds:  detailGrayThreshold,
+	})
+}
+
+func WorkloadDetailCPUUtilizationStatPanel(datasourceName string) panelgroup.Option {
+	return BuildStatPanel(datasourceName, StatPanelConfig{
+		Title:       "CPU Utilization",
+		Description: "CPU utilization ratio for the selected workload.\nCalculated as CPU Usage / CPU Request.",
+		Query:       `max by (cluster, profile, namespace, workload, workload_type)(max_over_time(acm_rs:workload:cpu_usage{` + wlDetailFilter + `}[$days:]) / max_over_time(acm_rs:workload:cpu_request{` + wlDetailFilter + `}[$days:]))`,
+		Unit:        &dashboards.PercentDecimalUnit,
+		Decimals:    1,
+		FontSize:    48,
+		Thresholds:  detailPercentThreshold,
+	})
+}
+
+func WorkloadDetailCPUTimeSeriesPanel(datasourceName string) panelgroup.Option {
+	return panelgroup.AddPanel("CPU Over Time - Workload (Namespace)",
+		panel.Description("CPU usage, request, limit, and recommendation over time for the selected workload."),
+		timeSeriesPanel.Chart(
+			timeSeriesPanel.WithYAxis(timeSeriesPanel.YAxis{
+				Format: &commonSdk.Format{Unit: &dashboards.DecimalUnit, DecimalPlaces: 2},
+			}),
+			timeSeriesPanel.WithLegend(timeSeriesPanel.Legend{
+				Position: timeSeriesPanel.BottomPosition,
+				Mode:     timeSeriesPanel.ListMode,
+			}),
+			timeSeriesPanel.WithVisual(timeSeriesPanel.Visual{
+				Display:      timeSeriesPanel.LineDisplay,
+				ConnectNulls: true,
+				LineWidth:    1.25,
+				AreaOpacity:  0.4,
+				PointRadius:  2.75,
+			}),
+		),
+		panel.AddQuery(query.PromQL(
+			`acm_rs:workload:cpu_usage{`+wlDetailFilter+`}`,
+			dashboards.AddQueryDataSource(datasourceName),
+			query.SeriesNameFormat("Usage"),
+		)),
+		panel.AddQuery(query.PromQL(
+			`acm_rs:workload:cpu_request{`+wlDetailFilter+`}`,
+			dashboards.AddQueryDataSource(datasourceName),
+			query.SeriesNameFormat("Request"),
+		)),
+		panel.AddQuery(query.PromQL(
+			`acm_rs:workload:cpu_limit{`+wlDetailFilter+`}`,
+			dashboards.AddQueryDataSource(datasourceName),
+			query.SeriesNameFormat("Limit"),
+		)),
+		panel.AddQuery(query.PromQL(
+			`acm_rs:workload:cpu_recommendation{`+wlDetailFilter+`}`,
+			dashboards.AddQueryDataSource(datasourceName),
+			query.SeriesNameFormat("Recommendation"),
+		)),
+	)
+}
+
+func WorkloadDetailMemRecommendationStatPanel(datasourceName string) panelgroup.Option {
+	return BuildStatPanel(datasourceName, StatPanelConfig{
+		Title:       "Mem Recommendation",
+		Description: "Recommended memory for the selected workload based on usage profile.",
+		Query:       `max by (cluster, profile, namespace, workload, workload_type)(max_over_time(acm_rs:workload:memory_recommendation{` + wlDetailFilter + `}[$days:]))`,
+		Unit:        &dashboards.BytesUnit,
+		Decimals:    1,
+		FontSize:    40,
+		Thresholds:  greenThreshold,
+	})
+}
+
+func WorkloadDetailMemUsageStatPanel(datasourceName string) panelgroup.Option {
+	return BuildStatPanel(datasourceName, StatPanelConfig{
+		Title:       "Mem Usage",
+		Description: "Actual memory consumed by the selected workload over the aggregation period.",
+		Query:       `max by (cluster, profile, namespace, workload, workload_type)(max_over_time(acm_rs:workload:memory_usage{` + wlDetailFilter + `}[$days:]))`,
+		Unit:        &dashboards.BytesUnit,
+		Decimals:    1,
+		FontSize:    40,
+		Thresholds:  detailGrayThreshold,
+	})
+}
+
+func WorkloadDetailMemRequestStatPanel(datasourceName string) panelgroup.Option {
+	return BuildStatPanel(datasourceName, StatPanelConfig{
+		Title:       "Mem Request",
+		Description: "Memory requested (allocated) for the selected workload.",
+		Query:       `max by (cluster, profile, namespace, workload, workload_type)(max_over_time(acm_rs:workload:memory_request{` + wlDetailFilter + `}[$days:]))`,
+		Unit:        &dashboards.BytesUnit,
+		Decimals:    1,
+		FontSize:    40,
+		Thresholds:  detailGrayThreshold,
+	})
+}
+
+func WorkloadDetailMemUtilizationStatPanel(datasourceName string) panelgroup.Option {
+	return BuildStatPanel(datasourceName, StatPanelConfig{
+		Title:       "Mem Utilization",
+		Description: "Memory utilization ratio for the selected workload.\nCalculated as Memory Usage / Memory Request.",
+		Query:       `max by (cluster, profile, namespace, workload, workload_type)(max_over_time(acm_rs:workload:memory_usage{` + wlDetailFilter + `}[$days:]) / max_over_time(acm_rs:workload:memory_request{` + wlDetailFilter + `}[$days:]))`,
+		Unit:        &dashboards.PercentDecimalUnit,
+		Decimals:    1,
+		FontSize:    40,
+		Thresholds:  detailPercentThreshold,
+	})
+}
+
+func WorkloadDetailMemTimeSeriesPanel(datasourceName string) panelgroup.Option {
+	return panelgroup.AddPanel("Memory Over Time - Workload (Namespace)",
+		panel.Description("Memory usage, request, limit, and recommendation over time for the selected workload."),
+		timeSeriesPanel.Chart(
+			timeSeriesPanel.WithYAxis(timeSeriesPanel.YAxis{
+				Format: &commonSdk.Format{Unit: &dashboards.BytesUnit, DecimalPlaces: 2},
+			}),
+			timeSeriesPanel.WithLegend(timeSeriesPanel.Legend{
+				Position: timeSeriesPanel.BottomPosition,
+				Mode:     timeSeriesPanel.ListMode,
+			}),
+			timeSeriesPanel.WithVisual(timeSeriesPanel.Visual{
+				Display:      timeSeriesPanel.LineDisplay,
+				ConnectNulls: true,
+				LineWidth:    1.25,
+				AreaOpacity:  0.4,
+				PointRadius:  2.75,
+			}),
+		),
+		panel.AddQuery(query.PromQL(
+			`acm_rs:workload:memory_usage{`+wlDetailFilter+`}`,
+			dashboards.AddQueryDataSource(datasourceName),
+			query.SeriesNameFormat("Usage"),
+		)),
+		panel.AddQuery(query.PromQL(
+			`acm_rs:workload:memory_request{`+wlDetailFilter+`}`,
+			dashboards.AddQueryDataSource(datasourceName),
+			query.SeriesNameFormat("Request"),
+		)),
+		panel.AddQuery(query.PromQL(
+			`acm_rs:workload:memory_limit{`+wlDetailFilter+`}`,
+			dashboards.AddQueryDataSource(datasourceName),
+			query.SeriesNameFormat("Limit"),
+		)),
+		panel.AddQuery(query.PromQL(
+			`acm_rs:workload:memory_recommendation{`+wlDetailFilter+`}`,
+			dashboards.AddQueryDataSource(datasourceName),
+			query.SeriesNameFormat("Recommendation"),
+		)),
+	)
+}
+
+func WorkloadBackToMainDashboardPanel(datasourceName string, project string) panelgroup.Option {
+	backURL := fmt.Sprintf("/monitoring/v2/dashboards/view?dashboard=acm-rs-workload-pod-overview&project=%s", project)
+	return panelgroup.AddPanel("Back to Main Dashboard",
+		panel.Description("Back to Main Dashboard"),
+		markdownPanel.Markdown(fmt.Sprintf("[Back to Main Dashboard](%s)", backURL)),
+		panel.AddLink(backURL,
+			link.Name("Back to Main Dashboard"),
+			link.Tooltip("Back to Main Dashboard"),
+		),
 	)
 }
