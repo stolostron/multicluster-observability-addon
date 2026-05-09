@@ -22,7 +22,7 @@ const (
 // --- Namespace Right-Sizing Dashboard ---
 
 func TestBuildNamespaceRightSizing(t *testing.T) {
-	db, err := BuildNamespaceRightSizing(testProject, testDatasource, testClusterLbl)
+	db, err := BuildNamespaceRightSizing(testProject, testDatasource, testClusterLbl, true)
 	require.NoError(t, err)
 
 	spec := db.Dashboard.Spec
@@ -75,11 +75,22 @@ func TestBuildNamespaceRightSizing(t *testing.T) {
 	})
 }
 
-func TestBuildNamespaceRightSizing_Idempotent(t *testing.T) {
-	db1, err := BuildNamespaceRightSizing(testProject, testDatasource, testClusterLbl)
+func TestBuildNamespaceRightSizing_NoWorkloadLink(t *testing.T) {
+	db, err := BuildNamespaceRightSizing(testProject, testDatasource, testClusterLbl, false)
 	require.NoError(t, err)
 
-	db2, err := BuildNamespaceRightSizing(testProject, testDatasource, testClusterLbl)
+	raw, err := json.Marshal(db.Dashboard.Spec)
+	require.NoError(t, err)
+	specStr := string(raw)
+	assert.NotContains(t, specStr, "acm-rs-workload-pod-overview",
+		"when workloadPodEnabled=false, no drill-down links should be present")
+}
+
+func TestBuildNamespaceRightSizing_Idempotent(t *testing.T) {
+	db1, err := BuildNamespaceRightSizing(testProject, testDatasource, testClusterLbl, true)
+	require.NoError(t, err)
+
+	db2, err := BuildNamespaceRightSizing(testProject, testDatasource, testClusterLbl, true)
 	require.NoError(t, err)
 
 	data1, _ := json.Marshal(db1.Dashboard.Spec)
@@ -438,11 +449,14 @@ func TestAllDashboards_ProjectAndDatasourceThreading(t *testing.T) {
 	customProject := "custom-project"
 	customDS := "custom-datasource"
 
+	nsBuilder := func(p, d, c string) (dashboard.Builder, error) {
+		return BuildNamespaceRightSizing(p, d, c, true)
+	}
 	builders := []struct {
 		name string
 		fn   func(string, string, string) (dashboard.Builder, error)
 	}{
-		{"NamespaceRightSizing", BuildNamespaceRightSizing},
+		{"NamespaceRightSizing", nsBuilder},
 		{"WorkloadPodRightSizing", BuildWorkloadPodRightSizing},
 		{"WorkloadDetail", BuildWorkloadDetail},
 		{"GPUUtilization", BuildGPUUtilization},
@@ -476,7 +490,9 @@ func TestDrillDownLinksUseCorrectProject(t *testing.T) {
 		{"VMOverview drill-down to underestimation", BuildVMOverview, "acm-rightsizing-vm-underestimation"},
 		{"VMOverestimation back link", BuildVMOverestimation, "acm-rightsizing-openshift-virtualization"},
 		{"VMUnderestimation back link", BuildVMUnderestimation, "acm-rightsizing-openshift-virtualization"},
-		{"NamespaceOverview drill-down to workload", BuildNamespaceRightSizing, "acm-rs-workload-pod-overview"},
+		{"NamespaceOverview drill-down to workload", func(p, d, c string) (dashboard.Builder, error) {
+			return BuildNamespaceRightSizing(p, d, c, true)
+		}, "acm-rs-workload-pod-overview"},
 		{"WorkloadOverview drill-down to detail", BuildWorkloadPodRightSizing, "acm-rs-workload-detail"},
 		{"WorkloadDetail back link", BuildWorkloadDetail, "acm-rs-workload-pod-overview"},
 	} {

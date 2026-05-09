@@ -79,7 +79,7 @@ func BuildValues(opts addon.Options, installOfCOOOnTheHubIsNeeded bool, isHubClu
 		}
 		if opts.Platform.AnalyticsOptions.RightSizing.NamespaceEnabled {
 			rightSizingEnabled = true
-			analyticsDashboards = append(analyticsDashboards, buildNamespaceRSDashboards()...)
+			analyticsDashboards = append(analyticsDashboards, buildNamespaceRSDashboards(opts.Platform.AnalyticsOptions.RightSizing.WorkloadPodEnabled)...)
 		}
 		if opts.Platform.AnalyticsOptions.RightSizing.VirtualizationEnabled {
 			rightSizingEnabled = true
@@ -191,9 +191,11 @@ func buildIncidentDetetctionDashboards() []DashboardValue {
 	return buildDashboards(builders, dsThanos, config.AnalyticsNamespace)
 }
 
-func buildNamespaceRSDashboards() []DashboardValue {
+func buildNamespaceRSDashboards(workloadPodEnabled bool) []DashboardValue {
 	builders := []DashboardBuilder{
-		{rsperses.BuildNamespaceRightSizing, "NamespaceRightSizing"},
+		{func(project, datasource, clusterLabelName string) (dashboard.Builder, error) {
+			return rsperses.BuildNamespaceRightSizing(project, datasource, clusterLabelName, workloadPodEnabled)
+		}, "NamespaceRightSizing"},
 	}
 
 	return buildDashboards(builders, dsThanos, config.AnalyticsNamespace)

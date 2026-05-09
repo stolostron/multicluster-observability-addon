@@ -17,7 +17,7 @@ import (
 	panels "github.com/stolostron/multicluster-observability-addon/internal/perses/panels/rightsizing"
 )
 
-func withCPUSection(datasource string, project string) dashboard.Option {
+func withCPUSection(datasource string, project string, linkToWorkload bool) dashboard.Option {
 	return acmHelpers.AddCustomPanelGroup("CPU",
 		[]acmHelpers.GridItem{
 			{X: 0, Y: 0, W: 6, H: 4},
@@ -32,11 +32,11 @@ func withCPUSection(datasource string, project string) dashboard.Option {
 		panels.CPURequestPanel(datasource),
 		panels.CPUUtilizationPanel(datasource),
 		panels.CPUTopNamespacesPanel(datasource),
-		panels.CPUQuotaTablePanel(datasource, project),
+		panels.CPUQuotaTablePanel(datasource, project, linkToWorkload),
 	)
 }
 
-func withMemSection(datasource string, project string) dashboard.Option {
+func withMemSection(datasource string, project string, linkToWorkload bool) dashboard.Option {
 	return acmHelpers.AddCustomPanelGroup("Memory",
 		[]acmHelpers.GridItem{
 			{X: 0, Y: 0, W: 6, H: 4},
@@ -51,12 +51,14 @@ func withMemSection(datasource string, project string) dashboard.Option {
 		panels.MemRequestPanel(datasource),
 		panels.MemUtilizationPanel(datasource),
 		panels.MemTopNamespacesPanel(datasource),
-		panels.MemQuotaTablePanel(datasource, project),
+		panels.MemQuotaTablePanel(datasource, project, linkToWorkload),
 	)
 }
 
-// BuildNamespaceRightSizing creates the namespace right-sizing dashboard
-func BuildNamespaceRightSizing(project string, datasource string, clusterLabelName string) (dashboard.Builder, error) {
+// BuildNamespaceRightSizing creates the namespace right-sizing dashboard.
+// When workloadPodEnabled is true, the namespace table columns include
+// drill-down links to the workload-pod overview dashboard.
+func BuildNamespaceRightSizing(project string, datasource string, clusterLabelName string, workloadPodEnabled bool) (dashboard.Builder, error) {
 	return dashboard.New("acm-rs-namespace-overview",
 		dashboard.ProjectName(project),
 		dashboard.Name("ACM Right-Sizing Namespace"),
@@ -108,7 +110,7 @@ func BuildNamespaceRightSizing(project string, datasource string, clusterLabelNa
 			),
 		),
 
-		withCPUSection(datasource, project),
-		withMemSection(datasource, project),
+		withCPUSection(datasource, project, workloadPodEnabled),
+		withMemSection(datasource, project, workloadPodEnabled),
 	)
 }
