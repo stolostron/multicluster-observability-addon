@@ -241,37 +241,42 @@ func buildWorkloadRules5m(nsFilter string, rb *rightsizing.RuleBuilder) []monito
 	return rules
 }
 
+// buildWorkloadRules1d builds 1-day aggregation recording rules for pod and workload metrics
+// across all recommendation profiles (Max, P99, P95, Avg).
 func buildWorkloadRules1d(configData rightsizing.RSConfigMapData, rb *rightsizing.RuleBuilder) []monitoringv1.Rule {
 	rp := configData.PrometheusRuleConfig.RecommendationPercentage
 	if rp == 0 {
 		rp = rightsizing.DefaultRecommendationPercentage
 	}
 
-	rules := []monitoringv1.Rule{}
+	var rules []monitoringv1.Rule
+	for _, profile := range rightsizing.RecommendationProfiles {
+		prb := rb.WithProfile(profile.Name)
 
-	// Pod 1d aggregations
-	rules = append(rules,
-		rb.RuleWithLabels("acm_rs:pod:cpu_request", rightsizing.Build1dAggregationExpr("acm_rs:pod:cpu_request:5m")),
-		rb.RuleWithLabels("acm_rs:pod:cpu_limit", rightsizing.Build1dAggregationExpr("acm_rs:pod:cpu_limit:5m")),
-		rb.RuleWithLabels("acm_rs:pod:cpu_usage", rightsizing.Build1dAggregationExpr("acm_rs:pod:cpu_usage:5m")),
-		rb.RuleWithLabels("acm_rs:pod:cpu_recommendation", rightsizing.BuildRecommendationExpr("acm_rs:pod:cpu_usage:5m", rp)),
-		rb.RuleWithLabels("acm_rs:pod:memory_request", rightsizing.Build1dAggregationExpr("acm_rs:pod:memory_request:5m")),
-		rb.RuleWithLabels("acm_rs:pod:memory_limit", rightsizing.Build1dAggregationExpr("acm_rs:pod:memory_limit:5m")),
-		rb.RuleWithLabels("acm_rs:pod:memory_usage", rightsizing.Build1dAggregationExpr("acm_rs:pod:memory_usage:5m")),
-		rb.RuleWithLabels("acm_rs:pod:memory_recommendation", rightsizing.BuildRecommendationExpr("acm_rs:pod:memory_usage:5m", rp)),
-	)
+		// Pod 1d aggregations
+		rules = append(rules,
+			prb.RuleWithLabels("acm_rs:pod:cpu_request", profile.AggExpr("acm_rs:pod:cpu_request:5m")),
+			prb.RuleWithLabels("acm_rs:pod:cpu_limit", profile.AggExpr("acm_rs:pod:cpu_limit:5m")),
+			prb.RuleWithLabels("acm_rs:pod:cpu_usage", profile.AggExpr("acm_rs:pod:cpu_usage:5m")),
+			prb.RuleWithLabels("acm_rs:pod:cpu_recommendation", rightsizing.BuildProfiledRecommendationExpr("acm_rs:pod:cpu_usage:5m", rp, profile)),
+			prb.RuleWithLabels("acm_rs:pod:memory_request", profile.AggExpr("acm_rs:pod:memory_request:5m")),
+			prb.RuleWithLabels("acm_rs:pod:memory_limit", profile.AggExpr("acm_rs:pod:memory_limit:5m")),
+			prb.RuleWithLabels("acm_rs:pod:memory_usage", profile.AggExpr("acm_rs:pod:memory_usage:5m")),
+			prb.RuleWithLabels("acm_rs:pod:memory_recommendation", rightsizing.BuildProfiledRecommendationExpr("acm_rs:pod:memory_usage:5m", rp, profile)),
+		)
 
-	// Workload 1d aggregations
-	rules = append(rules,
-		rb.RuleWithLabels("acm_rs:workload:cpu_request", rightsizing.Build1dAggregationExpr("acm_rs:workload:cpu_request:5m")),
-		rb.RuleWithLabels("acm_rs:workload:cpu_limit", rightsizing.Build1dAggregationExpr("acm_rs:workload:cpu_limit:5m")),
-		rb.RuleWithLabels("acm_rs:workload:cpu_usage", rightsizing.Build1dAggregationExpr("acm_rs:workload:cpu_usage:5m")),
-		rb.RuleWithLabels("acm_rs:workload:cpu_recommendation", rightsizing.BuildRecommendationExpr("acm_rs:workload:cpu_usage:5m", rp)),
-		rb.RuleWithLabels("acm_rs:workload:memory_request", rightsizing.Build1dAggregationExpr("acm_rs:workload:memory_request:5m")),
-		rb.RuleWithLabels("acm_rs:workload:memory_limit", rightsizing.Build1dAggregationExpr("acm_rs:workload:memory_limit:5m")),
-		rb.RuleWithLabels("acm_rs:workload:memory_usage", rightsizing.Build1dAggregationExpr("acm_rs:workload:memory_usage:5m")),
-		rb.RuleWithLabels("acm_rs:workload:memory_recommendation", rightsizing.BuildRecommendationExpr("acm_rs:workload:memory_usage:5m", rp)),
-	)
+		// Workload 1d aggregations
+		rules = append(rules,
+			prb.RuleWithLabels("acm_rs:workload:cpu_request", profile.AggExpr("acm_rs:workload:cpu_request:5m")),
+			prb.RuleWithLabels("acm_rs:workload:cpu_limit", profile.AggExpr("acm_rs:workload:cpu_limit:5m")),
+			prb.RuleWithLabels("acm_rs:workload:cpu_usage", profile.AggExpr("acm_rs:workload:cpu_usage:5m")),
+			prb.RuleWithLabels("acm_rs:workload:cpu_recommendation", rightsizing.BuildProfiledRecommendationExpr("acm_rs:workload:cpu_usage:5m", rp, profile)),
+			prb.RuleWithLabels("acm_rs:workload:memory_request", profile.AggExpr("acm_rs:workload:memory_request:5m")),
+			prb.RuleWithLabels("acm_rs:workload:memory_limit", profile.AggExpr("acm_rs:workload:memory_limit:5m")),
+			prb.RuleWithLabels("acm_rs:workload:memory_usage", profile.AggExpr("acm_rs:workload:memory_usage:5m")),
+			prb.RuleWithLabels("acm_rs:workload:memory_recommendation", rightsizing.BuildProfiledRecommendationExpr("acm_rs:workload:memory_usage:5m", rp, profile)),
+		)
+	}
 
 	return rules
 }
