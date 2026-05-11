@@ -54,9 +54,6 @@ func (o *OptionsBuilder) Build(ctx context.Context, cluster *clusterv1.ManagedCl
 		if err := o.ensureNamespaceConfigMap(ctx); err != nil {
 			o.Logger.Error(err, "Failed to ensure namespace ConfigMap exists, continuing with defaults")
 		}
-		if err := o.ensurePlacementConfigMap(ctx, rightsizing.NamespacePlacementCMName); err != nil {
-			o.Logger.Error(err, "Failed to ensure namespace placement ConfigMap exists, continuing with defaults")
-		}
 
 		nsConfigData, err := o.getConfigData(ctx, rightsizing.NamespaceConfigMapName)
 		if err != nil {
@@ -70,9 +67,7 @@ func (o *OptionsBuilder) Build(ctx context.Context, cluster *clusterv1.ManagedCl
 			}
 		}
 
-		nsPlacement := o.getPlacementOverride(ctx, rightsizing.NamespacePlacementCMName, nsConfigData.PlacementConfiguration)
-
-		if clusterMatchesPlacement(cluster, nsPlacement) {
+		if clusterMatchesPlacement(cluster, nsConfigData.PlacementConfiguration) {
 			nsOpts, err := o.buildNamespaceOptionsFromConfig(nsConfigData)
 			if err != nil {
 				return ret, fmt.Errorf("failed to build namespace right-sizing options: %w", err)
@@ -89,9 +84,6 @@ func (o *OptionsBuilder) Build(ctx context.Context, cluster *clusterv1.ManagedCl
 		if err := o.ensureVirtualizationConfigMap(ctx); err != nil {
 			o.Logger.Error(err, "Failed to ensure virtualization ConfigMap exists, continuing with defaults")
 		}
-		if err := o.ensurePlacementConfigMap(ctx, rightsizing.VirtualizationPlacementCMName); err != nil {
-			o.Logger.Error(err, "Failed to ensure virtualization placement ConfigMap exists, continuing with defaults")
-		}
 
 		virtConfigData, err := o.getConfigData(ctx, rightsizing.VirtualizationConfigMapName)
 		if err != nil {
@@ -105,9 +97,7 @@ func (o *OptionsBuilder) Build(ctx context.Context, cluster *clusterv1.ManagedCl
 			}
 		}
 
-		virtPlacement := o.getPlacementOverride(ctx, rightsizing.VirtualizationPlacementCMName, virtConfigData.PlacementConfiguration)
-
-		if clusterMatchesPlacement(cluster, virtPlacement) {
+		if clusterMatchesPlacement(cluster, virtConfigData.PlacementConfiguration) {
 			virtOpts, err := o.buildVirtualizationOptionsFromConfig(virtConfigData)
 			if err != nil {
 				return ret, fmt.Errorf("failed to build virtualization right-sizing options: %w", err)
@@ -190,12 +180,11 @@ func (o *OptionsBuilder) ensureVirtualizationConfigMap(ctx context.Context) erro
 }
 
 // createDefaultConfigMap creates a ConfigMap with the provided data.
-// The ConfigMap is labeled to indicate it's managed by MCOA for right-sizing.
+// The ConfigMap is labeled to indicate it's managed for right-sizing.
 //
-// NOTE: We do not delete existing ConfigMaps during mode switches (MCO <=> MCOA)
-// to preserve user customizations (namespace filters, recommendation %, etc.).
-// To support this, ownership (labels) should be updated when the new owner takes over.
-// In the future when only MCOA mode is supported, ownership transfer will not be needed.
+// Both MCO and MCOA use a "create if not exists" pattern for these ConfigMaps,
+// so user customizations (namespace filters, recommendation %, placement predicates)
+// are preserved across mode switches (MCO <=> MCOA).
 func (o *OptionsBuilder) createDefaultConfigMap(ctx context.Context, name string, data map[string]string) error {
 	cm := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
@@ -212,48 +201,6 @@ func (o *OptionsBuilder) createDefaultConfigMap(ctx context.Context, name string
 
 	o.Logger.V(1).Info("Created right-sizing ConfigMap", "name", name, "namespace", addoncfg.InstallNamespace)
 	return nil
-}
-
-// ensurePlacementConfigMap ensures a dedicated placement ConfigMap exists on the hub.
-// Created with default empty predicates (selects all clusters) so users can
-// simply `kubectl edit` it later to add label/claim filters.
-func (o *OptionsBuilder) ensurePlacementConfigMap(ctx context.Context, name string) error {
-	_, err := common.GetConfigMap(ctx, o.Client, addoncfg.InstallNamespace, name)
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			o.Logger.Info("Creating dedicated placement ConfigMap with defaults",
-				"name", name,
-				"namespace", addoncfg.InstallNamespace)
-			return o.createDefaultConfigMap(ctx, name, rightsizing.GetDefaultPlacementConfigData())
-		}
-		return err
-	}
-	return nil
-}
-
-// getPlacementOverride checks for a dedicated MCOA-owned placement ConfigMap.
-// MCO periodically overwrites the RS ConfigMaps (rs-namespace-config, rs-virt-config),
-// resetting any custom placement predicates. Dedicated placement ConfigMaps
-// (rs-namespace-placement, rs-virt-placement) are owned only by MCOA and are
-// never overwritten by MCO, so user-configured placement predicates persist.
-// Falls back to the placement from the RS ConfigMap if no override exists.
-func (o *OptionsBuilder) getPlacementOverride(ctx context.Context, placementCMName string, fallback clusterv1beta1.Placement) clusterv1beta1.Placement {
-	cm, err := common.GetConfigMap(ctx, o.Client, addoncfg.InstallNamespace, placementCMName)
-	if err != nil {
-		return fallback
-	}
-
-	placement, found, err := rightsizing.ParsePlacementConfigMap(cm.Data)
-	if err != nil {
-		o.Logger.Error(err, "Failed to parse placement ConfigMap, using fallback", "name", placementCMName)
-		return fallback
-	}
-	if !found {
-		return fallback
-	}
-
-	o.Logger.V(2).Info("Using placement override from dedicated ConfigMap", "name", placementCMName)
-	return placement
 }
 
 // clusterMatchesPlacement evaluates placement predicates in-memory against
