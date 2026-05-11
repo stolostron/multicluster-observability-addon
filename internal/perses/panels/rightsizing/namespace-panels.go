@@ -233,6 +233,7 @@ func CPUQuotaTablePanel(datasourceName string) panelgroup.Option {
 			},
 			Transforms: []commonSdk.Transform{
 				{Kind: commonSdk.MergeSeriesKind, Spec: commonSdk.MergeSeriesSpec{}},
+				{Kind: commonSdk.JoinByColumValueKind, Spec: commonSdk.JoinByColumnValueSpec{Columns: []string{"namespace"}}},
 			},
 			EnableFiltering: true,
 		}),
@@ -293,6 +294,7 @@ func MemQuotaTablePanel(datasourceName string) panelgroup.Option {
 			},
 			Transforms: []commonSdk.Transform{
 				{Kind: commonSdk.MergeSeriesKind, Spec: commonSdk.MergeSeriesSpec{}},
+				{Kind: commonSdk.JoinByColumValueKind, Spec: commonSdk.JoinByColumnValueSpec{Columns: []string{"namespace"}}},
 			},
 			EnableFiltering: true,
 		}),
