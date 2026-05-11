@@ -29,6 +29,7 @@ type StatPanelConfig struct {
 // This provides a reusable way to create consistent stat panels across dashboards.
 func BuildStatPanel(datasourceName string, cfg StatPanelConfig) panelgroup.Option {
 	opts := []statPanel.Option{
+		statPanel.Calculation("last-number"),
 		statPanel.Format(commonSdk.Format{
 			Unit:          cfg.Unit,
 			DecimalPlaces: cfg.Decimals,
