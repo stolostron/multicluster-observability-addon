@@ -97,14 +97,13 @@ func TestGeneratePrometheusRule(t *testing.T) {
 func TestDefaultRecommendationPercentage(t *testing.T) {
 	configData := rightsizing.RSConfigMapData{
 		PrometheusRuleConfig: rightsizing.RSPrometheusRuleConfig{
-			RecommendationPercentage: 0, // Zero should default to 110
+			RecommendationPercentage: 0,
 		},
 	}
 
 	rule, err := GeneratePrometheusRule(configData)
 	require.NoError(t, err)
 
-	// Check that the 1d rules contain the default recommendation percentage (110)
 	found := false
 	for _, group := range rule.Spec.Groups {
 		for _, r := range group.Rules {
@@ -116,4 +115,63 @@ func TestDefaultRecommendationPercentage(t *testing.T) {
 		}
 	}
 	assert.True(t, found, "cpu_recommendation rule should exist")
+}
+
+// TestAllProfilesGenerated verifies that 1d rules are generated for all recommendation profiles.
+func TestAllProfilesGenerated(t *testing.T) {
+	configData := rightsizing.RSConfigMapData{
+		PrometheusRuleConfig: rightsizing.GetDefaultRSPrometheusRuleConfig(),
+	}
+	rule, err := GeneratePrometheusRule(configData)
+	require.NoError(t, err)
+
+	expectedProfiles := map[string]bool{
+		"Max OverAll": false,
+		"P99":         false,
+		"P95":         false,
+		"Avg":         false,
+	}
+
+	for _, group := range rule.Spec.Groups {
+		for _, r := range group.Rules {
+			if r.Record == "acm_rs:namespace:cpu_recommendation" {
+				profile := r.Labels["profile"]
+				if _, ok := expectedProfiles[profile]; ok {
+					expectedProfiles[profile] = true
+				}
+			}
+		}
+	}
+
+	for profile, found := range expectedProfiles {
+		assert.True(t, found, "profile %q should generate cpu_recommendation rules", profile)
+	}
+}
+
+// TestProfileAggregationExpressions verifies that each profile uses the correct aggregation function.
+func TestProfileAggregationExpressions(t *testing.T) {
+	configData := rightsizing.RSConfigMapData{
+		PrometheusRuleConfig: rightsizing.GetDefaultRSPrometheusRuleConfig(),
+	}
+	rule, err := GeneratePrometheusRule(configData)
+	require.NoError(t, err)
+
+	profileExprs := map[string]string{
+		"Max OverAll": "max_over_time(",
+		"P99":         "quantile_over_time(0.99,",
+		"P95":         "quantile_over_time(0.95,",
+		"Avg":         "avg_over_time(",
+	}
+
+	for _, group := range rule.Spec.Groups {
+		for _, r := range group.Rules {
+			if r.Record == "acm_rs:namespace:cpu_recommendation" {
+				profile := r.Labels["profile"]
+				if expectedPrefix, ok := profileExprs[profile]; ok {
+					assert.Contains(t, r.Expr.String(), expectedPrefix,
+						"profile %q should use %s", profile, expectedPrefix)
+				}
+			}
+		}
+	}
 }

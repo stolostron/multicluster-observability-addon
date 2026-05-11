@@ -57,8 +57,8 @@ func (rb *RuleBuilder) RuleNoJoin(record, metricExpr string) monitoringv1.Rule {
 	}
 }
 
-// RuleWithLabels creates a PrometheusRule rule with profile and aggregation labels
-// These labels are used by dashboards to select the appropriate aggregation level
+// RuleWithLabels creates a PrometheusRule rule with profile and aggregation labels.
+// Dashboards use these labels to select the appropriate aggregation level.
 func (rb *RuleBuilder) RuleWithLabels(record, expr string) monitoringv1.Rule {
 	return monitoringv1.Rule{
 		Record: record,
@@ -70,15 +70,62 @@ func (rb *RuleBuilder) RuleWithLabels(record, expr string) monitoringv1.Rule {
 	}
 }
 
-// BuildRecommendationExpr builds a recommendation expression with the given percentage
-func BuildRecommendationExpr(usageMetric string, recommendationPercentage int) string {
-	if recommendationPercentage == 0 {
-		recommendationPercentage = DefaultRecommendationPercentage
+// WithProfile returns a copy of the RuleBuilder with a different profile name.
+func (rb *RuleBuilder) WithProfile(name string) *RuleBuilder {
+	return &RuleBuilder{
+		LabelJoin:   rb.LabelJoin,
+		Profile:     name,
+		Aggregation: rb.Aggregation,
 	}
-	return fmt.Sprintf(`max_over_time(%s[1d]) * (%d/100)`, usageMetric, recommendationPercentage)
 }
 
-// Build1dAggregationExpr builds a 1-day max_over_time aggregation expression
-func Build1dAggregationExpr(metric5m string) string {
+// ProfileConfig defines how a recommendation profile aggregates 5m metrics over 1d.
+type ProfileConfig struct {
+	Name    string
+	AggExpr func(metric5m string) string
+}
+
+// RecommendationProfiles defines all available recommendation profiles.
+// Dashboards auto-discover profiles via label_values(profile, ...).
+var RecommendationProfiles = []ProfileConfig{
+	{Name: "Max OverAll", AggExpr: Build1dMaxAggregationExpr},
+	{Name: "P99", AggExpr: BuildP99AggregationExpr},
+	{Name: "P95", AggExpr: BuildP95AggregationExpr},
+	{Name: "Avg", AggExpr: BuildAvgAggregationExpr},
+}
+
+// BuildProfiledRecommendationExpr builds a recommendation expression for a given profile.
+func BuildProfiledRecommendationExpr(usageMetric string, rp int, profile ProfileConfig) string {
+	if rp == 0 {
+		rp = DefaultRecommendationPercentage
+	}
+	return fmt.Sprintf(`%s * (%d/100)`, profile.AggExpr(usageMetric), rp)
+}
+
+// Build1dMaxAggregationExpr builds a 1-day max_over_time aggregation expression.
+func Build1dMaxAggregationExpr(metric5m string) string {
 	return fmt.Sprintf(`max_over_time(%s[1d])`, metric5m)
+}
+
+// BuildP99AggregationExpr builds a 1-day 99th-percentile aggregation expression.
+func BuildP99AggregationExpr(metric5m string) string {
+	return fmt.Sprintf(`quantile_over_time(0.99, %s[1d])`, metric5m)
+}
+
+// BuildP95AggregationExpr builds a 1-day 95th-percentile aggregation expression.
+func BuildP95AggregationExpr(metric5m string) string {
+	return fmt.Sprintf(`quantile_over_time(0.95, %s[1d])`, metric5m)
+}
+
+// BuildAvgAggregationExpr builds a 1-day average aggregation expression.
+func BuildAvgAggregationExpr(metric5m string) string {
+	return fmt.Sprintf(`avg_over_time(%s[1d])`, metric5m)
+}
+
+// Build1dAggregationExpr is an alias for Build1dMaxAggregationExpr (backward compat).
+var Build1dAggregationExpr = Build1dMaxAggregationExpr
+
+// BuildRecommendationExpr builds a max-based recommendation expression (backward compat).
+func BuildRecommendationExpr(usageMetric string, recommendationPercentage int) string {
+	return BuildProfiledRecommendationExpr(usageMetric, recommendationPercentage, RecommendationProfiles[0])
 }
