@@ -25,12 +25,10 @@ const (
 	// Namespace right-sizing constants
 	NamespacePrometheusRuleName = "acm-rs-namespace-prometheus-rules"
 	NamespaceConfigMapName      = "rs-namespace-config"
-	NamespacePlacementCMName    = "rs-namespace-placement"
 
 	// Virtualization right-sizing constants
 	VirtualizationPrometheusRuleName = "acm-rs-virt-prometheus-rules"
 	VirtualizationConfigMapName      = "rs-virt-config"
-	VirtualizationPlacementCMName    = "rs-virt-placement"
 )
 
 // RSLabelFilter represents label filtering criteria for right-sizing
