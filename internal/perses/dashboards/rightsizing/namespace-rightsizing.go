@@ -92,7 +92,7 @@ func BuildNamespaceRightSizing(project string, datasource string, clusterLabelNa
 						)),
 				),
 				listVar.DisplayName("Profile"),
-				listVar.DefaultValue("Max OverAll"),
+				listVar.DefaultValue("P95"),
 				listVar.AllowAllValue(false),
 				listVar.AllowMultiple(false),
 			),

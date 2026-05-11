@@ -94,7 +94,7 @@ func BuildVMOverview(project string, datasource string, clusterLabelName string)
 						)),
 				),
 				listVar.DisplayName("Profile"),
-				listVar.DefaultValue("Max OverAll"),
+				listVar.DefaultValue("P95"),
 				listVar.AllowAllValue(false),
 				listVar.AllowMultiple(false),
 			),

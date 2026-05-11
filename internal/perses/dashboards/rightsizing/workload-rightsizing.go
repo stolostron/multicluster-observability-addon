@@ -85,7 +85,7 @@ func BuildWorkloadPodRightSizing(project string, datasource string, clusterLabel
 						)),
 				),
 				listVar.DisplayName("Profile"),
-				listVar.DefaultValue("Max OverAll"),
+				listVar.DefaultValue("P95"),
 				listVar.AllowAllValue(false),
 				listVar.AllowMultiple(false),
 			),

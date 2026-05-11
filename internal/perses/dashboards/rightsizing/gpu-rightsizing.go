@@ -110,7 +110,7 @@ func BuildGPUUtilization(project string, datasource string, clusterLabelName str
 						)),
 				),
 				listVar.DisplayName("Profile"),
-				listVar.DefaultValue("Max OverAll"),
+				listVar.DefaultValue("P95"),
 				listVar.AllowAllValue(false),
 				listVar.AllowMultiple(false),
 			),
