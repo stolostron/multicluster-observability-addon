@@ -227,6 +227,7 @@ func WorkloadCPUTablePanel(datasourceName string, project string) panelgroup.Opt
 			},
 			Transforms: []commonSdk.Transform{
 				{Kind: commonSdk.MergeSeriesKind, Spec: commonSdk.MergeSeriesSpec{}},
+				{Kind: commonSdk.JoinByColumValueKind, Spec: commonSdk.JoinByColumnValueSpec{Columns: []string{"namespace", "workload", "workload_type"}}},
 			},
 			EnableFiltering: true,
 		}),
@@ -275,6 +276,7 @@ func WorkloadMemTablePanel(datasourceName string, project string) panelgroup.Opt
 			},
 			Transforms: []commonSdk.Transform{
 				{Kind: commonSdk.MergeSeriesKind, Spec: commonSdk.MergeSeriesSpec{}},
+				{Kind: commonSdk.JoinByColumValueKind, Spec: commonSdk.JoinByColumnValueSpec{Columns: []string{"namespace", "workload", "workload_type"}}},
 			},
 			EnableFiltering: true,
 		}),
