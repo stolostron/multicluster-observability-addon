@@ -120,9 +120,6 @@ func (o *OptionsBuilder) Build(ctx context.Context, cluster *clusterv1.ManagedCl
 		if err := o.ensureWorkloadConfigMap(ctx); err != nil {
 			o.Logger.Error(err, "Failed to ensure workload ConfigMap exists, continuing with defaults")
 		}
-		if err := o.ensurePlacementConfigMap(ctx, rightsizing.WorkloadPlacementCMName); err != nil {
-			o.Logger.Error(err, "Failed to ensure workload placement ConfigMap exists, continuing with defaults")
-		}
 
 		wlConfigData, err := o.getConfigData(ctx, rightsizing.WorkloadConfigMapName)
 		if err != nil {
@@ -136,9 +133,7 @@ func (o *OptionsBuilder) Build(ctx context.Context, cluster *clusterv1.ManagedCl
 			}
 		}
 
-		wlPlacement := o.getPlacementOverride(ctx, rightsizing.WorkloadPlacementCMName, wlConfigData.PlacementConfiguration)
-
-		if clusterMatchesPlacement(cluster, wlPlacement) {
+		if clusterMatchesPlacement(cluster, wlConfigData.PlacementConfiguration) {
 			wlOpts, err := o.buildWorkloadOptionsFromConfig(wlConfigData)
 			if err != nil {
 				return ret, fmt.Errorf("failed to build workload right-sizing options: %w", err)
@@ -155,9 +150,6 @@ func (o *OptionsBuilder) Build(ctx context.Context, cluster *clusterv1.ManagedCl
 		if err := o.ensureGPUConfigMap(ctx); err != nil {
 			o.Logger.Error(err, "Failed to ensure GPU ConfigMap exists, continuing with defaults")
 		}
-		if err := o.ensurePlacementConfigMap(ctx, rightsizing.GPUPlacementCMName); err != nil {
-			o.Logger.Error(err, "Failed to ensure GPU placement ConfigMap exists, continuing with defaults")
-		}
 
 		gpuConfigData, err := o.getConfigData(ctx, rightsizing.GPUConfigMapName)
 		if err != nil {
@@ -171,9 +163,7 @@ func (o *OptionsBuilder) Build(ctx context.Context, cluster *clusterv1.ManagedCl
 			}
 		}
 
-		gpuPlacement := o.getPlacementOverride(ctx, rightsizing.GPUPlacementCMName, gpuConfigData.PlacementConfiguration)
-
-		if clusterMatchesPlacement(cluster, gpuPlacement) {
+		if clusterMatchesPlacement(cluster, gpuConfigData.PlacementConfiguration) {
 			gpuOpts, err := o.buildGPUOptionsFromConfig(gpuConfigData, wlMatched)
 			if err != nil {
 				return ret, fmt.Errorf("failed to build GPU right-sizing options: %w", err)
