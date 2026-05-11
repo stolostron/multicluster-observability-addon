@@ -49,17 +49,11 @@ func (o *OptionsBuilder) ReconcileRSResources(ctx context.Context, opts addon.Op
 		if err := o.deleteRSConfigMap(ctx, rightsizing.NamespaceConfigMapName); err != nil {
 			return fmt.Errorf("failed to cleanup namespace configmap: %w", err)
 		}
-		if err := o.deleteRSConfigMap(ctx, rightsizing.NamespacePlacementCMName); err != nil {
-			return fmt.Errorf("failed to cleanup namespace placement configmap: %w", err)
-		}
 	}
 
 	if !opts.Platform.AnalyticsOptions.RightSizing.VirtualizationEnabled {
 		if err := o.deleteRSConfigMap(ctx, rightsizing.VirtualizationConfigMapName); err != nil {
 			return fmt.Errorf("failed to cleanup virtualization configmap: %w", err)
-		}
-		if err := o.deleteRSConfigMap(ctx, rightsizing.VirtualizationPlacementCMName); err != nil {
-			return fmt.Errorf("failed to cleanup virtualization placement configmap: %w", err)
 		}
 	}
 
