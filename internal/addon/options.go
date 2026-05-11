@@ -323,6 +323,11 @@ func BuildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Opti
 	//
 	// The auto-enable ensures right-sizing works immediately on fresh installs
 	// before the analytics controller has had time to sync state to ADC.
+	//
+	// NOTE: Workload-pod and GPU right-sizing are NOT auto-enabled. They require
+	// explicit opt-in via the ADC keys (platformWorkloadPodRightSizing,
+	// platformGPURightSizing). The MCO syncRightSizingStateToADC is responsible
+	// for setting these keys based on the MCO CR spec during mode switches.
 	if !nsRSExplicitlySet {
 		opts.Platform.Enabled = true
 		opts.Platform.AnalyticsOptions.RightSizing.NamespaceEnabled = true
