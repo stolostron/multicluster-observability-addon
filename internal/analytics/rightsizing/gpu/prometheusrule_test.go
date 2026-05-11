@@ -152,3 +152,64 @@ func TestGeneratePrometheusRule_DefaultConfig(t *testing.T) {
 	assert.Contains(t, groupNames, "acm-right-sizing-gpu-cluster-5m.rules")
 	assert.Contains(t, groupNames, "acm-right-sizing-gpu-cluster-1d.rules")
 }
+
+func TestAllGPUProfilesGenerated(t *testing.T) {
+	config := rightsizing.RSConfigMapData{
+		PrometheusRuleConfig: rightsizing.RSPrometheusRuleConfig{
+			RecommendationPercentage: rightsizing.DefaultRecommendationPercentage,
+		},
+	}
+	rule, err := GeneratePrometheusRule(config)
+	require.NoError(t, err)
+
+	expectedProfiles := map[string]bool{
+		"Max OverAll": false,
+		"P99":         false,
+		"P95":         false,
+		"Avg":         false,
+	}
+
+	for _, rg := range rule.Spec.Groups {
+		for _, r := range rg.Rules {
+			if r.Record == "acm_rs:namespace:gpu_recommendation" {
+				profile := r.Labels["profile"]
+				if _, ok := expectedProfiles[profile]; ok {
+					expectedProfiles[profile] = true
+				}
+			}
+		}
+	}
+
+	for profile, found := range expectedProfiles {
+		assert.True(t, found, "profile %q should generate gpu_recommendation rules", profile)
+	}
+}
+
+func TestGPUProfileAggregationExpressions(t *testing.T) {
+	config := rightsizing.RSConfigMapData{
+		PrometheusRuleConfig: rightsizing.RSPrometheusRuleConfig{
+			RecommendationPercentage: rightsizing.DefaultRecommendationPercentage,
+		},
+	}
+	rule, err := GeneratePrometheusRule(config)
+	require.NoError(t, err)
+
+	profileExprs := map[string]string{
+		"Max OverAll": "max_over_time(",
+		"P99":         "quantile_over_time(0.99,",
+		"P95":         "quantile_over_time(0.95,",
+		"Avg":         "avg_over_time(",
+	}
+
+	for _, rg := range rule.Spec.Groups {
+		for _, r := range rg.Rules {
+			if r.Record == "acm_rs:namespace:gpu_recommendation" {
+				profile := r.Labels["profile"]
+				if expectedPrefix, ok := profileExprs[profile]; ok {
+					assert.Contains(t, r.Expr.String(), expectedPrefix,
+						"profile %q should use %s", profile, expectedPrefix)
+				}
+			}
+		}
+	}
+}
