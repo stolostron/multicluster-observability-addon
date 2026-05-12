@@ -10,63 +10,47 @@ import (
 	"github.com/perses/community-mixins/pkg/dashboards"
 	"github.com/perses/community-mixins/pkg/promql"
 	"github.com/perses/perses/go-sdk/dashboard"
-	panelgroup "github.com/perses/perses/go-sdk/panel-group"
 	listVar "github.com/perses/perses/go-sdk/variable/list-variable"
 	labelValuesVar "github.com/perses/plugins/prometheus/sdk/go/variable/label-values"
 	staticListVar "github.com/perses/plugins/staticlistvariable/sdk/go"
+	acmHelpers "github.com/stolostron/multicluster-observability-addon/internal/perses/dashboards/acm"
 	panels "github.com/stolostron/multicluster-observability-addon/internal/perses/panels/rightsizing"
 )
 
-func withCPUStatsAndChart(datasource string) dashboard.Option {
-	return dashboard.AddPanelGroup("",
-		panelgroup.PanelsPerLine(4),
-		panelgroup.PanelHeight(4),
+func withCPUSection(datasource string) dashboard.Option {
+	return acmHelpers.AddCustomPanelGroup("CPU",
+		[]acmHelpers.GridItem{
+			{X: 0, Y: 0, W: 6, H: 4},
+			{X: 0, Y: 4, W: 6, H: 4},
+			{X: 0, Y: 8, W: 6, H: 4},
+			{X: 0, Y: 12, W: 6, H: 4},
+			{X: 6, Y: 0, W: 18, H: 16},
+			{X: 0, Y: 16, W: 24, H: 10},
+		},
 		panels.CPURecommendationPanel(datasource),
 		panels.CPUUsagePanel(datasource),
 		panels.CPURequestPanel(datasource),
 		panels.CPUUtilizationPanel(datasource),
-	)
-}
-
-func withCPUTopNamespaces(datasource string) dashboard.Option {
-	return dashboard.AddPanelGroup("",
-		panelgroup.PanelsPerLine(1),
-		panelgroup.PanelHeight(12),
 		panels.CPUTopNamespacesPanel(datasource),
-	)
-}
-
-func withCPUQuotaTable(datasource string) dashboard.Option {
-	return dashboard.AddPanelGroup("",
-		panelgroup.PanelsPerLine(1),
-		panelgroup.PanelHeight(8),
 		panels.CPUQuotaTablePanel(datasource),
 	)
 }
 
-func withMemStatsAndChart(datasource string) dashboard.Option {
-	return dashboard.AddPanelGroup("",
-		panelgroup.PanelsPerLine(4),
-		panelgroup.PanelHeight(4),
+func withMemSection(datasource string) dashboard.Option {
+	return acmHelpers.AddCustomPanelGroup("Memory",
+		[]acmHelpers.GridItem{
+			{X: 0, Y: 0, W: 6, H: 4},
+			{X: 0, Y: 4, W: 6, H: 4},
+			{X: 0, Y: 8, W: 6, H: 4},
+			{X: 0, Y: 12, W: 6, H: 4},
+			{X: 6, Y: 0, W: 18, H: 16},
+			{X: 0, Y: 16, W: 24, H: 10},
+		},
 		panels.MemRecommendationPanel(datasource),
 		panels.MemUsagePanel(datasource),
 		panels.MemRequestPanel(datasource),
 		panels.MemUtilizationPanel(datasource),
-	)
-}
-
-func withMemTopNamespaces(datasource string) dashboard.Option {
-	return dashboard.AddPanelGroup("",
-		panelgroup.PanelsPerLine(1),
-		panelgroup.PanelHeight(12),
 		panels.MemTopNamespacesPanel(datasource),
-	)
-}
-
-func withMemQuotaTable(datasource string) dashboard.Option {
-	return dashboard.AddPanelGroup("",
-		panelgroup.PanelsPerLine(1),
-		panelgroup.PanelHeight(8),
 		panels.MemQuotaTablePanel(datasource),
 	)
 }
@@ -124,11 +108,7 @@ func BuildNamespaceRightSizing(project string, datasource string, clusterLabelNa
 			),
 		),
 
-		withCPUStatsAndChart(datasource),
-		withCPUTopNamespaces(datasource),
-		withCPUQuotaTable(datasource),
-		withMemStatsAndChart(datasource),
-		withMemTopNamespaces(datasource),
-		withMemQuotaTable(datasource),
+		withCPUSection(datasource),
+		withMemSection(datasource),
 	)
 }

@@ -31,21 +31,17 @@ func nsTblCol(name, header string, align tablePanel.Align, format *commonSdk.For
 	return c
 }
 
-var greenThreshold = &commonSdk.Thresholds{
+var nsStatThreshold = &commonSdk.Thresholds{
 	Steps: []commonSdk.StepOption{
-		{Value: 0, Color: "#73BF69"},
+		{Value: 0, Color: "#0066cc"},
 	},
 }
 
-var grayThreshold = &commonSdk.Thresholds{
+var nsUtilizationThreshold = &commonSdk.Thresholds{
 	Steps: []commonSdk.StepOption{
-		{Value: 0, Color: "#808080"},
-	},
-}
-
-var percentThreshold = &commonSdk.Thresholds{
-	Steps: []commonSdk.StepOption{
-		{Value: 0, Color: "#808080"},
+		{Value: 0, Color: "#E02F44"},
+		{Value: 0.8, Color: "#73BF69"},
+		{Value: 1.0, Color: "#E0B400"},
 	},
 }
 
@@ -56,8 +52,8 @@ func CPURecommendationPanel(datasourceName string) panelgroup.Option {
 		Query:       `max_over_time(sum by (cluster)(acm_rs:cluster:cpu_recommendation{cluster="$cluster", profile="$profile"})[$days:])`,
 		Unit:        &dashboards.DecimalUnit,
 		Decimals:    2,
-		FontSize:    48,
-		Thresholds:  greenThreshold,
+		FontSize:    40,
+		Thresholds:  nsStatThreshold,
 	})
 }
 
@@ -68,8 +64,8 @@ func CPUUsagePanel(datasourceName string) panelgroup.Option {
 		Query:       `max_over_time(sum by (cluster)(acm_rs:cluster:cpu_usage{cluster="$cluster", profile="$profile"})[$days:])`,
 		Unit:        &dashboards.DecimalUnit,
 		Decimals:    2,
-		FontSize:    48,
-		Thresholds:  grayThreshold,
+		FontSize:    40,
+		Thresholds:  nsStatThreshold,
 	})
 }
 
@@ -80,8 +76,8 @@ func CPURequestPanel(datasourceName string) panelgroup.Option {
 		Query:       `max_over_time(sum by (cluster)(acm_rs:cluster:cpu_request{cluster="$cluster", profile="$profile"})[$days:])`,
 		Unit:        &dashboards.DecimalUnit,
 		Decimals:    2,
-		FontSize:    48,
-		Thresholds:  grayThreshold,
+		FontSize:    40,
+		Thresholds:  nsStatThreshold,
 	})
 }
 
@@ -92,56 +88,56 @@ func CPUUtilizationPanel(datasourceName string) panelgroup.Option {
 		Query:       `max_over_time(sum by (cluster)(acm_rs:cluster:cpu_usage{cluster="$cluster", profile="$profile"})[$days:]) / max_over_time(sum by (cluster)(acm_rs:cluster:cpu_request{cluster="$cluster", profile="$profile"})[$days:])`,
 		Unit:        &dashboards.PercentDecimalUnit,
 		Decimals:    1,
-		FontSize:    48,
-		Thresholds:  percentThreshold,
+		FontSize:    40,
+		Thresholds:  nsUtilizationThreshold,
 	})
 }
 
 func MemRecommendationPanel(datasourceName string) panelgroup.Option {
 	return BuildStatPanel(datasourceName, StatPanelConfig{
-		Title:       "Mem Recommendation",
+		Title:       "Memory Recommendation",
 		Description: "Memory recommendation for the selected cluster",
 		Query:       `max_over_time(sum by (cluster)(acm_rs:cluster:memory_recommendation{cluster="$cluster", profile="$profile"})[$days:])`,
 		Unit:        &dashboards.BytesUnit,
 		Decimals:    1,
 		FontSize:    40,
-		Thresholds:  greenThreshold,
+		Thresholds:  nsStatThreshold,
 	})
 }
 
 func MemUsagePanel(datasourceName string) panelgroup.Option {
 	return BuildStatPanel(datasourceName, StatPanelConfig{
-		Title:       "Mem Usage",
+		Title:       "Memory Usage",
 		Description: "Memory usage for the selected cluster",
 		Query:       `max_over_time(sum by (cluster)(acm_rs:cluster:memory_usage{cluster="$cluster", profile="$profile"})[$days:])`,
 		Unit:        &dashboards.BytesUnit,
 		Decimals:    1,
 		FontSize:    40,
-		Thresholds:  grayThreshold,
+		Thresholds:  nsStatThreshold,
 	})
 }
 
 func MemRequestPanel(datasourceName string) panelgroup.Option {
 	return BuildStatPanel(datasourceName, StatPanelConfig{
-		Title:       "Mem Request",
+		Title:       "Memory Request",
 		Description: "Memory request for the selected cluster",
 		Query:       `max_over_time(sum by (cluster)(acm_rs:cluster:memory_request{cluster="$cluster", profile="$profile"})[$days:])`,
 		Unit:        &dashboards.BytesUnit,
 		Decimals:    1,
 		FontSize:    40,
-		Thresholds:  grayThreshold,
+		Thresholds:  nsStatThreshold,
 	})
 }
 
 func MemUtilizationPanel(datasourceName string) panelgroup.Option {
 	return BuildStatPanel(datasourceName, StatPanelConfig{
-		Title:       "Mem Utilization",
+		Title:       "Memory Utilization",
 		Description: "Memory utilization percentage for the selected cluster",
 		Query:       `max_over_time(sum by (cluster)(acm_rs:cluster:memory_usage{cluster="$cluster", profile="$profile"})[$days:]) / max_over_time(sum by (cluster)(acm_rs:cluster:memory_request{cluster="$cluster", profile="$profile"})[$days:])`,
 		Unit:        &dashboards.PercentDecimalUnit,
 		Decimals:    1,
 		FontSize:    40,
-		Thresholds:  percentThreshold,
+		Thresholds:  nsUtilizationThreshold,
 	})
 }
 
