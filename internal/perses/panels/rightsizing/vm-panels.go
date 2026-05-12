@@ -79,7 +79,7 @@ func VMTotalCPUOverestimationPanel(datasourceName string) panelgroup.Option {
 			"\n" + `)[$days:])))>0)`,
 		Unit:       &dashboards.DecimalUnit,
 		Decimals:   0,
-		FontSize:   48,
+		FontSize:   40,
 		Thresholds: overestRedThreshold,
 	})
 }
@@ -96,7 +96,7 @@ func VMTotalCPUUnderestimationPanel(datasourceName string) panelgroup.Option {
 			"\n" + `)[$days:])))<0) * (-1)`,
 		Unit:       &dashboards.DecimalUnit,
 		Decimals:   0,
-		FontSize:   48,
+		FontSize:   40,
 		Thresholds: cpuUnderestYellowThreshold,
 	})
 }
@@ -398,7 +398,7 @@ func VMCPUOverestimationStatPanel(datasourceName string) panelgroup.Option {
 		Query:       `max by (cluster, profile, namespace, name)(floor(max_over_time(acm_rs_vm:namespace:cpu_request{cluster="$cluster", profile="$profile", namespace=~"$namespace", name=~"$vm"}[$days:])-` + "\n" + `max_over_time(acm_rs_vm:namespace:cpu_recommendation{cluster="$cluster", profile="$profile", namespace=~"$namespace", name=~"$vm"}[$days:])))`,
 		Unit:        &dashboards.DecimalUnit,
 		Decimals:    0,
-		FontSize:    48,
+		FontSize:    40,
 		Thresholds:  overestDetailRedThreshold,
 	})
 }
@@ -410,7 +410,7 @@ func VMCPUUsageStatPanel(datasourceName string) panelgroup.Option {
 		Query:       `max by (cluster, profile, namespace, name)(max_over_time(acm_rs_vm:namespace:cpu_usage{cluster="$cluster", profile="$profile", namespace=~"$namespace", name=~"$vm"}[$days:]))`,
 		Unit:        &dashboards.DecimalUnit,
 		Decimals:    0,
-		FontSize:    48,
+		FontSize:    40,
 		Thresholds:  detailGrayThreshold,
 	})
 }
@@ -422,7 +422,7 @@ func VMCPURequestStatPanel(datasourceName string) panelgroup.Option {
 		Query:       `max by (cluster, profile, namespace, name)(max_over_time(acm_rs_vm:namespace:cpu_request{cluster="$cluster", profile="$profile", namespace=~"$namespace", name=~"$vm"}[$days:]))`,
 		Unit:        &dashboards.DecimalUnit,
 		Decimals:    0,
-		FontSize:    48,
+		FontSize:    40,
 		Thresholds:  detailGrayThreshold,
 	})
 }
@@ -434,7 +434,7 @@ func VMCPUUtilizationStatPanel(datasourceName string) panelgroup.Option {
 		Query:       `max by (cluster, profile, namespace, name)(max_over_time(acm_rs_vm:namespace:cpu_usage{cluster="$cluster", profile="$profile", namespace=~"$namespace", name=~"$vm"}[$days:]) / max_over_time(acm_rs_vm:namespace:cpu_request{cluster="$cluster", profile="$profile", namespace=~"$namespace", name=~"$vm"}[$days:]))`,
 		Unit:        &dashboards.PercentDecimalUnit,
 		Decimals:    0,
-		FontSize:    48,
+		FontSize:    40,
 		Thresholds:  detailPercentThreshold,
 	})
 }
@@ -554,7 +554,7 @@ func VMCPUUnderestimationStatPanel(datasourceName string) panelgroup.Option {
 		Query:       `max by (cluster, profile, namespace, name)(floor(max_over_time(acm_rs_vm:namespace:cpu_request{cluster="$cluster", profile="$profile", namespace=~"$namespace", name=~"$vm"}[$days:])-` + "\n" + `max_over_time(acm_rs_vm:namespace:cpu_recommendation{cluster="$cluster", profile="$profile", namespace=~"$namespace", name=~"$vm"}[$days:]))* (-1))`,
 		Unit:        &dashboards.DecimalUnit,
 		Decimals:    0,
-		FontSize:    48,
+		FontSize:    40,
 		Thresholds:  underestDetailYellowThreshold,
 	})
 }
