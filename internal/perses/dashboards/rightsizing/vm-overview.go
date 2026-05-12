@@ -31,7 +31,7 @@ func withVMOverviewStatsGroup(datasource string) dashboard.Option {
 func withVMCPUOverestimationTableGroup(datasource string, project string) dashboard.Option {
 	return dashboard.AddPanelGroup("",
 		panelgroup.PanelsPerLine(1),
-		panelgroup.PanelHeight(8),
+		panelgroup.PanelHeight(10),
 		panels.VMCPUOverestimationTablePanel(datasource, project),
 	)
 }
@@ -39,7 +39,7 @@ func withVMCPUOverestimationTableGroup(datasource string, project string) dashbo
 func withVMCPUUnderestimationTableGroup(datasource string, project string) dashboard.Option {
 	return dashboard.AddPanelGroup("",
 		panelgroup.PanelsPerLine(1),
-		panelgroup.PanelHeight(8),
+		panelgroup.PanelHeight(10),
 		panels.VMCPUUnderestimationTablePanel(datasource, project),
 	)
 }
@@ -47,7 +47,7 @@ func withVMCPUUnderestimationTableGroup(datasource string, project string) dashb
 func withVMMemOverestimationTableGroup(datasource string, project string) dashboard.Option {
 	return dashboard.AddPanelGroup("",
 		panelgroup.PanelsPerLine(1),
-		panelgroup.PanelHeight(8),
+		panelgroup.PanelHeight(10),
 		panels.VMMemOverestimationTablePanel(datasource, project),
 	)
 }
@@ -55,7 +55,7 @@ func withVMMemOverestimationTableGroup(datasource string, project string) dashbo
 func withVMMemUnderestimationTableGroup(datasource string, project string) dashboard.Option {
 	return dashboard.AddPanelGroup("",
 		panelgroup.PanelsPerLine(1),
-		panelgroup.PanelHeight(8),
+		panelgroup.PanelHeight(10),
 		panels.VMMemUnderestimationTablePanel(datasource, project),
 	)
 }
