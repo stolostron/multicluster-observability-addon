@@ -10,6 +10,7 @@ import (
 	"github.com/perses/community-mixins/pkg/dashboards"
 	"github.com/perses/community-mixins/pkg/promql"
 	"github.com/perses/perses/go-sdk/dashboard"
+	panelgroup "github.com/perses/perses/go-sdk/panel-group"
 	listVar "github.com/perses/perses/go-sdk/variable/list-variable"
 	labelValuesVar "github.com/perses/plugins/prometheus/sdk/go/variable/label-values"
 	staticListVar "github.com/perses/plugins/staticlistvariable/sdk/go"
@@ -51,7 +52,7 @@ func BuildVMUnderestimation(project string, datasource string, clusterLabelName 
 						)),
 				),
 				listVar.DisplayName("Profile"),
-				listVar.DefaultValue("Max OverAll"),
+				listVar.DefaultValue("P95"),
 				listVar.AllowAllValue(false),
 				listVar.AllowMultiple(false),
 			),
@@ -106,33 +107,33 @@ func BuildVMUnderestimation(project string, datasource string, clusterLabelName 
 			panels.VMBackToMainDashboardPanel(datasource, project),
 		),
 
-		acmHelpers.AddCustomPanelGroup("CPU",
-			[]acmHelpers.GridItem{
-				{X: 0, Y: 0, W: 6, H: 4},
-				{X: 0, Y: 4, W: 6, H: 4},
-				{X: 0, Y: 8, W: 6, H: 4},
-				{X: 0, Y: 12, W: 6, H: 4},
-				{X: 6, Y: 0, W: 18, H: 16},
-			},
+		dashboard.AddPanelGroup("",
+			panelgroup.PanelsPerLine(4),
+			panelgroup.PanelHeight(4),
 			panels.VMCPUUnderestimationStatPanel(datasource),
 			panels.VMCPUUsageStatPanel(datasource),
 			panels.VMCPURequestStatPanel(datasource),
 			panels.VMCPUUtilizationStatPanel(datasource),
+		),
+
+		dashboard.AddPanelGroup("",
+			panelgroup.PanelsPerLine(1),
+			panelgroup.PanelHeight(12),
 			panels.VMCPUUtilizationTimeSeriesPanel(datasource),
 		),
 
-		acmHelpers.AddCustomPanelGroup("Memory",
-			[]acmHelpers.GridItem{
-				{X: 0, Y: 0, W: 6, H: 4},
-				{X: 0, Y: 4, W: 6, H: 4},
-				{X: 0, Y: 8, W: 6, H: 4},
-				{X: 0, Y: 12, W: 6, H: 4},
-				{X: 6, Y: 0, W: 18, H: 16},
-			},
+		dashboard.AddPanelGroup("",
+			panelgroup.PanelsPerLine(4),
+			panelgroup.PanelHeight(4),
 			panels.VMMemoryUnderestimationStatPanel(datasource),
 			panels.VMMemoryUsageStatPanel(datasource),
 			panels.VMMemoryRequestStatPanel(datasource),
 			panels.VMMemoryUtilizationStatPanel(datasource),
+		),
+
+		dashboard.AddPanelGroup("",
+			panelgroup.PanelsPerLine(1),
+			panelgroup.PanelHeight(12),
 			panels.VMMemoryUtilizationTimeSeriesPanel(datasource),
 		),
 	)

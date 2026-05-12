@@ -10,64 +10,43 @@ import (
 	"github.com/perses/community-mixins/pkg/dashboards"
 	"github.com/perses/community-mixins/pkg/promql"
 	"github.com/perses/perses/go-sdk/dashboard"
-	panelgroup "github.com/perses/perses/go-sdk/panel-group"
 	listVar "github.com/perses/perses/go-sdk/variable/list-variable"
 	labelValuesVar "github.com/perses/plugins/prometheus/sdk/go/variable/label-values"
 	staticListVar "github.com/perses/plugins/staticlistvariable/sdk/go"
+	acmHelpers "github.com/stolostron/multicluster-observability-addon/internal/perses/dashboards/acm"
 	panels "github.com/stolostron/multicluster-observability-addon/internal/perses/panels/rightsizing"
 )
 
-func withWorkloadCPUStats(datasource string) dashboard.Option {
-	return dashboard.AddPanelGroup("",
-		panelgroup.PanelsPerLine(4),
-		panelgroup.PanelHeight(4),
-		panels.WorkloadCPURecommendationPanel(datasource),
-		panels.WorkloadCPUUsagePanel(datasource),
-		panels.WorkloadCPURequestPanel(datasource),
-		panels.WorkloadCPUUtilizationPanel(datasource),
-	)
-}
-
-func withWorkloadCPUTopWorkloads(datasource string) dashboard.Option {
-	return dashboard.AddPanelGroup("",
-		panelgroup.PanelsPerLine(1),
-		panelgroup.PanelHeight(12),
+func withWorkloadCPUSection(datasource string, project string) dashboard.Option {
+	return acmHelpers.AddCustomPanelGroup("CPU",
+		[]acmHelpers.GridItem{
+			{X: 0, Y: 0, W: 24, H: 12},
+			{X: 0, Y: 12, W: 24, H: 10},
+		},
 		panels.WorkloadCPUTopWorkloadsPanel(datasource),
-	)
-}
-
-func withWorkloadCPUTable(datasource string, project string) dashboard.Option {
-	return dashboard.AddPanelGroup("",
-		panelgroup.PanelsPerLine(1),
-		panelgroup.PanelHeight(8),
 		panels.WorkloadCPUTablePanel(datasource, project),
 	)
 }
 
-func withWorkloadMemStats(datasource string) dashboard.Option {
-	return dashboard.AddPanelGroup("",
-		panelgroup.PanelsPerLine(4),
-		panelgroup.PanelHeight(4),
-		panels.WorkloadMemRecommendationPanel(datasource),
-		panels.WorkloadMemUsagePanel(datasource),
-		panels.WorkloadMemRequestPanel(datasource),
-		panels.WorkloadMemUtilizationPanel(datasource),
-	)
-}
-
-func withWorkloadMemTopWorkloads(datasource string) dashboard.Option {
-	return dashboard.AddPanelGroup("",
-		panelgroup.PanelsPerLine(1),
-		panelgroup.PanelHeight(12),
+func withWorkloadMemSection(datasource string, project string) dashboard.Option {
+	return acmHelpers.AddCustomPanelGroup("Memory",
+		[]acmHelpers.GridItem{
+			{X: 0, Y: 0, W: 24, H: 12},
+			{X: 0, Y: 12, W: 24, H: 10},
+		},
 		panels.WorkloadMemTopWorkloadsPanel(datasource),
+		panels.WorkloadMemTablePanel(datasource, project),
 	)
 }
 
-func withWorkloadMemTable(datasource string, project string) dashboard.Option {
-	return dashboard.AddPanelGroup("",
-		panelgroup.PanelsPerLine(1),
-		panelgroup.PanelHeight(8),
-		panels.WorkloadMemTablePanel(datasource, project),
+func withPodsSection(datasource string, project string) dashboard.Option {
+	return acmHelpers.AddCustomPanelGroup("Pods",
+		[]acmHelpers.GridItem{
+			{X: 0, Y: 0, W: 24, H: 10},
+			{X: 0, Y: 10, W: 24, H: 10},
+		},
+		panels.PodCPUTablePanel(datasource, project),
+		panels.PodMemTablePanel(datasource, project),
 	)
 }
 
@@ -141,11 +120,8 @@ func BuildWorkloadPodRightSizing(project string, datasource string, clusterLabel
 			),
 		),
 
-		withWorkloadCPUStats(datasource),
-		withWorkloadCPUTopWorkloads(datasource),
-		withWorkloadCPUTable(datasource, project),
-		withWorkloadMemStats(datasource),
-		withWorkloadMemTopWorkloads(datasource),
-		withWorkloadMemTable(datasource, project),
+		withWorkloadCPUSection(datasource, project),
+		withWorkloadMemSection(datasource, project),
+		withPodsSection(datasource, project),
 	)
 }

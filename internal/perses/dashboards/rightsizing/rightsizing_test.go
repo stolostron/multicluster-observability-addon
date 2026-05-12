@@ -38,7 +38,7 @@ func TestBuildNamespaceRightSizing(t *testing.T) {
 	})
 
 	t.Run("has expected panel groups", func(t *testing.T) {
-		require.Len(t, spec.Layouts, 2, "CPU section + Memory section")
+		require.Len(t, spec.Layouts, 6, "CPU stats/chart + CPU topK + CPU table + Mem stats/chart + Mem topK + Mem table")
 	})
 
 	t.Run("panels reference the datasource", func(t *testing.T) {
@@ -173,7 +173,7 @@ func TestBuildVMOverestimation(t *testing.T) {
 	})
 
 	t.Run("has expected panel groups", func(t *testing.T) {
-		require.Len(t, spec.Layouts, 3, "back-to-main + CPU stats+chart + Mem stats+chart")
+		require.Len(t, spec.Layouts, 5, "back-to-main + CPU stats + CPU timeseries + Mem stats + Mem timeseries")
 	})
 
 	t.Run("contains back to main dashboard link", func(t *testing.T) {
@@ -226,7 +226,7 @@ func TestBuildVMUnderestimation(t *testing.T) {
 	})
 
 	t.Run("has expected panel groups", func(t *testing.T) {
-		require.Len(t, spec.Layouts, 3, "back-to-main + CPU stats+chart + Mem stats+chart")
+		require.Len(t, spec.Layouts, 5, "back-to-main + CPU stats + CPU timeseries + Mem stats + Mem timeseries")
 	})
 
 	t.Run("contains back to main dashboard link", func(t *testing.T) {

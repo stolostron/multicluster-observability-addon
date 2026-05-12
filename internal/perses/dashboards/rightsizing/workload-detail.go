@@ -10,13 +10,50 @@ import (
 	"github.com/perses/community-mixins/pkg/dashboards"
 	"github.com/perses/community-mixins/pkg/promql"
 	"github.com/perses/perses/go-sdk/dashboard"
-	panelgroup "github.com/perses/perses/go-sdk/panel-group"
 	listVar "github.com/perses/perses/go-sdk/variable/list-variable"
 	labelValuesVar "github.com/perses/plugins/prometheus/sdk/go/variable/label-values"
 	staticListVar "github.com/perses/plugins/staticlistvariable/sdk/go"
 	acmHelpers "github.com/stolostron/multicluster-observability-addon/internal/perses/dashboards/acm"
 	panels "github.com/stolostron/multicluster-observability-addon/internal/perses/panels/rightsizing"
 )
+
+func withDetailCPUSection(datasource string) dashboard.Option {
+	return acmHelpers.AddCustomPanelGroup("CPU",
+		[]acmHelpers.GridItem{
+			{X: 0, Y: 0, W: 6, H: 3},
+			{X: 0, Y: 3, W: 6, H: 3},
+			{X: 0, Y: 6, W: 6, H: 3},
+			{X: 0, Y: 9, W: 6, H: 3},
+			{X: 6, Y: 0, W: 18, H: 12},
+			{X: 0, Y: 12, W: 24, H: 12},
+		},
+		panels.WorkloadDetailCPURecommendationStatPanel(datasource),
+		panels.WorkloadDetailCPUUsageStatPanel(datasource),
+		panels.WorkloadDetailCPURequestStatPanel(datasource),
+		panels.WorkloadDetailCPUUtilizationStatPanel(datasource),
+		panels.WorkloadDetailCPUTimeSeriesPanel(datasource),
+		panels.WorkloadDetailPodCPUTimeSeriesPanel(datasource),
+	)
+}
+
+func withDetailMemSection(datasource string) dashboard.Option {
+	return acmHelpers.AddCustomPanelGroup("Memory",
+		[]acmHelpers.GridItem{
+			{X: 0, Y: 0, W: 6, H: 3},
+			{X: 0, Y: 3, W: 6, H: 3},
+			{X: 0, Y: 6, W: 6, H: 3},
+			{X: 0, Y: 9, W: 6, H: 3},
+			{X: 6, Y: 0, W: 18, H: 12},
+			{X: 0, Y: 12, W: 24, H: 12},
+		},
+		panels.WorkloadDetailMemRecommendationStatPanel(datasource),
+		panels.WorkloadDetailMemUsageStatPanel(datasource),
+		panels.WorkloadDetailMemRequestStatPanel(datasource),
+		panels.WorkloadDetailMemUtilizationStatPanel(datasource),
+		panels.WorkloadDetailMemTimeSeriesPanel(datasource),
+		panels.WorkloadDetailPodMemTimeSeriesPanel(datasource),
+	)
+}
 
 // BuildWorkloadDetail creates the workload detail drill-down dashboard.
 // It shows CPU and Memory stat panels and time series for a single workload,
@@ -125,34 +162,7 @@ func BuildWorkloadDetail(project string, datasource string, clusterLabelName str
 			panels.WorkloadBackToMainDashboardPanel(datasource, project),
 		),
 
-		dashboard.AddPanelGroup("",
-			panelgroup.PanelsPerLine(4),
-			panelgroup.PanelHeight(4),
-			panels.WorkloadDetailCPURecommendationStatPanel(datasource),
-			panels.WorkloadDetailCPUUsageStatPanel(datasource),
-			panels.WorkloadDetailCPURequestStatPanel(datasource),
-			panels.WorkloadDetailCPUUtilizationStatPanel(datasource),
-		),
-
-		dashboard.AddPanelGroup("",
-			panelgroup.PanelsPerLine(1),
-			panelgroup.PanelHeight(12),
-			panels.WorkloadDetailCPUTimeSeriesPanel(datasource),
-		),
-
-		dashboard.AddPanelGroup("",
-			panelgroup.PanelsPerLine(4),
-			panelgroup.PanelHeight(4),
-			panels.WorkloadDetailMemRecommendationStatPanel(datasource),
-			panels.WorkloadDetailMemUsageStatPanel(datasource),
-			panels.WorkloadDetailMemRequestStatPanel(datasource),
-			panels.WorkloadDetailMemUtilizationStatPanel(datasource),
-		),
-
-		dashboard.AddPanelGroup("",
-			panelgroup.PanelsPerLine(1),
-			panelgroup.PanelHeight(12),
-			panels.WorkloadDetailMemTimeSeriesPanel(datasource),
-		),
+		withDetailCPUSection(datasource),
+		withDetailMemSection(datasource),
 	)
 }

@@ -14,70 +14,64 @@ import (
 	listVar "github.com/perses/perses/go-sdk/variable/list-variable"
 	labelValuesVar "github.com/perses/plugins/prometheus/sdk/go/variable/label-values"
 	staticListVar "github.com/perses/plugins/staticlistvariable/sdk/go"
+	acmHelpers "github.com/stolostron/multicluster-observability-addon/internal/perses/dashboards/acm"
 	panels "github.com/stolostron/multicluster-observability-addon/internal/perses/panels/rightsizing"
 )
 
-func withGPUClusterStats(datasource string) dashboard.Option {
-	return dashboard.AddPanelGroup("Cluster Overview",
-		panelgroup.PanelsPerLine(3),
-		panelgroup.PanelHeight(4),
-		panels.GPUClusterRequestPanel(datasource),
-		panels.GPUClusterUsagePanel(datasource),
-		panels.GPUClusterRecommendationPanel(datasource),
+func withGPUSection(datasource string) dashboard.Option {
+	return acmHelpers.AddCustomPanelGroup("GPU",
+		[]acmHelpers.GridItem{
+			{X: 0, Y: 0, W: 6, H: 3},
+			{X: 0, Y: 3, W: 6, H: 3},
+			{X: 0, Y: 6, W: 6, H: 3},
+			{X: 0, Y: 9, W: 6, H: 3},
+			{X: 6, Y: 0, W: 18, H: 12},
+			{X: 0, Y: 12, W: 24, H: 10},
+		},
+		panels.GPURecommendationStatPanel(datasource),
+		panels.GPUUsageStatPanel(datasource),
+		panels.GPURequestStatPanel(datasource),
+		panels.GPUUtilizationStatPanel(datasource),
+		panels.GPUUtilizationTopNamespacesPanel(datasource),
+		panels.GPUQuotaTable(datasource),
 	)
 }
 
-func withGPUNamespaceStats(datasource string) dashboard.Option {
-	return dashboard.AddPanelGroup("Namespace Overview",
-		panelgroup.PanelsPerLine(3),
-		panelgroup.PanelHeight(4),
-		panels.GPUNamespaceRequestPanel(datasource),
-		panels.GPUNamespaceUsagePanel(datasource),
-		panels.GPUNamespaceRecommendationPanel(datasource),
+func withGPUMemorySection(datasource string) dashboard.Option {
+	return acmHelpers.AddCustomPanelGroup("GPU Memory",
+		[]acmHelpers.GridItem{
+			{X: 0, Y: 0, W: 6, H: 3},
+			{X: 0, Y: 3, W: 6, H: 3},
+			{X: 0, Y: 6, W: 6, H: 3},
+			{X: 0, Y: 9, W: 6, H: 3},
+			{X: 6, Y: 0, W: 18, H: 12},
+			{X: 0, Y: 12, W: 24, H: 10},
+		},
+		panels.GPUMemRecommendationStatPanel(datasource),
+		panels.GPUMemUsedStatPanel(datasource),
+		panels.GPUMemTotalStatPanel(datasource),
+		panels.GPUMemUtilizationStatPanel(datasource),
+		panels.GPUMemUtilizationTopNamespacesPanel(datasource),
+		panels.GPUMemQuotaTable(datasource),
 	)
 }
 
-func withGPUNamespaceDetails(datasource string) dashboard.Option {
-	return dashboard.AddPanelGroup("Namespace Details",
-		panelgroup.PanelsPerLine(3),
-		panelgroup.PanelHeight(4),
-		panels.GPUNamespaceMemoryUsedPanel(datasource),
-		panels.GPUNamespaceMemoryTotalPanel(datasource),
-		panels.GPUNamespacePowerPanel(datasource),
-	)
-}
-
-func withGPUTimeSeries(datasource string) dashboard.Option {
-	return dashboard.AddPanelGroup("GPU Trends",
-		panelgroup.PanelsPerLine(2),
-		panelgroup.PanelHeight(10),
-		panels.GPUNamespaceUtilizationTSPanel(datasource),
-		panels.GPUNamespaceMemoryTSPanel(datasource),
-	)
-}
-
-func withGPUTopK(datasource string) dashboard.Option {
-	return dashboard.AddPanelGroup("Top Consumers",
-		panelgroup.PanelsPerLine(2),
-		panelgroup.PanelHeight(10),
-		panels.GPUTopKNamespacesByUsagePanel(datasource),
-		panels.GPUTopKWorkloadsByUsagePanel(datasource),
-	)
-}
-
-func withGPUNamespaceTable(datasource string) dashboard.Option {
-	return dashboard.AddPanelGroup("",
+func withGPUTelemetrySection(datasource string) dashboard.Option {
+	return dashboard.AddPanelGroup("GPU Telemetry",
 		panelgroup.PanelsPerLine(1),
 		panelgroup.PanelHeight(10),
-		panels.GPUNamespaceOverviewTable(datasource),
+		panels.GPUTelemetryTable(datasource),
 	)
 }
 
-func withGPUWorkloadTable(datasource string) dashboard.Option {
-	return dashboard.AddPanelGroup("",
-		panelgroup.PanelsPerLine(1),
-		panelgroup.PanelHeight(10),
-		panels.GPUWorkloadOverviewTable(datasource),
+func withGPUWorkloadsSection(datasource string) dashboard.Option {
+	return acmHelpers.AddCustomPanelGroup("Workloads",
+		[]acmHelpers.GridItem{
+			{X: 0, Y: 0, W: 24, H: 10},
+			{X: 0, Y: 10, W: 24, H: 10},
+		},
+		panels.GPUWorkloadQuotaTable(datasource),
+		panels.GPUPodQuotaTable(datasource),
 	)
 }
 
@@ -85,7 +79,7 @@ func withGPUWorkloadTable(datasource string) dashboard.Option {
 func BuildGPUUtilization(project string, datasource string, clusterLabelName string) (dashboard.Builder, error) {
 	return dashboard.New("acm-rs-gpu-utilization",
 		dashboard.ProjectName(project),
-		dashboard.Name("ACM GPU Right-Sizing"),
+		dashboard.Name("ACM GPU Utilization"),
 		dashboard.Duration(time.Hour*24*7),
 
 		dashboard.AddVariable("cluster",
@@ -127,19 +121,67 @@ func BuildGPUUtilization(project string, datasource string, clusterLabelName str
 				staticListVar.StaticList(
 					staticListVar.Values("1d", "2d", "5d", "10d", "30d", "60d", "90d"),
 				),
-				listVar.DisplayName("Days"),
-				listVar.DefaultValue("10d"),
+				listVar.DisplayName("Aggregation"),
+				listVar.DefaultValue("5d"),
 				listVar.AllowAllValue(false),
 				listVar.AllowMultiple(false),
 			),
 		),
 
-		withGPUClusterStats(datasource),
-		withGPUNamespaceStats(datasource),
-		withGPUNamespaceDetails(datasource),
-		withGPUTimeSeries(datasource),
-		withGPUTopK(datasource),
-		withGPUNamespaceTable(datasource),
-		withGPUWorkloadTable(datasource),
+		dashboard.AddVariable("namespace",
+			listVar.List(
+				labelValuesVar.PrometheusLabelValues("namespace",
+					dashboards.AddVariableDatasource(datasource),
+					labelValuesVar.Matchers(
+						promql.SetLabelMatchers(
+							`acm_rs:namespace:gpu_request{cluster="$cluster", profile="$profile"}`,
+							[]promql.LabelMatcher{},
+						)),
+				),
+				listVar.DisplayName("Namespace"),
+				listVar.DefaultValue("$__all"),
+				listVar.AllowAllValue(true),
+				listVar.AllowMultiple(true),
+			),
+		),
+
+		dashboard.AddVariable("workload_type",
+			listVar.List(
+				labelValuesVar.PrometheusLabelValues("workload_type",
+					dashboards.AddVariableDatasource(datasource),
+					labelValuesVar.Matchers(
+						promql.SetLabelMatchers(
+							`acm_rs:workload:gpu_request{cluster="$cluster", profile="$profile", namespace=~"$namespace"}`,
+							[]promql.LabelMatcher{},
+						)),
+				),
+				listVar.DisplayName("Workload Type"),
+				listVar.DefaultValue("$__all"),
+				listVar.AllowAllValue(true),
+				listVar.AllowMultiple(true),
+			),
+		),
+
+		dashboard.AddVariable("workload",
+			listVar.List(
+				labelValuesVar.PrometheusLabelValues("workload",
+					dashboards.AddVariableDatasource(datasource),
+					labelValuesVar.Matchers(
+						promql.SetLabelMatchers(
+							`acm_rs:workload:gpu_request{cluster="$cluster", profile="$profile", namespace=~"$namespace", workload_type=~"$workload_type"}`,
+							[]promql.LabelMatcher{},
+						)),
+				),
+				listVar.DisplayName("Workload"),
+				listVar.DefaultValue("$__all"),
+				listVar.AllowAllValue(true),
+				listVar.AllowMultiple(true),
+			),
+		),
+
+		withGPUSection(datasource),
+		withGPUMemorySection(datasource),
+		withGPUTelemetrySection(datasource),
+		withGPUWorkloadsSection(datasource),
 	)
 }
