@@ -38,7 +38,7 @@ func TestBuildNamespaceRightSizing(t *testing.T) {
 	})
 
 	t.Run("has expected panel groups", func(t *testing.T) {
-		require.Len(t, spec.Layouts, 6, "CPU stats/chart + CPU topK + CPU table + Mem stats/chart + Mem topK + Mem table")
+		require.Len(t, spec.Layouts, 2, "CPU section + Memory section")
 	})
 
 	t.Run("panels reference the datasource", func(t *testing.T) {
@@ -278,7 +278,7 @@ func TestBuildWorkloadPodRightSizing(t *testing.T) {
 	})
 
 	t.Run("has expected panel groups", func(t *testing.T) {
-		require.Len(t, spec.Layouts, 6, "CPU stats + CPU topK + CPU table + Mem stats + Mem topK + Mem table")
+		require.Len(t, spec.Layouts, 3, "CPU section + Memory section + Pods section")
 	})
 
 	t.Run("panels reference the datasource", func(t *testing.T) {
@@ -349,7 +349,7 @@ func TestBuildWorkloadDetail(t *testing.T) {
 	})
 
 	t.Run("has expected panel groups", func(t *testing.T) {
-		require.Len(t, spec.Layouts, 5, "back-to-main + CPU stats + CPU timeseries + Mem stats + Mem timeseries")
+		require.Len(t, spec.Layouts, 3, "back-to-main + CPU section + Memory section")
 	})
 
 	t.Run("contains back to main dashboard link", func(t *testing.T) {
@@ -391,18 +391,21 @@ func TestBuildGPUUtilization(t *testing.T) {
 
 	spec := db.Dashboard.Spec
 	assert.Equal(t, "acm-rs-gpu-utilization", db.Dashboard.Metadata.Name)
-	assert.Equal(t, "ACM GPU Right-Sizing", spec.Display.Name)
+	assert.Equal(t, "ACM GPU Utilization", spec.Display.Name)
 
 	t.Run("has expected variables", func(t *testing.T) {
-		require.Len(t, spec.Variables, 3, "expected cluster, profile, days")
+		require.Len(t, spec.Variables, 6, "expected cluster, profile, days, namespace, workload_type, workload")
 		varNames := extractVarNames(spec.Variables)
 		assert.Contains(t, varNames, "cluster")
 		assert.Contains(t, varNames, "profile")
 		assert.Contains(t, varNames, "days")
+		assert.Contains(t, varNames, "namespace")
+		assert.Contains(t, varNames, "workload_type")
+		assert.Contains(t, varNames, "workload")
 	})
 
 	t.Run("has expected panel groups", func(t *testing.T) {
-		require.Len(t, spec.Layouts, 7, "cluster stats + ns stats + ns details + trends + topK + ns table + wl table")
+		require.Len(t, spec.Layouts, 4, "GPU + GPU Memory + Telemetry + Workloads")
 	})
 
 	t.Run("panels reference the datasource", func(t *testing.T) {
@@ -417,7 +420,6 @@ func TestBuildGPUUtilization(t *testing.T) {
 		specStr := string(raw)
 		assert.Contains(t, specStr, "acm_rs:namespace:gpu_request")
 		assert.Contains(t, specStr, "acm_rs:namespace:gpu_usage")
-		assert.Contains(t, specStr, "acm_rs:cluster:gpu_request")
 		assert.Contains(t, specStr, "acm_rs:workload:gpu_usage")
 	})
 

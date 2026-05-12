@@ -61,17 +61,11 @@ func (o *OptionsBuilder) ReconcileRSResources(ctx context.Context, opts addon.Op
 		if err := o.deleteRSConfigMap(ctx, rightsizing.WorkloadConfigMapName); err != nil {
 			return fmt.Errorf("failed to cleanup workload configmap: %w", err)
 		}
-		if err := o.deleteRSConfigMap(ctx, rightsizing.WorkloadPlacementCMName); err != nil {
-			return fmt.Errorf("failed to cleanup workload placement configmap: %w", err)
-		}
 	}
 
 	if !opts.Platform.AnalyticsOptions.RightSizing.GPUEnabled {
 		if err := o.deleteRSConfigMap(ctx, rightsizing.GPUConfigMapName); err != nil {
 			return fmt.Errorf("failed to cleanup GPU configmap: %w", err)
-		}
-		if err := o.deleteRSConfigMap(ctx, rightsizing.GPUPlacementCMName); err != nil {
-			return fmt.Errorf("failed to cleanup GPU placement configmap: %w", err)
 		}
 	}
 

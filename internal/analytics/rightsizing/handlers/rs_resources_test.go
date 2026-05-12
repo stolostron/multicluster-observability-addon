@@ -190,9 +190,8 @@ func TestReconcileRSResources_CleanupBoth(t *testing.T) {
 
 func TestReconcileRSResources_CleanupWorkload(t *testing.T) {
 	wlCM := createTestConfigMap(rightsizing.WorkloadConfigMapName)
-	wlPlacementCM := createTestConfigMap(rightsizing.WorkloadPlacementCMName)
 
-	ob := newTestOptionsBuilder(t, wlCM, wlPlacementCM)
+	ob := newTestOptionsBuilder(t, wlCM)
 	ctx := context.TODO()
 
 	opts := newPlatformOptsAll(false, false, false)
@@ -203,18 +202,12 @@ func TestReconcileRSResources_CleanupWorkload(t *testing.T) {
 		Name: rightsizing.WorkloadConfigMapName, Namespace: addoncfg.InstallNamespace,
 	}, &corev1.ConfigMap{})
 	assert.True(t, apierrors.IsNotFound(err), "workload configmap should be deleted")
-
-	err = ob.Client.Get(ctx, types.NamespacedName{
-		Name: rightsizing.WorkloadPlacementCMName, Namespace: addoncfg.InstallNamespace,
-	}, &corev1.ConfigMap{})
-	assert.True(t, apierrors.IsNotFound(err), "workload placement configmap should be deleted")
 }
 
 func TestReconcileRSResources_CleanupGPU(t *testing.T) {
 	gpuCM := createTestConfigMap(rightsizing.GPUConfigMapName)
-	gpuPlacementCM := createTestConfigMap(rightsizing.GPUPlacementCMName)
 
-	ob := newTestOptionsBuilder(t, gpuCM, gpuPlacementCM)
+	ob := newTestOptionsBuilder(t, gpuCM)
 	ctx := context.TODO()
 
 	opts := newPlatformOptsAll(false, false, false)
@@ -225,11 +218,6 @@ func TestReconcileRSResources_CleanupGPU(t *testing.T) {
 		Name: rightsizing.GPUConfigMapName, Namespace: addoncfg.InstallNamespace,
 	}, &corev1.ConfigMap{})
 	assert.True(t, apierrors.IsNotFound(err), "GPU configmap should be deleted")
-
-	err = ob.Client.Get(ctx, types.NamespacedName{
-		Name: rightsizing.GPUPlacementCMName, Namespace: addoncfg.InstallNamespace,
-	}, &corev1.ConfigMap{})
-	assert.True(t, apierrors.IsNotFound(err), "GPU placement configmap should be deleted")
 }
 
 func TestReconcileRSResources_CleanupIdempotent(t *testing.T) {
