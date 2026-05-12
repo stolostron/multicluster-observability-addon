@@ -14,8 +14,10 @@ import (
 	timeSeriesPanel "github.com/perses/plugins/timeserieschart/sdk/go"
 )
 
-const gpuNsFilter = `cluster="$cluster", profile="$profile", namespace=~"$namespace"`
-const gpuWlFilter = `cluster="$cluster", profile="$profile", namespace=~"$namespace", workload_type=~"$workload_type", workload=~"$workload"`
+const (
+	gpuNsFilter = `cluster="$cluster", profile="$profile", namespace=~"$namespace"`
+	gpuWlFilter = `cluster="$cluster", profile="$profile", namespace=~"$namespace", workload_type=~"$workload_type", workload=~"$workload"`
+)
 
 // ===================== GPU Section =====================
 
