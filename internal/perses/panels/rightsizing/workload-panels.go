@@ -42,7 +42,7 @@ func WorkloadCPURecommendationPanel(datasourceName string) panelgroup.Option {
 		Description: "CPU recommendation across all workloads in the selected cluster",
 		Query:       `max_over_time(sum by (cluster)(acm_rs:workload:cpu_recommendation{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:])`,
 		Unit:        &dashboards.DecimalUnit,
-		Decimals:    2,
+		Decimals:    5,
 		FontSize:    40,
 		Thresholds:  nsStatThreshold,
 	})
@@ -54,7 +54,7 @@ func WorkloadCPUUsagePanel(datasourceName string) panelgroup.Option {
 		Description: "CPU usage across all workloads in the selected cluster",
 		Query:       `max_over_time(sum by (cluster)(acm_rs:workload:cpu_usage{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:])`,
 		Unit:        &dashboards.DecimalUnit,
-		Decimals:    2,
+		Decimals:    5,
 		FontSize:    40,
 		Thresholds:  nsStatThreshold,
 	})
@@ -66,7 +66,7 @@ func WorkloadCPURequestPanel(datasourceName string) panelgroup.Option {
 		Description: "CPU request across all workloads in the selected cluster",
 		Query:       `max_over_time(sum by (cluster)(acm_rs:workload:cpu_request{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$days:])`,
 		Unit:        &dashboards.DecimalUnit,
-		Decimals:    2,
+		Decimals:    5,
 		FontSize:    40,
 		Thresholds:  nsStatThreshold,
 	})
@@ -213,14 +213,14 @@ func WorkloadCPUTablePanel(datasourceName string, project string) panelgroup.Opt
 				nsTblCol("value #1", "CPU Utilization %", tablePanel.RightAlign,
 					&commonSdk.Format{Unit: &dashboards.PercentDecimalUnit, DecimalPlaces: 2},
 					func(c *ColumnSettingsWithLink) { c.Sort = tablePanel.DescSort }),
-			nsTblCol("value #2", "CPU Usage", tablePanel.RightAlign,
-				&commonSdk.Format{Unit: &dashboards.DecimalUnit, DecimalPlaces: 2}),
-			nsTblCol("value #3", "CPU Request", tablePanel.RightAlign,
-				&commonSdk.Format{Unit: &dashboards.DecimalUnit, DecimalPlaces: 2}),
-			nsTblCol("value #4", "CPU Limit", tablePanel.RightAlign,
-				&commonSdk.Format{Unit: &dashboards.DecimalUnit, DecimalPlaces: 2}),
-			nsTblCol("value #5", "CPU Recommendation", tablePanel.RightAlign,
-				&commonSdk.Format{Unit: &dashboards.DecimalUnit, DecimalPlaces: 2}),
+				nsTblCol("value #2", "CPU Usage", tablePanel.RightAlign,
+					&commonSdk.Format{Unit: &dashboards.DecimalUnit, DecimalPlaces: 5}),
+				nsTblCol("value #3", "CPU Request", tablePanel.RightAlign,
+					&commonSdk.Format{Unit: &dashboards.DecimalUnit, DecimalPlaces: 5}),
+				nsTblCol("value #4", "CPU Limit", tablePanel.RightAlign,
+					&commonSdk.Format{Unit: &dashboards.DecimalUnit, DecimalPlaces: 5}),
+				nsTblCol("value #5", "CPU Recommendation", tablePanel.RightAlign,
+					&commonSdk.Format{Unit: &dashboards.DecimalUnit, DecimalPlaces: 5}),
 			},
 			CellSettings: []tablePanel.CellSettings{
 				{Condition: tablePanel.Condition{Kind: tablePanel.MiscConditionKind, Spec: &tablePanel.MiscConditionSpec{Value: tablePanel.NullValue}}, Text: "N/A"},
@@ -308,7 +308,7 @@ func WorkloadDetailCPURecommendationStatPanel(datasourceName string) panelgroup.
 		Description: "Recommended CPU cores for the selected workload based on usage profile.",
 		Query:       `max by (cluster, profile, namespace, workload, workload_type)(max_over_time(acm_rs:workload:cpu_recommendation{` + wlDetailFilter + `}[$days:]))`,
 		Unit:        &dashboards.DecimalUnit,
-		Decimals:    2,
+		Decimals:    5,
 		FontSize:    40,
 		Thresholds:  nsStatThreshold,
 	})
@@ -320,7 +320,7 @@ func WorkloadDetailCPUUsageStatPanel(datasourceName string) panelgroup.Option {
 		Description: "Actual CPU cores consumed by the selected workload over the aggregation period.",
 		Query:       `max by (cluster, profile, namespace, workload, workload_type)(max_over_time(acm_rs:workload:cpu_usage{` + wlDetailFilter + `}[$days:]))`,
 		Unit:        &dashboards.DecimalUnit,
-		Decimals:    2,
+		Decimals:    5,
 		FontSize:    40,
 		Thresholds:  nsStatThreshold,
 	})
@@ -332,7 +332,7 @@ func WorkloadDetailCPURequestStatPanel(datasourceName string) panelgroup.Option 
 		Description: "CPU cores requested (allocated) for the selected workload.",
 		Query:       `max by (cluster, profile, namespace, workload, workload_type)(max_over_time(acm_rs:workload:cpu_request{` + wlDetailFilter + `}[$days:]))`,
 		Unit:        &dashboards.DecimalUnit,
-		Decimals:    2,
+		Decimals:    5,
 		FontSize:    40,
 		Thresholds:  nsStatThreshold,
 	})
@@ -355,7 +355,7 @@ func WorkloadDetailCPUTimeSeriesPanel(datasourceName string) panelgroup.Option {
 		panel.Description("CPU usage, request, limit, and recommendation over time for the selected workload."),
 		timeSeriesPanel.Chart(
 			timeSeriesPanel.WithYAxis(timeSeriesPanel.YAxis{
-				Format: &commonSdk.Format{Unit: &dashboards.DecimalUnit, DecimalPlaces: 2},
+				Format: &commonSdk.Format{Unit: &dashboards.DecimalUnit, DecimalPlaces: 5},
 			}),
 			timeSeriesPanel.WithLegend(timeSeriesPanel.Legend{
 				Position: timeSeriesPanel.BottomPosition,
@@ -510,14 +510,14 @@ func PodCPUTablePanel(datasourceName string, project string) panelgroup.Option {
 				nsTblCol("value #1", "CPU Utilization %", tablePanel.RightAlign,
 					&commonSdk.Format{Unit: &dashboards.PercentDecimalUnit, DecimalPlaces: 2},
 					func(c *ColumnSettingsWithLink) { c.Sort = tablePanel.DescSort }),
-			nsTblCol("value #2", "CPU Usage", tablePanel.RightAlign,
-				&commonSdk.Format{Unit: &dashboards.DecimalUnit, DecimalPlaces: 2}),
-			nsTblCol("value #3", "CPU Request", tablePanel.RightAlign,
-				&commonSdk.Format{Unit: &dashboards.DecimalUnit, DecimalPlaces: 2}),
-			nsTblCol("value #4", "CPU Limit", tablePanel.RightAlign,
-				&commonSdk.Format{Unit: &dashboards.DecimalUnit, DecimalPlaces: 2}),
-			nsTblCol("value #5", "CPU Recommendation", tablePanel.RightAlign,
-				&commonSdk.Format{Unit: &dashboards.DecimalUnit, DecimalPlaces: 2}),
+				nsTblCol("value #2", "CPU Usage", tablePanel.RightAlign,
+					&commonSdk.Format{Unit: &dashboards.DecimalUnit, DecimalPlaces: 5}),
+				nsTblCol("value #3", "CPU Request", tablePanel.RightAlign,
+					&commonSdk.Format{Unit: &dashboards.DecimalUnit, DecimalPlaces: 5}),
+				nsTblCol("value #4", "CPU Limit", tablePanel.RightAlign,
+					&commonSdk.Format{Unit: &dashboards.DecimalUnit, DecimalPlaces: 5}),
+				nsTblCol("value #5", "CPU Recommendation", tablePanel.RightAlign,
+					&commonSdk.Format{Unit: &dashboards.DecimalUnit, DecimalPlaces: 5}),
 			},
 			CellSettings: []tablePanel.CellSettings{
 				{Condition: tablePanel.Condition{Kind: tablePanel.MiscConditionKind, Spec: &tablePanel.MiscConditionSpec{Value: tablePanel.NullValue}}, Text: "N/A"},
@@ -603,7 +603,7 @@ func WorkloadDetailPodCPUTimeSeriesPanel(datasourceName string) panelgroup.Optio
 		panel.Description("CPU usage, request, and recommendation per pod for the selected workload."),
 		timeSeriesPanel.Chart(
 			timeSeriesPanel.WithYAxis(timeSeriesPanel.YAxis{
-				Format: &commonSdk.Format{Unit: &dashboards.DecimalUnit, DecimalPlaces: 2},
+				Format: &commonSdk.Format{Unit: &dashboards.DecimalUnit, DecimalPlaces: 5},
 			}),
 			timeSeriesPanel.WithLegend(timeSeriesPanel.Legend{
 				Position: timeSeriesPanel.BottomPosition,
