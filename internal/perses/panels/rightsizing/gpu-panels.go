@@ -63,7 +63,7 @@ func GPUUtilizationStatPanel(datasourceName string) panelgroup.Option {
 		Description: "GPU utilization percentage (usage / request)",
 		Query:       `max_over_time(sum by (cluster)(acm_rs:namespace:gpu_usage{` + gpuNsFilter + `})[$days:]) / max_over_time(sum by (cluster)(acm_rs:namespace:gpu_request{` + gpuNsFilter + `})[$days:])`,
 		Unit:        &dashboards.PercentDecimalUnit,
-		Decimals:    1,
+		Decimals:    2,
 		FontSize:    40,
 		Thresholds:  nsUtilizationThreshold,
 	})
@@ -186,7 +186,7 @@ func GPUMemUtilizationStatPanel(datasourceName string) panelgroup.Option {
 		Description: "GPU memory utilization percentage (used / total)",
 		Query:       `max_over_time(sum by (cluster)(acm_rs:namespace:gpu_memory_used{` + gpuNsFilter + `})[$days:]) / max_over_time(sum by (cluster)(acm_rs:namespace:gpu_memory_total{` + gpuNsFilter + `})[$days:])`,
 		Unit:        &dashboards.PercentDecimalUnit,
-		Decimals:    1,
+		Decimals:    2,
 		FontSize:    40,
 		Thresholds:  nsUtilizationThreshold,
 	})
