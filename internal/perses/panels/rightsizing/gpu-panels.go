@@ -29,7 +29,7 @@ func GPURecommendationStatPanel(datasourceName string) panelgroup.Option {
 		Unit:        &dashboards.DecimalUnit,
 		Decimals:    0,
 		FontSize:    40,
-		Thresholds:  greenThreshold,
+		Thresholds:  nsStatThreshold,
 	})
 }
 
@@ -41,7 +41,7 @@ func GPUUsageStatPanel(datasourceName string) panelgroup.Option {
 		Unit:        &dashboards.DecimalUnit,
 		Decimals:    0,
 		FontSize:    40,
-		Thresholds:  grayThreshold,
+		Thresholds:  nsStatThreshold,
 	})
 }
 
@@ -53,7 +53,7 @@ func GPURequestStatPanel(datasourceName string) panelgroup.Option {
 		Unit:        &dashboards.DecimalUnit,
 		Decimals:    0,
 		FontSize:    40,
-		Thresholds:  grayThreshold,
+		Thresholds:  nsStatThreshold,
 	})
 }
 
@@ -65,7 +65,7 @@ func GPUUtilizationStatPanel(datasourceName string) panelgroup.Option {
 		Unit:        &dashboards.PercentDecimalUnit,
 		Decimals:    1,
 		FontSize:    40,
-		Thresholds:  percentThreshold,
+		Thresholds:  nsUtilizationThreshold,
 	})
 }
 
@@ -152,7 +152,7 @@ func GPUMemRecommendationStatPanel(datasourceName string) panelgroup.Option {
 		Unit:        &dashboards.BytesUnit,
 		Decimals:    0,
 		FontSize:    40,
-		Thresholds:  greenThreshold,
+		Thresholds:  nsStatThreshold,
 	})
 }
 
@@ -164,7 +164,7 @@ func GPUMemUsedStatPanel(datasourceName string) panelgroup.Option {
 		Unit:        &dashboards.BytesUnit,
 		Decimals:    0,
 		FontSize:    40,
-		Thresholds:  grayThreshold,
+		Thresholds:  nsStatThreshold,
 	})
 }
 
@@ -176,7 +176,7 @@ func GPUMemTotalStatPanel(datasourceName string) panelgroup.Option {
 		Unit:        &dashboards.BytesUnit,
 		Decimals:    0,
 		FontSize:    40,
-		Thresholds:  grayThreshold,
+		Thresholds:  nsStatThreshold,
 	})
 }
 
@@ -188,7 +188,7 @@ func GPUMemUtilizationStatPanel(datasourceName string) panelgroup.Option {
 		Unit:        &dashboards.PercentDecimalUnit,
 		Decimals:    1,
 		FontSize:    40,
-		Thresholds:  percentThreshold,
+		Thresholds:  nsUtilizationThreshold,
 	})
 }
 

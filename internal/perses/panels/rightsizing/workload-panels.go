@@ -44,7 +44,7 @@ func WorkloadCPURecommendationPanel(datasourceName string) panelgroup.Option {
 		Unit:        &dashboards.DecimalUnit,
 		Decimals:    2,
 		FontSize:    40,
-		Thresholds:  greenThreshold,
+		Thresholds:  nsStatThreshold,
 	})
 }
 
@@ -56,7 +56,7 @@ func WorkloadCPUUsagePanel(datasourceName string) panelgroup.Option {
 		Unit:        &dashboards.DecimalUnit,
 		Decimals:    2,
 		FontSize:    40,
-		Thresholds:  grayThreshold,
+		Thresholds:  nsStatThreshold,
 	})
 }
 
@@ -68,7 +68,7 @@ func WorkloadCPURequestPanel(datasourceName string) panelgroup.Option {
 		Unit:        &dashboards.DecimalUnit,
 		Decimals:    2,
 		FontSize:    40,
-		Thresholds:  grayThreshold,
+		Thresholds:  nsStatThreshold,
 	})
 }
 
@@ -80,7 +80,7 @@ func WorkloadCPUUtilizationPanel(datasourceName string) panelgroup.Option {
 		Unit:        &dashboards.PercentDecimalUnit,
 		Decimals:    1,
 		FontSize:    40,
-		Thresholds:  percentThreshold,
+		Thresholds:  nsUtilizationThreshold,
 	})
 }
 
@@ -92,7 +92,7 @@ func WorkloadMemRecommendationPanel(datasourceName string) panelgroup.Option {
 		Unit:        &dashboards.BytesUnit,
 		Decimals:    1,
 		FontSize:    40,
-		Thresholds:  greenThreshold,
+		Thresholds:  nsStatThreshold,
 	})
 }
 
@@ -104,7 +104,7 @@ func WorkloadMemUsagePanel(datasourceName string) panelgroup.Option {
 		Unit:        &dashboards.BytesUnit,
 		Decimals:    1,
 		FontSize:    40,
-		Thresholds:  grayThreshold,
+		Thresholds:  nsStatThreshold,
 	})
 }
 
@@ -116,7 +116,7 @@ func WorkloadMemRequestPanel(datasourceName string) panelgroup.Option {
 		Unit:        &dashboards.BytesUnit,
 		Decimals:    1,
 		FontSize:    40,
-		Thresholds:  grayThreshold,
+		Thresholds:  nsStatThreshold,
 	})
 }
 
@@ -128,7 +128,7 @@ func WorkloadMemUtilizationPanel(datasourceName string) panelgroup.Option {
 		Unit:        &dashboards.PercentDecimalUnit,
 		Decimals:    1,
 		FontSize:    40,
-		Thresholds:  percentThreshold,
+		Thresholds:  nsUtilizationThreshold,
 	})
 }
 
@@ -310,7 +310,7 @@ func WorkloadDetailCPURecommendationStatPanel(datasourceName string) panelgroup.
 		Unit:        &dashboards.DecimalUnit,
 		Decimals:    2,
 		FontSize:    40,
-		Thresholds:  greenThreshold,
+		Thresholds:  nsStatThreshold,
 	})
 }
 
@@ -322,7 +322,7 @@ func WorkloadDetailCPUUsageStatPanel(datasourceName string) panelgroup.Option {
 		Unit:        &dashboards.DecimalUnit,
 		Decimals:    2,
 		FontSize:    40,
-		Thresholds:  detailGrayThreshold,
+		Thresholds:  nsStatThreshold,
 	})
 }
 
@@ -334,7 +334,7 @@ func WorkloadDetailCPURequestStatPanel(datasourceName string) panelgroup.Option 
 		Unit:        &dashboards.DecimalUnit,
 		Decimals:    2,
 		FontSize:    40,
-		Thresholds:  detailGrayThreshold,
+		Thresholds:  nsStatThreshold,
 	})
 }
 
@@ -346,7 +346,7 @@ func WorkloadDetailCPUUtilizationStatPanel(datasourceName string) panelgroup.Opt
 		Unit:        &dashboards.PercentDecimalUnit,
 		Decimals:    1,
 		FontSize:    40,
-		Thresholds:  detailPercentThreshold,
+		Thresholds:  nsUtilizationThreshold,
 	})
 }
 
@@ -400,7 +400,7 @@ func WorkloadDetailMemRecommendationStatPanel(datasourceName string) panelgroup.
 		Unit:        &dashboards.BytesUnit,
 		Decimals:    1,
 		FontSize:    40,
-		Thresholds:  greenThreshold,
+		Thresholds:  nsStatThreshold,
 	})
 }
 
@@ -412,7 +412,7 @@ func WorkloadDetailMemUsageStatPanel(datasourceName string) panelgroup.Option {
 		Unit:        &dashboards.BytesUnit,
 		Decimals:    1,
 		FontSize:    40,
-		Thresholds:  detailGrayThreshold,
+		Thresholds:  nsStatThreshold,
 	})
 }
 
@@ -424,7 +424,7 @@ func WorkloadDetailMemRequestStatPanel(datasourceName string) panelgroup.Option 
 		Unit:        &dashboards.BytesUnit,
 		Decimals:    1,
 		FontSize:    40,
-		Thresholds:  detailGrayThreshold,
+		Thresholds:  nsStatThreshold,
 	})
 }
 
@@ -436,7 +436,7 @@ func WorkloadDetailMemUtilizationStatPanel(datasourceName string) panelgroup.Opt
 		Unit:        &dashboards.PercentDecimalUnit,
 		Decimals:    1,
 		FontSize:    40,
-		Thresholds:  detailPercentThreshold,
+		Thresholds:  nsUtilizationThreshold,
 	})
 }
 
