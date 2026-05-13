@@ -71,10 +71,10 @@ func VMTotalCPUOverestimationPanel(datasourceName string) panelgroup.Option {
 	return BuildStatPanel(datasourceName, StatPanelConfig{
 		Title:       "Total CPU Overestimation",
 		Description: "Total number of overestimated CPU cores across all VMs in the selected namespace(s).\nRepresents the total CPU cores that can be reclaimed.",
-		Query: `sum(floor((max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:cpu_request{cluster="$cluster", namespace=~"$namespace"}` +
+		Query: `sum(floor((max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:cpu_request{cluster="$cluster", profile="$profile", namespace=~"$namespace"}` +
 			"\n" + `+ on(cluster, namespace, name) group_left(_blah)(0 * max by (cluster, namespace, name) (kubevirt_vm_running_status_last_transition_timestamp_seconds{cluster="$cluster", namespace=~"$namespace"} > 0))` +
 			"\n" + `)[$days:])-` +
-			"\n" + `max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:cpu_recommendation{cluster="$cluster", namespace=~"$namespace"}` +
+			"\n" + `max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:cpu_recommendation{cluster="$cluster", profile="$profile", namespace=~"$namespace"}` +
 			"\n" + `+ on(cluster, namespace, name) group_left(_blah)(0 * max by (cluster, namespace, name) (kubevirt_vm_running_status_last_transition_timestamp_seconds{cluster="$cluster", namespace=~"$namespace"} > 0))` +
 			"\n" + `)[$days:])))>0)`,
 		Unit:       &dashboards.DecimalUnit,
@@ -88,10 +88,10 @@ func VMTotalCPUUnderestimationPanel(datasourceName string) panelgroup.Option {
 	return BuildStatPanel(datasourceName, StatPanelConfig{
 		Title:       "Total CPU Underestimation",
 		Description: "Total number of underestimated CPU cores across all VMs in the selected namespace(s).\nRepresents the total additional CPU cores needed.",
-		Query: `sum(floor((max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:cpu_request{cluster="$cluster", namespace=~"$namespace"}` +
+		Query: `sum(floor((max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:cpu_request{cluster="$cluster", profile="$profile", namespace=~"$namespace"}` +
 			"\n" + `+ on(cluster, namespace, name) group_left(_blah)(0 * max by (cluster, namespace, name) (kubevirt_vm_running_status_last_transition_timestamp_seconds{cluster="$cluster", namespace=~"$namespace"} > 0))` +
 			"\n" + `)[$days:])-` +
-			"\n" + `max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:cpu_recommendation{cluster="$cluster", namespace=~"$namespace"}` +
+			"\n" + `max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:cpu_recommendation{cluster="$cluster", profile="$profile", namespace=~"$namespace"}` +
 			"\n" + `+ on(cluster, namespace, name) group_left(_blah)(0 * max by (cluster, namespace, name) (kubevirt_vm_running_status_last_transition_timestamp_seconds{cluster="$cluster", namespace=~"$namespace"} > 0))` +
 			"\n" + `)[$days:])))<0) * (-1)`,
 		Unit:       &dashboards.DecimalUnit,
@@ -105,10 +105,10 @@ func VMTotalMemOverestimationPanel(datasourceName string) panelgroup.Option {
 	return BuildStatPanel(datasourceName, StatPanelConfig{
 		Title:       "Total Memory Overestimation",
 		Description: "Total overestimated memory across all VMs in the selected namespace(s).\nRepresents the total memory that can be reclaimed.",
-		Query: `(sum(floor((max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:memory_request{cluster="$cluster", namespace=~"$namespace"}` +
+		Query: `(sum(floor((max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:memory_request{cluster="$cluster", profile="$profile", namespace=~"$namespace"}` +
 			"\n" + `+ on(cluster, namespace, name) group_left(_blah)(0 * max by (cluster, namespace, name) (kubevirt_vm_running_status_last_transition_timestamp_seconds{cluster="$cluster", namespace=~"$namespace"} > 0))` +
 			"\n" + `)[$days:]) / 1073741824)-` +
-			"\n" + `(max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:memory_recommendation{cluster="$cluster", namespace=~"$namespace"}` +
+			"\n" + `(max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:memory_recommendation{cluster="$cluster", profile="$profile", namespace=~"$namespace"}` +
 			"\n" + `+ on(cluster, namespace, name) group_left(_blah)(0 * max by (cluster, namespace, name) (kubevirt_vm_running_status_last_transition_timestamp_seconds{cluster="$cluster", namespace=~"$namespace"} > 0))` +
 			"\n" + `)[$days:]) / 1073741824))>0)) * 1073741824`,
 		Unit:       &dashboards.BytesUnit,
@@ -122,10 +122,10 @@ func VMTotalMemUnderestimationPanel(datasourceName string) panelgroup.Option {
 	return BuildStatPanel(datasourceName, StatPanelConfig{
 		Title:       "Total Memory Underestimation",
 		Description: "Total underestimated memory across all VMs in the selected namespace(s).\nRepresents the total additional memory needed.",
-		Query: `(sum(floor((max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:memory_request{cluster="$cluster", namespace=~"$namespace"}` +
+		Query: `(sum(floor((max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:memory_request{cluster="$cluster", profile="$profile", namespace=~"$namespace"}` +
 			"\n" + `+ on(cluster, namespace, name) group_left(_blah)(0 * max by (cluster, namespace, name) (kubevirt_vm_running_status_last_transition_timestamp_seconds{cluster="$cluster", namespace=~"$namespace"} > 0))` +
 			"\n" + `)[$days:]) / 1073741824)-` +
-			"\n" + `(max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:memory_recommendation{cluster="$cluster", namespace=~"$namespace"}` +
+			"\n" + `(max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:memory_recommendation{cluster="$cluster", profile="$profile", namespace=~"$namespace"}` +
 			"\n" + `+ on(cluster, namespace, name) group_left(_blah)(0 * max by (cluster, namespace, name) (kubevirt_vm_running_status_last_transition_timestamp_seconds{cluster="$cluster", namespace=~"$namespace"} > 0))` +
 			"\n" + `)[$days:]) / 1073741824))<0) * (-1)) * 1073741824`,
 		Unit:       &dashboards.BytesUnit,

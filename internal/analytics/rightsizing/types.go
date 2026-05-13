@@ -29,6 +29,14 @@ const (
 	// Virtualization right-sizing constants
 	VirtualizationPrometheusRuleName = "acm-rs-virt-prometheus-rules"
 	VirtualizationConfigMapName      = "rs-virt-config"
+
+	// Workload-pod right-sizing constants
+	WorkloadPrometheusRuleName = "acm-rs-workload-prometheus-rules"
+	WorkloadConfigMapName      = "rs-workload-config"
+
+	// GPU right-sizing constants
+	GPUPrometheusRuleName = "acm-rs-gpu-prometheus-rules"
+	GPUConfigMapName      = "rs-gpu-config"
 )
 
 // RSLabelFilter represents label filtering criteria for right-sizing

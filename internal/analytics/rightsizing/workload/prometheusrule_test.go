@@ -1,4 +1,4 @@
-package namespace
+package workload
 
 import (
 	"testing"
@@ -8,9 +8,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestGeneratePrometheusRule validates namespace PrometheusRule generation across
-// namespace filter configurations: default, inclusion-only, exclusion-only,
-// and the mutually-exclusive error case.
 func TestGeneratePrometheusRule(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -22,7 +19,6 @@ func TestGeneratePrometheusRule(t *testing.T) {
 			configData: rightsizing.RSConfigMapData{
 				PrometheusRuleConfig: rightsizing.GetDefaultRSPrometheusRuleConfig(),
 			},
-			expectError: false,
 		},
 		{
 			name: "with inclusion filter",
@@ -37,7 +33,6 @@ func TestGeneratePrometheusRule(t *testing.T) {
 					RecommendationPercentage: 120,
 				},
 			},
-			expectError: false,
 		},
 		{
 			name: "with exclusion filter",
@@ -52,7 +47,6 @@ func TestGeneratePrometheusRule(t *testing.T) {
 					RecommendationPercentage: 110,
 				},
 			},
-			expectError: false,
 		},
 		{
 			name: "invalid config - both inclusion and exclusion",
@@ -78,22 +72,89 @@ func TestGeneratePrometheusRule(t *testing.T) {
 				assert.Error(t, err)
 			} else {
 				require.NoError(t, err)
-				assert.Equal(t, rightsizing.NamespacePrometheusRuleName, rule.Name)
+				assert.Equal(t, rightsizing.WorkloadPrometheusRuleName, rule.Name)
 				assert.Equal(t, rightsizing.MonitoringNamespace, rule.Namespace)
-				require.Len(t, rule.Spec.Groups, 4)
+				require.Len(t, rule.Spec.Groups, 2)
 
-				// Check group names
-				assert.Equal(t, "acm-right-sizing-namespace-5m.rule", rule.Spec.Groups[0].Name)
-				assert.Equal(t, "acm-right-sizing-namespace-1d.rules", rule.Spec.Groups[1].Name)
-				assert.Equal(t, "acm-right-sizing-cluster-5m.rule", rule.Spec.Groups[2].Name)
-				assert.Equal(t, "acm-right-sizing-cluster-1d.rule", rule.Spec.Groups[3].Name)
+				assert.Equal(t, "acm-right-sizing-workload-5m.rules", rule.Spec.Groups[0].Name)
+				assert.Equal(t, "acm-right-sizing-workload-1d.rules", rule.Spec.Groups[1].Name)
 			}
 		})
 	}
 }
 
-// TestDefaultRecommendationPercentage verifies that a zero RecommendationPercentage
-// falls back to the default (110%) in the generated 1d recommendation rules.
+func TestGeneratePrometheusRule_IncludesMappingRule(t *testing.T) {
+	config := rightsizing.RSConfigMapData{
+		PrometheusRuleConfig: rightsizing.RSPrometheusRuleConfig{
+			NamespaceFilterCriteria: struct {
+				InclusionCriteria []string `json:"inclusionCriteria"`
+				ExclusionCriteria []string `json:"exclusionCriteria"`
+			}{
+				InclusionCriteria: []string{"ns-a"},
+			},
+			RecommendationPercentage: 110,
+		},
+	}
+
+	rule, err := GeneratePrometheusRule(config)
+	require.NoError(t, err)
+	assert.Equal(t, "acm_rs:pod_workload:relabel:5m", rule.Spec.Groups[0].Rules[0].Record)
+	expr := rule.Spec.Groups[0].Rules[0].Expr.String()
+	assert.Contains(t, expr, `namespace=~"ns-a"`)
+	assert.Contains(t, expr, `owner_kind="Job"`)
+	assert.Contains(t, expr, `kube_job_owner`)
+	assert.Contains(t, expr, `owner_kind="CronJob"`)
+	assert.Contains(t, expr, `"workload_type", "ReplicaSet"`)
+}
+
+func TestGeneratePrometheusRule_IncludesLimitRules(t *testing.T) {
+	config := rightsizing.RSConfigMapData{
+		PrometheusRuleConfig: rightsizing.RSPrometheusRuleConfig{
+			NamespaceFilterCriteria: struct {
+				InclusionCriteria []string `json:"inclusionCriteria"`
+				ExclusionCriteria []string `json:"exclusionCriteria"`
+			}{
+				ExclusionCriteria: []string{"openshift.*"},
+			},
+			RecommendationPercentage: 110,
+		},
+	}
+
+	rule, err := GeneratePrometheusRule(config)
+	require.NoError(t, err)
+
+	recordNames5m := make(map[string]string)
+	for _, r := range rule.Spec.Groups[0].Rules {
+		recordNames5m[r.Record] = r.Expr.String()
+	}
+	recordNames1d := make(map[string]string)
+	for _, r := range rule.Spec.Groups[1].Rules {
+		recordNames1d[r.Record] = r.Expr.String()
+	}
+
+	for _, name := range []string{
+		"acm_rs:pod:cpu_limit:5m",
+		"acm_rs:pod:memory_limit:5m",
+		"acm_rs:workload:cpu_limit:5m",
+		"acm_rs:workload:memory_limit:5m",
+	} {
+		expr, ok := recordNames5m[name]
+		assert.True(t, ok, "5m rule %q must be present", name)
+		assert.Contains(t, expr, "kube_pod_container_resource_limits", "5m rule %q must use limits metric", name)
+	}
+
+	for _, name := range []string{
+		"acm_rs:pod:cpu_limit",
+		"acm_rs:pod:memory_limit",
+		"acm_rs:workload:cpu_limit",
+		"acm_rs:workload:memory_limit",
+	} {
+		expr, ok := recordNames1d[name]
+		assert.True(t, ok, "1d rule %q must be present", name)
+		assert.Contains(t, expr, name+":5m", "1d rule %q must reference its 5m counterpart", name)
+	}
+}
+
 func TestDefaultRecommendationPercentage(t *testing.T) {
 	configData := rightsizing.RSConfigMapData{
 		PrometheusRuleConfig: rightsizing.RSPrometheusRuleConfig{
@@ -107,17 +168,16 @@ func TestDefaultRecommendationPercentage(t *testing.T) {
 	found := false
 	for _, group := range rule.Spec.Groups {
 		for _, r := range group.Rules {
-			if r.Record == "acm_rs:namespace:cpu_recommendation" {
+			if r.Record == "acm_rs:pod:cpu_recommendation" {
 				assert.Contains(t, r.Expr.String(), "110/100")
 				found = true
 				break
 			}
 		}
 	}
-	assert.True(t, found, "cpu_recommendation rule should exist")
+	assert.True(t, found, "pod cpu_recommendation rule should exist")
 }
 
-// TestAllProfilesGenerated verifies that 1d rules are generated for all recommendation profiles.
 func TestAllProfilesGenerated(t *testing.T) {
 	configData := rightsizing.RSConfigMapData{
 		PrometheusRuleConfig: rightsizing.GetDefaultRSPrometheusRuleConfig(),
@@ -134,7 +194,7 @@ func TestAllProfilesGenerated(t *testing.T) {
 
 	for _, group := range rule.Spec.Groups {
 		for _, r := range group.Rules {
-			if r.Record == "acm_rs:namespace:cpu_recommendation" {
+			if r.Record == "acm_rs:pod:cpu_recommendation" {
 				profile := r.Labels["profile"]
 				if _, ok := expectedProfiles[profile]; ok {
 					expectedProfiles[profile] = true
@@ -144,11 +204,10 @@ func TestAllProfilesGenerated(t *testing.T) {
 	}
 
 	for profile, found := range expectedProfiles {
-		assert.True(t, found, "profile %q should generate cpu_recommendation rules", profile)
+		assert.True(t, found, "profile %q should generate pod cpu_recommendation rules", profile)
 	}
 }
 
-// TestProfileAggregationExpressions verifies that each profile uses the correct aggregation function.
 func TestProfileAggregationExpressions(t *testing.T) {
 	configData := rightsizing.RSConfigMapData{
 		PrometheusRuleConfig: rightsizing.GetDefaultRSPrometheusRuleConfig(),
@@ -165,7 +224,7 @@ func TestProfileAggregationExpressions(t *testing.T) {
 
 	for _, group := range rule.Spec.Groups {
 		for _, r := range group.Rules {
-			if r.Record == "acm_rs:namespace:cpu_recommendation" {
+			if r.Record == "acm_rs:workload:cpu_recommendation" {
 				profile := r.Labels["profile"]
 				if expectedPrefix, ok := profileExprs[profile]; ok {
 					assert.Contains(t, r.Expr.String(), expectedPrefix,

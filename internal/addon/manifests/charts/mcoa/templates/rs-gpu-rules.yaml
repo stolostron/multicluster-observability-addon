@@ -1,0 +1,19 @@
+{{- if and .Values.rightSizing .Values.rightSizing.gpuRightSizing .Values.rightSizing.gpuRightSizing.enabled }}
+{{- range $_, $rule := .Values.rightSizing.gpuRightSizing.rules }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ $rule.name }}
+  namespace: openshift-monitoring
+  labels:
+    {{- $mcoaHelmLabels := fromYaml (include "mcoahelm.labels" $) }}
+    {{- $customLabel := dict "app.kubernetes.io/component" "right-sizing-gpu" }}
+    {{- $mergedLabels := mergeOverwrite $mcoaHelmLabels $customLabel }}
+    {{- toYaml $mergedLabels | nindent 4 }}
+  annotations:
+    operator.prometheus.io/controller-id: "openshift-monitoring/prometheus-operator"
+spec:
+{{ fromJson $rule.data | toYaml | nindent 2 }}
+---
+{{- end }}
+{{- end }}

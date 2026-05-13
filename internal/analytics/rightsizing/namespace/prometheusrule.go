@@ -113,23 +113,28 @@ func buildNamespaceRules5m(nsFilter string, rb *rightsizing.RuleBuilder) []monit
 	}
 }
 
-// buildNamespaceRules1d builds 1-day aggregation recording rules for namespace-level metrics.
-// Aggregates the 5m rules into daily summaries with profile/aggregation labels for dashboard selection.
+// buildNamespaceRules1d builds 1-day aggregation recording rules for namespace-level metrics
+// across all recommendation profiles (Max, P99, P95, Avg).
 func buildNamespaceRules1d(configData rightsizing.RSConfigMapData, rb *rightsizing.RuleBuilder) []monitoringv1.Rule {
 	rp := configData.PrometheusRuleConfig.RecommendationPercentage
 	if rp == 0 {
 		rp = rightsizing.DefaultRecommendationPercentage
 	}
-	return []monitoringv1.Rule{
-		rb.RuleWithLabels("acm_rs:namespace:cpu_request_hard", rightsizing.Build1dAggregationExpr("acm_rs:namespace:cpu_request_hard:5m")),
-		rb.RuleWithLabels("acm_rs:namespace:cpu_request", rightsizing.Build1dAggregationExpr("acm_rs:namespace:cpu_request:5m")),
-		rb.RuleWithLabels("acm_rs:namespace:cpu_usage", rightsizing.Build1dAggregationExpr("acm_rs:namespace:cpu_usage:5m")),
-		rb.RuleWithLabels("acm_rs:namespace:cpu_recommendation", rightsizing.BuildRecommendationExpr("acm_rs:namespace:cpu_usage:5m", rp)),
-		rb.RuleWithLabels("acm_rs:namespace:memory_request_hard", rightsizing.Build1dAggregationExpr("acm_rs:namespace:memory_request_hard:5m")),
-		rb.RuleWithLabels("acm_rs:namespace:memory_request", rightsizing.Build1dAggregationExpr("acm_rs:namespace:memory_request:5m")),
-		rb.RuleWithLabels("acm_rs:namespace:memory_usage", rightsizing.Build1dAggregationExpr("acm_rs:namespace:memory_usage:5m")),
-		rb.RuleWithLabels("acm_rs:namespace:memory_recommendation", rightsizing.BuildRecommendationExpr("acm_rs:namespace:memory_usage:5m", rp)),
+	var rules []monitoringv1.Rule
+	for _, profile := range rightsizing.RecommendationProfiles {
+		prb := rb.WithProfile(profile.Name)
+		rules = append(rules,
+			prb.RuleWithLabels("acm_rs:namespace:cpu_request_hard", profile.AggExpr("acm_rs:namespace:cpu_request_hard:5m")),
+			prb.RuleWithLabels("acm_rs:namespace:cpu_request", profile.AggExpr("acm_rs:namespace:cpu_request:5m")),
+			prb.RuleWithLabels("acm_rs:namespace:cpu_usage", profile.AggExpr("acm_rs:namespace:cpu_usage:5m")),
+			prb.RuleWithLabels("acm_rs:namespace:cpu_recommendation", rightsizing.BuildProfiledRecommendationExpr("acm_rs:namespace:cpu_usage:5m", rp, profile)),
+			prb.RuleWithLabels("acm_rs:namespace:memory_request_hard", profile.AggExpr("acm_rs:namespace:memory_request_hard:5m")),
+			prb.RuleWithLabels("acm_rs:namespace:memory_request", profile.AggExpr("acm_rs:namespace:memory_request:5m")),
+			prb.RuleWithLabels("acm_rs:namespace:memory_usage", profile.AggExpr("acm_rs:namespace:memory_usage:5m")),
+			prb.RuleWithLabels("acm_rs:namespace:memory_recommendation", rightsizing.BuildProfiledRecommendationExpr("acm_rs:namespace:memory_usage:5m", rp, profile)),
+		)
 	}
+	return rules
 }
 
 // buildClusterRules5m builds 5-minute recording rules for cluster-level resource metrics.
@@ -187,21 +192,26 @@ func buildClusterRules5m(nsFilter string, rb *rightsizing.RuleBuilder) []monitor
 	}
 }
 
-// buildClusterRules1d builds 1-day aggregation recording rules for cluster-level metrics.
-// Aggregates the 5m cluster rules into daily summaries with profile/aggregation labels for dashboard selection.
+// buildClusterRules1d builds 1-day aggregation recording rules for cluster-level metrics
+// across all recommendation profiles (Max, P99, P95, Avg).
 func buildClusterRules1d(configData rightsizing.RSConfigMapData, rb *rightsizing.RuleBuilder) []monitoringv1.Rule {
 	rp := configData.PrometheusRuleConfig.RecommendationPercentage
 	if rp == 0 {
 		rp = rightsizing.DefaultRecommendationPercentage
 	}
-	return []monitoringv1.Rule{
-		rb.RuleWithLabels("acm_rs:cluster:cpu_request_hard", rightsizing.Build1dAggregationExpr("acm_rs:cluster:cpu_request_hard:5m")),
-		rb.RuleWithLabels("acm_rs:cluster:cpu_request", rightsizing.Build1dAggregationExpr("acm_rs:cluster:cpu_request:5m")),
-		rb.RuleWithLabels("acm_rs:cluster:cpu_usage", rightsizing.Build1dAggregationExpr("acm_rs:cluster:cpu_usage:5m")),
-		rb.RuleWithLabels("acm_rs:cluster:cpu_recommendation", rightsizing.BuildRecommendationExpr("acm_rs:cluster:cpu_usage:5m", rp)),
-		rb.RuleWithLabels("acm_rs:cluster:memory_request_hard", rightsizing.Build1dAggregationExpr("acm_rs:cluster:memory_request_hard:5m")),
-		rb.RuleWithLabels("acm_rs:cluster:memory_request", rightsizing.Build1dAggregationExpr("acm_rs:cluster:memory_request:5m")),
-		rb.RuleWithLabels("acm_rs:cluster:memory_usage", rightsizing.Build1dAggregationExpr("acm_rs:cluster:memory_usage:5m")),
-		rb.RuleWithLabels("acm_rs:cluster:memory_recommendation", rightsizing.BuildRecommendationExpr("acm_rs:cluster:memory_usage:5m", rp)),
+	var rules []monitoringv1.Rule
+	for _, profile := range rightsizing.RecommendationProfiles {
+		prb := rb.WithProfile(profile.Name)
+		rules = append(rules,
+			prb.RuleWithLabels("acm_rs:cluster:cpu_request_hard", profile.AggExpr("acm_rs:cluster:cpu_request_hard:5m")),
+			prb.RuleWithLabels("acm_rs:cluster:cpu_request", profile.AggExpr("acm_rs:cluster:cpu_request:5m")),
+			prb.RuleWithLabels("acm_rs:cluster:cpu_usage", profile.AggExpr("acm_rs:cluster:cpu_usage:5m")),
+			prb.RuleWithLabels("acm_rs:cluster:cpu_recommendation", rightsizing.BuildProfiledRecommendationExpr("acm_rs:cluster:cpu_usage:5m", rp, profile)),
+			prb.RuleWithLabels("acm_rs:cluster:memory_request_hard", profile.AggExpr("acm_rs:cluster:memory_request_hard:5m")),
+			prb.RuleWithLabels("acm_rs:cluster:memory_request", profile.AggExpr("acm_rs:cluster:memory_request:5m")),
+			prb.RuleWithLabels("acm_rs:cluster:memory_usage", profile.AggExpr("acm_rs:cluster:memory_usage:5m")),
+			prb.RuleWithLabels("acm_rs:cluster:memory_recommendation", rightsizing.BuildProfiledRecommendationExpr("acm_rs:cluster:memory_usage:5m", rp, profile)),
+		)
 	}
+	return rules
 }

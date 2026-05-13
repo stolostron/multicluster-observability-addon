@@ -21,6 +21,8 @@ const (
 	KeyPlatformIncidentDetection         = "platformIncidentDetection"
 	KeyPlatformNamespaceRightSizing      = "platformNamespaceRightSizing"
 	KeyPlatformVirtualizationRightSizing = "platformVirtualizationRightSizing"
+	KeyPlatformWorkloadPodRightSizing    = "platformWorkloadPodRightSizing"
+	KeyPlatformGPURightSizing            = "platformGPURightSizing"
 	KeyMetricsHubHostname                = "metricsHubHostname"
 	KeyMetricsAlertManagerHostname       = "metricsAlertManagerHostname"
 	KeyNodeExporterHostPort              = "nodeExporterHostPort"
@@ -93,6 +95,8 @@ type PlatformOptions struct {
 type RightSizingOptions struct {
 	NamespaceEnabled      bool
 	VirtualizationEnabled bool
+	WorkloadPodEnabled    bool
+	GPUEnabled            bool
 }
 
 type AnalyticsOptions struct {
@@ -268,6 +272,16 @@ func BuildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Opti
 			if keyvalue.Value == "enabled" {
 				opts.Platform.AnalyticsOptions.RightSizing.VirtualizationEnabled = true
 			}
+		case KeyPlatformWorkloadPodRightSizing:
+			opts.Platform.Enabled = true
+			if keyvalue.Value == "enabled" {
+				opts.Platform.AnalyticsOptions.RightSizing.WorkloadPodEnabled = true
+			}
+		case KeyPlatformGPURightSizing:
+			opts.Platform.Enabled = true
+			if keyvalue.Value == "enabled" {
+				opts.Platform.AnalyticsOptions.RightSizing.GPUEnabled = true
+			}
 		// User Workload Observability Options
 		case KeyUserWorkloadMetricsCollection:
 			if keyvalue.Value == string(PrometheusAgentV1alpha1) {
@@ -309,6 +323,11 @@ func BuildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Opti
 	//
 	// The auto-enable ensures right-sizing works immediately on fresh installs
 	// before the analytics controller has had time to sync state to ADC.
+	//
+	// NOTE: Workload-pod and GPU right-sizing are NOT auto-enabled. They require
+	// explicit opt-in via the ADC keys (platformWorkloadPodRightSizing,
+	// platformGPURightSizing). The MCO syncRightSizingStateToADC is responsible
+	// for setting these keys based on the MCO CR spec during mode switches.
 	if !nsRSExplicitlySet {
 		opts.Platform.Enabled = true
 		opts.Platform.AnalyticsOptions.RightSizing.NamespaceEnabled = true

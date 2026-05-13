@@ -5,6 +5,8 @@
 package rightsizing
 
 import (
+	"fmt"
+
 	"github.com/perses/community-mixins/pkg/dashboards"
 	commonSdk "github.com/perses/perses/go-sdk/common"
 	"github.com/perses/perses/go-sdk/panel"
@@ -13,6 +15,20 @@ import (
 	tablePanel "github.com/perses/plugins/table/sdk/go"
 	timeSeriesPanel "github.com/perses/plugins/timeserieschart/sdk/go"
 )
+
+func namespaceToWorkloadLink(project, title string) *DataLink {
+	return &DataLink{
+		OpenNewTab: false,
+		Title:      title,
+		URL: fmt.Sprintf(
+			"/monitoring/v2/dashboards/view?dashboard=acm-rs-workload-pod-overview&project=%s"+
+				"&var-cluster=$cluster"+
+				"&var-namespace=${__data.fields[\"namespace\"]}"+
+				"&var-days=$days&var-profile=$profile",
+			project,
+		),
+	}
+}
 
 // nsTblCol is a shorthand to create a ColumnSettingsWithLink for namespace tables (no DataLink).
 func nsTblCol(name, header string, align tablePanel.Align, format *commonSdk.Format, opts ...func(*ColumnSettingsWithLink)) ColumnSettingsWithLink {
@@ -52,7 +68,7 @@ func CPURecommendationPanel(datasourceName string) panelgroup.Option {
 		Query:       `max_over_time(sum by (cluster)(acm_rs:cluster:cpu_recommendation{cluster="$cluster", profile="$profile"})[$days:])`,
 		Unit:        &dashboards.DecimalUnit,
 		Decimals:    2,
-		FontSize:    40,
+		FontSize:    48,
 		Thresholds:  nsStatThreshold,
 	})
 }
@@ -64,7 +80,7 @@ func CPUUsagePanel(datasourceName string) panelgroup.Option {
 		Query:       `max_over_time(sum by (cluster)(acm_rs:cluster:cpu_usage{cluster="$cluster", profile="$profile"})[$days:])`,
 		Unit:        &dashboards.DecimalUnit,
 		Decimals:    2,
-		FontSize:    40,
+		FontSize:    48,
 		Thresholds:  nsStatThreshold,
 	})
 }
@@ -76,7 +92,7 @@ func CPURequestPanel(datasourceName string) panelgroup.Option {
 		Query:       `max_over_time(sum by (cluster)(acm_rs:cluster:cpu_request{cluster="$cluster", profile="$profile"})[$days:])`,
 		Unit:        &dashboards.DecimalUnit,
 		Decimals:    2,
-		FontSize:    40,
+		FontSize:    48,
 		Thresholds:  nsStatThreshold,
 	})
 }
@@ -88,7 +104,7 @@ func CPUUtilizationPanel(datasourceName string) panelgroup.Option {
 		Query:       `max_over_time(sum by (cluster)(acm_rs:cluster:cpu_usage{cluster="$cluster", profile="$profile"})[$days:]) / max_over_time(sum by (cluster)(acm_rs:cluster:cpu_request{cluster="$cluster", profile="$profile"})[$days:])`,
 		Unit:        &dashboards.PercentDecimalUnit,
 		Decimals:    1,
-		FontSize:    40,
+		FontSize:    48,
 		Thresholds:  nsUtilizationThreshold,
 	})
 }
@@ -205,13 +221,22 @@ func MemTopNamespacesPanel(datasourceName string) panelgroup.Option {
 	)
 }
 
-func CPUQuotaTablePanel(datasourceName string) panelgroup.Option {
+func CPUQuotaTablePanel(datasourceName string, project string, linkToWorkload bool) panelgroup.Option {
+	nsCol := nsTblCol("namespace", "Namespace", tablePanel.LeftAlign, nil)
+	desc := "CPU utilization, usage, request, recommendation, and request hard per namespace"
+	if linkToWorkload {
+		nsCol = ColumnSettingsWithLink{
+			ColumnSettings: tablePanel.ColumnSettings{Name: "namespace", Header: "Namespace", Align: tablePanel.LeftAlign, EnableSorting: true},
+			DataLink:       namespaceToWorkloadLink(project, "View Workloads in Namespace"),
+		}
+		desc += ".\nClick Namespace to drill down into workload-level details."
+	}
 	return panelgroup.AddPanel("CPU Quota Table",
-		panel.Description("CPU utilization, usage, request, recommendation, and request hard per namespace"),
+		panel.Description(desc),
 		TableWithLinks(TablePluginSpec{
 			ColumnSettings: []ColumnSettingsWithLink{
 				{ColumnSettings: tablePanel.ColumnSettings{Name: "timestamp", Hide: true}},
-				nsTblCol("namespace", "Namespace", tablePanel.LeftAlign, nil),
+				nsCol,
 				nsTblCol("value #1", "CPU Utilization %", tablePanel.RightAlign,
 					&commonSdk.Format{Unit: &dashboards.PercentDecimalUnit, DecimalPlaces: 2},
 					func(c *ColumnSettingsWithLink) { c.Sort = tablePanel.DescSort }),
@@ -266,13 +291,22 @@ func CPUQuotaTablePanel(datasourceName string) panelgroup.Option {
 	)
 }
 
-func MemQuotaTablePanel(datasourceName string) panelgroup.Option {
+func MemQuotaTablePanel(datasourceName string, project string, linkToWorkload bool) panelgroup.Option {
+	nsCol := nsTblCol("namespace", "Namespace", tablePanel.LeftAlign, nil)
+	desc := "Memory utilization, usage, request, recommendation, and request hard per namespace"
+	if linkToWorkload {
+		nsCol = ColumnSettingsWithLink{
+			ColumnSettings: tablePanel.ColumnSettings{Name: "namespace", Header: "Namespace", Align: tablePanel.LeftAlign, EnableSorting: true},
+			DataLink:       namespaceToWorkloadLink(project, "View Workloads in Namespace"),
+		}
+		desc += ".\nClick Namespace to drill down into workload-level details."
+	}
 	return panelgroup.AddPanel("Memory Quota Table",
-		panel.Description("Memory utilization, usage, request, recommendation, and request hard per namespace"),
+		panel.Description(desc),
 		TableWithLinks(TablePluginSpec{
 			ColumnSettings: []ColumnSettingsWithLink{
 				{ColumnSettings: tablePanel.ColumnSettings{Name: "timestamp", Hide: true}},
-				nsTblCol("namespace", "Namespace", tablePanel.LeftAlign, nil),
+				nsCol,
 				nsTblCol("value #1", "Memory Utilization %", tablePanel.RightAlign,
 					&commonSdk.Format{Unit: &dashboards.PercentDecimalUnit, DecimalPlaces: 2},
 					func(c *ColumnSettingsWithLink) { c.Sort = tablePanel.DescSort }),

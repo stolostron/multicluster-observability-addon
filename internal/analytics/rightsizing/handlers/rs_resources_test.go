@@ -52,6 +52,10 @@ func newTestOptionsBuilder(t *testing.T, objs ...runtime.Object) *OptionsBuilder
 }
 
 func newPlatformOpts(nsEnabled, virtEnabled bool) addon.Options {
+	return newPlatformOptsAll(nsEnabled, virtEnabled, false)
+}
+
+func newPlatformOptsAll(nsEnabled, virtEnabled, wlEnabled bool) addon.Options {
 	return addon.Options{
 		Platform: addon.PlatformOptions{
 			Enabled: true,
@@ -59,6 +63,7 @@ func newPlatformOpts(nsEnabled, virtEnabled bool) addon.Options {
 				RightSizing: addon.RightSizingOptions{
 					NamespaceEnabled:      nsEnabled,
 					VirtualizationEnabled: virtEnabled,
+					WorkloadPodEnabled:    wlEnabled,
 				},
 			},
 		},
@@ -84,6 +89,12 @@ func TestRSConfigMapPredicate(t *testing.T) {
 	rsVirtCM := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
 		Name: rightsizing.VirtualizationConfigMapName, Namespace: addoncfg.InstallNamespace,
 	}}
+	rsWlCM := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
+		Name: rightsizing.WorkloadConfigMapName, Namespace: addoncfg.InstallNamespace,
+	}}
+	rsGpuCM := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
+		Name: rightsizing.GPUConfigMapName, Namespace: addoncfg.InstallNamespace,
+	}}
 	unrelatedCM := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
 		Name: "other-config", Namespace: addoncfg.InstallNamespace,
 	}}
@@ -94,6 +105,8 @@ func TestRSConfigMapPredicate(t *testing.T) {
 	// Create: accepts RS ConfigMaps, rejects others
 	assert.True(t, pred.CreateFunc(event.CreateEvent{Object: rsNsCM}))
 	assert.True(t, pred.CreateFunc(event.CreateEvent{Object: rsVirtCM}))
+	assert.True(t, pred.CreateFunc(event.CreateEvent{Object: rsWlCM}))
+	assert.True(t, pred.CreateFunc(event.CreateEvent{Object: rsGpuCM}))
 	assert.False(t, pred.CreateFunc(event.CreateEvent{Object: unrelatedCM}))
 	assert.False(t, pred.CreateFunc(event.CreateEvent{Object: wrongNsCM}))
 
@@ -175,11 +188,43 @@ func TestReconcileRSResources_CleanupBoth(t *testing.T) {
 	assert.True(t, apierrors.IsNotFound(err), "virtualization configmap should be deleted")
 }
 
+func TestReconcileRSResources_CleanupWorkload(t *testing.T) {
+	wlCM := createTestConfigMap(rightsizing.WorkloadConfigMapName)
+
+	ob := newTestOptionsBuilder(t, wlCM)
+	ctx := context.TODO()
+
+	opts := newPlatformOptsAll(false, false, false)
+	err := ob.ReconcileRSResources(ctx, opts)
+	require.NoError(t, err)
+
+	err = ob.Client.Get(ctx, types.NamespacedName{
+		Name: rightsizing.WorkloadConfigMapName, Namespace: addoncfg.InstallNamespace,
+	}, &corev1.ConfigMap{})
+	assert.True(t, apierrors.IsNotFound(err), "workload configmap should be deleted")
+}
+
+func TestReconcileRSResources_CleanupGPU(t *testing.T) {
+	gpuCM := createTestConfigMap(rightsizing.GPUConfigMapName)
+
+	ob := newTestOptionsBuilder(t, gpuCM)
+	ctx := context.TODO()
+
+	opts := newPlatformOptsAll(false, false, false)
+	err := ob.ReconcileRSResources(ctx, opts)
+	require.NoError(t, err)
+
+	err = ob.Client.Get(ctx, types.NamespacedName{
+		Name: rightsizing.GPUConfigMapName, Namespace: addoncfg.InstallNamespace,
+	}, &corev1.ConfigMap{})
+	assert.True(t, apierrors.IsNotFound(err), "GPU configmap should be deleted")
+}
+
 func TestReconcileRSResources_CleanupIdempotent(t *testing.T) {
 	ob := newTestOptionsBuilder(t)
 	ctx := context.TODO()
 
-	opts := newPlatformOpts(false, false)
+	opts := newPlatformOptsAll(false, false, false)
 	err := ob.ReconcileRSResources(ctx, opts)
 	require.NoError(t, err)
 }

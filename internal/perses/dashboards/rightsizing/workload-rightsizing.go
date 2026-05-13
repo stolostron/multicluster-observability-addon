@@ -17,51 +17,44 @@ import (
 	panels "github.com/stolostron/multicluster-observability-addon/internal/perses/panels/rightsizing"
 )
 
-func withCPUSection(datasource string, project string, linkToWorkload bool) dashboard.Option {
+func withWorkloadCPUSection(datasource string, project string) dashboard.Option {
 	return acmHelpers.AddCustomPanelGroup("CPU",
 		[]acmHelpers.GridItem{
-			{X: 0, Y: 0, W: 6, H: 4},
-			{X: 0, Y: 4, W: 6, H: 4},
-			{X: 0, Y: 8, W: 6, H: 4},
-			{X: 0, Y: 12, W: 6, H: 4},
-			{X: 6, Y: 0, W: 18, H: 16},
-			{X: 0, Y: 16, W: 24, H: 10},
+			{X: 0, Y: 0, W: 24, H: 12},
+			{X: 0, Y: 12, W: 24, H: 10},
 		},
-		panels.CPURecommendationPanel(datasource),
-		panels.CPUUsagePanel(datasource),
-		panels.CPURequestPanel(datasource),
-		panels.CPUUtilizationPanel(datasource),
-		panels.CPUTopNamespacesPanel(datasource),
-		panels.CPUQuotaTablePanel(datasource, project, linkToWorkload),
+		panels.WorkloadCPUTopWorkloadsPanel(datasource),
+		panels.WorkloadCPUTablePanel(datasource, project),
 	)
 }
 
-func withMemSection(datasource string, project string, linkToWorkload bool) dashboard.Option {
+func withWorkloadMemSection(datasource string, project string) dashboard.Option {
 	return acmHelpers.AddCustomPanelGroup("Memory",
 		[]acmHelpers.GridItem{
-			{X: 0, Y: 0, W: 6, H: 4},
-			{X: 0, Y: 4, W: 6, H: 4},
-			{X: 0, Y: 8, W: 6, H: 4},
-			{X: 0, Y: 12, W: 6, H: 4},
-			{X: 6, Y: 0, W: 18, H: 16},
-			{X: 0, Y: 16, W: 24, H: 10},
+			{X: 0, Y: 0, W: 24, H: 12},
+			{X: 0, Y: 12, W: 24, H: 10},
 		},
-		panels.MemRecommendationPanel(datasource),
-		panels.MemUsagePanel(datasource),
-		panels.MemRequestPanel(datasource),
-		panels.MemUtilizationPanel(datasource),
-		panels.MemTopNamespacesPanel(datasource),
-		panels.MemQuotaTablePanel(datasource, project, linkToWorkload),
+		panels.WorkloadMemTopWorkloadsPanel(datasource),
+		panels.WorkloadMemTablePanel(datasource, project),
 	)
 }
 
-// BuildNamespaceRightSizing creates the namespace right-sizing dashboard.
-// When workloadPodEnabled is true, the namespace table columns include
-// drill-down links to the workload-pod overview dashboard.
-func BuildNamespaceRightSizing(project string, datasource string, clusterLabelName string, workloadPodEnabled bool) (dashboard.Builder, error) {
-	return dashboard.New("acm-rs-namespace-overview",
+func withPodsSection(datasource string, project string) dashboard.Option {
+	return acmHelpers.AddCustomPanelGroup("Pods",
+		[]acmHelpers.GridItem{
+			{X: 0, Y: 0, W: 24, H: 10},
+			{X: 0, Y: 10, W: 24, H: 10},
+		},
+		panels.PodCPUTablePanel(datasource, project),
+		panels.PodMemTablePanel(datasource, project),
+	)
+}
+
+// BuildWorkloadPodRightSizing creates the workload-pod right-sizing dashboard
+func BuildWorkloadPodRightSizing(project string, datasource string, clusterLabelName string) (dashboard.Builder, error) {
+	return dashboard.New("acm-rs-workload-pod-overview",
 		dashboard.ProjectName(project),
-		dashboard.Name("ACM Right-Sizing Namespace"),
+		dashboard.Name("ACM Right-Sizing Workloads & Pods"),
 		dashboard.Duration(time.Hour*24*7),
 
 		dashboard.AddVariable("cluster",
@@ -70,7 +63,7 @@ func BuildNamespaceRightSizing(project string, datasource string, clusterLabelNa
 					dashboards.AddVariableDatasource(datasource),
 					labelValuesVar.Matchers(
 						promql.SetLabelMatchers(
-							"acm_rs:cluster:cpu_request",
+							"acm_rs:workload:cpu_request",
 							[]promql.LabelMatcher{},
 						)),
 				),
@@ -87,7 +80,7 @@ func BuildNamespaceRightSizing(project string, datasource string, clusterLabelNa
 					dashboards.AddVariableDatasource(datasource),
 					labelValuesVar.Matchers(
 						promql.SetLabelMatchers(
-							`acm_rs:namespace:cpu_usage{cluster="$cluster"}`,
+							`acm_rs:workload:cpu_usage{cluster="$cluster"}`,
 							[]promql.LabelMatcher{},
 						)),
 				),
@@ -110,7 +103,25 @@ func BuildNamespaceRightSizing(project string, datasource string, clusterLabelNa
 			),
 		),
 
-		withCPUSection(datasource, project, workloadPodEnabled),
-		withMemSection(datasource, project, workloadPodEnabled),
+		dashboard.AddVariable("namespace",
+			listVar.List(
+				labelValuesVar.PrometheusLabelValues("namespace",
+					dashboards.AddVariableDatasource(datasource),
+					labelValuesVar.Matchers(
+						promql.SetLabelMatchers(
+							`acm_rs:workload:cpu_usage{cluster="$cluster", profile="$profile"}`,
+							[]promql.LabelMatcher{},
+						)),
+				),
+				listVar.DisplayName("Namespace"),
+				listVar.DefaultValue("$__all"),
+				listVar.AllowAllValue(true),
+				listVar.AllowMultiple(true),
+			),
+		),
+
+		withWorkloadCPUSection(datasource, project),
+		withWorkloadMemSection(datasource, project),
+		withPodsSection(datasource, project),
 	)
 }

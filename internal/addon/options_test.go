@@ -268,6 +268,53 @@ func TestBuildOptions(t *testing.T) {
 			},
 		},
 		{
+			name: "right-sizing workload-pod enabled explicitly",
+			addOnDeploy: &addonapiv1alpha1.AddOnDeploymentConfig{
+				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
+					CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
+						{Name: KeyPlatformNamespaceRightSizing, Value: "enabled"},
+						{Name: KeyPlatformVirtualizationRightSizing, Value: "enabled"},
+						{Name: KeyPlatformWorkloadPodRightSizing, Value: "enabled"},
+					},
+				},
+			},
+			expectedOpts: Options{
+				Platform: PlatformOptions{
+					Enabled: true,
+					AnalyticsOptions: AnalyticsOptions{
+						RightSizing: RightSizingOptions{
+							NamespaceEnabled:      true,
+							VirtualizationEnabled: true,
+							WorkloadPodEnabled:    true,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "right-sizing GPU enabled explicitly",
+			addOnDeploy: &addonapiv1alpha1.AddOnDeploymentConfig{
+				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
+					CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
+						{Name: KeyPlatformNamespaceRightSizing, Value: "enabled"},
+						{Name: KeyPlatformGPURightSizing, Value: "enabled"},
+					},
+				},
+			},
+			expectedOpts: Options{
+				Platform: PlatformOptions{
+					Enabled: true,
+					AnalyticsOptions: AnalyticsOptions{
+						RightSizing: RightSizingOptions{
+							NamespaceEnabled:      true,
+							VirtualizationEnabled: true,
+							GPUEnabled:            true,
+						},
+					},
+				},
+			},
+		},
+		{
 			name: "right-sizing disabled explicitly",
 			addOnDeploy: &addonapiv1alpha1.AddOnDeploymentConfig{
 				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
