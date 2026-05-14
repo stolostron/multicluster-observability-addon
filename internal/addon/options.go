@@ -24,9 +24,9 @@ const (
 	KeyPlatformWorkloadPodRightSizing    = "platformWorkloadPodRightSizing"
 	KeyPlatformGPURightSizing            = "platformGPURightSizing"
 
-	ADCKeyPrediction         = "platformRightSizingPrediction"
-	ADCKeyPredictionProvider = "platformRightSizingPredictionProvider"
-	ADCKeyPredictionConfig   = "platformRightSizingPredictionConfig"
+	ADCKeyPrediction               = "platformRightSizingPrediction"
+	ADCKeyPredictionProvider       = "platformRightSizingPredictionProvider"
+	ADCKeyPredictionConfig         = "platformRightSizingPredictionConfig"
 	KeyMetricsHubHostname          = "metricsHubHostname"
 	KeyMetricsAlertManagerHostname = "metricsAlertManagerHostname"
 	KeyNodeExporterHostPort        = "nodeExporterHostPort"
