@@ -21,7 +21,7 @@ func ValidateTrainingResult(oldMAPE, newMAPE float64) bool {
 // ComputeMAPE computes mean absolute percentage error over aligned actual vs predicted points.
 func ComputeMAPE(actual, predicted []prediction.DataPoint) float64 {
 	if len(actual) == 0 || len(predicted) == 0 {
-		return math.Inf(1)
+		return 0
 	}
 	n := len(actual)
 	if len(predicted) < n {

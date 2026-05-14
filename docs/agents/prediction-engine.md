@@ -11,11 +11,36 @@
 - `internal/analytics/rightsizing/prediction/backtest.go`: `Backtest()` — train/test split validation (80/20). Computes MAPE, RMSE per model. Updates ensemble weights only if improvement > 5%
 - `internal/analytics/rightsizing/prediction/features/types.go`: `FeatureVector` struct and `ExtractFeatures()` — extracts temporal, statistical, trend, workload behavior, and correlation features from `acm_rs:*` time-series
 - `internal/analytics/rightsizing/prediction/anomaly/detector.go`: `Detect()` — composite anomaly detector combining Z-score, rate-of-change, and adaptive threshold methods. Returns `[]AnomalyResult`
-- `internal/analytics/rightsizing/prediction/optimizer/recommender.go`: `Recommend()` — combines forecast + anomaly + safety bounds into final `OptimizationResult` with target CPU/memory and estimated savings
-- `internal/analytics/rightsizing/prediction/training/controller.go`: `TrainingController` — periodic reconciler (every 6h). Queries Thanos for 7-90 day history, trains per-workload models, validates via backtest, stores parameters in ConfigMaps
+- `internal/analytics/rightsizing/prediction/optimizer/recommender.go`: `Recommend()` — combines forecast + anomaly + safety bounds into final `OptimizationResult` with target CPU/memory and estimated savings; `RecommendWithGPU()` adds `TargetGPU` and `TargetGPUMemory` from GPU utilization and GPU memory forecasts
+- `internal/analytics/rightsizing/prediction/training/controller.go`: `TrainingController` — periodic reconciler (every 6h). Queries Thanos for 7-90 day history across all **enabled** RS dimensions (namespace, workload/pod, GPU, VM), trains per-series models, validates via backtest, stores parameters in ConfigMaps
 - `internal/analytics/rightsizing/prediction/provider/interface.go`: `PredictionProvider` interface — the pluggable contract. `Forecast()`, `Train()`, `DetectAnomalies()`, `Explain()`, `ProviderType()`, `PrivacyLevel()`
 - `internal/analytics/rightsizing/prediction/provider/registry.go`: `ProviderRegistry` — factory that creates the correct provider from ADC configuration
 - `internal/analytics/rightsizing/prediction/privacy/consent.go`: `ValidateConsent()` — blocks external API calls unless `dataExfiltrationConsent: true` is set. `RedactLabels()` hashes sensitive labels before external send
+- `internal/analytics/rightsizing/scrapeconfig.go`: `GenerateScrapeConfig` — builds federation `match[]` lists for namespace, virtualization (VM), workload/pod, GPU, and prediction metrics when each feature flag is set
+
+## Multi-Dimension Architecture
+
+Training, forecasting, and federation are aligned with four **right-sizing dimensions**. Each dimension uses distinct recording-rule inputs (5m rollups where applicable):
+
+| Dimension | Resource signals (examples) |
+|-----------|------------------------------|
+| **Namespace** (CPU/memory) | `acm_rs:namespace:cpu_usage:5m`, `acm_rs:namespace:memory_usage:5m` |
+| **Workload/pod** (CPU/memory) | `acm_rs:workload:cpu_usage:5m`, `acm_rs:workload:memory_usage:5m` |
+| **GPU** (utilization / memory) | `acm_rs:namespace:gpu_usage:5m`, `acm_rs:namespace:gpu_memory_used:5m` |
+| **VM** (CPU/memory) | `acm_rs_vm:namespace:cpu_usage:5m`, `acm_rs_vm:namespace:memory_usage:5m` |
+
+The **training controller** appends Thanos queries only for dimensions whose flags are set in `TrainingConfig`: `NamespaceEnabled`, `WorkloadEnabled`, `GPUEnabled`, `VMEnabled`. Those flags are populated from the active RS capability flags on the hub (`NamespaceRightSizing`, `WorkloadPodRightSizing`, `GPURightSizing`, `VirtualizationRightSizing` via `internal/analytics/rightsizing/handlers/values.go`), so turning off a RS component stops training and history pull for that dimension.
+
+**Forecast exposition** uses fourteen Prometheus metrics (federated when prediction is enabled; see `PredictionMetrics` in `scrapeconfig.go`):
+
+- Namespace: `acm_rs:prediction_forecast_cpu`, `acm_rs:prediction_forecast_memory`
+- Workload: `acm_rs:prediction_forecast_workload_cpu`, `acm_rs:prediction_forecast_workload_memory`
+- GPU: `acm_rs:prediction_forecast_gpu_utilization`, `acm_rs:prediction_forecast_gpu_memory`
+- VM: `acm_rs:prediction_forecast_vm_cpu`, `acm_rs:prediction_forecast_vm_memory`
+- Anomaly (cross-cutting): `acm_rs:prediction_anomaly_score`, `acm_rs:prediction_anomaly_score_workload`, `acm_rs:prediction_anomaly_score_gpu`, `acm_rs:prediction_anomaly_score_vm`
+- Quality: `acm_rs:prediction_model_accuracy`, `acm_rs:prediction_ensemble_weight`
+
+**Perses** rightsizing dashboards (`internal/perses/dashboards/rightsizing/`) add a collapsible **Forecasting** section on namespace, workload, GPU, and VM dashboards, with **ten** panels overall (forecast vs. actual time series per dimension, wired through `internal/perses/panels/rightsizing/`).
 
 ## Patterns & Conventions
 
@@ -69,14 +94,19 @@ The `PredictionProvider` interface abstracts the prediction backend. Four implem
 
 `TrainingController` runs as a reconciler inside the MCOA process (not a separate CronJob):
 - **Trigger**: every 6 hours (configurable via `rs-prediction-config` ConfigMap)
-- **Scope**: one model ensemble per (cluster, namespace, workload, resource) tuple
-- **Data source**: Thanos range queries for `acm_rs:*` metrics, 7-90 day windows
+- **Scope**: one model ensemble per time series key (cluster, namespace, workload identity, resource label) — covering each enabled dimension’s CPU/memory/utilization streams
+- **Data source**: Thanos range queries for `acm_rs:*` and `acm_rs_vm:*` metrics (see Multi-Dimension Architecture), 7-90 day windows
+- **Gating**: `NamespaceEnabled`, `WorkloadEnabled`, `GPUEnabled`, `VMEnabled` in `TrainingConfig` — only queries and trains for dimensions whose RS components are active
 - **Storage**: model coefficients in ConfigMap `rs-prediction-model-state` (~200 bytes per workload). Sharded if fleet is large.
 - **Validation**: trains on 80%, validates on 20%. Only updates weights if MAPE improves by > 5%.
 
 ### Optimization Recommender
 
-Combines forecast + anomaly + safety into a final target:
+`Recommend()` combines forecast + anomaly + safety into CPU/memory targets. **`RecommendWithGPU()`** extends that path with GPU utilization and GPU memory: it fills `TargetGPU` and `TargetGPUMemory` on `OptimizationResult`, using the same margin and rate-limit machinery as CPU/memory.
+
+Default **GPU bounds** in `BoundsConfig`: utilization **0–100%** (`MinGPU` / `MaxGPU`); GPU memory **0–80 GiB** (`MinGPUMemoryMiB` / `MaxGPUMemoryMiB`, default max 81920 MiB).
+
+CPU/memory targeting still follows:
 ```
 target = max(
     forecast.PredictedValue * safetyMargin,     // 1.15 default
@@ -88,10 +118,22 @@ target = max(
 
 Respects existing safety mechanisms: bounds (50m-8 CPU, 64Mi-16Gi memory), rate limits (down 30%, up 100%), rollback history (extra headroom for previously-OOMed workloads).
 
+### ScrapeConfig and federation
+
+`GenerateScrapeConfig(includeNamespace, includeVirtualization, includeWorkloadPod, includeGPU, includePrediction bool)` unions dedicated metric name lists:
+
+- **Namespace** → `NamespaceMetrics`
+- **Virtualization (VM)** → `VirtualizationMetrics`
+- **Workload/pod** → `WorkloadPodMetrics`
+- **GPU** → `GPUMetrics`
+- **Prediction** → `PredictionMetrics` (the fourteen forecast/anomaly/quality series above)
+
+The handler passes placement-derived RS matches plus whether prediction is enabled so spokes only federate the slices they need.
+
 ## Gotchas
 
 - **Training controller shares the MCOA process.** It's not a separate pod or CronJob. If MCOA restarts, training state is preserved in ConfigMaps but the in-memory model objects are rebuilt from stored coefficients.
-- **ConfigMap size limits.** Model state is ~200 bytes per workload, but a fleet with 10,000 workloads × 4 resources approaches the 1MB ConfigMap limit. The controller auto-shards across multiple ConfigMaps (`rs-prediction-model-state-0`, `-1`, etc.).
+- **ConfigMap size limits.** Model state is ~200 bytes per trained series, but many workloads × several resource types per enabled dimension approaches the 1MB ConfigMap limit. The controller auto-shards across multiple ConfigMaps (`rs-prediction-model-state-0`, `-1`, etc.).
 - **Holt-Winters seasonal period must match data frequency.** At 5m recording rule intervals: daily = 288 samples, weekly = 2016. If recording rules change frequency, seasonal periods must be updated.
 - **STL LOESS is O(n*k) per iteration.** For 90 days of 5m data (25,920 points), each LOESS iteration processes ~26K points × window size. 3 iterations is the default; increasing iterations improves accuracy but linearly increases training time.
 - **AR order selection tests p=1..maxOrder.** With `maxOrder=10`, Yule-Walker runs 10 times per training. Each is O(p²) from the Toeplitz solve, so this is fast, but if `maxOrder` is set very high it adds up across thousands of workloads.
@@ -100,9 +142,17 @@ Respects existing safety mechanisms: bounds (50m-8 CPU, 64Mi-16Gi memory), rate 
 - **Consent validation happens at call time, not config time.** A misconfigured MCO CR with `provider: external` but missing `dataExfiltrationConsent` will start the external provider but block every call. The `consent_violations_total` metric will increment.
 - **Backtest validation threshold is 5%.** The ensemble only updates weights if a new training run improves MAPE by more than 5%. This prevents oscillation but means small accuracy improvements are ignored.
 
+## File inventory
+
+Rough layout on `feature/rs-prediction-engine`:
+
+- **`internal/analytics/rightsizing/prediction/`** — **34** production Go files (excluding `*_test.go`) across packages: root (`ensemble`, models, `backtest`, `types`), `features/`, `anomaly/`, `optimizer/`, `training/`, `privacy/`, `provider/`.
+- **`internal/perses/panels/rightsizing/`** — **10** panel modules for forecasting and quality visualization: `forecast_cpu.go`, `forecast_memory.go`, `forecast_workload_cpu.go`, `forecast_workload_memory.go`, `forecast_gpu_util.go`, `forecast_gpu_memory.go`, `forecast_vm_cpu.go`, `forecast_vm_memory.go`, `anomaly_score.go`, `model_accuracy.go` (dashboards also use `common.go`, `namespace-panels.go`, `workload-panels.go`, `gpu-panels.go`, `vm-panels.go` for layout).
+- **`internal/addon/manifests/charts/mcoa/templates/`** — **3** Helm templates for prediction: `rs-prediction-configmap.yaml`, `rs-prediction-rbac.yaml`, `rs-prediction-networkpolicy.yaml`.
+
 ## Dependencies & Context
 
-- **Thanos Store**: the training controller queries Thanos for historical `acm_rs:*` metrics. Requires the existing ScrapeConfig federation to be working.
+- **Thanos Store**: the training controller queries Thanos for historical `acm_rs:*` and `acm_rs_vm:*` metrics (per enabled dimension). Requires the existing ScrapeConfig federation to be working.
 - **MCO CR**: prediction configuration flows from `spec.capabilities.platform.analytics.prediction` through MCO → ADC → MCOA. Three ADC keys: `platformRightSizingPrediction`, `platformRightSizingPredictionProvider`, `platformRightSizingPredictionConfig`.
 - **RS Agent** (spoke-side): consumes forecast-informed target values from policy ConfigMaps delivered via ManifestWork. The agent doesn't run any models — it just reads the targets.
 - **PersAI**: extends existing RS tools with `explain_forecast` (which model dominated, feature importance) and `prediction_health` (model accuracy, training status, ensemble weights).
