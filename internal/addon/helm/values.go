@@ -163,6 +163,8 @@ func getCOOValues(ctx context.Context, k8s client.Client, logger logr.Logger, cl
 }
 
 func getRightSizingValues(ctx context.Context, k8s client.Client, logger logr.Logger, cluster *clusterv1.ManagedCluster, opts addon.Options) (*rshandlers.RightSizingValues, error) {
+	// Prediction ADC fields on opts.Platform.AnalyticsOptions.RightSizing flow through
+	// OptionsBuilder.Build into handlers.Options, then BuildValues emits .Values.rightSizing.prediction.
 	rsOptsBuilder := rshandlers.OptionsBuilder{
 		Client: k8s,
 		Logger: logger,

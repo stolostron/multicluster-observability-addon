@@ -77,7 +77,8 @@ func BuildValues(opts addon.Options, installOfCOOOnTheHubIsNeeded bool, isHubClu
 		if incidentDetectionEnabled {
 			analyticsDashboards = append(analyticsDashboards, buildIncidentDetetctionDashboards()...)
 		}
-		if opts.Platform.AnalyticsOptions.RightSizing.NamespaceEnabled {
+		if opts.Platform.AnalyticsOptions.RightSizing.NamespaceEnabled ||
+			opts.Platform.AnalyticsOptions.RightSizing.PredictionEnabled {
 			rightSizingEnabled = true
 			analyticsDashboards = append(analyticsDashboards, buildNamespaceRSDashboards(opts.Platform.AnalyticsOptions.RightSizing.WorkloadPodEnabled)...)
 		}

@@ -1,0 +1,20 @@
+{{- if and .Values.rightSizing .Values.rightSizing.prediction .Values.rightSizing.prediction.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rs-prediction-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- $mcoaHelmLabels := fromYaml (include "mcoahelm.labels" $) }}
+    {{- $customLabel := dict "app.kubernetes.io/component" "rs-prediction" }}
+    {{- $mergedLabels := mergeOverwrite $mcoaHelmLabels $customLabel }}
+    {{- toYaml $mergedLabels | nindent 4 }}
+data:
+  config.json: |
+    {
+      "provider": {{ .Values.rightSizing.prediction.provider | default "builtin" | quote }},
+      "trainingIntervalHours": {{ .Values.rightSizing.prediction.trainingIntervalHours | default 6 }},
+      "historyDays": {{ .Values.rightSizing.prediction.historyDays | default 30 }},
+      "safetyMarginPercent": {{ .Values.rightSizing.prediction.safetyMarginPercent | default 115 }}
+    }
+{{- end }}

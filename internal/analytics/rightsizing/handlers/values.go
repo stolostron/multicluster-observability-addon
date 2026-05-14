@@ -12,9 +12,21 @@ import (
 type RightSizingValues struct {
 	NamespaceRightSizing      *ComponentValues   `json:"namespaceRightSizing,omitempty"`
 	VirtualizationRightSizing *ComponentValues   `json:"virtRightSizing,omitempty"`
-	WorkloadPodRightSizing    *ComponentValues   `json:"workloadPodRightSizing,omitempty"`
-	GPURightSizing            *ComponentValues   `json:"gpuRightSizing,omitempty"`
+	Prediction                *PredictionValues  `json:"prediction,omitempty"`
 	ScrapeConfig              *ScrapeConfigValue `json:"scrapeConfig,omitempty"`
+}
+
+// PredictionValues are rendered into the chart as .Values.rightSizing.prediction.
+type PredictionValues struct {
+	Enabled               bool    `json:"enabled"`
+	Provider              string  `json:"provider"`
+	TrainingIntervalHours int     `json:"trainingIntervalHours"`
+	HistoryDays           int     `json:"historyDays"`
+	SafetyMarginPercent   float64 `json:"safetyMarginPercent"`
+	NamespaceEnabled      bool    `json:"namespaceEnabled"`
+	WorkloadEnabled       bool    `json:"workloadEnabled"`
+	GPUEnabled            bool    `json:"gpuEnabled"`
+	VMEnabled             bool    `json:"vmEnabled"`
 }
 
 // ScrapeConfigValue contains the helm values for a ScrapeConfig
@@ -37,9 +49,82 @@ type PrometheusRuleValue struct {
 	Data string `json:"data"`
 }
 
+// predictionConfigFile is persisted to the hub ConfigMap (config.json) and matches the Helm template schema.
+type predictionConfigFile struct {
+	Provider              string  `json:"provider"`
+	TrainingIntervalHours int     `json:"trainingIntervalHours"`
+	HistoryDays           int     `json:"historyDays"`
+	SafetyMarginPercent   float64 `json:"safetyMarginPercent"`
+}
+
+func mergedPredictionSettings(opts Options) (PredictionValues, error) {
+	pv := PredictionValues{
+		Enabled:               true,
+		Provider:              opts.PredictionProvider,
+		TrainingIntervalHours: 6,
+		HistoryDays:           30,
+		SafetyMarginPercent:   115,
+	}
+	if pv.Provider == "" {
+		pv.Provider = "builtin"
+	}
+	if len(opts.PredictionConfig) == 0 || string(opts.PredictionConfig) == "null" {
+		return pv, nil
+	}
+	var overlay struct {
+		Provider              string  `json:"provider"`
+		TrainingIntervalHours int     `json:"trainingIntervalHours"`
+		HistoryDays           int     `json:"historyDays"`
+		SafetyMarginPercent   float64 `json:"safetyMarginPercent"`
+	}
+	if err := json.Unmarshal(opts.PredictionConfig, &overlay); err != nil {
+		return PredictionValues{}, err
+	}
+	if overlay.Provider != "" {
+		pv.Provider = overlay.Provider
+	}
+	if overlay.TrainingIntervalHours != 0 {
+		pv.TrainingIntervalHours = overlay.TrainingIntervalHours
+	}
+	if overlay.HistoryDays != 0 {
+		pv.HistoryDays = overlay.HistoryDays
+	}
+	if overlay.SafetyMarginPercent != 0 {
+		pv.SafetyMarginPercent = overlay.SafetyMarginPercent
+	}
+	return pv, nil
+}
+
+func buildPredictionValues(opts Options) (*PredictionValues, error) {
+	pv, err := mergedPredictionSettings(opts)
+	if err != nil {
+		return nil, err
+	}
+	pv.NamespaceEnabled = opts.NamespaceRightSizing.Enabled
+	pv.WorkloadEnabled = opts.WorkloadPodRightSizing.Enabled
+	pv.GPUEnabled = opts.GPURightSizing.Enabled
+	pv.VMEnabled = opts.VirtualizationRightSizing.Enabled
+	return &pv, nil
+}
+
+// PredictionHubConfigBytes returns JSON for the hub rs-prediction-config data key config.json.
+func PredictionHubConfigBytes(opts Options) ([]byte, error) {
+	pv, err := mergedPredictionSettings(opts)
+	if err != nil {
+		return nil, err
+	}
+	file := predictionConfigFile{
+		Provider:              pv.Provider,
+		TrainingIntervalHours: pv.TrainingIntervalHours,
+		HistoryDays:           pv.HistoryDays,
+		SafetyMarginPercent:   pv.SafetyMarginPercent,
+	}
+	return json.Marshal(file)
+}
+
 // BuildValues builds the helm values from the right-sizing options
 func BuildValues(opts Options) (*RightSizingValues, error) {
-	if !opts.NamespaceRightSizing.Enabled && !opts.VirtualizationRightSizing.Enabled && !opts.WorkloadPodRightSizing.Enabled && !opts.GPURightSizing.Enabled {
+	if !opts.NamespaceRightSizing.Enabled && !opts.VirtualizationRightSizing.Enabled && !opts.PredictionEnabled {
 		return nil, nil
 	}
 
@@ -81,40 +166,12 @@ func BuildValues(opts Options) (*RightSizingValues, error) {
 		ret.VirtualizationRightSizing = virtValues
 	}
 
-	// Build workload-pod right-sizing values
-	if opts.WorkloadPodRightSizing.Enabled {
-		wlValues := &ComponentValues{
-			Enabled: true,
+	if opts.PredictionEnabled {
+		pred, err := buildPredictionValues(opts)
+		if err != nil {
+			return nil, err
 		}
-		for _, rule := range opts.WorkloadPodRightSizing.PrometheusRules {
-			ruleJSON, err := json.Marshal(rule.Spec)
-			if err != nil {
-				return nil, err
-			}
-			wlValues.Rules = append(wlValues.Rules, PrometheusRuleValue{
-				Name: rule.Name,
-				Data: string(ruleJSON),
-			})
-		}
-		ret.WorkloadPodRightSizing = wlValues
-	}
-
-	// Build GPU right-sizing values
-	if opts.GPURightSizing.Enabled {
-		gpuValues := &ComponentValues{
-			Enabled: true,
-		}
-		for _, rule := range opts.GPURightSizing.PrometheusRules {
-			ruleJSON, err := json.Marshal(rule.Spec)
-			if err != nil {
-				return nil, err
-			}
-			gpuValues.Rules = append(gpuValues.Rules, PrometheusRuleValue{
-				Name: rule.Name,
-				Data: string(ruleJSON),
-			})
-		}
-		ret.GPURightSizing = gpuValues
+		ret.Prediction = pred
 	}
 
 	if opts.ScrapeConfig != nil {

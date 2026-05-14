@@ -55,6 +55,21 @@ func withMemSection(datasource string, project string, linkToWorkload bool) dash
 	)
 }
 
+func withForecastSection(datasource string) dashboard.Option {
+	return acmHelpers.AddCustomPanelGroup("Forecasting",
+		[]acmHelpers.GridItem{
+			{X: 0, Y: 0, W: 12, H: 6},
+			{X: 12, Y: 0, W: 12, H: 6},
+			{X: 0, Y: 6, W: 12, H: 4},
+			{X: 12, Y: 6, W: 12, H: 4},
+		},
+		panels.ForecastCPUPanel(datasource),
+		panels.ForecastMemoryPanel(datasource),
+		panels.ModelAccuracyPanel(datasource),
+		panels.AnomalyScorePanel(datasource),
+	)
+}
+
 // BuildNamespaceRightSizing creates the namespace right-sizing dashboard.
 // When workloadPodEnabled is true, the namespace table columns include
 // drill-down links to the workload-pod overview dashboard.
@@ -110,7 +125,24 @@ func BuildNamespaceRightSizing(project string, datasource string, clusterLabelNa
 			),
 		),
 
+		dashboard.AddVariable("namespace",
+			listVar.List(
+				labelValuesVar.PrometheusLabelValues("namespace",
+					dashboards.AddVariableDatasource(datasource),
+					labelValuesVar.Matchers(
+						promql.SetLabelMatchers(
+							`acm_rs:namespace:cpu_usage{cluster="$cluster", profile="$profile"}`,
+							[]promql.LabelMatcher{},
+						)),
+				),
+				listVar.DisplayName("Namespace"),
+				listVar.AllowAllValue(false),
+				listVar.AllowMultiple(false),
+			),
+		),
+
 		withCPUSection(datasource, project, workloadPodEnabled),
 		withMemSection(datasource, project, workloadPodEnabled),
+		withForecastSection(datasource),
 	)
 }

@@ -37,6 +37,10 @@ const (
 	// GPU right-sizing constants
 	GPUPrometheusRuleName = "acm-rs-gpu-prometheus-rules"
 	GPUConfigMapName      = "rs-gpu-config"
+
+	// Prediction engine hub resources (ConfigMap names; model state is sharded as rs-prediction-model-state-<n>)
+	RSPredictionConfigMapName    = "rs-prediction-config"
+	RSPredictionModelStatePrefix = "rs-prediction-model-state"
 )
 
 // RSLabelFilter represents label filtering criteria for right-sizing

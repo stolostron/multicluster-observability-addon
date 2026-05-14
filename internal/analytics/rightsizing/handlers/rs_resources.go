@@ -10,6 +10,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
@@ -35,7 +36,9 @@ func isRSConfigMap(namespace, name string) bool {
 		return false
 	}
 	switch name {
-	case rightsizing.NamespaceConfigMapName, rightsizing.VirtualizationConfigMapName, rightsizing.WorkloadConfigMapName, rightsizing.GPUConfigMapName:
+	case rightsizing.NamespaceConfigMapName, rightsizing.VirtualizationConfigMapName,
+		rightsizing.WorkloadConfigMapName, rightsizing.GPUConfigMapName,
+		rightsizing.RSPredictionConfigMapName:
 		return true
 	}
 	return false
@@ -69,6 +72,15 @@ func (o *OptionsBuilder) ReconcileRSResources(ctx context.Context, opts addon.Op
 		}
 	}
 
+	if !opts.Platform.AnalyticsOptions.RightSizing.PredictionEnabled {
+		if err := o.deleteRSConfigMap(ctx, rightsizing.RSPredictionConfigMapName); err != nil {
+			return fmt.Errorf("failed to cleanup prediction configmap: %w", err)
+		}
+		if err := o.deletePredictionModelStateConfigMaps(ctx); err != nil {
+			return fmt.Errorf("failed to cleanup prediction model state configmaps: %w", err)
+		}
+	}
+
 	return nil
 }
 
@@ -86,5 +98,28 @@ func (o *OptionsBuilder) deleteRSConfigMap(ctx context.Context, configMapName st
 		return fmt.Errorf("failed to delete configmap %s: %w", configMapName, err)
 	}
 	o.Logger.V(1).Info("Deleted right-sizing ConfigMap", "name", configMapName, "namespace", addoncfg.InstallNamespace)
+	return nil
+}
+
+// deletePredictionModelStateConfigMaps removes sharded training state (rs-prediction-model-state-*)
+// identified by the same labels the training controller uses.
+func (o *OptionsBuilder) deletePredictionModelStateConfigMaps(ctx context.Context) error {
+	list := &corev1.ConfigMapList{}
+	err := o.Client.List(ctx, list,
+		client.InNamespace(addoncfg.InstallNamespace),
+		client.MatchingLabels{
+			"app.kubernetes.io/component": "rs-prediction-state",
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("list prediction model state configmaps: %w", err)
+	}
+	for i := range list.Items {
+		cm := &list.Items[i]
+		if err := o.Client.Delete(ctx, cm); err != nil && !apierrors.IsNotFound(err) {
+			return fmt.Errorf("failed to delete configmap %s: %w", cm.Name, err)
+		}
+		o.Logger.V(1).Info("Deleted prediction model state ConfigMap", "name", cm.Name, "namespace", addoncfg.InstallNamespace)
+	}
 	return nil
 }

@@ -75,6 +75,17 @@ func withGPUWorkloadsSection(datasource string) dashboard.Option {
 	)
 }
 
+func withGPUForecastSection(datasource string) dashboard.Option {
+	return acmHelpers.AddCustomPanelGroup("Forecasting",
+		[]acmHelpers.GridItem{
+			{X: 0, Y: 0, W: 12, H: 6},
+			{X: 12, Y: 0, W: 12, H: 6},
+		},
+		panels.ForecastGPUUtilPanel(datasource),
+		panels.ForecastGPUMemoryPanel(datasource),
+	)
+}
+
 // BuildGPUUtilization creates the GPU utilization right-sizing dashboard
 func BuildGPUUtilization(project string, datasource string, clusterLabelName string) (dashboard.Builder, error) {
 	return dashboard.New("acm-rs-gpu-utilization",
@@ -183,5 +194,6 @@ func BuildGPUUtilization(project string, datasource string, clusterLabelName str
 		withGPUMemorySection(datasource),
 		withGPUTelemetrySection(datasource),
 		withGPUWorkloadsSection(datasource),
+		withGPUForecastSection(datasource),
 	)
 }

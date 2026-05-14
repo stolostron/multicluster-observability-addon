@@ -41,26 +41,6 @@ var NamespaceMetrics = []string{
 	"acm_rs:cluster:memory_recommendation",
 }
 
-// WorkloadPodMetrics are the metrics to federate for workload-pod right-sizing
-var WorkloadPodMetrics = []string{
-	"acm_rs:pod:cpu_request",
-	"acm_rs:pod:cpu_limit",
-	"acm_rs:pod:cpu_usage",
-	"acm_rs:pod:cpu_recommendation",
-	"acm_rs:pod:memory_request",
-	"acm_rs:pod:memory_limit",
-	"acm_rs:pod:memory_usage",
-	"acm_rs:pod:memory_recommendation",
-	"acm_rs:workload:cpu_request",
-	"acm_rs:workload:cpu_limit",
-	"acm_rs:workload:cpu_usage",
-	"acm_rs:workload:cpu_recommendation",
-	"acm_rs:workload:memory_request",
-	"acm_rs:workload:memory_limit",
-	"acm_rs:workload:memory_usage",
-	"acm_rs:workload:memory_recommendation",
-}
-
 // VirtualizationMetrics are the metrics to federate for virtualization right-sizing
 // Uses 1d aggregated metrics matching MCO Grafana dashboard patterns
 var VirtualizationMetrics = []string{
@@ -79,49 +59,52 @@ var VirtualizationMetrics = []string{
 	"kubevirt_vm_running_status_last_transition_timestamp_seconds",
 }
 
-// GPUMetrics are the metrics to federate for GPU right-sizing
+// WorkloadPodMetrics are federated for workload/pod right-sizing.
+var WorkloadPodMetrics = []string{
+	"acm_rs:workload:cpu_request",
+	"acm_rs:workload:cpu_limit",
+	"acm_rs:workload:cpu_usage",
+	"acm_rs:workload:cpu_recommendation",
+	"acm_rs:workload:memory_request",
+	"acm_rs:workload:memory_limit",
+	"acm_rs:workload:memory_usage",
+	"acm_rs:workload:memory_recommendation",
+	"acm_rs:pod:cpu_request",
+	"acm_rs:pod:cpu_usage",
+	"acm_rs:pod:memory_request",
+	"acm_rs:pod:memory_usage",
+}
+
+// GPUMetrics are federated for GPU right-sizing.
 var GPUMetrics = []string{
 	"acm_rs:namespace:gpu_request",
 	"acm_rs:namespace:gpu_usage",
 	"acm_rs:namespace:gpu_recommendation",
 	"acm_rs:namespace:gpu_memory_used",
-	"acm_rs:namespace:gpu_memory_recommendation",
 	"acm_rs:namespace:gpu_memory_total",
-	"acm_rs:namespace:gpu_power_usage_watts",
-	"acm_rs:namespace:gpu_temperature_celsius",
-	"acm_rs:namespace:gpu_sm_clock_hertz",
-	"acm_rs:namespace:gpu_memory_clock_hertz",
-	"acm_rs:namespace:gpu_type",
-	"acm_rs:pod:gpu_request",
-	"acm_rs:pod:gpu_usage",
-	"acm_rs:pod:gpu_recommendation",
-	"acm_rs:pod:gpu_memory_used",
-	"acm_rs:pod:gpu_memory_recommendation",
-	"acm_rs:pod:gpu_memory_total",
-	"acm_rs:pod:gpu_power_usage_watts",
-	"acm_rs:pod:gpu_temperature_celsius",
-	"acm_rs:pod:gpu_sm_clock_hertz",
-	"acm_rs:pod:gpu_memory_clock_hertz",
-	"acm_rs:workload:gpu_request",
-	"acm_rs:workload:gpu_usage",
-	"acm_rs:workload:gpu_recommendation",
-	"acm_rs:workload:gpu_memory_used",
-	"acm_rs:workload:gpu_memory_recommendation",
-	"acm_rs:workload:gpu_memory_total",
-	"acm_rs:workload:gpu_power_usage_watts",
-	"acm_rs:workload:gpu_temperature_celsius",
-	"acm_rs:workload:gpu_sm_clock_hertz",
-	"acm_rs:workload:gpu_memory_clock_hertz",
+	"acm_rs:namespace:gpu_memory_recommendation",
 	"acm_rs:cluster:gpu_request",
 	"acm_rs:cluster:gpu_usage",
-	"acm_rs:cluster:gpu_recommendation",
 	"acm_rs:cluster:gpu_memory_used",
-	"acm_rs:cluster:gpu_memory_recommendation",
 	"acm_rs:cluster:gpu_memory_total",
-	"acm_rs:cluster:gpu_power_usage_watts",
-	"acm_rs:cluster:gpu_temperature_celsius",
-	"acm_rs:cluster:gpu_sm_clock_hertz",
-	"acm_rs:cluster:gpu_memory_clock_hertz",
+}
+
+// PredictionMetrics are federated when workload prediction is enabled.
+var PredictionMetrics = []string{
+	"acm_rs:prediction_forecast_cpu",
+	"acm_rs:prediction_forecast_memory",
+	"acm_rs:prediction_forecast_workload_cpu",
+	"acm_rs:prediction_forecast_workload_memory",
+	"acm_rs:prediction_forecast_gpu_utilization",
+	"acm_rs:prediction_forecast_gpu_memory",
+	"acm_rs:prediction_forecast_vm_cpu",
+	"acm_rs:prediction_forecast_vm_memory",
+	"acm_rs:prediction_anomaly_score",
+	"acm_rs:prediction_anomaly_score_workload",
+	"acm_rs:prediction_anomaly_score_gpu",
+	"acm_rs:prediction_anomaly_score_vm",
+	"acm_rs:prediction_model_accuracy",
+	"acm_rs:prediction_ensemble_weight",
 }
 
 // GenerateScrapeConfig generates a ScrapeConfig for right-sizing metrics federation.
@@ -129,11 +112,17 @@ var GPUMetrics = []string{
 // invocation on metrics collection being enabled, which guarantees the ScrapeConfig
 // CRD exists on the spoke. The work agent then tracks the resource via
 // AppliedManifestWork and deletes it when it disappears from the ManifestWork spec.
-func GenerateScrapeConfig(includeNamespace, includeVirtualization, includeWorkloadPod, includeGPU bool) *cooprometheusv1alpha1.ScrapeConfig {
+func GenerateScrapeConfig(includeNamespace, includeVirtualization, includeWorkloadPod, includeGPU, includePrediction bool) *cooprometheusv1alpha1.ScrapeConfig {
 	var matchParams []string
 
 	if includeNamespace {
 		for _, metric := range NamespaceMetrics {
+			matchParams = append(matchParams, "{__name__=\""+metric+"\"}")
+		}
+	}
+
+	if includeVirtualization {
+		for _, metric := range VirtualizationMetrics {
 			matchParams = append(matchParams, "{__name__=\""+metric+"\"}")
 		}
 	}
@@ -150,8 +139,8 @@ func GenerateScrapeConfig(includeNamespace, includeVirtualization, includeWorklo
 		}
 	}
 
-	if includeVirtualization {
-		for _, metric := range VirtualizationMetrics {
+	if includePrediction {
+		for _, metric := range PredictionMetrics {
 			matchParams = append(matchParams, "{__name__=\""+metric+"\"}")
 		}
 	}

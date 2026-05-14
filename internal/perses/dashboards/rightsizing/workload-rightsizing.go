@@ -50,6 +50,17 @@ func withPodsSection(datasource string, project string) dashboard.Option {
 	)
 }
 
+func withWorkloadForecastSection(datasource string) dashboard.Option {
+	return acmHelpers.AddCustomPanelGroup("Forecasting",
+		[]acmHelpers.GridItem{
+			{X: 0, Y: 0, W: 12, H: 6},
+			{X: 12, Y: 0, W: 12, H: 6},
+		},
+		panels.ForecastWorkloadCPUPanel(datasource),
+		panels.ForecastWorkloadMemoryPanel(datasource),
+	)
+}
+
 // BuildWorkloadPodRightSizing creates the workload-pod right-sizing dashboard
 func BuildWorkloadPodRightSizing(project string, datasource string, clusterLabelName string) (dashboard.Builder, error) {
 	return dashboard.New("acm-rs-workload-pod-overview",
@@ -120,8 +131,25 @@ func BuildWorkloadPodRightSizing(project string, datasource string, clusterLabel
 			),
 		),
 
+		dashboard.AddVariable("workload",
+			listVar.List(
+				labelValuesVar.PrometheusLabelValues("workload",
+					dashboards.AddVariableDatasource(datasource),
+					labelValuesVar.Matchers(
+						promql.SetLabelMatchers(
+							`acm_rs:workload:cpu_usage{cluster="$cluster", profile="$profile", namespace=~"$namespace"}`,
+							[]promql.LabelMatcher{},
+						)),
+				),
+				listVar.DisplayName("Workload"),
+				listVar.AllowAllValue(false),
+				listVar.AllowMultiple(false),
+			),
+		),
+
 		withWorkloadCPUSection(datasource, project),
 		withWorkloadMemSection(datasource, project),
 		withPodsSection(datasource, project),
+		withWorkloadForecastSection(datasource),
 	)
 }

@@ -14,6 +14,7 @@ import (
 	listVar "github.com/perses/perses/go-sdk/variable/list-variable"
 	labelValuesVar "github.com/perses/plugins/prometheus/sdk/go/variable/label-values"
 	staticListVar "github.com/perses/plugins/staticlistvariable/sdk/go"
+	acmHelpers "github.com/stolostron/multicluster-observability-addon/internal/perses/dashboards/acm"
 	panels "github.com/stolostron/multicluster-observability-addon/internal/perses/panels/rightsizing"
 )
 
@@ -57,6 +58,17 @@ func withVMMemUnderestimationTableGroup(datasource string, project string) dashb
 		panelgroup.PanelsPerLine(1),
 		panelgroup.PanelHeight(10),
 		panels.VMMemUnderestimationTablePanel(datasource, project),
+	)
+}
+
+func withVMForecastSection(datasource string) dashboard.Option {
+	return acmHelpers.AddCustomPanelGroup("Forecasting",
+		[]acmHelpers.GridItem{
+			{X: 0, Y: 0, W: 12, H: 6},
+			{X: 12, Y: 0, W: 12, H: 6},
+		},
+		panels.ForecastVMCPUPanel(datasource),
+		panels.ForecastVMMemoryPanel(datasource),
 	)
 }
 
@@ -129,10 +141,27 @@ func BuildVMOverview(project string, datasource string, clusterLabelName string)
 			),
 		),
 
+		dashboard.AddVariable("name",
+			listVar.List(
+				labelValuesVar.PrometheusLabelValues("name",
+					dashboards.AddVariableDatasource(datasource),
+					labelValuesVar.Matchers(
+						promql.SetLabelMatchers(
+							`acm_rs_vm:namespace:cpu_usage{cluster="$cluster",profile="$profile",namespace=~"$namespace"}`,
+							[]promql.LabelMatcher{},
+						)),
+				),
+				listVar.DisplayName("VM"),
+				listVar.AllowAllValue(false),
+				listVar.AllowMultiple(false),
+			),
+		),
+
 		withVMOverviewStatsGroup(datasource),
 		withVMCPUOverestimationTableGroup(datasource, project),
 		withVMCPUUnderestimationTableGroup(datasource, project),
 		withVMMemOverestimationTableGroup(datasource, project),
 		withVMMemUnderestimationTableGroup(datasource, project),
+		withVMForecastSection(datasource),
 	)
 }

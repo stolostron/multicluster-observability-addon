@@ -2,8 +2,10 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"slices"
+	"strings"
 
 	"github.com/go-logr/logr"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
@@ -43,6 +45,13 @@ func (o *OptionsBuilder) Build(ctx context.Context, cluster *clusterv1.ManagedCl
 	if !common.IsOpenShiftVendor(cluster) {
 		o.Logger.V(2).Info("Skipping right-sizing for non-OpenShift cluster", "cluster", cluster.Name)
 		return ret, nil
+	}
+
+	predictionEnabled := opts.Platform.AnalyticsOptions.RightSizing.PredictionEnabled
+	if predictionEnabled {
+		if err := o.ensurePredictionConfigMap(ctx, opts); err != nil {
+			o.Logger.Error(err, "Failed to ensure prediction ConfigMap exists, continuing")
+		}
 	}
 
 	namespaceEnabled := opts.Platform.AnalyticsOptions.RightSizing.NamespaceEnabled
@@ -176,7 +185,18 @@ func (o *OptionsBuilder) Build(ctx context.Context, cluster *clusterv1.ManagedCl
 	}
 
 	if opts.Platform.Metrics.CollectionEnabled {
-		ret.ScrapeConfig = rightsizing.GenerateScrapeConfig(nsMatched, virtMatched, wlMatched, gpuMatched)
+		ret.ScrapeConfig = rightsizing.GenerateScrapeConfig(nsMatched, virtMatched, wlMatched, gpuMatched, predictionEnabled)
+	}
+
+	if predictionEnabled {
+		ret.PredictionEnabled = true
+		ret.PredictionProvider = opts.Platform.AnalyticsOptions.RightSizing.PredictionProvider
+		pc := strings.TrimSpace(opts.Platform.AnalyticsOptions.RightSizing.PredictionConfig)
+		if pc != "" {
+			ret.PredictionConfig = json.RawMessage(pc)
+		} else {
+			ret.PredictionConfig = json.RawMessage("{}")
+		}
 	}
 
 	return ret, nil
@@ -320,6 +340,49 @@ func (o *OptionsBuilder) createDefaultConfigMap(ctx context.Context, name string
 	}
 
 	o.Logger.V(1).Info("Created right-sizing ConfigMap", "name", name, "namespace", addoncfg.InstallNamespace)
+	return nil
+}
+
+func (o *OptionsBuilder) ensurePredictionConfigMap(ctx context.Context, addonOpts addon.Options) error {
+	hOpts := Options{
+		PredictionEnabled:  true,
+		PredictionProvider: addonOpts.Platform.AnalyticsOptions.RightSizing.PredictionProvider,
+	}
+	pc := strings.TrimSpace(addonOpts.Platform.AnalyticsOptions.RightSizing.PredictionConfig)
+	if pc != "" {
+		hOpts.PredictionConfig = json.RawMessage(pc)
+	} else {
+		hOpts.PredictionConfig = json.RawMessage("{}")
+	}
+
+	payload, err := PredictionHubConfigBytes(hOpts)
+	if err != nil {
+		return fmt.Errorf("marshal prediction hub config: %w", err)
+	}
+
+	_, err = common.GetConfigMap(ctx, o.Client, addoncfg.InstallNamespace, rightsizing.RSPredictionConfigMapName)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			o.Logger.Info("Creating prediction ConfigMap with defaults",
+				"name", rightsizing.RSPredictionConfigMapName,
+				"namespace", addoncfg.InstallNamespace)
+			cm := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      rightsizing.RSPredictionConfigMapName,
+					Namespace: addoncfg.InstallNamespace,
+					Labels:    rightsizing.RSLabels(),
+				},
+				Data: map[string]string{
+					"config.json": string(payload),
+				},
+			}
+			if err := o.Client.Create(ctx, cm); err != nil {
+				return fmt.Errorf("failed to create ConfigMap %s: %w", rightsizing.RSPredictionConfigMapName, err)
+			}
+			return nil
+		}
+		return err
+	}
 	return nil
 }
 

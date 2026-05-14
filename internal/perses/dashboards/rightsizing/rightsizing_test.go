@@ -30,15 +30,16 @@ func TestBuildNamespaceRightSizing(t *testing.T) {
 	assert.Equal(t, "ACM Right-Sizing Namespace", spec.Display.Name)
 
 	t.Run("has expected variables", func(t *testing.T) {
-		require.Len(t, spec.Variables, 3, "expected cluster, profile, days")
+		require.Len(t, spec.Variables, 4, "expected cluster, profile, days, namespace")
 		varNames := extractVarNames(spec.Variables)
 		assert.Contains(t, varNames, "cluster")
 		assert.Contains(t, varNames, "profile")
 		assert.Contains(t, varNames, "days")
+		assert.Contains(t, varNames, "namespace")
 	})
 
 	t.Run("has expected panel groups", func(t *testing.T) {
-		require.Len(t, spec.Layouts, 2, "CPU section + Memory section")
+		require.Len(t, spec.Layouts, 3, "CPU section + Memory section + Forecasting")
 	})
 
 	t.Run("panels reference the datasource", func(t *testing.T) {
@@ -109,16 +110,17 @@ func TestBuildVMOverview(t *testing.T) {
 	assert.Equal(t, "ACM Right-Sizing OpenShift Virtualization", spec.Display.Name)
 
 	t.Run("has expected variables", func(t *testing.T) {
-		require.Len(t, spec.Variables, 4, "expected cluster, profile, days, namespace")
+		require.Len(t, spec.Variables, 5, "expected cluster, profile, days, namespace, name")
 		varNames := extractVarNames(spec.Variables)
 		assert.Contains(t, varNames, "cluster")
 		assert.Contains(t, varNames, "profile")
 		assert.Contains(t, varNames, "days")
 		assert.Contains(t, varNames, "namespace")
+		assert.Contains(t, varNames, "name")
 	})
 
 	t.Run("has expected panel groups", func(t *testing.T) {
-		require.Len(t, spec.Layouts, 5, "stats + 4 table groups")
+		require.Len(t, spec.Layouts, 6, "stats + 4 table groups + Forecasting")
 	})
 
 	t.Run("panels query acm_rs_vm metrics", func(t *testing.T) {
@@ -269,16 +271,17 @@ func TestBuildWorkloadPodRightSizing(t *testing.T) {
 	assert.Equal(t, "ACM Right-Sizing Workloads & Pods", spec.Display.Name)
 
 	t.Run("has expected variables", func(t *testing.T) {
-		require.Len(t, spec.Variables, 4, "expected cluster, profile, days, namespace")
+		require.Len(t, spec.Variables, 5, "expected cluster, profile, days, namespace, workload")
 		varNames := extractVarNames(spec.Variables)
 		assert.Contains(t, varNames, "cluster")
 		assert.Contains(t, varNames, "profile")
 		assert.Contains(t, varNames, "days")
 		assert.Contains(t, varNames, "namespace")
+		assert.Contains(t, varNames, "workload")
 	})
 
 	t.Run("has expected panel groups", func(t *testing.T) {
-		require.Len(t, spec.Layouts, 3, "CPU section + Memory section + Pods section")
+		require.Len(t, spec.Layouts, 4, "CPU section + Memory section + Pods section + Forecasting")
 	})
 
 	t.Run("panels reference the datasource", func(t *testing.T) {
@@ -405,7 +408,7 @@ func TestBuildGPUUtilization(t *testing.T) {
 	})
 
 	t.Run("has expected panel groups", func(t *testing.T) {
-		require.Len(t, spec.Layouts, 4, "GPU + GPU Memory + Telemetry + Workloads")
+		require.Len(t, spec.Layouts, 5, "GPU + GPU Memory + Telemetry + Workloads + Forecasting")
 	})
 
 	t.Run("panels reference the datasource", func(t *testing.T) {

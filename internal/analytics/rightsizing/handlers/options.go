@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"encoding/json"
+
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
 )
@@ -12,6 +14,9 @@ type Options struct {
 	WorkloadPodRightSizing    ComponentOptions
 	GPURightSizing            ComponentOptions
 	ScrapeConfig              *cooprometheusv1alpha1.ScrapeConfig
+	PredictionEnabled         bool
+	PredictionProvider        string
+	PredictionConfig          json.RawMessage
 }
 
 // ComponentOptions contains the configuration for a single right-sizing component

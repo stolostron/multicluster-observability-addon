@@ -23,10 +23,14 @@ const (
 	KeyPlatformVirtualizationRightSizing = "platformVirtualizationRightSizing"
 	KeyPlatformWorkloadPodRightSizing    = "platformWorkloadPodRightSizing"
 	KeyPlatformGPURightSizing            = "platformGPURightSizing"
-	KeyMetricsHubHostname                = "metricsHubHostname"
-	KeyMetricsAlertManagerHostname       = "metricsAlertManagerHostname"
-	KeyNodeExporterHostPort              = "nodeExporterHostPort"
-	KeyNodeExporterInternalPort          = "nodeExporterInternalPort"
+
+	ADCKeyPrediction         = "platformRightSizingPrediction"
+	ADCKeyPredictionProvider = "platformRightSizingPredictionProvider"
+	ADCKeyPredictionConfig   = "platformRightSizingPredictionConfig"
+	KeyMetricsHubHostname          = "metricsHubHostname"
+	KeyMetricsAlertManagerHostname = "metricsAlertManagerHostname"
+	KeyNodeExporterHostPort        = "nodeExporterHostPort"
+	KeyNodeExporterInternalPort    = "nodeExporterInternalPort"
 
 	// User Workloads Observability Keys
 	KeyUserWorkloadMetricsCollection = "userWorkloadMetricsCollection"
@@ -97,6 +101,9 @@ type RightSizingOptions struct {
 	VirtualizationEnabled bool
 	WorkloadPodEnabled    bool
 	GPUEnabled            bool
+	PredictionEnabled     bool
+	PredictionProvider    string
+	PredictionConfig      string
 }
 
 type AnalyticsOptions struct {
@@ -282,6 +289,15 @@ func BuildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Opti
 			if keyvalue.Value == "enabled" {
 				opts.Platform.AnalyticsOptions.RightSizing.GPUEnabled = true
 			}
+		case ADCKeyPrediction:
+			opts.Platform.Enabled = true
+			if keyvalue.Value == "enabled" {
+				opts.Platform.AnalyticsOptions.RightSizing.PredictionEnabled = true
+			}
+		case ADCKeyPredictionProvider:
+			opts.Platform.AnalyticsOptions.RightSizing.PredictionProvider = keyvalue.Value
+		case ADCKeyPredictionConfig:
+			opts.Platform.AnalyticsOptions.RightSizing.PredictionConfig = keyvalue.Value
 		// User Workload Observability Options
 		case KeyUserWorkloadMetricsCollection:
 			if keyvalue.Value == string(PrometheusAgentV1alpha1) {
@@ -339,6 +355,11 @@ func BuildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Opti
 
 	if !opts.Platform.Metrics.CollectionEnabled {
 		opts.Platform.Metrics.UI.Enabled = false
+	}
+
+	if opts.Platform.AnalyticsOptions.RightSizing.PredictionEnabled &&
+		opts.Platform.AnalyticsOptions.RightSizing.PredictionProvider == "" {
+		opts.Platform.AnalyticsOptions.RightSizing.PredictionProvider = "builtin"
 	}
 
 	return opts, opts.validate()
