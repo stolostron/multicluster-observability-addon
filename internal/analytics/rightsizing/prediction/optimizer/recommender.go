@@ -119,10 +119,7 @@ func percentile99(values []float64) float64 {
 	}
 	sorted := append([]float64(nil), values...)
 	sort.Float64s(sorted)
-	idx := int(math.Round(0.99 * float64(len(sorted)-1)))
-	if idx < 0 {
-		idx = 0
-	}
+	idx := max(int(math.Round(0.99*float64(len(sorted)-1))), 0)
 	if idx >= len(sorted) {
 		idx = len(sorted) - 1
 	}

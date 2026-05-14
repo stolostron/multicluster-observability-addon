@@ -23,13 +23,10 @@ func ComputeMAPE(actual, predicted []prediction.DataPoint) float64 {
 	if len(actual) == 0 || len(predicted) == 0 {
 		return 0
 	}
-	n := len(actual)
-	if len(predicted) < n {
-		n = len(predicted)
-	}
+	n := min(len(predicted), len(actual))
 	eps := 1e-9
 	var sum float64
-	for i := 0; i < n; i++ {
+	for i := range n {
 		a := actual[i].Value
 		p := predicted[i].Value
 		den := math.Abs(a)

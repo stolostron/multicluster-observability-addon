@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -13,6 +14,8 @@ import (
 	"github.com/stolostron/multicluster-observability-addon/internal/analytics/rightsizing/prediction"
 	"github.com/stolostron/multicluster-observability-addon/internal/analytics/rightsizing/prediction/privacy"
 )
+
+var errCustomUnexpectedHTTPStatus = errors.New("custom provider: unexpected HTTP status")
 
 // CustomProvider calls a user-defined HTTP prediction service inside or outside the cluster.
 type CustomProvider struct {
@@ -114,9 +117,9 @@ func (p *CustomProvider) Forecast(ctx context.Context, req prediction.ForecastRe
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
-		return nil, fmt.Errorf("custom provider forecast: HTTP %d", resp.StatusCode)
+		return nil, fmt.Errorf("custom provider forecast: %w: %d", errCustomUnexpectedHTTPStatus, resp.StatusCode)
 	}
 
 	var payload customForecastResponse
@@ -160,9 +163,9 @@ func (p *CustomProvider) Train(ctx context.Context, points []prediction.DataPoin
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
-		return fmt.Errorf("custom provider train: HTTP %d", resp.StatusCode)
+		return fmt.Errorf("custom provider train: %w: %d", errCustomUnexpectedHTTPStatus, resp.StatusCode)
 	}
 	_, _ = io.Copy(io.Discard, resp.Body)
 	return nil
@@ -188,9 +191,9 @@ func (p *CustomProvider) DetectAnomalies(ctx context.Context, points []predictio
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
-		return nil, fmt.Errorf("custom provider detect: HTTP %d", resp.StatusCode)
+		return nil, fmt.Errorf("custom provider detect: %w: %d", errCustomUnexpectedHTTPStatus, resp.StatusCode)
 	}
 
 	var payload customDetectResponse
@@ -215,7 +218,7 @@ func (p *CustomProvider) DetectAnomalies(ctx context.Context, points []predictio
 }
 
 // Explain POSTs to /v1/explain and returns the JSON object as a map.
-func (p *CustomProvider) Explain(ctx context.Context, req prediction.ForecastRequest) (map[string]interface{}, error) {
+func (p *CustomProvider) Explain(ctx context.Context, req prediction.ForecastRequest) (map[string]any, error) {
 	if err := p.ensureCustomConsent(); err != nil {
 		return nil, err
 	}
@@ -234,14 +237,14 @@ func (p *CustomProvider) Explain(ctx context.Context, req prediction.ForecastReq
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
-		return nil, fmt.Errorf("custom provider explain: HTTP %d", resp.StatusCode)
+		return nil, fmt.Errorf("custom provider explain: %w: %d", errCustomUnexpectedHTTPStatus, resp.StatusCode)
 	}
 
 	dec := json.NewDecoder(resp.Body)
 	dec.UseNumber()
-	var out map[string]interface{}
+	var out map[string]any
 	if err := dec.Decode(&out); err != nil {
 		return nil, fmt.Errorf("custom provider: decode explain response: %w", err)
 	}

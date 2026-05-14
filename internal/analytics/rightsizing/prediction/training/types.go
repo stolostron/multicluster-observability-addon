@@ -32,9 +32,9 @@ type TrainingConfig struct {
 	VMEnabled        bool
 
 	// Optional: used when ProviderType is "external" or "custom" (see prediction.ProviderConfig).
-	ExternalAPIKey     string
-	CustomEndpointURL  string
-	ConsentGiven       bool
+	ExternalAPIKey    string
+	CustomEndpointURL string
+	ConsentGiven      bool
 }
 
 // WorkloadKey identifies a workload resource dimension for caching and persistence.

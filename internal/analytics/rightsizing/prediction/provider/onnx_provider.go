@@ -7,6 +7,11 @@ import (
 	"github.com/stolostron/multicluster-observability-addon/internal/analytics/rightsizing/prediction"
 )
 
+var (
+	errONNXInferenceUnavailable = errors.New("ONNX inference not available: onnxruntime-go not linked")
+	errONNXTrainUsesPretrained  = errors.New("ONNX provider uses pre-trained models; call Forecast directly")
+)
+
 // ONNXProvider holds an ONNX model payload for future onnxruntime-go integration.
 // Real inference requires CGO and a build tag; see Forecast.
 type ONNXProvider struct {
@@ -27,14 +32,14 @@ func (p *ONNXProvider) Forecast(ctx context.Context, req prediction.ForecastRequ
 	_ = ctx
 	_ = req
 	// Stub: wire onnxruntime-go with //go:build onnx (or similar) for real inference.
-	return nil, errors.New("ONNX inference not available: onnxruntime-go not linked")
+	return nil, errONNXInferenceUnavailable
 }
 
 // Train reports that ONNX models are supplied pre-trained.
 func (p *ONNXProvider) Train(ctx context.Context, points []prediction.DataPoint) error {
 	_ = ctx
 	_ = points
-	return errors.New("ONNX provider uses pre-trained models; call Forecast directly")
+	return errONNXTrainUsesPretrained
 }
 
 // DetectAnomalies is not supported for external ONNX model graphs.
@@ -45,10 +50,10 @@ func (p *ONNXProvider) DetectAnomalies(ctx context.Context, points []prediction.
 }
 
 // Explain returns minimal ONNX metadata.
-func (p *ONNXProvider) Explain(ctx context.Context, req prediction.ForecastRequest) (map[string]interface{}, error) {
+func (p *ONNXProvider) Explain(ctx context.Context, req prediction.ForecastRequest) (map[string]any, error) {
 	_ = ctx
 	_ = req
-	return map[string]interface{}{
+	return map[string]any{
 		"provider":     "onnx",
 		"model_loaded": p.loaded,
 	}, nil

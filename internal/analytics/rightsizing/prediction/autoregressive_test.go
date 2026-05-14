@@ -10,7 +10,7 @@ func TestARModel_FitAndForecast(t *testing.T) {
 	const n = 200
 	points := make([]DataPoint, n)
 	start := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		t0 := start.Add(5 * time.Minute * time.Duration(i))
 		// Simple linear trend (deterministic, easy to sanity-check)
 		points[i] = DataPoint{Timestamp: t0, Value: 10.0 + 0.35*float64(i)}
@@ -58,7 +58,7 @@ func TestARModel_ConstantSeries(t *testing.T) {
 	const v = 42.7
 	const n = 100
 	points := make([]DataPoint, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		points[i] = DataPoint{
 			Timestamp: time.Date(2024, 6, 1, 0, 0, i, 0, time.UTC),
 			Value:     v,

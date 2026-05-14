@@ -58,7 +58,7 @@ func rollingMeans(y []float64, win int) []float64 {
 	}
 	out := make([]float64, 0, n-win+1)
 	var sum float64
-	for i := 0; i < win; i++ {
+	for i := range win {
 		sum += y[i]
 	}
 	out = append(out, sum/float64(win))
@@ -75,13 +75,7 @@ func changePointScoreFromSeries(y []float64) float64 {
 	if n < 3 {
 		return 0
 	}
-	w := 12
-	if w > n {
-		w = n
-	}
-	if w < 2 {
-		w = 2
-	}
+	w := max(min(12, n), 2)
 	rm := rollingMeans(y, w)
 	if len(rm) < 2 {
 		return 0

@@ -3,6 +3,7 @@ package training
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -13,6 +14,13 @@ import (
 	"time"
 
 	"github.com/stolostron/multicluster-observability-addon/internal/analytics/rightsizing/prediction"
+)
+
+var (
+	errThanosHTTPStatus = errors.New("thanos query_range: non-OK HTTP response")
+	errThanosAPIError   = errors.New("thanos query_range: API returned error")
+	errPromPairFormat   = errors.New("expected [timestamp, value] sample pair")
+	errJSONFloatType    = errors.New("unsupported JSON value type for float conversion")
 )
 
 // Querier loads Prometheus range vectors (e.g. from Thanos Querier).
@@ -62,14 +70,14 @@ func (t *ThanosQuerier) Query(ctx context.Context, promQL string, start, end tim
 	if err != nil {
 		return nil, fmt.Errorf("thanos query_range: http: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 32<<20))
 	if err != nil {
 		return nil, fmt.Errorf("thanos query_range: read body: %w", err)
 	}
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("thanos query_range: http %d: %s", resp.StatusCode, truncateForErr(body, 512))
+		return nil, fmt.Errorf("%w: %d: %s", errThanosHTTPStatus, resp.StatusCode, truncateForErr(body, 512))
 	}
 
 	var payload thanosQueryRangeResponse
@@ -77,7 +85,7 @@ func (t *ThanosQuerier) Query(ctx context.Context, promQL string, start, end tim
 		return nil, fmt.Errorf("thanos query_range: json: %w", err)
 	}
 	if payload.Status != "success" {
-		return nil, fmt.Errorf("thanos query_range: %s: %s", payload.ErrorType, payload.Error)
+		return nil, fmt.Errorf("%w: %s: %s", errThanosAPIError, payload.ErrorType, payload.Error)
 	}
 
 	out := make([]DataPointSeries, 0, len(payload.Data.Result))
@@ -101,7 +109,7 @@ type thanosQueryRangeResponse struct {
 		ResultType string `json:"resultType"`
 		Result     []struct {
 			Metric map[string]string `json:"metric"`
-			Values [][]interface{}   `json:"values"`
+			Values [][]any           `json:"values"`
 		} `json:"result"`
 	} `json:"data"`
 }
@@ -110,10 +118,7 @@ func formatPrometheusStep(d time.Duration) string {
 	if d <= 0 {
 		d = time.Minute
 	}
-	sec := int64(d / time.Second)
-	if sec < 1 {
-		sec = 1
-	}
+	sec := max(int64(d/time.Second), 1)
 	return fmt.Sprintf("%ds", sec)
 }
 
@@ -141,14 +146,14 @@ func workloadKeyFromMetric(m map[string]string, resourceHint string) WorkloadKey
 	}
 }
 
-func valuesToDataPoints(values [][]interface{}) ([]prediction.DataPoint, error) {
+func valuesToDataPoints(values [][]any) ([]prediction.DataPoint, error) {
 	if len(values) == 0 {
 		return nil, nil
 	}
 	out := make([]prediction.DataPoint, 0, len(values))
 	for i, pair := range values {
 		if len(pair) < 2 {
-			return nil, fmt.Errorf("pair %d: expected [timestamp, value]", i)
+			return nil, fmt.Errorf("pair %d: %w", i, errPromPairFormat)
 		}
 		tsF, err := ifaceToFloat64(pair[0])
 		if err != nil {
@@ -165,7 +170,7 @@ func valuesToDataPoints(values [][]interface{}) ([]prediction.DataPoint, error) 
 	return out, nil
 }
 
-func ifaceToFloat64(v interface{}) (float64, error) {
+func ifaceToFloat64(v any) (float64, error) {
 	switch x := v.(type) {
 	case float64:
 		return x, nil
@@ -174,7 +179,7 @@ func ifaceToFloat64(v interface{}) (float64, error) {
 	case string:
 		return strconv.ParseFloat(x, 64)
 	default:
-		return 0, fmt.Errorf("unsupported type %T", v)
+		return 0, fmt.Errorf("%T: %w", v, errJSONFloatType)
 	}
 }
 

@@ -16,10 +16,7 @@ func extractStatisticalFeatures(points []prediction.DataPoint, cfg FeatureConfig
 	if w <= 0 {
 		w = n
 	}
-	start := n - w
-	if start < 0 {
-		start = 0
-	}
+	start := max(n-w, 0)
 	window := make([]float64, n-start)
 	for i := range window {
 		window[i] = points[start+i].Value

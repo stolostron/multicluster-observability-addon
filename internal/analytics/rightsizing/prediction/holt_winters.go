@@ -70,21 +70,21 @@ func (h *HoltWintersModel) fitFullHW(points []DataPoint, m int) {
 
 	// Initial level: mean of first season
 	var sum float64
-	for i := 0; i < m; i++ {
+	for i := range m {
 		sum += vals[i]
 	}
 	level := sum / float64(m)
 
 	// Initial trend: average slope across the first two seasons
 	var trendSum float64
-	for i := 0; i < m; i++ {
+	for i := range m {
 		trendSum += (vals[m+i] - vals[i]) / float64(m)
 	}
 	trend := trendSum / float64(m)
 
 	// Initial seasonal: deviation from level in first season
 	seasonal := make([]float64, m)
-	for i := 0; i < m; i++ {
+	for i := range m {
 		seasonal[i] = vals[i] - level
 	}
 

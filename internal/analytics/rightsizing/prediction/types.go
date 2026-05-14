@@ -26,12 +26,12 @@ type ForecastRequest struct {
 
 // ForecastResult is one step of a forecast with optional uncertainty and metadata.
 type ForecastResult struct {
-	PredictedValue     float64
-	ConfidenceLower    float64
-	ConfidenceUpper    float64
-	Timestamp          time.Time
-	DominantModel      string
-	FeatureImportance  map[string]float64
+	PredictedValue    float64
+	ConfidenceLower   float64
+	ConfidenceUpper   float64
+	Timestamp         time.Time
+	DominantModel     string
+	FeatureImportance map[string]float64
 }
 
 // AnomalyResult describes a detected anomaly in the input series.

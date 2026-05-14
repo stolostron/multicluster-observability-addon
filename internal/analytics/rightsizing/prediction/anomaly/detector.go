@@ -2,6 +2,7 @@ package anomaly
 
 import (
 	"math"
+	"slices"
 	"sort"
 	"time"
 
@@ -93,7 +94,7 @@ func typicalInterval(points []prediction.DataPoint) time.Duration {
 	if len(diffs) == 0 {
 		return time.Minute
 	}
-	sort.Slice(diffs, func(i, j int) bool { return diffs[i] < diffs[j] })
+	slices.Sort(diffs)
 	return medianDuration(diffs)
 }
 

@@ -1,9 +1,14 @@
 package prediction
 
 import (
-	"fmt"
+	"errors"
 	"math"
 	"time"
+)
+
+var (
+	errARNeedPoints = errors.New("ar: need at least 4 points")
+	errARTooShort   = errors.New("ar: series too short for AR(1)")
 )
 
 // ARModel is a univariate autoregressive model with automatic order selection.
@@ -40,7 +45,7 @@ func (a *ARModel) maxOrder(n int) int {
 // Fit estimates the mean, selects AR order by BIC via Yule–Walker (Levinson–Durbin), and stores coefficients.
 func (a *ARModel) Fit(points []DataPoint) error {
 	if len(points) < 4 {
-		return fmt.Errorf("ar: need at least 4 points")
+		return errARNeedPoints
 	}
 	n := len(points)
 	values := make([]float64, n)
@@ -67,7 +72,7 @@ func (a *ARModel) Fit(points []DataPoint) error {
 
 	acfMax := a.maxOrder(n)
 	if acfMax < 1 {
-		return fmt.Errorf("ar: series too short for AR(1)")
+		return errARTooShort
 	}
 	acf := sampleAutocorr(z, acfMax)
 	if acf[0] < 1e-18 {
@@ -149,8 +154,8 @@ func (a *ARModel) Forecast(horizon int) []ForecastResult {
 	out := make([]ForecastResult, horizon)
 	p := a.order
 	for h := 1; h <= horizon; h++ {
-		var pred float64 = a.mean
-		for i := 0; i < p; i++ {
+		pred := a.mean
+		for i := range p {
 			// state[len-1] is most recent lag-1
 			xLag := state[len(state)-1-i]
 			pred += a.coefficients[i] * (xLag - a.mean)
@@ -195,9 +200,9 @@ func yuleWalkerCoeffs(r []float64, p int) ([]float64, bool) {
 		return nil, false
 	}
 	mat := make([][]float64, p)
-	for i := 0; i < p; i++ {
+	for i := range p {
 		row := make([]float64, p+1)
-		for j := 0; j < p; j++ {
+		for j := range p {
 			row[j] = r[absInt(i-j)]
 		}
 		row[p] = r[i+1]
@@ -207,7 +212,7 @@ func yuleWalkerCoeffs(r []float64, p int) ([]float64, bool) {
 		return nil, false
 	}
 	phi := make([]float64, p)
-	for i := 0; i < p; i++ {
+	for i := range p {
 		phi[i] = mat[i][p]
 	}
 	return phi, true
@@ -226,10 +231,12 @@ func gaussianPartialPivot(a [][]float64) bool {
 		return false
 	}
 	cols := len(a[0])
-	for i := 0; i < n; i++ {
-		piv := i
-		for k := i + 1; k < n; k++ {
-			if math.Abs(a[k][i]) > math.Abs(a[piv][i]) {
+	for i := range n {
+		var piv int
+		for k := i; k < n; k++ {
+			if k == i {
+				piv = i
+			} else if math.Abs(a[k][i]) > math.Abs(a[piv][i]) {
 				piv = k
 			}
 		}
@@ -241,7 +248,7 @@ func gaussianPartialPivot(a [][]float64) bool {
 		for j := i; j < cols; j++ {
 			a[i][j] /= div
 		}
-		for k := 0; k < n; k++ {
+		for k := range n {
 			if k == i {
 				continue
 			}
@@ -262,8 +269,8 @@ func arInnovationVar(values []float64, phi []float64, mean float64) float64 {
 	}
 	var sse float64
 	for t := p; t < n; t++ {
-		var pred float64 = mean
-		for i := 0; i < p; i++ {
+		pred := mean
+		for i := range p {
 			pred += phi[i] * (values[t-1-i] - mean)
 		}
 		e := values[t] - pred

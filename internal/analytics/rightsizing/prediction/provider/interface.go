@@ -29,7 +29,7 @@ type PredictionProvider interface {
 	Forecast(ctx context.Context, req prediction.ForecastRequest) ([]prediction.ForecastResult, error)
 	Train(ctx context.Context, points []prediction.DataPoint) error
 	DetectAnomalies(ctx context.Context, points []prediction.DataPoint) ([]prediction.AnomalyResult, error)
-	Explain(ctx context.Context, req prediction.ForecastRequest) (map[string]interface{}, error)
+	Explain(ctx context.Context, req prediction.ForecastRequest) (map[string]any, error)
 	ProviderType() ProviderType
 	PrivacyLevel() PrivacyLevel
 }

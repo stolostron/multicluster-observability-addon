@@ -3,7 +3,13 @@ package privacy
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
+)
+
+var (
+	errConsentRequired = errors.New("privacy: provider requires explicit user consent")
+	errUnknownProvider = errors.New("privacy: unknown provider type")
 )
 
 // ValidateConsent enforces exfiltration policy for prediction providers.
@@ -13,11 +19,11 @@ func ValidateConsent(providerType string, consentGiven bool) error {
 		return nil
 	case "external", "custom":
 		if !consentGiven {
-			return fmt.Errorf("privacy: provider %q requires explicit user consent", providerType)
+			return fmt.Errorf("privacy: provider %q: %w", providerType, errConsentRequired)
 		}
 		return nil
 	default:
-		return fmt.Errorf("privacy: unknown provider type %q", providerType)
+		return fmt.Errorf("privacy: unknown provider type %q: %w", providerType, errUnknownProvider)
 	}
 }
 

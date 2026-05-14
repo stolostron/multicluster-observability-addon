@@ -1,10 +1,16 @@
 package prediction
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"sort"
 	"time"
+)
+
+var (
+	errSTLTooFewPoints = errors.New("stl: need at least 8 points")
+	errSTLShortSeason  = errors.New("stl: series shorter than two seasonal periods")
 )
 
 // STLModel performs seasonal-trend decomposition via LOESS-based STL iterations.
@@ -48,7 +54,7 @@ func (s *STLModel) iterations() int {
 // Decompose fits trend, seasonal, and residual for the given series.
 func (s *STLModel) Decompose(points []DataPoint) error {
 	if len(points) < 8 {
-		return fmt.Errorf("stl: need at least 8 points, got %d", len(points))
+		return fmt.Errorf("%w (got %d)", errSTLTooFewPoints, len(points))
 	}
 	n := len(points)
 	y := make([]float64, n)
@@ -61,7 +67,7 @@ func (s *STLModel) Decompose(points []DataPoint) error {
 
 	m := s.seasonalPeriod(n)
 	if n < 2*m {
-		return fmt.Errorf("stl: series shorter than two seasonal periods")
+		return errSTLShortSeason
 	}
 
 	iters := s.iterations()
@@ -77,13 +83,13 @@ func (s *STLModel) Decompose(points []DataPoint) error {
 	var trend []float64
 	bw := loessBandwidthFrac(len(points))
 
-	for iter := 0; iter < iters; iter++ {
+	for range iters {
 		deseason := make([]float64, n)
 		for i := range y {
 			deseason[i] = y[i] - seasonal[i]
 		}
 		trend = make([]float64, n)
-		for i := 0; i < n; i++ {
+		for i := range n {
 			trend[i] = loess(x, deseason, x[i], bw)
 		}
 		detrended := make([]float64, n)
@@ -216,27 +222,27 @@ func expandSeasonalCycle(detrended []float64, m int) []float64 {
 	n := len(detrended)
 	cycleMean := make([]float64, m)
 	counts := make([]int, m)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		r := i % m
 		cycleMean[r] += detrended[i]
 		counts[r]++
 	}
-	for j := 0; j < m; j++ {
+	for j := range m {
 		if counts[j] > 0 {
 			cycleMean[j] /= float64(counts[j])
 		}
 	}
 	// De-mean seasonal to reduce double-counting with trend
 	var ssum float64
-	for j := 0; j < m; j++ {
+	for j := range m {
 		ssum += cycleMean[j]
 	}
 	meanS := ssum / float64(m)
-	for j := 0; j < m; j++ {
+	for j := range m {
 		cycleMean[j] -= meanS
 	}
 	out := make([]float64, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		out[i] = cycleMean[i%m]
 	}
 	return out
@@ -248,10 +254,7 @@ func seasonalAtPhase(fullSeasonal []float64, period, phase, n int) float64 {
 	}
 	if n > 0 && len(fullSeasonal) >= n && phase >= 0 && phase < period {
 		// Use last full cycle slice for stable phase estimate when available
-		base := n - period
-		if base < 0 {
-			base = 0
-		}
+		base := max(n-period, 0)
 		idx := base + phase
 		if idx < len(fullSeasonal) {
 			return fullSeasonal[idx]
@@ -268,10 +271,7 @@ func linearFitLastPeriod(trend []float64, m int) (slope, intercept float64) {
 	if m < 2 {
 		m = 2
 	}
-	start := n - m
-	if start < 0 {
-		start = 0
-	}
+	start := max(n-m, 0)
 	var sumX, sumY, sumXX, sumXY float64
 	k := 0
 	for i := start; i < n; i++ {
@@ -317,31 +317,30 @@ func loess(x, y []float64, xNew float64, bandwidth float64) float64 {
 		d float64
 	}
 	arr := make([]idxDist, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		arr[i] = idxDist{i: i, d: math.Abs(x[i] - xNew)}
 	}
 	sort.Slice(arr, func(a, b int) bool { return arr[a].d < arr[b].d })
-	span := int(math.Max(3, math.Ceil(bandwidth*float64(n))))
-	if span > n {
-		span = n
-	}
+	span := min(int(math.Max(3, math.Ceil(bandwidth*float64(n)))), n)
 	maxD := arr[span-1].d
 	if maxD < 1e-12 {
 		var sum float64
-		for k := 0; k < span; k++ {
+		for k := range span {
 			sum += y[arr[k].i]
 		}
 		return sum / float64(span)
 	}
 	var sw, swx, swy, swxx, swxy float64
-	for k := 0; k < span; k++ {
+	for k := range span {
 		xi := x[arr[k].i]
 		yi := y[arr[k].i]
 		u := math.Abs(xi-xNew) / maxD
 		if u >= 1 {
 			continue
 		}
-		w := math.Pow(1-math.Pow(u, 3), 3)
+		uuu := u * u * u
+		oneMinus := 1 - uuu
+		w := oneMinus * oneMinus * oneMinus
 		sw += w
 		swx += w * xi
 		swy += w * yi

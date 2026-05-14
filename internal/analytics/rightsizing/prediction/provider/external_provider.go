@@ -12,6 +12,11 @@ import (
 	"github.com/stolostron/multicluster-observability-addon/internal/analytics/rightsizing/prediction/privacy"
 )
 
+var (
+	errExternalEndpointNotConfigured = errors.New("external API endpoint not configured")
+	errExternalTrainUnsupported      = errors.New("external provider does not support on-cluster training")
+)
+
 // ExternalProvider calls a vendor-managed prediction HTTP API (not yet configured).
 type ExternalProvider struct {
 	apiKey       string
@@ -56,14 +61,14 @@ func (p *ExternalProvider) Forecast(ctx context.Context, req prediction.Forecast
 	_ = p.client
 	_ = p.apiKey
 	// Real implementation would POST to a configured vendor URL and parse the response.
-	return nil, errors.New("external API endpoint not configured")
+	return nil, errExternalEndpointNotConfigured
 }
 
 // Train is unsupported for hosted external models.
 func (p *ExternalProvider) Train(ctx context.Context, points []prediction.DataPoint) error {
 	_ = ctx
 	_ = points
-	return errors.New("external provider does not support on-cluster training")
+	return errExternalTrainUnsupported
 }
 
 // DetectAnomalies is not exposed by the external stub.
@@ -74,11 +79,11 @@ func (p *ExternalProvider) DetectAnomalies(ctx context.Context, points []predict
 }
 
 // Explain returns consent and provider metadata only.
-func (p *ExternalProvider) Explain(ctx context.Context, req prediction.ForecastRequest) (map[string]interface{}, error) {
+func (p *ExternalProvider) Explain(ctx context.Context, req prediction.ForecastRequest) (map[string]any, error) {
 	_ = ctx
 	_ = req
-	return map[string]interface{}{
-		"provider":       "external",
+	return map[string]any{
+		"provider":      "external",
 		"consent_given": p.consentGiven,
 	}, nil
 }

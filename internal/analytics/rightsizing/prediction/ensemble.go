@@ -1,6 +1,7 @@
 package prediction
 
 import (
+	"maps"
 	"math"
 	"time"
 )
@@ -101,7 +102,7 @@ func (e *EnsembleForecaster) Forecast(req ForecastRequest) []ForecastResult {
 	dom := dominantWeight(e.weights)
 
 	out := make([]ForecastResult, h)
-	for t := 0; t < h; t++ {
+	for t := range h {
 		var mean, varMix float64
 		if t < len(hwOut) {
 			w := e.weights["holt_winters"]
@@ -148,15 +149,13 @@ func sigmaFromInterval(fr ForecastResult) float64 {
 
 func cloneWeights(in map[string]float64) map[string]float64 {
 	out := make(map[string]float64, len(in))
-	for k, v := range in {
-		out[k] = v
-	}
+	maps.Copy(out, in)
 	return out
 }
 
 func dominantWeight(w map[string]float64) string {
 	var bestK string
-	var bestV float64 = math.Inf(-1)
+	bestV := math.Inf(-1)
 	for k, v := range w {
 		if v > bestV {
 			bestV = v

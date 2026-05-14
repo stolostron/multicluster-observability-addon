@@ -29,7 +29,9 @@ func Backtest(points []DataPoint, cfg ModelConfig) []BacktestResult {
 	}
 
 	hw := NewHoltWintersModel(cfg)
-	hw.Fit(train)
+	if err := hw.Fit(train); err != nil {
+		return nil
+	}
 	hPred := hw.Forecast(h)
 	stl := NewSTLModel(cfg)
 	ar := NewARModel(cfg)
@@ -53,14 +55,11 @@ func mapeRMSE(test []DataPoint, pred []ForecastResult) (mape, rmse float64) {
 	if len(test) == 0 || len(pred) == 0 {
 		return 0, 0
 	}
-	m := len(test)
-	if len(pred) < m {
-		m = len(pred)
-	}
+	m := min(len(pred), len(test))
 	eps := 1e-9
 	var sumAPE, sumSE float64
 	var count int
-	for i := 0; i < m; i++ {
+	for i := range m {
 		a := test[i].Value
 		p := pred[i].PredictedValue
 		den := math.Abs(a)

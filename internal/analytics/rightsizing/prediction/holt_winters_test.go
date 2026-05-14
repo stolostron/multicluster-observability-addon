@@ -8,7 +8,7 @@ import (
 
 func generateSinusoidal(n int, period int, amplitude, base float64) []DataPoint {
 	points := make([]DataPoint, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		t := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC).Add(5 * time.Minute * time.Duration(i))
 		v := base + amplitude*math.Sin(2*math.Pi*float64(i)/float64(period))
 		points[i] = DataPoint{Timestamp: t, Value: v}
@@ -20,13 +20,10 @@ func forecastMAPE(actual []DataPoint, pred []ForecastResult) float64 {
 	if len(actual) == 0 || len(pred) == 0 {
 		return math.NaN()
 	}
-	m := len(actual)
-	if len(pred) < m {
-		m = len(pred)
-	}
+	m := min(len(pred), len(actual))
 	eps := 1e-9
 	var sum float64
-	for i := 0; i < m; i++ {
+	for i := range m {
 		a := actual[i].Value
 		p := pred[i].PredictedValue
 		den := math.Abs(a)
@@ -52,7 +49,7 @@ func TestHoltWintersFit_ShortSeries(t *testing.T) {
 	if !h.fitted {
 		t.Fatal("expected fitted after short series")
 	}
-	if h.seasonal != nil && len(h.seasonal) > 0 {
+	if len(h.seasonal) > 0 {
 		t.Fatalf("expected no seasonal component for short series, got len=%d", len(h.seasonal))
 	}
 	out := h.Forecast(8)
@@ -86,7 +83,7 @@ func TestHoltWintersForecast_Sinusoidal(t *testing.T) {
 	}
 
 	actual := make([]DataPoint, horizon)
-	for i := 0; i < horizon; i++ {
+	for i := range horizon {
 		idx := trainN + i
 		t0 := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC).Add(5 * time.Minute * time.Duration(idx))
 		v := base + amp*math.Sin(2*math.Pi*float64(idx)/float64(period))
@@ -104,7 +101,7 @@ func TestHoltWintersForecast_Constant(t *testing.T) {
 	n := 400
 	val := 123.45
 	points := make([]DataPoint, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		t0 := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC).Add(5 * time.Minute * time.Duration(i))
 		points[i] = DataPoint{Timestamp: t0, Value: val}
 	}

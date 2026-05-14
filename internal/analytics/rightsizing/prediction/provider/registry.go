@@ -2,11 +2,14 @@ package provider
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/stolostron/multicluster-observability-addon/internal/analytics/rightsizing/prediction"
 )
+
+var errRegistryUnknownProviderType = errors.New("prediction provider: unknown type")
 
 type externalProviderConfig struct {
 	APIKey       string `json:"apiKey"`
@@ -54,6 +57,6 @@ func Create(pc prediction.ProviderConfig) (PredictionProvider, error) {
 		return NewCustomProvider(cc.EndpointURL, cc.ConsentGiven), nil
 
 	default:
-		return nil, fmt.Errorf("prediction provider: unknown type %q", pc.Type)
+		return nil, fmt.Errorf("%w %q", errRegistryUnknownProviderType, pc.Type)
 	}
 }

@@ -39,7 +39,7 @@ func (p *BuiltinProvider) DetectAnomalies(ctx context.Context, points []predicti
 }
 
 // Explain returns ensemble weights and the currently dominant model name.
-func (p *BuiltinProvider) Explain(ctx context.Context, req prediction.ForecastRequest) (map[string]interface{}, error) {
+func (p *BuiltinProvider) Explain(ctx context.Context, req prediction.ForecastRequest) (map[string]any, error) {
 	_ = ctx
 	_ = req
 	w := p.ensemble.Weights()
@@ -51,7 +51,7 @@ func (p *BuiltinProvider) Explain(ctx context.Context, req prediction.ForecastRe
 			dom = k
 		}
 	}
-	return map[string]interface{}{
+	return map[string]any{
 		"weights":       w,
 		"dominantModel": dom,
 	}, nil

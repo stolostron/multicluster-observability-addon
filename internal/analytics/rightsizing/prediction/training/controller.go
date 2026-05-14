@@ -3,8 +3,10 @@ package training
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
+	"maps"
 	"sort"
 	"strconv"
 	"strings"
@@ -28,12 +30,14 @@ const (
 	maxShardBytes            = 1024 * 1024
 )
 
+var errWorkloadStateTooLarge = errors.New("single workload state exceeds maximum serialized size")
+
 // ModelState is persisted to ConfigMaps for reuse across controller restarts.
 type ModelState struct {
-	Weights       map[string]float64       `json:"weights"`
-	LastMAPE      float64                  `json:"lastMAPE"`
-	LastTrainedAt time.Time                `json:"lastTrainedAt"`
-	Config        prediction.ModelConfig   `json:"config"`
+	Weights       map[string]float64     `json:"weights"`
+	LastMAPE      float64                `json:"lastMAPE"`
+	LastTrainedAt time.Time              `json:"lastTrainedAt"`
+	Config        prediction.ModelConfig `json:"config"`
 }
 
 // Controller periodically retrains prediction providers and persists workload model state.
@@ -58,7 +62,7 @@ func NewController(cfg TrainingConfig, querier Querier, cl client.Client, namesp
 	}
 }
 
-// Start restores state, runs a training loop until ctx is cancelled, then returns ctx.Err().
+// Start restores state, runs a training loop until ctx is canceled, then returns ctx.Err().
 func (c *Controller) Start(ctx context.Context) error {
 	if err := c.restoreState(ctx); err != nil {
 		log.Printf("training: restore state: %v", err)
@@ -172,8 +176,8 @@ func (c *Controller) trainOneSeries(ctx context.Context, series DataPointSeries)
 	trainPts := pts[:split]
 	testPts := pts[split:]
 
-	if err := prov.Train(ctx, trainPts); err != nil {
-		log.Printf("training: Train %s: %v", key, err)
+	if trainErr := prov.Train(ctx, trainPts); trainErr != nil {
+		log.Printf("training: Train %s: %v", key, trainErr)
 		return
 	}
 
@@ -254,16 +258,13 @@ func (c *Controller) restoreState(ctx context.Context) error {
 		if err := json.Unmarshal([]byte(raw), &partial); err != nil {
 			return fmt.Errorf("configmap %s/%s: unmarshal states: %w", cm.Namespace, cm.Name, err)
 		}
-		for k, v := range partial {
-			merged[k] = v
-		}
+		maps.Copy(merged, partial)
 	}
 
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	for k, v := range merged {
-		vv := v
-		c.states[k] = &vv
+		c.states[k] = &v
 	}
 	return nil
 }
@@ -307,8 +308,8 @@ func (c *Controller) persistState(ctx context.Context) error {
 					configMapDataKeyStates: string(payload),
 				},
 			}
-			if err := c.client.Create(ctx, cm); err != nil {
-				return fmt.Errorf("create %s: %w", name, err)
+			if createErr := c.client.Create(ctx, cm); createErr != nil {
+				return fmt.Errorf("create %s: %w", name, createErr)
 			}
 			continue
 		}
@@ -362,9 +363,7 @@ func splitStateShards(states map[string]ModelState, maxBytes int) ([]map[string]
 			return
 		}
 		shardCopy := make(map[string]ModelState, len(current))
-		for k, v := range current {
-			shardCopy[k] = v
-		}
+		maps.Copy(shardCopy, current)
 		shards = append(shards, shardCopy)
 		for k := range current {
 			delete(current, k)
@@ -374,9 +373,7 @@ func splitStateShards(states map[string]ModelState, maxBytes int) ([]map[string]
 	for _, k := range keys {
 		v := states[k]
 		try := make(map[string]ModelState, len(current)+1)
-		for ck, cv := range current {
-			try[ck] = cv
-		}
+		maps.Copy(try, current)
 		try[k] = v
 
 		b, err := json.Marshal(try)
@@ -392,11 +389,9 @@ func splitStateShards(states map[string]ModelState, maxBytes int) ([]map[string]
 			}
 		}
 		if len(b) > maxBytes && len(try) == 1 {
-			return nil, fmt.Errorf("single workload state for key %q exceeds %d bytes", k, maxBytes)
+			return nil, fmt.Errorf("workload state for key %q exceeds %d bytes: %w", k, maxBytes, errWorkloadStateTooLarge)
 		}
-		for ck, cv := range try {
-			current[ck] = cv
-		}
+		maps.Copy(current, try)
 	}
 	flush()
 	return shards, nil
