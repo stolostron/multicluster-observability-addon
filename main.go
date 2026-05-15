@@ -22,6 +22,7 @@ import (
 	uiplugin "github.com/rhobs/observability-operator/pkg/apis/uiplugin/v1alpha1"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	"github.com/stolostron/multicluster-observability-addon/internal/analytics/rightsizing/prediction/training"
 	addonctrl "github.com/stolostron/multicluster-observability-addon/internal/controllers/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/controllers/resourcecreator"
 	"github.com/stolostron/multicluster-observability-addon/internal/controllers/watcher"
@@ -143,6 +144,8 @@ func runControllers(ctx context.Context, kubeConfig *rest.Config) error {
 		return fmt.Errorf("unable to create resource creator manager: %w", err)
 	}
 	rcm.Start(ctx)
+
+	training.StartHubControllerIfEnabled(ctx, kubeConfig, scheme, logger)
 
 	err = mgr.Start(ctx)
 	if err != nil {
