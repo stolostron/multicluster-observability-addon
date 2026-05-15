@@ -5,6 +5,7 @@ import (
 	goflag "flag"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/ViaQ/logerr/v2/log"
 	otelv1alpha1 "github.com/open-telemetry/opentelemetry-operator/apis/v1alpha1"
@@ -72,6 +73,12 @@ func main() {
 	pflag.CommandLine.AddGoFlagSet(goflag.CommandLine)
 
 	logs.AddFlags(logs.NewLoggingConfiguration(), pflag.CommandLine)
+
+	// Spoke ManifestWork runs `command: [endpoint-monitoring-operator]` with no args, matching
+	// the legacy operator binary. Default to the controller subcommand in that case only.
+	if filepath.Base(os.Args[0]) == "endpoint-monitoring-operator" && len(os.Args) == 1 {
+		os.Args = append(os.Args, "controller")
+	}
 
 	command := newCommand()
 	if err := command.Execute(); err != nil {
