@@ -38,14 +38,14 @@ func ForecastGPUUtilPanel(datasourceName string) panelgroup.Option {
 		),
 		panel.AddQuery(
 			query.PromQL(
-				`acm_rs:prediction_forecast_gpu_utilization{namespace="$namespace"}`,
+				`acm_rs:prediction_forecast_gpu_utilization{cluster="$cluster", namespace="$namespace"}`,
 				dashboards.AddQueryDataSource(datasourceName),
 				query.SeriesNameFormat("Forecast"),
 			),
 		),
 		panel.AddQuery(
 			query.PromQL(
-				`acm_rs:namespace:gpu_usage{namespace="$namespace"}`,
+				`acm_rs:namespace:gpu_usage{cluster="$cluster", profile="$profile", namespace="$namespace"}`,
 				dashboards.AddQueryDataSource(datasourceName),
 				query.SeriesNameFormat("Actual"),
 			),

@@ -13,8 +13,8 @@ data:
   config.json: |
     {
       "provider": {{ .Values.rightSizing.prediction.provider | default "builtin" | quote }},
-      "trainingIntervalHours": {{ .Values.rightSizing.prediction.trainingIntervalHours | default 6 }},
-      "historyDays": {{ .Values.rightSizing.prediction.historyDays | default 30 }},
+      "trainingIntervalHours": {{ .Values.rightSizing.prediction.trainingIntervalHours | default 1 }},
+      "historyDays": {{ .Values.rightSizing.prediction.historyDays | default 7 }},
       "safetyMarginPercent": {{ .Values.rightSizing.prediction.safetyMarginPercent | default 115 }}
     }
 {{- end }}

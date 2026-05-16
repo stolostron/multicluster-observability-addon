@@ -38,14 +38,14 @@ func ForecastMemoryPanel(datasourceName string) panelgroup.Option {
 		),
 		panel.AddQuery(
 			query.PromQL(
-				`acm_rs:prediction_forecast_memory{namespace="$namespace"}`,
+				`acm_rs:prediction_forecast_memory{cluster="$cluster", namespace="$namespace"}`,
 				dashboards.AddQueryDataSource(datasourceName),
 				query.SeriesNameFormat("Forecast"),
 			),
 		),
 		panel.AddQuery(
 			query.PromQL(
-				`namespace:container_memory_working_set_bytes:sum{namespace="$namespace"}`,
+				`acm_rs:namespace:memory_usage{cluster="$cluster", profile="$profile", namespace="$namespace"}`,
 				dashboards.AddQueryDataSource(datasourceName),
 				query.SeriesNameFormat("Actual"),
 			),

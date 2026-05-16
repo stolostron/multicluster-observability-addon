@@ -5,14 +5,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
-	"maps"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/go-logr/logr"
+	"github.com/stolostron/multicluster-observability-addon/internal/analytics/rightsizing"
 	"github.com/stolostron/multicluster-observability-addon/internal/analytics/rightsizing/prediction"
 	"github.com/stolostron/multicluster-observability-addon/internal/analytics/rightsizing/prediction/provider"
 	corev1 "k8s.io/api/core/v1"
@@ -30,14 +30,21 @@ const (
 	maxShardBytes            = 1024 * 1024
 )
 
+// federatedTrainingPromQL selects 1d aggregated series that are actually federated to the hub Thanos
+// (see rightsizing.scrapeconfig NamespaceMetrics / workload metrics — :5m rules are not federated).
+func federatedTrainingPromQL(metricName string) string {
+	p := rightsizing.RecommendationProfiles[0].Name
+	return fmt.Sprintf(`%s{profile=%q,aggregation=%q}`, metricName, p, "1d")
+}
+
 var errWorkloadStateTooLarge = errors.New("single workload state exceeds maximum serialized size")
 
 // ModelState is persisted to ConfigMaps for reuse across controller restarts.
 type ModelState struct {
-	Weights       map[string]float64     `json:"weights"`
-	LastMAPE      float64                `json:"lastMAPE"`
-	LastTrainedAt time.Time              `json:"lastTrainedAt"`
-	Config        prediction.ModelConfig `json:"config"`
+	Weights       map[string]float64       `json:"weights"`
+	LastMAPE      float64                  `json:"lastMAPE"`
+	LastTrainedAt time.Time                `json:"lastTrainedAt"`
+	Config        prediction.ModelConfig   `json:"config"`
 }
 
 // Controller periodically retrains prediction providers and persists workload model state.
@@ -49,33 +56,38 @@ type Controller struct {
 
 	states map[string]*ModelState
 	mu     sync.RWMutex
+	log    logr.Logger
 }
 
 // NewController constructs a training controller.
-func NewController(cfg TrainingConfig, querier Querier, cl client.Client, namespace string) *Controller {
+func NewController(cfg TrainingConfig, querier Querier, cl client.Client, namespace string, log logr.Logger) *Controller {
+	if log.GetSink() == nil {
+		log = logr.Discard()
+	}
 	return &Controller{
 		config:    cfg,
 		querier:   querier,
 		client:    cl,
 		namespace: namespace,
 		states:    make(map[string]*ModelState),
+		log:       log,
 	}
 }
 
-// Start restores state, runs a training loop until ctx is canceled, then returns ctx.Err().
+// Start restores state, runs a training loop until ctx is cancelled, then returns ctx.Err().
 func (c *Controller) Start(ctx context.Context) error {
 	if err := c.restoreState(ctx); err != nil {
-		log.Printf("training: restore state: %v", err)
+		c.log.Error(err, "training restore state")
 	}
 
 	runSafe := func() {
 		defer func() {
 			if r := recover(); r != nil {
-				log.Printf("training: cycle panic: %v", r)
+				c.log.Info("training cycle panic recovered", "recover", fmt.Sprint(r))
 			}
 		}()
 		if err := c.runTrainingCycle(ctx); err != nil {
-			log.Printf("training: cycle error: %v", err)
+			c.log.Error(err, "training cycle")
 		}
 	}
 
@@ -108,33 +120,33 @@ func (c *Controller) runTrainingCycle(ctx context.Context) error {
 
 	if c.config.NamespaceEnabled {
 		queries = append(queries,
-			metricQuery{"acm_rs:namespace:cpu_usage:5m", "namespace_cpu"},
-			metricQuery{"acm_rs:namespace:memory_usage:5m", "namespace_memory"},
+			metricQuery{federatedTrainingPromQL("acm_rs:namespace:cpu_usage"), "namespace_cpu"},
+			metricQuery{federatedTrainingPromQL("acm_rs:namespace:memory_usage"), "namespace_memory"},
 		)
 	}
 	if c.config.WorkloadEnabled {
 		queries = append(queries,
-			metricQuery{"acm_rs:workload:cpu_usage:5m", "workload_cpu"},
-			metricQuery{"acm_rs:workload:memory_usage:5m", "workload_memory"},
+			metricQuery{federatedTrainingPromQL("acm_rs:workload:cpu_usage"), "workload_cpu"},
+			metricQuery{federatedTrainingPromQL("acm_rs:workload:memory_usage"), "workload_memory"},
 		)
 	}
 	if c.config.GPUEnabled {
 		queries = append(queries,
-			metricQuery{"acm_rs:namespace:gpu_usage:5m", "gpu_utilization"},
-			metricQuery{"acm_rs:namespace:gpu_memory_used:5m", "gpu_memory"},
+			metricQuery{federatedTrainingPromQL("acm_rs:namespace:gpu_usage"), "gpu_utilization"},
+			metricQuery{federatedTrainingPromQL("acm_rs:namespace:gpu_memory_used"), "gpu_memory"},
 		)
 	}
 	if c.config.VMEnabled {
 		queries = append(queries,
-			metricQuery{"acm_rs_vm:namespace:cpu_usage:5m", "vm_cpu"},
-			metricQuery{"acm_rs_vm:namespace:memory_usage:5m", "vm_memory"},
+			metricQuery{federatedTrainingPromQL("acm_rs_vm:namespace:cpu_usage"), "vm_cpu"},
+			metricQuery{federatedTrainingPromQL("acm_rs_vm:namespace:memory_usage"), "vm_memory"},
 		)
 	}
 
 	for _, q := range queries {
 		series, err := c.querier.Query(ctx, q.query, start, end, step)
 		if err != nil {
-			log.Printf("training: %s query: %v", q.label, err)
+			c.log.Error(err, "training metric query", "series", q.label, "query", q.query)
 			continue
 		}
 		for _, s := range series {
@@ -163,7 +175,7 @@ func (c *Controller) trainOneSeries(ctx context.Context, series DataPointSeries)
 
 	prov, err := provider.Create(providerConfigFromTraining(c.config))
 	if err != nil {
-		log.Printf("training: provider %s: %v", key, err)
+		c.log.Error(err, "training create provider", "key", key)
 		return
 	}
 
@@ -177,7 +189,7 @@ func (c *Controller) trainOneSeries(ctx context.Context, series DataPointSeries)
 	testPts := pts[split:]
 
 	if trainErr := prov.Train(ctx, trainPts); trainErr != nil {
-		log.Printf("training: Train %s: %v", key, trainErr)
+		c.log.Error(trainErr, "training Train", "key", key)
 		return
 	}
 
@@ -195,7 +207,11 @@ func (c *Controller) trainOneSeries(ctx context.Context, series DataPointSeries)
 		Interval: interval,
 	})
 	if err != nil || len(fr) < len(testPts) {
-		log.Printf("training: Forecast %s: err=%v len=%d want=%d", key, err, len(fr), len(testPts))
+		if err != nil {
+			c.log.Error(err, "training Forecast", "key", key, "forecastLen", len(fr), "want", len(testPts))
+		} else {
+			c.log.Info("training Forecast shorter than test window", "key", key, "forecastLen", len(fr), "want", len(testPts))
+		}
 		return
 	}
 
@@ -258,7 +274,9 @@ func (c *Controller) restoreState(ctx context.Context) error {
 		if err := json.Unmarshal([]byte(raw), &partial); err != nil {
 			return fmt.Errorf("configmap %s/%s: unmarshal states: %w", cm.Namespace, cm.Name, err)
 		}
-		maps.Copy(merged, partial)
+		for k, v := range partial {
+			merged[k] = v
+		}
 	}
 
 	c.mu.Lock()
@@ -363,7 +381,9 @@ func splitStateShards(states map[string]ModelState, maxBytes int) ([]map[string]
 			return
 		}
 		shardCopy := make(map[string]ModelState, len(current))
-		maps.Copy(shardCopy, current)
+		for k, v := range current {
+			shardCopy[k] = v
+		}
 		shards = append(shards, shardCopy)
 		for k := range current {
 			delete(current, k)
@@ -373,7 +393,9 @@ func splitStateShards(states map[string]ModelState, maxBytes int) ([]map[string]
 	for _, k := range keys {
 		v := states[k]
 		try := make(map[string]ModelState, len(current)+1)
-		maps.Copy(try, current)
+		for ck, cv := range current {
+			try[ck] = cv
+		}
 		try[k] = v
 
 		b, err := json.Marshal(try)
@@ -391,7 +413,9 @@ func splitStateShards(states map[string]ModelState, maxBytes int) ([]map[string]
 		if len(b) > maxBytes && len(try) == 1 {
 			return nil, fmt.Errorf("workload state for key %q exceeds %d bytes: %w", k, maxBytes, errWorkloadStateTooLarge)
 		}
-		maps.Copy(current, try)
+		for ck, cv := range try {
+			current[ck] = cv
+		}
 	}
 	flush()
 	return shards, nil

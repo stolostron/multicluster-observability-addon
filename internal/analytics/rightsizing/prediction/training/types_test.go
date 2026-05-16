@@ -32,11 +32,11 @@ func TestDefaultTrainingConfig(t *testing.T) {
 	if cfg.VMEnabled {
 		t.Error("VMEnabled: want false")
 	}
-	if cfg.IntervalHours != 6 {
-		t.Errorf("IntervalHours: got %d, want 6", cfg.IntervalHours)
+	if cfg.IntervalHours != 1 {
+		t.Errorf("IntervalHours: got %d, want 1", cfg.IntervalHours)
 	}
-	if cfg.HistoryDays != 30 {
-		t.Errorf("HistoryDays: got %d, want 30", cfg.HistoryDays)
+	if cfg.HistoryDays != 7 {
+		t.Errorf("HistoryDays: got %d, want 7", cfg.HistoryDays)
 	}
 	// Default model config should be wired
 	defaultModel := prediction.DefaultModelConfig()

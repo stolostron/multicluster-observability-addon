@@ -109,7 +109,7 @@ type thanosQueryRangeResponse struct {
 		ResultType string `json:"resultType"`
 		Result     []struct {
 			Metric map[string]string `json:"metric"`
-			Values [][]any           `json:"values"`
+			Values [][]interface{}   `json:"values"`
 		} `json:"result"`
 	} `json:"data"`
 }
@@ -118,12 +118,21 @@ func formatPrometheusStep(d time.Duration) string {
 	if d <= 0 {
 		d = time.Minute
 	}
-	sec := max(int64(d/time.Second), 1)
+	sec := int64(d / time.Second)
+	if sec < 1 {
+		sec = 1
+	}
 	return fmt.Sprintf("%ds", sec)
 }
 
 func resourceHintFromQuery(promQL string) string {
 	s := strings.ToLower(promQL)
+	if strings.Contains(s, "gpu_memory") {
+		return "gpu_memory"
+	}
+	if strings.Contains(s, "gpu_usage") {
+		return "gpu_utilization"
+	}
 	if strings.Contains(s, "namespace_memory") || strings.Contains(s, "memory_usage") {
 		return "memory"
 	}
@@ -138,15 +147,19 @@ func workloadKeyFromMetric(m map[string]string, resourceHint string) WorkloadKey
 	if r == "" {
 		r = resourceHint
 	}
+	wk := m["workload"]
+	if wk == "" {
+		wk = m["name"]
+	}
 	return WorkloadKey{
 		Cluster:   m["cluster"],
 		Namespace: m["namespace"],
-		Workload:  m["workload"],
+		Workload:  wk,
 		Resource:  r,
 	}
 }
 
-func valuesToDataPoints(values [][]any) ([]prediction.DataPoint, error) {
+func valuesToDataPoints(values [][]interface{}) ([]prediction.DataPoint, error) {
 	if len(values) == 0 {
 		return nil, nil
 	}
@@ -170,7 +183,7 @@ func valuesToDataPoints(values [][]any) ([]prediction.DataPoint, error) {
 	return out, nil
 }
 
-func ifaceToFloat64(v any) (float64, error) {
+func ifaceToFloat64(v interface{}) (float64, error) {
 	switch x := v.(type) {
 	case float64:
 		return x, nil

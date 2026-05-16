@@ -7,11 +7,13 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/go-logr/logr"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"github.com/stolostron/multicluster-observability-addon/internal/analytics/rightsizing"
+	"github.com/stolostron/multicluster-observability-addon/internal/analytics/rightsizing/prediction/exporter"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -20,6 +22,7 @@ import (
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
+	"sigs.k8s.io/controller-runtime/pkg/metrics"
 )
 
 // DefaultThanosQueryURL is the in-cluster Thanos query frontend when observability runs in the standard namespace.
@@ -27,6 +30,31 @@ const DefaultThanosQueryURL = "http://observability-thanos-query-frontend.open-c
 
 // EnvThanosQueryURL overrides the Thanos base URL (scheme + host + port, no path). Set for non-standard installs.
 const EnvThanosQueryURL = "MCOA_THANOS_QUERY_URL"
+
+// exporterQuerierAdapter bridges training.Querier to exporter.Querier without an import cycle.
+type exporterQuerierAdapter struct {
+	inner Querier
+}
+
+func (a exporterQuerierAdapter) Query(ctx context.Context, promQL string, start, end time.Time, step time.Duration) ([]exporter.DataPointSeries, error) {
+	series, err := a.inner.Query(ctx, promQL, start, end, step)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]exporter.DataPointSeries, len(series))
+	for i, s := range series {
+		out[i] = exporter.DataPointSeries{
+			Key: exporter.WorkloadKey{
+				Cluster:   s.Key.Cluster,
+				Namespace: s.Key.Namespace,
+				Workload:  s.Key.Workload,
+				Resource:  s.Key.Resource,
+			},
+			Points: s.Points,
+		}
+	}
+	return out, nil
+}
 
 type hubPredictionFile struct {
 	Provider              string  `json:"provider"`
@@ -94,7 +122,18 @@ func StartHubControllerIfEnabled(ctx context.Context, restCfg *rest.Config, sche
 	}
 
 	querier := NewThanosQuerier(thanosBase)
-	ctrl := NewController(tc, querier, k8s, addoncfg.InstallNamespace)
+	ctrl := NewController(tc, querier, k8s, addoncfg.InstallNamespace, l)
+
+	exp := exporter.NewForecastExporter(exporter.Options{
+		Client:        k8s,
+		Querier:       exporterQuerierAdapter{inner: querier},
+		Namespace:     addoncfg.InstallNamespace,
+		IntervalHours: tc.IntervalHours,
+		HistoryDays:   tc.HistoryDays,
+		ProviderType:  tc.ProviderType,
+		Logger:        l,
+	})
+	metrics.Registry.MustRegister(exp)
 
 	l.Info("starting prediction training controller",
 		"namespace", addoncfg.InstallNamespace,
@@ -145,10 +184,10 @@ func buildTrainingConfigForHub(ctx context.Context, k8s client.Client, opts addo
 	}
 
 	if tc.IntervalHours <= 0 {
-		tc.IntervalHours = 6
+		tc.IntervalHours = 1
 	}
 	if tc.HistoryDays <= 0 {
-		tc.HistoryDays = 30
+		tc.HistoryDays = 7
 	}
 	return tc, nil
 }

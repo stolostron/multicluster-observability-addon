@@ -61,8 +61,8 @@ func mergedPredictionSettings(opts Options) (PredictionValues, error) {
 	pv := PredictionValues{
 		Enabled:               true,
 		Provider:              opts.PredictionProvider,
-		TrainingIntervalHours: 6,
-		HistoryDays:           30,
+		TrainingIntervalHours: 1,
+		HistoryDays:           7,
 		SafetyMarginPercent:   115,
 	}
 	if pv.Provider == "" {

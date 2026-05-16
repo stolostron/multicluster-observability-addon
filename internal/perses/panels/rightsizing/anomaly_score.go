@@ -38,7 +38,7 @@ func AnomalyScorePanel(datasourceName string) panelgroup.Option {
 		),
 		panel.AddQuery(
 			query.PromQL(
-				`acm_rs:prediction_anomaly_score{namespace="$namespace"}`,
+				`acm_rs:prediction_anomaly_score{cluster="$cluster", namespace="$namespace"}`,
 				dashboards.AddQueryDataSource(datasourceName),
 				query.SeriesNameFormat("Anomaly score"),
 			),
