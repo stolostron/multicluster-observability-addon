@@ -13,7 +13,7 @@ const (
 
 const vmByTimeInStatusStatusJoin = `
   + on(cluster, name, namespace) group_left(status)
-  (
+  (0 * (
     (
       (
         (time() - ` + vmStartingLastTransitionExpr + `)
@@ -79,7 +79,7 @@ const vmByTimeInStatusStatusJoin = `
       (kubevirt_vm_info{cluster=~"$cluster", name=~"$name", namespace=~"$namespace", status_group=~"starting|running|non_running|error"} > 0)
     )
   ) and on(cluster, name, namespace)
-  (kubevirt_vm_info{cluster=~"$cluster", name=~"$name", namespace=~"$namespace", status_group=~"$status"} > 0)`
+  (kubevirt_vm_info{cluster=~"$cluster", name=~"$name", namespace=~"$namespace", status_group=~"$status"} > 0))`
 
 const vmByTimeInStatusTotalAllocatedCPUStatQuery = `sum (
 (` + allocatedCPUMultiVMExpr + `)
