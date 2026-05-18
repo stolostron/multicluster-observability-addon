@@ -82,23 +82,23 @@ const vmByTimeInStatusStatusJoin = `
   (kubevirt_vm_info{cluster=~"$cluster", name=~"$name", namespace=~"$namespace", status_group=~"$status"} > 0)`
 
 const vmByTimeInStatusTotalAllocatedCPUStatQuery = `sum (
-(` + allocatedCPUMultiVMExpr + `)
+max by (cluster, namespace, name)(` + allocatedCPUMultiVMExpr + `)
 ` + vmByTimeInStatusStatusJoin + `
 ) or vector(0)`
 
 const vmByTimeInStatusTotalAllocatedMemoryStatQuery = `sum(
 max by (cluster, namespace, name, status)(
-  (` + allocatedMemoryMultiVMExpr + `)
+  max by (cluster, namespace, name)(` + allocatedMemoryMultiVMExpr + `)
 ` + vmByTimeInStatusStatusJoin + `
 )) or vector(0)`
 
 const vmByTimeInStatusTotalAllocatedDiskStatQuery = `sum (
-  (kubevirt_vm_disk_allocated_size_bytes{cluster=~"$cluster", name=~"$name", namespace=~"$namespace"})
+  sum by (cluster, namespace, name)(kubevirt_vm_disk_allocated_size_bytes{cluster=~"$cluster", name=~"$name", namespace=~"$namespace"})
 ` + vmByTimeInStatusStatusJoin + `
 ) or vector(0)`
 
 const vmByTimeInStatusTableDiskQuery = `sum by (cluster, namespace, name, status)(
-  (kubevirt_vm_disk_allocated_size_bytes{cluster=~"$cluster", name=~"$name", namespace=~"$namespace"})
+  sum by (cluster, namespace, name)(kubevirt_vm_disk_allocated_size_bytes{cluster=~"$cluster", name=~"$name", namespace=~"$namespace"})
 ` + vmByTimeInStatusStatusJoin + `
 )`
 
@@ -171,9 +171,11 @@ const vmByTimeInStatusTableMigrationEndMsQuery = `sum by (cluster, namespace, na
 )`
 
 const vmByTimeInStatusTableMemoryQuery = `max by (cluster, namespace, name, status)(
-  (` + allocatedMemoryMultiVMExpr + `)
+  max by (cluster, namespace, name)(` + allocatedMemoryMultiVMExpr + `)
 ` + vmByTimeInStatusStatusJoin + `
 )`
 
-const vmByTimeInStatusTableCPUQuery = `(` + allocatedCPUMultiVMExpr + `)
-` + vmByTimeInStatusStatusJoin
+const vmByTimeInStatusTableCPUQuery = `max by (cluster, namespace, name, status)(
+  max by (cluster, namespace, name)(` + allocatedCPUMultiVMExpr + `)
+` + vmByTimeInStatusStatusJoin + `
+)`
