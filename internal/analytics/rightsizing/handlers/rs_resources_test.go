@@ -57,6 +57,7 @@ func newPlatformOpts(nsEnabled, virtEnabled bool) addon.Options {
 			Enabled: true,
 			AnalyticsOptions: addon.AnalyticsOptions{
 				RightSizing: addon.RightSizingOptions{
+					Delegated:             true,
 					NamespaceEnabled:      nsEnabled,
 					VirtualizationEnabled: virtEnabled,
 				},
@@ -182,6 +183,40 @@ func TestReconcileRSResources_CleanupIdempotent(t *testing.T) {
 	opts := newPlatformOpts(false, false)
 	err := ob.ReconcileRSResources(ctx, opts)
 	require.NoError(t, err)
+}
+
+// TestReconcileRSResources_SkipsWhenNotDelegated verifies ConfigMaps survive when RS is not delegated to MCOA.
+func TestReconcileRSResources_SkipsWhenNotDelegated(t *testing.T) {
+	nsCM := createTestConfigMap(rightsizing.NamespaceConfigMapName)
+	virtCM := createTestConfigMap(rightsizing.VirtualizationConfigMapName)
+
+	ob := newTestOptionsBuilder(t, nsCM, virtCM)
+	ctx := context.TODO()
+
+	opts := addon.Options{
+		Platform: addon.PlatformOptions{
+			Enabled: true,
+			AnalyticsOptions: addon.AnalyticsOptions{
+				RightSizing: addon.RightSizingOptions{
+					Delegated:             false,
+					NamespaceEnabled:      false,
+					VirtualizationEnabled: false,
+				},
+			},
+		},
+	}
+	err := ob.ReconcileRSResources(ctx, opts)
+	require.NoError(t, err)
+
+	err = ob.Client.Get(ctx, types.NamespacedName{
+		Name: rightsizing.NamespaceConfigMapName, Namespace: addoncfg.InstallNamespace,
+	}, &corev1.ConfigMap{})
+	require.NoError(t, err, "namespace configmap must survive when not delegated")
+
+	err = ob.Client.Get(ctx, types.NamespacedName{
+		Name: rightsizing.VirtualizationConfigMapName, Namespace: addoncfg.InstallNamespace,
+	}, &corev1.ConfigMap{})
+	require.NoError(t, err, "virtualization configmap must survive when not delegated")
 }
 
 func TestClusterMatchesPlacement_EmptyPredicates(t *testing.T) {

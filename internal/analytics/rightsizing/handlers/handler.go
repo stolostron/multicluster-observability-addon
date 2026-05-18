@@ -43,6 +43,10 @@ func (o *OptionsBuilder) Build(ctx context.Context, cluster *clusterv1.ManagedCl
 		return ret, nil
 	}
 
+	if !opts.Platform.AnalyticsOptions.RightSizing.Delegated {
+		return ret, nil
+	}
+
 	namespaceEnabled := opts.Platform.AnalyticsOptions.RightSizing.NamespaceEnabled
 	virtualizationEnabled := opts.Platform.AnalyticsOptions.RightSizing.VirtualizationEnabled
 

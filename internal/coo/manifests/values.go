@@ -54,6 +54,7 @@ type UIValues struct {
 	Enabled bool `json:"enabled"`
 }
 
+// BuildValues constructs COO Helm values from addon options, including dashboards and feature gates.
 func BuildValues(opts addon.Options, installOfCOOOnTheHubIsNeeded bool, isHubCluster bool) *COOValues {
 	var dashboards []DashboardValue
 	var incidentDetectionEnabled bool
@@ -78,13 +79,15 @@ func BuildValues(opts addon.Options, installOfCOOOnTheHubIsNeeded bool, isHubClu
 		if incidentDetectionEnabled {
 			analyticsDashboards = append(analyticsDashboards, buildIncidentDetetctionDashboards()...)
 		}
-		if opts.Platform.AnalyticsOptions.RightSizing.NamespaceEnabled {
-			rightSizingEnabled = true
-			analyticsDashboards = append(analyticsDashboards, buildNamespaceRSDashboards()...)
-		}
-		if opts.Platform.AnalyticsOptions.RightSizing.VirtualizationEnabled {
-			rightSizingEnabled = true
-			analyticsDashboards = append(analyticsDashboards, buildVMRSDashboards()...)
+		if opts.Platform.AnalyticsOptions.RightSizing.Delegated {
+			if opts.Platform.AnalyticsOptions.RightSizing.NamespaceEnabled {
+				rightSizingEnabled = true
+				analyticsDashboards = append(analyticsDashboards, buildNamespaceRSDashboards()...)
+			}
+			if opts.Platform.AnalyticsOptions.RightSizing.VirtualizationEnabled {
+				rightSizingEnabled = true
+				analyticsDashboards = append(analyticsDashboards, buildVMRSDashboards()...)
+			}
 		}
 	}
 

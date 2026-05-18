@@ -149,6 +149,7 @@ func (o Options) validateMetrics() error {
 	return nil
 }
 
+// BuildOptions parses an AddOnDeploymentConfig into addon Options.
 func BuildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Options, error) {
 	var opts Options
 	if addOnDeployment == nil {
