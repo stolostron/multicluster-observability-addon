@@ -21,6 +21,7 @@ const (
 	KeyPlatformIncidentDetection         = "platformIncidentDetection"
 	KeyPlatformNamespaceRightSizing      = "platformNamespaceRightSizing"
 	KeyPlatformVirtualizationRightSizing = "platformVirtualizationRightSizing"
+	KeyRightSizingDelegated              = "rightSizingDelegated"
 	KeyMetricsHubHostname                = "metricsHubHostname"
 	KeyMetricsAlertManagerHostname       = "metricsAlertManagerHostname"
 	KeyNodeExporterHostPort              = "nodeExporterHostPort"
@@ -91,6 +92,7 @@ type PlatformOptions struct {
 }
 
 type RightSizingOptions struct {
+	Delegated             bool
 	NamespaceEnabled      bool
 	VirtualizationEnabled bool
 }
@@ -252,6 +254,10 @@ func BuildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Opti
 			if keyvalue.Value == string(UIPluginV1alpha1) {
 				opts.Platform.Enabled = true
 				opts.Platform.AnalyticsOptions.IncidentDetection.Enabled = true
+			}
+		case KeyRightSizingDelegated:
+			if keyvalue.Value == "true" {
+				opts.Platform.AnalyticsOptions.RightSizing.Delegated = true
 			}
 		case KeyPlatformNamespaceRightSizing:
 			nsRSExplicitlySet = true

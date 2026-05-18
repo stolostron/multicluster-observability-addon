@@ -41,10 +41,14 @@ func isRSConfigMap(namespace, name string) bool {
 	return false
 }
 
-// ReconcileRSResources ensures right-sizing ConfigMap resources are cleaned up
-// for disabled features.
-// Called from ResourceCreator (hub-wide, not per-cluster) to avoid race conditions.
+// ReconcileRSResources cleans up RS ConfigMaps for disabled features, but only
+// when RS is delegated to MCOA (signaled via ADC). In MCO mode, MCO owns
+// ConfigMap lifecycle — deleting them here would cause a create-delete loop.
 func (o *OptionsBuilder) ReconcileRSResources(ctx context.Context, opts addon.Options) error {
+	if !opts.Platform.AnalyticsOptions.RightSizing.Delegated {
+		return nil
+	}
+
 	if !opts.Platform.AnalyticsOptions.RightSizing.NamespaceEnabled {
 		if err := o.deleteRSConfigMap(ctx, rightsizing.NamespaceConfigMapName); err != nil {
 			return fmt.Errorf("failed to cleanup namespace configmap: %w", err)
