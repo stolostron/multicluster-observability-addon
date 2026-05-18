@@ -100,6 +100,7 @@ func classify(objects []runtime.Object) renderedObjects {
 
 func TestRightSizing_HubCluster_BothEnabled(t *testing.T) {
 	cv := []addonapiv1alpha1.CustomizedVariable{
+		{Name: addon.KeyRightSizingDelegated, Value: "true"},
 		{Name: addon.KeyPlatformNamespaceRightSizing, Value: "enabled"},
 		{Name: addon.KeyPlatformVirtualizationRightSizing, Value: "enabled"},
 	}
@@ -177,6 +178,7 @@ func TestRightSizing_HubCluster_BothEnabled(t *testing.T) {
 
 func TestRightSizing_HubCluster_NamespaceOnly(t *testing.T) {
 	cv := []addonapiv1alpha1.CustomizedVariable{
+		{Name: addon.KeyRightSizingDelegated, Value: "true"},
 		{Name: addon.KeyPlatformNamespaceRightSizing, Value: "enabled"},
 		{Name: addon.KeyPlatformVirtualizationRightSizing, Value: "disabled"},
 	}
@@ -200,6 +202,7 @@ func TestRightSizing_HubCluster_NamespaceOnly(t *testing.T) {
 
 func TestRightSizing_HubCluster_VirtualizationOnly(t *testing.T) {
 	cv := []addonapiv1alpha1.CustomizedVariable{
+		{Name: addon.KeyRightSizingDelegated, Value: "true"},
 		{Name: addon.KeyPlatformNamespaceRightSizing, Value: "disabled"},
 		{Name: addon.KeyPlatformVirtualizationRightSizing, Value: "enabled"},
 	}
@@ -218,6 +221,7 @@ func TestRightSizing_HubCluster_VirtualizationOnly(t *testing.T) {
 
 func TestRightSizing_HubCluster_BothDisabled(t *testing.T) {
 	cv := []addonapiv1alpha1.CustomizedVariable{
+		{Name: addon.KeyRightSizingDelegated, Value: "true"},
 		{Name: addon.KeyPlatformNamespaceRightSizing, Value: "disabled"},
 		{Name: addon.KeyPlatformVirtualizationRightSizing, Value: "disabled"},
 	}
@@ -241,6 +245,7 @@ func TestRightSizing_HubCluster_BothDisabled(t *testing.T) {
 
 func TestRightSizing_NonHubCluster_NoRSDashboards(t *testing.T) {
 	cv := []addonapiv1alpha1.CustomizedVariable{
+		{Name: addon.KeyRightSizingDelegated, Value: "true"},
 		{Name: addon.KeyPlatformNamespaceRightSizing, Value: "enabled"},
 		{Name: addon.KeyPlatformVirtualizationRightSizing, Value: "enabled"},
 	}
@@ -258,6 +263,7 @@ func TestRightSizing_NonHubCluster_NoRSDashboards(t *testing.T) {
 
 func TestRightSizing_DashboardSpecStructure(t *testing.T) {
 	cv := []addonapiv1alpha1.CustomizedVariable{
+		{Name: addon.KeyRightSizingDelegated, Value: "true"},
 		{Name: addon.KeyPlatformNamespaceRightSizing, Value: "enabled"},
 		{Name: addon.KeyPlatformVirtualizationRightSizing, Value: "enabled"},
 	}
@@ -322,6 +328,7 @@ func TestRightSizing_DashboardSpecStructure(t *testing.T) {
 
 func TestRightSizing_CombinedWithIncidentDetection(t *testing.T) {
 	cv := []addonapiv1alpha1.CustomizedVariable{
+		{Name: addon.KeyRightSizingDelegated, Value: "true"},
 		{Name: addon.KeyPlatformNamespaceRightSizing, Value: "enabled"},
 		{Name: addon.KeyPlatformVirtualizationRightSizing, Value: "enabled"},
 		{Name: addon.KeyPlatformIncidentDetection, Value: "uiplugins.v1alpha1.observability.openshift.io"},
@@ -354,6 +361,31 @@ func TestRightSizing_CombinedWithIncidentDetection(t *testing.T) {
 			}
 		}
 		assert.Equal(t, 1, count, "exactly one analytics namespace object should be rendered")
+	})
+}
+
+// TestRightSizing_MCOMode_NoDashboardsWhenNotDelegated verifies no RS dashboards render in MCO mode.
+func TestRightSizing_MCOMode_NoDashboardsWhenNotDelegated(t *testing.T) {
+	cv := []addonapiv1alpha1.CustomizedVariable{
+		{Name: addon.KeyPlatformNamespaceRightSizing, Value: "enabled"},
+		{Name: addon.KeyPlatformVirtualizationRightSizing, Value: "enabled"},
+	}
+
+	objects := renderRSManifests(t, true, cv)
+	r := classify(objects)
+
+	t.Run("no RS dashboards without delegation", func(t *testing.T) {
+		for _, db := range r.dashboards {
+			assert.NotContains(t, allRSDashboardIDs, db.Name,
+				"RS dashboards must not render in MCO mode (rightSizingDelegated absent)")
+		}
+	})
+
+	t.Run("no analytics namespace without delegation", func(t *testing.T) {
+		for _, ns := range r.namespaces {
+			assert.NotEqual(t, addoncfg.AnalyticsNamespace, ns.Name,
+				"analytics namespace must not be created in MCO mode")
+		}
 	})
 }
 

@@ -117,6 +117,7 @@ func Test_IncidentDetection_AllConfigsTogether_AllResources(t *testing.T) {
 			name:  "right-sizing dashboards in observability-analytics namespace",
 			isHub: true,
 			cv: []addonapiv1alpha1.CustomizedVariable{
+				{Name: addon.KeyRightSizingDelegated, Value: "true"},
 				{Name: addon.KeyPlatformNamespaceRightSizing, Value: "enabled"},
 				{Name: addon.KeyPlatformVirtualizationRightSizing, Value: "enabled"},
 			},
