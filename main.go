@@ -4,6 +4,8 @@ import (
 	"context"
 	goflag "flag"
 	"fmt"
+	"net/http"
+	"net/http/pprof"
 	"os"
 
 	"github.com/ViaQ/logerr/v2/log"
@@ -65,6 +67,8 @@ func init() {
 }
 
 var logVerbosity int
+var enablePprof bool
+var pprofAddr string
 
 func main() {
 	pflag.CommandLine.SetNormalizeFunc(utilflag.WordSepNormalizeFunc)
@@ -109,6 +113,8 @@ func newControllerCommand() *cobra.Command {
 	cmd.Use = "controller"
 	cmd.Short = "Start the addon controller"
 	cmd.Flags().IntVar(&logVerbosity, "log-verbosity", 0, "Log verbosity level. The higher the level, the noisier the logs.")
+	cmd.Flags().BoolVar(&enablePprof, "enable-pprof", false, "Enable pprof profiling.")
+	cmd.Flags().StringVar(&pprofAddr, "pprof-addr", "127.0.0.1:6060", "The address the pprof server will bind to.")
 
 	return cmd
 }
@@ -116,6 +122,35 @@ func newControllerCommand() *cobra.Command {
 func runControllers(ctx context.Context, kubeConfig *rest.Config) error {
 	logger := log.NewLogger("mcoa", log.WithVerbosity(logVerbosity))
 	ctrl.SetLogger(logger)
+
+	if enablePprof {
+		mux := http.NewServeMux()
+		mux.HandleFunc("/debug/pprof/", pprof.Index)
+		mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+		mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+		mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+		mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+
+		srv := &http.Server{
+			Addr:    pprofAddr,
+			Handler: mux,
+		}
+
+		go func() {
+			logger.Info("starting pprof server", "addr", pprofAddr)
+			if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				logger.Error(err, "pprof server failed")
+			}
+		}()
+
+		go func() {
+			<-ctx.Done()
+			logger.Info("shutting down pprof server")
+			_ = srv.Shutdown(context.Background())
+		}()
+	} else {
+		logger.V(1).Info("pprof server disabled")
+	}
 
 	// Increase client-side throttling limits to support large number of managed clusters
 	kubeConfig.QPS = 50.0
