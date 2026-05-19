@@ -80,9 +80,9 @@ sum(kubevirt_vmi_memory_used_bytes{cluster=~"$cluster", node=~"$node"})`
 
 // ClusterVirtualCommittedNow (virtual memory commitment ratio)
 const nodeMemoryClusterVirtualCommittedNowRatio = `(
-sum((label_replace((node_memory_MemTotal_bytes{cluster=~"$cluster", instance=~"$node"} - node_memory_MemAvailable_bytes{cluster=~"$cluster", instance=~"$node"}), "node", "$1", "instance", "(.+)") * on (node) kube_node_role{role="$role", cluster=~"$cluster", node=~"$node"}))
+sum((label_replace((node_memory_MemTotal_bytes{cluster=~"$cluster", instance=~"$node"} - node_memory_MemAvailable_bytes{cluster=~"$cluster", instance=~"$node"}), "node", "$1", "instance", "(.+)") * on (node) group_left() kube_node_role{role="$role", cluster=~"$cluster", node=~"$node"}))
 -
-(sum((kube_node_status_capacity{resource="memory", cluster=~"$cluster", node=~"$node"} * on (node) kube_node_role{role="$role", cluster=~"$cluster", node=~"$node"})) - sum((kube_node_status_allocatable{resource="memory", cluster=~"$cluster", node=~"$node"} * on (node) kube_node_role{role="$role", cluster=~"$cluster", node=~"$node"})))
+(sum((kube_node_status_capacity{resource="memory", cluster=~"$cluster", node=~"$node"} * on (node) group_left() kube_node_role{role="$role", cluster=~"$cluster", node=~"$node"})) - sum((kube_node_status_allocatable{resource="memory", cluster=~"$cluster", node=~"$node"} * on (node) group_left() kube_node_role{role="$role", cluster=~"$cluster", node=~"$node"})))
 +
 sum(kubevirt_vmi_memory_domain_bytes{cluster=~"$cluster", node=~"$node"})
 )
@@ -90,7 +90,7 @@ sum(kubevirt_vmi_memory_domain_bytes{cluster=~"$cluster", node=~"$node"})
 /
 
 (
-sum((kube_node_status_allocatable{resource="memory", cluster=~"$cluster", node=~"$node"} * on (node) kube_node_role{role="$role", cluster=~"$cluster", node=~"$node"}))
+sum((kube_node_status_allocatable{resource="memory", cluster=~"$cluster", node=~"$node"} * on (node) group_left() kube_node_role{role="$role", cluster=~"$cluster", node=~"$node"}))
 )`
 
 // NodePressureHistory
@@ -341,11 +341,11 @@ const nodeMemoryVMsOvercommitRatio = `(label_replace(max by (cluster, namespace,
 / on (namespace, label_vm_kubevirt_io_name) group_left()
 
 max by (namespace, label_vm_kubevirt_io_name) (
-  kube_pod_resource_request{cluster=~"$cluster", resource="memory"}
-  * on(namespace, pod) group_left(label_vm_kubevirt_io_name)
   group by(namespace, pod, label_vm_kubevirt_io_name) (
     kube_pod_labels{cluster=~"$cluster", label_vm_kubevirt_io_name!=""}
   )
+  * on(namespace, pod) group_left()
+  max by (namespace, pod) (kube_pod_resource_request{cluster=~"$cluster", resource="memory"})
 )`
 
 // VMvirtualmemoryutiliztaionhostvmurilization (top 10 VM memory used ratio)
@@ -354,11 +354,11 @@ const nodeMemoryVMVirtualMemoryUtilizationHostVMRatio = `topk(10, (label_replace
 / on (namespace, label_vm_kubevirt_io_name) group_left()
 
 sum by (namespace, label_vm_kubevirt_io_name) (
-  container_memory_usage_bytes{cluster=~"$cluster"}
-  * on(namespace, pod) group_left(label_vm_kubevirt_io_name)
   group by(namespace, pod, label_vm_kubevirt_io_name) (
     kube_pod_labels{cluster=~"$cluster", label_vm_kubevirt_io_name!=""}
   )
+  * on(namespace, pod) group_left()
+  max by (namespace, pod) (container_memory_usage_bytes{cluster=~"$cluster"})
 )
 )`
 
@@ -366,17 +366,16 @@ sum by (namespace, label_vm_kubevirt_io_name) (
 const nodeMemoryVMVirtualCommittedNowAvgOvercommit = `avg(
 (
 (label_replace(max by (cluster, namespace, name)(kubevirt_vmi_memory_domain_bytes{cluster=~"$cluster"}), "label_vm_kubevirt_io_name", "$1", "name", "(.+)"))
-+ on(name, namespace) group_left() max by (cluster, name, namespace)(kubevirt_vmi_launcher_memory_overhead_bytes{cluster=~"$cluster"})
++ on(cluster, name, namespace) group_left() max by (cluster, name, namespace)(kubevirt_vmi_launcher_memory_overhead_bytes{cluster=~"$cluster"})
 )
 
 / on (namespace, label_vm_kubevirt_io_name) group_left()
 
-avg by (namespace, label_vm_kubevirt_io_name) (
-  kube_pod_resource_request{cluster=~"$cluster", resource="memory"}
-  * on(namespace, pod) group_left(label_vm_kubevirt_io_name)
+max by (namespace, label_vm_kubevirt_io_name) (
   group by(namespace, pod, label_vm_kubevirt_io_name) (
     kube_pod_labels{cluster=~"$cluster", label_vm_kubevirt_io_name!=""}
   )
-
+  * on(namespace, pod) group_left()
+  max by (namespace, pod) (kube_pod_resource_request{cluster=~"$cluster", resource="memory"})
 )
 )`
