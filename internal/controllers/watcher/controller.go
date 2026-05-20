@@ -44,13 +44,25 @@ func SetupWithManager(mgr ctrl.Manager, addonManager addonmanager.AddonManager, 
 		Cache:        NewReferenceCache(),
 	}
 
+	// We want to watch metadata only for Secrets and ConfigMaps globally.
+	// This avoids memory bloat by not caching the full objects, and avoids
+	// API server connection exhaustion by using the shared metadata informer.
+	// We use PartialObjectMetadata as the object type to force the cache to
+	// only track metadata for these resources.
+	secretMetadata := &metav1.PartialObjectMetadata{}
+	secretMetadata.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("Secret"))
+
+	configMapMetadata := &metav1.PartialObjectMetadata{}
+	configMapMetadata.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("ConfigMap"))
+
 	return ctrl.NewControllerManagedBy(mgr).
 		Named("watcher").
 		Watches(&workv1.ManifestWork{}, r.enqueueForManifestWork(), builder.WithPredicates(manifestWorkPredicate)).
-		Watches(&corev1.Secret{}, r.enqueueForConfigResource(), builder.OnlyMetadata).
-		Watches(&corev1.ConfigMap{}, r.enqueueForConfigResource(), builder.OnlyMetadata).
-		Watches(&corev1.ConfigMap{}, r.enqueueForAllManagedClusters(), builder.WithPredicates(imagesConfigMapPredicate), builder.OnlyMetadata).
-		Watches(&corev1.ConfigMap{}, r.enqueueForAllManagedClusters(), builder.WithPredicates(rshandlers.RSConfigMapPredicate()), builder.OnlyMetadata).
+		// Global metadata watches for Secrets and ConfigMaps
+		Watches(secretMetadata, r.enqueueForConfigResource()).
+		Watches(configMapMetadata, r.enqueueForConfigResource()).
+		// Specific metadata watches for images and right-sizing ConfigMaps
+		Watches(configMapMetadata, r.enqueueForAllManagedClusters(), builder.WithPredicates(predicate.Or(imagesConfigMapPredicate, rshandlers.RSConfigMapPredicate()))).
 		Watches(&hyperv1.HostedCluster{}, r.enqueueForLocalCluster(), hostedClusterPredicate).
 		Watches(&prometheusv1.ServiceMonitor{}, r.enqueueForLocalCluster(), hypershiftServiceMonitorsPredicate(r.Log), builder.OnlyMetadata).
 		Complete(r)
@@ -86,14 +98,16 @@ func (r *WatcherReconciler) getConfigResourceKey(obj client.Object) string {
 			gvk = gvks[0]
 		}
 	}
+
 	return fmt.Sprintf("%s/%s/%s/%s", gvk.Group, gvk.Kind, obj.GetNamespace(), obj.GetName())
 }
 
-// enqueueForManifestWork updates the cache when a ManifestWork is created/updated/deleted
 func (r *WatcherReconciler) enqueueForManifestWork() handler.EventHandler {
 	return handler.Funcs{
 		CreateFunc: func(ctx context.Context, e event.CreateEvent, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
-			r.updateCache(e.Object.(*workv1.ManifestWork))
+			if mw, ok := e.Object.(*workv1.ManifestWork); ok {
+				r.updateCache(mw)
+			}
 		},
 		UpdateFunc: func(ctx context.Context, e event.UpdateEvent, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 			oldMw, okOld := e.ObjectOld.(*workv1.ManifestWork)
@@ -102,13 +116,30 @@ func (r *WatcherReconciler) enqueueForManifestWork() handler.EventHandler {
 				return
 			}
 			if oldMw.Generation != newMw.Generation {
-				r.updateCache(e.ObjectNew.(*workv1.ManifestWork))
+				r.updateCache(newMw)
 			}
 		},
 		DeleteFunc: func(ctx context.Context, e event.DeleteEvent, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 			r.Cache.Remove(e.Object.GetNamespace(), e.Object.GetName())
 		},
 	}
+}
+
+var manifestWorkPredicate = predicate.Funcs{
+	CreateFunc: func(e event.CreateEvent) bool {
+		return e.Object.GetLabels()[addoncfg.LabelOCMAddonName] == addoncfg.Name
+	},
+	UpdateFunc: func(e event.UpdateEvent) bool {
+		oldMw, okOld := e.ObjectOld.(*workv1.ManifestWork)
+		newMw, okNew := e.ObjectNew.(*workv1.ManifestWork)
+		if !okOld || !okNew {
+			return false
+		}
+		return oldMw.Generation != newMw.Generation && newMw.Labels[addoncfg.LabelOCMAddonName] == addoncfg.Name
+	},
+	DeleteFunc: func(e event.DeleteEvent) bool {
+		return e.Object.GetLabels()[addoncfg.LabelOCMAddonName] == addoncfg.Name
+	},
 }
 
 func (r *WatcherReconciler) updateCache(mw *workv1.ManifestWork) {
@@ -220,10 +251,6 @@ func (r *WatcherReconciler) enqueueForConfigResource() handler.EventHandler {
 		return rqs
 	})
 }
-
-var manifestWorkPredicate = predicate.NewPredicateFuncs(func(obj client.Object) bool {
-	return obj.GetLabels()[addoncfg.LabelOCMAddonName] == addoncfg.Name
-})
 
 var hostedClusterPredicate = builder.WithPredicates(predicate.Funcs{
 	UpdateFunc: func(e event.UpdateEvent) bool {
