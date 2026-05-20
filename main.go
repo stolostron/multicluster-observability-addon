@@ -44,7 +44,6 @@ import (
 	workv1 "open-cluster-management.io/api/work/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 )
 
@@ -170,22 +169,24 @@ func runControllers(ctx context.Context, kubeConfig *rest.Config) error {
 		Scheme: scheme,
 		Logger: logger.WithName("manager"),
 		Cache: cache.Options{
-			// We restrict ConfigMap and Secret caching to specific namespaces (e.g., the addon's
-			// installation namespace and openshift-ingress for router certs). Reads for these types
-			// in other namespaces (like the managed cluster namespaces) will intentionally bypass
-			// the cache and hit the API server directly to prevent memory bloat.
-			ByObject: map[client.Object]cache.ByObject{
-				&corev1.ConfigMap{}: {
-					Namespaces: map[string]cache.Config{
-						addoncfg.InstallNamespace: {},
-					},
-				},
-				&corev1.Secret{}: {
-					Namespaces: map[string]cache.Config{
-						addoncfg.InstallNamespace: {},
-						"openshift-ingress":       {},
-					},
-				},
+			DefaultTransform: func(in any) (any, error) {
+				switch obj := in.(type) {
+				case *corev1.Secret:
+					// Keep full Secret for addoncfg.InstallNamespace and openshift-ingress
+					if obj.Namespace != addoncfg.InstallNamespace && obj.Namespace != "openshift-ingress" {
+						// Strip payload for all other namespaces to save memory
+						obj.Data = nil
+						obj.StringData = nil
+					}
+				case *corev1.ConfigMap:
+					// Keep full ConfigMap only for addoncfg.InstallNamespace
+					if obj.Namespace != addoncfg.InstallNamespace {
+						// Strip payload for all other namespaces to save memory
+						obj.Data = nil
+						obj.BinaryData = nil
+					}
+				}
+				return in, nil
 			},
 		},
 	})

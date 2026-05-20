@@ -44,25 +44,12 @@ func SetupWithManager(mgr ctrl.Manager, addonManager addonmanager.AddonManager, 
 		Cache:        NewReferenceCache(),
 	}
 
-	// We want to watch metadata only for Secrets and ConfigMaps globally.
-	// This avoids memory bloat by not caching the full objects, and avoids
-	// API server connection exhaustion by using the shared metadata informer.
-	// We use PartialObjectMetadata as the object type to force the cache to
-	// only track metadata for these resources.
-	secretMetadata := &metav1.PartialObjectMetadata{}
-	secretMetadata.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("Secret"))
-
-	configMapMetadata := &metav1.PartialObjectMetadata{}
-	configMapMetadata.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("ConfigMap"))
-
 	return ctrl.NewControllerManagedBy(mgr).
 		Named("watcher").
 		Watches(&workv1.ManifestWork{}, r.enqueueForManifestWork(), builder.WithPredicates(manifestWorkPredicate)).
-		// Global metadata watches for Secrets and ConfigMaps
-		Watches(secretMetadata, r.enqueueForConfigResource()).
-		Watches(configMapMetadata, r.enqueueForConfigResource()).
-		// Specific metadata watches for images and right-sizing ConfigMaps
-		Watches(configMapMetadata, r.enqueueForAllManagedClusters(), builder.WithPredicates(predicate.Or(imagesConfigMapPredicate, rshandlers.RSConfigMapPredicate()))).
+		Watches(&corev1.Secret{}, r.enqueueForConfigResource(), builder.OnlyMetadata).
+		Watches(&corev1.ConfigMap{}, r.enqueueForConfigResource(), builder.OnlyMetadata).
+		Watches(&corev1.ConfigMap{}, r.enqueueForAllManagedClusters(), builder.WithPredicates(predicate.Or(imagesConfigMapPredicate, rshandlers.RSConfigMapPredicate())), builder.OnlyMetadata).
 		Watches(&hyperv1.HostedCluster{}, r.enqueueForLocalCluster(), hostedClusterPredicate).
 		Watches(&prometheusv1.ServiceMonitor{}, r.enqueueForLocalCluster(), hypershiftServiceMonitorsPredicate(r.Log), builder.OnlyMetadata).
 		Complete(r)
