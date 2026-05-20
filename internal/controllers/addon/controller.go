@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"context"
 	"fmt"
+	"maps"
 	"net/http"
 	"slices"
 
@@ -17,7 +18,6 @@ import (
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	addonhelm "github.com/stolostron/multicluster-observability-addon/internal/addon/helm"
-	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -95,7 +95,7 @@ func NewAddonManager(ctx context.Context, kubeConfig *rest.Config, scheme *runti
 		WithAgentHealthProber(addon.HealthProber(k8sClient, agentLogger)).
 		WithAgentRegistrationOption(registrationOption).
 		WithAgentDeployTriggerClusterFilter(func(old, new *clusterv1.ManagedCluster) bool {
-			return !equality.Semantic.DeepEqual(old.Labels, new.Labels)
+			return !maps.Equal(old.Labels, new.Labels)
 		}).
 		WithAgentInstallNamespace(
 			// Set agent install namespace from addon deployment config if it exists

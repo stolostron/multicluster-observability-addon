@@ -222,7 +222,6 @@ func runControllers(ctx context.Context, kubeConfig *rest.Config) error {
 	if err != nil {
 		return fmt.Errorf("failed to start shared manager: %w", err)
 	}
-
 	if err = sharedMgr.AddHealthzCheck("health", healthz.Ping); err != nil {
 		return fmt.Errorf("failed to set up health check: %w", err)
 	}
