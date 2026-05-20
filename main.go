@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	goflag "flag"
 	"fmt"
 	"net/http"
@@ -24,9 +25,11 @@ import (
 	uiplugin "github.com/rhobs/observability-operator/pkg/apis/uiplugin/v1alpha1"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	addonctrl "github.com/stolostron/multicluster-observability-addon/internal/controllers/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/controllers/resourcecreator"
 	"github.com/stolostron/multicluster-observability-addon/internal/controllers/watcher"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -40,6 +43,9 @@ import (
 	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 	workv1 "open-cluster-management.io/api/work/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/healthz"
 )
 
 var scheme = runtime.NewScheme()
@@ -66,9 +72,11 @@ func init() {
 	// +kubebuilder:scaffold:scheme
 }
 
-var logVerbosity int
-var enablePprof bool
-var pprofAddr string
+var (
+	logVerbosity int
+	enablePprof  bool
+	pprofAddr    string
+)
 
 func main() {
 	pflag.CommandLine.SetNormalizeFunc(utilflag.WordSepNormalizeFunc)
@@ -138,7 +146,7 @@ func runControllers(ctx context.Context, kubeConfig *rest.Config) error {
 
 		go func() {
 			logger.Info("starting pprof server", "addr", pprofAddr)
-			if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 				logger.Error(err, "pprof server failed")
 			}
 		}()
@@ -146,7 +154,9 @@ func runControllers(ctx context.Context, kubeConfig *rest.Config) error {
 		go func() {
 			<-ctx.Done()
 			logger.Info("shutting down pprof server")
-			_ = srv.Shutdown(context.Background())
+			if err := srv.Shutdown(context.Background()); err != nil {
+				logger.Error(err, "failed to shutdown pprof server")
+			}
 		}()
 	} else {
 		logger.V(1).Info("pprof server disabled")
@@ -156,35 +166,64 @@ func runControllers(ctx context.Context, kubeConfig *rest.Config) error {
 	kubeConfig.QPS = 50.0
 	kubeConfig.Burst = 100
 
-	mgr, err := addonctrl.NewAddonManager(ctx, kubeConfig, scheme, logger)
+	mgr, err := ctrl.NewManager(kubeConfig, ctrl.Options{
+		Scheme: scheme,
+		Logger: logger.WithName("manager"),
+		Cache: cache.Options{
+			// We restrict ConfigMap and Secret caching to specific namespaces (e.g., the addon's
+			// installation namespace and openshift-ingress for router certs). Reads for these types
+			// in other namespaces (like the managed cluster namespaces) will intentionally bypass
+			// the cache and hit the API server directly to prevent memory bloat.
+			ByObject: map[client.Object]cache.ByObject{
+				&corev1.ConfigMap{}: {
+					Namespaces: map[string]cache.Config{
+						addoncfg.InstallNamespace: {},
+					},
+				},
+				&corev1.Secret{}: {
+					Namespaces: map[string]cache.Config{
+						addoncfg.InstallNamespace: {},
+						"openshift-ingress":       {},
+					},
+				},
+			},
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("failed to start manager: %w", err)
+	}
+
+	if err = mgr.AddHealthzCheck("health", healthz.Ping); err != nil {
+		return fmt.Errorf("failed to set up health check: %w", err)
+	}
+	if err = mgr.AddReadyzCheck("check", healthz.Ping); err != nil {
+		return fmt.Errorf("failed to set up ready check: %w", err)
+	}
+
+	addonManager, err := addonctrl.NewAddonManager(ctx, kubeConfig, mgr, logger)
 	if err != nil {
 		return fmt.Errorf("failed to create addon manager: %w", err)
 	}
 
+	if err = mgr.Add(addonManager); err != nil {
+		return fmt.Errorf("failed to add addon manager to controller-runtime manager: %w", err)
+	}
+
 	disableReconciliation := os.Getenv("DISABLE_WATCHER_CONTROLLER")
 	if disableReconciliation == "" {
-		var wm *watcher.WatcherManager
-		wm, err = watcher.NewWatcherManager(&mgr, scheme, logger)
-		if err != nil {
-			return fmt.Errorf("unable to create watcher manager: %w", err)
+		if err = watcher.SetupWithManager(mgr, addonManager, logger); err != nil {
+			return fmt.Errorf("failed to setup watcher manager: %w", err)
 		}
-
-		wm.Start(ctx)
 	}
 
-	var rcm *resourcecreator.ResourceCreatorManager
-	rcm, err = resourcecreator.NewResourceCreatorManager(logger, scheme)
-	if err != nil {
-		return fmt.Errorf("unable to create resource creator manager: %w", err)
+	if err = resourcecreator.SetupWithManager(mgr, logger); err != nil {
+		return fmt.Errorf("failed to setup resource creator manager: %w", err)
 	}
-	rcm.Start(ctx)
 
 	err = mgr.Start(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to start addon manager: %w", err)
+		return fmt.Errorf("failed to start controller-runtime manager: %w", err)
 	}
-
-	<-ctx.Done()
 
 	return nil
 }

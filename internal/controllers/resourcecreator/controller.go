@@ -28,7 +28,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
-	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
@@ -72,49 +71,28 @@ var partOfMCOAPredicate = builder.WithPredicates(predicate.NewPredicateFuncs(fun
 	return partOfMCOALabelSelector.Matches(labels.Set(obj.GetLabels()))
 }))
 
-type ResourceCreatorManager struct {
-	mgr    *ctrl.Manager
-	logger logr.Logger
-}
-
-func NewResourceCreatorManager(logger logr.Logger, scheme *runtime.Scheme) (*ResourceCreatorManager, error) {
+// SetupWithManager sets up the controller with the Manager.
+func SetupWithManager(mgr ctrl.Manager, logger logr.Logger) error {
 	l := logger.WithName("resourcecreator")
-
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme: scheme,
-		Metrics: server.Options{
-			BindAddress: ":8084",
-		},
-		Logger: l.WithName("manager"),
-	})
-	if err != nil {
-		return nil, fmt.Errorf("unable to start manager: %w", err)
-	}
-
-	if err = (&ResourceCreatorReconciler{
+	r := &ResourceCreatorReconciler{
 		Client: mgr.GetClient(),
 		Log:    l.WithName("controller"),
 		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		return nil, fmt.Errorf("unable to create mcoa-resourcecreator controller: %w", err)
 	}
 
-	wm := ResourceCreatorManager{
-		mgr:    &mgr,
-		logger: l,
-	}
-
-	return &wm, nil
-}
-
-func (wm *ResourceCreatorManager) Start(ctx context.Context) {
-	wm.logger.Info("Starting resourcecreator manager")
-	go func() {
-		err := (*wm.mgr).Start(ctx)
-		if err != nil {
-			wm.logger.Error(err, "there was an error while running the reconciliation resourcecreator")
-		}
-	}()
+	return ctrl.NewControllerManagedBy(mgr).
+		For(&addonv1alpha1.AddOnDeploymentConfig{}, mcoaAODCPredicate).
+		// Trigger reconciliations due to changes in Placements
+		Watches(&addonv1alpha1.ClusterManagementAddOn{}, r.enqueueAODC(), cmaoPredicate).
+		// Trigger reconciliations if the pool of ManagedClusters changes
+		Watches(&clusterv1.ManagedCluster{}, r.enqueueAODC(), builder.OnlyMetadata).
+		// Trigger reconciliations if the metrics configuration resources change
+		Watches(&cooprometheusv1alpha1.PrometheusAgent{}, r.enqueueForMCOAOwnedResources()).
+		Watches(&cooprometheusv1alpha1.ScrapeConfig{}, r.enqueueForMCOControlledResources(), partOfMCOAPredicate).
+		Watches(&prometheusv1.PrometheusRule{}, r.enqueueForMCOControlledResources(), partOfMCOAPredicate).
+		// Trigger reconciliations if right-sizing ConfigMaps change
+		Watches(&corev1.ConfigMap{}, r.enqueueAODC(), rsConfigMapPredicate).
+		Complete(r)
 }
 
 // ResourceCreatorReconciler creates resources for default mode according to user configuration
@@ -192,33 +170,20 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	return ctrl.Result{}, nil
 }
 
-// SetupWithManager sets up the controller with the Manager.
-func (r *ResourceCreatorReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&addonv1alpha1.AddOnDeploymentConfig{}, mcoaAODCPredicate).
-		// Trigger reconciliations due to changes in Placements
-		Watches(&addonv1alpha1.ClusterManagementAddOn{}, r.enqueueAODC(), cmaoPredicate).
-		// Trigger reconciliations if the pool of ManagedClusters changes
-		Watches(&clusterv1.ManagedCluster{}, r.enqueueAODC(), builder.OnlyMetadata).
-		// Trigger reconciliations if the metrics configuration resources change
-		Watches(&cooprometheusv1alpha1.PrometheusAgent{}, r.enqueueForMCOAOwnedResources()).
-		Watches(&cooprometheusv1alpha1.ScrapeConfig{}, r.enqueueForMCOControlledResources(), partOfMCOAPredicate).
-		Watches(&prometheusv1.PrometheusRule{}, r.enqueueForMCOControlledResources(), partOfMCOAPredicate).
-		// Trigger reconciliations if right-sizing ConfigMaps change
-		Watches(&corev1.ConfigMap{}, r.enqueueAODC(), rsConfigMapPredicate).
-		Complete(r)
+func mcoaAODCRequest() []reconcile.Request {
+	return []reconcile.Request{
+		{
+			NamespacedName: types.NamespacedName{
+				Name:      addoncfg.Name,
+				Namespace: addoncfg.InstallNamespace,
+			},
+		},
+	}
 }
 
 func (r *ResourceCreatorReconciler) enqueueAODC() handler.EventHandler {
 	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
-		return []reconcile.Request{
-			{
-				NamespacedName: types.NamespacedName{
-					Name:      addoncfg.Name,
-					Namespace: addoncfg.InstallNamespace,
-				},
-			},
-		}
+		return mcoaAODCRequest()
 	})
 }
 
@@ -234,14 +199,7 @@ func (r *ResourceCreatorReconciler) enqueueForMCOAOwnedResources() handler.Event
 			return []reconcile.Request{}
 		}
 
-		return []reconcile.Request{
-			{
-				NamespacedName: types.NamespacedName{
-					Name:      addoncfg.Name,
-					Namespace: addoncfg.InstallNamespace,
-				},
-			},
-		}
+		return mcoaAODCRequest()
 	})
 }
 
@@ -268,13 +226,6 @@ func (r *ResourceCreatorReconciler) enqueueForMCOControlledResources() handler.E
 			return []reconcile.Request{}
 		}
 
-		return []reconcile.Request{
-			{
-				NamespacedName: types.NamespacedName{
-					Name:      addoncfg.Name,
-					Namespace: addoncfg.InstallNamespace,
-				},
-			},
-		}
+		return mcoaAODCRequest()
 	})
 }

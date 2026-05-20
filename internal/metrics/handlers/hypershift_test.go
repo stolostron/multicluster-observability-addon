@@ -41,7 +41,7 @@ func TestHypershift_Nominal(t *testing.T) {
 			Params: map[string][]string{
 				"match[]": {
 					`{__name__=":node_memory_MemAvailable_bytes:sum"}`, // ignore rules
-					`{__name__=~"acm_"}`, // ignore regex
+					`{__name__=~"acm_"}`,                               // ignore regex
 					`{__name__="acm_managed_cluster_labels"}`,
 				},
 			},
@@ -68,7 +68,7 @@ func TestHypershift_Nominal(t *testing.T) {
 			Params: map[string][]string{
 				"match[]": {
 					`{__name__=":node_memory_MemAvailable_bytes:sum"}`, // ignore rules
-					`{__name__=~"acm_"}`, // ignore regex
+					`{__name__=~"acm_"}`,                               // ignore regex
 					`{__name__="grpc_server_handled_total"}`,
 				},
 			},
@@ -263,7 +263,7 @@ func TestHypershift_NoHypershiftServiceMonitors(t *testing.T) {
 			Params: map[string][]string{
 				"match[]": {
 					`{__name__=":node_memory_MemAvailable_bytes:sum"}`, // ignore rules
-					`{__name__=~"acm_"}`, // ignore regex
+					`{__name__=~"acm_"}`,                               // ignore regex
 					`{__name__="grpc_server_handled_total"}`,
 				},
 			},
@@ -275,7 +275,7 @@ func TestHypershift_NoHypershiftServiceMonitors(t *testing.T) {
 			Params: map[string][]string{
 				"match[]": {
 					`{__name__=":node_memory_MemAvailable_bytes:sum"}`, // ignore rules
-					`{__name__=~"acm_"}`, // ignore regex
+					`{__name__=~"acm_"}`,                               // ignore regex
 					`{__name__="acm_managed_cluster_labels"}`,
 				},
 			},
@@ -325,7 +325,7 @@ func TestHypershift_ExtractDependentMetrics(t *testing.T) {
 					Params: map[string][]string{
 						"match[]": {
 							`{__name__=":node_memory_MemAvailable_bytes:sum"}`, // ignore rules
-							`{__name__=~"acm_"}`, // ignore regex
+							`{__name__=~"acm_"}`,                               // ignore regex
 							`{__name__="acm_managed_cluster_labels"}`,
 							`{__name__="active_streams_lease:grpc_server_handled_total:sum"}`,
 						},
