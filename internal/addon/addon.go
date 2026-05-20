@@ -18,11 +18,10 @@ import (
 	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"open-cluster-management.io/addon-framework/pkg/agent"
-	"open-cluster-management.io/addon-framework/pkg/utils"
+	addonutils "open-cluster-management.io/addon-framework/pkg/utils"
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	v1 "open-cluster-management.io/api/cluster/v1"
 	workv1 "open-cluster-management.io/api/work/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -48,11 +47,11 @@ var (
 func NewRegistrationOption(agentName string) *agent.RegistrationOption {
 	return &agent.RegistrationOption{
 		Configurations:  agent.KubeClientSignerConfigurations(addoncfg.Name, agentName),
-		CSRApproveCheck: utils.DefaultCSRApprover(agentName),
+		CSRApproveCheck: addonutils.DefaultCSRApprover(agentName),
 	}
 }
 
-func HealthProber(k8s client.Client, logger logr.Logger) *agent.HealthProber {
+func HealthProber(getter addonutils.AddOnDeploymentConfigGetter, logger logr.Logger) *agent.HealthProber {
 	probeFields := []agent.ProbeField{}
 	probeFields = append(probeFields, getMetricsProbeFields()...)
 	probeFields = append(probeFields, getLogsProbeFields()...)
@@ -63,7 +62,7 @@ func HealthProber(k8s client.Client, logger logr.Logger) *agent.HealthProber {
 		WorkProber: &agent.WorkHealthProber{
 			ProbeFields: probeFields,
 			HealthChecker: func(fields []agent.FieldResult, mc *v1.ManagedCluster, mcao *addonapiv1beta1.ManagedClusterAddOn) error {
-				if err := healthChecker(k8s, fields, mc, mcao); err != nil {
+				if err := healthChecker(getter, fields, mc, mcao); err != nil {
 					logger.V(1).Info("Health check failed for managed cluster", "clusterName", mc.Name, "error", err.Error())
 					return fmt.Errorf("healthChecker failed: %w", err)
 				}
@@ -328,7 +327,7 @@ func ManifestConfigs() []workv1.ManifestConfigOption {
 	return manifestConfigs
 }
 
-func healthChecker(k8s client.Client, fields []agent.FieldResult, mc *v1.ManagedCluster, mcao *addonapiv1beta1.ManagedClusterAddOn) error {
+func healthChecker(getter addonutils.AddOnDeploymentConfigGetter, fields []agent.FieldResult, mc *v1.ManagedCluster, mcao *addonapiv1beta1.ManagedClusterAddOn) error {
 	if len(fields) == 0 {
 		return errMissingFields
 	}
@@ -336,7 +335,7 @@ func healthChecker(k8s client.Client, fields []agent.FieldResult, mc *v1.Managed
 	ctx, cancel := context.WithTimeout(context.Background(), addoncfg.DefaultContextTimeout)
 	defer cancel()
 
-	aodc, err := common.GetAddOnDeploymentConfig(ctx, k8s, mcao)
+	aodc, err := common.GetAddOnDeploymentConfig(ctx, getter, mcao)
 	if err != nil {
 		return fmt.Errorf("failed to get AddOnDeploymentConfig: %w", err)
 	}

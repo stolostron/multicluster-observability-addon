@@ -19,9 +19,16 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	addonutils "open-cluster-management.io/addon-framework/pkg/utils"
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
+	fakeaddon "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
 	workv1 "open-cluster-management.io/api/work/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
+
+func newTestGetter(aodc *addonapiv1beta1.AddOnDeploymentConfig) addonutils.AddOnDeploymentConfigGetter {
+	if aodc == nil {
+		return addonutils.NewAddOnDeploymentConfigGetter(fakeaddon.NewSimpleClientset())
+	}
+	return addonutils.NewAddOnDeploymentConfigGetter(fakeaddon.NewSimpleClientset(aodc))
+}
 
 func Test_AgentHealthProber_PPA(t *testing.T) {
 	managedCluster := addontesting.NewManagedCluster("cluster-1")
@@ -48,7 +55,7 @@ func Test_AgentHealthProber_PPA(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			healthProber := HealthProber(fake.NewClientBuilder().WithScheme(scheme).WithObjects(aodc).Build(), logr.Discard())
+			healthProber := HealthProber(newTestGetter(aodc), logr.Discard())
 			err := healthProber.WorkProber.HealthChecker(
 				[]agent.FieldResult{
 					{
@@ -120,7 +127,7 @@ func Test_AgentHealthProber_PPA_UserWorkload(t *testing.T) {
 			} else {
 				managedCluster.Labels["vendor"] = "Other"
 			}
-			healthProber := HealthProber(fake.NewClientBuilder().WithScheme(scheme).WithObjects(aodc).Build(), logr.Discard())
+			healthProber := HealthProber(newTestGetter(aodc), logr.Discard())
 			err := healthProber.WorkProber.HealthChecker(
 				[]agent.FieldResult{
 					{
@@ -178,7 +185,7 @@ func Test_AgentHealthProber_CLF(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			healthProber := HealthProber(fake.NewClientBuilder().WithScheme(scheme).WithObjects(aodc).Build(), logr.Discard())
+			healthProber := HealthProber(newTestGetter(aodc), logr.Discard())
 			err := healthProber.WorkProber.HealthChecker(
 				[]agent.FieldResult{
 					{
@@ -235,7 +242,7 @@ func Test_AgentHealthProber_OTELCol(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			healthProber := HealthProber(fake.NewClientBuilder().WithScheme(scheme).WithObjects(aodc).Build(), logr.Discard())
+			healthProber := HealthProber(newTestGetter(aodc), logr.Discard())
 			err := healthProber.WorkProber.HealthChecker([]agent.FieldResult{
 				{
 					ResourceIdentifier: workv1.ResourceIdentifier{
@@ -306,7 +313,7 @@ func Test_AgentHealthProber_UIPlugin(t *testing.T) {
 				managedCluster.Labels = map[string]string{}
 			}
 
-			healthProber := HealthProber(fake.NewClientBuilder().WithScheme(scheme).WithObjects(aodc).Build(), logr.Discard())
+			healthProber := HealthProber(newTestGetter(aodc), logr.Discard())
 			metricsStatus := "True"
 			err := healthProber.WorkProber.HealthChecker([]agent.FieldResult{
 				{
@@ -368,7 +375,7 @@ func Test_AgentHealthProber_MissingResources(t *testing.T) {
 		addPlatformMetricsCustomizedVariables(aodc)
 		addAODCConfigReference(managedClusterAddOn, aodc)
 
-		healthProber := HealthProber(fake.NewClientBuilder().WithScheme(scheme).WithObjects(aodc).Build(), logr.Discard())
+		healthProber := HealthProber(newTestGetter(aodc), logr.Discard())
 		err := healthProber.WorkProber.HealthChecker(
 			[]agent.FieldResult{scrapeConfigFieldResult()}, // Missing PPA
 			managedCluster, managedClusterAddOn)
@@ -380,7 +387,7 @@ func Test_AgentHealthProber_MissingResources(t *testing.T) {
 		addLoggingCustomizedVariables(aodc)
 		addAODCConfigReference(managedClusterAddOn, aodc)
 
-		healthProber := HealthProber(fake.NewClientBuilder().WithScheme(scheme).WithObjects(aodc).Build(), logr.Discard())
+		healthProber := HealthProber(newTestGetter(aodc), logr.Discard())
 		err := healthProber.WorkProber.HealthChecker(
 			// We pass an unrelated field to bypass the initial check for empty fields
 			// in the healthChecker function.
@@ -394,7 +401,7 @@ func Test_AgentHealthProber_MissingResources(t *testing.T) {
 		addTracingCustomizedVariables(aodc)
 		addAODCConfigReference(managedClusterAddOn, aodc)
 
-		healthProber := HealthProber(fake.NewClientBuilder().WithScheme(scheme).WithObjects(aodc).Build(), logr.Discard())
+		healthProber := HealthProber(newTestGetter(aodc), logr.Discard())
 		err := healthProber.WorkProber.HealthChecker(
 			// We pass an unrelated field to bypass the initial check for empty fields
 			// in the healthChecker function.
@@ -412,7 +419,7 @@ func Test_AgentHealthProber_MissingResources(t *testing.T) {
 		addUIPluginCustomizedVariables(aodc)
 		addAODCConfigReference(managedClusterAddOn, aodc)
 
-		healthProber := HealthProber(fake.NewClientBuilder().WithScheme(scheme).WithObjects(aodc).Build(), logr.Discard())
+		healthProber := HealthProber(newTestGetter(aodc), logr.Discard())
 		metricsStatus := "True"
 		err := healthProber.WorkProber.HealthChecker(
 			[]agent.FieldResult{

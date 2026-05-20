@@ -25,7 +25,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
-	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
@@ -34,81 +33,42 @@ const (
 	localClusterNamespace = "local-cluster"
 )
 
-type WatcherManager struct {
-	mgr    *ctrl.Manager
-	logger logr.Logger
-}
-
-func NewWatcherManager(addonManager *addonmanager.AddonManager, scheme *runtime.Scheme, logger logr.Logger) (*WatcherManager, error) {
-	l := logger.WithName("watcher")
-
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{Scheme: scheme, Logger: l.WithName("manager")})
-	if err != nil {
-		return nil, fmt.Errorf("unable to start manager: %w", err)
-	}
-
-	if err = (&WatcherReconciler{
-		Client:        mgr.GetClient(),
-		Log:           l.WithName("controller"),
-		Scheme:        mgr.GetScheme(),
-		addonnManager: addonManager,
-		Cache:         NewReferenceCache(),
-	}).SetupWithManager(mgr); err != nil {
-		return nil, fmt.Errorf("unable to create mcoa-watcher controller: %w", err)
-	}
-
-	if err = mgr.AddHealthzCheck("health", healthz.Ping); err != nil {
-		return nil, fmt.Errorf("unable to set up health check: %w", err)
-	}
-	if err = mgr.AddReadyzCheck("check", healthz.Ping); err != nil {
-		return nil, fmt.Errorf("unable to set up ready check: %w", err)
-	}
-
-	wm := WatcherManager{
-		mgr:    &mgr,
-		logger: l,
-	}
-
-	return &wm, nil
-}
-
-func (wm *WatcherManager) Start(ctx context.Context) {
-	wm.logger.Info("Starting watcher manager")
-	go func() {
-		err := (*wm.mgr).Start(ctx)
-		if err != nil {
-			wm.logger.Error(err, "there was an error while running the reconciliation watcher")
-		}
-	}()
-}
-
 // WatcherReconciler triggers reconciliation in the AddonManager when something changes in an upstream resource
 type WatcherReconciler struct {
 	client.Client
-	Log           logr.Logger
-	Scheme        *runtime.Scheme
-	addonnManager *addonmanager.AddonManager
-	Cache         *ReferenceCache
+	Log          logr.Logger
+	Scheme       *runtime.Scheme
+	addonManager addonmanager.AddonManager
+	Cache        *ReferenceCache
 }
 
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.11.0/pkg/reconcile
 func (r *WatcherReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	r.Log.V(2).Info("reconciliation triggered", "request", req.String())
-	(*r.addonnManager).Trigger(req.Namespace, req.Name)
+	r.addonManager.Trigger(req.Namespace, req.Name)
 
 	return ctrl.Result{}, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *WatcherReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func SetupWithManager(mgr ctrl.Manager, addonManager addonmanager.AddonManager, logger logr.Logger) error {
+	l := logger.WithName("watcher")
+
+	r := &WatcherReconciler{
+		Client:       mgr.GetClient(),
+		Log:          l.WithName("controller"),
+		Scheme:       mgr.GetScheme(),
+		addonManager: addonManager,
+		Cache:        NewReferenceCache(),
+	}
+
 	return ctrl.NewControllerManagedBy(mgr).
 		Named("watcher").
 		Watches(&workv1.ManifestWork{}, r.enqueueForManifestWork(), builder.WithPredicates(manifestWorkPredicate)).
 		Watches(&corev1.Secret{}, r.enqueueForConfigResource(), builder.OnlyMetadata).
 		Watches(&corev1.ConfigMap{}, r.enqueueForConfigResource(), builder.OnlyMetadata).
-		Watches(&corev1.ConfigMap{}, r.enqueueForAllManagedClusters(), builder.WithPredicates(imagesConfigMapPredicate), builder.OnlyMetadata).
-		Watches(&corev1.ConfigMap{}, r.enqueueForAllManagedClusters(), builder.WithPredicates(rshandlers.RSConfigMapPredicate()), builder.OnlyMetadata).
+		Watches(&corev1.ConfigMap{}, r.enqueueForAllManagedClusters(), builder.WithPredicates(predicate.Or(imagesConfigMapPredicate, rshandlers.RSConfigMapPredicate())), builder.OnlyMetadata).
 		Watches(&hyperv1.HostedCluster{}, r.enqueueForLocalCluster(), hostedClusterPredicate).
 		Watches(&prometheusv1.ServiceMonitor{}, r.enqueueForLocalCluster(), hypershiftServiceMonitorsPredicate(r.Log), builder.OnlyMetadata).
 		Complete(r)
@@ -133,7 +93,9 @@ func (r *WatcherReconciler) getConfigResourceKey(obj client.Object) string {
 func (r *WatcherReconciler) enqueueForManifestWork() handler.EventHandler {
 	return handler.Funcs{
 		CreateFunc: func(ctx context.Context, e event.CreateEvent, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
-			r.updateCache(e.Object.(*workv1.ManifestWork))
+			if mw, ok := e.Object.(*workv1.ManifestWork); ok {
+				r.updateCache(mw)
+			}
 		},
 		UpdateFunc: func(ctx context.Context, e event.UpdateEvent, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 			oldMw, okOld := e.ObjectOld.(*workv1.ManifestWork)
@@ -142,7 +104,7 @@ func (r *WatcherReconciler) enqueueForManifestWork() handler.EventHandler {
 				return
 			}
 			if oldMw.Generation != newMw.Generation {
-				r.updateCache(e.ObjectNew.(*workv1.ManifestWork))
+				r.updateCache(newMw)
 			}
 		},
 		DeleteFunc: func(ctx context.Context, e event.DeleteEvent, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
@@ -238,12 +200,12 @@ func (r *WatcherReconciler) enqueueForAllManagedClusters() handler.EventHandler 
 
 func (r *WatcherReconciler) enqueueForConfigResource() handler.EventHandler {
 	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
-		rqs := []reconcile.Request{}
 		namespaces := r.Cache.GetNamespaces(r.getConfigResourceKey(obj))
 		if len(namespaces) == 0 {
-			return []reconcile.Request{}
+			return nil
 		}
 
+		rqs := make([]reconcile.Request, 0, len(namespaces))
 		r.Log.V(2).Info("Enqueue for config resource event", "gvk", obj.GetObjectKind().GroupVersionKind().String(), "name", obj.GetName(), "namespace", obj.GetNamespace(), "clustersCount", len(namespaces))
 
 		for _, ns := range namespaces {
@@ -261,9 +223,22 @@ func (r *WatcherReconciler) enqueueForConfigResource() handler.EventHandler {
 	})
 }
 
-var manifestWorkPredicate = predicate.NewPredicateFuncs(func(obj client.Object) bool {
-	return obj.GetLabels()[addoncfg.LabelOCMAddonName] == addoncfg.Name
-})
+var manifestWorkPredicate = predicate.Funcs{
+	CreateFunc: func(e event.CreateEvent) bool {
+		return e.Object.GetLabels()[addoncfg.LabelOCMAddonName] == addoncfg.Name
+	},
+	UpdateFunc: func(e event.UpdateEvent) bool {
+		oldMw, okOld := e.ObjectOld.(*workv1.ManifestWork)
+		newMw, okNew := e.ObjectNew.(*workv1.ManifestWork)
+		if !okOld || !okNew {
+			return false
+		}
+		return oldMw.Generation != newMw.Generation && newMw.Labels[addoncfg.LabelOCMAddonName] == addoncfg.Name
+	},
+	DeleteFunc: func(e event.DeleteEvent) bool {
+		return e.Object.GetLabels()[addoncfg.LabelOCMAddonName] == addoncfg.Name
+	},
+}
 
 var hostedClusterPredicate = builder.WithPredicates(predicate.Funcs{
 	UpdateFunc: func(e event.UpdateEvent) bool {
@@ -310,7 +285,7 @@ func isHypershiftServiceMonitor(logger logr.Logger, obj client.Object) bool {
 		for _, owner := range obj.GetOwnerReferences() {
 			gv, err := schema.ParseGroupVersion(owner.APIVersion)
 			if err != nil {
-				logger.V(1).Info("failed to parse groupVersion", "error", err.Error())
+				logger.V(1).Info("failed to parse groupVersion", "apiVersion", owner.APIVersion, "error", err)
 				continue
 			}
 
