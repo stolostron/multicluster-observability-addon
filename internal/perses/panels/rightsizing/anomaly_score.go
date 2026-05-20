@@ -38,9 +38,9 @@ func AnomalyScorePanel(datasourceName string) panelgroup.Option {
 		),
 		panel.AddQuery(
 			query.PromQL(
-				`acm_rs:prediction_anomaly_score{cluster="$cluster", namespace="$namespace"}`,
+				`max by (resource) (acm_rs:prediction_anomaly_score{namespace="$namespace"})`,
 				dashboards.AddQueryDataSource(datasourceName),
-				query.SeriesNameFormat("Anomaly score"),
+				query.SeriesNameFormat("{{resource}}"),
 			),
 		),
 	)

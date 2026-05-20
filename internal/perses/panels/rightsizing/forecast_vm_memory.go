@@ -38,14 +38,14 @@ func ForecastVMMemoryPanel(datasourceName string) panelgroup.Option {
 		),
 		panel.AddQuery(
 			query.PromQL(
-				`acm_rs:prediction_forecast_vm_memory{cluster="$cluster", namespace="$namespace", workload="$name"}`,
+				`max(acm_rs:prediction_forecast_vm_memory{namespace="$namespace", workload="$name"})`,
 				dashboards.AddQueryDataSource(datasourceName),
 				query.SeriesNameFormat("Forecast"),
 			),
 		),
 		panel.AddQuery(
 			query.PromQL(
-				`acm_rs_vm:namespace:memory_usage{cluster="$cluster", profile="$profile", namespace="$namespace", name="$name"}`,
+				`max(acm_rs_vm:namespace:memory_usage{cluster="$cluster", profile="$profile", namespace="$namespace", name="$name"})`,
 				dashboards.AddQueryDataSource(datasourceName),
 				query.SeriesNameFormat("Actual"),
 			),

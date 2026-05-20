@@ -14,7 +14,7 @@ func ModelAccuracyPanel(datasourceName string) panelgroup.Option {
 	return BuildStatPanel(datasourceName, StatPanelConfig{
 		Title:       "Prediction Model Accuracy",
 		Description: "Model accuracy score (e.g. validation error or fit quality) for workload forecasting in the selected namespace",
-		Query:       `max(acm_rs:prediction_model_accuracy{cluster="$cluster", namespace="$namespace"})`,
+		Query:       `max(acm_rs:prediction_model_accuracy{namespace="$namespace"})`,
 		Unit:        &dashboards.DecimalUnit,
 		Decimals:    3,
 		FontSize:    40,

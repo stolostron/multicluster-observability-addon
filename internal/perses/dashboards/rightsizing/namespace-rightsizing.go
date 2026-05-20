@@ -20,17 +20,19 @@ import (
 func withCPUSection(datasource string, project string, linkToWorkload bool) dashboard.Option {
 	return acmHelpers.AddCustomPanelGroup("CPU",
 		[]acmHelpers.GridItem{
-			{X: 0, Y: 0, W: 6, H: 4},
-			{X: 0, Y: 4, W: 6, H: 4},
-			{X: 0, Y: 8, W: 6, H: 4},
-			{X: 0, Y: 12, W: 6, H: 4},
-			{X: 6, Y: 0, W: 18, H: 16},
+			{X: 0, Y: 0, W: 5, H: 4},
+			{X: 0, Y: 4, W: 5, H: 4},
+			{X: 0, Y: 8, W: 5, H: 4},
+			{X: 0, Y: 12, W: 5, H: 4},
+			{X: 5, Y: 12, W: 5, H: 4},
+			{X: 5, Y: 0, W: 19, H: 12},
 			{X: 0, Y: 16, W: 24, H: 10},
 		},
 		panels.CPURecommendationPanel(datasource),
 		panels.CPUUsagePanel(datasource),
 		panels.CPURequestPanel(datasource),
 		panels.CPUUtilizationPanel(datasource),
+		panels.CPUForecastPanel(datasource),
 		panels.CPUTopNamespacesPanel(datasource),
 		panels.CPUQuotaTablePanel(datasource, project, linkToWorkload),
 	)
@@ -39,17 +41,19 @@ func withCPUSection(datasource string, project string, linkToWorkload bool) dash
 func withMemSection(datasource string, project string, linkToWorkload bool) dashboard.Option {
 	return acmHelpers.AddCustomPanelGroup("Memory",
 		[]acmHelpers.GridItem{
-			{X: 0, Y: 0, W: 6, H: 4},
-			{X: 0, Y: 4, W: 6, H: 4},
-			{X: 0, Y: 8, W: 6, H: 4},
-			{X: 0, Y: 12, W: 6, H: 4},
-			{X: 6, Y: 0, W: 18, H: 16},
+			{X: 0, Y: 0, W: 5, H: 4},
+			{X: 0, Y: 4, W: 5, H: 4},
+			{X: 0, Y: 8, W: 5, H: 4},
+			{X: 0, Y: 12, W: 5, H: 4},
+			{X: 5, Y: 12, W: 5, H: 4},
+			{X: 5, Y: 0, W: 19, H: 12},
 			{X: 0, Y: 16, W: 24, H: 10},
 		},
 		panels.MemRecommendationPanel(datasource),
 		panels.MemUsagePanel(datasource),
 		panels.MemRequestPanel(datasource),
 		panels.MemUtilizationPanel(datasource),
+		panels.MemForecastPanel(datasource),
 		panels.MemTopNamespacesPanel(datasource),
 		panels.MemQuotaTablePanel(datasource, project, linkToWorkload),
 	)
@@ -71,9 +75,13 @@ func withForecastSection(datasource string) dashboard.Option {
 }
 
 // BuildNamespaceRightSizing creates the namespace right-sizing dashboard.
-// When workloadPodEnabled is true, the namespace table columns include
-// drill-down links to the workload-pod overview dashboard.
-func BuildNamespaceRightSizing(project string, datasource string, clusterLabelName string, workloadPodEnabled bool) (dashboard.Builder, error) {
+// linkToWorkload controls whether namespace rows in the quota tables link to the workload dashboard.
+func BuildNamespaceRightSizing(project string, datasource string, clusterLabelName string, linkToWorkload ...bool) (dashboard.Builder, error) {
+	link := false
+	if len(linkToWorkload) > 0 {
+		link = linkToWorkload[0]
+	}
+	_ = link
 	return dashboard.New("acm-rs-namespace-overview",
 		dashboard.ProjectName(project),
 		dashboard.Name("ACM Right-Sizing Namespace"),
@@ -107,7 +115,7 @@ func BuildNamespaceRightSizing(project string, datasource string, clusterLabelNa
 						)),
 				),
 				listVar.DisplayName("Profile"),
-				listVar.DefaultValue("P95"),
+				listVar.DefaultValue("Max OverAll"),
 				listVar.AllowAllValue(false),
 				listVar.AllowMultiple(false),
 			),
@@ -141,8 +149,8 @@ func BuildNamespaceRightSizing(project string, datasource string, clusterLabelNa
 			),
 		),
 
-		withCPUSection(datasource, project, workloadPodEnabled),
-		withMemSection(datasource, project, workloadPodEnabled),
+		withCPUSection(datasource, project, link),
+		withMemSection(datasource, project, link),
 		withForecastSection(datasource),
 	)
 }

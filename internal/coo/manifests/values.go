@@ -80,19 +80,12 @@ func BuildValues(opts addon.Options, installOfCOOOnTheHubIsNeeded bool, isHubClu
 		if opts.Platform.AnalyticsOptions.RightSizing.NamespaceEnabled ||
 			opts.Platform.AnalyticsOptions.RightSizing.PredictionEnabled {
 			rightSizingEnabled = true
-			analyticsDashboards = append(analyticsDashboards, buildNamespaceRSDashboards(opts.Platform.AnalyticsOptions.RightSizing.WorkloadPodEnabled)...)
+			analyticsDashboards = append(analyticsDashboards, buildNamespaceRSDashboards()...)
+			analyticsDashboards = append(analyticsDashboards, buildForecastingDashboards()...)
 		}
 		if opts.Platform.AnalyticsOptions.RightSizing.VirtualizationEnabled {
 			rightSizingEnabled = true
 			analyticsDashboards = append(analyticsDashboards, buildVMRSDashboards()...)
-		}
-		if opts.Platform.AnalyticsOptions.RightSizing.WorkloadPodEnabled {
-			rightSizingEnabled = true
-			analyticsDashboards = append(analyticsDashboards, buildWorkloadPodRSDashboards()...)
-		}
-		if opts.Platform.AnalyticsOptions.RightSizing.GPUEnabled {
-			rightSizingEnabled = true
-			analyticsDashboards = append(analyticsDashboards, buildGPURSDashboards()...)
 		}
 	}
 
@@ -192,28 +185,19 @@ func buildIncidentDetetctionDashboards() []DashboardValue {
 	return buildDashboards(builders, dsThanos, config.AnalyticsNamespace)
 }
 
-func buildNamespaceRSDashboards(workloadPodEnabled bool) []DashboardValue {
+func buildNamespaceRSDashboards() []DashboardValue {
 	builders := []DashboardBuilder{
 		{func(project, datasource, clusterLabelName string) (dashboard.Builder, error) {
-			return rsperses.BuildNamespaceRightSizing(project, datasource, clusterLabelName, workloadPodEnabled)
+			return rsperses.BuildNamespaceRightSizing(project, datasource, clusterLabelName)
 		}, "NamespaceRightSizing"},
 	}
 
 	return buildDashboards(builders, dsThanos, config.AnalyticsNamespace)
 }
 
-func buildWorkloadPodRSDashboards() []DashboardValue {
+func buildForecastingDashboards() []DashboardValue {
 	builders := []DashboardBuilder{
-		{rsperses.BuildWorkloadPodRightSizing, "WorkloadPodRightSizing"},
-		{rsperses.BuildWorkloadDetail, "WorkloadDetail"},
-	}
-
-	return buildDashboards(builders, dsThanos, config.AnalyticsNamespace)
-}
-
-func buildGPURSDashboards() []DashboardValue {
-	builders := []DashboardBuilder{
-		{rsperses.BuildGPUUtilization, "GPUUtilization"},
+		{rsperses.BuildForecasting, "Forecasting"},
 	}
 
 	return buildDashboards(builders, dsThanos, config.AnalyticsNamespace)

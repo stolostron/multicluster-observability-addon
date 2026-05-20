@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "hooks": {
+    "stop": [
+      {
+        "command": ".cursor/hooks/check-phase-gate.sh",
+        "loop_limit": 2
+      }
+    ],
+    "afterFileEdit": [
+      {
+        "command": ".cursor/hooks/mcoa-post-edit.sh",
+        "matcher": "\\.go$"
+      }
+    ]
+  }
+}

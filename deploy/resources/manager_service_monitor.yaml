@@ -1,0 +1,35 @@
+# Scrapes the multicluster-observability-addon manager /metrics on the hub for prediction gauges.
+# The exporter labels series with managed_cluster=<spoke name>; hub Prometheus adds cluster=<hub identity>
+# on ingest. Metric relabeling copies managed_cluster into cluster so Thanos/Perses match
+# rightsizing usage metrics (cluster="$cluster" in dashboards).
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  labels:
+    app: multicluster-observability-addon-manager
+  name: multicluster-observability-addon-manager
+spec:
+  endpoints:
+    - honorLabels: true
+      interval: 60s
+      metricRelabelings:
+        - action: keep
+          regex: acm_rs:prediction.*
+          sourceLabels:
+            - __name__
+        - action: replace
+          regex: acm_rs:prediction_.+;(.+)
+          replacement: $1
+          sourceLabels:
+            - __name__
+            - managed_cluster
+          targetLabel: cluster
+      path: /metrics
+      port: metrics
+      scheme: http
+  namespaceSelector:
+    matchNames:
+      - open-cluster-management-observability
+  selector:
+    matchLabels:
+      app: multicluster-observability-addon-manager

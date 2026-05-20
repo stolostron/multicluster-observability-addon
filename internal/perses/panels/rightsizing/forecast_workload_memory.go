@@ -38,14 +38,14 @@ func ForecastWorkloadMemoryPanel(datasourceName string) panelgroup.Option {
 		),
 		panel.AddQuery(
 			query.PromQL(
-				`acm_rs:prediction_forecast_workload_memory{cluster="$cluster", namespace="$namespace", workload="$workload"}`,
+				`max(acm_rs:prediction_forecast_workload_memory{namespace="$namespace", workload="$workload"})`,
 				dashboards.AddQueryDataSource(datasourceName),
 				query.SeriesNameFormat("Forecast"),
 			),
 		),
 		panel.AddQuery(
 			query.PromQL(
-				`acm_rs:workload:memory_usage{cluster="$cluster", profile="$profile", namespace="$namespace", workload="$workload"}`,
+				`max(acm_rs:workload:memory_usage{cluster="$cluster", profile="$profile", namespace="$namespace", workload="$workload"})`,
 				dashboards.AddQueryDataSource(datasourceName),
 				query.SeriesNameFormat("Actual"),
 			),

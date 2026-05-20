@@ -38,14 +38,14 @@ func ForecastCPUPanel(datasourceName string) panelgroup.Option {
 		),
 		panel.AddQuery(
 			query.PromQL(
-				`acm_rs:prediction_forecast_cpu{cluster="$cluster", namespace="$namespace"}`,
+				`max(acm_rs:prediction_forecast_cpu{namespace="$namespace"})`,
 				dashboards.AddQueryDataSource(datasourceName),
 				query.SeriesNameFormat("Forecast"),
 			),
 		),
 		panel.AddQuery(
 			query.PromQL(
-				`acm_rs:namespace:cpu_usage{cluster="$cluster", profile="$profile", namespace="$namespace"}`,
+				`max(acm_rs:namespace:cpu_usage{cluster="$cluster", profile="$profile", namespace="$namespace"})`,
 				dashboards.AddQueryDataSource(datasourceName),
 				query.SeriesNameFormat("Actual"),
 			),

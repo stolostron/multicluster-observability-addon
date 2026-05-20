@@ -17,6 +17,33 @@ import (
 	panels "github.com/stolostron/multicluster-observability-addon/internal/perses/panels/rightsizing"
 )
 
+func withNamespaceStatsSection(datasource string) dashboard.Option {
+	return acmHelpers.AddCustomPanelGroup("Namespace Overview",
+		[]acmHelpers.GridItem{
+			{X: 0, Y: 0, W: 4, H: 4},
+			{X: 4, Y: 0, W: 4, H: 4},
+			{X: 8, Y: 0, W: 4, H: 4},
+			{X: 12, Y: 0, W: 4, H: 4},
+			{X: 16, Y: 0, W: 4, H: 4},
+			{X: 20, Y: 0, W: 4, H: 4},
+			{X: 0, Y: 4, W: 4, H: 4},
+			{X: 4, Y: 4, W: 4, H: 4},
+			{X: 8, Y: 4, W: 4, H: 4},
+			{X: 12, Y: 4, W: 4, H: 4},
+		},
+		panels.CPURecommendationPanel(datasource),
+		panels.CPUUsagePanel(datasource),
+		panels.CPURequestPanel(datasource),
+		panels.CPUUtilizationPanel(datasource),
+		panels.CPUForecastPanel(datasource),
+		panels.MemRecommendationPanel(datasource),
+		panels.MemUsagePanel(datasource),
+		panels.MemRequestPanel(datasource),
+		panels.MemUtilizationPanel(datasource),
+		panels.MemForecastPanel(datasource),
+	)
+}
+
 func withWorkloadCPUSection(datasource string, project string) dashboard.Option {
 	return acmHelpers.AddCustomPanelGroup("CPU",
 		[]acmHelpers.GridItem{
@@ -147,6 +174,7 @@ func BuildWorkloadPodRightSizing(project string, datasource string, clusterLabel
 			),
 		),
 
+		withNamespaceStatsSection(datasource),
 		withWorkloadCPUSection(datasource, project),
 		withWorkloadMemSection(datasource, project),
 		withPodsSection(datasource, project),
