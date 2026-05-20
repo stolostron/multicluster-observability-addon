@@ -4,6 +4,8 @@ import (
 	"cmp"
 	"context"
 	"fmt"
+	"maps"
+	"net/http"
 	"slices"
 
 	"github.com/go-logr/logr"
@@ -16,7 +18,6 @@ import (
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	addonhelm "github.com/stolostron/multicluster-observability-addon/internal/addon/helm"
-	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -30,13 +31,12 @@ import (
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 )
 
-func NewAddonManager(ctx context.Context, kubeConfig *rest.Config, scheme *runtime.Scheme, logger logr.Logger) (addonmanager.AddonManager, error) {
+func NewAddonManager(ctx context.Context, kubeConfig *rest.Config, scheme *runtime.Scheme, logger logr.Logger, httpClient *http.Client, mapper meta.RESTMapper) (addonmanager.AddonManager, error) {
 	logger = logger.WithName("addon")
 
-	addonClient, err := addonv1alpha1client.NewForConfig(kubeConfig)
+	addonClient, err := addonv1alpha1client.NewForConfigAndClient(kubeConfig, httpClient)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create addonv1alpha1 client: %w", err)
 	}
@@ -47,16 +47,6 @@ func NewAddonManager(ctx context.Context, kubeConfig *rest.Config, scheme *runti
 	}
 
 	registrationOption := addon.NewRegistrationOption(utilrand.String(5))
-
-	httpClient, err := rest.HTTPClientFor(kubeConfig)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create HTTP client for kubeConfig: %w", err)
-	}
-
-	mapper, err := apiutil.NewDynamicRESTMapper(kubeConfig, httpClient)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create dynamic REST mapper: %w", err)
-	}
 
 	opts := client.Options{
 		Scheme:     scheme,
@@ -69,8 +59,10 @@ func NewAddonManager(ctx context.Context, kubeConfig *rest.Config, scheme *runti
 		return nil, fmt.Errorf("failed to create new Kubernetes client: %w", err)
 	}
 
+	getter := utils.NewAddOnDeploymentConfigGetter(addonClient)
+
 	addonConfigValuesFn := addonfactory.GetAddOnDeploymentConfigValues(
-		addonfactory.NewAddOnDeploymentConfigGetter(addonClient),
+		getter,
 		addonfactory.ToAddOnCustomizedVariableValues,
 		addonfactory.ToAddOnResourceRequirementsValues,
 	)
@@ -100,17 +92,16 @@ func NewAddonManager(ctx context.Context, kubeConfig *rest.Config, scheme *runti
 
 	mcoaAgentAddon, err := addonfactory.NewAgentAddonFactory(addoncfg.Name, addon.FS, "manifests/charts/mcoa").
 		WithConfigGVRs(configGVRs...).
-		WithGetValuesFuncs(addonConfigValuesFn, addonhelm.GetValuesFunc(ctx, k8sClient, agentLogger)).
-		WithAgentHealthProber(addon.HealthProber(k8sClient, agentLogger)).
+		WithAgentHealthProber(addon.HealthProber(getter, agentLogger)).
+		WithGetValuesFuncs(addonConfigValuesFn, addonhelm.GetValuesFunc(ctx, k8sClient, getter, agentLogger)).
+		WithAgentHealthProber(addon.HealthProber(getter, agentLogger)).
 		WithAgentRegistrationOption(registrationOption).
 		WithAgentDeployTriggerClusterFilter(func(old, new *clusterv1.ManagedCluster) bool {
-			return !equality.Semantic.DeepEqual(old.Labels, new.Labels)
+			return !maps.Equal(old.Labels, new.Labels)
 		}).
 		WithAgentInstallNamespace(
 			// Set agent install namespace from addon deployment config if it exists
-			utils.AgentInstallNamespaceFromDeploymentConfigFunc(
-				utils.NewAddOnDeploymentConfigGetter(addonClient),
-			),
+			utils.AgentInstallNamespaceFromDeploymentConfigFunc(getter),
 		).WithScheme(scheme).
 		WithTrimCRDDescription().
 		BuildHelmAgentAddon()
