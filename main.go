@@ -30,6 +30,7 @@ import (
 	"github.com/stolostron/multicluster-observability-addon/internal/controllers/resourcecreator"
 	"github.com/stolostron/multicluster-observability-addon/internal/controllers/watcher"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -44,7 +45,10 @@ import (
 	workv1 "open-cluster-management.io/api/work/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
+	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 )
 
 var scheme = runtime.NewScheme()
@@ -165,9 +169,34 @@ func runControllers(ctx context.Context, kubeConfig *rest.Config) error {
 	kubeConfig.QPS = 50.0
 	kubeConfig.Burst = 100
 
-	mgr, err := ctrl.NewManager(kubeConfig, ctrl.Options{
+	httpClient, err := rest.HTTPClientFor(kubeConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create HTTP client for kubeConfig: %w", err)
+	}
+
+	mapper, err := apiutil.NewDynamicRESTMapper(kubeConfig, httpClient)
+	if err != nil {
+		return fmt.Errorf("failed to create dynamic REST mapper: %w", err)
+	}
+
+	addonMgr, err := addonctrl.NewAddonManager(ctx, kubeConfig, scheme, logger, httpClient, mapper)
+	if err != nil {
+		return fmt.Errorf("failed to create addon manager: %w", err)
+	}
+
+	// Create a single shared controller-runtime Manager for our custom controllers
+	sharedMgr, err := ctrl.NewManager(kubeConfig, ctrl.Options{
 		Scheme: scheme,
 		Logger: logger.WithName("manager"),
+		MapperProvider: func(c *rest.Config, hc *http.Client) (meta.RESTMapper, error) {
+			return mapper, nil
+		},
+		Client: client.Options{
+			HTTPClient: httpClient,
+		},
+		Metrics: server.Options{
+			BindAddress: ":8084",
+		},
 		Cache: cache.Options{
 			DefaultTransform: func(in any) (any, error) {
 				switch obj := in.(type) {
@@ -191,40 +220,40 @@ func runControllers(ctx context.Context, kubeConfig *rest.Config) error {
 		},
 	})
 	if err != nil {
-		return fmt.Errorf("failed to start manager: %w", err)
+		return fmt.Errorf("failed to start shared manager: %w", err)
 	}
 
-	if err = mgr.AddHealthzCheck("health", healthz.Ping); err != nil {
+	if err = sharedMgr.AddHealthzCheck("health", healthz.Ping); err != nil {
 		return fmt.Errorf("failed to set up health check: %w", err)
 	}
-	if err = mgr.AddReadyzCheck("check", healthz.Ping); err != nil {
+	if err = sharedMgr.AddReadyzCheck("check", healthz.Ping); err != nil {
 		return fmt.Errorf("failed to set up ready check: %w", err)
-	}
-
-	addonManager, err := addonctrl.NewAddonManager(ctx, kubeConfig, mgr, logger)
-	if err != nil {
-		return fmt.Errorf("failed to create addon manager: %w", err)
-	}
-
-	if err = mgr.Add(addonManager); err != nil {
-		return fmt.Errorf("failed to add addon manager to controller-runtime manager: %w", err)
 	}
 
 	disableReconciliation := os.Getenv("DISABLE_WATCHER_CONTROLLER")
 	if disableReconciliation == "" {
-		if err = watcher.SetupWithManager(mgr, addonManager, logger); err != nil {
-			return fmt.Errorf("failed to setup watcher manager: %w", err)
+		if err = watcher.SetupWithManager(sharedMgr, addonMgr, logger); err != nil {
+			return fmt.Errorf("unable to create watcher controller: %w", err)
 		}
 	}
 
-	if err = resourcecreator.SetupWithManager(mgr, logger); err != nil {
-		return fmt.Errorf("failed to setup resource creator manager: %w", err)
+	if err = resourcecreator.SetupWithManager(sharedMgr, logger); err != nil {
+		return fmt.Errorf("unable to create resource creator controller: %w", err)
 	}
 
-	err = mgr.Start(ctx)
+	go func() {
+		logger.Info("Starting shared controller-runtime manager")
+		if startErr := sharedMgr.Start(ctx); startErr != nil {
+			logger.Error(startErr, "shared manager exited with error")
+		}
+	}()
+
+	err = addonMgr.Start(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to start controller-runtime manager: %w", err)
+		return fmt.Errorf("failed to start addon manager: %w", err)
 	}
+
+	<-ctx.Done()
 
 	return nil
 }

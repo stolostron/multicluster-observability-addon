@@ -33,9 +33,28 @@ const (
 	localClusterNamespace = "local-cluster"
 )
 
+// WatcherReconciler triggers reconciliation in the AddonManager when something changes in an upstream resource
+type WatcherReconciler struct {
+	client.Client
+	Log          logr.Logger
+	Scheme       *runtime.Scheme
+	addonManager addonmanager.AddonManager
+	Cache        *ReferenceCache
+}
+
+// For more details, check Reconcile and its Result here:
+// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.11.0/pkg/reconcile
+func (r *WatcherReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	r.Log.V(2).Info("reconciliation triggered", "request", req.String())
+	r.addonManager.Trigger(req.Namespace, req.Name)
+
+	return ctrl.Result{}, nil
+}
+
 // SetupWithManager sets up the controller with the Manager.
 func SetupWithManager(mgr ctrl.Manager, addonManager addonmanager.AddonManager, logger logr.Logger) error {
 	l := logger.WithName("watcher")
+
 	r := &WatcherReconciler{
 		Client:       mgr.GetClient(),
 		Log:          l.WithName("controller"),
@@ -55,24 +74,6 @@ func SetupWithManager(mgr ctrl.Manager, addonManager addonmanager.AddonManager, 
 		Complete(r)
 }
 
-// WatcherReconciler triggers reconciliation in the AddonManager when something changes in an upstream resource
-type WatcherReconciler struct {
-	client.Client
-	Log          logr.Logger
-	Scheme       *runtime.Scheme
-	addonManager addonmanager.AddonManager
-	Cache        *ReferenceCache
-}
-
-// For more details, check Reconcile and its Result here:
-// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.11.0/pkg/reconcile
-func (r *WatcherReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	r.Log.V(2).Info("reconciliation triggered", "request", req.String())
-	r.addonManager.Trigger(req.Namespace, req.Name)
-
-	return ctrl.Result{}, nil
-}
-
 // getConfigResourceKey generates a key for a given client.Object.
 // The key format is "<Group>/<Kind>/<Namespace>/<Name>".
 func (r *WatcherReconciler) getConfigResourceKey(obj client.Object) string {
@@ -85,10 +86,10 @@ func (r *WatcherReconciler) getConfigResourceKey(obj client.Object) string {
 			gvk = gvks[0]
 		}
 	}
-
 	return fmt.Sprintf("%s/%s/%s/%s", gvk.Group, gvk.Kind, obj.GetNamespace(), obj.GetName())
 }
 
+// enqueueForManifestWork updates the cache when a ManifestWork is created/updated/deleted
 func (r *WatcherReconciler) enqueueForManifestWork() handler.EventHandler {
 	return handler.Funcs{
 		CreateFunc: func(ctx context.Context, e event.CreateEvent, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
@@ -110,23 +111,6 @@ func (r *WatcherReconciler) enqueueForManifestWork() handler.EventHandler {
 			r.Cache.Remove(e.Object.GetNamespace(), e.Object.GetName())
 		},
 	}
-}
-
-var manifestWorkPredicate = predicate.Funcs{
-	CreateFunc: func(e event.CreateEvent) bool {
-		return e.Object.GetLabels()[addoncfg.LabelOCMAddonName] == addoncfg.Name
-	},
-	UpdateFunc: func(e event.UpdateEvent) bool {
-		oldMw, okOld := e.ObjectOld.(*workv1.ManifestWork)
-		newMw, okNew := e.ObjectNew.(*workv1.ManifestWork)
-		if !okOld || !okNew {
-			return false
-		}
-		return oldMw.Generation != newMw.Generation && newMw.Labels[addoncfg.LabelOCMAddonName] == addoncfg.Name
-	},
-	DeleteFunc: func(e event.DeleteEvent) bool {
-		return e.Object.GetLabels()[addoncfg.LabelOCMAddonName] == addoncfg.Name
-	},
 }
 
 func (r *WatcherReconciler) updateCache(mw *workv1.ManifestWork) {
@@ -237,6 +221,23 @@ func (r *WatcherReconciler) enqueueForConfigResource() handler.EventHandler {
 		}
 		return rqs
 	})
+}
+
+var manifestWorkPredicate = predicate.Funcs{
+	CreateFunc: func(e event.CreateEvent) bool {
+		return e.Object.GetLabels()[addoncfg.LabelOCMAddonName] == addoncfg.Name
+	},
+	UpdateFunc: func(e event.UpdateEvent) bool {
+		oldMw, okOld := e.ObjectOld.(*workv1.ManifestWork)
+		newMw, okNew := e.ObjectNew.(*workv1.ManifestWork)
+		if !okOld || !okNew {
+			return false
+		}
+		return oldMw.Generation != newMw.Generation && newMw.Labels[addoncfg.LabelOCMAddonName] == addoncfg.Name
+	},
+	DeleteFunc: func(e event.DeleteEvent) bool {
+		return e.Object.GetLabels()[addoncfg.LabelOCMAddonName] == addoncfg.Name
+	},
 }
 
 var hostedClusterPredicate = builder.WithPredicates(predicate.Funcs{

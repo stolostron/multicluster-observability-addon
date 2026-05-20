@@ -210,6 +210,7 @@ func TestEnqueueForConfigResource(t *testing.T) {
 				Scheme: s,
 				Cache:  NewReferenceCache(),
 			}
+
 			// Populate cache
 			keys := map[string]struct{}{}
 			decode := serializer.NewCodecFactory(r.Scheme).UniversalDeserializer().Decode

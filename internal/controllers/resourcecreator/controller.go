@@ -74,6 +74,7 @@ var partOfMCOAPredicate = builder.WithPredicates(predicate.NewPredicateFuncs(fun
 // SetupWithManager sets up the controller with the Manager.
 func SetupWithManager(mgr ctrl.Manager, logger logr.Logger) error {
 	l := logger.WithName("resourcecreator")
+
 	r := &ResourceCreatorReconciler{
 		Client: mgr.GetClient(),
 		Log:    l.WithName("controller"),

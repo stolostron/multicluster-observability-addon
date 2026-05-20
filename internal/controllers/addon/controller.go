@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"context"
 	"fmt"
+	"net/http"
 	"slices"
 
 	"github.com/go-logr/logr"
@@ -32,14 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// ManagerDependencies provides the subset of ctrl.Manager methods required by the AddonManager.
-type ManagerDependencies interface {
-	GetClient() client.Client
-	GetScheme() *runtime.Scheme
-	GetRESTMapper() meta.RESTMapper
-}
-
-func NewAddonManager(ctx context.Context, kubeConfig *rest.Config, mgr ManagerDependencies, logger logr.Logger) (addonmanager.AddonManager, error) {
+func NewAddonManager(ctx context.Context, kubeConfig *rest.Config, scheme *runtime.Scheme, logger logr.Logger, httpClient *http.Client, mapper meta.RESTMapper) (addonmanager.AddonManager, error) {
 	logger = logger.WithName("addon")
 
 	addonClient, err := addonv1alpha1client.NewForConfig(kubeConfig)
@@ -47,14 +41,23 @@ func NewAddonManager(ctx context.Context, kubeConfig *rest.Config, mgr ManagerDe
 		return nil, fmt.Errorf("failed to create addonv1alpha1 client: %w", err)
 	}
 
-	addonManager, err := addonmanager.New(kubeConfig)
+	mgr, err := addonmanager.New(kubeConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create addon manager: %w", err)
 	}
 
 	registrationOption := addon.NewRegistrationOption(utilrand.String(5))
 
-	k8sClient := mgr.GetClient()
+	opts := client.Options{
+		Scheme:     scheme,
+		Mapper:     mapper,
+		HTTPClient: httpClient,
+	}
+
+	k8sClient, err := client.New(kubeConfig, opts)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create new Kubernetes client: %w", err)
+	}
 
 	addonConfigValuesFn := addonfactory.GetAddOnDeploymentConfigValues(
 		addonfactory.NewAddOnDeploymentConfigGetter(addonClient),
@@ -63,10 +66,6 @@ func NewAddonManager(ctx context.Context, kubeConfig *rest.Config, mgr ManagerDe
 	)
 
 	agentLogger := logger.WithName("agent")
-
-	// The GetValuesFunc below receives the construction-time ctx.
-	// This is intentional as the agent rendering uses long-lived caches that need this context.
-	valuesFunc := addonhelm.GetValuesFunc(ctx, k8sClient, agentLogger)
 
 	configGVRs := []schema.GroupVersionResource{
 		{Version: loggingv1.GroupVersion.Version, Group: loggingv1.GroupVersion.Group, Resource: addoncfg.ClusterLogForwardersResource},
@@ -83,7 +82,7 @@ func NewAddonManager(ctx context.Context, kubeConfig *rest.Config, mgr ManagerDe
 		Group:    coomonitoringv1.SchemeGroupVersion.Group,
 		Resource: coomonitoringv1.PrometheusRuleName,
 	}
-	if _, mapErr := mgr.GetRESTMapper().RESTMapping(schema.GroupKind{Group: coomonitoringv1.SchemeGroupVersion.Group, Kind: coomonitoringv1.PrometheusRuleKind}); mapErr == nil {
+	if _, mapErr := mapper.RESTMapping(schema.GroupKind{Group: coomonitoringv1.SchemeGroupVersion.Group, Kind: coomonitoringv1.PrometheusRuleKind}); mapErr == nil {
 		configGVRs = append(configGVRs, cooPrometheusRuleGVR)
 	} else {
 		logger.Info("monitoring.rhobs PrometheusRule CRD not found on hub, skipping config GVR registration", "gvr", cooPrometheusRuleGVR)
@@ -91,7 +90,7 @@ func NewAddonManager(ctx context.Context, kubeConfig *rest.Config, mgr ManagerDe
 
 	mcoaAgentAddon, err := addonfactory.NewAgentAddonFactory(addoncfg.Name, addon.FS, "manifests/charts/mcoa").
 		WithConfigGVRs(configGVRs...).
-		WithGetValuesFuncs(addonConfigValuesFn, valuesFunc).
+		WithGetValuesFuncs(addonConfigValuesFn, addonhelm.GetValuesFunc(ctx, k8sClient, agentLogger)).
 		WithUpdaters(addon.Updaters()).
 		WithAgentHealthProber(addon.HealthProber(k8sClient, agentLogger)).
 		WithAgentRegistrationOption(registrationOption).
@@ -103,14 +102,14 @@ func NewAddonManager(ctx context.Context, kubeConfig *rest.Config, mgr ManagerDe
 			utils.AgentInstallNamespaceFromDeploymentConfigFunc(
 				utils.NewAddOnDeploymentConfigGetter(addonClient),
 			),
-		).WithScheme(mgr.GetScheme()).
+		).WithScheme(scheme).
 		WithTrimCRDDescription().
 		BuildHelmAgentAddon()
 	if err != nil {
 		return nil, fmt.Errorf("failed to build helm agent addon: %w", err)
 	}
 
-	err = addonManager.AddAgent(&AgentAddonWithSortedManifests{
+	err = mgr.AddAgent(&AgentAddonWithSortedManifests{
 		agent:  mcoaAgentAddon,
 		logger: agentLogger,
 		client: k8sClient,
@@ -119,7 +118,7 @@ func NewAddonManager(ctx context.Context, kubeConfig *rest.Config, mgr ManagerDe
 		return nil, fmt.Errorf("failed to add mcoa agent to manager: %w", err)
 	}
 
-	return addonManager, nil
+	return mgr, nil
 }
 
 type AgentAddonWithSortedManifests struct {
