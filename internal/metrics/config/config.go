@@ -96,6 +96,19 @@ const (
 	AlertmanagerPlatformNamespace  = "openshift-monitoring"
 	AlertmanagerUWLNamespace       = "openshift-user-workload-monitoring"
 
+	// Memcached defaults matching MCO configuration.
+	MemcachedImage                   = "quay.io/ocm-observability/memcached:1.6.3-alpine"
+	MemcachedExporterImage           = "quay.io/prometheus/memcached-exporter:v0.9.0"
+	DefaultMemcachedReplicas         = 3
+	DefaultMemcachedMemoryLimitMB    = 1024
+	DefaultMemcachedConnectionLimit  = 1024
+	DefaultMemcachedMaxItemSize      = "1m"
+	StoreMemcachedName               = "mcoa-store-memcached"
+	QueryFrontendMemcachedName       = "mcoa-query-frontend-memcached"
+	StoreMemcachedSecretName         = "mcoa-store-index-cache-config"
+	QueryFrontendMemcachedSecretName = "mcoa-query-frontend-cache-config"
+	MemcachedCacheSecretKey          = "config.yaml"
+
 	// ContainerIDs for Thanos components used to match AddOnDeploymentConfig resource requirements.
 	// Format: "<resourceType>:<name>:<containerName>"
 	ThanosReceiveRouterContainerID   = "deployments:mcoa-receive:thanos"

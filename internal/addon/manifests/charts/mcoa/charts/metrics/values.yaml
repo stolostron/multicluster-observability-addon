@@ -28,6 +28,14 @@ thanosOperator:
   appName: thanos-operator
   component: controller-manager
   image: ""
+  memcached:
+    image: ""
+    exporterImage: ""
+    storeReplicas: 3
+    queryFrontendReplicas: 3
+    memoryLimitMB: 1024
+    connectionLimit: 1024
+    maxItemSize: "1m"
   receiveSpec:
     data: ""
   querySpec:

@@ -640,6 +640,10 @@ func (o *OptionsBuilder) buildThanosComponents(ctx context.Context, opts *Option
 	o.buildThanosCompact(opts, objStoreCfg)
 	o.buildThanosStore(opts, objStoreCfg)
 	o.buildThanosRuler(opts, objStoreCfg)
+
+	o.addMemcachedCacheSecret(&opts.Secrets, config.StoreMemcachedName, config.StoreMemcachedSecretName)
+	o.addMemcachedCacheSecret(&opts.Secrets, config.QueryFrontendMemcachedName, config.QueryFrontendMemcachedSecretName)
+
 	return nil
 }
 
@@ -703,6 +707,12 @@ func (o *OptionsBuilder) buildThanosQuery(opts *Options) {
 			QueryFrontend: &thanosv1alpha1.QueryFrontendSpec{
 				Replicas:          int32(config.DefaultQueryFrontendReplicas),
 				CompressResponses: true,
+				QueryRangeResponseCacheConfig: &thanosv1alpha1.CacheConfig{
+					ExternalCacheConfig: &corev1.SecretKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{Name: config.QueryFrontendMemcachedSecretName},
+						Key:                  config.MemcachedCacheSecretKey,
+					},
+				},
 			},
 		},
 	}
@@ -747,6 +757,12 @@ func (o *OptionsBuilder) buildThanosStore(opts *Options, objStore thanosv1alpha1
 				Type:   thanosv1alpha1.Block,
 				Shards: shards,
 			},
+			IndexCacheConfig: &thanosv1alpha1.CacheConfig{
+				ExternalCacheConfig: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{Name: config.StoreMemcachedSecretName},
+					Key:                  config.MemcachedCacheSecretKey,
+				},
+			},
 		},
 	}
 
@@ -777,6 +793,34 @@ func (o *OptionsBuilder) buildThanosRuler(opts *Options, objStore thanosv1alpha1
 
 	// Managed fields: node selectors, tolerations, and resource requirements from AddOnDeploymentConfig.
 	o.applyCommonThanosFields(&opts.Thanos.Ruler.Spec.CommonFields, opts, config.ThanosRulerContainerID)
+}
+
+// addMemcachedCacheSecret creates a secret with the Thanos memcached cache configuration
+// pointing to the given memcached service name (which must be in the same namespace).
+func (o *OptionsBuilder) addMemcachedCacheSecret(secrets *[]*corev1.Secret, serviceName, secretName string) {
+	cacheConfig := fmt.Sprintf(`type: MEMCACHED
+config:
+  addresses:
+  - "dns+%s:11211"
+  timeout: 500ms
+  max_idle_connections: 100
+  max_async_concurrency: 20
+  max_async_buffer_size: 10000
+  max_get_multi_concurrency: 100
+  max_get_multi_batch_size: 0
+  max_item_size: 1MiB
+  dns_provider_update_interval: 10s
+`, serviceName)
+
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: secretName,
+		},
+		Data: map[string][]byte{
+			config.MemcachedCacheSecretKey: []byte(cacheConfig),
+		},
+	}
+	*secrets = append(*secrets, secret)
 }
 
 // applyCommonThanosFields sets node selectors, tolerations, and resource requirements from the addon config.
