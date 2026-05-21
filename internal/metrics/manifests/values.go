@@ -51,16 +51,27 @@ type NodeExporterValues struct {
 
 // ThanosOperatorValues holds the serialized Thanos CR specs for Helm rendering.
 type ThanosOperatorValues struct {
-	Enabled     bool        `json:"enabled"`
-	IsHub       bool        `json:"isHub"`
-	AppName     string      `json:"appName"`
-	Component   string      `json:"component"`
-	Image       string      `json:"image"`
-	ReceiveSpec ConfigValue `json:"receiveSpec"`
-	QuerySpec   ConfigValue `json:"querySpec"`
-	CompactSpec ConfigValue `json:"compactSpec"`
-	StoreSpec   ConfigValue `json:"storeSpec"`
-	RulerSpec   ConfigValue `json:"rulerSpec"`
+	Enabled     bool             `json:"enabled"`
+	IsHub       bool             `json:"isHub"`
+	AppName     string           `json:"appName"`
+	Component   string           `json:"component"`
+	Image       string           `json:"image"`
+	Memcached   MemcachedValues  `json:"memcached"`
+	ReceiveSpec ConfigValue      `json:"receiveSpec"`
+	QuerySpec   ConfigValue      `json:"querySpec"`
+	CompactSpec ConfigValue      `json:"compactSpec"`
+	StoreSpec   ConfigValue      `json:"storeSpec"`
+	RulerSpec   ConfigValue      `json:"rulerSpec"`
+}
+
+type MemcachedValues struct {
+	Image                 string `json:"image"`
+	ExporterImage         string `json:"exporterImage"`
+	StoreReplicas         int32  `json:"storeReplicas"`
+	QueryFrontendReplicas int32  `json:"queryFrontendReplicas"`
+	MemoryLimitMB         int32  `json:"memoryLimitMB"`
+	ConnectionLimit       int32  `json:"connectionLimit"`
+	MaxItemSize           string `json:"maxItemSize"`
 }
 
 type Collector struct {
@@ -327,6 +338,15 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 		AppName:   config.ThanosOperatorAppName,
 		Component: "controller-manager",
 		Image:     thanosOperatorImage,
+		Memcached: MemcachedValues{
+			Image:                 config.MemcachedImage,
+			ExporterImage:         config.MemcachedExporterImage,
+			StoreReplicas:         int32(config.DefaultMemcachedReplicas),
+			QueryFrontendReplicas: int32(config.DefaultMemcachedReplicas),
+			MemoryLimitMB:         int32(config.DefaultMemcachedMemoryLimitMB),
+			ConnectionLimit:       int32(config.DefaultMemcachedConnectionLimit),
+			MaxItemSize:           config.DefaultMemcachedMaxItemSize,
+		},
 	}
 
 	if opts.IsHub {
