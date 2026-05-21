@@ -7,11 +7,9 @@ import (
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	addonutils "open-cluster-management.io/addon-framework/pkg/utils"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	fakeaddon "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
 )
 
 func TestGetAddOnDeploymentConfig(t *testing.T) {
@@ -90,23 +88,20 @@ func TestGetAddOnDeploymentConfig(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create a fake client with the existing AODC if provided
-			objs := []client.Object{}
+			fakeAddonClient := fakeaddon.NewSimpleClientset()
 			if tt.existingAODC != nil {
-				objs = append(objs, tt.existingAODC)
+				fakeAddonClient = fakeaddon.NewSimpleClientset(tt.existingAODC)
 			}
-			scheme := runtime.NewScheme()
-			require.NoError(t, addonapiv1alpha1.AddToScheme(scheme))
-			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(objs...).Build()
+			getter := addonutils.NewAddOnDeploymentConfigGetter(fakeAddonClient)
 
 			// Call the function
 			ctx := t.Context()
-			_, err := common.GetAddOnDeploymentConfig(ctx, fakeClient, tt.mcAddon)
+			_, err := common.GetAddOnDeploymentConfig(ctx, getter, tt.mcAddon)
 
 			// require the results
 			if tt.expectedErr != nil {
 				require.Error(t, err)
-				require.Equal(t, tt.expectedErr, err)
+				require.ErrorIs(t, err, tt.expectedErr)
 			} else {
 				require.NoError(t, err)
 			}

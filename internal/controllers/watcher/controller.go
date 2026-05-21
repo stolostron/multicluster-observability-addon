@@ -200,12 +200,12 @@ func (r *WatcherReconciler) enqueueForAllManagedClusters() handler.EventHandler 
 
 func (r *WatcherReconciler) enqueueForConfigResource() handler.EventHandler {
 	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
-		rqs := []reconcile.Request{}
 		namespaces := r.Cache.GetNamespaces(r.getConfigResourceKey(obj))
 		if len(namespaces) == 0 {
-			return []reconcile.Request{}
+			return nil
 		}
 
+		rqs := make([]reconcile.Request, 0, len(namespaces))
 		r.Log.V(2).Info("Enqueue for config resource event", "gvk", obj.GetObjectKind().GroupVersionKind().String(), "name", obj.GetName(), "namespace", obj.GetNamespace(), "clustersCount", len(namespaces))
 
 		for _, ns := range namespaces {
@@ -285,7 +285,7 @@ func isHypershiftServiceMonitor(logger logr.Logger, obj client.Object) bool {
 		for _, owner := range obj.GetOwnerReferences() {
 			gv, err := schema.ParseGroupVersion(owner.APIVersion)
 			if err != nil {
-				logger.V(1).Info("failed to parse groupVersion", "error", err.Error())
+				logger.V(1).Info("failed to parse groupVersion", "apiVersion", owner.APIVersion, "error", err)
 				continue
 			}
 

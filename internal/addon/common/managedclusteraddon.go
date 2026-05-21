@@ -3,6 +3,7 @@ package common
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	addonutils "open-cluster-management.io/addon-framework/pkg/utils"
@@ -12,7 +13,7 @@ import (
 
 var (
 	ErrMissingAODCRef  = errors.New("missing required AddOnDeploymentConfig reference in addon configuration")
-	ErrMultipleAODCRef = errors.New("addonmultiple AddOnDeploymentConfig references found - only one is supported")
+	ErrMultipleAODCRef = errors.New("multiple AddOnDeploymentConfig references found - only one is supported")
 )
 
 func GetObjectKeys(configRef []addonapiv1alpha1.ConfigReference, group, resource string) []client.ObjectKey {
@@ -42,18 +43,18 @@ func GetObjectKeys(configRef []addonapiv1alpha1.ConfigReference, group, resource
 	return keys
 }
 
-func GetAddOnDeploymentConfig(ctx context.Context, k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAddOn) (*addonapiv1alpha1.AddOnDeploymentConfig, error) {
-	aodc := &addonapiv1alpha1.AddOnDeploymentConfig{}
+func GetAddOnDeploymentConfig(ctx context.Context, getter addonutils.AddOnDeploymentConfigGetter, mcAddon *addonapiv1alpha1.ManagedClusterAddOn) (*addonapiv1alpha1.AddOnDeploymentConfig, error) {
 	keys := GetObjectKeys(mcAddon.Status.ConfigReferences, addonutils.AddOnDeploymentConfigGVR.Group, addoncfg.AddonDeploymentConfigResource)
 	switch {
 	case len(keys) == 0:
-		return aodc, ErrMissingAODCRef
+		return nil, ErrMissingAODCRef
 	case len(keys) > 1:
-		return aodc, ErrMultipleAODCRef
+		return nil, ErrMultipleAODCRef
 	}
-	if err := k8s.Get(ctx, keys[0], aodc, &client.GetOptions{}); err != nil {
-		// TODO(JoaoBraveCoding) Add proper error handling
-		return aodc, err
+
+	aodc, err := getter.Get(ctx, keys[0].Namespace, keys[0].Name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get AddOnDeploymentConfig %s/%s: %w", keys[0].Namespace, keys[0].Name, err)
 	}
 	return aodc, nil
 }
