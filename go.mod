@@ -31,8 +31,6 @@ require (
 	github.com/perses/community-mixins v0.0.0-20251209094652-b91692c6ac00
 	github.com/perses/perses v0.53.1
 	github.com/perses/perses-operator v0.2.0
-	github.com/perses/plugins/barchart v0.11.1
-	github.com/perses/plugins/piechart v0.13.2-0.20260326134814-37e86f6b1c58
 	github.com/perses/plugins/prometheus v0.57.1
 	github.com/perses/plugins/statchart v0.12.1
 	github.com/perses/plugins/staticlistvariable v0.8.1
@@ -58,6 +56,8 @@ require (
 	github.com/go-openapi/swag/yamlutils v0.25.4 // indirect
 	github.com/golang-jwt/jwt/v5 v5.3.1 // indirect
 	github.com/hashicorp/go-version v1.8.0 // indirect
+	github.com/perses/plugins/barchart v0.11.1 // indirect
+	github.com/perses/plugins/piechart v0.13.2-0.20260326134814-37e86f6b1c58 // indirect
 	github.com/prometheus/otlptranslator v1.0.0 // indirect
 	go.opentelemetry.io/collector/featuregate v1.51.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
@@ -126,7 +126,7 @@ require (
 	github.com/nexucis/lamenv v0.5.2 // indirect
 	github.com/openshift/api v0.0.0-20260130140113-71e91db96ffc
 	github.com/perses/common v0.30.2 // indirect
-	github.com/perses/plugins/gaugechart v0.12.1
+	github.com/perses/plugins/gaugechart v0.12.1 // indirect
 	github.com/perses/plugins/markdown v0.11.1
 	github.com/perses/promql-builder v0.2.1-0.20260106092606-e4909fea9c57
 	github.com/pkg/errors v0.9.1 // indirect
@@ -140,6 +140,7 @@ require (
 	github.com/sirupsen/logrus v1.9.4 // indirect
 	github.com/spf13/cast v1.7.1 // indirect
 	github.com/stoewer/go-strcase v1.3.1 // indirect
+	github.com/stolostron/multicluster-observability-addon/pkg/perses v0.0.0
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasttemplate v1.2.2 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
@@ -205,4 +206,7 @@ require (
 	sigs.k8s.io/yaml v1.6.0
 )
 
-replace github.com/google/cel-go => github.com/google/cel-go v0.23.2
+replace (
+	github.com/google/cel-go => github.com/google/cel-go v0.23.2
+	github.com/stolostron/multicluster-observability-addon/pkg/perses => ./pkg/perses
+)
