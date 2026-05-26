@@ -26,5 +26,7 @@ aliases:
   #   - frzifus
   #   - rubenvp8510
   #   - andreasgerstmayr
+  cnv-observability:
+    - sradco
   observability-intelligence:
     - tremes 
