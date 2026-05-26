@@ -43,7 +43,7 @@ sum(kubevirt_vmi_memory_domain_bytes{cluster=~"$cluster", node=~"$node"})`
 -
 (sum((kube_node_status_capacity{resource="memory", cluster=~"$cluster", node=~"$node"} * on (node) kube_node_role{role="$role", cluster=~"$cluster", node=~"$node"})) - sum((kube_node_status_allocatable{resource="memory", cluster=~"$cluster", node=~"$node"} * on (node) kube_node_role{role="$role", cluster=~"$cluster", node=~"$node"})))`
 
-	nodeMemoryClusterUtilizationHistorySummaryPlanMaxVMAssigned = `(kubevirt_hco_memory_overcommit_percentage{cluster=~"$cluster"} / 100)
+	nodeMemoryClusterUtilizationHistorySummaryPlanMaxVMAssigned = `scalar(kubevirt_hco_memory_overcommit_percentage{cluster=~"$cluster"} / 100)
 
 *
 
