@@ -328,114 +328,37 @@ func Updaters() []agent.Updater {
 	// Thanos CR updaters: ignore "unmanaged" fields so users can modify them on the CR
 	// without MCOA overwriting them on each reconcile.
 	thanosGroup := "monitoring.thanos.io"
+	thanosSSAStrategy := workv1.UpdateStrategy{
+		Type: workv1.UpdateStrategyTypeServerSideApply,
+		ServerSideApply: &workv1.ServerSideApplyConfig{
+			IgnoreFields: []workv1.IgnoreField{
+				{
+					Condition: "OnSpokeChange",
+					JSONPaths: []string{".spec"},
+				},
+			},
+		},
+	}
 	updaters = append(updaters,
 		agent.Updater{
-			UpdateStrategy: workv1.UpdateStrategy{
-				Type: workv1.UpdateStrategyTypeServerSideApply,
-				ServerSideApply: &workv1.ServerSideApplyConfig{
-					IgnoreFields: []workv1.IgnoreField{
-						{
-							Condition: "OnSpokePresent",
-							JSONPaths: []string{
-								".spec.replicas",
-								".spec.queryFrontend.replicas",
-							},
-						},
-					},
-				},
-			},
-			ResourceIdentifier: workv1.ResourceIdentifier{
-				Group:    thanosGroup,
-				Resource: "thanosqueries",
-				Name:     "mcoa-query",
-			},
+			UpdateStrategy:     thanosSSAStrategy,
+			ResourceIdentifier: workv1.ResourceIdentifier{Group: thanosGroup, Resource: "thanosqueries", Name: "mcoa-query"},
 		},
 		agent.Updater{
-			UpdateStrategy: workv1.UpdateStrategy{
-				Type: workv1.UpdateStrategyTypeServerSideApply,
-				ServerSideApply: &workv1.ServerSideApplyConfig{
-					IgnoreFields: []workv1.IgnoreField{
-						{
-							Condition: "OnSpokePresent",
-							JSONPaths: []string{
-								".spec.router.replicas",
-								".spec.router.replicationFactor",
-								".spec.ingester.hashrings",
-							},
-						},
-					},
-				},
-			},
-			ResourceIdentifier: workv1.ResourceIdentifier{
-				Group:    thanosGroup,
-				Resource: "thanosreceives",
-				Name:     "mcoa-receive",
-			},
+			UpdateStrategy:     thanosSSAStrategy,
+			ResourceIdentifier: workv1.ResourceIdentifier{Group: thanosGroup, Resource: "thanosreceives", Name: "mcoa-receive"},
 		},
 		agent.Updater{
-			UpdateStrategy: workv1.UpdateStrategy{
-				Type: workv1.UpdateStrategyTypeServerSideApply,
-				ServerSideApply: &workv1.ServerSideApplyConfig{
-					IgnoreFields: []workv1.IgnoreField{
-						{
-							Condition: "OnSpokePresent",
-							JSONPaths: []string{
-								".spec.retentionConfig",
-								".spec.storageConfiguration",
-							},
-						},
-					},
-				},
-			},
-			ResourceIdentifier: workv1.ResourceIdentifier{
-				Group:    thanosGroup,
-				Resource: "thanoscompacts",
-				Name:     "mcoa-compact",
-			},
+			UpdateStrategy:     thanosSSAStrategy,
+			ResourceIdentifier: workv1.ResourceIdentifier{Group: thanosGroup, Resource: "thanoscompacts", Name: "mcoa-compact"},
 		},
 		agent.Updater{
-			UpdateStrategy: workv1.UpdateStrategy{
-				Type: workv1.UpdateStrategyTypeServerSideApply,
-				ServerSideApply: &workv1.ServerSideApplyConfig{
-					IgnoreFields: []workv1.IgnoreField{
-						{
-							Condition: "OnSpokePresent",
-							JSONPaths: []string{
-								".spec.replicas",
-								".spec.shardingStrategy",
-								".spec.storage",
-							},
-						},
-					},
-				},
-			},
-			ResourceIdentifier: workv1.ResourceIdentifier{
-				Group:    thanosGroup,
-				Resource: "thanosstores",
-				Name:     "mcoa-store",
-			},
+			UpdateStrategy:     thanosSSAStrategy,
+			ResourceIdentifier: workv1.ResourceIdentifier{Group: thanosGroup, Resource: "thanosstores", Name: "mcoa-store"},
 		},
 		agent.Updater{
-			UpdateStrategy: workv1.UpdateStrategy{
-				Type: workv1.UpdateStrategyTypeServerSideApply,
-				ServerSideApply: &workv1.ServerSideApplyConfig{
-					IgnoreFields: []workv1.IgnoreField{
-						{
-							Condition: "OnSpokePresent",
-							JSONPaths: []string{
-								".spec.replicas",
-								".spec.retention",
-								".spec.storageConfiguration",
-							},
-						},
-					},
-				},
-			},
-			ResourceIdentifier: workv1.ResourceIdentifier{
-				Group:    thanosGroup,
-				Resource: "thanosrulers",
-				Name:     "mcoa-ruler",
-			},
+			UpdateStrategy:     thanosSSAStrategy,
+			ResourceIdentifier: workv1.ResourceIdentifier{Group: thanosGroup, Resource: "thanosrulers", Name: "mcoa-ruler"},
 		},
 	)
 
