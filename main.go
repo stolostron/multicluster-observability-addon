@@ -25,11 +25,9 @@ import (
 	uiplugin "github.com/rhobs/observability-operator/pkg/apis/uiplugin/v1alpha1"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	addonctrl "github.com/stolostron/multicluster-observability-addon/internal/controllers/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/controllers/resourcecreator"
 	"github.com/stolostron/multicluster-observability-addon/internal/controllers/watcher"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -44,12 +42,12 @@ import (
 	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 	workv1 "open-cluster-management.io/api/work/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 )
+
 
 var scheme = runtime.NewScheme()
 
@@ -196,27 +194,6 @@ func runControllers(ctx context.Context, kubeConfig *rest.Config) error {
 		},
 		Metrics: server.Options{
 			BindAddress: ":8084",
-		},
-		Cache: cache.Options{
-			DefaultTransform: func(in any) (any, error) {
-				switch obj := in.(type) {
-				case *corev1.Secret:
-					// Keep full Secret for addoncfg.InstallNamespace and openshift-ingress
-					if obj.Namespace != addoncfg.InstallNamespace && obj.Namespace != "openshift-ingress" {
-						// Strip payload for all other namespaces to save memory
-						obj.Data = nil
-						obj.StringData = nil
-					}
-				case *corev1.ConfigMap:
-					// Keep full ConfigMap only for addoncfg.InstallNamespace
-					if obj.Namespace != addoncfg.InstallNamespace {
-						// Strip payload for all other namespaces to save memory
-						obj.Data = nil
-						obj.BinaryData = nil
-					}
-				}
-				return in, nil
-			},
 		},
 	})
 	if err != nil {

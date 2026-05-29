@@ -36,7 +36,7 @@ import (
 func NewAddonManager(ctx context.Context, kubeConfig *rest.Config, scheme *runtime.Scheme, logger logr.Logger, httpClient *http.Client, mapper meta.RESTMapper) (addonmanager.AddonManager, error) {
 	logger = logger.WithName("addon")
 
-	addonClient, err := addonv1alpha1client.NewForConfig(kubeConfig)
+	addonClient, err := addonv1alpha1client.NewForConfigAndClient(kubeConfig, httpClient)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create addonv1alpha1 client: %w", err)
 	}
