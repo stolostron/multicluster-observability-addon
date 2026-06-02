@@ -325,6 +325,43 @@ func Updaters() []agent.Updater {
 		},
 	})
 
+	// Thanos CR updaters: ignore "unmanaged" fields so users can modify them on the CR
+	// without MCOA overwriting them on each reconcile.
+	thanosGroup := "monitoring.thanos.io"
+	thanosSSAStrategy := workv1.UpdateStrategy{
+		Type: workv1.UpdateStrategyTypeServerSideApply,
+		ServerSideApply: &workv1.ServerSideApplyConfig{
+			IgnoreFields: []workv1.IgnoreField{
+				{
+					Condition: "OnSpokeChange",
+					JSONPaths: []string{".spec"},
+				},
+			},
+		},
+	}
+	updaters = append(updaters,
+		agent.Updater{
+			UpdateStrategy:     thanosSSAStrategy,
+			ResourceIdentifier: workv1.ResourceIdentifier{Group: thanosGroup, Resource: "thanosqueries", Name: "mcoa-query"},
+		},
+		agent.Updater{
+			UpdateStrategy:     thanosSSAStrategy,
+			ResourceIdentifier: workv1.ResourceIdentifier{Group: thanosGroup, Resource: "thanosreceives", Name: "mcoa-receive"},
+		},
+		agent.Updater{
+			UpdateStrategy:     thanosSSAStrategy,
+			ResourceIdentifier: workv1.ResourceIdentifier{Group: thanosGroup, Resource: "thanoscompacts", Name: "mcoa-compact"},
+		},
+		agent.Updater{
+			UpdateStrategy:     thanosSSAStrategy,
+			ResourceIdentifier: workv1.ResourceIdentifier{Group: thanosGroup, Resource: "thanosstores", Name: "mcoa-store"},
+		},
+		agent.Updater{
+			UpdateStrategy:     thanosSSAStrategy,
+			ResourceIdentifier: workv1.ResourceIdentifier{Group: thanosGroup, Resource: "thanosrulers", Name: "mcoa-ruler"},
+		},
+	)
+
 	return updaters
 }
 

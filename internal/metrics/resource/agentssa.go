@@ -80,12 +80,13 @@ func makeConfigResourceLabels(isUWL bool, placementRef addonv1alpha1.PlacementRe
 // PrometheusAgentSSA applies configuration and invariants to an existing PrometheusAgent
 // It is used to enforce mandatory fields with server-side apply.
 type PrometheusAgentSSA struct {
-	ExistingAgent       *cooprometheusv1alpha1.PrometheusAgent
-	IsUwl               bool
-	PrometheusImage     string
-	KubeRBACProxyImage  string
-	Labels              map[string]string
-	RemoteWriteEndpoint string
+	ExistingAgent           *cooprometheusv1alpha1.PrometheusAgent
+	IsUwl                   bool
+	PrometheusImage         string
+	KubeRBACProxyImage      string
+	Labels                  map[string]string
+	RemoteWriteEndpoint     string
+	McoaRemoteWriteEndpoint string
 
 	desiredAgent *cooprometheusv1alpha1.PrometheusAgent
 }
@@ -202,6 +203,29 @@ func (p *PrometheusAgentSSA) setPrometheusRemoteWriteConfig() {
 		p.desiredAgent.Spec.RemoteWrite[index] = desiredRemoteWriteSpec
 	} else {
 		p.desiredAgent.Spec.RemoteWrite = append(p.desiredAgent.Spec.RemoteWrite, desiredRemoteWriteSpec)
+	}
+
+	// Add MCOA remote write when thanos operator is enabled
+	if p.McoaRemoteWriteEndpoint != "" {
+		mcoaRemoteWriteSpec := cooprometheusv1.RemoteWriteSpec{
+			URL:           p.McoaRemoteWriteEndpoint,
+			Name:          ptr.To(config.McoaRemoteWriteCfgName),
+			RemoteTimeout: ptr.To(cooprometheusv1.Duration("30s")),
+			TLSConfig: &cooprometheusv1.TLSConfig{
+				CAFile:   p.formatSecretPath(config.HubCASecretName, "ca.crt"),
+				CertFile: p.formatSecretPath(config.ClientCertSecretName, "tls.crt"),
+				KeyFile:  p.formatSecretPath(config.ClientCertSecretName, "tls.key"),
+			},
+		}
+
+		mcoaIndex := slices.IndexFunc(p.desiredAgent.Spec.RemoteWrite, func(e cooprometheusv1.RemoteWriteSpec) bool {
+			return e.Name != nil && *e.Name == config.McoaRemoteWriteCfgName
+		})
+		if mcoaIndex >= 0 {
+			p.desiredAgent.Spec.RemoteWrite[mcoaIndex] = mcoaRemoteWriteSpec
+		} else {
+			p.desiredAgent.Spec.RemoteWrite = append(p.desiredAgent.Spec.RemoteWrite, mcoaRemoteWriteSpec)
+		}
 	}
 }
 

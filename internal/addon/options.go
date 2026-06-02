@@ -119,14 +119,15 @@ type ProxyConfig struct {
 }
 
 type Options struct {
-	Platform         PlatformOptions
-	UserWorkloads    UserWorkloadOptions
-	InstallNamespace string
-	Tolerations      []corev1.Toleration
-	NodeSelector     map[string]string
-	ResourceReqs     []addonapiv1alpha1.ContainerResourceRequirements
-	ProxyConfig      ProxyConfig
-	Registries       []addonapiv1alpha1.ImageMirror
+	Platform              PlatformOptions
+	UserWorkloads         UserWorkloadOptions
+	InstallNamespace      string
+	Tolerations           []corev1.Toleration
+	NodeSelector          map[string]string
+	ResourceReqs          []addonapiv1alpha1.ContainerResourceRequirements
+	ProxyConfig           ProxyConfig
+	Registries            []addonapiv1alpha1.ImageMirror
+	ThanosOperatorEnabled bool
 }
 
 func (o Options) validate() error {
@@ -176,6 +177,7 @@ func BuildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Opti
 
 	opts.ProxyConfig.NoProxy = addOnDeployment.Spec.ProxyConfig.NoProxy
 	opts.Registries = addOnDeployment.Spec.Registries
+	opts.ThanosOperatorEnabled = addOnDeployment.Annotations["mcoa-thanos-operator"] == "true"
 
 	// Do NOT return early when CustomizedVariables is nil. The for-range
 	// loop below is a safe no-op on a nil slice, and we must always fall

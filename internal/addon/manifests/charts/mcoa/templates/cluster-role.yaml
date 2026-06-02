@@ -25,4 +25,7 @@ rules:
   - apiGroups: ["apiextensions.k8s.io"]
     resources: ["customresourcedefinitions"]
     verbs: ["get", "list", "watch", "create", "update", "delete", "patch"]
+  - apiGroups: ["monitoring.thanos.io"]
+    resources: ["thanosreceives", "thanosqueries", "thanoscompacts", "thanosstores", "thanosrulers"]
+    verbs: ["get", "list", "watch", "create", "update", "delete", "patch"]
 {{- end }}

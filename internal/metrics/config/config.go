@@ -53,11 +53,41 @@ const (
 	AcmApiServerServiceMonitorName        = "acm-kube-apiserver"
 
 	RemoteWriteCfgName        = "acm-observability"
+	McoaRemoteWriteCfgName    = "mcoa-observability"
+	McoaObsApiRouteName       = "mcoa-observatorium-api"
 	ScrapeClassCfgName        = "ocp-monitoring"
 	NonOCPScrapeClassName     = "non-ocp-monitoring"
 	ScrapeClassPlatformTarget = "prometheus-k8s.openshift-monitoring.svc:9091"
 	ScrapeClassUWLTarget      = "prometheus-user-workload.openshift-user-workload-monitoring.svc:9092"
 	MonitoringStackCRDName    = "monitoringstacks.monitoring.rhobs"
+
+	// Thanos Operator
+	ThanosOperatorAppName = "thanos-operator"
+	// TODO: replace with image from ACM image overrides ConfigMap once available.
+	ThanosOperatorImage = "quay.io/thanos/thanos-operator:main-2026-04-09-a4dc024"
+
+	// Object storage secret used by Thanos components on the hub.
+	// This matches the MCO convention for the metric object storage secret.
+	ObjectStorageSecretName = "thanos-object-storage"
+	ObjectStorageSecretKey  = "thanos.yaml"
+
+	// Default Thanos component configuration matching MCO defaults.
+	DefaultReceiveReplicas          = 3
+	DefaultReceiveReplicationFactor = 3
+	DefaultReceiveStorageSize       = "100Gi"
+	DefaultRetentionInLocal         = "24h"
+	DefaultQueryReplicas            = 2
+	DefaultCompactStorageSize       = "100Gi"
+	DefaultRetentionResolutionRaw   = "365d"
+	DefaultRetentionResolution5m    = "365d"
+	DefaultRetentionResolution1h    = "365d"
+	DefaultStoreShards              = 3
+	DefaultStoreStorageSize         = "10Gi"
+	DefaultRulerReplicas            = 3
+	DefaultRulerStorageSize         = "1Gi"
+	DefaultQueryFrontendReplicas    = 2
+	DefaultRulerEvalInterval        = "1m"
+	DefaultAlertmanagerURL          = "dnssrv+http://alertmanager-operated.open-cluster-management-observability.svc:9093"
 
 	AlertmanagerAccessorSecretName = "observability-alertmanager-accessor"
 	AlertmanagerRouterCASecretName = "hub-alertmanager-router-ca"
@@ -65,6 +95,29 @@ const (
 	AlertmanagerRouteBYOCERTName   = "alertmanager-byo-cert"
 	AlertmanagerPlatformNamespace  = "openshift-monitoring"
 	AlertmanagerUWLNamespace       = "openshift-user-workload-monitoring"
+
+	// Memcached defaults matching MCO configuration.
+	MemcachedImage                   = "quay.io/ocm-observability/memcached:1.6.3-alpine"
+	MemcachedExporterImage           = "quay.io/prometheus/memcached-exporter:v0.9.0"
+	DefaultMemcachedReplicas         = 3
+	DefaultMemcachedMemoryLimitMB    = 1024
+	DefaultMemcachedConnectionLimit  = 1024
+	DefaultMemcachedMaxItemSize      = "1m"
+	StoreMemcachedName               = "mcoa-store-memcached"
+	QueryFrontendMemcachedName       = "mcoa-query-frontend-memcached"
+	StoreMemcachedSecretName         = "mcoa-store-index-cache-config"
+	QueryFrontendMemcachedSecretName = "mcoa-query-frontend-cache-config"
+	MemcachedCacheSecretKey          = "config.yaml"
+
+	// ContainerIDs for Thanos components used to match AddOnDeploymentConfig resource requirements.
+	// Format: "<resourceType>:<name>:<containerName>"
+	ThanosReceiveRouterContainerID   = "deployments:mcoa-receive:thanos"
+	ThanosReceiveIngesterContainerID = "statefulsets:mcoa-receive:thanos"
+	ThanosQueryContainerID           = "deployments:mcoa-query:thanos"
+	ThanosQueryFrontendContainerID   = "deployments:mcoa-query-frontend:thanos"
+	ThanosCompactContainerID         = "statefulsets:mcoa-compact:thanos"
+	ThanosStoreContainerID           = "statefulsets:mcoa-store:thanos"
+	ThanosRulerContainerID           = "statefulsets:mcoa-ruler:thanos"
 )
 
 var (
@@ -101,6 +154,7 @@ type ImageOverrides struct {
 	KubeStateMetrics           string `json:"kube_state_metrics"`
 	NodeExporter               string `json:"node_exporter"`
 	Prometheus                 string `json:"prometheus"`
+	ThanosOperator             string `json:"thanos_operator,omitempty"`
 }
 
 func GetImageOverrides(ctx context.Context, c client.Client, registries []addonapiv1alpha1.ImageMirror, logger logr.Logger) (ImageOverrides, error) {

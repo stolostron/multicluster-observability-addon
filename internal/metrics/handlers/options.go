@@ -6,6 +6,7 @@ import (
 	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
+	thanosv1alpha1 "github.com/thanos-community/thanos-operator/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 )
@@ -33,6 +34,19 @@ type Options struct {
 	// prevents synchronization issues by ensuring the operator can watch these resources upon startup.
 	CRDEstablishedAnnotation string
 	ProxyConfig              addon.ProxyConfig
+
+	// Thanos holds the hub-only Thanos component specifications.
+	// These are only populated when IsHub is true and platform metrics collection is enabled.
+	Thanos ThanosOptions
+}
+
+// ThanosOptions holds the Thanos operator CR specs for hub deployment.
+type ThanosOptions struct {
+	Receive *thanosv1alpha1.ThanosReceive
+	Query   *thanosv1alpha1.ThanosQuery
+	Compact *thanosv1alpha1.ThanosCompact
+	Store   *thanosv1alpha1.ThanosStore
+	Ruler   *thanosv1alpha1.ThanosRuler
 }
 
 type Collector struct {
