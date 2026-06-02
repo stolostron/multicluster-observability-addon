@@ -21,7 +21,9 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
 	"open-cluster-management.io/addon-framework/pkg/agent"
+	addonutils "open-cluster-management.io/addon-framework/pkg/utils"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	fakeaddon "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
@@ -36,6 +38,13 @@ var (
 	_ = apiextensionsv1.AddToScheme(scheme.Scheme)
 	_ = uiplugin.AddToScheme(scheme.Scheme)
 )
+
+func newTestGetter(aodc *addonapiv1alpha1.AddOnDeploymentConfig) addonutils.AddOnDeploymentConfigGetter {
+	if aodc == nil {
+		return addonutils.NewAddOnDeploymentConfigGetter(fakeaddon.NewSimpleClientset())
+	}
+	return addonutils.NewAddOnDeploymentConfigGetter(fakeaddon.NewSimpleClientset(aodc))
+}
 
 func Test_Supported_Vendors(t *testing.T) {
 	for _, tc := range []struct {
@@ -186,7 +195,7 @@ func Test_Supported_Vendors(t *testing.T) {
 				Build()
 
 			loggingAgentAddon, err := addonfactory.NewAgentAddonFactory(addoncfg.Name, addon.FS, addoncfg.McoaChartDir).
-				WithGetValuesFuncs(GetValuesFunc(t.Context(), fakeKubeClient, logr.Discard())).
+				WithGetValuesFuncs(GetValuesFunc(t.Context(), fakeKubeClient, newTestGetter(addOnDeploymentConfig), logr.Discard())).
 				WithAgentRegistrationOption(&agent.RegistrationOption{}).
 				WithScheme(scheme.Scheme).
 				BuildHelmAgentAddon()
@@ -250,7 +259,7 @@ func TestRSOnlyBothDisabled_ManifestsNotEmpty(t *testing.T) {
 		Build()
 
 	agentAddon, err := addonfactory.NewAgentAddonFactory(addoncfg.Name, addon.FS, addoncfg.McoaChartDir).
-		WithGetValuesFuncs(GetValuesFunc(t.Context(), fakeKubeClient, logr.Discard())).
+		WithGetValuesFuncs(GetValuesFunc(t.Context(), fakeKubeClient, newTestGetter(addOnDeploymentConfig), logr.Discard())).
 		WithAgentRegistrationOption(&agent.RegistrationOption{}).
 		WithScheme(scheme.Scheme).
 		BuildHelmAgentAddon()

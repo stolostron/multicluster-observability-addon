@@ -18,6 +18,7 @@ import (
 	thandlers "github.com/stolostron/multicluster-observability-addon/internal/tracing/handlers"
 	tmanifests "github.com/stolostron/multicluster-observability-addon/internal/tracing/manifests"
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
+	addonutils "open-cluster-management.io/addon-framework/pkg/utils"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -33,7 +34,7 @@ type HelmChartValues struct {
 	ObsAPI      *omanifests.ObsAPIValues      `json:"obs-api,omitempty"`
 }
 
-func GetValuesFunc(ctx context.Context, k8s client.Client, logger logr.Logger) addonfactory.GetValuesFunc {
+func GetValuesFunc(ctx context.Context, k8s client.Client, getter addonutils.AddOnDeploymentConfigGetter, logger logr.Logger) addonfactory.GetValuesFunc {
 	return func(
 		cluster *clusterv1.ManagedCluster,
 		mcAddon *addonapiv1alpha1.ManagedClusterAddOn,
@@ -41,7 +42,7 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, logger logr.Logger) a
 		logger = logger.WithValues("cluster", cluster.Name)
 		logger.V(2).Info("reconciliation triggered")
 
-		aodc, err := common.GetAddOnDeploymentConfig(ctx, k8s, mcAddon)
+		aodc, err := common.GetAddOnDeploymentConfig(ctx, getter, mcAddon)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get AddOnDeploymentConfig: %w", err)
 		}

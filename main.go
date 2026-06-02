@@ -2,8 +2,11 @@ package main
 
 import (
 	"context"
+	"errors"
 	goflag "flag"
 	"fmt"
+	"net/http"
+	"net/http/pprof"
 	"os"
 
 	"github.com/ViaQ/logerr/v2/log"
@@ -25,6 +28,7 @@ import (
 	addonctrl "github.com/stolostron/multicluster-observability-addon/internal/controllers/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/controllers/resourcecreator"
 	"github.com/stolostron/multicluster-observability-addon/internal/controllers/watcher"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -38,7 +42,12 @@ import (
 	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 	workv1 "open-cluster-management.io/api/work/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
+	"sigs.k8s.io/controller-runtime/pkg/healthz"
+	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 )
+
 
 var scheme = runtime.NewScheme()
 
@@ -64,7 +73,11 @@ func init() {
 	// +kubebuilder:scaffold:scheme
 }
 
-var logVerbosity int
+var (
+	logVerbosity int
+	enablePprof  bool
+	pprofAddr    string
+)
 
 func main() {
 	pflag.CommandLine.SetNormalizeFunc(utilflag.WordSepNormalizeFunc)
@@ -109,6 +122,8 @@ func newControllerCommand() *cobra.Command {
 	cmd.Use = "controller"
 	cmd.Short = "Start the addon controller"
 	cmd.Flags().IntVar(&logVerbosity, "log-verbosity", 0, "Log verbosity level. The higher the level, the noisier the logs.")
+	cmd.Flags().BoolVar(&enablePprof, "enable-pprof", false, "Enable pprof profiling.")
+	cmd.Flags().StringVar(&pprofAddr, "pprof-addr", "127.0.0.1:6060", "The address the pprof server will bind to.")
 
 	return cmd
 }
@@ -117,34 +132,99 @@ func runControllers(ctx context.Context, kubeConfig *rest.Config) error {
 	logger := log.NewLogger("mcoa", log.WithVerbosity(logVerbosity))
 	ctrl.SetLogger(logger)
 
+	if enablePprof {
+		mux := http.NewServeMux()
+		mux.HandleFunc("/debug/pprof/", pprof.Index)
+		mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+		mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+		mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+		mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+
+		srv := &http.Server{
+			Addr:    pprofAddr,
+			Handler: mux,
+		}
+
+		go func() {
+			logger.Info("starting pprof server", "addr", pprofAddr)
+			if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+				logger.Error(err, "pprof server failed")
+			}
+		}()
+
+		go func() {
+			<-ctx.Done()
+			logger.Info("shutting down pprof server")
+			if err := srv.Shutdown(context.Background()); err != nil {
+				logger.Error(err, "failed to shutdown pprof server")
+			}
+		}()
+	} else {
+		logger.V(1).Info("pprof server disabled")
+	}
+
 	// Increase client-side throttling limits to support large number of managed clusters
 	kubeConfig.QPS = 50.0
 	kubeConfig.Burst = 100
 
-	mgr, err := addonctrl.NewAddonManager(ctx, kubeConfig, scheme, logger)
+	httpClient, err := rest.HTTPClientFor(kubeConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create HTTP client for kubeConfig: %w", err)
+	}
+
+	mapper, err := apiutil.NewDynamicRESTMapper(kubeConfig, httpClient)
+	if err != nil {
+		return fmt.Errorf("failed to create dynamic REST mapper: %w", err)
+	}
+
+	addonMgr, err := addonctrl.NewAddonManager(ctx, kubeConfig, scheme, logger, httpClient, mapper)
 	if err != nil {
 		return fmt.Errorf("failed to create addon manager: %w", err)
 	}
 
+	// Create a single shared controller-runtime Manager for our custom controllers
+	sharedMgr, err := ctrl.NewManager(kubeConfig, ctrl.Options{
+		Scheme: scheme,
+		Logger: logger.WithName("manager"),
+		MapperProvider: func(c *rest.Config, hc *http.Client) (meta.RESTMapper, error) {
+			return mapper, nil
+		},
+		Client: client.Options{
+			HTTPClient: httpClient,
+		},
+		Metrics: server.Options{
+			BindAddress: ":8084",
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("failed to start shared manager: %w", err)
+	}
+	if err = sharedMgr.AddHealthzCheck("health", healthz.Ping); err != nil {
+		return fmt.Errorf("failed to set up health check: %w", err)
+	}
+	if err = sharedMgr.AddReadyzCheck("check", healthz.Ping); err != nil {
+		return fmt.Errorf("failed to set up ready check: %w", err)
+	}
+
 	disableReconciliation := os.Getenv("DISABLE_WATCHER_CONTROLLER")
 	if disableReconciliation == "" {
-		var wm *watcher.WatcherManager
-		wm, err = watcher.NewWatcherManager(&mgr, scheme, logger)
-		if err != nil {
-			return fmt.Errorf("unable to create watcher manager: %w", err)
+		if err = watcher.SetupWithManager(sharedMgr, addonMgr, logger); err != nil {
+			return fmt.Errorf("unable to create watcher controller: %w", err)
 		}
-
-		wm.Start(ctx)
 	}
 
-	var rcm *resourcecreator.ResourceCreatorManager
-	rcm, err = resourcecreator.NewResourceCreatorManager(logger, scheme)
-	if err != nil {
-		return fmt.Errorf("unable to create resource creator manager: %w", err)
+	if err = resourcecreator.SetupWithManager(sharedMgr, logger); err != nil {
+		return fmt.Errorf("unable to create resource creator controller: %w", err)
 	}
-	rcm.Start(ctx)
 
-	err = mgr.Start(ctx)
+	go func() {
+		logger.Info("Starting shared controller-runtime manager")
+		if startErr := sharedMgr.Start(ctx); startErr != nil {
+			logger.Error(startErr, "shared manager exited with error")
+		}
+	}()
+
+	err = addonMgr.Start(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to start addon manager: %w", err)
 	}
