@@ -2,17 +2,12 @@
 # https://golangci-lint.run/usage/configuration/
 version: "2"
 linters:
-  default: standard # use default linters: errcheck, govet, ineffassign staticcheck unused
   enable:
-    - copyloopvar # catches accidental copies of loop variables, including aliases
+    - copyloopvar
     - err113 # checks that errors are wrapped according to go 1.13 error wrapping tools
-    - errorlint # checks modern error wrapping, comparisons, and assertions
     - misspell # spell checker
-    - modernize # suggests newer stdlib and language idioms when applicable
-    - nolintlint # validates nolint directives so they stay intentional
-    - revive # configurable style and correctness checks
+    - revive
     - rowserrcheck # checks whether Err of rows is checked successfully
-    - testifylint # catches common mistakes in testify assertions and tests
   settings:
     copyloopvar:
       check-alias: true
@@ -21,17 +16,16 @@ linters:
         - shadow
     misspell:
       locale: US
-      ignore-rules:
-        - utilisation
     revive:
       rules:
         - name: package-comments
           disabled: true
   exclusions:
-    generated: strict
-    warn-unused: true
-
-
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
 formatters:
   enable:
     - gci # Gci controls Go package import order and makes it always deterministic
@@ -46,14 +40,8 @@ formatters:
         - blank
         - dot
   exclusions:
-    generated: strict
-    warn-unused: true
-
-run:
-  timeout: 5m
-  relative-path-mode: cfg
-  modules-download-mode: readonly
-
-issues:
-  max-issues-per-linter: 0
-  max-same-issues: 0
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$

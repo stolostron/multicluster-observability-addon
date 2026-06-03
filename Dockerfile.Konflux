@@ -1,7 +1,7 @@
 # Copyright Contributors to the Open Cluster Management project
 # Licensed under the Apache License 2.0
 
-FROM brew.registry.redhat.io/rh-osbs/openshift-golang-builder:v1.25.7 AS builder
+FROM brew.registry.redhat.io/rh-osbs/openshift-golang-builder:v1.24.3-202506060640.ge53d574.el9 AS builder
 
 WORKDIR /workspace
 # Copy the Go Modules manifests
@@ -16,19 +16,13 @@ COPY main.go main.go
 COPY internal/ internal/
 
 # Build
-# Enable CGO for FIPS compliance (dynamic linking)
-RUN CGO_ENABLED=1 GOOS=linux GO111MODULE=on go build -mod=readonly -a -o multicluster-observability-addon main.go
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -mod=readonly -a -o multicluster-observability-addon main.go
 
-# IMPORTANT: When changing base image RHEL version (ubi9 → ubi10):
-# 1. Update FROM statement below
-# 2. Update 'name' label to match new destination repo (rhel9 → rhel10)
-# 3. Update 'cpe' label with correct RHEL version (::el9 → ::el10)
-# 4. Verify destination repository exists in registry.redhat.io
-# 5. Run 'make verify-containerfile-labels' to check consistency (if script exists)
 FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
 
 ARG VCS_REF
 ARG VCS_URL
+ARG IMAGE_NAME
 ARG IMAGE_DESCRIPTION
 ARG IMAGE_DISPLAY_NAME
 ARG IMAGE_NAME_ARCH
@@ -47,8 +41,7 @@ LABEL org.label-schema.vendor="Red Hat" \
     org.label-schema.vcs-url=$VCS_URL \
     org.label-schema.license="Red Hat Advanced Cluster Management for Kubernetes EULA" \
     org.label-schema.schema-version="1.0" \
-    name="rhacm2/acm-multicluster-observability-addon-rhel9" \
-    cpe="cpe:/a:redhat:acm:5.0::el9" \
+    name="$IMAGE_NAME" \
     maintainer="$IMAGE_MAINTAINER" \
     version="$IMAGE_VERSION" \
     release="$IMAGE_RELEASE" \
