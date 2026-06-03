@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	goflag "flag"
 	"fmt"
 	"net/http"
@@ -66,9 +67,11 @@ func init() {
 	// +kubebuilder:scaffold:scheme
 }
 
-var logVerbosity int
-var enablePprof bool
-var pprofAddr string
+var (
+	logVerbosity int
+	enablePprof  bool
+	pprofAddr    string
+)
 
 func main() {
 	pflag.CommandLine.SetNormalizeFunc(utilflag.WordSepNormalizeFunc)
@@ -138,7 +141,7 @@ func runControllers(ctx context.Context, kubeConfig *rest.Config) error {
 
 		go func() {
 			logger.Info("starting pprof server", "addr", pprofAddr)
-			if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 				logger.Error(err, "pprof server failed")
 			}
 		}()
