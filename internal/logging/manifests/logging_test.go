@@ -9,7 +9,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 )
 
 func Test_BuildSubscriptionChannel(t *testing.T) {
@@ -83,7 +83,7 @@ func Test_BuildSecrets(t *testing.T) {
 func Test_BuildCLFSpec(t *testing.T) {
 	var (
 		// Addon envinronment and registration
-		managedClusterAddOn *addonapiv1alpha1.ManagedClusterAddOn
+		managedClusterAddOn *addonapiv1beta1.ManagedClusterAddOn
 
 		// Addon configuration
 		clf *loggingv1.ClusterLogForwarder
@@ -91,15 +91,17 @@ func Test_BuildCLFSpec(t *testing.T) {
 
 	// Register the addon for the managed cluster
 	managedClusterAddOn = addontesting.NewAddon("test", "cluster-1")
-	managedClusterAddOn.Status.ConfigReferences = []addonapiv1alpha1.ConfigReference{
+	managedClusterAddOn.Status.ConfigReferences = []addonapiv1beta1.ConfigReference{
 		{
-			ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+			ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 				Group:    "observability.openshift.io",
 				Resource: "clusterlogforwarders",
 			},
-			ConfigReferent: addonapiv1alpha1.ConfigReferent{
-				Namespace: "open-cluster-management-observability",
-				Name:      "mcoa-instance",
+			DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+				ConfigReferent: addonapiv1beta1.ConfigReferent{
+					Namespace: "open-cluster-management-observability",
+					Name:      "mcoa-instance",
+				},
 			},
 		},
 	}

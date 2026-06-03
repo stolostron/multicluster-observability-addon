@@ -20,7 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -48,8 +48,8 @@ var mcoaAODCPredicate = builder.WithPredicates(predicate.Funcs{
 })
 
 func cmaoPlacementsChanged(old, new client.Object) bool {
-	oldCMAO := old.(*addonv1alpha1.ClusterManagementAddOn)
-	newCMAO := new.(*addonv1alpha1.ClusterManagementAddOn)
+	oldCMAO := old.(*addonv1beta1.ClusterManagementAddOn)
+	newCMAO := new.(*addonv1beta1.ClusterManagementAddOn)
 	return !equality.Semantic.DeepEqual(oldCMAO.Spec.InstallStrategy.Placements, newCMAO.Spec.InstallStrategy.Placements)
 }
 
@@ -131,7 +131,7 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 	// Fetch the AddOnDeploymentConfig instance and transform it into the Options struct
 	key := client.ObjectKey{Namespace: req.Namespace, Name: req.Name}
-	aodc := &addonv1alpha1.AddOnDeploymentConfig{}
+	aodc := &addonv1beta1.AddOnDeploymentConfig{}
 	if err := r.Get(ctx, key, aodc); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to get the AddOnDeploymentConfig: %w", err)
 	}
@@ -141,7 +141,7 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 
 	key = client.ObjectKey{Name: addoncfg.Name}
-	cmao := &addonv1alpha1.ClusterManagementAddOn{}
+	cmao := &addonv1beta1.ClusterManagementAddOn{}
 	if err = r.Get(ctx, key, cmao); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to get the ClusterManagementAddOn: %w", err)
 	}
@@ -181,7 +181,7 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 
 	// Retrieve the updated ClusterManagementAddOn with current default configs
-	cmao = &addonv1alpha1.ClusterManagementAddOn{}
+	cmao = &addonv1beta1.ClusterManagementAddOn{}
 	if err := r.Get(ctx, types.NamespacedName{Name: addoncfg.Name}, cmao); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to get ClusterManagementAddOn: %w", err)
 	}
@@ -195,9 +195,9 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 // SetupWithManager sets up the controller with the Manager.
 func (r *ResourceCreatorReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&addonv1alpha1.AddOnDeploymentConfig{}, mcoaAODCPredicate).
+		For(&addonv1beta1.AddOnDeploymentConfig{}, mcoaAODCPredicate).
 		// Trigger reconciliations due to changes in Placements
-		Watches(&addonv1alpha1.ClusterManagementAddOn{}, r.enqueueAODC(), cmaoPredicate).
+		Watches(&addonv1beta1.ClusterManagementAddOn{}, r.enqueueAODC(), cmaoPredicate).
 		// Trigger reconciliations if the pool of ManagedClusters changes
 		Watches(&clusterv1.ManagedCluster{}, r.enqueueAODC(), builder.OnlyMetadata).
 		// Trigger reconciliations if the metrics configuration resources change

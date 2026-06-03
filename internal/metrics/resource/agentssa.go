@@ -13,12 +13,12 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
-	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 )
 
 // NewDefaultPrometheusAgent generates the default prometheusAgent resource containing sensible
 // defaults that can be overridden by the user.
-func NewDefaultPrometheusAgent(ns, name string, isUWL bool, placementRef addonv1alpha1.PlacementRef) *cooprometheusv1alpha1.PrometheusAgent {
+func NewDefaultPrometheusAgent(ns, name string, isUWL bool, placementRef addonv1beta1.PlacementRef) *cooprometheusv1alpha1.PrometheusAgent {
 	agent := &cooprometheusv1alpha1.PrometheusAgent{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       cooprometheusv1alpha1.PrometheusAgentsKind,
@@ -64,7 +64,7 @@ func NewDefaultPrometheusAgent(ns, name string, isUWL bool, placementRef addonv1
 	return agent
 }
 
-func makeConfigResourceLabels(isUWL bool, placementRef addonv1alpha1.PlacementRef) map[string]string {
+func makeConfigResourceLabels(isUWL bool, placementRef addonv1beta1.PlacementRef) map[string]string {
 	appName := config.PlatformMetricsCollectorApp
 	if isUWL {
 		appName = config.UserWorkloadMetricsCollectorApp

@@ -7,7 +7,7 @@ import (
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	corev1 "k8s.io/api/core/v1"
-	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 )
 
 type Options struct {
@@ -26,7 +26,7 @@ type Options struct {
 	COOIsSubscribed      bool
 	Tolerations          []corev1.Toleration
 	NodeSelector         map[string]string
-	ResourceReqs         []addonv1alpha1.ContainerResourceRequirements
+	ResourceReqs         []addonv1beta1.ContainerResourceRequirements
 	NodeExporter         addon.NodeExporterOptions
 	// CRDEstablishedAnnotation is injected into the Prometheus Operator Deployment to trigger a
 	// restart when optional CRDs (PrometheusAgent, ScrapeConfig) become available. This

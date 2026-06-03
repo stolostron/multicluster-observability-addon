@@ -19,7 +19,7 @@ import (
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	"open-cluster-management.io/addon-framework/pkg/utils"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	v1 "open-cluster-management.io/api/cluster/v1"
 	workv1 "open-cluster-management.io/api/work/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -47,8 +47,8 @@ var (
 
 func NewRegistrationOption(agentName string) *agent.RegistrationOption {
 	return &agent.RegistrationOption{
-		CSRConfigurations: agent.KubeClientSignerConfigurations(addoncfg.Name, agentName),
-		CSRApproveCheck:   utils.DefaultCSRApprover(agentName),
+		Configurations:  agent.KubeClientSignerConfigurations(addoncfg.Name, agentName),
+		CSRApproveCheck: utils.DefaultCSRApprover(agentName),
 	}
 }
 
@@ -62,7 +62,7 @@ func HealthProber(k8s client.Client, logger logr.Logger) *agent.HealthProber {
 		Type: agent.HealthProberTypeWork,
 		WorkProber: &agent.WorkHealthProber{
 			ProbeFields: probeFields,
-			HealthChecker: func(fields []agent.FieldResult, mc *v1.ManagedCluster, mcao *addonapiv1alpha1.ManagedClusterAddOn) error {
+			HealthChecker: func(fields []agent.FieldResult, mc *v1.ManagedCluster, mcao *addonapiv1beta1.ManagedClusterAddOn) error {
 				if err := healthChecker(k8s, fields, mc, mcao); err != nil {
 					logger.V(1).Info("Health check failed for managed cluster", "clusterName", mc.Name, "error", err.Error())
 					return fmt.Errorf("healthChecker failed: %w", err)
@@ -328,7 +328,7 @@ func Updaters() []agent.Updater {
 	return updaters
 }
 
-func healthChecker(k8s client.Client, fields []agent.FieldResult, mc *v1.ManagedCluster, mcao *addonapiv1alpha1.ManagedClusterAddOn) error {
+func healthChecker(k8s client.Client, fields []agent.FieldResult, mc *v1.ManagedCluster, mcao *addonapiv1beta1.ManagedClusterAddOn) error {
 	if len(fields) == 0 {
 		return errMissingFields
 	}

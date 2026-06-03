@@ -46,7 +46,7 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	"open-cluster-management.io/addon-framework/pkg/utils"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	fakeaddon "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	workv1 "open-cluster-management.io/api/work/v1"
@@ -88,7 +88,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 		IsHub            bool
 		InstallNamespace string
 		ResourceReqs     bool
-		Registries       []addonapiv1alpha1.ImageMirror
+		Registries       []addonapiv1beta1.ImageMirror
 		NodeExporterOpts addon.NodeExporterOptions
 		Expects          func(*testing.T, []client.Object)
 	}{
@@ -504,7 +504,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 			UserMetrics:     false,
 			COOIsInstalled:  false,
 			IsOCP:           true,
-			Registries: []addonapiv1alpha1.ImageMirror{
+			Registries: []addonapiv1beta1.ImageMirror{
 				{
 					Source: "quay.io/prometheus/obo-operator",
 					Mirror: "my-registry.com/prometheus/obo-operator",
@@ -535,7 +535,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 	assert.NoError(t, prometheusv1.AddToScheme(scheme))
 	assert.NoError(t, cooprometheusv1.AddToScheme(scheme))
 	assert.NoError(t, clusterv1.AddToScheme(scheme))
-	assert.NoError(t, addonapiv1alpha1.AddToScheme(scheme))
+	assert.NoError(t, addonapiv1beta1.AddToScheme(scheme))
 	assert.NoError(t, workv1.AddToScheme(scheme))
 	assert.NoError(t, operatorv1.AddToScheme(scheme))
 	assert.NoError(t, hyperv1.AddToScheme(scheme))
@@ -602,7 +602,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 			defaultAgentResources = append(defaultAgentResources, clusterVersion)
 
 			// Add user workload resources
-			configReferences := []addonapiv1alpha1.ConfigReference{}
+			configReferences := []addonapiv1beta1.ConfigReference{}
 			for _, obj := range defaultAgentResources {
 				configReferences = append(configReferences, newConfigReference(obj))
 			}
@@ -695,7 +695,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 			if tc.ResourceReqs {
 				prometheusContainerID := "statefulsets:" + config.PlatformMetricsCollectorApp + ":prometheus"
 				operatorContainerID := "deployments:prometheus-operator:prometheus-operator"
-				aodc.Spec.ResourceRequirements = []addonapiv1alpha1.ContainerResourceRequirements{
+				aodc.Spec.ResourceRequirements = []addonapiv1beta1.ContainerResourceRequirements{
 					{
 						ContainerID: prometheusContainerID,
 						Resources: corev1.ResourceRequirements{
@@ -802,7 +802,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 
 			// Register the addon for the managed cluster
 			managedClusterAddOn := addontesting.NewAddon("test", "cluster-1")
-			managedClusterAddOn.Status.ConfigReferences = []addonapiv1alpha1.ConfigReference{}
+			managedClusterAddOn.Status.ConfigReferences = []addonapiv1beta1.ConfigReference{}
 			managedClusterAddOn.Status.ConfigReferences = append(managedClusterAddOn.Status.ConfigReferences, configReferences...)
 
 			// Wire everything together to a fake addon instance
@@ -822,7 +822,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 			}
 
 			// Render manifests and return them as k8s runtime objects
-			objects, err := agentAddon.Manifests(managedCluster, managedClusterAddOn)
+			objects, err := agentAddon.Manifests(t.Context(), managedCluster, managedClusterAddOn)
 			require.NoError(t, err)
 			clientObjs := runtimeToClientObjects(t, objects)
 
@@ -860,7 +860,7 @@ func TestHelmBuild_Metrics_HCP(t *testing.T) {
 	assert.NoError(t, cooprometheusv1.AddToScheme(scheme))
 	assert.NoError(t, clusterv1.AddToScheme(scheme))
 	assert.NoError(t, hyperv1.AddToScheme(scheme))
-	assert.NoError(t, addonapiv1alpha1.AddToScheme(scheme))
+	assert.NoError(t, addonapiv1beta1.AddToScheme(scheme))
 	assert.NoError(t, workv1.AddToScheme(scheme))
 	assert.NoError(t, operatorv1.AddToScheme(scheme))
 
@@ -870,7 +870,7 @@ func TestHelmBuild_Metrics_HCP(t *testing.T) {
 	// Add user workload resources
 	defaultAgentResources := []client.Object{}
 
-	configReferences := []addonapiv1alpha1.ConfigReference{}
+	configReferences := []addonapiv1beta1.ConfigReference{}
 	for _, obj := range defaultAgentResources {
 		configReferences = append(configReferences, newConfigReference(obj))
 	}
@@ -1093,7 +1093,7 @@ func TestHelmBuild_Metrics_HCP(t *testing.T) {
 
 	// Register the addon for the managed cluster
 	managedClusterAddOn := addontesting.NewAddon("test", "cluster-1")
-	managedClusterAddOn.Status.ConfigReferences = []addonapiv1alpha1.ConfigReference{}
+	managedClusterAddOn.Status.ConfigReferences = []addonapiv1beta1.ConfigReference{}
 	managedClusterAddOn.Status.ConfigReferences = append(managedClusterAddOn.Status.ConfigReferences, configReferences...)
 
 	// Wire everything together to a fake addon instance
@@ -1107,7 +1107,7 @@ func TestHelmBuild_Metrics_HCP(t *testing.T) {
 	}
 
 	// Render manifests and return them as k8s runtime objects
-	objects, err := agentAddon.Manifests(managedCluster, managedClusterAddOn)
+	objects, err := agentAddon.Manifests(t.Context(), managedCluster, managedClusterAddOn)
 	require.NoError(t, err)
 	clientObjs := runtimeToClientObjects(t, objects)
 
@@ -1124,18 +1124,18 @@ func TestHelmBuild_Metrics_HCP(t *testing.T) {
 	assert.Len(t, serviceMonitors[1].Spec.Endpoints, 1)
 }
 
-func newAddonDeploymentConfig() *addonapiv1alpha1.AddOnDeploymentConfig {
-	return &addonapiv1alpha1.AddOnDeploymentConfig{
+func newAddonDeploymentConfig() *addonapiv1beta1.AddOnDeploymentConfig {
+	return &addonapiv1beta1.AddOnDeploymentConfig{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "AddOnDeploymentConfig",
-			APIVersion: addonapiv1alpha1.GroupVersion.String(),
+			APIVersion: addonapiv1beta1.GroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "multicluster-observability-addon",
 			Namespace: "open-cluster-management-observability",
 		},
-		Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
-			CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
+		Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+			CustomizedVariables: []addonapiv1beta1.CustomizedVariable{
 				{
 					Name:  "loggingSubscriptionChannel",
 					Value: "stable-5.9",
@@ -1158,10 +1158,10 @@ func newSecret(name, ns string) *corev1.Secret {
 	}
 }
 
-func fakeGetValues(k8s client.Client, platformMetrics, userWorkloadMetrics bool, installNs string, resReqs []addonapiv1alpha1.ContainerResourceRequirements, registries []addonapiv1alpha1.ImageMirror, nodeExporterOpts addon.NodeExporterOptions) addonfactory.GetValuesFunc {
+func fakeGetValues(k8s client.Client, platformMetrics, userWorkloadMetrics bool, installNs string, resReqs []addonapiv1beta1.ContainerResourceRequirements, registries []addonapiv1beta1.ImageMirror, nodeExporterOpts addon.NodeExporterOptions) addonfactory.GetValuesFunc {
 	return func(
 		cluster *clusterv1.ManagedCluster,
-		mcAddon *addonapiv1alpha1.ManagedClusterAddOn,
+		mcAddon *addonapiv1beta1.ManagedClusterAddOn,
 	) (addonfactory.Values, error) {
 		optionsBuilder := handlers.OptionsBuilder{
 			Client: k8s,
@@ -1206,16 +1206,16 @@ func fakeGetValues(k8s client.Client, platformMetrics, userWorkloadMetrics bool,
 	}
 }
 
-func newConfigReference(obj client.Object) addonapiv1alpha1.ConfigReference {
+func newConfigReference(obj client.Object) addonapiv1beta1.ConfigReference {
 	resource := strings.ToLower(obj.GetObjectKind().GroupVersionKind().Kind) + "s"
 
-	return addonapiv1alpha1.ConfigReference{
-		ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+	return addonapiv1beta1.ConfigReference{
+		ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 			Group:    obj.GetObjectKind().GroupVersionKind().Group,
 			Resource: resource,
 		},
-		DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
-			ConfigReferent: addonapiv1alpha1.ConfigReferent{
+		DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+			ConfigReferent: addonapiv1beta1.ConfigReferent{
 				Namespace: obj.GetNamespace(),
 				Name:      obj.GetName(),
 			},
@@ -1262,17 +1262,17 @@ func newAddonOptions(platformEnabled, uwlEnabled bool) addon.Options {
 	}
 }
 
-func newCMOA() *addonapiv1alpha1.ClusterManagementAddOn {
-	return &addonapiv1alpha1.ClusterManagementAddOn{
+func newCMOA() *addonapiv1beta1.ClusterManagementAddOn {
+	return &addonapiv1beta1.ClusterManagementAddOn{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: addoncfg.Name,
 			UID:  types.UID("test-cmao-uid"),
 		},
-		Spec: addonapiv1alpha1.ClusterManagementAddOnSpec{
-			InstallStrategy: addonapiv1alpha1.InstallStrategy{
-				Placements: []addonapiv1alpha1.PlacementStrategy{
+		Spec: addonapiv1beta1.ClusterManagementAddOnSpec{
+			InstallStrategy: addonapiv1beta1.InstallStrategy{
+				Placements: []addonapiv1beta1.PlacementStrategy{
 					{
-						PlacementRef: addonapiv1alpha1.PlacementRef{
+						PlacementRef: addonapiv1beta1.PlacementRef{
 							Namespace: "placement-ns",
 							Name:      "placement-name",
 						},
@@ -1289,7 +1289,7 @@ func newManifestWork(name string, isOLMSubscrided bool) *workv1.ManifestWork {
 			Name:      name,
 			Namespace: name,
 			Labels: map[string]string{
-				addonapiv1alpha1.AddonLabelKey: addoncfg.Name,
+				addonapiv1beta1.AddonLabelKey: addoncfg.Name,
 			},
 		},
 		Status: workv1.ManifestWorkStatus{

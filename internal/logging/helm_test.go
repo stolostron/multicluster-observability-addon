@@ -21,7 +21,7 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	addonutils "open-cluster-management.io/addon-framework/pkg/utils"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	fakeaddon "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -32,15 +32,15 @@ var (
 	_ = loggingv1.AddToScheme(scheme.Scheme)
 	_ = operatorsv1.AddToScheme(scheme.Scheme)
 	_ = operatorsv1alpha1.AddToScheme(scheme.Scheme)
-	_ = addonapiv1alpha1.AddToScheme(scheme.Scheme)
+	_ = addonapiv1beta1.Install(scheme.Scheme)
 )
 
 func fakeGetValues(k8s client.Client) addonfactory.GetValuesFunc {
 	return func(
 		cluster *clusterv1.ManagedCluster,
-		mcAddon *addonapiv1alpha1.ManagedClusterAddOn,
+		mcAddon *addonapiv1beta1.ManagedClusterAddOn,
 	) (addonfactory.Values, error) {
-		aodc := &addonapiv1alpha1.AddOnDeploymentConfig{}
+		aodc := &addonapiv1beta1.AddOnDeploymentConfig{}
 		keys := common.GetObjectKeys(mcAddon.Status.ConfigReferences, addonutils.AddOnDeploymentConfigGVR.Group, addoncfg.AddonDeploymentConfigResource)
 		if err := k8s.Get(context.TODO(), keys[0], aodc, &client.GetOptions{}); err != nil {
 			return nil, err
@@ -72,7 +72,7 @@ func fakeGetValues(k8s client.Client) addonfactory.GetValuesFunc {
 	}
 }
 
-func newLoggingAgentAddon(initObjects []client.Object, addOnDeploymentConfig *addonapiv1alpha1.AddOnDeploymentConfig) agent.AgentAddon {
+func newLoggingAgentAddon(initObjects []client.Object, addOnDeploymentConfig *addonapiv1beta1.AddOnDeploymentConfig) agent.AgentAddon {
 	initObjects = append(initObjects, addOnDeploymentConfig)
 	// Setup the fake k8s client with all objects
 	fakeKubeClient := fake.NewClientBuilder().
@@ -99,20 +99,16 @@ func newLoggingAgentAddon(initObjects []client.Object, addOnDeploymentConfig *ad
 	return loggingAgentAddon
 }
 
-func newMCAOUnmanagedScenario() *addonapiv1alpha1.ManagedClusterAddOn {
+func newMCAOUnmanagedScenario() *addonapiv1beta1.ManagedClusterAddOn {
 	managedClusterAddOn := addontesting.NewAddon("test", "cluster-1")
-	managedClusterAddOn.Status.ConfigReferences = []addonapiv1alpha1.ConfigReference{
+	managedClusterAddOn.Status.ConfigReferences = []addonapiv1beta1.ConfigReference{
 		{
-			ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+			ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 				Group:    "addon.open-cluster-management.io",
 				Resource: "addondeploymentconfigs",
 			},
-			ConfigReferent: addonapiv1alpha1.ConfigReferent{
-				Namespace: "open-cluster-management-observability",
-				Name:      "multicluster-observability-addon",
-			},
-			DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
-				ConfigReferent: addonapiv1alpha1.ConfigReferent{
+			DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+				ConfigReferent: addonapiv1beta1.ConfigReferent{
 					Namespace: "open-cluster-management-observability",
 					Name:      "multicluster-observability-addon",
 				},
@@ -120,13 +116,15 @@ func newMCAOUnmanagedScenario() *addonapiv1alpha1.ManagedClusterAddOn {
 			},
 		},
 		{
-			ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+			ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 				Group:    "observability.openshift.io",
 				Resource: "clusterlogforwarders",
 			},
-			ConfigReferent: addonapiv1alpha1.ConfigReferent{
-				Namespace: "open-cluster-management-observability",
-				Name:      "mcoa-instance",
+			DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+				ConfigReferent: addonapiv1beta1.ConfigReferent{
+					Namespace: "open-cluster-management-observability",
+					Name:      "mcoa-instance",
+				},
 			},
 		},
 	}
@@ -134,14 +132,14 @@ func newMCAOUnmanagedScenario() *addonapiv1alpha1.ManagedClusterAddOn {
 	return managedClusterAddOn
 }
 
-func newAODCUnmanagedScenario() *addonapiv1alpha1.AddOnDeploymentConfig {
-	addOnDeploymentConfig := &addonapiv1alpha1.AddOnDeploymentConfig{
+func newAODCUnmanagedScenario() *addonapiv1beta1.AddOnDeploymentConfig {
+	addOnDeploymentConfig := &addonapiv1beta1.AddOnDeploymentConfig{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "multicluster-observability-addon",
 			Namespace: "open-cluster-management-observability",
 		},
-		Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
-			CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
+		Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+			CustomizedVariables: []addonapiv1beta1.CustomizedVariable{
 				{
 					Name:  "openshiftLoggingChannel",
 					Value: "latest-version",
@@ -325,7 +323,7 @@ func Test_Logging_Unmanaged_CLF(t *testing.T) {
 	loggingAgentAddon := newLoggingAgentAddon([]client.Object{managedClusterAddOn, clf, staticCred, caConfigMap}, addOnDeploymentConfig)
 
 	// Render manifests and return them as k8s runtime objects
-	objects, err := loggingAgentAddon.Manifests(managedCluster, managedClusterAddOn)
+	objects, err := loggingAgentAddon.Manifests(t.Context(), managedCluster, managedClusterAddOn)
 	require.NoError(t, err)
 	require.Len(t, objects, 11)
 
@@ -433,7 +431,7 @@ func Test_Logging_Unmanaged(t *testing.T) {
 			logginAgentAddon := newLoggingAgentAddon(initObjects, addOnDeploymentConfig)
 
 			// Render manifests and return them as k8s runtime objects
-			objects, err := logginAgentAddon.Manifests(managedCluster, managedClusterAddOn)
+			objects, err := logginAgentAddon.Manifests(t.Context(), managedCluster, managedClusterAddOn)
 			require.NoError(t, err)
 			require.Len(t, objects, tc.nbExptedObjects)
 		})
