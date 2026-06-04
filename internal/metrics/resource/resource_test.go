@@ -865,7 +865,7 @@ func TestGetPrometheusRules(t *testing.T) {
 func newTestScheme() *runtime.Scheme {
 	s := runtime.NewScheme()
 	_ = kubescheme.AddToScheme(s)
-	_ = addonv1beta1.AddToScheme(s)
+	_ = addonv1beta1.Install(s)
 	_ = cooprometheusv1alpha1.AddToScheme(s)
 	_ = cooprometheusv1.AddToScheme(s)
 	_ = prometheusv1.AddToScheme(s)

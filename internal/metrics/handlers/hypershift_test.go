@@ -25,7 +25,7 @@ func TestHypershift_Nominal(t *testing.T) {
 	require.NoError(t, hyperv1.AddToScheme(scheme))
 	require.NoError(t, prometheusv1.AddToScheme(scheme))
 	require.NoError(t, cooprometheusv1alpha1.AddToScheme(scheme))
-	require.NoError(t, clusterv1.AddToScheme(scheme))
+	require.NoError(t, clusterv1.Install(scheme))
 
 	mc := &clusterv1.ManagedCluster{
 		ObjectMeta: metav1.ObjectMeta{
@@ -41,7 +41,7 @@ func TestHypershift_Nominal(t *testing.T) {
 			Params: map[string][]string{
 				"match[]": {
 					`{__name__=":node_memory_MemAvailable_bytes:sum"}`, // ignore rules
-					`{__name__=~"acm_"}`, // ignore regex
+					`{__name__=~"acm_"}`,                               // ignore regex
 					`{__name__="acm_managed_cluster_labels"}`,
 				},
 			},
@@ -68,7 +68,7 @@ func TestHypershift_Nominal(t *testing.T) {
 			Params: map[string][]string{
 				"match[]": {
 					`{__name__=":node_memory_MemAvailable_bytes:sum"}`, // ignore rules
-					`{__name__=~"acm_"}`, // ignore regex
+					`{__name__=~"acm_"}`,                               // ignore regex
 					`{__name__="grpc_server_handled_total"}`,
 				},
 			},
@@ -210,7 +210,7 @@ func TestHypershift_NoScrapeConfigsAndRules(t *testing.T) {
 	require.NoError(t, hyperv1.AddToScheme(scheme))
 	require.NoError(t, prometheusv1.AddToScheme(scheme))
 	require.NoError(t, cooprometheusv1alpha1.AddToScheme(scheme))
-	require.NoError(t, clusterv1.AddToScheme(scheme))
+	require.NoError(t, clusterv1.Install(scheme))
 
 	hostedCluster := &hyperv1.HostedCluster{
 		ObjectMeta: metav1.ObjectMeta{
@@ -244,7 +244,7 @@ func TestHypershift_NoHypershiftServiceMonitors(t *testing.T) {
 	require.NoError(t, hyperv1.AddToScheme(scheme))
 	require.NoError(t, prometheusv1.AddToScheme(scheme))
 	require.NoError(t, cooprometheusv1alpha1.AddToScheme(scheme))
-	require.NoError(t, clusterv1.AddToScheme(scheme))
+	require.NoError(t, clusterv1.Install(scheme))
 
 	hostedCluster := &hyperv1.HostedCluster{
 		ObjectMeta: metav1.ObjectMeta{
@@ -263,7 +263,7 @@ func TestHypershift_NoHypershiftServiceMonitors(t *testing.T) {
 			Params: map[string][]string{
 				"match[]": {
 					`{__name__=":node_memory_MemAvailable_bytes:sum"}`, // ignore rules
-					`{__name__=~"acm_"}`, // ignore regex
+					`{__name__=~"acm_"}`,                               // ignore regex
 					`{__name__="grpc_server_handled_total"}`,
 				},
 			},
@@ -275,7 +275,7 @@ func TestHypershift_NoHypershiftServiceMonitors(t *testing.T) {
 			Params: map[string][]string{
 				"match[]": {
 					`{__name__=":node_memory_MemAvailable_bytes:sum"}`, // ignore rules
-					`{__name__=~"acm_"}`, // ignore regex
+					`{__name__=~"acm_"}`,                               // ignore regex
 					`{__name__="acm_managed_cluster_labels"}`,
 				},
 			},
@@ -325,7 +325,7 @@ func TestHypershift_ExtractDependentMetrics(t *testing.T) {
 					Params: map[string][]string{
 						"match[]": {
 							`{__name__=":node_memory_MemAvailable_bytes:sum"}`, // ignore rules
-							`{__name__=~"acm_"}`, // ignore regex
+							`{__name__=~"acm_"}`,                               // ignore regex
 							`{__name__="acm_managed_cluster_labels"}`,
 							`{__name__="active_streams_lease:grpc_server_handled_total:sum"}`,
 						},

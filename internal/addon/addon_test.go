@@ -30,7 +30,7 @@ func Test_AgentHealthProber_PPA(t *testing.T) {
 	addPlatformMetricsCustomizedVariables(aodc)
 	addAODCConfigReference(managedClusterAddOn, aodc)
 	scheme := runtime.NewScheme()
-	require.NoError(t, addonapiv1beta1.AddToScheme(scheme))
+	require.NoError(t, addonapiv1beta1.Install(scheme))
 
 	for _, tc := range []struct {
 		name        string
@@ -89,7 +89,7 @@ func Test_AgentHealthProber_PPA_UserWorkload(t *testing.T) {
 	addUserWorkloadMetricsCustomizedVariables(aodc)
 	addAODCConfigReference(managedClusterAddOn, aodc)
 	scheme := runtime.NewScheme()
-	require.NoError(t, addonapiv1beta1.AddToScheme(scheme))
+	require.NoError(t, addonapiv1beta1.Install(scheme))
 
 	for _, tc := range []struct {
 		name        string
@@ -160,7 +160,7 @@ func Test_AgentHealthProber_CLF(t *testing.T) {
 	addLoggingCustomizedVariables(aodc)
 	addAODCConfigReference(managedClusterAddOn, aodc)
 	scheme := runtime.NewScheme()
-	require.NoError(t, addonapiv1beta1.AddToScheme(scheme))
+	require.NoError(t, addonapiv1beta1.Install(scheme))
 
 	for _, tc := range []struct {
 		name        string
@@ -217,7 +217,7 @@ func Test_AgentHealthProber_OTELCol(t *testing.T) {
 	addTracingCustomizedVariables(aodc)
 	addAODCConfigReference(managedClusterAddOn, aodc)
 	scheme := runtime.NewScheme()
-	require.NoError(t, addonapiv1beta1.AddToScheme(scheme))
+	require.NoError(t, addonapiv1beta1.Install(scheme))
 
 	for _, tc := range []struct {
 		name        string
@@ -274,7 +274,7 @@ func Test_AgentHealthProber_UIPlugin(t *testing.T) {
 	addPlatformMetricsCustomizedVariables(aodc)
 	addAODCConfigReference(managedClusterAddOn, aodc)
 	scheme := runtime.NewScheme()
-	require.NoError(t, addonapiv1beta1.AddToScheme(scheme))
+	require.NoError(t, addonapiv1beta1.Install(scheme))
 
 	for _, tc := range []struct {
 		name        string
@@ -361,7 +361,7 @@ func Test_AgentHealthProber_MissingResources(t *testing.T) {
 	managedCluster := addontesting.NewManagedCluster("cluster-1")
 	managedClusterAddOn := addontesting.NewAddon("test", "cluster-1")
 	scheme := runtime.NewScheme()
-	require.NoError(t, addonapiv1beta1.AddToScheme(scheme))
+	require.NoError(t, addonapiv1beta1.Install(scheme))
 
 	t.Run("metrics enabled but missing prometheus agent", func(t *testing.T) {
 		aodc := newAddonDeploymentConfig()

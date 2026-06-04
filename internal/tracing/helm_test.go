@@ -197,7 +197,7 @@ func Test_Tracing_AllConfigsTogether_AllResources(t *testing.T) {
 		Build()
 
 	// Setup the fake addon client
-	fakeAddonClient = fakeaddon.NewSimpleClientset(addOnDeploymentConfig)
+	fakeAddonClient = fakeaddon.NewSimpleClientset(addOnDeploymentConfig) //nolint:staticcheck // NewClientset requires ApplyConfigurations which we don't have generated
 	addonConfigValuesFn := addonfactory.GetAddOnDeploymentConfigValues(
 		addonfactory.NewAddOnDeploymentConfigGetter(fakeAddonClient),
 		addonfactory.ToAddOnCustomizedVariableValues,

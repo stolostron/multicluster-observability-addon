@@ -81,7 +81,7 @@ func newCOOAgentAddon(initObjects []client.Object, addOnDeploymentConfig *addona
 		WithObjects(initObjects...).
 		Build()
 
-	fakeAddonClient := fakeaddon.NewSimpleClientset(addOnDeploymentConfig)
+	fakeAddonClient := fakeaddon.NewSimpleClientset(addOnDeploymentConfig) //nolint:staticcheck // NewClientset requires ApplyConfigurations which we don't have generated
 	addonConfigValuesFn := addonfactory.GetAddOnDeploymentConfigValues(
 		addonfactory.NewAddOnDeploymentConfigGetter(fakeAddonClient),
 		addonfactory.ToAddOnCustomizedVariableValues,

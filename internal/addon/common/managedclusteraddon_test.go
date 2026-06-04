@@ -102,7 +102,7 @@ func TestGetAddOnDeploymentConfig(t *testing.T) {
 				objs = append(objs, tt.existingAODC)
 			}
 			scheme := runtime.NewScheme()
-			require.NoError(t, addonapiv1beta1.AddToScheme(scheme))
+			require.NoError(t, addonapiv1beta1.Install(scheme))
 			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(objs...).Build()
 
 			// Call the function

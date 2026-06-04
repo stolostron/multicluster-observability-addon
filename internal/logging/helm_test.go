@@ -81,7 +81,7 @@ func newLoggingAgentAddon(initObjects []client.Object, addOnDeploymentConfig *ad
 		Build()
 
 	// Setup the fake addon client
-	fakeAddonClient := fakeaddon.NewSimpleClientset(addOnDeploymentConfig)
+	fakeAddonClient := fakeaddon.NewSimpleClientset(addOnDeploymentConfig) //nolint:staticcheck // NewClientset requires ApplyConfigurations which we don't have generated
 	addonConfigValuesFn := addonfactory.GetAddOnDeploymentConfigValues(
 		addonfactory.NewAddOnDeploymentConfigGetter(fakeAddonClient),
 		addonfactory.ToAddOnCustomizedVariableValues,

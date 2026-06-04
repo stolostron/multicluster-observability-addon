@@ -27,7 +27,7 @@ func TestCleanOrphanResources(t *testing.T) {
 
 	// Create a new scheme and add the types we need
 	scheme := runtime.NewScheme()
-	require.NoError(t, addonapiv1beta1.AddToScheme(scheme))
+	require.NoError(t, addonapiv1beta1.Install(scheme))
 	require.NoError(t, cooprometheusv1alpha1.AddToScheme(scheme))
 
 	tests := []struct {

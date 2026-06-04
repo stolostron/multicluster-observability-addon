@@ -534,9 +534,9 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 	assert.NoError(t, cooprometheusv1alpha1.AddToScheme(scheme))
 	assert.NoError(t, prometheusv1.AddToScheme(scheme))
 	assert.NoError(t, cooprometheusv1.AddToScheme(scheme))
-	assert.NoError(t, clusterv1.AddToScheme(scheme))
-	assert.NoError(t, addonapiv1beta1.AddToScheme(scheme))
-	assert.NoError(t, workv1.AddToScheme(scheme))
+	assert.NoError(t, clusterv1.Install(scheme))
+	assert.NoError(t, addonapiv1beta1.Install(scheme))
+	assert.NoError(t, workv1.Install(scheme))
 	assert.NoError(t, operatorv1.AddToScheme(scheme))
 	assert.NoError(t, hyperv1.AddToScheme(scheme))
 
@@ -754,7 +754,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				Build()
 
 			// Setup the fake addon client
-			addonClient := fakeaddon.NewSimpleClientset(aodc)
+			addonClient := fakeaddon.NewSimpleClientset(aodc) //nolint:staticcheck // NewClientset requires ApplyConfigurations which we don't have generated
 			addonConfigValuesFn := addonfactory.GetAddOnDeploymentConfigValues(
 				addonfactory.NewAddOnDeploymentConfigGetter(addonClient),
 				addonfactory.ToAddOnCustomizedVariableValues,
@@ -858,10 +858,10 @@ func TestHelmBuild_Metrics_HCP(t *testing.T) {
 	assert.NoError(t, cooprometheusv1alpha1.AddToScheme(scheme))
 	assert.NoError(t, prometheusv1.AddToScheme(scheme))
 	assert.NoError(t, cooprometheusv1.AddToScheme(scheme))
-	assert.NoError(t, clusterv1.AddToScheme(scheme))
+	assert.NoError(t, clusterv1.Install(scheme))
 	assert.NoError(t, hyperv1.AddToScheme(scheme))
-	assert.NoError(t, addonapiv1beta1.AddToScheme(scheme))
-	assert.NoError(t, workv1.AddToScheme(scheme))
+	assert.NoError(t, addonapiv1beta1.Install(scheme))
+	assert.NoError(t, workv1.Install(scheme))
 	assert.NoError(t, operatorv1.AddToScheme(scheme))
 
 	// installNamespace := "open-cluster-management-addon-observability"
@@ -1067,7 +1067,7 @@ func TestHelmBuild_Metrics_HCP(t *testing.T) {
 		Build()
 
 	// Setup the fake addon client
-	addonClient := fakeaddon.NewSimpleClientset(newAddonDeploymentConfig())
+	addonClient := fakeaddon.NewSimpleClientset(newAddonDeploymentConfig()) //nolint:staticcheck // NewClientset requires ApplyConfigurations which we don't have generated
 	addonConfigValuesFn := addonfactory.GetAddOnDeploymentConfigValues(
 		addonfactory.NewAddOnDeploymentConfigGetter(addonClient),
 		addonfactory.ToAddOnCustomizedVariableValues,
