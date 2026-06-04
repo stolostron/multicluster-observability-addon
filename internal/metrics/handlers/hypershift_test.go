@@ -112,8 +112,14 @@ func TestHypershift_Nominal(t *testing.T) {
 				{
 					Port:       "metrics",
 					TargetPort: &targetPort,
-					TLSConfig: &prometheusv1.TLSConfig{
-						CAFile: "cafile",
+					HTTPConfigWithProxyAndTLSFiles: prometheusv1.HTTPConfigWithProxyAndTLSFiles{
+						HTTPConfigWithTLSFiles: prometheusv1.HTTPConfigWithTLSFiles{
+							TLSConfig: &prometheusv1.TLSConfig{
+								TLSFilesConfig: prometheusv1.TLSFilesConfig{
+									CAFile: "cafile",
+								},
+							},
+						},
 					},
 				},
 			},
@@ -136,8 +142,14 @@ func TestHypershift_Nominal(t *testing.T) {
 				{
 					TargetPort: &targetPort,
 					Port:       "client",
-					TLSConfig: &prometheusv1.TLSConfig{
-						CAFile: "cafile",
+					HTTPConfigWithProxyAndTLSFiles: prometheusv1.HTTPConfigWithProxyAndTLSFiles{
+						HTTPConfigWithTLSFiles: prometheusv1.HTTPConfigWithTLSFiles{
+							TLSConfig: &prometheusv1.TLSConfig{
+								TLSFilesConfig: prometheusv1.TLSFilesConfig{
+									CAFile: "cafile",
+								},
+							},
+						},
 					},
 				},
 			},
