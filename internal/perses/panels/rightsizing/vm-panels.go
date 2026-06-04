@@ -331,6 +331,84 @@ func VMMemUnderestimationTablePanel(datasourceName string, project string) panel
 	)
 }
 
+func VMCPUForecastRecommendationTablePanel(datasourceName string) panelgroup.Option {
+	return panelgroup.AddPanel("VM CPU Forecast Recommendation",
+		panel.Description("CPU actual usage, forecasted usage, and recommendation per VM over the selected forecast lookback period"),
+		TableWithLinks(TablePluginSpec{
+			ColumnSettings: []ColumnSettingsWithLink{
+				{ColumnSettings: tablePanel.ColumnSettings{Name: "timestamp", Hide: true}},
+				{ColumnSettings: tablePanel.ColumnSettings{Name: "name_namespace", Hide: true}},
+				{ColumnSettings: tablePanel.ColumnSettings{Name: "name", Header: "VM Name", HeaderDescription: "Name of the Virtual Machine", EnableSorting: true}},
+				{ColumnSettings: tablePanel.ColumnSettings{Name: "namespace", Header: "Namespace", HeaderDescription: "Kubernetes namespace", EnableSorting: true}},
+				{ColumnSettings: tablePanel.ColumnSettings{
+					Name: "value #1", Header: "Actual CPU Usage", HeaderDescription: "Average CPU usage over the forecast lookback period",
+					EnableSorting: true, Sort: tablePanel.DescSort,
+					Format: &commonSdk.Format{Unit: &dashboards.DecimalUnit, DecimalPlaces: 2},
+				}},
+				{ColumnSettings: tablePanel.ColumnSettings{
+					Name: "value #2", Header: "Forecasted CPU", HeaderDescription: "Predicted CPU usage from the forecasting engine",
+					EnableSorting: true,
+					Format:        &commonSdk.Format{Unit: &dashboards.DecimalUnit, DecimalPlaces: 2},
+				}},
+				{ColumnSettings: tablePanel.ColumnSettings{
+					Name: "value #3", Header: "CPU Recommendation", HeaderDescription: "Recommended CPU based on forecast with safety margin",
+					EnableSorting: true,
+					Format:        &commonSdk.Format{Unit: &dashboards.DecimalUnit, DecimalPlaces: 2},
+				}},
+			},
+			CellSettings: []tablePanel.CellSettings{
+				{Condition: tablePanel.Condition{Kind: tablePanel.MiscConditionKind, Spec: &tablePanel.MiscConditionSpec{Value: tablePanel.NullValue}}, Text: "N/A"},
+			},
+			Transforms: []commonSdk.Transform{
+				{Kind: commonSdk.MergeSeriesKind, Spec: commonSdk.MergeSeriesSpec{}},
+			},
+			EnableFiltering: true,
+		}),
+		panel.AddQuery(query.PromQL(`label_join(avg_over_time(sum by (name, namespace)(acm_rs_vm:namespace:cpu_usage{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$forecast_days:]), "name_namespace", "-", "name", "namespace")`, dashboards.AddQueryDataSource(datasourceName))),
+		panel.AddQuery(query.PromQL(`label_join(max by (name, namespace)(acm_rs:prediction_forecast_vm_cpu{cluster="$cluster", namespace=~"$namespace"}), "name_namespace", "-", "name", "namespace")`, dashboards.AddQueryDataSource(datasourceName))),
+		panel.AddQuery(query.PromQL(`label_join(sum by (name, namespace)(acm_rs_vm:namespace:cpu_recommendation{cluster="$cluster", profile="$profile", namespace=~"$namespace"}), "name_namespace", "-", "name", "namespace")`, dashboards.AddQueryDataSource(datasourceName))),
+	)
+}
+
+func VMMemForecastRecommendationTablePanel(datasourceName string) panelgroup.Option {
+	return panelgroup.AddPanel("VM Memory Forecast Recommendation",
+		panel.Description("Memory actual usage, forecasted usage, and recommendation per VM over the selected forecast lookback period"),
+		TableWithLinks(TablePluginSpec{
+			ColumnSettings: []ColumnSettingsWithLink{
+				{ColumnSettings: tablePanel.ColumnSettings{Name: "timestamp", Hide: true}},
+				{ColumnSettings: tablePanel.ColumnSettings{Name: "name_namespace", Hide: true}},
+				{ColumnSettings: tablePanel.ColumnSettings{Name: "name", Header: "VM Name", HeaderDescription: "Name of the Virtual Machine", EnableSorting: true}},
+				{ColumnSettings: tablePanel.ColumnSettings{Name: "namespace", Header: "Namespace", HeaderDescription: "Kubernetes namespace", EnableSorting: true}},
+				{ColumnSettings: tablePanel.ColumnSettings{
+					Name: "value #1", Header: "Actual Memory Usage", HeaderDescription: "Average memory usage over the forecast lookback period",
+					EnableSorting: true, Sort: tablePanel.DescSort,
+					Format: &commonSdk.Format{Unit: &dashboards.BytesUnit, DecimalPlaces: 2},
+				}},
+				{ColumnSettings: tablePanel.ColumnSettings{
+					Name: "value #2", Header: "Forecasted Memory", HeaderDescription: "Predicted memory usage from the forecasting engine",
+					EnableSorting: true,
+					Format:        &commonSdk.Format{Unit: &dashboards.BytesUnit, DecimalPlaces: 2},
+				}},
+				{ColumnSettings: tablePanel.ColumnSettings{
+					Name: "value #3", Header: "Memory Recommendation", HeaderDescription: "Recommended memory based on forecast with safety margin",
+					EnableSorting: true,
+					Format:        &commonSdk.Format{Unit: &dashboards.BytesUnit, DecimalPlaces: 2},
+				}},
+			},
+			CellSettings: []tablePanel.CellSettings{
+				{Condition: tablePanel.Condition{Kind: tablePanel.MiscConditionKind, Spec: &tablePanel.MiscConditionSpec{Value: tablePanel.NullValue}}, Text: "N/A"},
+			},
+			Transforms: []commonSdk.Transform{
+				{Kind: commonSdk.MergeSeriesKind, Spec: commonSdk.MergeSeriesSpec{}},
+			},
+			EnableFiltering: true,
+		}),
+		panel.AddQuery(query.PromQL(`label_join(avg_over_time(sum by (name, namespace)(acm_rs_vm:namespace:memory_usage{cluster="$cluster", profile="$profile", namespace=~"$namespace"})[$forecast_days:]), "name_namespace", "-", "name", "namespace")`, dashboards.AddQueryDataSource(datasourceName))),
+		panel.AddQuery(query.PromQL(`label_join(max by (name, namespace)(acm_rs:prediction_forecast_vm_memory{cluster="$cluster", namespace=~"$namespace"}), "name_namespace", "-", "name", "namespace")`, dashboards.AddQueryDataSource(datasourceName))),
+		panel.AddQuery(query.PromQL(`label_join(sum by (name, namespace)(acm_rs_vm:namespace:memory_recommendation{cluster="$cluster", profile="$profile", namespace=~"$namespace"}), "name_namespace", "-", "name", "namespace")`, dashboards.AddQueryDataSource(datasourceName))),
+	)
+}
+
 // --- VM Overestimation / Underestimation Detail Dashboard panels ---
 
 var overestDetailRedThreshold = &commonSdk.Thresholds{

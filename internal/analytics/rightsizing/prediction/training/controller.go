@@ -224,26 +224,26 @@ func (c *Controller) trainOneSeries(ctx context.Context, series DataPointSeries)
 	}
 	newMAPE := ComputeMAPE(testPts, predPts)
 
-	if !ValidateTrainingResult(oldMAPE, newMAPE) {
-		return
-	}
-
-	weights := map[string]float64{}
-	if ex, err := prov.Explain(ctx, prediction.ForecastRequest{Points: trainPts, Horizon: 1, Interval: interval}); err == nil {
-		if w, ok := ex["weights"].(map[string]float64); ok {
-			weights = w
-		}
-	}
-
-	ns := &ModelState{
-		Weights:       weights,
-		LastMAPE:      newMAPE,
-		LastTrainedAt: time.Now().UTC(),
-		Config:        c.config.ModelConfig,
-	}
+	improved := ValidateTrainingResult(oldMAPE, newMAPE)
 
 	c.mu.Lock()
-	c.states[key] = ns
+	existing := c.states[key]
+	if improved {
+		weights := map[string]float64{}
+		if ex, err := prov.Explain(ctx, prediction.ForecastRequest{Points: trainPts, Horizon: 1, Interval: interval}); err == nil {
+			if w, ok := ex["weights"].(map[string]float64); ok {
+				weights = w
+			}
+		}
+		c.states[key] = &ModelState{
+			Weights:       weights,
+			LastMAPE:      newMAPE,
+			LastTrainedAt: time.Now().UTC(),
+			Config:        c.config.ModelConfig,
+		}
+	} else if existing != nil {
+		existing.LastTrainedAt = time.Now().UTC()
+	}
 	c.mu.Unlock()
 }
 

@@ -61,6 +61,17 @@ func withVMMemUnderestimationTableGroup(datasource string, project string) dashb
 	)
 }
 
+func withVMForecastRecommendationSection(datasource string) dashboard.Option {
+	return acmHelpers.AddCustomPanelGroup("Forecast Recommendations",
+		[]acmHelpers.GridItem{
+			{X: 0, Y: 0, W: 24, H: 10},
+			{X: 0, Y: 10, W: 24, H: 10},
+		},
+		panels.VMCPUForecastRecommendationTablePanel(datasource),
+		panels.VMMemForecastRecommendationTablePanel(datasource),
+	)
+}
+
 func withVMForecastSection(datasource string) dashboard.Option {
 	return acmHelpers.AddCustomPanelGroup("Forecasting",
 		[]acmHelpers.GridItem{
@@ -157,11 +168,24 @@ func BuildVMOverview(project string, datasource string, clusterLabelName string)
 			),
 		),
 
+		dashboard.AddVariable("forecast_days",
+			listVar.List(
+				staticListVar.StaticList(
+					staticListVar.Values("7d", "14d", "30d", "60d", "90d"),
+				),
+				listVar.DisplayName("Forecast Lookback"),
+				listVar.DefaultValue("7d"),
+				listVar.AllowAllValue(false),
+				listVar.AllowMultiple(false),
+			),
+		),
+
 		withVMOverviewStatsGroup(datasource),
 		withVMCPUOverestimationTableGroup(datasource, project),
 		withVMCPUUnderestimationTableGroup(datasource, project),
 		withVMMemOverestimationTableGroup(datasource, project),
 		withVMMemUnderestimationTableGroup(datasource, project),
+		withVMForecastRecommendationSection(datasource),
 		withVMForecastSection(datasource),
 	)
 }

@@ -205,6 +205,11 @@ func (e *ForecastExporter) Collect(ch chan<- prometheus.Metric) {
 			continue
 		}
 
+		lastVal := points[len(points)-1].Value
+		if lastVal <= 0 {
+			continue
+		}
+
 		forecastVal, anomaly, cerr := e.computeForecastAndAnomaly(st, points)
 		if cerr != nil {
 			e.opts.Logger.V(1).Info("forecast exporter: forecast failed", "key", key, "err", cerr)

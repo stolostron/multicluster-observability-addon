@@ -59,6 +59,21 @@ func withMemSection(datasource string, project string, linkToWorkload bool) dash
 	)
 }
 
+func withForecastRecommendationSection(datasource string) dashboard.Option {
+	return acmHelpers.AddCustomPanelGroup("Forecast Recommendations",
+		[]acmHelpers.GridItem{
+			{X: 0, Y: 0, W: 5, H: 4},
+			{X: 5, Y: 0, W: 5, H: 4},
+			{X: 0, Y: 4, W: 24, H: 10},
+			{X: 0, Y: 14, W: 24, H: 10},
+		},
+		panels.CPUClusterForecastPanel(datasource),
+		panels.MemClusterForecastPanel(datasource),
+		panels.CPUForecastRecommendationTablePanel(datasource),
+		panels.MemForecastRecommendationTablePanel(datasource),
+	)
+}
+
 func withForecastSection(datasource string) dashboard.Option {
 	return acmHelpers.AddCustomPanelGroup("Forecasting",
 		[]acmHelpers.GridItem{
@@ -149,8 +164,21 @@ func BuildNamespaceRightSizing(project string, datasource string, clusterLabelNa
 			),
 		),
 
+		dashboard.AddVariable("forecast_days",
+			listVar.List(
+				staticListVar.StaticList(
+					staticListVar.Values("7d", "14d", "30d", "60d", "90d"),
+				),
+				listVar.DisplayName("Forecast Lookback"),
+				listVar.DefaultValue("7d"),
+				listVar.AllowAllValue(false),
+				listVar.AllowMultiple(false),
+			),
+		),
+
 		withCPUSection(datasource, project, link),
 		withMemSection(datasource, project, link),
+		withForecastRecommendationSection(datasource),
 		withForecastSection(datasource),
 	)
 }

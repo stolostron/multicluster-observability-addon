@@ -160,24 +160,30 @@ func MemUtilizationPanel(datasourceName string) panelgroup.Option {
 func CPUForecastPanel(datasourceName string) panelgroup.Option {
 	return BuildStatPanel(datasourceName, StatPanelConfig{
 		Title:       "CPU Forecast",
-		Description: "Forecasted CPU usage for the selected cluster (sum of namespace-level forecasts)",
-		Query:       `sum(max by (namespace) (acm_rs:prediction_forecast_cpu{cluster="$cluster"} > 0))`,
-		Unit:        &dashboards.DecimalUnit,
-		Decimals:    2,
-		FontSize:    48,
-		Thresholds:  nsStatThreshold,
+		Description: "Forecasted CPU usage for the selected cluster (only namespaces with actual usage)",
+		Query: `sum(` +
+			`(max by (namespace) (acm_rs:prediction_forecast_cpu{cluster="$cluster"}) > 0) ` +
+			`and on (namespace) (max by (namespace) (acm_rs:namespace:cpu_usage{cluster="$cluster", profile="$profile"}) > 0)` +
+			`) or vector(0)`,
+		Unit:       &dashboards.DecimalUnit,
+		Decimals:   2,
+		FontSize:   48,
+		Thresholds: nsStatThreshold,
 	})
 }
 
 func MemForecastPanel(datasourceName string) panelgroup.Option {
 	return BuildStatPanel(datasourceName, StatPanelConfig{
 		Title:       "Memory Forecast",
-		Description: "Forecasted memory usage for the selected cluster (sum of namespace-level forecasts)",
-		Query:       `sum(max by (namespace) (acm_rs:prediction_forecast_memory{cluster="$cluster"} > 0))`,
-		Unit:        &dashboards.BytesUnit,
-		Decimals:    1,
-		FontSize:    40,
-		Thresholds:  nsStatThreshold,
+		Description: "Forecasted memory usage for the selected cluster (only namespaces with actual usage)",
+		Query: `sum(` +
+			`(max by (namespace) (acm_rs:prediction_forecast_memory{cluster="$cluster"}) > 0) ` +
+			`and on (namespace) (max by (namespace) (acm_rs:namespace:memory_usage{cluster="$cluster", profile="$profile"}) > 0)` +
+			`) or vector(0)`,
+		Unit:       &dashboards.BytesUnit,
+		Decimals:   1,
+		FontSize:   40,
+		Thresholds: nsStatThreshold,
 	})
 }
 
@@ -240,6 +246,128 @@ func MemTopNamespacesPanel(datasourceName string) panelgroup.Option {
 				`topk(20, sum by (namespace) (acm_rs:namespace:memory_usage{cluster="$cluster", profile="$profile"}) / sum by (namespace) (acm_rs:namespace:memory_request{cluster="$cluster", profile="$profile"}))`,
 				dashboards.AddQueryDataSource(datasourceName),
 				query.SeriesNameFormat("{{namespace}}"),
+			),
+		),
+	)
+}
+
+func CPUClusterForecastPanel(datasourceName string) panelgroup.Option {
+	return BuildStatPanel(datasourceName, StatPanelConfig{
+		Title:       "Cluster CPU Forecast",
+		Description: "Aggregated forecasted CPU usage across namespaces with actual usage in the selected cluster",
+		Query: `sum(` +
+			`(max by (namespace)(acm_rs:prediction_forecast_cpu{cluster="$cluster"}) > 0) ` +
+			`and on (namespace) (max by (namespace)(acm_rs:namespace:cpu_usage{cluster="$cluster", profile="$profile"}) > 0)` +
+			`) or vector(0)`,
+		Unit:       &dashboards.DecimalUnit,
+		Decimals:   2,
+		FontSize:   48,
+		Thresholds: nsStatThreshold,
+	})
+}
+
+func MemClusterForecastPanel(datasourceName string) panelgroup.Option {
+	return BuildStatPanel(datasourceName, StatPanelConfig{
+		Title:       "Cluster Memory Forecast",
+		Description: "Aggregated forecasted memory usage across namespaces with actual usage in the selected cluster",
+		Query: `sum(` +
+			`(max by (namespace)(acm_rs:prediction_forecast_memory{cluster="$cluster"}) > 0) ` +
+			`and on (namespace) (max by (namespace)(acm_rs:namespace:memory_usage{cluster="$cluster", profile="$profile"}) > 0)` +
+			`) or vector(0)`,
+		Unit:       &dashboards.BytesUnit,
+		Decimals:   1,
+		FontSize:   40,
+		Thresholds: nsStatThreshold,
+	})
+}
+
+func CPUForecastRecommendationTablePanel(datasourceName string) panelgroup.Option {
+	return panelgroup.AddPanel("CPU Forecast Recommendation",
+		panel.Description("CPU actual usage, forecasted usage, and recommendation per namespace over the selected forecast lookback period"),
+		TableWithLinks(TablePluginSpec{
+			ColumnSettings: []ColumnSettingsWithLink{
+				{ColumnSettings: tablePanel.ColumnSettings{Name: "timestamp", Hide: true}},
+				nsTblCol("namespace", "Namespace", tablePanel.LeftAlign, nil),
+				nsTblCol("value #1", "Actual CPU Usage", tablePanel.RightAlign,
+					&commonSdk.Format{Unit: &dashboards.DecimalUnit, DecimalPlaces: 2},
+					func(c *ColumnSettingsWithLink) { c.Sort = tablePanel.DescSort }),
+				nsTblCol("value #2", "Forecasted CPU", tablePanel.RightAlign,
+					&commonSdk.Format{Unit: &dashboards.DecimalUnit, DecimalPlaces: 2}),
+				nsTblCol("value #3", "CPU Recommendation", tablePanel.RightAlign,
+					&commonSdk.Format{Unit: &dashboards.DecimalUnit, DecimalPlaces: 2}),
+			},
+			CellSettings: []tablePanel.CellSettings{
+				{Condition: tablePanel.Condition{Kind: tablePanel.MiscConditionKind, Spec: &tablePanel.MiscConditionSpec{Value: tablePanel.NullValue}}, Text: "N/A"},
+			},
+			Transforms: []commonSdk.Transform{
+				{Kind: commonSdk.MergeSeriesKind, Spec: commonSdk.MergeSeriesSpec{}},
+				{Kind: commonSdk.JoinByColumValueKind, Spec: commonSdk.JoinByColumnValueSpec{Columns: []string{"namespace"}}},
+			},
+			EnableFiltering: true,
+		}),
+		panel.AddQuery(
+			query.PromQL(
+				`avg_over_time(sum by (namespace)(acm_rs:namespace:cpu_usage{cluster="$cluster", profile="$profile"})[$forecast_days:])`,
+				dashboards.AddQueryDataSource(datasourceName),
+			),
+		),
+		panel.AddQuery(
+			query.PromQL(
+				`max by (namespace)(acm_rs:prediction_forecast_cpu{cluster="$cluster"}) `+
+					`and on (namespace) (max by (namespace)(acm_rs:namespace:cpu_usage{cluster="$cluster", profile="$profile"}) >= 0)`,
+				dashboards.AddQueryDataSource(datasourceName),
+			),
+		),
+		panel.AddQuery(
+			query.PromQL(
+				`sum by (namespace)(acm_rs:namespace:cpu_recommendation{cluster="$cluster", profile="$profile"})`,
+				dashboards.AddQueryDataSource(datasourceName),
+			),
+		),
+	)
+}
+
+func MemForecastRecommendationTablePanel(datasourceName string) panelgroup.Option {
+	return panelgroup.AddPanel("Memory Forecast Recommendation",
+		panel.Description("Memory actual usage, forecasted usage, and recommendation per namespace over the selected forecast lookback period"),
+		TableWithLinks(TablePluginSpec{
+			ColumnSettings: []ColumnSettingsWithLink{
+				{ColumnSettings: tablePanel.ColumnSettings{Name: "timestamp", Hide: true}},
+				nsTblCol("namespace", "Namespace", tablePanel.LeftAlign, nil),
+				nsTblCol("value #1", "Actual Memory Usage", tablePanel.RightAlign,
+					&commonSdk.Format{Unit: &dashboards.BytesUnit, DecimalPlaces: 2},
+					func(c *ColumnSettingsWithLink) { c.Sort = tablePanel.DescSort }),
+				nsTblCol("value #2", "Forecasted Memory", tablePanel.RightAlign,
+					&commonSdk.Format{Unit: &dashboards.BytesUnit, DecimalPlaces: 2}),
+				nsTblCol("value #3", "Memory Recommendation", tablePanel.RightAlign,
+					&commonSdk.Format{Unit: &dashboards.BytesUnit, DecimalPlaces: 2}),
+			},
+			CellSettings: []tablePanel.CellSettings{
+				{Condition: tablePanel.Condition{Kind: tablePanel.MiscConditionKind, Spec: &tablePanel.MiscConditionSpec{Value: tablePanel.NullValue}}, Text: "N/A"},
+			},
+			Transforms: []commonSdk.Transform{
+				{Kind: commonSdk.MergeSeriesKind, Spec: commonSdk.MergeSeriesSpec{}},
+				{Kind: commonSdk.JoinByColumValueKind, Spec: commonSdk.JoinByColumnValueSpec{Columns: []string{"namespace"}}},
+			},
+			EnableFiltering: true,
+		}),
+		panel.AddQuery(
+			query.PromQL(
+				`avg_over_time(sum by (namespace)(acm_rs:namespace:memory_usage{cluster="$cluster", profile="$profile"})[$forecast_days:])`,
+				dashboards.AddQueryDataSource(datasourceName),
+			),
+		),
+		panel.AddQuery(
+			query.PromQL(
+				`max by (namespace)(acm_rs:prediction_forecast_memory{cluster="$cluster"}) `+
+					`and on (namespace) (max by (namespace)(acm_rs:namespace:memory_usage{cluster="$cluster", profile="$profile"}) >= 0)`,
+				dashboards.AddQueryDataSource(datasourceName),
+			),
+		),
+		panel.AddQuery(
+			query.PromQL(
+				`sum by (namespace)(acm_rs:namespace:memory_recommendation{cluster="$cluster", profile="$profile"})`,
+				dashboards.AddQueryDataSource(datasourceName),
 			),
 		),
 	)

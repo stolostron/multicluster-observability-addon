@@ -13,8 +13,10 @@ import (
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"github.com/stolostron/multicluster-observability-addon/internal/analytics/rightsizing"
+	rsgpu "github.com/stolostron/multicluster-observability-addon/internal/analytics/rightsizing/gpu"
 	rsnamespace "github.com/stolostron/multicluster-observability-addon/internal/analytics/rightsizing/namespace"
 	rsvirtualization "github.com/stolostron/multicluster-observability-addon/internal/analytics/rightsizing/virtualization"
+	rsworkload "github.com/stolostron/multicluster-observability-addon/internal/analytics/rightsizing/workload"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -120,6 +122,24 @@ func (o *OptionsBuilder) Build(ctx context.Context, cluster *clusterv1.ManagedCl
 		}
 	}
 
+	if workloadPodEnabled || gpuEnabled {
+		sharedConfigData := o.getSharedConfigData(ctx)
+		if workloadPodEnabled {
+			wlOpts, err := o.buildWorkloadOptionsFromConfig(sharedConfigData)
+			if err != nil {
+				return ret, fmt.Errorf("failed to build workload right-sizing options: %w", err)
+			}
+			ret.WorkloadPodRightSizing = wlOpts
+		}
+		if gpuEnabled {
+			gpuOpts, err := o.buildGPUOptionsFromConfig(sharedConfigData, workloadPodEnabled)
+			if err != nil {
+				return ret, fmt.Errorf("failed to build GPU right-sizing options: %w", err)
+			}
+			ret.GPURightSizing = gpuOpts
+		}
+	}
+
 	if opts.Platform.Metrics.CollectionEnabled {
 		ret.ScrapeConfig = rightsizing.GenerateScrapeConfig(nsMatched, virtMatched, workloadPodEnabled, gpuEnabled, predictionEnabled)
 	}
@@ -156,6 +176,39 @@ func (o *OptionsBuilder) buildVirtualizationOptionsFromConfig(configData rightsi
 	}
 	opts.PrometheusRules = []*monitoringv1.PrometheusRule{&rule}
 	return opts, nil
+}
+
+func (o *OptionsBuilder) buildWorkloadOptionsFromConfig(configData rightsizing.RSConfigMapData) (ComponentOptions, error) {
+	opts := ComponentOptions{Enabled: true}
+	rule, err := rsworkload.GeneratePrometheusRule(configData)
+	if err != nil {
+		return opts, fmt.Errorf("failed to generate workload PrometheusRule: %w", err)
+	}
+	opts.PrometheusRules = []*monitoringv1.PrometheusRule{&rule}
+	return opts, nil
+}
+
+func (o *OptionsBuilder) buildGPUOptionsFromConfig(configData rightsizing.RSConfigMapData, workloadPodAlsoEnabled bool) (ComponentOptions, error) {
+	opts := ComponentOptions{Enabled: true}
+	rule, err := rsgpu.GeneratePrometheusRuleWithMapping(configData, !workloadPodAlsoEnabled)
+	if err != nil {
+		return opts, fmt.Errorf("failed to generate GPU PrometheusRule: %w", err)
+	}
+	opts.PrometheusRules = []*monitoringv1.PrometheusRule{&rule}
+	return opts, nil
+}
+
+// getSharedConfigData returns the namespace RS config, falling back to defaults.
+// Workload and GPU rules share the same namespace filter and recommendation settings.
+func (o *OptionsBuilder) getSharedConfigData(ctx context.Context) rightsizing.RSConfigMapData {
+	data, err := o.getConfigData(ctx, rightsizing.NamespaceConfigMapName)
+	if err != nil {
+		return rightsizing.RSConfigMapData{
+			PrometheusRuleConfig:   rightsizing.GetDefaultRSPrometheusRuleConfig(),
+			PlacementConfiguration: rightsizing.GetDefaultRSPlacement(),
+		}
+	}
+	return data
 }
 
 func (o *OptionsBuilder) getConfigData(ctx context.Context, configMapName string) (rightsizing.RSConfigMapData, error) {

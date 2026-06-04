@@ -30,16 +30,17 @@ func TestBuildNamespaceRightSizing(t *testing.T) {
 	assert.Equal(t, "ACM Right-Sizing Namespace", spec.Display.Name)
 
 	t.Run("has expected variables", func(t *testing.T) {
-		require.Len(t, spec.Variables, 4, "expected cluster, profile, days, namespace")
+		require.Len(t, spec.Variables, 5, "expected cluster, profile, days, namespace, forecast_days")
 		varNames := extractVarNames(spec.Variables)
 		assert.Contains(t, varNames, "cluster")
 		assert.Contains(t, varNames, "profile")
 		assert.Contains(t, varNames, "days")
 		assert.Contains(t, varNames, "namespace")
+		assert.Contains(t, varNames, "forecast_days")
 	})
 
 	t.Run("has expected panel groups", func(t *testing.T) {
-		require.Len(t, spec.Layouts, 3, "CPU section + Memory section + Forecasting")
+		require.Len(t, spec.Layouts, 4, "CPU section + Memory section + Forecast Recommendations + Forecasting")
 	})
 
 	t.Run("panels reference the datasource", func(t *testing.T) {
@@ -110,17 +111,18 @@ func TestBuildVMOverview(t *testing.T) {
 	assert.Equal(t, "ACM Right-Sizing OpenShift Virtualization", spec.Display.Name)
 
 	t.Run("has expected variables", func(t *testing.T) {
-		require.Len(t, spec.Variables, 5, "expected cluster, profile, days, namespace, name")
+		require.Len(t, spec.Variables, 6, "expected cluster, profile, days, namespace, name, forecast_days")
 		varNames := extractVarNames(spec.Variables)
 		assert.Contains(t, varNames, "cluster")
 		assert.Contains(t, varNames, "profile")
 		assert.Contains(t, varNames, "days")
 		assert.Contains(t, varNames, "namespace")
 		assert.Contains(t, varNames, "name")
+		assert.Contains(t, varNames, "forecast_days")
 	})
 
 	t.Run("has expected panel groups", func(t *testing.T) {
-		require.Len(t, spec.Layouts, 6, "stats + 4 table groups + Forecasting")
+		require.Len(t, spec.Layouts, 7, "stats + 4 table groups + Forecast Recommendations + Forecasting")
 	})
 
 	t.Run("panels query acm_rs_vm metrics", func(t *testing.T) {
@@ -281,7 +283,7 @@ func TestBuildWorkloadPodRightSizing(t *testing.T) {
 	})
 
 	t.Run("has expected panel groups", func(t *testing.T) {
-		require.Len(t, spec.Layouts, 4, "CPU section + Memory section + Pods section + Forecasting")
+		require.Len(t, spec.Layouts, 5, "Namespace stats + CPU section + Memory section + Pods section + Forecasting")
 	})
 
 	t.Run("panels reference the datasource", func(t *testing.T) {

@@ -80,8 +80,18 @@ func BuildValues(opts addon.Options, installOfCOOOnTheHubIsNeeded bool, isHubClu
 		if opts.Platform.AnalyticsOptions.RightSizing.NamespaceEnabled ||
 			opts.Platform.AnalyticsOptions.RightSizing.PredictionEnabled {
 			rightSizingEnabled = true
-			analyticsDashboards = append(analyticsDashboards, buildNamespaceRSDashboards()...)
+			linkToWorkload := opts.Platform.AnalyticsOptions.RightSizing.WorkloadPodEnabled
+			analyticsDashboards = append(analyticsDashboards, buildNamespaceRSDashboards(linkToWorkload)...)
 			analyticsDashboards = append(analyticsDashboards, buildForecastingDashboards()...)
+		}
+		log.Printf("WorkloadPodEnabled=%v, NamespaceEnabled=%v, VirtualizationEnabled=%v, PredictionEnabled=%v",
+			opts.Platform.AnalyticsOptions.RightSizing.WorkloadPodEnabled,
+			opts.Platform.AnalyticsOptions.RightSizing.NamespaceEnabled,
+			opts.Platform.AnalyticsOptions.RightSizing.VirtualizationEnabled,
+			opts.Platform.AnalyticsOptions.RightSizing.PredictionEnabled)
+		if opts.Platform.AnalyticsOptions.RightSizing.WorkloadPodEnabled {
+			rightSizingEnabled = true
+			analyticsDashboards = append(analyticsDashboards, buildWorkloadRSDashboards()...)
 		}
 		if opts.Platform.AnalyticsOptions.RightSizing.VirtualizationEnabled {
 			rightSizingEnabled = true
@@ -185,11 +195,20 @@ func buildIncidentDetetctionDashboards() []DashboardValue {
 	return buildDashboards(builders, dsThanos, config.AnalyticsNamespace)
 }
 
-func buildNamespaceRSDashboards() []DashboardValue {
+func buildNamespaceRSDashboards(linkToWorkload bool) []DashboardValue {
 	builders := []DashboardBuilder{
 		{func(project, datasource, clusterLabelName string) (dashboard.Builder, error) {
-			return rsperses.BuildNamespaceRightSizing(project, datasource, clusterLabelName)
+			return rsperses.BuildNamespaceRightSizing(project, datasource, clusterLabelName, linkToWorkload)
 		}, "NamespaceRightSizing"},
+	}
+
+	return buildDashboards(builders, dsThanos, config.AnalyticsNamespace)
+}
+
+func buildWorkloadRSDashboards() []DashboardValue {
+	builders := []DashboardBuilder{
+		{rsperses.BuildWorkloadPodRightSizing, "WorkloadPodRightSizing"},
+		{rsperses.BuildWorkloadDetail, "WorkloadDetail"},
 	}
 
 	return buildDashboards(builders, dsThanos, config.AnalyticsNamespace)

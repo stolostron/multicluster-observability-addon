@@ -12,6 +12,8 @@ import (
 type RightSizingValues struct {
 	NamespaceRightSizing      *ComponentValues   `json:"namespaceRightSizing,omitempty"`
 	VirtualizationRightSizing *ComponentValues   `json:"virtRightSizing,omitempty"`
+	WorkloadPodRightSizing    *ComponentValues   `json:"workloadPodRightSizing,omitempty"`
+	GPURightSizing            *ComponentValues   `json:"gpuRightSizing,omitempty"`
 	Prediction                *PredictionValues  `json:"prediction,omitempty"`
 	ScrapeConfig              *ScrapeConfigValue `json:"scrapeConfig,omitempty"`
 }
@@ -124,46 +126,24 @@ func PredictionHubConfigBytes(opts Options) ([]byte, error) {
 
 // BuildValues builds the helm values from the right-sizing options
 func BuildValues(opts Options) (*RightSizingValues, error) {
-	if !opts.NamespaceRightSizing.Enabled && !opts.VirtualizationRightSizing.Enabled && !opts.PredictionEnabled {
+	if !opts.NamespaceRightSizing.Enabled && !opts.VirtualizationRightSizing.Enabled &&
+		!opts.WorkloadPodRightSizing.Enabled && !opts.GPURightSizing.Enabled && !opts.PredictionEnabled {
 		return nil, nil
 	}
 
 	ret := &RightSizingValues{}
 
-	// Build namespace right-sizing values
 	if opts.NamespaceRightSizing.Enabled {
-		nsValues := &ComponentValues{
-			Enabled: true,
-		}
-		for _, rule := range opts.NamespaceRightSizing.PrometheusRules {
-			ruleJSON, err := json.Marshal(rule.Spec)
-			if err != nil {
-				return nil, err
-			}
-			nsValues.Rules = append(nsValues.Rules, PrometheusRuleValue{
-				Name: rule.Name,
-				Data: string(ruleJSON),
-			})
-		}
-		ret.NamespaceRightSizing = nsValues
+		ret.NamespaceRightSizing = buildComponentValues(opts.NamespaceRightSizing)
 	}
-
-	// Build virtualization right-sizing values
 	if opts.VirtualizationRightSizing.Enabled {
-		virtValues := &ComponentValues{
-			Enabled: true,
-		}
-		for _, rule := range opts.VirtualizationRightSizing.PrometheusRules {
-			ruleJSON, err := json.Marshal(rule.Spec)
-			if err != nil {
-				return nil, err
-			}
-			virtValues.Rules = append(virtValues.Rules, PrometheusRuleValue{
-				Name: rule.Name,
-				Data: string(ruleJSON),
-			})
-		}
-		ret.VirtualizationRightSizing = virtValues
+		ret.VirtualizationRightSizing = buildComponentValues(opts.VirtualizationRightSizing)
+	}
+	if opts.WorkloadPodRightSizing.Enabled {
+		ret.WorkloadPodRightSizing = buildComponentValues(opts.WorkloadPodRightSizing)
+	}
+	if opts.GPURightSizing.Enabled {
+		ret.GPURightSizing = buildComponentValues(opts.GPURightSizing)
 	}
 
 	if opts.PredictionEnabled {
@@ -189,6 +169,18 @@ func BuildValues(opts Options) (*RightSizingValues, error) {
 	}
 
 	return ret, nil
+}
+
+func buildComponentValues(comp ComponentOptions) *ComponentValues {
+	cv := &ComponentValues{Enabled: true}
+	for _, rule := range comp.PrometheusRules {
+		ruleJSON, _ := json.Marshal(rule.Spec)
+		cv.Rules = append(cv.Rules, PrometheusRuleValue{
+			Name: rule.Name,
+			Data: string(ruleJSON),
+		})
+	}
+	return cv
 }
 
 // enrichScrapeConfigForPlatform sets the platform target, scheme, and scrape class

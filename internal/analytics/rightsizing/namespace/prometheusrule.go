@@ -110,6 +110,22 @@ func buildNamespaceRules5m(nsFilter string, rb *rightsizing.RuleBuilder) []monit
 				nsFilter,
 			),
 		),
+		rb.Rule(
+			"acm_rs:namespace:cpu_limit:5m",
+			fmt.Sprintf(
+				`max_over_time(sum(kube_pod_container_resource_limits{`+
+					`%s, resource="cpu", container!=""}) by (namespace)[5m:])`,
+				nsFilter,
+			),
+		),
+		rb.Rule(
+			"acm_rs:namespace:memory_limit:5m",
+			fmt.Sprintf(
+				`max_over_time(sum(kube_pod_container_resource_limits{`+
+					`%s, resource="memory", container!=""}) by (namespace)[5m:])`,
+				nsFilter,
+			),
+		),
 	}
 }
 
@@ -132,6 +148,8 @@ func buildNamespaceRules1d(configData rightsizing.RSConfigMapData, rb *rightsizi
 			prb.RuleWithLabels("acm_rs:namespace:memory_request", profile.AggExpr("acm_rs:namespace:memory_request:5m")),
 			prb.RuleWithLabels("acm_rs:namespace:memory_usage", profile.AggExpr("acm_rs:namespace:memory_usage:5m")),
 			prb.RuleWithLabels("acm_rs:namespace:memory_recommendation", rightsizing.BuildProfiledRecommendationExpr("acm_rs:namespace:memory_usage:5m", rp, profile)),
+			prb.RuleWithLabels("acm_rs:namespace:cpu_limit", profile.AggExpr("acm_rs:namespace:cpu_limit:5m")),
+			prb.RuleWithLabels("acm_rs:namespace:memory_limit", profile.AggExpr("acm_rs:namespace:memory_limit:5m")),
 		)
 	}
 	return rules
@@ -189,6 +207,22 @@ func buildClusterRules5m(nsFilter string, rb *rightsizing.RuleBuilder) []monitor
 				nsFilter,
 			),
 		),
+		rb.RuleNoJoin(
+			"acm_rs:cluster:cpu_limit:5m",
+			fmt.Sprintf(
+				`max_over_time(sum(kube_pod_container_resource_limits{`+
+					`%s, resource="cpu", container!=""}) by (cluster)[5m:])`,
+				nsFilter,
+			),
+		),
+		rb.RuleNoJoin(
+			"acm_rs:cluster:memory_limit:5m",
+			fmt.Sprintf(
+				`max_over_time(sum(kube_pod_container_resource_limits{`+
+					`%s, resource="memory", container!=""}) by (cluster)[5m:])`,
+				nsFilter,
+			),
+		),
 	}
 }
 
@@ -211,6 +245,8 @@ func buildClusterRules1d(configData rightsizing.RSConfigMapData, rb *rightsizing
 			prb.RuleWithLabels("acm_rs:cluster:memory_request", profile.AggExpr("acm_rs:cluster:memory_request:5m")),
 			prb.RuleWithLabels("acm_rs:cluster:memory_usage", profile.AggExpr("acm_rs:cluster:memory_usage:5m")),
 			prb.RuleWithLabels("acm_rs:cluster:memory_recommendation", rightsizing.BuildProfiledRecommendationExpr("acm_rs:cluster:memory_usage:5m", rp, profile)),
+			prb.RuleWithLabels("acm_rs:cluster:cpu_limit", profile.AggExpr("acm_rs:cluster:cpu_limit:5m")),
+			prb.RuleWithLabels("acm_rs:cluster:memory_limit", profile.AggExpr("acm_rs:cluster:memory_limit:5m")),
 		)
 	}
 	return rules

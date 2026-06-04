@@ -39,6 +39,10 @@ var NamespaceMetrics = []string{
 	"acm_rs:cluster:memory_request",
 	"acm_rs:cluster:memory_usage",
 	"acm_rs:cluster:memory_recommendation",
+	"acm_rs:namespace:cpu_limit",
+	"acm_rs:namespace:memory_limit",
+	"acm_rs:cluster:cpu_limit",
+	"acm_rs:cluster:memory_limit",
 }
 
 // VirtualizationMetrics are the metrics to federate for virtualization right-sizing

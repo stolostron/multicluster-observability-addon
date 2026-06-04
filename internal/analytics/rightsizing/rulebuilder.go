@@ -11,10 +11,11 @@ import (
 var (
 	// Duration5m is the evaluation interval for high-resolution metrics (5-minute aggregations)
 	Duration5m = monitoringv1.Duration("5m")
-	// Duration15m is the evaluation interval for daily aggregated metrics.
-	// Rules evaluate every 15 minutes but aggregate data over 1 day (via max_over_time(...[1d])).
-	// This provides fresh dashboard data without waiting a full day between evaluations.
-	Duration1d = monitoringv1.Duration("15m")
+	// Duration1d is the evaluation interval for daily aggregated metrics.
+	// Must be <= 5m to stay within the Prometheus default staleness window;
+	// otherwise the metrics collector federation misses data between evaluations.
+	// The 1-day aggregation window is in the PromQL subquery (e.g. [1d:15m]).
+	Duration1d = monitoringv1.Duration("5m")
 )
 
 // RuleBuilder provides common utilities for building PrometheusRule rules
