@@ -257,7 +257,7 @@ func getAnalyticsProbeFields() []agent.ProbeField {
 	}
 }
 
-func Updaters() []agent.Updater {
+func ManifestConfigs() []workv1.ManifestConfigOption {
 	crdNames := []string{
 		scrapeConfigCRDName,
 		prometheusAgentCRDName,
@@ -266,25 +266,30 @@ func Updaters() []agent.Updater {
 		probeCRDName,
 	}
 
-	updaters := make([]agent.Updater, len(crdNames))
+	manifestConfigs := make([]workv1.ManifestConfigOption, len(crdNames))
 	for i, crdName := range crdNames {
-		updaters[i] = agent.Updater{
-			UpdateStrategy: workv1.UpdateStrategy{
-				Type: workv1.UpdateStrategyTypeServerSideApply,
-				ServerSideApply: &workv1.ServerSideApplyConfig{
-					Force: false,
-				},
-			},
+		manifestConfigs[i] = workv1.ManifestConfigOption{
 			ResourceIdentifier: workv1.ResourceIdentifier{
 				Group:    apiextensionsv1.GroupName,
 				Resource: crdResourceName,
 				Name:     crdName,
 			},
+			UpdateStrategy: &workv1.UpdateStrategy{
+				Type: workv1.UpdateStrategyTypeServerSideApply,
+				ServerSideApply: &workv1.ServerSideApplyConfig{
+					Force: false,
+				},
+			},
 		}
 	}
 
-	updaters = append(updaters, agent.Updater{
-		UpdateStrategy: workv1.UpdateStrategy{
+	manifestConfigs = append(manifestConfigs, workv1.ManifestConfigOption{
+		ResourceIdentifier: workv1.ResourceIdentifier{
+			Group:    "",
+			Resource: "configmaps",
+			Name:     mconfig.PrometheusCAConfigMapName,
+		},
+		UpdateStrategy: &workv1.UpdateStrategy{
 			Type: workv1.UpdateStrategyTypeServerSideApply,
 			ServerSideApply: &workv1.ServerSideApplyConfig{
 				IgnoreFields: []workv1.IgnoreField{
@@ -295,37 +300,32 @@ func Updaters() []agent.Updater {
 				},
 			},
 		},
-		ResourceIdentifier: workv1.ResourceIdentifier{
-			Group:    "",
-			Resource: "configmaps",
-			Name:     mconfig.PrometheusCAConfigMapName,
-		},
 	})
-	updaters = append(updaters, agent.Updater{
-		UpdateStrategy: workv1.UpdateStrategy{
-			Type: workv1.UpdateStrategyTypeCreateOnly,
-		},
+	manifestConfigs = append(manifestConfigs, workv1.ManifestConfigOption{
 		ResourceIdentifier: workv1.ResourceIdentifier{
 			Group:    apiextensionsv1.GroupName,
 			Resource: crdResourceName,
 			Name:     mconfig.MonitoringStackCRDName,
 		},
+		UpdateStrategy: &workv1.UpdateStrategy{
+			Type: workv1.UpdateStrategyTypeCreateOnly,
+		},
 	})
 
-	updaters = append(updaters, agent.Updater{
-		UpdateStrategy: workv1.UpdateStrategy{
+	manifestConfigs = append(manifestConfigs, workv1.ManifestConfigOption{
+		ResourceIdentifier: workv1.ResourceIdentifier{
+			Group:    "",
+			Resource: "namespaces",
+		},
+		UpdateStrategy: &workv1.UpdateStrategy{
 			Type: workv1.UpdateStrategyTypeServerSideApply,
 			ServerSideApply: &workv1.ServerSideApplyConfig{
 				Force: false,
 			},
 		},
-		ResourceIdentifier: workv1.ResourceIdentifier{
-			Group:    "",
-			Resource: "namespaces",
-		},
 	})
 
-	return updaters
+	return manifestConfigs
 }
 
 func healthChecker(k8s client.Client, fields []agent.FieldResult, mc *v1.ManagedCluster, mcao *addonapiv1beta1.ManagedClusterAddOn) error {

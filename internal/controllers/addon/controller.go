@@ -101,7 +101,6 @@ func NewAddonManager(ctx context.Context, kubeConfig *rest.Config, scheme *runti
 	mcoaAgentAddon, err := addonfactory.NewAgentAddonFactory(addoncfg.Name, addon.FS, "manifests/charts/mcoa").
 		WithConfigGVRs(configGVRs...).
 		WithGetValuesFuncs(addonConfigValuesFn, addonhelm.GetValuesFunc(ctx, k8sClient, agentLogger)).
-		WithUpdaters(addon.Updaters()).
 		WithAgentHealthProber(addon.HealthProber(k8sClient, agentLogger)).
 		WithAgentRegistrationOption(registrationOption).
 		WithAgentDeployTriggerClusterFilter(func(old, new *clusterv1.ManagedCluster) bool {
@@ -180,5 +179,7 @@ func (a *AgentAddonWithSortedManifests) Manifests(ctx context.Context, cluster *
 }
 
 func (a *AgentAddonWithSortedManifests) GetAgentAddonOptions() agent.AgentAddonOptions {
-	return a.agent.GetAgentAddonOptions()
+	options := a.agent.GetAgentAddonOptions()
+	options.ManifestConfigs = addon.ManifestConfigs()
+	return options
 }
