@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	workv1 "open-cluster-management.io/api/work/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -54,7 +54,7 @@ func ListAddonManifestWorks(ctx context.Context, kubeClient client.Client, clust
 	listOpts := []client.ListOption{
 		client.InNamespace(clusterName),
 		client.MatchingLabels{
-			addonapiv1alpha1.AddonLabelKey: addonName,
+			addonapiv1beta1.AddonLabelKey: addonName,
 		},
 	}
 	err := kubeClient.List(ctx, workList, listOpts...)

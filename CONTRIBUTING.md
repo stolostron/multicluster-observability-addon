@@ -75,7 +75,7 @@ oc -n open-cluster-management-observability delete pod -l app=multicluster-obser
 The addon supports enabling observability capabilities using the resource `AddOnDeploymentConfig`. For instance, to enable platform and user workloads logging/tracing/instrumentation create the following resource on the hub cluster:
 
 ```yaml
-apiVersion: addon.open-cluster-management.io/v1alpha1
+apiVersion: addon.open-cluster-management.io/v1beta1
 kind: AddOnDeploymentConfig
 metadata:
   name: multicluster-observability-addon
@@ -103,7 +103,7 @@ Supported keys are:
 __Note__: Some keys can hold multiple values separated by semicolon to support multiple data collection capabilities in parallel, e.g:
 
 ```yaml
-apiVersion: addon.open-cluster-management.io/v1alpha1
+apiVersion: addon.open-cluster-management.io/v1beta1
 kind: AddOnDeploymentConfig
 metadata:
   name: multicluster-observability-addon

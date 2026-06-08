@@ -11,7 +11,7 @@ import (
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -24,7 +24,7 @@ var (
 
 func CreateOrUpdateWithAddOnOwner(ctx context.Context, logger logr.Logger, k8s client.Client, objs []client.Object) error {
 	// ClusterManagementAddOn as owner
-	owner := &addonapiv1alpha1.ClusterManagementAddOn{}
+	owner := &addonapiv1beta1.ClusterManagementAddOn{}
 	if err := k8s.Get(ctx, types.NamespacedName{Name: addoncfg.Name, Namespace: addoncfg.InstallNamespace}, owner); err != nil {
 		return err
 	}

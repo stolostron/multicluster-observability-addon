@@ -36,7 +36,6 @@ import (
 	logs "k8s.io/component-base/logs/api/v1"
 	cmdfactory "open-cluster-management.io/addon-framework/pkg/cmd/factory"
 	"open-cluster-management.io/addon-framework/pkg/version"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 	workv1 "open-cluster-management.io/api/work/v1"
@@ -47,7 +46,6 @@ var scheme = runtime.NewScheme()
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-	utilruntime.Must(addonapiv1alpha1.Install(scheme))
 	utilruntime.Must(workv1.Install(scheme))
 	utilruntime.Must(loggingv1.AddToScheme(scheme))
 	utilruntime.Must(otelv1beta1.AddToScheme(scheme))
