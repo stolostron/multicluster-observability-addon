@@ -25,7 +25,6 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	addonutils "open-cluster-management.io/addon-framework/pkg/utils"
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
-	fakeaddon "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -81,9 +80,9 @@ func newCOOAgentAddon(initObjects []client.Object, addOnDeploymentConfig *addona
 		WithObjects(initObjects...).
 		Build()
 
-	fakeAddonClient := fakeaddon.NewSimpleClientset(addOnDeploymentConfig) //nolint:staticcheck // NewClientset requires ApplyConfigurations which we don't have generated
+	getter := mockAODCGetter{addOnDeploymentConfig}
 	addonConfigValuesFn := addonfactory.GetAddOnDeploymentConfigValues(
-		addonfactory.NewAddOnDeploymentConfigGetter(fakeAddonClient),
+		getter,
 		addonfactory.ToAddOnCustomizedVariableValues,
 	)
 	ctx := context.Background()
@@ -299,4 +298,12 @@ func Test_IncidentDetection_AllConfigsTogether_AllResources(t *testing.T) {
 			tc.expectedFunc(t, objects)
 		})
 	}
+}
+
+type mockAODCGetter struct {
+	aodc *addonapiv1beta1.AddOnDeploymentConfig
+}
+
+func (m mockAODCGetter) Get(ctx context.Context, namespace, name string) (*addonapiv1beta1.AddOnDeploymentConfig, error) {
+	return m.aodc, nil
 }

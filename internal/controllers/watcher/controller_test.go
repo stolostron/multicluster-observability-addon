@@ -199,8 +199,7 @@ func TestEnqueueForConfigResource(t *testing.T) {
 
 			// Create a fake client
 			s := scheme.Scheme
-			//nolint:staticcheck // workv1.SchemeGroupVersion is deprecated but required by AddKnownTypes
-			s.AddKnownTypes(workv1.SchemeGroupVersion, &workv1.ManifestWork{}, &workv1.ManifestWorkList{})
+			_ = workv1.Install(s)
 			cl := fake.NewClientBuilder().
 				WithScheme(s).
 				WithObjects(manifestWork).

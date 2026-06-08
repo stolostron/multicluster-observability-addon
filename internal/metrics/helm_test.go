@@ -47,7 +47,6 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	"open-cluster-management.io/addon-framework/pkg/utils"
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
-	fakeaddon "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	workv1 "open-cluster-management.io/api/work/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -59,6 +58,14 @@ import (
 const (
 	testClusterID = "97e51387-3da1-4ae4-89e3-f29bcd42fd42"
 )
+
+type mockAODCGetter struct {
+	aodc *addonapiv1beta1.AddOnDeploymentConfig
+}
+
+func (m mockAODCGetter) Get(ctx context.Context, namespace, name string) (*addonapiv1beta1.AddOnDeploymentConfig, error) {
+	return m.aodc, nil
+}
 
 func TestHelmBuild_Metrics_All(t *testing.T) {
 	hubNamespace := "open-cluster-management-observability"
@@ -754,9 +761,9 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				Build()
 
 			// Setup the fake addon client
-			addonClient := fakeaddon.NewSimpleClientset(aodc) //nolint:staticcheck // NewClientset requires ApplyConfigurations which we don't have generated
+			getter := mockAODCGetter{aodc}
 			addonConfigValuesFn := addonfactory.GetAddOnDeploymentConfigValues(
-				addonfactory.NewAddOnDeploymentConfigGetter(addonClient),
+				getter,
 				addonfactory.ToAddOnCustomizedVariableValues,
 				addonfactory.ToAddOnResourceRequirementsValues,
 			)
@@ -812,7 +819,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				WithAgentInstallNamespace(
 					// Set agent install namespace from addon deployment config if it exists
 					utils.AgentInstallNamespaceFromDeploymentConfigFunc(
-						utils.NewAddOnDeploymentConfigGetter(addonClient),
+						getter,
 					),
 				).
 				WithScheme(scheme).
@@ -1067,9 +1074,9 @@ func TestHelmBuild_Metrics_HCP(t *testing.T) {
 		Build()
 
 	// Setup the fake addon client
-	addonClient := fakeaddon.NewSimpleClientset(newAddonDeploymentConfig()) //nolint:staticcheck // NewClientset requires ApplyConfigurations which we don't have generated
+	getter := mockAODCGetter{newAddonDeploymentConfig()}
 	addonConfigValuesFn := addonfactory.GetAddOnDeploymentConfigValues(
-		addonfactory.NewAddOnDeploymentConfigGetter(addonClient),
+		getter,
 		addonfactory.ToAddOnCustomizedVariableValues,
 	)
 
