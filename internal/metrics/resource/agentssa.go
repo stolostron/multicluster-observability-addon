@@ -159,13 +159,15 @@ func (p *PrometheusAgentSSA) setPrometheusRemoteWriteConfig() {
 
 	// keep user remote write configs and enforce ours
 	desiredRemoteWriteSpec := cooprometheusv1.RemoteWriteSpec{
-		URL:           p.RemoteWriteEndpoint,
+		URL:           cooprometheusv1.URL(p.RemoteWriteEndpoint),
 		Name:          ptr.To(config.RemoteWriteCfgName),
 		RemoteTimeout: ptr.To(cooprometheusv1.Duration("30s")),
 		TLSConfig: &cooprometheusv1.TLSConfig{
-			CAFile:   p.formatSecretPath(config.HubCASecretName, "ca.crt"),
-			CertFile: p.formatSecretPath(config.ClientCertSecretName, "tls.crt"),
-			KeyFile:  p.formatSecretPath(config.ClientCertSecretName, "tls.key"),
+			TLSFilesConfig: cooprometheusv1.TLSFilesConfig{
+				CAFile:   p.formatSecretPath(config.HubCASecretName, "ca.crt"),
+				CertFile: p.formatSecretPath(config.ClientCertSecretName, "tls.crt"),
+				KeyFile:  p.formatSecretPath(config.ClientCertSecretName, "tls.key"),
+			},
 		},
 		// WriteRelabelConfigs is set individually for each managed cluster in order to enforce cluster identification labels
 	}

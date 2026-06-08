@@ -112,7 +112,7 @@ func TestPrometheusAgentSSA(t *testing.T) {
 				})
 				assert.Equal(t, 1, agent.Spec.RemoteWrite[index].QueueConfig.Capacity)
 				assert.Equal(t, 1, agent.Spec.RemoteWrite[index].QueueConfig.Capacity)
-				assert.Equal(t, "https://example.com/write", agent.Spec.RemoteWrite[index].URL)
+				assert.Equal(t, cooprometheusv1.URL("https://example.com/write"), agent.Spec.RemoteWrite[index].URL)
 			},
 		},
 		{

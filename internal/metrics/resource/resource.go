@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-logr/logr"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	cooprometheusv1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1"
 	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
@@ -150,7 +151,7 @@ func (d DefaultStackResources) reconcileScrapeConfigs(ctx context.Context, mcoUI
 		if !isUWL {
 			// Enforce empty values, they are set when generating the manifests for a given managedCluster
 			desiredSC.Spec.ScrapeClassName = ptr.To("not-configurable")
-			desiredSC.Spec.Scheme = ptr.To("HTTPS")
+			desiredSC.Spec.Scheme = ptr.To(cooprometheusv1.Scheme("HTTPS"))
 			desiredSC.Spec.StaticConfigs = []cooprometheusv1alpha1.StaticConfig{
 				{
 					Targets: []cooprometheusv1alpha1.Target{

@@ -36,7 +36,7 @@ require (
 	github.com/perses/plugins/staticlistvariable v0.8.1
 	github.com/perses/plugins/table v0.11.3-0.20260416092358-50d24073dacc
 	github.com/perses/plugins/timeserieschart v0.12.1
-	github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring v0.83.0-rhobs1
+	github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring v0.90.1-rhobs1
 	github.com/rhobs/observability-operator/pkg/apis v0.0.0-20250902133632-f98bd8a20a80
 	golang.org/x/text v0.37.0
 )
