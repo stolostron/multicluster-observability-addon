@@ -36,6 +36,7 @@ import (
 	logs "k8s.io/component-base/logs/api/v1"
 	cmdfactory "open-cluster-management.io/addon-framework/pkg/cmd/factory"
 	"open-cluster-management.io/addon-framework/pkg/version"
+	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 	workv1 "open-cluster-management.io/api/work/v1"
@@ -62,6 +63,7 @@ func init() {
 	utilruntime.Must(hyperv1.AddToScheme(scheme))
 	utilruntime.Must(persesv1.AddToScheme(scheme))
 	utilruntime.Must(routev1.AddToScheme(scheme))
+	utilruntime.Must(addonv1beta1.Install(scheme))
 	// +kubebuilder:scaffold:scheme
 }
 
