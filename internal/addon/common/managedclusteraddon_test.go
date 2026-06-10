@@ -119,3 +119,101 @@ func TestGetAddOnDeploymentConfig(t *testing.T) {
 		})
 	}
 }
+
+func TestGetObjectKeys(t *testing.T) {
+	tests := []struct {
+		name      string
+		configRef []addonapiv1beta1.ConfigReference
+		group     string
+		resource  string
+		expected  []client.ObjectKey
+	}{
+		{
+			name: "Matching config with name and namespace",
+			configRef: []addonapiv1beta1.ConfigReference{
+				{
+					ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
+						Group:    "apps",
+						Resource: "deployments",
+					},
+					DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+						ConfigReferent: addonapiv1beta1.ConfigReferent{
+							Name:      "test-deploy",
+							Namespace: "test-ns",
+						},
+					},
+				},
+			},
+			group:    "apps",
+			resource: "deployments",
+			expected: []client.ObjectKey{
+				{
+					Name:      "test-deploy",
+					Namespace: "test-ns",
+				},
+			},
+		},
+		{
+			name: "Mismatched group",
+			configRef: []addonapiv1beta1.ConfigReference{
+				{
+					ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
+						Group:    "apps",
+						Resource: "deployments",
+					},
+					DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+						ConfigReferent: addonapiv1beta1.ConfigReferent{
+							Name:      "test-deploy",
+							Namespace: "test-ns",
+						},
+					},
+				},
+			},
+			group:    "batch",
+			resource: "deployments",
+			expected: nil,
+		},
+		{
+			name: "Mismatched resource",
+			configRef: []addonapiv1beta1.ConfigReference{
+				{
+					ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
+						Group:    "apps",
+						Resource: "deployments",
+					},
+					DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+						ConfigReferent: addonapiv1beta1.ConfigReferent{
+							Name:      "test-deploy",
+							Namespace: "test-ns",
+						},
+					},
+				},
+			},
+			group:    "apps",
+			resource: "statefulsets",
+			expected: nil,
+		},
+		{
+			name: "Nil DesiredConfig",
+			configRef: []addonapiv1beta1.ConfigReference{
+				{
+					ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
+						Group:    "apps",
+						Resource: "deployments",
+					},
+					DesiredConfig: nil,
+				},
+			},
+			group:    "apps",
+			resource: "deployments",
+			expected: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := common.GetObjectKeys(tt.configRef, tt.group, tt.resource)
+			require.Equal(t, tt.expected, result)
+		})
+	}
+}

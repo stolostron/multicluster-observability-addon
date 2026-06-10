@@ -24,6 +24,9 @@ func GetObjectKeys(configRef []addonapiv1beta1.ConfigReference, group, resource 
 		if config.Resource != resource {
 			continue
 		}
+		if config.DesiredConfig == nil {
+			continue
+		}
 
 		keys = append(keys, client.ObjectKey{
 			Name:      config.DesiredConfig.Name,
