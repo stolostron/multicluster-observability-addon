@@ -17,6 +17,7 @@ func ServerSideApply(ctx context.Context, c client.Client, obj client.Object, ow
 		}
 	}
 
+	//nolint:staticcheck // client.Apply is deprecated, but alternative requires ApplyConfigurations which we don't have
 	if err := c.Patch(ctx, obj, client.Apply, client.ForceOwnership, client.FieldOwner(addoncfg.Name)); err != nil {
 		return fmt.Errorf("failed to patch with SSA: %w", err)
 	}

@@ -9,7 +9,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	addonutils "open-cluster-management.io/addon-framework/pkg/utils"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
@@ -17,14 +17,14 @@ import (
 func TestGetAddOnDeploymentConfig(t *testing.T) {
 	tests := []struct {
 		name         string
-		mcAddon      *addonapiv1alpha1.ManagedClusterAddOn
-		existingAODC *addonapiv1alpha1.AddOnDeploymentConfig
+		mcAddon      *addonapiv1beta1.ManagedClusterAddOn
+		existingAODC *addonapiv1beta1.AddOnDeploymentConfig
 		expectedErr  error
 	}{
 		{
 			name: "No AODC reference",
-			mcAddon: &addonapiv1alpha1.ManagedClusterAddOn{
-				Status: addonapiv1alpha1.ManagedClusterAddOnStatus{
+			mcAddon: &addonapiv1beta1.ManagedClusterAddOn{
+				Status: addonapiv1beta1.ManagedClusterAddOnStatus{
 					ConfigReferences: nil,
 				},
 			},
@@ -32,27 +32,31 @@ func TestGetAddOnDeploymentConfig(t *testing.T) {
 		},
 		{
 			name: "Multiple AODC references",
-			mcAddon: &addonapiv1alpha1.ManagedClusterAddOn{
-				Status: addonapiv1alpha1.ManagedClusterAddOnStatus{
-					ConfigReferences: []addonapiv1alpha1.ConfigReference{
+			mcAddon: &addonapiv1beta1.ManagedClusterAddOn{
+				Status: addonapiv1beta1.ManagedClusterAddOnStatus{
+					ConfigReferences: []addonapiv1beta1.ConfigReference{
 						{
-							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 								Group:    addonutils.AddOnDeploymentConfigGVR.Group,
 								Resource: addoncfg.AddonDeploymentConfigResource,
 							},
-							ConfigReferent: addonapiv1alpha1.ConfigReferent{
-								Name:      "foo",
-								Namespace: "foo",
+							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+								ConfigReferent: addonapiv1beta1.ConfigReferent{
+									Name:      "foo",
+									Namespace: "foo",
+								},
 							},
 						},
 						{
-							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 								Group:    addonutils.AddOnDeploymentConfigGVR.Group,
 								Resource: addoncfg.AddonDeploymentConfigResource,
 							},
-							ConfigReferent: addonapiv1alpha1.ConfigReferent{
-								Name:      "bar",
-								Namespace: "bar",
+							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+								ConfigReferent: addonapiv1beta1.ConfigReferent{
+									Name:      "bar",
+									Namespace: "bar",
+								},
 							},
 						},
 					},
@@ -62,23 +66,25 @@ func TestGetAddOnDeploymentConfig(t *testing.T) {
 		},
 		{
 			name: "AODC reference found",
-			mcAddon: &addonapiv1alpha1.ManagedClusterAddOn{
-				Status: addonapiv1alpha1.ManagedClusterAddOnStatus{
-					ConfigReferences: []addonapiv1alpha1.ConfigReference{
+			mcAddon: &addonapiv1beta1.ManagedClusterAddOn{
+				Status: addonapiv1beta1.ManagedClusterAddOnStatus{
+					ConfigReferences: []addonapiv1beta1.ConfigReference{
 						{
-							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 								Group:    addonutils.AddOnDeploymentConfigGVR.Group,
 								Resource: addoncfg.AddonDeploymentConfigResource,
 							},
-							ConfigReferent: addonapiv1alpha1.ConfigReferent{
-								Name:      "foo",
-								Namespace: "foo",
+							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+								ConfigReferent: addonapiv1beta1.ConfigReferent{
+									Name:      "foo",
+									Namespace: "foo",
+								},
 							},
 						},
 					},
 				},
 			},
-			existingAODC: &addonapiv1alpha1.AddOnDeploymentConfig{
+			existingAODC: &addonapiv1beta1.AddOnDeploymentConfig{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: "foo",
@@ -96,7 +102,7 @@ func TestGetAddOnDeploymentConfig(t *testing.T) {
 				objs = append(objs, tt.existingAODC)
 			}
 			scheme := runtime.NewScheme()
-			require.NoError(t, addonapiv1alpha1.AddToScheme(scheme))
+			require.NoError(t, addonapiv1beta1.Install(scheme))
 			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(objs...).Build()
 
 			// Call the function
@@ -110,6 +116,104 @@ func TestGetAddOnDeploymentConfig(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 			}
+		})
+	}
+}
+
+func TestGetObjectKeys(t *testing.T) {
+	tests := []struct {
+		name      string
+		configRef []addonapiv1beta1.ConfigReference
+		group     string
+		resource  string
+		expected  []client.ObjectKey
+	}{
+		{
+			name: "Matching config with name and namespace",
+			configRef: []addonapiv1beta1.ConfigReference{
+				{
+					ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
+						Group:    "apps",
+						Resource: "deployments",
+					},
+					DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+						ConfigReferent: addonapiv1beta1.ConfigReferent{
+							Name:      "test-deploy",
+							Namespace: "test-ns",
+						},
+					},
+				},
+			},
+			group:    "apps",
+			resource: "deployments",
+			expected: []client.ObjectKey{
+				{
+					Name:      "test-deploy",
+					Namespace: "test-ns",
+				},
+			},
+		},
+		{
+			name: "Mismatched group",
+			configRef: []addonapiv1beta1.ConfigReference{
+				{
+					ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
+						Group:    "apps",
+						Resource: "deployments",
+					},
+					DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+						ConfigReferent: addonapiv1beta1.ConfigReferent{
+							Name:      "test-deploy",
+							Namespace: "test-ns",
+						},
+					},
+				},
+			},
+			group:    "batch",
+			resource: "deployments",
+			expected: nil,
+		},
+		{
+			name: "Mismatched resource",
+			configRef: []addonapiv1beta1.ConfigReference{
+				{
+					ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
+						Group:    "apps",
+						Resource: "deployments",
+					},
+					DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+						ConfigReferent: addonapiv1beta1.ConfigReferent{
+							Name:      "test-deploy",
+							Namespace: "test-ns",
+						},
+					},
+				},
+			},
+			group:    "apps",
+			resource: "statefulsets",
+			expected: nil,
+		},
+		{
+			name: "Nil DesiredConfig",
+			configRef: []addonapiv1beta1.ConfigReference{
+				{
+					ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
+						Group:    "apps",
+						Resource: "deployments",
+					},
+					DesiredConfig: nil,
+				},
+			},
+			group:    "apps",
+			resource: "deployments",
+			expected: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := common.GetObjectKeys(tt.configRef, tt.group, tt.resource)
+			require.Equal(t, tt.expected, result)
 		})
 	}
 }

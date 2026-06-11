@@ -26,7 +26,7 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/addonmanager"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	"open-cluster-management.io/addon-framework/pkg/utils"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -101,7 +101,6 @@ func NewAddonManager(ctx context.Context, kubeConfig *rest.Config, scheme *runti
 	mcoaAgentAddon, err := addonfactory.NewAgentAddonFactory(addoncfg.Name, addon.FS, "manifests/charts/mcoa").
 		WithConfigGVRs(configGVRs...).
 		WithGetValuesFuncs(addonConfigValuesFn, addonhelm.GetValuesFunc(ctx, k8sClient, agentLogger)).
-		WithUpdaters(addon.Updaters()).
 		WithAgentHealthProber(addon.HealthProber(k8sClient, agentLogger)).
 		WithAgentRegistrationOption(registrationOption).
 		WithAgentDeployTriggerClusterFilter(func(old, new *clusterv1.ManagedCluster) bool {
@@ -137,8 +136,8 @@ type AgentAddonWithSortedManifests struct {
 	client client.Client
 }
 
-func (a *AgentAddonWithSortedManifests) Manifests(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) ([]runtime.Object, error) {
-	objects, err := a.agent.Manifests(cluster, addon)
+func (a *AgentAddonWithSortedManifests) Manifests(ctx context.Context, cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) ([]runtime.Object, error) {
+	objects, err := a.agent.Manifests(ctx, cluster, addon)
 	if err != nil {
 		return nil, err
 	}
@@ -180,5 +179,7 @@ func (a *AgentAddonWithSortedManifests) Manifests(cluster *clusterv1.ManagedClus
 }
 
 func (a *AgentAddonWithSortedManifests) GetAgentAddonOptions() agent.AgentAddonOptions {
-	return a.agent.GetAgentAddonOptions()
+	options := a.agent.GetAgentAddonOptions()
+	options.ManifestConfigs = addon.ManifestConfigs()
+	return options
 }

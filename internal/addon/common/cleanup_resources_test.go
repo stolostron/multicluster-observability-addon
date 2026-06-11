@@ -12,7 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -27,23 +27,23 @@ func TestCleanOrphanResources(t *testing.T) {
 
 	// Create a new scheme and add the types we need
 	scheme := runtime.NewScheme()
-	require.NoError(t, addonapiv1alpha1.AddToScheme(scheme))
+	require.NoError(t, addonapiv1beta1.Install(scheme))
 	require.NoError(t, cooprometheusv1alpha1.AddToScheme(scheme))
 
 	tests := []struct {
 		name               string
-		cmao               *addonapiv1alpha1.ClusterManagementAddOn
+		cmao               *addonapiv1beta1.ClusterManagementAddOn
 		cmaoOwnedResources []*cooprometheusv1alpha1.PrometheusAgent
 		extraResources     []client.Object
 		expectDeleted      map[string]bool
 	}{
 		{
 			name: "No placement exists but resources exist not owned by CMAO",
-			cmao: &addonapiv1alpha1.ClusterManagementAddOn{
+			cmao: &addonapiv1beta1.ClusterManagementAddOn{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: cmaoName,
 				},
-				Spec: addonapiv1alpha1.ClusterManagementAddOnSpec{
+				Spec: addonapiv1beta1.ClusterManagementAddOnSpec{
 					// No placements
 				},
 			},
@@ -66,11 +66,11 @@ func TestCleanOrphanResources(t *testing.T) {
 		},
 		{
 			name: "No placement but exist resources owned by CMAO",
-			cmao: &addonapiv1alpha1.ClusterManagementAddOn{
+			cmao: &addonapiv1beta1.ClusterManagementAddOn{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: cmaoName,
 				},
-				Spec: addonapiv1alpha1.ClusterManagementAddOnSpec{
+				Spec: addonapiv1beta1.ClusterManagementAddOnSpec{
 					// No placements
 				},
 			},
@@ -94,15 +94,15 @@ func TestCleanOrphanResources(t *testing.T) {
 		},
 		{
 			name: "Placement exists but also exists some resources not owned by CMAO",
-			cmao: &addonapiv1alpha1.ClusterManagementAddOn{
+			cmao: &addonapiv1beta1.ClusterManagementAddOn{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: cmaoName,
 				},
-				Spec: addonapiv1alpha1.ClusterManagementAddOnSpec{
-					InstallStrategy: addonapiv1alpha1.InstallStrategy{
-						Placements: []addonapiv1alpha1.PlacementStrategy{
+				Spec: addonapiv1beta1.ClusterManagementAddOnSpec{
+					InstallStrategy: addonapiv1beta1.InstallStrategy{
+						Placements: []addonapiv1beta1.PlacementStrategy{
 							{
-								PlacementRef: addonapiv1alpha1.PlacementRef{
+								PlacementRef: addonapiv1beta1.PlacementRef{
 									Name:      placementName,
 									Namespace: placementNs,
 								},
@@ -144,15 +144,15 @@ func TestCleanOrphanResources(t *testing.T) {
 		},
 		{
 			name: "Placement exists but also exists some resources owned by CMAO",
-			cmao: &addonapiv1alpha1.ClusterManagementAddOn{
+			cmao: &addonapiv1beta1.ClusterManagementAddOn{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: cmaoName,
 				},
-				Spec: addonapiv1alpha1.ClusterManagementAddOnSpec{
-					InstallStrategy: addonapiv1alpha1.InstallStrategy{
-						Placements: []addonapiv1alpha1.PlacementStrategy{
+				Spec: addonapiv1beta1.ClusterManagementAddOnSpec{
+					InstallStrategy: addonapiv1beta1.InstallStrategy{
+						Placements: []addonapiv1beta1.PlacementStrategy{
 							{
-								PlacementRef: addonapiv1alpha1.PlacementRef{
+								PlacementRef: addonapiv1beta1.PlacementRef{
 									Name:      placementName,
 									Namespace: placementNs,
 								},

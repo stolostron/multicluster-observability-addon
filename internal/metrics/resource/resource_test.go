@@ -23,7 +23,7 @@ import (
 	kubescheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
-	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -35,7 +35,7 @@ func TestGetOrCreateDefaultAgent(t *testing.T) {
 	cmao := newCMAO()
 
 	// Existing Platform Agent
-	placementRef := addonv1alpha1.PlacementRef{
+	placementRef := addonv1beta1.PlacementRef{
 		Name:      "global",
 		Namespace: config.HubInstallNamespace,
 	}
@@ -50,13 +50,13 @@ func TestGetOrCreateDefaultAgent(t *testing.T) {
 
 	testCases := []struct {
 		name         string
-		placementRef addonv1alpha1.PlacementRef
+		placementRef addonv1beta1.PlacementRef
 		isUWL        bool
 		initObjs     []client.Object
 	}{
 		{
 			name: "creates platform agent",
-			placementRef: addonv1alpha1.PlacementRef{
+			placementRef: addonv1beta1.PlacementRef{
 				Name:      "my-placement",
 				Namespace: config.HubInstallNamespace,
 			},
@@ -71,7 +71,7 @@ func TestGetOrCreateDefaultAgent(t *testing.T) {
 		},
 		{
 			name: "creates uwl agent",
-			placementRef: addonv1alpha1.PlacementRef{
+			placementRef: addonv1beta1.PlacementRef{
 				Name:      "my-placement",
 				Namespace: config.HubInstallNamespace,
 			},
@@ -122,7 +122,7 @@ func TestReconcileAgent(t *testing.T) {
 	opts := newAddonOptions(true, true)
 	kubeRbacImage := "kube-rbac-proxy:version"
 	prometheusImage := "prometheus:version"
-	placementRef := addonv1alpha1.PlacementRef{Name: "my-placement", Namespace: "my-namespace"}
+	placementRef := addonv1beta1.PlacementRef{Name: "my-placement", Namespace: "my-namespace"}
 
 	// Dynamic fake client doesn't support apply types of patch. This is overridden with an interceptor toward a
 	// merge type patch that has no unwanted effect for this unit test.
@@ -179,7 +179,7 @@ func TestReconcileAgent(t *testing.T) {
 
 func TestReconcileAgentWithRegistries(t *testing.T) {
 	cmao := newCMAO()
-	registries := []addonv1alpha1.ImageMirror{
+	registries := []addonv1beta1.ImageMirror{
 		{
 			Source: "quay.io/prometheus/prometheus",
 			Mirror: "my-registry.com/prometheus/prometheus",
@@ -228,7 +228,7 @@ func TestReconcileAgentWithRegistries(t *testing.T) {
 		PrometheusImage:    images.Prometheus,
 	}
 
-	placementRef := addonv1alpha1.PlacementRef{Name: "my-placement", Namespace: "my-namespace"}
+	placementRef := addonv1beta1.PlacementRef{Name: "my-placement", Namespace: "my-namespace"}
 	retAgent, err := d.reconcileAgentForPlacement(context.Background(), placementRef, false)
 	require.NoError(t, err)
 
@@ -242,11 +242,11 @@ func TestReconcileAgentWithRegistries(t *testing.T) {
 }
 
 func TestReconcile(t *testing.T) {
-	placementRefA := addonv1alpha1.PlacementRef{
+	placementRefA := addonv1beta1.PlacementRef{
 		Namespace: "ns",
 		Name:      "a",
 	}
-	placementRefB := addonv1alpha1.PlacementRef{
+	placementRefB := addonv1beta1.PlacementRef{
 		Namespace: "ns",
 		Name:      "b",
 	}
@@ -367,7 +367,7 @@ func TestReconcile(t *testing.T) {
 
 	testCases := []struct {
 		name               string
-		initialPlacements  []addonv1alpha1.PlacementStrategy
+		initialPlacements  []addonv1beta1.PlacementStrategy
 		initObjs           []client.Object
 		platformEnabled    bool
 		uwlEnabled         bool
@@ -380,9 +380,9 @@ func TestReconcile(t *testing.T) {
 		},
 		{
 			name: "one placement with disabled monitoring",
-			initialPlacements: []addonv1alpha1.PlacementStrategy{
+			initialPlacements: []addonv1beta1.PlacementStrategy{
 				{
-					Configs:      []addonv1alpha1.AddOnConfig{},
+					Configs:      []addonv1beta1.AddOnConfig{},
 					PlacementRef: placementRefA,
 				},
 			},
@@ -392,9 +392,9 @@ func TestReconcile(t *testing.T) {
 		},
 		{
 			name: "one placement with enabled monitoring",
-			initialPlacements: []addonv1alpha1.PlacementStrategy{
+			initialPlacements: []addonv1beta1.PlacementStrategy{
 				{
-					Configs:      []addonv1alpha1.AddOnConfig{},
+					Configs:      []addonv1beta1.AddOnConfig{},
 					PlacementRef: placementRefA,
 				},
 			},
@@ -406,9 +406,9 @@ func TestReconcile(t *testing.T) {
 		},
 		{
 			name: "one placement with enabled monitoring and hcp",
-			initialPlacements: []addonv1alpha1.PlacementStrategy{
+			initialPlacements: []addonv1beta1.PlacementStrategy{
 				{
-					Configs:      []addonv1alpha1.AddOnConfig{},
+					Configs:      []addonv1beta1.AddOnConfig{},
 					PlacementRef: placementRefA,
 				},
 			},
@@ -422,9 +422,9 @@ func TestReconcile(t *testing.T) {
 		},
 		{
 			name: "one placement with enabled monitoring",
-			initialPlacements: []addonv1alpha1.PlacementStrategy{
+			initialPlacements: []addonv1beta1.PlacementStrategy{
 				{
-					Configs:      []addonv1alpha1.AddOnConfig{},
+					Configs:      []addonv1beta1.AddOnConfig{},
 					PlacementRef: placementRefA,
 				},
 			},
@@ -436,13 +436,13 @@ func TestReconcile(t *testing.T) {
 		},
 		{
 			name: "two placements with enabled platform monitoring",
-			initialPlacements: []addonv1alpha1.PlacementStrategy{
+			initialPlacements: []addonv1beta1.PlacementStrategy{
 				{
-					Configs:      []addonv1alpha1.AddOnConfig{},
+					Configs:      []addonv1beta1.AddOnConfig{},
 					PlacementRef: placementRefA,
 				},
 				{
-					Configs:      []addonv1alpha1.AddOnConfig{},
+					Configs:      []addonv1beta1.AddOnConfig{},
 					PlacementRef: placementRefB,
 				},
 			},
@@ -454,13 +454,13 @@ func TestReconcile(t *testing.T) {
 		},
 		{
 			name: "two placements with enabled monitoring",
-			initialPlacements: []addonv1alpha1.PlacementStrategy{
+			initialPlacements: []addonv1beta1.PlacementStrategy{
 				{
-					Configs:      []addonv1alpha1.AddOnConfig{},
+					Configs:      []addonv1beta1.AddOnConfig{},
 					PlacementRef: placementRefA,
 				},
 				{
-					Configs:      []addonv1alpha1.AddOnConfig{},
+					Configs:      []addonv1beta1.AddOnConfig{},
 					PlacementRef: placementRefB,
 				},
 			},
@@ -525,7 +525,7 @@ func TestReconcileScrapeConfigs(t *testing.T) {
 		UID:        mcoUID,
 		Controller: ptr.To(true),
 	}
-	placementRefA := addonv1alpha1.PlacementRef{
+	placementRefA := addonv1beta1.PlacementRef{
 		Namespace: "ns",
 		Name:      "a",
 	}
@@ -641,8 +641,8 @@ func TestReconcileScrapeConfigs(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			cmao := newCMAO(addonv1alpha1.PlacementStrategy{
-				Configs:      []addonv1alpha1.AddOnConfig{},
+			cmao := newCMAO(addonv1beta1.PlacementStrategy{
+				Configs:      []addonv1beta1.AddOnConfig{},
 				PlacementRef: placementRefA,
 			})
 			initObjs := append(tc.initObjs, cmao)
@@ -678,7 +678,7 @@ func TestGetPrometheusRules(t *testing.T) {
 		UID:        mcoUID,
 		Controller: ptr.To(true),
 	}
-	placementRefA := addonv1alpha1.PlacementRef{
+	placementRefA := addonv1beta1.PlacementRef{
 		Namespace: "ns",
 		Name:      "a",
 	}
@@ -819,8 +819,8 @@ func TestGetPrometheusRules(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			cmao := newCMAO(addonv1alpha1.PlacementStrategy{
-				Configs:      []addonv1alpha1.AddOnConfig{},
+			cmao := newCMAO(addonv1beta1.PlacementStrategy{
+				Configs:      []addonv1beta1.AddOnConfig{},
 				PlacementRef: placementRefA,
 			})
 			initObjs := append(tc.initObjs, cmao)
@@ -865,7 +865,7 @@ func TestGetPrometheusRules(t *testing.T) {
 func newTestScheme() *runtime.Scheme {
 	s := runtime.NewScheme()
 	_ = kubescheme.AddToScheme(s)
-	_ = addonv1alpha1.AddToScheme(s)
+	_ = addonv1beta1.Install(s)
 	_ = cooprometheusv1alpha1.AddToScheme(s)
 	_ = cooprometheusv1.AddToScheme(s)
 	_ = prometheusv1.AddToScheme(s)
@@ -873,8 +873,8 @@ func newTestScheme() *runtime.Scheme {
 	return s
 }
 
-func newCMAO(placements ...addonv1alpha1.PlacementStrategy) *addonv1alpha1.ClusterManagementAddOn {
-	return &addonv1alpha1.ClusterManagementAddOn{
+func newCMAO(placements ...addonv1beta1.PlacementStrategy) *addonv1beta1.ClusterManagementAddOn {
+	return &addonv1beta1.ClusterManagementAddOn{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: addoncfg.Name,
 			UID:  types.UID("test-cmao-uid"),
@@ -885,8 +885,8 @@ func newCMAO(placements ...addonv1alpha1.PlacementStrategy) *addonv1alpha1.Clust
 				},
 			},
 		},
-		Spec: addonv1alpha1.ClusterManagementAddOnSpec{
-			InstallStrategy: addonv1alpha1.InstallStrategy{
+		Spec: addonv1beta1.ClusterManagementAddOnSpec{
+			InstallStrategy: addonv1beta1.InstallStrategy{
 				Placements: placements,
 			},
 		},

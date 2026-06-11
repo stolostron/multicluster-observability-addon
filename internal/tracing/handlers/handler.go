@@ -13,7 +13,7 @@ import (
 	"github.com/stolostron/multicluster-observability-addon/internal/tracing/manifests"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -27,7 +27,7 @@ var (
 	errMultipleOTELInstrRef   = errors.New("multiple Instrumentation references on addon installation")
 )
 
-func BuildOptions(ctx context.Context, k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, userWorkloads addon.TracesOptions) (manifests.Options, error) {
+func BuildOptions(ctx context.Context, k8s client.Client, mcAddon *addonapiv1beta1.ManagedClusterAddOn, userWorkloads addon.TracesOptions) (manifests.Options, error) {
 	opts := manifests.Options{
 		ClusterName:   mcAddon.Namespace,
 		UserWorkloads: userWorkloads,

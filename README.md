@@ -92,7 +92,7 @@ In 2.12, multicluster-observability-operator has the ability to install MCOA usi
 #### Default configurations references
 
 ```yaml
-apiVersion: addon.open-cluster-management.io/v1alpha1
+apiVersion: addon.open-cluster-management.io/v1beta1
 kind: ClusterManagementAddOn
 spec:
   installStrategy:

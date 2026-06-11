@@ -5,12 +5,31 @@ set -euo pipefail
 # This script updates the Prometheus Operator CRDs from the rhobs/obo-prometheus-operator repository.
 
 # The version is pinned to what is defined in go.mod.
-VERSION=$(grep 'github.com/rhobs/obo-prometheus-operator' go.mod | awk '{print $2}')
-if [ -z "$VERSION" ]; then
+OBO_VERSION=$(grep 'github.com/rhobs/obo-prometheus-operator' go.mod | awk '{print $2}')
+if [ -z "$OBO_VERSION" ]; then
     echo "Error: Could not find obo-prometheus-operator version in go.mod"
     exit 1
 fi
 
+PROM_VERSION=$(grep 'github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring' go.mod | awk '{print $2}')
+if [ -z "$PROM_VERSION" ]; then
+    echo "Error: Could not find prometheus-operator version in go.mod"
+    exit 1
+fi
+
+# Align versions without considering the rhobs suffix
+OBO_CLEAN="${OBO_VERSION%%-rhobs*}"
+PROM_CLEAN="${PROM_VERSION%%-rhobs*}"
+
+if [ "${OBO_CLEAN}" != "${PROM_CLEAN}" ]; then
+    echo "Error: Version mismatch!"
+    echo "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring version is ${OBO_VERSION} (cleaned: ${OBO_CLEAN})"
+    echo "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring version is ${PROM_VERSION} (cleaned: ${PROM_CLEAN})"
+    echo "These versions must be aligned (without considering the rhobs suffix)."
+    exit 1
+fi
+
+VERSION="${OBO_VERSION}"
 echo "Using obo-prometheus-operator version: ${VERSION}"
 
 # Corrected base URL for the raw CRD files on GitHub.

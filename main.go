@@ -36,7 +36,7 @@ import (
 	logs "k8s.io/component-base/logs/api/v1"
 	cmdfactory "open-cluster-management.io/addon-framework/pkg/cmd/factory"
 	"open-cluster-management.io/addon-framework/pkg/version"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 	workv1 "open-cluster-management.io/api/work/v1"
@@ -47,15 +47,14 @@ var scheme = runtime.NewScheme()
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-	utilruntime.Must(addonapiv1alpha1.AddToScheme(scheme))
-	utilruntime.Must(workv1.AddToScheme(scheme))
+	utilruntime.Must(workv1.Install(scheme))
 	utilruntime.Must(loggingv1.AddToScheme(scheme))
 	utilruntime.Must(otelv1beta1.AddToScheme(scheme))
 	utilruntime.Must(otelv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(operatorsv1.AddToScheme(scheme))
 	utilruntime.Must(operatorsv1alpha1.AddToScheme(scheme))
-	utilruntime.Must(clusterv1.AddToScheme(scheme))
-	utilruntime.Must(clusterv1beta1.AddToScheme(scheme))
+	utilruntime.Must(clusterv1.Install(scheme))
+	utilruntime.Must(clusterv1beta1.Install(scheme))
 	utilruntime.Must(operatorv1.AddToScheme(scheme))
 	utilruntime.Must(cooprometheusv1.AddToScheme(scheme))
 	utilruntime.Must(cooprometheusv1alpha1.AddToScheme(scheme)) // Adds prometheusAgent and scrapeConfig
@@ -64,6 +63,7 @@ func init() {
 	utilruntime.Must(hyperv1.AddToScheme(scheme))
 	utilruntime.Must(persesv1.AddToScheme(scheme))
 	utilruntime.Must(routev1.AddToScheme(scheme))
+	utilruntime.Must(addonv1beta1.Install(scheme))
 	// +kubebuilder:scaffold:scheme
 }
 
