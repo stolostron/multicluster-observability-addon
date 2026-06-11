@@ -24,8 +24,7 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	addonutils "open-cluster-management.io/addon-framework/pkg/utils"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
-	fakeaddon "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -34,7 +33,7 @@ import (
 var (
 	_ = operatorsv1.AddToScheme(scheme.Scheme)
 	_ = operatorsv1alpha1.AddToScheme(scheme.Scheme)
-	_ = addonapiv1alpha1.AddToScheme(scheme.Scheme)
+	_ = addonapiv1beta1.Install(scheme.Scheme)
 	_ = uiplugin.AddToScheme(scheme.Scheme)
 	_ = persesv1.AddToScheme(scheme.Scheme) // Assuming persesv1alpha1 is imported correctly
 )
@@ -42,9 +41,9 @@ var (
 func fakeGetValues(ctx context.Context, k8s client.Client) addonfactory.GetValuesFunc {
 	return func(
 		cluster *clusterv1.ManagedCluster,
-		mcAddon *addonapiv1alpha1.ManagedClusterAddOn,
+		mcAddon *addonapiv1beta1.ManagedClusterAddOn,
 	) (addonfactory.Values, error) {
-		aodc := &addonapiv1alpha1.AddOnDeploymentConfig{}
+		aodc := &addonapiv1beta1.AddOnDeploymentConfig{}
 		keys := common.GetObjectKeys(mcAddon.Status.ConfigReferences, addonutils.AddOnDeploymentConfigGVR.Group, addoncfg.AddonDeploymentConfigResource)
 		if err := k8s.Get(ctx, keys[0], aodc, &client.GetOptions{}); err != nil {
 			return nil, err
@@ -73,7 +72,7 @@ func fakeGetValues(ctx context.Context, k8s client.Client) addonfactory.GetValue
 	}
 }
 
-func newCOOAgentAddon(initObjects []client.Object, addOnDeploymentConfig *addonapiv1alpha1.AddOnDeploymentConfig) agent.AgentAddon {
+func newCOOAgentAddon(initObjects []client.Object, addOnDeploymentConfig *addonapiv1beta1.AddOnDeploymentConfig) agent.AgentAddon {
 	initObjects = append(initObjects, addOnDeploymentConfig)
 	// Setup the fake k8s client
 	fakeKubeClient := fake.NewClientBuilder().
@@ -81,9 +80,9 @@ func newCOOAgentAddon(initObjects []client.Object, addOnDeploymentConfig *addona
 		WithObjects(initObjects...).
 		Build()
 
-	fakeAddonClient := fakeaddon.NewSimpleClientset(addOnDeploymentConfig)
+	getter := mockAODCGetter{addOnDeploymentConfig}
 	addonConfigValuesFn := addonfactory.GetAddOnDeploymentConfigValues(
-		addonfactory.NewAddOnDeploymentConfigGetter(fakeAddonClient),
+		getter,
 		addonfactory.ToAddOnCustomizedVariableValues,
 	)
 	ctx := context.Background()
@@ -104,7 +103,7 @@ func Test_IncidentDetection_AllConfigsTogether_AllResources(t *testing.T) {
 	for _, tc := range []struct {
 		name         string
 		isHub        bool
-		cv           []addonapiv1alpha1.CustomizedVariable
+		cv           []addonapiv1beta1.CustomizedVariable
 		expectedFunc func(*testing.T, []runtime.Object)
 	}{
 		{
@@ -116,7 +115,7 @@ func Test_IncidentDetection_AllConfigsTogether_AllResources(t *testing.T) {
 		{
 			name:  "right-sizing dashboards in observability-analytics namespace",
 			isHub: true,
-			cv: []addonapiv1alpha1.CustomizedVariable{
+			cv: []addonapiv1beta1.CustomizedVariable{
 				{Name: addon.KeyRightSizingDelegated, Value: "true"},
 				{Name: addon.KeyPlatformNamespaceRightSizing, Value: "enabled"},
 				{Name: addon.KeyPlatformVirtualizationRightSizing, Value: "enabled"},
@@ -157,7 +156,7 @@ func Test_IncidentDetection_AllConfigsTogether_AllResources(t *testing.T) {
 		},
 		{
 			name: "incident detection dashboards in observability-analytics namespace",
-			cv: []addonapiv1alpha1.CustomizedVariable{
+			cv: []addonapiv1beta1.CustomizedVariable{
 				{
 					Name:  "platformIncidentDetection",
 					Value: "uiplugins.v1alpha1.observability.openshift.io",
@@ -205,7 +204,7 @@ func Test_IncidentDetection_AllConfigsTogether_AllResources(t *testing.T) {
 		{
 			name:  "platform metrics collection & UI",
 			isHub: true,
-			cv: []addonapiv1alpha1.CustomizedVariable{
+			cv: []addonapiv1beta1.CustomizedVariable{
 				{
 					Name:  "platformMetricsCollection",
 					Value: "prometheusagents.v1alpha1.monitoring.rhobs",
@@ -264,18 +263,14 @@ func Test_IncidentDetection_AllConfigsTogether_AllResources(t *testing.T) {
 
 			// Register the addon for the managed cluster
 			mcao := addontesting.NewAddon("test", "cluster-1")
-			mcao.Status.ConfigReferences = []addonapiv1alpha1.ConfigReference{
+			mcao.Status.ConfigReferences = []addonapiv1beta1.ConfigReference{
 				{
-					ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+					ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 						Group:    "addon.open-cluster-management.io",
 						Resource: "addondeploymentconfigs",
 					},
-					ConfigReferent: addonapiv1alpha1.ConfigReferent{
-						Namespace: "open-cluster-management-observability",
-						Name:      "multicluster-observability-addon",
-					},
-					DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
-						ConfigReferent: addonapiv1alpha1.ConfigReferent{
+					DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+						ConfigReferent: addonapiv1beta1.ConfigReferent{
 							Namespace: "open-cluster-management-observability",
 							Name:      "multicluster-observability-addon",
 						},
@@ -284,12 +279,12 @@ func Test_IncidentDetection_AllConfigsTogether_AllResources(t *testing.T) {
 				},
 			}
 
-			addc := &addonapiv1alpha1.AddOnDeploymentConfig{
+			addc := &addonapiv1beta1.AddOnDeploymentConfig{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "multicluster-observability-addon",
 					Namespace: "open-cluster-management-observability",
 				},
-				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
+				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
 					CustomizedVariables: tc.cv,
 				},
 			}
@@ -298,9 +293,17 @@ func Test_IncidentDetection_AllConfigsTogether_AllResources(t *testing.T) {
 			cooAgentAddon := newCOOAgentAddon([]client.Object{mcao}, addc)
 
 			// Render manifests and return them as k8s runtime objects
-			objects, err := cooAgentAddon.Manifests(mc, mcao)
+			objects, err := cooAgentAddon.Manifests(t.Context(), mc, mcao)
 			require.NoError(t, err)
 			tc.expectedFunc(t, objects)
 		})
 	}
+}
+
+type mockAODCGetter struct {
+	aodc *addonapiv1beta1.AddOnDeploymentConfig
+}
+
+func (m mockAODCGetter) Get(ctx context.Context, namespace, name string) (*addonapiv1beta1.AddOnDeploymentConfig, error) {
+	return m.aodc, nil
 }

@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-logr/logr"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	cooprometheusv1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1"
 	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
@@ -19,7 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
-	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
@@ -33,7 +34,7 @@ var (
 type DefaultStackResources struct {
 	AddonOptions       addon.Options
 	Client             client.Client
-	CMAO               *addonv1alpha1.ClusterManagementAddOn
+	CMAO               *addonv1beta1.ClusterManagementAddOn
 	Logger             logr.Logger
 	KubeRBACProxyImage string
 	PrometheusImage    string
@@ -150,7 +151,7 @@ func (d DefaultStackResources) reconcileScrapeConfigs(ctx context.Context, mcoUI
 		if !isUWL {
 			// Enforce empty values, they are set when generating the manifests for a given managedCluster
 			desiredSC.Spec.ScrapeClassName = ptr.To("not-configurable")
-			desiredSC.Spec.Scheme = ptr.To("HTTPS")
+			desiredSC.Spec.Scheme = ptr.To(cooprometheusv1.Scheme("HTTPS"))
 			desiredSC.Spec.StaticConfigs = []cooprometheusv1alpha1.StaticConfig{
 				{
 					Targets: []cooprometheusv1alpha1.Target{
@@ -231,7 +232,7 @@ func (d DefaultStackResources) getPrometheusRules(ctx context.Context, mcoUID ty
 	return configs, nil
 }
 
-func (d DefaultStackResources) reconcileAgentForPlacement(ctx context.Context, placementRef addonv1alpha1.PlacementRef, isUWL bool) (common.DefaultConfig, error) {
+func (d DefaultStackResources) reconcileAgentForPlacement(ctx context.Context, placementRef addonv1beta1.PlacementRef, isUWL bool) (common.DefaultConfig, error) {
 	d.Logger.V(2).Info("reconciling prometheus agent", "placementName", placementRef.Name, "placementNamespace", placementRef.Namespace, "isUWL", isUWL)
 	// Get or create default
 	agent, err := d.getOrCreateDefaultAgent(ctx, placementRef, isUWL)
@@ -276,7 +277,7 @@ func (d DefaultStackResources) reconcileAgentForPlacement(ctx context.Context, p
 	}, nil
 }
 
-func (d DefaultStackResources) getOrCreateDefaultAgent(ctx context.Context, placementRef addonv1alpha1.PlacementRef, isUWL bool) (*cooprometheusv1alpha1.PrometheusAgent, error) {
+func (d DefaultStackResources) getOrCreateDefaultAgent(ctx context.Context, placementRef addonv1beta1.PlacementRef, isUWL bool) (*cooprometheusv1alpha1.PrometheusAgent, error) {
 	promAgents := &cooprometheusv1alpha1.PrometheusAgentList{}
 	if err := d.Client.List(ctx, promAgents, &client.ListOptions{
 		Namespace:     config.HubInstallNamespace,
@@ -325,7 +326,7 @@ func (d DefaultStackResources) getOrCreateDefaultAgent(ctx context.Context, plac
 
 func (d DefaultStackResources) generateConfigsForAllPlacements(object []client.Object) ([]common.DefaultConfig, error) {
 	// Compute configs to add to each placement
-	addonConfigs := []addonv1alpha1.AddOnConfig{}
+	addonConfigs := []addonv1beta1.AddOnConfig{}
 	for _, obj := range object {
 		cfg, err := common.ObjectToAddonConfig(obj)
 		if err != nil {

@@ -24,7 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	workv1 "open-cluster-management.io/api/work/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -47,7 +47,7 @@ type OptionsBuilder struct {
 	Logger logr.Logger
 }
 
-func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, managedCluster *clusterv1.ManagedCluster, opts addon.Options) (Options, error) {
+func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1beta1.ManagedClusterAddOn, managedCluster *clusterv1.ManagedCluster, opts addon.Options) (Options, error) {
 	ret := Options{
 		IsHub:            common.IsHubCluster(managedCluster),
 		InstallNamespace: opts.InstallNamespace,
@@ -371,7 +371,7 @@ func (o *OptionsBuilder) addConfigMap(ctx context.Context, configMaps *[]*corev1
 	return nil
 }
 
-func (o *OptionsBuilder) getAvailableConfigResources(ctx context.Context, mcAddon *addonapiv1alpha1.ManagedClusterAddOn) ([]client.Object, error) {
+func (o *OptionsBuilder) getAvailableConfigResources(ctx context.Context, mcAddon *addonapiv1beta1.ManagedClusterAddOn) ([]client.Object, error) {
 	ret := []client.Object{}
 
 	for _, cfg := range mcAddon.Status.ConfigReferences {

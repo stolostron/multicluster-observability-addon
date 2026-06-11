@@ -18,7 +18,7 @@ import (
 	thandlers "github.com/stolostron/multicluster-observability-addon/internal/tracing/handlers"
 	tmanifests "github.com/stolostron/multicluster-observability-addon/internal/tracing/manifests"
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -36,7 +36,7 @@ type HelmChartValues struct {
 func GetValuesFunc(ctx context.Context, k8s client.Client, logger logr.Logger) addonfactory.GetValuesFunc {
 	return func(
 		cluster *clusterv1.ManagedCluster,
-		mcAddon *addonapiv1alpha1.ManagedClusterAddOn,
+		mcAddon *addonapiv1beta1.ManagedClusterAddOn,
 	) (addonfactory.Values, error) {
 		logger = logger.WithValues("cluster", cluster.Name)
 		logger.V(2).Info("reconciliation triggered")
@@ -92,7 +92,7 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, logger logr.Logger) a
 	}
 }
 
-func getMonitoringValues(ctx context.Context, k8s client.Client, logger logr.Logger, cluster *clusterv1.ManagedCluster, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, opts addon.Options) (*mmanifests.MetricsValues, error) {
+func getMonitoringValues(ctx context.Context, k8s client.Client, logger logr.Logger, cluster *clusterv1.ManagedCluster, mcAddon *addonapiv1beta1.ManagedClusterAddOn, opts addon.Options) (*mmanifests.MetricsValues, error) {
 	if !opts.Platform.Metrics.CollectionEnabled && !opts.UserWorkloads.Metrics.CollectionEnabled {
 		logger.V(2).Info("both platform and userWorkloads metrics are disabled, ignoring cluster")
 		return nil, nil
@@ -110,7 +110,7 @@ func getMonitoringValues(ctx context.Context, k8s client.Client, logger logr.Log
 	return mmanifests.BuildValues(metricsOpts)
 }
 
-func getLoggingValues(ctx context.Context, k8s client.Client, cluster *clusterv1.ManagedCluster, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, opts addon.Options) (*lmanifests.LoggingValues, error) {
+func getLoggingValues(ctx context.Context, k8s client.Client, cluster *clusterv1.ManagedCluster, mcAddon *addonapiv1beta1.ManagedClusterAddOn, opts addon.Options) (*lmanifests.LoggingValues, error) {
 	if !opts.Platform.Logs.CollectionEnabled && !opts.UserWorkloads.Logs.CollectionEnabled {
 		return nil, nil
 	}
@@ -127,7 +127,7 @@ func getLoggingValues(ctx context.Context, k8s client.Client, cluster *clusterv1
 	return lmanifests.BuildValues(loggingOpts)
 }
 
-func getTracingValues(ctx context.Context, k8s client.Client, cluster *clusterv1.ManagedCluster, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, opts addon.Options) (*tmanifests.TracingValues, error) {
+func getTracingValues(ctx context.Context, k8s client.Client, cluster *clusterv1.ManagedCluster, mcAddon *addonapiv1beta1.ManagedClusterAddOn, opts addon.Options) (*tmanifests.TracingValues, error) {
 	if common.IsHubCluster(cluster) || !opts.UserWorkloads.Traces.CollectionEnabled {
 		return nil, nil
 	}

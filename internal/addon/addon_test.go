@@ -18,7 +18,7 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	addonutils "open-cluster-management.io/addon-framework/pkg/utils"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	workv1 "open-cluster-management.io/api/work/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
@@ -30,7 +30,7 @@ func Test_AgentHealthProber_PPA(t *testing.T) {
 	addPlatformMetricsCustomizedVariables(aodc)
 	addAODCConfigReference(managedClusterAddOn, aodc)
 	scheme := runtime.NewScheme()
-	require.NoError(t, addonapiv1alpha1.AddToScheme(scheme))
+	require.NoError(t, addonapiv1beta1.Install(scheme))
 
 	for _, tc := range []struct {
 		name        string
@@ -89,7 +89,7 @@ func Test_AgentHealthProber_PPA_UserWorkload(t *testing.T) {
 	addUserWorkloadMetricsCustomizedVariables(aodc)
 	addAODCConfigReference(managedClusterAddOn, aodc)
 	scheme := runtime.NewScheme()
-	require.NoError(t, addonapiv1alpha1.AddToScheme(scheme))
+	require.NoError(t, addonapiv1beta1.Install(scheme))
 
 	for _, tc := range []struct {
 		name        string
@@ -160,7 +160,7 @@ func Test_AgentHealthProber_CLF(t *testing.T) {
 	addLoggingCustomizedVariables(aodc)
 	addAODCConfigReference(managedClusterAddOn, aodc)
 	scheme := runtime.NewScheme()
-	require.NoError(t, addonapiv1alpha1.AddToScheme(scheme))
+	require.NoError(t, addonapiv1beta1.Install(scheme))
 
 	for _, tc := range []struct {
 		name        string
@@ -217,7 +217,7 @@ func Test_AgentHealthProber_OTELCol(t *testing.T) {
 	addTracingCustomizedVariables(aodc)
 	addAODCConfigReference(managedClusterAddOn, aodc)
 	scheme := runtime.NewScheme()
-	require.NoError(t, addonapiv1alpha1.AddToScheme(scheme))
+	require.NoError(t, addonapiv1beta1.Install(scheme))
 
 	for _, tc := range []struct {
 		name        string
@@ -274,7 +274,7 @@ func Test_AgentHealthProber_UIPlugin(t *testing.T) {
 	addPlatformMetricsCustomizedVariables(aodc)
 	addAODCConfigReference(managedClusterAddOn, aodc)
 	scheme := runtime.NewScheme()
-	require.NoError(t, addonapiv1alpha1.AddToScheme(scheme))
+	require.NoError(t, addonapiv1beta1.Install(scheme))
 
 	for _, tc := range []struct {
 		name        string
@@ -361,7 +361,7 @@ func Test_AgentHealthProber_MissingResources(t *testing.T) {
 	managedCluster := addontesting.NewManagedCluster("cluster-1")
 	managedClusterAddOn := addontesting.NewAddon("test", "cluster-1")
 	scheme := runtime.NewScheme()
-	require.NoError(t, addonapiv1alpha1.AddToScheme(scheme))
+	require.NoError(t, addonapiv1beta1.Install(scheme))
 
 	t.Run("metrics enabled but missing prometheus agent", func(t *testing.T) {
 		aodc := newAddonDeploymentConfig()
@@ -576,8 +576,8 @@ func TestIsVersionOlder(t *testing.T) {
 	}
 }
 
-func newAddonDeploymentConfig() *addonapiv1alpha1.AddOnDeploymentConfig {
-	return &addonapiv1alpha1.AddOnDeploymentConfig{
+func newAddonDeploymentConfig() *addonapiv1beta1.AddOnDeploymentConfig {
+	return &addonapiv1beta1.AddOnDeploymentConfig{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "multicluster-observability-addon",
 			Namespace: "open-cluster-management-observability",
@@ -585,8 +585,8 @@ func newAddonDeploymentConfig() *addonapiv1alpha1.AddOnDeploymentConfig {
 	}
 }
 
-func addPlatformMetricsCustomizedVariables(aodc *addonapiv1alpha1.AddOnDeploymentConfig) {
-	aodc.Spec.CustomizedVariables = append(aodc.Spec.CustomizedVariables, []addonapiv1alpha1.CustomizedVariable{
+func addPlatformMetricsCustomizedVariables(aodc *addonapiv1beta1.AddOnDeploymentConfig) {
+	aodc.Spec.CustomizedVariables = append(aodc.Spec.CustomizedVariables, []addonapiv1beta1.CustomizedVariable{
 		{
 			Name:  KeyPlatformMetricsCollection,
 			Value: string(PrometheusAgentV1alpha1),
@@ -598,8 +598,8 @@ func addPlatformMetricsCustomizedVariables(aodc *addonapiv1alpha1.AddOnDeploymen
 	}...)
 }
 
-func addLoggingCustomizedVariables(aodc *addonapiv1alpha1.AddOnDeploymentConfig) {
-	aodc.Spec.CustomizedVariables = append(aodc.Spec.CustomizedVariables, []addonapiv1alpha1.CustomizedVariable{
+func addLoggingCustomizedVariables(aodc *addonapiv1beta1.AddOnDeploymentConfig) {
+	aodc.Spec.CustomizedVariables = append(aodc.Spec.CustomizedVariables, []addonapiv1beta1.CustomizedVariable{
 		{
 			Name:  KeyPlatformLogsCollection,
 			Value: string(ClusterLogForwarderV1),
@@ -607,8 +607,8 @@ func addLoggingCustomizedVariables(aodc *addonapiv1alpha1.AddOnDeploymentConfig)
 	}...)
 }
 
-func addTracingCustomizedVariables(aodc *addonapiv1alpha1.AddOnDeploymentConfig) {
-	aodc.Spec.CustomizedVariables = append(aodc.Spec.CustomizedVariables, []addonapiv1alpha1.CustomizedVariable{
+func addTracingCustomizedVariables(aodc *addonapiv1beta1.AddOnDeploymentConfig) {
+	aodc.Spec.CustomizedVariables = append(aodc.Spec.CustomizedVariables, []addonapiv1beta1.CustomizedVariable{
 		{
 			Name:  KeyUserWorkloadTracesCollection,
 			Value: string(OpenTelemetryCollectorV1beta1),
@@ -616,8 +616,8 @@ func addTracingCustomizedVariables(aodc *addonapiv1alpha1.AddOnDeploymentConfig)
 	}...)
 }
 
-func addUIPluginCustomizedVariables(aodc *addonapiv1alpha1.AddOnDeploymentConfig) {
-	aodc.Spec.CustomizedVariables = append(aodc.Spec.CustomizedVariables, []addonapiv1alpha1.CustomizedVariable{
+func addUIPluginCustomizedVariables(aodc *addonapiv1beta1.AddOnDeploymentConfig) {
+	aodc.Spec.CustomizedVariables = append(aodc.Spec.CustomizedVariables, []addonapiv1beta1.CustomizedVariable{
 		{
 			Name:  KeyPlatformMetricsUI,
 			Value: string(UIPluginV1alpha1),
@@ -625,15 +625,15 @@ func addUIPluginCustomizedVariables(aodc *addonapiv1alpha1.AddOnDeploymentConfig
 	}...)
 }
 
-func addAODCConfigReference(managedClusterAddOn *addonapiv1alpha1.ManagedClusterAddOn, aodc *addonapiv1alpha1.AddOnDeploymentConfig) {
-	managedClusterAddOn.Status.ConfigReferences = []addonapiv1alpha1.ConfigReference{
+func addAODCConfigReference(managedClusterAddOn *addonapiv1beta1.ManagedClusterAddOn, aodc *addonapiv1beta1.AddOnDeploymentConfig) {
+	managedClusterAddOn.Status.ConfigReferences = []addonapiv1beta1.ConfigReference{
 		{
-			ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+			ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 				Group:    addonutils.AddOnDeploymentConfigGVR.Group,
 				Resource: addoncfg.AddonDeploymentConfigResource,
 			},
-			DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
-				ConfigReferent: addonapiv1alpha1.ConfigReferent{
+			DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+				ConfigReferent: addonapiv1beta1.ConfigReferent{
 					Namespace: aodc.Namespace,
 					Name:      aodc.Name,
 				},
@@ -642,8 +642,8 @@ func addAODCConfigReference(managedClusterAddOn *addonapiv1alpha1.ManagedCluster
 	}
 }
 
-func addUserWorkloadMetricsCustomizedVariables(aodc *addonapiv1alpha1.AddOnDeploymentConfig) {
-	aodc.Spec.CustomizedVariables = append(aodc.Spec.CustomizedVariables, []addonapiv1alpha1.CustomizedVariable{
+func addUserWorkloadMetricsCustomizedVariables(aodc *addonapiv1beta1.AddOnDeploymentConfig) {
+	aodc.Spec.CustomizedVariables = append(aodc.Spec.CustomizedVariables, []addonapiv1beta1.CustomizedVariable{
 		{
 			Name:  KeyUserWorkloadMetricsCollection,
 			Value: string(PrometheusAgentV1alpha1),

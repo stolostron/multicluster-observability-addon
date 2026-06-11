@@ -199,7 +199,7 @@ func TestEnqueueForConfigResource(t *testing.T) {
 
 			// Create a fake client
 			s := scheme.Scheme
-			s.AddKnownTypes(workv1.GroupVersion, &workv1.ManifestWork{}, &workv1.ManifestWorkList{})
+			_ = workv1.Install(s)
 			cl := fake.NewClientBuilder().
 				WithScheme(s).
 				WithObjects(manifestWork).

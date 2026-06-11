@@ -1,6 +1,7 @@
 package addon
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -9,7 +10,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"open-cluster-management.io/addon-framework/pkg/agent"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 )
 
@@ -17,7 +18,7 @@ type mockAgent struct {
 	manifests []runtime.Object
 }
 
-func (m *mockAgent) Manifests(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) ([]runtime.Object, error) {
+func (m *mockAgent) Manifests(_ context.Context, cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) ([]runtime.Object, error) {
 	return m.manifests, nil
 }
 
@@ -64,7 +65,7 @@ func TestManifestsSorting(t *testing.T) {
 		agent: mock,
 	}
 
-	sorted, err := prober.Manifests(nil, nil)
+	sorted, err := prober.Manifests(t.Context(), nil, nil)
 	require.NoError(t, err)
 	assert.Len(t, sorted, 4)
 

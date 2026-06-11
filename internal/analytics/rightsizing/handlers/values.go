@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 
+	cooprometheusv1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1"
 	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	"k8s.io/utils/ptr"
@@ -101,7 +102,7 @@ func BuildValues(opts Options) (*RightSizingValues, error) {
 // Right-sizing only runs on OpenShift clusters, so OCP defaults are used.
 func enrichScrapeConfigForPlatform(sc *cooprometheusv1alpha1.ScrapeConfig) {
 	sc.Spec.ScrapeClassName = ptr.To(mconfig.ScrapeClassCfgName)
-	sc.Spec.Scheme = ptr.To("HTTPS")
+	sc.Spec.Scheme = ptr.To(cooprometheusv1.Scheme("HTTPS"))
 	sc.Spec.StaticConfigs = []cooprometheusv1alpha1.StaticConfig{
 		{
 			Targets: []cooprometheusv1alpha1.Target{

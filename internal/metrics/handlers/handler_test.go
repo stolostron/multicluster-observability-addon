@@ -30,7 +30,7 @@ import (
 	intstr "k8s.io/apimachinery/pkg/util/intstr"
 	kubescheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/utils/ptr"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	workv1 "open-cluster-management.io/api/work/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -52,10 +52,10 @@ func TestBuildOptions(t *testing.T) {
 	require.NoError(t, cooprometheusv1alpha1.AddToScheme(scheme))
 	require.NoError(t, cooprometheusv1.AddToScheme(scheme))
 	require.NoError(t, prometheusv1.AddToScheme(scheme))
-	require.NoError(t, clusterv1.AddToScheme(scheme))
-	require.NoError(t, addonapiv1alpha1.AddToScheme(scheme))
+	require.NoError(t, clusterv1.Install(scheme))
+	require.NoError(t, addonapiv1beta1.Install(scheme))
 	require.NoError(t, hyperv1.AddToScheme(scheme))
-	require.NoError(t, workv1.AddToScheme(scheme))
+	require.NoError(t, workv1.Install(scheme))
 
 	platformAgent := &cooprometheusv1alpha1.PrometheusAgent{
 		ObjectMeta: metav1.ObjectMeta{
@@ -143,56 +143,56 @@ func TestBuildOptions(t *testing.T) {
 		},
 	}
 
-	platformManagedClusterAddOn := &addonapiv1alpha1.ManagedClusterAddOn{
+	platformManagedClusterAddOn := &addonapiv1beta1.ManagedClusterAddOn{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: spokeName,
 			Name:      "observability-controller",
 		},
-		Status: addonapiv1alpha1.ManagedClusterAddOnStatus{
-			ConfigReferences: []addonapiv1alpha1.ConfigReference{
+		Status: addonapiv1beta1.ManagedClusterAddOnStatus{
+			ConfigReferences: []addonapiv1beta1.ConfigReference{
 				{
-					ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+					ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 						Group:    "monitoring.rhobs",
 						Resource: cooprometheusv1alpha1.PrometheusAgentName,
 					},
-					DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
-						ConfigReferent: addonapiv1alpha1.ConfigReferent{
+					DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+						ConfigReferent: addonapiv1beta1.ConfigReferent{
 							Name:      platformAgent.Name,
 							Namespace: platformAgent.Namespace,
 						},
 					},
 				},
 				{
-					ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+					ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 						Group:    "",
 						Resource: "configmaps",
 					},
-					DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
-						ConfigReferent: addonapiv1alpha1.ConfigReferent{
+					DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+						ConfigReferent: addonapiv1beta1.ConfigReferent{
 							Name:      platformHAProxyCM.Name,
 							Namespace: platformHAProxyCM.Namespace,
 						},
 					},
 				},
 				{
-					ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+					ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 						Group:    "monitoring.rhobs",
 						Resource: cooprometheusv1alpha1.ScrapeConfigName,
 					},
-					DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
-						ConfigReferent: addonapiv1alpha1.ConfigReferent{
+					DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+						ConfigReferent: addonapiv1beta1.ConfigReferent{
 							Name:      platformScrapeConfig.Name,
 							Namespace: platformScrapeConfig.Namespace,
 						},
 					},
 				},
 				{
-					ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+					ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 						Group:    "monitoring.coreos.com",
 						Resource: prometheusv1.PrometheusRuleName,
 					},
-					DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
-						ConfigReferent: addonapiv1alpha1.ConfigReferent{
+					DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+						ConfigReferent: addonapiv1beta1.ConfigReferent{
 							Name:      platformRule.Name,
 							Namespace: platformRule.Namespace,
 						},
@@ -202,7 +202,7 @@ func TestBuildOptions(t *testing.T) {
 		},
 	}
 
-	cmao := &addonapiv1alpha1.ClusterManagementAddOn{
+	cmao := &addonapiv1beta1.ClusterManagementAddOn{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: addoncfg.Name,
 			UID:  types.UID("test-cmao-uid"),
@@ -311,7 +311,7 @@ func TestBuildOptions(t *testing.T) {
 	}
 
 	testCases := map[string]struct {
-		addon                *addonapiv1alpha1.ManagedClusterAddOn
+		addon                *addonapiv1beta1.ManagedClusterAddOn
 		platformEnabled      bool
 		userWorkloadsEnabled bool
 		proxyConfig          *addon.ProxyConfig
@@ -369,7 +369,7 @@ func TestBuildOptions(t *testing.T) {
 			},
 		},
 		"missing config reference": {
-			addon: &addonapiv1alpha1.ManagedClusterAddOn{
+			addon: &addonapiv1beta1.ManagedClusterAddOn{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: spokeName,
 					Name:      "observability-controller",
@@ -441,32 +441,32 @@ func TestBuildOptions(t *testing.T) {
 		},
 		"user workloads collection is enabled": {
 			resources: createResources,
-			addon: &addonapiv1alpha1.ManagedClusterAddOn{
+			addon: &addonapiv1beta1.ManagedClusterAddOn{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: spokeName,
 					Name:      "observability-controller",
 				},
-				Status: addonapiv1alpha1.ManagedClusterAddOnStatus{
-					ConfigReferences: []addonapiv1alpha1.ConfigReference{
+				Status: addonapiv1beta1.ManagedClusterAddOnStatus{
+					ConfigReferences: []addonapiv1beta1.ConfigReference{
 						{
-							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 								Group:    "monitoring.rhobs",
 								Resource: cooprometheusv1alpha1.PrometheusAgentName,
 							},
-							DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
-								ConfigReferent: addonapiv1alpha1.ConfigReferent{
+							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+								ConfigReferent: addonapiv1beta1.ConfigReferent{
 									Name:      uwlAgent.Name,
 									Namespace: uwlAgent.Namespace,
 								},
 							},
 						},
 						{
-							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 								Group:    "",
 								Resource: "configmaps",
 							},
-							DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
-								ConfigReferent: addonapiv1alpha1.ConfigReferent{
+							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+								ConfigReferent: addonapiv1beta1.ConfigReferent{
 									Name:      uwlHAProxyCM.Name,
 									Namespace: uwlHAProxyCM.Namespace,
 								},
@@ -492,44 +492,44 @@ func TestBuildOptions(t *testing.T) {
 			resources: func() []client.Object {
 				return append(createResources(), uwlCooRule.DeepCopy())
 			},
-			addon: &addonapiv1alpha1.ManagedClusterAddOn{
+			addon: &addonapiv1beta1.ManagedClusterAddOn{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: spokeName,
 					Name:      "observability-controller",
 				},
-				Status: addonapiv1alpha1.ManagedClusterAddOnStatus{
-					ConfigReferences: []addonapiv1alpha1.ConfigReference{
+				Status: addonapiv1beta1.ManagedClusterAddOnStatus{
+					ConfigReferences: []addonapiv1beta1.ConfigReference{
 						{
-							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 								Group:    "monitoring.rhobs",
 								Resource: cooprometheusv1alpha1.PrometheusAgentName,
 							},
-							DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
-								ConfigReferent: addonapiv1alpha1.ConfigReferent{
+							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+								ConfigReferent: addonapiv1beta1.ConfigReferent{
 									Name:      uwlAgent.Name,
 									Namespace: uwlAgent.Namespace,
 								},
 							},
 						},
 						{
-							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 								Group:    "",
 								Resource: "configmaps",
 							},
-							DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
-								ConfigReferent: addonapiv1alpha1.ConfigReferent{
+							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+								ConfigReferent: addonapiv1beta1.ConfigReferent{
 									Name:      uwlHAProxyCM.Name,
 									Namespace: uwlHAProxyCM.Namespace,
 								},
 							},
 						},
 						{
-							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 								Group:    "monitoring.rhobs",
 								Resource: cooprometheusv1.PrometheusRuleName,
 							},
-							DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
-								ConfigReferent: addonapiv1alpha1.ConfigReferent{
+							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+								ConfigReferent: addonapiv1beta1.ConfigReferent{
 									Name:      uwlCooRule.Name,
 									Namespace: uwlCooRule.Namespace,
 								},
@@ -550,80 +550,80 @@ func TestBuildOptions(t *testing.T) {
 			},
 		},
 		"user workload is enabled and is hypershift hub": {
-			addon: &addonapiv1alpha1.ManagedClusterAddOn{
+			addon: &addonapiv1beta1.ManagedClusterAddOn{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: spokeName,
 					Name:      "observability-controller",
 				},
-				Status: addonapiv1alpha1.ManagedClusterAddOnStatus{
-					ConfigReferences: []addonapiv1alpha1.ConfigReference{
+				Status: addonapiv1beta1.ManagedClusterAddOnStatus{
+					ConfigReferences: []addonapiv1beta1.ConfigReference{
 						{
-							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 								Group:    "monitoring.rhobs",
 								Resource: cooprometheusv1alpha1.PrometheusAgentName,
 							},
-							DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
-								ConfigReferent: addonapiv1alpha1.ConfigReferent{
+							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+								ConfigReferent: addonapiv1beta1.ConfigReferent{
 									Name:      uwlAgent.Name,
 									Namespace: uwlAgent.Namespace,
 								},
 							},
 						},
 						{
-							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 								Group:    "",
 								Resource: "configmaps",
 							},
-							DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
-								ConfigReferent: addonapiv1alpha1.ConfigReferent{
+							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+								ConfigReferent: addonapiv1beta1.ConfigReferent{
 									Name:      uwlHAProxyCM.Name,
 									Namespace: uwlHAProxyCM.Namespace,
 								},
 							},
 						},
 						{
-							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 								Group:    "",
 								Resource: "scrapeconfigs",
 							},
-							DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
-								ConfigReferent: addonapiv1alpha1.ConfigReferent{
+							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+								ConfigReferent: addonapiv1beta1.ConfigReferent{
 									Name:      "etcd-base",
 									Namespace: hubNamespace,
 								},
 							},
 						},
 						{
-							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 								Group:    "",
 								Resource: "scrapeconfigs",
 							},
-							DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
-								ConfigReferent: addonapiv1alpha1.ConfigReferent{
+							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+								ConfigReferent: addonapiv1beta1.ConfigReferent{
 									Name:      "apiserver-base",
 									Namespace: hubNamespace,
 								},
 							},
 						},
 						{
-							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 								Group:    "",
 								Resource: "prometheusrules",
 							},
-							DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
-								ConfigReferent: addonapiv1alpha1.ConfigReferent{
+							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+								ConfigReferent: addonapiv1beta1.ConfigReferent{
 									Name:      "etcd-base",
 									Namespace: hubNamespace,
 								},
 							},
 						},
 						{
-							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 								Group:    "",
 								Resource: "prometheusrules",
 							},
-							DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
-								ConfigReferent: addonapiv1alpha1.ConfigReferent{
+							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+								ConfigReferent: addonapiv1beta1.ConfigReferent{
 									Name:      "apiserver-base",
 									Namespace: hubNamespace,
 								},
@@ -836,7 +836,7 @@ func newManifestWork(name string, isOLMSubscrided bool) *workv1.ManifestWork {
 			Name:      name,
 			Namespace: name,
 			Labels: map[string]string{
-				addonapiv1alpha1.AddonLabelKey: addoncfg.Name,
+				addonapiv1beta1.AddonLabelKey: addoncfg.Name,
 			},
 		},
 		Status: workv1.ManifestWorkStatus{

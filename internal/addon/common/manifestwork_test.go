@@ -20,7 +20,7 @@ const (
 
 func newTestScheme(t *testing.T) *runtime.Scheme {
 	scheme := runtime.NewScheme()
-	require.NoError(t, workv1.AddToScheme(scheme))
+	require.NoError(t, workv1.Install(scheme))
 	return scheme
 }
 

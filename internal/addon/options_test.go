@@ -8,13 +8,13 @@ import (
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 )
 
 func TestBuildOptions(t *testing.T) {
 	testCases := []struct {
 		name           string
-		addOnDeploy    *addonapiv1alpha1.AddOnDeploymentConfig
+		addOnDeploy    *addonapiv1beta1.AddOnDeploymentConfig
 		expectedOpts   Options
 		expectedErrMsg string
 	}{
@@ -25,8 +25,8 @@ func TestBuildOptions(t *testing.T) {
 		},
 		{
 			name: "empty CustomizedVariables",
-			addOnDeploy: &addonapiv1alpha1.AddOnDeploymentConfig{
-				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{},
+			addOnDeploy: &addonapiv1beta1.AddOnDeploymentConfig{
+				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{},
 			},
 			expectedOpts: Options{
 				Platform: PlatformOptions{
@@ -42,9 +42,9 @@ func TestBuildOptions(t *testing.T) {
 		},
 		{
 			name: "invalid name key",
-			addOnDeploy: &addonapiv1alpha1.AddOnDeploymentConfig{
-				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
-					CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
+			addOnDeploy: &addonapiv1beta1.AddOnDeploymentConfig{
+				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+					CustomizedVariables: []addonapiv1beta1.CustomizedVariable{
 						{Name: "foo", Value: ""},
 					},
 				},
@@ -63,9 +63,9 @@ func TestBuildOptions(t *testing.T) {
 		},
 		{
 			name: "valid metrics without scheme for hub",
-			addOnDeploy: &addonapiv1alpha1.AddOnDeploymentConfig{
-				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
-					CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
+			addOnDeploy: &addonapiv1beta1.AddOnDeploymentConfig{
+				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+					CustomizedVariables: []addonapiv1beta1.CustomizedVariable{
 						{Name: KeyPlatformMetricsCollection, Value: string(PrometheusAgentV1alpha1)},
 						{Name: KeyUserWorkloadMetricsCollection, Value: string(PrometheusAgentV1alpha1)},
 						{Name: KeyMetricsHubHostname, Value: "metrics.example.com"},
@@ -106,9 +106,9 @@ func TestBuildOptions(t *testing.T) {
 		},
 		{
 			name: "valid metrics",
-			addOnDeploy: &addonapiv1alpha1.AddOnDeploymentConfig{
-				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
-					CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
+			addOnDeploy: &addonapiv1beta1.AddOnDeploymentConfig{
+				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+					CustomizedVariables: []addonapiv1beta1.CustomizedVariable{
 						{Name: KeyPlatformMetricsCollection, Value: string(PrometheusAgentV1alpha1)},
 						{Name: KeyUserWorkloadMetricsCollection, Value: string(PrometheusAgentV1alpha1)},
 						{Name: KeyMetricsHubHostname, Value: "https://metrics.example.com"},
@@ -149,9 +149,9 @@ func TestBuildOptions(t *testing.T) {
 		},
 		{
 			name: "invalid metrics hub hostname",
-			addOnDeploy: &addonapiv1alpha1.AddOnDeploymentConfig{
-				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
-					CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
+			addOnDeploy: &addonapiv1beta1.AddOnDeploymentConfig{
+				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+					CustomizedVariables: []addonapiv1beta1.CustomizedVariable{
 						{Name: KeyMetricsHubHostname, Value: "://invalid-url"},
 					},
 				},
@@ -160,9 +160,9 @@ func TestBuildOptions(t *testing.T) {
 		},
 		{
 			name: "valid logs",
-			addOnDeploy: &addonapiv1alpha1.AddOnDeploymentConfig{
-				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
-					CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
+			addOnDeploy: &addonapiv1beta1.AddOnDeploymentConfig{
+				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+					CustomizedVariables: []addonapiv1beta1.CustomizedVariable{
 						{Name: KeyOpenShiftLoggingChannel, Value: "stable-6"},
 						{Name: KeyPlatformLogsCollection, Value: string(ClusterLogForwarderV1)},
 						{Name: KeyUserWorkloadLogsCollection, Value: string(ClusterLogForwarderV1)},
@@ -194,9 +194,9 @@ func TestBuildOptions(t *testing.T) {
 		},
 		{
 			name: "valid otel",
-			addOnDeploy: &addonapiv1alpha1.AddOnDeploymentConfig{
-				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
-					CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
+			addOnDeploy: &addonapiv1beta1.AddOnDeploymentConfig{
+				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+					CustomizedVariables: []addonapiv1beta1.CustomizedVariable{
 						{Name: KeyUserWorkloadTracesCollection, Value: string(OpenTelemetryCollectorV1beta1)},
 						{Name: KeyUserWorkloadInstrumentation, Value: string(InstrumentationV1alpha1)},
 					},
@@ -223,9 +223,9 @@ func TestBuildOptions(t *testing.T) {
 		},
 		{
 			name: "valid incident detection",
-			addOnDeploy: &addonapiv1alpha1.AddOnDeploymentConfig{
-				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
-					CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
+			addOnDeploy: &addonapiv1beta1.AddOnDeploymentConfig{
+				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+					CustomizedVariables: []addonapiv1beta1.CustomizedVariable{
 						{Name: KeyPlatformIncidentDetection, Value: string(UIPluginV1alpha1)},
 					},
 				},
@@ -247,9 +247,9 @@ func TestBuildOptions(t *testing.T) {
 		},
 		{
 			name: "right-sizing enabled explicitly",
-			addOnDeploy: &addonapiv1alpha1.AddOnDeploymentConfig{
-				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
-					CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
+			addOnDeploy: &addonapiv1beta1.AddOnDeploymentConfig{
+				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+					CustomizedVariables: []addonapiv1beta1.CustomizedVariable{
 						{Name: KeyPlatformNamespaceRightSizing, Value: "enabled"},
 						{Name: KeyPlatformVirtualizationRightSizing, Value: "enabled"},
 					},
@@ -269,9 +269,9 @@ func TestBuildOptions(t *testing.T) {
 		},
 		{
 			name: "right-sizing disabled explicitly",
-			addOnDeploy: &addonapiv1alpha1.AddOnDeploymentConfig{
-				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
-					CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
+			addOnDeploy: &addonapiv1beta1.AddOnDeploymentConfig{
+				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+					CustomizedVariables: []addonapiv1beta1.CustomizedVariable{
 						{Name: KeyPlatformNamespaceRightSizing, Value: "disabled"},
 						{Name: KeyPlatformVirtualizationRightSizing, Value: "disabled"},
 					},
@@ -286,9 +286,9 @@ func TestBuildOptions(t *testing.T) {
 		},
 		{
 			name: "valid node selector and tolerations",
-			addOnDeploy: &addonapiv1alpha1.AddOnDeploymentConfig{
-				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
-					NodePlacement: &addonapiv1alpha1.NodePlacement{
+			addOnDeploy: &addonapiv1beta1.AddOnDeploymentConfig{
+				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+					NodePlacement: &addonapiv1beta1.NodePlacement{
 						NodeSelector: map[string]string{"node-role.kubernetes.io/infra": ""},
 						Tolerations: []corev1.Toleration{
 							{
@@ -298,7 +298,7 @@ func TestBuildOptions(t *testing.T) {
 							},
 						},
 					},
-					CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
+					CustomizedVariables: []addonapiv1beta1.CustomizedVariable{
 						{Name: KeyPlatformNamespaceRightSizing, Value: "disabled"},
 						{Name: KeyPlatformVirtualizationRightSizing, Value: "disabled"},
 					},
@@ -318,9 +318,9 @@ func TestBuildOptions(t *testing.T) {
 		},
 		{
 			name: "valid resource requirements",
-			addOnDeploy: &addonapiv1alpha1.AddOnDeploymentConfig{
-				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
-					ResourceRequirements: []addonapiv1alpha1.ContainerResourceRequirements{
+			addOnDeploy: &addonapiv1beta1.AddOnDeploymentConfig{
+				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+					ResourceRequirements: []addonapiv1beta1.ContainerResourceRequirements{
 						{
 							ContainerID: "deployments:platform-metrics:collector",
 							Resources: corev1.ResourceRequirements{
@@ -338,7 +338,7 @@ func TestBuildOptions(t *testing.T) {
 				},
 			},
 			expectedOpts: Options{
-				ResourceReqs: []addonapiv1alpha1.ContainerResourceRequirements{
+				ResourceReqs: []addonapiv1beta1.ContainerResourceRequirements{
 					{
 						ContainerID: "deployments:platform-metrics:collector",
 						Resources: corev1.ResourceRequirements{
@@ -366,13 +366,13 @@ func TestBuildOptions(t *testing.T) {
 		},
 		{
 			name: "valid http proxy and no proxy",
-			addOnDeploy: &addonapiv1alpha1.AddOnDeploymentConfig{
-				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
-					ProxyConfig: addonapiv1alpha1.ProxyConfig{
+			addOnDeploy: &addonapiv1beta1.AddOnDeploymentConfig{
+				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+					ProxyConfig: addonapiv1beta1.ProxyConfig{
 						HTTPProxy: "http://proxy.example.com:8080",
 						NoProxy:   "*.example.com",
 					},
-					CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
+					CustomizedVariables: []addonapiv1beta1.CustomizedVariable{
 						{Name: KeyPlatformNamespaceRightSizing, Value: "disabled"},
 						{Name: KeyPlatformVirtualizationRightSizing, Value: "disabled"},
 					},
@@ -391,9 +391,9 @@ func TestBuildOptions(t *testing.T) {
 		},
 		{
 			name: "valid node exporter ports",
-			addOnDeploy: &addonapiv1alpha1.AddOnDeploymentConfig{
-				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
-					CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
+			addOnDeploy: &addonapiv1beta1.AddOnDeploymentConfig{
+				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+					CustomizedVariables: []addonapiv1beta1.CustomizedVariable{
 						{Name: KeyNodeExporterHostPort, Value: "19100"},
 						{Name: KeyNodeExporterInternalPort, Value: "19101"},
 					},
@@ -419,9 +419,9 @@ func TestBuildOptions(t *testing.T) {
 		},
 		{
 			name: "invalid node exporter host port - format",
-			addOnDeploy: &addonapiv1alpha1.AddOnDeploymentConfig{
-				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
-					CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
+			addOnDeploy: &addonapiv1beta1.AddOnDeploymentConfig{
+				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+					CustomizedVariables: []addonapiv1beta1.CustomizedVariable{
 						{Name: KeyNodeExporterHostPort, Value: "abc"},
 					},
 				},
@@ -430,9 +430,9 @@ func TestBuildOptions(t *testing.T) {
 		},
 		{
 			name: "invalid node exporter host port - out of bounds high",
-			addOnDeploy: &addonapiv1alpha1.AddOnDeploymentConfig{
-				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
-					CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
+			addOnDeploy: &addonapiv1beta1.AddOnDeploymentConfig{
+				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+					CustomizedVariables: []addonapiv1beta1.CustomizedVariable{
 						{Name: KeyNodeExporterHostPort, Value: "65536"},
 					},
 				},
@@ -441,9 +441,9 @@ func TestBuildOptions(t *testing.T) {
 		},
 		{
 			name: "invalid node exporter port - out of bounds low",
-			addOnDeploy: &addonapiv1alpha1.AddOnDeploymentConfig{
-				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
-					CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
+			addOnDeploy: &addonapiv1beta1.AddOnDeploymentConfig{
+				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+					CustomizedVariables: []addonapiv1beta1.CustomizedVariable{
 						{Name: KeyNodeExporterInternalPort, Value: "0"},
 					},
 				},

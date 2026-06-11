@@ -21,7 +21,7 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
 	"open-cluster-management.io/addon-framework/pkg/agent"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
@@ -32,7 +32,7 @@ var (
 	_ = operatorsv1alpha1.AddToScheme(scheme.Scheme)
 	_ = prometheusv1.AddToScheme(scheme.Scheme)
 	_ = cooprometheusv1alpha1.AddToScheme(scheme.Scheme)
-	_ = addonapiv1alpha1.AddToScheme(scheme.Scheme)
+	_ = addonapiv1beta1.Install(scheme.Scheme)
 	_ = apiextensionsv1.AddToScheme(scheme.Scheme)
 	_ = uiplugin.AddToScheme(scheme.Scheme)
 )
@@ -41,7 +41,7 @@ func Test_Supported_Vendors(t *testing.T) {
 	for _, tc := range []struct {
 		name                  string
 		managedClusterLabels  map[string]string
-		addonDeploymentConfig []addonapiv1alpha1.CustomizedVariable
+		addonDeploymentConfig []addonapiv1beta1.CustomizedVariable
 		expectedObjects       bool
 	}{
 		{
@@ -52,7 +52,7 @@ func Test_Supported_Vendors(t *testing.T) {
 			managedClusterLabels: map[string]string{
 				"vendor": "OpenShift",
 			},
-			addonDeploymentConfig: []addonapiv1alpha1.CustomizedVariable{},
+			addonDeploymentConfig: []addonapiv1beta1.CustomizedVariable{},
 			expectedObjects:       true,
 		},
 		{
@@ -60,7 +60,7 @@ func Test_Supported_Vendors(t *testing.T) {
 			managedClusterLabels: map[string]string{
 				"vendor": "OpenShift",
 			},
-			addonDeploymentConfig: []addonapiv1alpha1.CustomizedVariable{
+			addonDeploymentConfig: []addonapiv1beta1.CustomizedVariable{
 				{
 					Name:  addon.KeyPlatformLogsCollection,
 					Value: string(addon.ClusterLogForwarderV1),
@@ -73,7 +73,7 @@ func Test_Supported_Vendors(t *testing.T) {
 			managedClusterLabels: map[string]string{
 				"vendor": "foo",
 			},
-			addonDeploymentConfig: []addonapiv1alpha1.CustomizedVariable{
+			addonDeploymentConfig: []addonapiv1beta1.CustomizedVariable{
 				{
 					Name:  addon.KeyPlatformLogsCollection,
 					Value: string(addon.ClusterLogForwarderV1),
@@ -85,43 +85,47 @@ func Test_Supported_Vendors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			var (
 				managedCluster        *clusterv1.ManagedCluster
-				managedClusterAddOn   *addonapiv1alpha1.ManagedClusterAddOn
-				addOnDeploymentConfig *addonapiv1alpha1.AddOnDeploymentConfig
+				managedClusterAddOn   *addonapiv1beta1.ManagedClusterAddOn
+				addOnDeploymentConfig *addonapiv1beta1.AddOnDeploymentConfig
 			)
 
 			managedCluster = addontesting.NewManagedCluster("cluster-1")
 			managedCluster.Labels = tc.managedClusterLabels
 			managedClusterAddOn = addontesting.NewAddon("test", "cluster-1")
 
-			managedClusterAddOn.Status.ConfigReferences = []addonapiv1alpha1.ConfigReference{
+			managedClusterAddOn.Status.ConfigReferences = []addonapiv1beta1.ConfigReference{
 				{
-					ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+					ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 						Group:    "addon.open-cluster-management.io",
 						Resource: "addondeploymentconfigs",
 					},
-					ConfigReferent: addonapiv1alpha1.ConfigReferent{
-						Name:      "multicluster-observability-addon",
-						Namespace: "open-cluster-management-observability",
+					DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+						ConfigReferent: addonapiv1beta1.ConfigReferent{
+							Name:      "multicluster-observability-addon",
+							Namespace: "open-cluster-management-observability",
+						},
 					},
 				},
 				{
-					ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+					ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 						Group:    "observability.openshift.io",
 						Resource: "clusterlogforwarders",
 					},
-					ConfigReferent: addonapiv1alpha1.ConfigReferent{
-						Namespace: "open-cluster-management-observability",
-						Name:      "mcoa-instance",
+					DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+						ConfigReferent: addonapiv1beta1.ConfigReferent{
+							Namespace: "open-cluster-management-observability",
+							Name:      "mcoa-instance",
+						},
 					},
 				},
 			}
 
-			addOnDeploymentConfig = &addonapiv1alpha1.AddOnDeploymentConfig{
+			addOnDeploymentConfig = &addonapiv1beta1.AddOnDeploymentConfig{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "multicluster-observability-addon",
 					Namespace: "open-cluster-management-observability",
 				},
-				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
+				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
 					CustomizedVariables: tc.addonDeploymentConfig,
 				},
 			}
@@ -194,7 +198,7 @@ func Test_Supported_Vendors(t *testing.T) {
 				klog.Fatalf("failed to build agent %v", err)
 			}
 
-			objects, err := loggingAgentAddon.Manifests(managedCluster, managedClusterAddOn)
+			objects, err := loggingAgentAddon.Manifests(t.Context(), managedCluster, managedClusterAddOn)
 			require.NoError(t, err)
 			if tc.expectedObjects {
 				require.NotEmpty(t, objects)
@@ -218,26 +222,28 @@ func TestRSOnlyBothDisabled_ManifestsNotEmpty(t *testing.T) {
 	managedCluster.Labels = map[string]string{"vendor": "OpenShift"}
 
 	managedClusterAddOn := addontesting.NewAddon("test", "cluster-1")
-	managedClusterAddOn.Status.ConfigReferences = []addonapiv1alpha1.ConfigReference{
+	managedClusterAddOn.Status.ConfigReferences = []addonapiv1beta1.ConfigReference{
 		{
-			ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+			ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 				Group:    "addon.open-cluster-management.io",
 				Resource: "addondeploymentconfigs",
 			},
-			ConfigReferent: addonapiv1alpha1.ConfigReferent{
-				Name:      "multicluster-observability-addon",
-				Namespace: "open-cluster-management-observability",
+			DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+				ConfigReferent: addonapiv1beta1.ConfigReferent{
+					Name:      "multicluster-observability-addon",
+					Namespace: "open-cluster-management-observability",
+				},
 			},
 		},
 	}
 
-	addOnDeploymentConfig := &addonapiv1alpha1.AddOnDeploymentConfig{
+	addOnDeploymentConfig := &addonapiv1beta1.AddOnDeploymentConfig{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "multicluster-observability-addon",
 			Namespace: "open-cluster-management-observability",
 		},
-		Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
-			CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
+		Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+			CustomizedVariables: []addonapiv1beta1.CustomizedVariable{
 				{Name: addon.KeyPlatformNamespaceRightSizing, Value: "disabled"},
 				{Name: addon.KeyPlatformVirtualizationRightSizing, Value: "disabled"},
 			},
@@ -256,7 +262,7 @@ func TestRSOnlyBothDisabled_ManifestsNotEmpty(t *testing.T) {
 		BuildHelmAgentAddon()
 	require.NoError(t, err)
 
-	objects, err := agentAddon.Manifests(managedCluster, managedClusterAddOn)
+	objects, err := agentAddon.Manifests(t.Context(), managedCluster, managedClusterAddOn)
 	require.NoError(t, err)
 
 	// Manifests must be non-empty so the addon framework can compare and prune stale content

@@ -8,7 +8,7 @@ import (
 
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	corev1 "k8s.io/api/core/v1"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 )
 
 const (
@@ -124,9 +124,9 @@ type Options struct {
 	InstallNamespace string
 	Tolerations      []corev1.Toleration
 	NodeSelector     map[string]string
-	ResourceReqs     []addonapiv1alpha1.ContainerResourceRequirements
+	ResourceReqs     []addonapiv1beta1.ContainerResourceRequirements
 	ProxyConfig      ProxyConfig
-	Registries       []addonapiv1alpha1.ImageMirror
+	Registries       []addonapiv1beta1.ImageMirror
 }
 
 func (o Options) validate() error {
@@ -150,7 +150,7 @@ func (o Options) validateMetrics() error {
 }
 
 // BuildOptions parses an AddOnDeploymentConfig into addon Options.
-func BuildOptions(addOnDeployment *addonapiv1alpha1.AddOnDeploymentConfig) (Options, error) {
+func BuildOptions(addOnDeployment *addonapiv1beta1.AddOnDeploymentConfig) (Options, error) {
 	var opts Options
 	if addOnDeployment == nil {
 		return opts, nil

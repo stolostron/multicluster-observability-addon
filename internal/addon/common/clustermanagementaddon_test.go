@@ -7,102 +7,102 @@ import (
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 )
 
 func TestEnsureConfigsInAddon(t *testing.T) {
-	paConfigGR := addonv1alpha1.ConfigGroupResource{
+	paConfigGR := addonv1beta1.ConfigGroupResource{
 		Group:    cooprometheusv1alpha1.SchemeGroupVersion.Group,
 		Resource: cooprometheusv1alpha1.PrometheusAgentName,
 	}
-	platformConfig := addonv1alpha1.AddOnConfig{
+	platformConfig := addonv1beta1.AddOnConfig{
 		ConfigGroupResource: paConfigGR,
-		ConfigReferent: addonv1alpha1.ConfigReferent{
+		ConfigReferent: addonv1beta1.ConfigReferent{
 			Name:      "platform-agent",
 			Namespace: "ns",
 		},
 	}
-	uwlConfig := addonv1alpha1.AddOnConfig{
+	uwlConfig := addonv1beta1.AddOnConfig{
 		ConfigGroupResource: paConfigGR,
-		ConfigReferent: addonv1alpha1.ConfigReferent{
+		ConfigReferent: addonv1beta1.ConfigReferent{
 			Name:      "user-workload-agent",
 			Namespace: "ns",
 		},
 	}
 
-	placementRefA := addonv1alpha1.PlacementRef{
+	placementRefA := addonv1beta1.PlacementRef{
 		Namespace: "ns",
 		Name:      "a",
 	}
-	placementRefB := addonv1alpha1.PlacementRef{
+	placementRefB := addonv1beta1.PlacementRef{
 		Namespace: "ns",
 		Name:      "b",
 	}
 
 	testCases := []struct {
 		name               string
-		initialPlacements  []addonv1alpha1.PlacementStrategy
+		initialPlacements  []addonv1beta1.PlacementStrategy
 		inputConfigs       []DefaultConfig
-		expectedPlacements []addonv1alpha1.PlacementStrategy
+		expectedPlacements []addonv1beta1.PlacementStrategy
 	}{
 		{
 			name: "empty config list",
-			initialPlacements: []addonv1alpha1.PlacementStrategy{
+			initialPlacements: []addonv1beta1.PlacementStrategy{
 				{
 					PlacementRef: placementRefA,
-					Configs:      []addonv1alpha1.AddOnConfig{platformConfig},
+					Configs:      []addonv1beta1.AddOnConfig{platformConfig},
 				},
 			},
 			inputConfigs: []DefaultConfig{},
-			expectedPlacements: []addonv1alpha1.PlacementStrategy{
+			expectedPlacements: []addonv1beta1.PlacementStrategy{
 				{
 					PlacementRef: placementRefA,
-					Configs:      []addonv1alpha1.AddOnConfig{platformConfig},
+					Configs:      []addonv1beta1.AddOnConfig{platformConfig},
 				},
 			},
 		},
 		{
 			name: "no configs to add - all present",
-			initialPlacements: []addonv1alpha1.PlacementStrategy{
+			initialPlacements: []addonv1beta1.PlacementStrategy{
 				{
 					PlacementRef: placementRefA,
-					Configs:      []addonv1alpha1.AddOnConfig{platformConfig},
+					Configs:      []addonv1beta1.AddOnConfig{platformConfig},
 				},
 			},
 			inputConfigs: []DefaultConfig{
 				{PlacementRef: placementRefA, Config: platformConfig},
 			},
-			expectedPlacements: []addonv1alpha1.PlacementStrategy{
+			expectedPlacements: []addonv1beta1.PlacementStrategy{
 				{
 					PlacementRef: placementRefA,
-					Configs:      []addonv1alpha1.AddOnConfig{platformConfig},
+					Configs:      []addonv1beta1.AddOnConfig{platformConfig},
 				},
 			},
 		},
 		{
 			name: "add config to existing placement",
-			initialPlacements: []addonv1alpha1.PlacementStrategy{
+			initialPlacements: []addonv1beta1.PlacementStrategy{
 				{
 					PlacementRef: placementRefA,
-					Configs:      []addonv1alpha1.AddOnConfig{platformConfig},
+					Configs:      []addonv1beta1.AddOnConfig{platformConfig},
 				},
 			},
 			inputConfigs: []DefaultConfig{
 				{PlacementRef: placementRefA, Config: platformConfig},
 				{PlacementRef: placementRefA, Config: uwlConfig},
 			},
-			expectedPlacements: []addonv1alpha1.PlacementStrategy{
+			expectedPlacements: []addonv1beta1.PlacementStrategy{
 				{
-					Configs:      []addonv1alpha1.AddOnConfig{platformConfig, uwlConfig},
+					Configs:      []addonv1beta1.AddOnConfig{platformConfig, uwlConfig},
 					PlacementRef: placementRefA,
 				},
 			},
 		},
 		{
 			name: "add config to empty placement",
-			initialPlacements: []addonv1alpha1.PlacementStrategy{
+			initialPlacements: []addonv1beta1.PlacementStrategy{
 				{
-					Configs:      []addonv1alpha1.AddOnConfig{platformConfig},
+					Configs:      []addonv1beta1.AddOnConfig{platformConfig},
 					PlacementRef: placementRefA,
 				},
 				{
@@ -113,40 +113,40 @@ func TestEnsureConfigsInAddon(t *testing.T) {
 				{PlacementRef: placementRefA, Config: platformConfig},
 				{PlacementRef: placementRefB, Config: platformConfig},
 			},
-			expectedPlacements: []addonv1alpha1.PlacementStrategy{
+			expectedPlacements: []addonv1beta1.PlacementStrategy{
 				{
-					Configs:      []addonv1alpha1.AddOnConfig{platformConfig},
+					Configs:      []addonv1beta1.AddOnConfig{platformConfig},
 					PlacementRef: placementRefA,
 				},
 				{
-					Configs:      []addonv1alpha1.AddOnConfig{platformConfig},
+					Configs:      []addonv1beta1.AddOnConfig{platformConfig},
 					PlacementRef: placementRefB,
 				},
 			},
 		},
 		{
 			name: "no matching placement - no change",
-			initialPlacements: []addonv1alpha1.PlacementStrategy{
+			initialPlacements: []addonv1beta1.PlacementStrategy{
 				{
-					Configs:      []addonv1alpha1.AddOnConfig{platformConfig},
+					Configs:      []addonv1beta1.AddOnConfig{platformConfig},
 					PlacementRef: placementRefA,
 				},
 			},
 			inputConfigs: []DefaultConfig{
 				{PlacementRef: placementRefB, Config: platformConfig},
 			},
-			expectedPlacements: []addonv1alpha1.PlacementStrategy{
+			expectedPlacements: []addonv1beta1.PlacementStrategy{
 				{
-					Configs:      []addonv1alpha1.AddOnConfig{platformConfig},
+					Configs:      []addonv1beta1.AddOnConfig{platformConfig},
 					PlacementRef: placementRefA,
 				},
 			},
 		},
 		{
 			name: "multiple configs to multiple placements",
-			initialPlacements: []addonv1alpha1.PlacementStrategy{
+			initialPlacements: []addonv1beta1.PlacementStrategy{
 				{
-					Configs:      []addonv1alpha1.AddOnConfig{platformConfig},
+					Configs:      []addonv1beta1.AddOnConfig{platformConfig},
 					PlacementRef: placementRefA,
 				},
 				{
@@ -159,22 +159,22 @@ func TestEnsureConfigsInAddon(t *testing.T) {
 				{PlacementRef: placementRefB, Config: platformConfig},
 				{PlacementRef: placementRefB, Config: uwlConfig},
 			},
-			expectedPlacements: []addonv1alpha1.PlacementStrategy{
+			expectedPlacements: []addonv1beta1.PlacementStrategy{
 				{
-					Configs:      []addonv1alpha1.AddOnConfig{platformConfig, uwlConfig},
+					Configs:      []addonv1beta1.AddOnConfig{platformConfig, uwlConfig},
 					PlacementRef: placementRefA,
 				},
 				{
-					Configs:      []addonv1alpha1.AddOnConfig{platformConfig, uwlConfig},
+					Configs:      []addonv1beta1.AddOnConfig{platformConfig, uwlConfig},
 					PlacementRef: placementRefB,
 				},
 			},
 		},
 		{
 			name: "duplicated configs",
-			initialPlacements: []addonv1alpha1.PlacementStrategy{
+			initialPlacements: []addonv1beta1.PlacementStrategy{
 				{
-					Configs:      []addonv1alpha1.AddOnConfig{platformConfig},
+					Configs:      []addonv1beta1.AddOnConfig{platformConfig},
 					PlacementRef: placementRefA,
 				},
 			},
@@ -182,9 +182,9 @@ func TestEnsureConfigsInAddon(t *testing.T) {
 				{PlacementRef: placementRefA, Config: uwlConfig},
 				{PlacementRef: placementRefA, Config: uwlConfig},
 			},
-			expectedPlacements: []addonv1alpha1.PlacementStrategy{
+			expectedPlacements: []addonv1beta1.PlacementStrategy{
 				{
-					Configs:      []addonv1alpha1.AddOnConfig{platformConfig, uwlConfig},
+					Configs:      []addonv1beta1.AddOnConfig{platformConfig, uwlConfig},
 					PlacementRef: placementRefA,
 				},
 			},
@@ -193,12 +193,12 @@ func TestEnsureConfigsInAddon(t *testing.T) {
 
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			cmao := &addonv1alpha1.ClusterManagementAddOn{
+			cmao := &addonv1beta1.ClusterManagementAddOn{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: addoncfg.Name,
 				},
-				Spec: addonv1alpha1.ClusterManagementAddOnSpec{
-					InstallStrategy: addonv1alpha1.InstallStrategy{
+				Spec: addonv1beta1.ClusterManagementAddOnSpec{
+					InstallStrategy: addonv1beta1.InstallStrategy{
 						Placements: tt.initialPlacements,
 					},
 				},

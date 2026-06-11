@@ -10,7 +10,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
@@ -39,7 +39,7 @@ func TestGetImageOverrides(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		registries []addonapiv1alpha1.ImageMirror
+		registries []addonapiv1beta1.ImageMirror
 		expected   ImageOverrides
 	}{
 		{
@@ -56,7 +56,7 @@ func TestGetImageOverrides(t *testing.T) {
 		},
 		{
 			name: "full image override",
-			registries: []addonapiv1alpha1.ImageMirror{
+			registries: []addonapiv1beta1.ImageMirror{
 				{
 					Source: "quay.io/prometheus/prometheus",
 					Mirror: "registry.example.com/prometheus/prometheus",
@@ -73,7 +73,7 @@ func TestGetImageOverrides(t *testing.T) {
 		},
 		{
 			name: "registry domain override - should be ignored",
-			registries: []addonapiv1alpha1.ImageMirror{
+			registries: []addonapiv1beta1.ImageMirror{
 				{
 					Source: "quay.io",
 					Mirror: "registry.example.com",
@@ -90,7 +90,7 @@ func TestGetImageOverrides(t *testing.T) {
 		},
 		{
 			name: "org override - should be ignored",
-			registries: []addonapiv1alpha1.ImageMirror{
+			registries: []addonapiv1beta1.ImageMirror{
 				{
 					Source: "quay.io/prometheus",
 					Mirror: "registry.example.com/prometheus",

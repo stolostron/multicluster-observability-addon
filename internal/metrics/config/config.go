@@ -12,7 +12,7 @@ import (
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -103,7 +103,7 @@ type ImageOverrides struct {
 	Prometheus                 string `json:"prometheus"`
 }
 
-func GetImageOverrides(ctx context.Context, c client.Client, registries []addonapiv1alpha1.ImageMirror, logger logr.Logger) (ImageOverrides, error) {
+func GetImageOverrides(ctx context.Context, c client.Client, registries []addonapiv1beta1.ImageMirror, logger logr.Logger) (ImageOverrides, error) {
 	ret := ImageOverrides{}
 	// Get the ACM images overrides
 	imagesList := &corev1.ConfigMap{}
@@ -142,7 +142,7 @@ func GetImageOverrides(ctx context.Context, c client.Client, registries []addona
 	return ret, nil
 }
 
-func overrideImage(image string, registries []addonapiv1alpha1.ImageMirror, logger logr.Logger) string {
+func overrideImage(image string, registries []addonapiv1beta1.ImageMirror, logger logr.Logger) string {
 	for _, registry := range registries {
 		if !strings.HasPrefix(image, registry.Source) {
 			continue

@@ -145,7 +145,7 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 		}
 
 		scrapeConfig.Spec.ScrapeClassName = ptr.To(scrapeClassName)
-		scrapeConfig.Spec.Scheme = ptr.To(scheme)
+		scrapeConfig.Spec.Scheme = ptr.To(cooprometheusv1.Scheme(scheme))
 		scrapeConfig.Spec.StaticConfigs = []cooprometheusv1alpha1.StaticConfig{
 			{
 				Targets: []cooprometheusv1alpha1.Target{
@@ -169,7 +169,7 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 	for _, scrapeConfig := range opts.UserWorkloads.ScrapeConfigs {
 		if len(scrapeConfig.Spec.StaticConfigs) == 0 && opts.IsOpenShiftVendor {
 			scrapeConfig.Spec.ScrapeClassName = ptr.To(config.ScrapeClassCfgName)
-			scrapeConfig.Spec.Scheme = ptr.To("HTTPS")
+			scrapeConfig.Spec.Scheme = ptr.To(cooprometheusv1.Scheme("HTTPS"))
 			scrapeConfig.Spec.StaticConfigs = []cooprometheusv1alpha1.StaticConfig{
 				{
 					Targets: []cooprometheusv1alpha1.Target{
@@ -342,7 +342,9 @@ func configureAgentForOCP(agent *cooprometheusv1alpha1.PrometheusAgent) {
 		},
 		Name: config.ScrapeClassCfgName,
 		TLSConfig: &cooprometheusv1.TLSConfig{
-			CAFile: fmt.Sprintf("/etc/prometheus/configmaps/%s/service-ca.crt", config.PrometheusCAConfigMapName),
+			TLSFilesConfig: cooprometheusv1.TLSFilesConfig{
+				CAFile: fmt.Sprintf("/etc/prometheus/configmaps/%s/service-ca.crt", config.PrometheusCAConfigMapName),
+			},
 		},
 		Default: ptr.To(true),
 	}

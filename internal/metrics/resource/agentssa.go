@@ -13,12 +13,12 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
-	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 )
 
 // NewDefaultPrometheusAgent generates the default prometheusAgent resource containing sensible
 // defaults that can be overridden by the user.
-func NewDefaultPrometheusAgent(ns, name string, isUWL bool, placementRef addonv1alpha1.PlacementRef) *cooprometheusv1alpha1.PrometheusAgent {
+func NewDefaultPrometheusAgent(ns, name string, isUWL bool, placementRef addonv1beta1.PlacementRef) *cooprometheusv1alpha1.PrometheusAgent {
 	agent := &cooprometheusv1alpha1.PrometheusAgent{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       cooprometheusv1alpha1.PrometheusAgentsKind,
@@ -64,7 +64,7 @@ func NewDefaultPrometheusAgent(ns, name string, isUWL bool, placementRef addonv1
 	return agent
 }
 
-func makeConfigResourceLabels(isUWL bool, placementRef addonv1alpha1.PlacementRef) map[string]string {
+func makeConfigResourceLabels(isUWL bool, placementRef addonv1beta1.PlacementRef) map[string]string {
 	appName := config.PlatformMetricsCollectorApp
 	if isUWL {
 		appName = config.UserWorkloadMetricsCollectorApp
@@ -159,13 +159,15 @@ func (p *PrometheusAgentSSA) setPrometheusRemoteWriteConfig() {
 
 	// keep user remote write configs and enforce ours
 	desiredRemoteWriteSpec := cooprometheusv1.RemoteWriteSpec{
-		URL:           p.RemoteWriteEndpoint,
+		URL:           cooprometheusv1.URL(p.RemoteWriteEndpoint),
 		Name:          ptr.To(config.RemoteWriteCfgName),
 		RemoteTimeout: ptr.To(cooprometheusv1.Duration("30s")),
 		TLSConfig: &cooprometheusv1.TLSConfig{
-			CAFile:   p.formatSecretPath(config.HubCASecretName, "ca.crt"),
-			CertFile: p.formatSecretPath(config.ClientCertSecretName, "tls.crt"),
-			KeyFile:  p.formatSecretPath(config.ClientCertSecretName, "tls.key"),
+			TLSFilesConfig: cooprometheusv1.TLSFilesConfig{
+				CAFile:   p.formatSecretPath(config.HubCASecretName, "ca.crt"),
+				CertFile: p.formatSecretPath(config.ClientCertSecretName, "tls.crt"),
+				KeyFile:  p.formatSecretPath(config.ClientCertSecretName, "tls.key"),
+			},
 		},
 		// WriteRelabelConfigs is set individually for each managed cluster in order to enforce cluster identification labels
 	}

@@ -159,11 +159,15 @@ func (h *Hypershift) generateEtcdServiceMonitor(ctx context.Context, namespace s
 
 	for _, endpoint := range hypershiftEtcdSM.Spec.Endpoints {
 		ret.Spec.Endpoints = append(ret.Spec.Endpoints, prometheusv1.Endpoint{
-			Interval:             "30s",
-			Scheme:               endpoint.Scheme,
-			Port:                 endpoint.Port,
-			TargetPort:           endpoint.TargetPort,
-			TLSConfig:            endpoint.TLSConfig,
+			Interval:   "30s",
+			Scheme:     endpoint.Scheme,
+			Port:       endpoint.Port,
+			TargetPort: endpoint.TargetPort,
+			HTTPConfigWithProxyAndTLSFiles: prometheusv1.HTTPConfigWithProxyAndTLSFiles{
+				HTTPConfigWithTLSFiles: prometheusv1.HTTPConfigWithTLSFiles{
+					TLSConfig: endpoint.TLSConfig,
+				},
+			},
 			MetricRelabelConfigs: h.generateMetricsRelabelConfigs(hostedCluster, metrics),
 			RelabelConfigs: []prometheusv1.RelabelConfig{
 				{
@@ -208,11 +212,15 @@ func (h *Hypershift) generateApiServerServiceMonitor(ctx context.Context, namesp
 
 	for _, endpoint := range hypershiftApiServerSM.Spec.Endpoints {
 		ret.Spec.Endpoints = append(ret.Spec.Endpoints, prometheusv1.Endpoint{
-			Interval:             "30s",
-			Scheme:               endpoint.Scheme,
-			Port:                 endpoint.Port,
-			TargetPort:           endpoint.TargetPort,
-			TLSConfig:            endpoint.TLSConfig,
+			Interval:   "30s",
+			Scheme:     endpoint.Scheme,
+			Port:       endpoint.Port,
+			TargetPort: endpoint.TargetPort,
+			HTTPConfigWithProxyAndTLSFiles: prometheusv1.HTTPConfigWithProxyAndTLSFiles{
+				HTTPConfigWithTLSFiles: prometheusv1.HTTPConfigWithTLSFiles{
+					TLSConfig: endpoint.TLSConfig,
+				},
+			},
 			MetricRelabelConfigs: h.generateMetricsRelabelConfigs(hostedCluster, metrics),
 			RelabelConfigs: []prometheusv1.RelabelConfig{
 				{

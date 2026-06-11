@@ -13,7 +13,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -28,7 +28,7 @@ var (
 	allRSDashboardIDs = append([]string{namespaceDashboardID}, vmDashboardIDs...)
 )
 
-func renderRSManifests(t *testing.T, isHub bool, cv []addonapiv1alpha1.CustomizedVariable) []runtime.Object {
+func renderRSManifests(t *testing.T, isHub bool, cv []addonapiv1beta1.CustomizedVariable) []runtime.Object {
 	t.Helper()
 
 	mc := addontesting.NewManagedCluster("cluster-1")
@@ -37,18 +37,14 @@ func renderRSManifests(t *testing.T, isHub bool, cv []addonapiv1alpha1.Customize
 	}
 
 	mcao := addontesting.NewAddon("test", "cluster-1")
-	mcao.Status.ConfigReferences = []addonapiv1alpha1.ConfigReference{
+	mcao.Status.ConfigReferences = []addonapiv1beta1.ConfigReference{
 		{
-			ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+			ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 				Group:    "addon.open-cluster-management.io",
 				Resource: "addondeploymentconfigs",
 			},
-			ConfigReferent: addonapiv1alpha1.ConfigReferent{
-				Namespace: addoncfg.InstallNamespace,
-				Name:      addoncfg.Name,
-			},
-			DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
-				ConfigReferent: addonapiv1alpha1.ConfigReferent{
+			DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+				ConfigReferent: addonapiv1beta1.ConfigReferent{
 					Namespace: addoncfg.InstallNamespace,
 					Name:      addoncfg.Name,
 				},
@@ -57,9 +53,9 @@ func renderRSManifests(t *testing.T, isHub bool, cv []addonapiv1alpha1.Customize
 		},
 	}
 
-	addc := &addonapiv1alpha1.AddOnDeploymentConfig{
+	addc := &addonapiv1beta1.AddOnDeploymentConfig{
 		ObjectMeta: mcao.ObjectMeta,
-		Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
+		Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
 			CustomizedVariables: cv,
 		},
 	}
@@ -67,7 +63,7 @@ func renderRSManifests(t *testing.T, isHub bool, cv []addonapiv1alpha1.Customize
 	addc.Namespace = addoncfg.InstallNamespace
 
 	cooAgent := newCOOAgentAddon([]client.Object{mcao}, addc)
-	objects, err := cooAgent.Manifests(mc, mcao)
+	objects, err := cooAgent.Manifests(t.Context(), mc, mcao)
 	require.NoError(t, err)
 	return objects
 }
@@ -99,7 +95,7 @@ func classify(objects []runtime.Object) renderedObjects {
 // --- End-to-End Tests ---
 
 func TestRightSizing_HubCluster_BothEnabled(t *testing.T) {
-	cv := []addonapiv1alpha1.CustomizedVariable{
+	cv := []addonapiv1beta1.CustomizedVariable{
 		{Name: addon.KeyRightSizingDelegated, Value: "true"},
 		{Name: addon.KeyPlatformNamespaceRightSizing, Value: "enabled"},
 		{Name: addon.KeyPlatformVirtualizationRightSizing, Value: "enabled"},
@@ -177,7 +173,7 @@ func TestRightSizing_HubCluster_BothEnabled(t *testing.T) {
 }
 
 func TestRightSizing_HubCluster_NamespaceOnly(t *testing.T) {
-	cv := []addonapiv1alpha1.CustomizedVariable{
+	cv := []addonapiv1beta1.CustomizedVariable{
 		{Name: addon.KeyRightSizingDelegated, Value: "true"},
 		{Name: addon.KeyPlatformNamespaceRightSizing, Value: "enabled"},
 		{Name: addon.KeyPlatformVirtualizationRightSizing, Value: "disabled"},
@@ -201,7 +197,7 @@ func TestRightSizing_HubCluster_NamespaceOnly(t *testing.T) {
 }
 
 func TestRightSizing_HubCluster_VirtualizationOnly(t *testing.T) {
-	cv := []addonapiv1alpha1.CustomizedVariable{
+	cv := []addonapiv1beta1.CustomizedVariable{
 		{Name: addon.KeyRightSizingDelegated, Value: "true"},
 		{Name: addon.KeyPlatformNamespaceRightSizing, Value: "disabled"},
 		{Name: addon.KeyPlatformVirtualizationRightSizing, Value: "enabled"},
@@ -220,7 +216,7 @@ func TestRightSizing_HubCluster_VirtualizationOnly(t *testing.T) {
 }
 
 func TestRightSizing_HubCluster_BothDisabled(t *testing.T) {
-	cv := []addonapiv1alpha1.CustomizedVariable{
+	cv := []addonapiv1beta1.CustomizedVariable{
 		{Name: addon.KeyRightSizingDelegated, Value: "true"},
 		{Name: addon.KeyPlatformNamespaceRightSizing, Value: "disabled"},
 		{Name: addon.KeyPlatformVirtualizationRightSizing, Value: "disabled"},
@@ -244,7 +240,7 @@ func TestRightSizing_HubCluster_BothDisabled(t *testing.T) {
 }
 
 func TestRightSizing_NonHubCluster_NoRSDashboards(t *testing.T) {
-	cv := []addonapiv1alpha1.CustomizedVariable{
+	cv := []addonapiv1beta1.CustomizedVariable{
 		{Name: addon.KeyRightSizingDelegated, Value: "true"},
 		{Name: addon.KeyPlatformNamespaceRightSizing, Value: "enabled"},
 		{Name: addon.KeyPlatformVirtualizationRightSizing, Value: "enabled"},
@@ -262,7 +258,7 @@ func TestRightSizing_NonHubCluster_NoRSDashboards(t *testing.T) {
 }
 
 func TestRightSizing_DashboardSpecStructure(t *testing.T) {
-	cv := []addonapiv1alpha1.CustomizedVariable{
+	cv := []addonapiv1beta1.CustomizedVariable{
 		{Name: addon.KeyRightSizingDelegated, Value: "true"},
 		{Name: addon.KeyPlatformNamespaceRightSizing, Value: "enabled"},
 		{Name: addon.KeyPlatformVirtualizationRightSizing, Value: "enabled"},
@@ -327,7 +323,7 @@ func TestRightSizing_DashboardSpecStructure(t *testing.T) {
 }
 
 func TestRightSizing_CombinedWithIncidentDetection(t *testing.T) {
-	cv := []addonapiv1alpha1.CustomizedVariable{
+	cv := []addonapiv1beta1.CustomizedVariable{
 		{Name: addon.KeyRightSizingDelegated, Value: "true"},
 		{Name: addon.KeyPlatformNamespaceRightSizing, Value: "enabled"},
 		{Name: addon.KeyPlatformVirtualizationRightSizing, Value: "enabled"},
@@ -366,7 +362,7 @@ func TestRightSizing_CombinedWithIncidentDetection(t *testing.T) {
 
 // TestRightSizing_MCOMode_NoDashboardsWhenNotDelegated verifies no RS dashboards render in MCO mode.
 func TestRightSizing_MCOMode_NoDashboardsWhenNotDelegated(t *testing.T) {
-	cv := []addonapiv1alpha1.CustomizedVariable{
+	cv := []addonapiv1beta1.CustomizedVariable{
 		{Name: addon.KeyPlatformNamespaceRightSizing, Value: "enabled"},
 		{Name: addon.KeyPlatformVirtualizationRightSizing, Value: "enabled"},
 	}
