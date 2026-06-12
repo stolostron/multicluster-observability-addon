@@ -92,12 +92,6 @@ func (d DefaultStackResources) Reconcile(ctx context.Context) ([]common.DefaultC
 			return configs, fmt.Errorf("failed to reconcile scrapeConfigs: %w", err)
 		}
 		configs = append(configs, scConfigs...)
-
-		userScrapeConfigs, err := d.reconcileUserScrapeConfigs(ctx, mcoUID)
-		if err != nil {
-			return configs, fmt.Errorf("failed to reconcile user-defined scrapeConfigs: %w", err)
-		}
-		configs = append(configs, userScrapeConfigs...)
 	}
 
 	if d.AddonOptions.Platform.Metrics.CollectionEnabled || d.AddonOptions.UserWorkloads.Metrics.CollectionEnabled {
@@ -107,6 +101,11 @@ func (d DefaultStackResources) Reconcile(ctx context.Context) ([]common.DefaultC
 			return configs, fmt.Errorf("failed to get prometheusRules: %w", err)
 		}
 		configs = append(configs, ruleConfigs...)
+		userScrapeConfigs, err := d.reconcileUserScrapeConfigs(ctx, mcoUID)
+		if err != nil {
+			return configs, fmt.Errorf("failed to reconcile user-defined scrapeConfigs: %w", err)
+		}
+		configs = append(configs, userScrapeConfigs...)
 	}
 
 	return configs, nil
