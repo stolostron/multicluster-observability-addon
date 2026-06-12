@@ -176,7 +176,7 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, fmt.Errorf("failed to reconcile right-sizing resources: %w", err)
 	}
 
-	if err := common.x(ctx, r.Log, r.Client, objs); err != nil {
+	if err := common.EnsureAddonConfig(ctx, r.Log, r.Client, objs); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to patch default configs of the clustermanageraddon: %w", err)
 	}
 
