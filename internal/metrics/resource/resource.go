@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"strings"
 
 	"github.com/go-logr/logr"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
@@ -91,6 +92,12 @@ func (d DefaultStackResources) Reconcile(ctx context.Context) ([]common.DefaultC
 			return configs, fmt.Errorf("failed to reconcile scrapeConfigs: %w", err)
 		}
 		configs = append(configs, scConfigs...)
+
+		userScrapeConfigs, err := d.reconcileUserScrapeConfigs(ctx, mcoUID)
+		if err != nil {
+			return configs, fmt.Errorf("failed to reconcile user-defined scrapeConfigs: %w", err)
+		}
+		configs = append(configs, userScrapeConfigs...)
 	}
 
 	if d.AddonOptions.Platform.Metrics.CollectionEnabled || d.AddonOptions.UserWorkloads.Metrics.CollectionEnabled {
@@ -178,6 +185,48 @@ func (d DefaultStackResources) reconcileScrapeConfigs(ctx context.Context, mcoUI
 		return nil, fmt.Errorf("failed to generate default configs: %w", err)
 	}
 
+	return configs, nil
+}
+
+// This function is used to generate a config for each user-defined scrape config with the appropriate labels
+func (d DefaultStackResources) reconcileUserScrapeConfigs(ctx context.Context, mcoUID types.UID) ([]common.DefaultConfig, error) {
+	labelVals := []string{"multicluster-observability-addon"}
+	d.Logger.V(2).Info("reconciling User-Defined ScrapeConfigs", "mcoUID", mcoUID)
+	req, err := labels.NewRequirement(addoncfg.PartOfK8sLabelKey, selection.In, labelVals)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create labels requirement for scrapeConfigs: %w", err)
+	}
+	labelsSelector := labels.NewSelector().Add(*req)
+
+	scrapeConfigsList := &cooprometheusv1alpha1.ScrapeConfigList{}
+	if err = d.Client.List(ctx, scrapeConfigsList, client.InNamespace(addoncfg.InstallNamespace), client.MatchingLabelsSelector{Selector: labelsSelector}); err != nil {
+		return nil, fmt.Errorf("failed to list scrapeConfigs: %w", err)
+	}
+	configs := []common.DefaultConfig{}
+	for _, existingSC := range scrapeConfigsList.Items {
+		if hasControllerUID(existingSC.OwnerReferences, mcoUID) {
+			continue
+		}
+		placementAnnotations := existingSC.Annotations[addoncfg.PlacementAnnotationKey]
+		placements := strings.Split(placementAnnotations, ",")
+		cfg, err := common.ObjectToAddonConfig(&existingSC)
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate addon config for %s: %w", existingSC.Name, err)
+		}
+		for _, placement := range placements {
+			nameNamespacePair := strings.Split(placement, "/")
+			placementNamespace := nameNamespacePair[0]
+			placementName := nameNamespacePair[1]
+			placementRef := addonv1beta1.PlacementRef{
+				Namespace: placementNamespace,
+				Name:      placementName,
+			}
+			configs = append(configs, common.DefaultConfig{
+				PlacementRef: placementRef,
+				Config:       cfg,
+			})
+		}
+	}
 	return configs, nil
 }
 
