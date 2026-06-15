@@ -237,18 +237,41 @@ func (d DefaultStackResources) getPrometheusRules(ctx context.Context, mcoUID ty
 		return nil, fmt.Errorf("failed to list prometheusRules: %w", err)
 	}
 
-	promRules := []client.Object{}
-	for _, sc := range promRuleList.Items {
-		if !hasControllerUID(sc.OwnerReferences, mcoUID) {
+	mcoManagedRules := []client.Object{}
+	userDefinedRules := []client.Object{}
+	for _, rule := range promRuleList.Items {
+		if !hasControllerUID(rule.OwnerReferences, mcoUID) && rule.Labels[addoncfg.PartOfK8sLabelKey] == addoncfg.Name {
 			continue
 		}
 
-		promRules = append(promRules, &sc)
+		if hasControllerUID(rule.OwnerReferences, mcoUID) {
+			mcoManagedRules = append(mcoManagedRules, &rule)
+		} else {
+			userDefinedRules = append(userDefinedRules, &rule)
+		}
 	}
 
-	configs, err := d.generateConfigsForAllPlacements(promRules)
+	configs, err := d.generateConfigsForAllPlacements(mcoManagedRules)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate default configs for prometheusRules: %w", err)
+	}
+
+	for _, userDefinedRule := range userDefinedRules {
+		placementAnnotations := userDefinedRule.(*prometheusv1.PrometheusRule).Annotations[addoncfg.PlacementAnnotationKey]
+		placementRefs, err := d.generatePlacementRefs(placementAnnotations)
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate placement refs: %w", err)
+		}
+		cfg, err := common.ObjectToAddonConfig(userDefinedRule)
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate addon config for %s: %w", userDefinedRule.(*prometheusv1.PrometheusRule).Name, err)
+		}
+		for _, placementRef := range placementRefs {
+			configs = append(configs, common.DefaultConfig{
+				PlacementRef: placementRef,
+				Config:       cfg,
+			})
+		}
 	}
 
 	return configs, nil
