@@ -140,9 +140,11 @@ func (d DefaultStackResources) reconcileScrapeConfigs(ctx context.Context, mcoUI
 		return nil, fmt.Errorf("failed to list scrapeConfigs: %w", err)
 	}
 
-	scrapeConfigs := []client.Object{}
+	mcoManagedScrapeConfigs := []client.Object{}
+	userDefinedScrapeConfigs := []client.Object{}
 	for _, existingSC := range scrapeConfigsList.Items {
-		if !hasControllerUID(existingSC.OwnerReferences, mcoUID) {
+		// Ensures that we only filter for MCO-managed scrape configs or user-defined scrape configs that have at least one of these labels along with the required annotation for user-defined scrape configs
+		if !hasControllerUID(existingSC.OwnerReferences, mcoUID) && existingSC.Labels[addoncfg.PartOfK8sLabelKey] == addoncfg.Name {
 			continue
 		}
 
@@ -175,13 +177,32 @@ func (d DefaultStackResources) reconcileScrapeConfigs(ctx context.Context, mcoUI
 			}
 			d.Logger.Info("updated scrapeConfig with server-side apply", "namespace", desiredSC.Namespace, "name", desiredSC.Name)
 		}
-
-		scrapeConfigs = append(scrapeConfigs, desiredSC)
+		if hasControllerUID(existingSC.OwnerReferences, mcoUID) {
+			mcoManagedScrapeConfigs = append(mcoManagedScrapeConfigs, desiredSC)
+		} else {
+			userDefinedScrapeConfigs = append(userDefinedScrapeConfigs, desiredSC)
+		}
 	}
-
-	configs, err := d.generateConfigsForAllPlacements(scrapeConfigs)
+	configs, err := d.generateConfigsForAllPlacements(mcoManagedScrapeConfigs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate default configs: %w", err)
+	}
+	for _, userDefinedSC := range userDefinedScrapeConfigs {
+		placementAnnotations := userDefinedSC.(*cooprometheusv1alpha1.ScrapeConfig).Annotations[addoncfg.PlacementAnnotationKey]
+		placementRefs, err := d.generatePlacementRefs(placementAnnotations)
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate placement refs: %w", err)
+		}
+		cfg, err := common.ObjectToAddonConfig(userDefinedSC)
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate addon config for %s: %w", userDefinedSC.(*cooprometheusv1alpha1.ScrapeConfig).Name, err)
+		}
+		for _, placementRef := range placementRefs {
+			configs = append(configs, common.DefaultConfig{
+				PlacementRef: placementRef,
+				Config:       cfg,
+			})
+		}
 	}
 
 	return configs, nil
@@ -394,6 +415,22 @@ func (d DefaultStackResources) generateConfigsForAllPlacements(object []client.O
 	}
 
 	return defaultConfigs, nil
+}
+func (d DefaultStackResources) generatePlacementRefs(placementAnnotations string) ([]addonv1beta1.PlacementRef, error) {
+	// Compute configs to add to each placement
+	placements := strings.Split(placementAnnotations, ",")
+	placementRefs := []addonv1beta1.PlacementRef{}
+	for _, placement := range placements {
+		nameNamespacePair := strings.Split(placement, "/")
+		placementNamespace := nameNamespacePair[0]
+		placementName := nameNamespacePair[1]
+		placementRef := addonv1beta1.PlacementRef{
+			Namespace: placementNamespace,
+			Name:      placementName,
+		}
+		placementRefs = append(placementRefs, placementRef)
+	}
+	return placementRefs, nil
 }
 
 func makeAgentName(app, placement string) string {
