@@ -39,7 +39,6 @@ func GetObjectKeys(configRef []addonapiv1beta1.ConfigReference, group, resource 
 }
 
 func GetAddOnDeploymentConfig(ctx context.Context, getter addonutils.AddOnDeploymentConfigGetter, mcAddon *addonapiv1beta1.ManagedClusterAddOn) (*addonapiv1beta1.AddOnDeploymentConfig, error) {
-	aodc := &addonapiv1beta1.AddOnDeploymentConfig{}
 	keys := GetObjectKeys(mcAddon.Status.ConfigReferences, addonutils.AddOnDeploymentConfigGVR.Group, addoncfg.AddonDeploymentConfigResource)
 	switch {
 	case len(keys) == 0:
