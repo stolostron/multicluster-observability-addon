@@ -25,8 +25,10 @@ import (
 
 func newTestGetter(aodc *addonapiv1beta1.AddOnDeploymentConfig) addonutils.AddOnDeploymentConfigGetter {
 	if aodc == nil {
+		//nolint:staticcheck // client.Apply is deprecated, but alternative requires ApplyConfigurations which we don't have
 		return addonutils.NewAddOnDeploymentConfigGetter(fakeaddon.NewSimpleClientset())
 	}
+	//nolint:staticcheck // client.Apply is deprecated, but alternative requires ApplyConfigurations which we don't have
 	return addonutils.NewAddOnDeploymentConfigGetter(fakeaddon.NewSimpleClientset(aodc))
 }
 
