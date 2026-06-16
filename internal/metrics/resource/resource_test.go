@@ -625,7 +625,7 @@ func TestReconcileScrapeConfigs(t *testing.T) {
 						Name:      "user-sc",
 						Labels: map[string]string{
 							addoncfg.ComponentK8sLabelKey: config.PlatformPrometheusMatchLabels[addoncfg.ComponentK8sLabelKey],
-							addoncfg.PartOfK8sLabelKey:   addoncfg.Name,
+							addoncfg.PartOfK8sLabelKey:    addoncfg.Name,
 						},
 						Annotations: map[string]string{
 							addoncfg.PlacementAnnotationKey: "ns/a",
@@ -652,7 +652,7 @@ func TestReconcileScrapeConfigs(t *testing.T) {
 						Name:      "user-sc-multi",
 						Labels: map[string]string{
 							addoncfg.ComponentK8sLabelKey: config.PlatformPrometheusMatchLabels[addoncfg.ComponentK8sLabelKey],
-							addoncfg.PartOfK8sLabelKey:   addoncfg.Name,
+							addoncfg.PartOfK8sLabelKey:    addoncfg.Name,
 						},
 						Annotations: map[string]string{
 							addoncfg.PlacementAnnotationKey: "ns/a,ns/b",
@@ -676,7 +676,7 @@ func TestReconcileScrapeConfigs(t *testing.T) {
 						Name:      "user-sc-no-annotation",
 						Labels: map[string]string{
 							addoncfg.ComponentK8sLabelKey: config.PlatformPrometheusMatchLabels[addoncfg.ComponentK8sLabelKey],
-							addoncfg.PartOfK8sLabelKey:   addoncfg.Name,
+							addoncfg.PartOfK8sLabelKey:    addoncfg.Name,
 						},
 					},
 				},
@@ -708,7 +708,7 @@ func TestReconcileScrapeConfigs(t *testing.T) {
 						Name:      "user-sc",
 						Labels: map[string]string{
 							addoncfg.ComponentK8sLabelKey: config.PlatformPrometheusMatchLabels[addoncfg.ComponentK8sLabelKey],
-							addoncfg.PartOfK8sLabelKey:   addoncfg.Name,
+							addoncfg.PartOfK8sLabelKey:    addoncfg.Name,
 						},
 						Annotations: map[string]string{
 							addoncfg.PlacementAnnotationKey: "ns/a",
@@ -904,7 +904,7 @@ func TestGetPrometheusRules(t *testing.T) {
 						Name:      "user-rule",
 						Labels: map[string]string{
 							addoncfg.ComponentK8sLabelKey: config.PlatformPrometheusMatchLabels[addoncfg.ComponentK8sLabelKey],
-							addoncfg.PartOfK8sLabelKey:   addoncfg.Name,
+							addoncfg.PartOfK8sLabelKey:    addoncfg.Name,
 						},
 						Annotations: map[string]string{
 							addoncfg.PlacementAnnotationKey: "ns/a",
@@ -930,7 +930,7 @@ func TestGetPrometheusRules(t *testing.T) {
 						Name:      "user-rule-multi",
 						Labels: map[string]string{
 							addoncfg.ComponentK8sLabelKey: config.PlatformPrometheusMatchLabels[addoncfg.ComponentK8sLabelKey],
-							addoncfg.PartOfK8sLabelKey:   addoncfg.Name,
+							addoncfg.PartOfK8sLabelKey:    addoncfg.Name,
 						},
 						Annotations: map[string]string{
 							addoncfg.PlacementAnnotationKey: "ns/a,ns/b",
@@ -955,7 +955,7 @@ func TestGetPrometheusRules(t *testing.T) {
 						Name:      "user-rule-no-annotation",
 						Labels: map[string]string{
 							addoncfg.ComponentK8sLabelKey: config.PlatformPrometheusMatchLabels[addoncfg.ComponentK8sLabelKey],
-							addoncfg.PartOfK8sLabelKey:   addoncfg.Name,
+							addoncfg.PartOfK8sLabelKey:    addoncfg.Name,
 						},
 					},
 				},
@@ -988,7 +988,7 @@ func TestGetPrometheusRules(t *testing.T) {
 						Name:      "user-rule",
 						Labels: map[string]string{
 							addoncfg.ComponentK8sLabelKey: config.PlatformPrometheusMatchLabels[addoncfg.ComponentK8sLabelKey],
-							addoncfg.PartOfK8sLabelKey:   addoncfg.Name,
+							addoncfg.PartOfK8sLabelKey:    addoncfg.Name,
 						},
 						Annotations: map[string]string{
 							addoncfg.PlacementAnnotationKey: "ns/a",

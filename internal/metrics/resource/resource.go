@@ -27,8 +27,9 @@ import (
 )
 
 var (
-	errTooManyConfigResources = errors.New("too many configuration resources")
-	errMissingHubEndpoint     = errors.New("hub endpoint is missing")
+	errTooManyConfigResources    = errors.New("too many configuration resources")
+	errMissingHubEndpoint        = errors.New("hub endpoint is missing")
+	errInvalidPlacementReference = errors.New("invalid placement reference")
 )
 
 // DefaultStackResources reconciles the configuration resources needed for metrics collection
@@ -139,7 +140,7 @@ func (d DefaultStackResources) reconcileScrapeConfigs(ctx context.Context, mcoUI
 	userDefinedScrapeConfigs := []client.Object{}
 	for _, existingSC := range scrapeConfigsList.Items {
 		// Ensures that we only filter for MCO-managed scrape configs or user-defined scrape configs that have at least one of these labels along with the required annotation for user-defined scrape configs
-		if !hasControllerUID(existingSC.OwnerReferences, mcoUID) && !(existingSC.Labels[addoncfg.PartOfK8sLabelKey] == addoncfg.Name) {
+		if !hasControllerUID(existingSC.OwnerReferences, mcoUID) && existingSC.Labels[addoncfg.PartOfK8sLabelKey] != addoncfg.Name {
 			continue
 		}
 
@@ -240,7 +241,7 @@ func (d DefaultStackResources) getPrometheusRules(ctx context.Context, mcoUID ty
 	mcoManagedRules := []client.Object{}
 	userDefinedRules := []client.Object{}
 	for _, rule := range promRuleList.Items {
-		if !hasControllerUID(rule.OwnerReferences, mcoUID) && !(rule.Labels[addoncfg.PartOfK8sLabelKey] == addoncfg.Name) {
+		if !hasControllerUID(rule.OwnerReferences, mcoUID) && rule.Labels[addoncfg.PartOfK8sLabelKey] != addoncfg.Name {
 			continue
 		}
 
@@ -405,7 +406,7 @@ func (d DefaultStackResources) generatePlacementRefs(placementAnnotations string
 		}
 		nameNamespacePair := strings.SplitN(placement, "/", 2)
 		if len(nameNamespacePair) != 2 || nameNamespacePair[0] == "" || nameNamespacePair[1] == "" {
-			return nil, fmt.Errorf("invalid placement reference %q: expected format namespace/name", placement)
+			return nil, fmt.Errorf("%w %q: expected format namespace/name", errInvalidPlacementReference, placement)
 		}
 		placementRefs = append(placementRefs, addonv1beta1.PlacementRef{
 			Namespace: nameNamespacePair[0],
