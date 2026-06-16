@@ -392,7 +392,11 @@ func (d DefaultStackResources) generateConfigsForAllPlacements(object []client.O
 
 	return defaultConfigs, nil
 }
+
 func (d DefaultStackResources) generatePlacementRefs(placementAnnotations string) ([]addonv1beta1.PlacementRef, error) {
+	if placementAnnotations == "" {
+		return nil, nil
+	}
 	// Compute configs to add to each placement
 	placements := strings.Split(placementAnnotations, ",")
 	placementRefs := []addonv1beta1.PlacementRef{}
