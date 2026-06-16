@@ -139,7 +139,7 @@ func (d DefaultStackResources) reconcileScrapeConfigs(ctx context.Context, mcoUI
 	userDefinedScrapeConfigs := []client.Object{}
 	for _, existingSC := range scrapeConfigsList.Items {
 		// Ensures that we only filter for MCO-managed scrape configs or user-defined scrape configs that have at least one of these labels along with the required annotation for user-defined scrape configs
-		if !hasControllerUID(existingSC.OwnerReferences, mcoUID) && existingSC.Labels[addoncfg.PartOfK8sLabelKey] == addoncfg.Name {
+		if !hasControllerUID(existingSC.OwnerReferences, mcoUID) && !(existingSC.Labels[addoncfg.PartOfK8sLabelKey] == addoncfg.Name) {
 			continue
 		}
 
@@ -240,7 +240,7 @@ func (d DefaultStackResources) getPrometheusRules(ctx context.Context, mcoUID ty
 	mcoManagedRules := []client.Object{}
 	userDefinedRules := []client.Object{}
 	for _, rule := range promRuleList.Items {
-		if !hasControllerUID(rule.OwnerReferences, mcoUID) && rule.Labels[addoncfg.PartOfK8sLabelKey] == addoncfg.Name {
+		if !hasControllerUID(rule.OwnerReferences, mcoUID) && !(rule.Labels[addoncfg.PartOfK8sLabelKey] == addoncfg.Name) {
 			continue
 		}
 
