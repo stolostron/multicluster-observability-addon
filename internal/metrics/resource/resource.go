@@ -397,18 +397,20 @@ func (d DefaultStackResources) generatePlacementRefs(placementAnnotations string
 	if placementAnnotations == "" {
 		return nil, nil
 	}
-	// Compute configs to add to each placement
 	placements := strings.Split(placementAnnotations, ",")
 	placementRefs := []addonv1beta1.PlacementRef{}
 	for _, placement := range placements {
-		nameNamespacePair := strings.Split(placement, "/")
-		placementNamespace := nameNamespacePair[0]
-		placementName := nameNamespacePair[1]
-		placementRef := addonv1beta1.PlacementRef{
-			Namespace: placementNamespace,
-			Name:      placementName,
+		if placement == "" {
+			continue
 		}
-		placementRefs = append(placementRefs, placementRef)
+		nameNamespacePair := strings.SplitN(placement, "/", 2)
+		if len(nameNamespacePair) != 2 || nameNamespacePair[0] == "" || nameNamespacePair[1] == "" {
+			return nil, fmt.Errorf("invalid placement reference %q: expected format namespace/name", placement)
+		}
+		placementRefs = append(placementRefs, addonv1beta1.PlacementRef{
+			Namespace: nameNamespacePair[0],
+			Name:      nameNamespacePair[1],
+		})
 	}
 	return placementRefs, nil
 }

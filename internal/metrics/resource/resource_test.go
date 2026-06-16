@@ -1113,6 +1113,28 @@ func TestGeneratePlacementRefs(t *testing.T) {
 				{Namespace: "ns-b", Name: "placement-b"},
 			},
 		},
+		{
+			name:        "trailing comma is tolerated",
+			annotations: "ns-a/placement-a,",
+			expected: []addonv1beta1.PlacementRef{
+				{Namespace: "ns-a", Name: "placement-a"},
+			},
+		},
+		{
+			name:        "missing separator returns error",
+			annotations: "no-separator",
+			expectErr:   true,
+		},
+		{
+			name:        "empty namespace returns error",
+			annotations: "/placement-a",
+			expectErr:   true,
+		},
+		{
+			name:        "empty name returns error",
+			annotations: "ns-a/",
+			expectErr:   true,
+		},
 	}
 
 	for _, tc := range testCases {
