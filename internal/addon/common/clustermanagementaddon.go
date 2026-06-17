@@ -12,6 +12,7 @@ import (
 	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"k8s.io/apimachinery/pkg/api/equality"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
@@ -64,6 +65,10 @@ func EnsureAddonConfig(ctx context.Context, logger logr.Logger, k8s client.Clien
 	desiredCmao.ManagedFields = nil // required for patching with ssa
 	ensureConfigsInAddon(desiredCmao, configs)
 
+	if err := removeStaleConfigs(ctx, k8s, desiredCmao); err != nil {
+		return fmt.Errorf("failed to remove stale configs: %w", err)
+	}
+
 	// If there are no changes, nothing to do
 	if equality.Semantic.DeepEqual(cmao.Spec.InstallStrategy.Placements, desiredCmao.Spec.InstallStrategy.Placements) {
 		return nil
@@ -82,6 +87,7 @@ func EnsureAddonConfig(ctx context.Context, logger logr.Logger, k8s client.Clien
 
 func ensureConfigsInAddon(cmao *addonv1beta1.ClusterManagementAddOn, configs []DefaultConfig) {
 	containsConfig := func(configs []addonv1beta1.AddOnConfig, cfg addonv1beta1.AddOnConfig) bool {
+		// Loops through each of the configs and checks if config is equal to the config passed in
 		return slices.ContainsFunc(configs, func(e addonv1beta1.AddOnConfig) bool {
 			return e == cfg
 		})
@@ -90,6 +96,8 @@ func ensureConfigsInAddon(cmao *addonv1beta1.ClusterManagementAddOn, configs []D
 	// Group configs by placement.
 	placementConfigs := map[addonv1beta1.PlacementRef][]addonv1beta1.AddOnConfig{}
 	for _, cfg := range configs {
+		// If the config is already present in the placement, skip it
+		// Why is this necessary?
 		if containsConfig(placementConfigs[cfg.PlacementRef], cfg.Config) {
 			continue
 		}
@@ -107,9 +115,56 @@ func ensureConfigsInAddon(cmao *addonv1beta1.ClusterManagementAddOn, configs []D
 			}
 			dedupConfigs = append(dedupConfigs, cfg)
 		}
-
 		cmao.Spec.InstallStrategy.Placements[i].Configs = append(cmao.Spec.InstallStrategy.Placements[i].Configs, dedupConfigs...)
 	}
+}
+
+// removeStaleConfigs removes any user-defined PrometheusRule or ScrapeConfig
+// entries from the CMAO placements whose underlying resource no longer exists.
+func removeStaleConfigs(ctx context.Context, k8s client.Client, cmao *addonv1beta1.ClusterManagementAddOn) error {
+	for i, placement := range cmao.Spec.InstallStrategy.Placements {
+		filtered := make([]addonv1beta1.AddOnConfig, 0, len(placement.Configs))
+		for _, cfg := range placement.Configs {
+			_, err := isUserDefinedConfig(ctx, k8s, cfg)
+			if err != nil {
+				if apierrors.IsNotFound(err) {
+					continue
+				}
+				return fmt.Errorf("failed to check config %s/%s: %w", cfg.Namespace, cfg.Name, err)
+			}
+			filtered = append(filtered, cfg)
+		}
+		cmao.Spec.InstallStrategy.Placements[i].Configs = filtered
+	}
+	return nil
+}
+
+// isUserDefinedConfig checks whether the config references a user-defined PrometheusRule
+// or ScrapeConfig by fetching the resource and looking for the placement annotation.
+// Returns the raw API error on failure so callers can distinguish NotFound from other errors.
+func isUserDefinedConfig(ctx context.Context, k8s client.Client, cfg addonv1beta1.AddOnConfig) (bool, error) {
+	key := types.NamespacedName{Name: cfg.Name, Namespace: cfg.Namespace}
+
+	var annotations map[string]string
+	switch cfg.Resource {
+	case cooprometheusv1alpha1.ScrapeConfigName:
+		sc := &cooprometheusv1alpha1.ScrapeConfig{}
+		if err := k8s.Get(ctx, key, sc); err != nil {
+			return false, err
+		}
+		annotations = sc.Annotations
+	case prometheusv1.PrometheusRuleName:
+		rule := &prometheusv1.PrometheusRule{}
+		if err := k8s.Get(ctx, key, rule); err != nil {
+			return false, err
+		}
+		annotations = rule.Annotations
+	default:
+		return false, nil
+	}
+
+	_, hasPlacementAnnotation := annotations[addoncfg.PlacementAnnotationKey]
+	return hasPlacementAnnotation, nil
 }
 
 func ObjectToAddonConfig(obj client.Object) (addonv1beta1.AddOnConfig, error) {
