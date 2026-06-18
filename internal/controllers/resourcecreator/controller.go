@@ -5,12 +5,15 @@ import (
 	"fmt"
 
 	"github.com/go-logr/logr"
+	lokiv1 "github.com/grafana/loki/operator/api/loki/v1"
+	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	rshandlers "github.com/stolostron/multicluster-observability-addon/internal/analytics/rightsizing/handlers"
+	lhandlers "github.com/stolostron/multicluster-observability-addon/internal/logging/handlers"
 	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	mresources "github.com/stolostron/multicluster-observability-addon/internal/metrics/resource"
 	corev1 "k8s.io/api/core/v1"
@@ -93,6 +96,9 @@ func SetupWithManager(mgr ctrl.Manager, logger logr.Logger) error {
 		Watches(&prometheusv1.PrometheusRule{}, r.enqueueForMCOControlledResources(), partOfMCOAPredicate).
 		// Trigger reconciliations if right-sizing ConfigMaps change
 		Watches(&corev1.ConfigMap{}, r.enqueueAODC(), rsConfigMapPredicate).
+		// Trigger reconciliations if logging resources change
+		Watches(&lokiv1.LokiStack{}, r.enqueueForMCOAOwnedResources()).
+		Watches(&loggingv1.ClusterLogForwarder{}, r.enqueueForMCOAOwnedResources()).
 		Complete(r)
 }
 
@@ -151,9 +157,21 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	// ConfigMap resources are created/updated/deleted here, not per-cluster in handler.go,
 	// to avoid race conditions from concurrent Build() calls.
 	rsBuilder := &rshandlers.OptionsBuilder{Client: r.Client, Logger: r.Log.WithName("rightsizing")}
-	if err := rsBuilder.ReconcileRSResources(ctx, opts); err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to reconcile right-sizing resources: %w", err)
+	if rsErr := rsBuilder.ReconcileRSResources(ctx, opts); rsErr != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to reconcile right-sizing resources: %w", rsErr)
 	}
+
+	// Reconcile logging resources
+	lObjs, lDefaultConfig, err := lhandlers.BuildDefaultStackResources(ctx, r.Client, cmao, opts.Platform.Logs, opts.UserWorkloads.Logs, opts.HubHostname)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to build default stack logging resources: %w", err)
+	}
+	for _, obj := range lObjs {
+		if err := common.ServerSideApply(ctx, r.Client, obj, cmao); err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to apply logging resource %s/%s: %w", obj.GetNamespace(), obj.GetName(), err)
+		}
+	}
+	objs = append(objs, lDefaultConfig...)
 
 	if err := common.EnsureAddonConfig(ctx, r.Log, r.Client, objs); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to patch default configs of the clustermanageraddon: %w", err)
@@ -169,6 +187,12 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	// at least one of them still exists.
 	if err := common.DeleteOrphanResources(ctx, r.Log, r.Client, cmao, &cooprometheusv1alpha1.PrometheusAgentList{}); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to clean orphan resources: %w", err)
+	}
+	if err := common.DeleteOrphanResources(ctx, r.Log, r.Client, cmao, &lokiv1.LokiStackList{}); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to clean orphan logging storage resources: %w", err)
+	}
+	if err := common.DeleteOrphanResources(ctx, r.Log, r.Client, cmao, &loggingv1.ClusterLogForwarderList{}); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to clean orphan logging collection resources: %w", err)
 	}
 
 	return ctrl.Result{}, nil

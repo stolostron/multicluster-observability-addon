@@ -1,3 +1,4 @@
 nameOverride: null
 
 enabled: false
+logsEnabled: false

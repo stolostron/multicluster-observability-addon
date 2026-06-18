@@ -1,0 +1,15 @@
+{{- if .Values.enabled }}
+{{- range $_, $configmap_config := .Values.configmaps }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $configmap_config.name }}
+  namespace: openshift-logging
+  labels:
+    app: {{ template "loggingCollection.name" $ }}
+    chart: {{ template "loggingCollection.chart" $ }}
+    release: {{ $.Release.Name }}
+data: {{ fromJson $configmap_config.data | toYaml | nindent 2 }}
+---
+{{- end }}
+{{- end }}
