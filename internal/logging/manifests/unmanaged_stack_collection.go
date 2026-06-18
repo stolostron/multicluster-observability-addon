@@ -1,7 +1,6 @@
 package manifests
 
 import (
-	"encoding/json"
 	"errors"
 
 	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
@@ -19,40 +18,8 @@ func buildSubscriptionChannel(resources Options) string {
 	return defaultLoggingVersion
 }
 
-func buildConfigMaps(resources Options) ([]ResourceValue, error) {
-	configmapsValue := []ResourceValue{}
-	for _, configmap := range resources.ConfigMaps {
-		dataJSON, err := json.Marshal(configmap.Data)
-		if err != nil {
-			return configmapsValue, err
-		}
-		configmapValue := ResourceValue{
-			Name: configmap.Name,
-			Data: string(dataJSON),
-		}
-		configmapsValue = append(configmapsValue, configmapValue)
-	}
-	return configmapsValue, nil
-}
-
-func buildSecrets(resources Options) ([]ResourceValue, error) {
-	secretsValue := []ResourceValue{}
-	for _, secret := range resources.Secrets {
-		dataJSON, err := json.Marshal(secret.Data)
-		if err != nil {
-			return secretsValue, err
-		}
-		secretValue := ResourceValue{
-			Name: secret.Name,
-			Data: string(dataJSON),
-		}
-		secretsValue = append(secretsValue, secretValue)
-	}
-	return secretsValue, nil
-}
-
 func buildClusterLogForwarderSpec(opts Options) (*loggingv1.ClusterLogForwarderSpec, error) {
-	clf := opts.ClusterLogForwarder
+	clf := opts.Unmanaged.Collection.ClusterLogForwarder
 	clf.Spec.ManagementState = loggingv1.ManagementStateManaged
 
 	// Validate Platform Logs enabled
