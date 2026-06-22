@@ -1,0 +1,65 @@
+{{- if or .Values.platformEnabled .Values.userWorkloadsEnabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: endpoint-monitoring-operator
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/component: endpoint-monitoring-operator
+    {{- include "metricshelm.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: metrics
+      app.kubernetes.io/component: endpoint-monitoring-operator
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: endpoint-monitoring-operator
+        {{- include "metricshelm.labels" . | nindent 8 }}
+    spec:
+      serviceAccountName: endpoint-monitoring-operator
+      {{- if .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml .Values.nodeSelector | nindent 8 }}
+      {{- end }}
+      {{- if .Values.tolerations }}
+      tolerations:
+        {{- toYaml .Values.tolerations | nindent 8 }}
+      {{- end }}
+      containers:
+      - name: endpoint-monitoring-operator
+        image: {{ .Values.images.endpointMonitoringOperator }}
+        imagePullPolicy: IfNotPresent
+        command:
+        - /usr/local/bin/endpoint-monitoring-operator
+        args:
+        - mcoa
+        - --namespace={{ .Release.Namespace }}
+        {{- if and .Values.alertManagerEndpoint (or .Values.platformAlertsEnabled .Values.userWorkloadAlertsEnabled) }}
+        - --hub-alertmanager-url={{ .Values.alertManagerEndpoint }}
+        - --hub-alertmanager-ca-secret={{ .Values.alertmanagerRouterCASecretName }}
+        - --hub-alertmanager-cert-secret={{ .Values.clientCertSecretName }}
+        - --hub-alertmanager-accessor-secret={{ .Values.alertmanagerAccessorSecretName }}
+        {{- end }}
+        {{- if .Values.hubClusterID }}
+        - --cluster-id={{ .Values.hubClusterID }}
+        {{- end }}
+        - --enable-uwl-alert-forwarding={{ and .Values.userWorkloadsEnabled .Values.userWorkloadAlertsEnabled }}
+        resources:
+          requests:
+            cpu: 10m
+            memory: 50Mi
+          limits:
+            cpu: 100m
+            memory: 100Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          privileged: false
+          runAsNonRoot: true
+          readOnlyRootFilesystem: true
+{{- end }}

@@ -271,6 +271,7 @@ func TestBuildOptions(t *testing.T) {
 					"kube_state_metrics":            "quay.io/kube/kube-state-metrics",
 					"node_exporter":                 "quay.io/kube/node-exporter",
 					"prometheus":                    "quay.io/prometheus/prometheus",
+					"endpoint_monitoring_operator":  "endpoint-monitoring-operator-image",
 				},
 			},
 			platformAgent.DeepCopy(),

@@ -25,6 +25,11 @@ type MetricsValues struct {
 	PrometheusServerName           string              `json:"prometheusServerName"`
 	AlertmanagerRouterCASecretName string              `json:"alertmanagerRouterCASecretName"`
 	AlertmanagerAccessorSecretName string              `json:"alertmanagerAccessorSecretName"`
+	ClientCertSecretName           string              `json:"clientCertSecretName"`
+	HubClusterID                   string              `json:"hubClusterID"`
+	ClusterID                      string              `json:"clusterID"`
+	PlatformAlertsEnabled          bool                `json:"platformAlertsEnabled"`
+	UserWorkloadAlertsEnabled      bool                `json:"userWorkloadAlertsEnabled"`
 	Platform                       Collector           `json:"platform"`
 	UserWorkload                   Collector           `json:"userWorkload"`
 	DeployNonOCPStack              bool                `json:"deployNonOCPStack"`
@@ -53,12 +58,13 @@ type Collector struct {
 }
 
 type ImagesValues struct {
-	CooPrometheusOperator    string `json:"cooPrometheusOperator"`
-	PrometheusConfigReloader string `json:"prometheusConfigReloader"`
-	KubeStateMetrics         string `json:"kubeStateMetrics"`
-	NodeExporter             string `json:"nodeExporter"`
-	RBACProxyImage           string `json:"rbacProxyImage"`
-	Prometheus               string `json:"prometheus"`
+	CooPrometheusOperator      string `json:"cooPrometheusOperator"`
+	PrometheusConfigReloader   string `json:"prometheusConfigReloader"`
+	KubeStateMetrics           string `json:"kubeStateMetrics"`
+	NodeExporter               string `json:"nodeExporter"`
+	RBACProxyImage             string `json:"rbacProxyImage"`
+	Prometheus                 string `json:"prometheus"`
+	EndpointMonitoringOperator string `json:"endpointMonitoringOperator"`
 }
 
 type ConfigValue struct {
@@ -77,6 +83,11 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 		PrometheusServerName:           config.PrometheusServerName,
 		AlertmanagerRouterCASecretName: config.GetAlertmanagerRouterCASecretName(config.GetTrimmedClusterID(opts.HubClusterID)),
 		AlertmanagerAccessorSecretName: config.GetAlertmanagerAccessorSecretName(config.GetTrimmedClusterID(opts.HubClusterID)),
+		ClientCertSecretName:           config.ClientCertSecretName,
+		HubClusterID:                   opts.HubClusterID,
+		ClusterID:                      opts.ClusterID,
+		PlatformAlertsEnabled:          opts.PlatformAlertsEnabled,
+		UserWorkloadAlertsEnabled:      opts.UserWorkloadAlertsEnabled,
 		Platform: Collector{
 			AppName:            config.PlatformMetricsCollectorApp,
 			RBACProxyTLSSecret: config.PlatformRBACProxyTLSSecret,
@@ -277,12 +288,13 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 
 	// Set images
 	ret.Images = ImagesValues{
-		CooPrometheusOperator:    opts.Images.CooPrometheusOperatorImage,
-		PrometheusConfigReloader: opts.Images.PrometheusConfigReloader,
-		KubeStateMetrics:         opts.Images.KubeStateMetrics,
-		NodeExporter:             opts.Images.NodeExporter,
-		RBACProxyImage:           opts.Images.KubeRBACProxy,
-		Prometheus:               opts.Images.Prometheus,
+		CooPrometheusOperator:      opts.Images.CooPrometheusOperatorImage,
+		PrometheusConfigReloader:   opts.Images.PrometheusConfigReloader,
+		KubeStateMetrics:           opts.Images.KubeStateMetrics,
+		NodeExporter:               opts.Images.NodeExporter,
+		RBACProxyImage:             opts.Images.KubeRBACProxy,
+		Prometheus:                 opts.Images.Prometheus,
+		EndpointMonitoringOperator: opts.Images.EndpointMonitoringOperator,
 	}
 
 	return ret, nil

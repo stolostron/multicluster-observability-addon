@@ -11,6 +11,8 @@ import (
 )
 
 type Options struct {
+	PlatformAlertsEnabled     bool
+	UserWorkloadAlertsEnabled bool
 	Platform             Collector
 	UserWorkloads        Collector
 	Secrets              []*corev1.Secret
