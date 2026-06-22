@@ -131,11 +131,17 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				assert.Len(t, recordingRules, 2)
 				assert.Equal(t, "openshift-monitoring/prometheus-operator", recordingRules[0].Annotations["operator.prometheus.io/controller-id"])
 				// Ensure the COO Prometheus operator is generated
-				cooOperator := common.FilterResourcesByLabelSelector[*appsv1.Deployment](objects, nil)
-				assert.Len(t, cooOperator, 1)
+				deployments := common.FilterResourcesByLabelSelector[*appsv1.Deployment](objects, nil)
+				var cooOperator *appsv1.Deployment
+				for _, dep := range deployments {
+					if dep.GetName() == "prometheus-operator" {
+						cooOperator = dep
+						break
+					}
+				}
+				assert.NotNil(t, cooOperator)
 				// ensure that the number of objects is correct
-				// 4 (prom operator) + 5 (agent) + 2 secrets (mTLS to hub) + 1 cm (prom ca) + 2 rule + 2 scrape config + 1 configmap + 1 namespace = 17
-				expectedCount := 36
+				expectedCount := 44
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
@@ -183,7 +189,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 					t.Fatalf("expected %d objects, but got %d", expectedCount, len(crds))
 				}
 				// ensure that the number of objects is correct
-				expectedCount = 34
+				expectedCount = 42
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
@@ -202,7 +208,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				assert.Equal(t, "observability-operator", agent[0].Labels["app.kubernetes.io/managed-by"])
 				assert.Empty(t, agent[0].Annotations["operator.prometheus.io/controller-id"])
 				// ensure that the number of objects is correct
-				expectedCount := 23
+				expectedCount := 31
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
@@ -234,7 +240,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				cooRecordingRules := common.FilterResourcesByLabelSelector[*cooprometheusv1.PrometheusRule](objects, config.UserWorkloadPrometheusMatchLabels)
 				assert.Len(t, cooRecordingRules, 2)
 				assert.Equal(t, "openshift-user-workload-monitoring/prometheus-operator", cooRecordingRules[0].Annotations["operator.prometheus.io/controller-id"])
-				expectedCount := 38
+				expectedCount := 46
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
@@ -259,7 +265,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				assert.Len(t, crds, 1) // Only the monitoringstacks one
 
 				// ensure that the number of objects is correct
-				expectedCount := 25
+				expectedCount := 33
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
@@ -379,7 +385,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				verifyClusterScopedResourcesPrefix(t, objects)
 
 				// ensure that the number of objects is correct
-				expectedCount := 72
+				expectedCount := 80
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
@@ -456,7 +462,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				assert.Equal(t, "metrics", ns[0].Labels["app"])
 
 				// ensure that the number of objects is correct
-				expectedCount := 72
+				expectedCount := 80
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
@@ -538,9 +544,16 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				assert.Equal(t, "my-registry.com/kube/rbac-proxy", agent[0].Spec.Containers[0].Image)
 
 				// Check COO Operator image
-				cooOperator := common.FilterResourcesByLabelSelector[*appsv1.Deployment](objects, nil)
-				assert.Len(t, cooOperator, 1)
-				assert.Equal(t, "my-registry.com/prometheus/obo-operator", cooOperator[0].Spec.Template.Spec.Containers[0].Image)
+				deployments := common.FilterResourcesByLabelSelector[*appsv1.Deployment](objects, nil)
+				var cooOperator *appsv1.Deployment
+				for _, dep := range deployments {
+					if dep.GetName() == "prometheus-operator" {
+						cooOperator = dep
+						break
+					}
+				}
+				assert.NotNil(t, cooOperator)
+				assert.Equal(t, "my-registry.com/prometheus/obo-operator", cooOperator.Spec.Template.Spec.Containers[0].Image)
 				verifyClusterScopedResourcesPrefix(t, objects)
 			},
 		},
@@ -758,6 +771,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 					"kube_state_metrics":            "quay.io/kube/kube-state-metrics",
 					"node_exporter":                 "quay.io/kube/node-exporter",
 					"prometheus":                    "quay.io/prometheus/prometheus",
+					"endpoint_monitoring_operator":  "quay.io/stolostron/endpoint-monitoring-operator",
 				},
 			}
 			clientObjects = append(clientObjects, imagesCM)
@@ -1073,6 +1087,7 @@ func TestHelmBuild_Metrics_HCP(t *testing.T) {
 			"kube_state_metrics":            "quay.io/kube/kube-state-metrics",
 			"node_exporter":                 "quay.io/kube/node-exporter",
 			"prometheus":                    "quay.io/prometheus/prometheus",
+			"endpoint_monitoring_operator":  "quay.io/stolostron/endpoint-monitoring-operator",
 		},
 	}
 	clientObjects = append(clientObjects, imagesCM)

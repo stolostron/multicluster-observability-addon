@@ -26,12 +26,14 @@ const (
 	KeyMetricsAlertManagerHostname       = "metricsAlertManagerHostname"
 	KeyNodeExporterHostPort              = "nodeExporterHostPort"
 	KeyNodeExporterInternalPort          = "nodeExporterInternalPort"
+	KeyPlatformMetricsAlerts             = "platformMetricsAlerts"
 
 	// User Workloads Observability Keys
 	KeyUserWorkloadMetricsCollection = "userWorkloadMetricsCollection"
 	KeyUserWorkloadLogsCollection    = "userWorkloadLogsCollection"
 	KeyUserWorkloadTracesCollection  = "userWorkloadTracesCollection"
 	KeyUserWorkloadInstrumentation   = "userWorkloadInstrumentation"
+	KeyUserWorkloadMetricsAlerts     = "userWorkloadMetricsAlerts"
 
 	KeyPlatformMetricsUI = "platformMetricsUI"
 )
@@ -62,6 +64,7 @@ type MetricsOptions struct {
 	AlertManagerEndpoint url.URL
 	UI                   MetricsUIOptions
 	NodeExporter         NodeExporterOptions
+	AlertsEnabled        bool
 }
 
 type NodeExporterOptions struct {
@@ -177,6 +180,10 @@ func BuildOptions(addOnDeployment *addonapiv1beta1.AddOnDeploymentConfig) (Optio
 	opts.ProxyConfig.NoProxy = addOnDeployment.Spec.ProxyConfig.NoProxy
 	opts.Registries = addOnDeployment.Spec.Registries
 
+	// Default alerts to disabled
+	opts.Platform.Metrics.AlertsEnabled = false
+	opts.UserWorkloads.Metrics.AlertsEnabled = false
+
 	// Do NOT return early when CustomizedVariables is nil. The for-range
 	// loop below is a safe no-op on a nil slice, and we must always fall
 	// through to the auto-enable right-sizing logic that follows it.
@@ -229,6 +236,14 @@ func BuildOptions(addOnDeployment *addonapiv1beta1.AddOnDeploymentConfig) (Optio
 			}
 
 			opts.Platform.Metrics.AlertManagerEndpoint = *url
+		case KeyPlatformMetricsAlerts:
+			if keyvalue.Value == "enabled" {
+				opts.Platform.Metrics.AlertsEnabled = true
+			}
+		case KeyUserWorkloadMetricsAlerts:
+			if keyvalue.Value == "enabled" {
+				opts.UserWorkloads.Metrics.AlertsEnabled = true
+			}
 		case KeyNodeExporterHostPort:
 			port, err := parsePort(keyvalue.Name, keyvalue.Value)
 			if err != nil {

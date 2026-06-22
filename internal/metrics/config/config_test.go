@@ -25,6 +25,7 @@ func TestGetImageOverrides(t *testing.T) {
 		"kube_state_metrics":            "k8s.gcr.io/kube-state-metrics/kube-state-metrics:v2.0.0",
 		"node_exporter":                 "quay.io/prometheus/node-exporter:v1.0.0",
 		"prometheus":                    "quay.io/prometheus/prometheus:v2.0.0",
+		"endpoint_monitoring_operator":  "quay.io/stolostron/endpoint-monitoring-operator:v1.0.0",
 	}
 
 	cm := &corev1.ConfigMap{
@@ -52,6 +53,7 @@ func TestGetImageOverrides(t *testing.T) {
 				KubeStateMetrics:           "k8s.gcr.io/kube-state-metrics/kube-state-metrics:v2.0.0",
 				NodeExporter:               "quay.io/prometheus/node-exporter:v1.0.0",
 				Prometheus:                 "quay.io/prometheus/prometheus:v2.0.0",
+				EndpointMonitoringOperator: "quay.io/stolostron/endpoint-monitoring-operator:v1.0.0",
 			},
 		},
 		{
@@ -61,6 +63,10 @@ func TestGetImageOverrides(t *testing.T) {
 					Source: "quay.io/prometheus/prometheus",
 					Mirror: "registry.example.com/prometheus/prometheus",
 				},
+				{
+					Source: "quay.io/stolostron/endpoint-monitoring-operator",
+					Mirror: "registry.example.com/stolostron/endpoint-monitoring-operator",
+				},
 			},
 			expected: ImageOverrides{
 				PrometheusConfigReloader:   "quay.io/prometheus-operator/prometheus-config-reloader:v0.60.0",
@@ -69,6 +75,7 @@ func TestGetImageOverrides(t *testing.T) {
 				KubeStateMetrics:           "k8s.gcr.io/kube-state-metrics/kube-state-metrics:v2.0.0",
 				NodeExporter:               "quay.io/prometheus/node-exporter:v1.0.0",
 				Prometheus:                 "registry.example.com/prometheus/prometheus:v2.0.0",
+				EndpointMonitoringOperator: "registry.example.com/stolostron/endpoint-monitoring-operator:v1.0.0",
 			},
 		},
 		{
@@ -86,6 +93,7 @@ func TestGetImageOverrides(t *testing.T) {
 				KubeStateMetrics:           "k8s.gcr.io/kube-state-metrics/kube-state-metrics:v2.0.0",
 				NodeExporter:               "quay.io/prometheus/node-exporter:v1.0.0",
 				Prometheus:                 "quay.io/prometheus/prometheus:v2.0.0",
+				EndpointMonitoringOperator: "quay.io/stolostron/endpoint-monitoring-operator:v1.0.0",
 			},
 		},
 		{
@@ -103,6 +111,7 @@ func TestGetImageOverrides(t *testing.T) {
 				KubeStateMetrics:           "k8s.gcr.io/kube-state-metrics/kube-state-metrics:v2.0.0",
 				NodeExporter:               "quay.io/prometheus/node-exporter:v1.0.0",
 				Prometheus:                 "quay.io/prometheus/prometheus:v2.0.0", // "quay.io/prometheus" is prefix of "quay.io/prometheus/prometheus" but not exact match for repo
+				EndpointMonitoringOperator: "quay.io/stolostron/endpoint-monitoring-operator:v1.0.0",
 			},
 		},
 	}
