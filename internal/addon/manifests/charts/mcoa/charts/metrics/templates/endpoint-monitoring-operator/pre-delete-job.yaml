@@ -1,0 +1,89 @@
+{{- if or .Values.platformEnabled .Values.userWorkloadsEnabled }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: observability-pre-delete-sa
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/component: endpoint-monitoring-operator-cleanup
+    {{- include "metricshelm.labels" . | nindent 4 }}
+{{- if .Values.global.imagePullSecret }}
+imagePullSecrets:
+  - name: "{{ .Values.global.imagePullSecret }}"
+{{- end }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "mcoa.globalResourcePrefix" "observability-addon-cleanup" }}
+  labels:
+    app.kubernetes.io/component: endpoint-monitoring-operator-cleanup
+    {{- include "metricshelm.labels" . | nindent 4 }}
+rules:
+- apiGroups: [""]
+  resources: ["configmaps"]
+  resourceNames: ["cluster-monitoring-config", "user-workload-monitoring-config"]
+  verbs: ["get", "patch", "update"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "mcoa.globalResourcePrefix" "observability-addon-cleanup" }}
+  labels:
+    app.kubernetes.io/component: endpoint-monitoring-operator-cleanup
+    {{- include "metricshelm.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "mcoa.globalResourcePrefix" "observability-addon-cleanup" }}
+subjects:
+- kind: ServiceAccount
+  name: observability-pre-delete-sa
+  namespace: {{ .Release.Namespace }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: observability-monitoring-cleanup
+  namespace: {{ .Release.Namespace }}
+  labels:
+    open-cluster-management.io/addon-pre-delete: ""
+    app.kubernetes.io/component: endpoint-monitoring-operator-cleanup
+    {{- include "metricshelm.labels" . | nindent 4 }}
+spec:
+  backoffLimit: 2
+  activeDeadlineSeconds: 120
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: endpoint-monitoring-operator-cleanup
+    spec:
+      serviceAccountName: observability-pre-delete-sa
+      restartPolicy: Never
+      {{- if .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml .Values.nodeSelector | nindent 8 }}
+      {{- end }}
+      {{- if .Values.tolerations }}
+      tolerations:
+        {{- toYaml .Values.tolerations | nindent 8 }}
+      {{- end }}
+      containers:
+      - name: observability-monitoring-cleanup
+        image: {{ .Values.images.endpointMonitoringOperator }}
+        command:
+        - /usr/local/bin/endpoint-monitoring-operator
+        args:
+        - cleanup
+        {{- if .Values.hubClusterID }}
+        - --hub-id={{ .Values.hubClusterID }}
+        {{- end }}
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          privileged: false
+          runAsNonRoot: true
+          readOnlyRootFilesystem: true
+{{- end }}

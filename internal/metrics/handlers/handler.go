@@ -49,13 +49,15 @@ type OptionsBuilder struct {
 
 func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1beta1.ManagedClusterAddOn, managedCluster *clusterv1.ManagedCluster, opts addon.Options) (Options, error) {
 	ret := Options{
-		IsHub:            common.IsHubCluster(managedCluster),
-		InstallNamespace: opts.InstallNamespace,
-		NodeSelector:     opts.NodeSelector,
-		Tolerations:      opts.Tolerations,
-		ResourceReqs:     opts.ResourceReqs,
-		ProxyConfig:      opts.ProxyConfig,
-		NodeExporter:     opts.Platform.Metrics.NodeExporter,
+		IsHub:                     common.IsHubCluster(managedCluster),
+		InstallNamespace:          opts.InstallNamespace,
+		NodeSelector:              opts.NodeSelector,
+		Tolerations:               opts.Tolerations,
+		ResourceReqs:              opts.ResourceReqs,
+		ProxyConfig:               opts.ProxyConfig,
+		NodeExporter:              opts.Platform.Metrics.NodeExporter,
+		PlatformAlertsEnabled:     opts.Platform.Metrics.AlertsEnabled,
+		UserWorkloadAlertsEnabled: opts.UserWorkloads.Metrics.AlertsEnabled,
 	}
 
 	if !opts.Platform.Metrics.CollectionEnabled && !opts.UserWorkloads.Metrics.CollectionEnabled {

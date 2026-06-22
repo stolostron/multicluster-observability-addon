@@ -64,11 +64,13 @@ func TestBuildValues(t *testing.T) {
 				Images: config.ImageOverrides{
 					CooPrometheusOperatorImage: "obo-prometheus-operator:latest",
 					PrometheusConfigReloader:   "prometheus-config-reloader:latest",
+					EndpointMonitoringOperator: "endpoint-monitoring-operator:latest",
 				},
 			},
 			Expect: func(t *testing.T, values *manifests.MetricsValues) {
 				assert.Equal(t, "obo-prometheus-operator:latest", values.Images.CooPrometheusOperator)
 				assert.Equal(t, "prometheus-config-reloader:latest", values.Images.PrometheusConfigReloader)
+				assert.Equal(t, "endpoint-monitoring-operator:latest", values.Images.EndpointMonitoringOperator)
 			},
 		},
 		"with secrets": {
