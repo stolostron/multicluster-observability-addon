@@ -96,11 +96,6 @@ func ensureConfigsInAddon(cmao *addonv1beta1.ClusterManagementAddOn, configs []D
 	// Group configs by placement.
 	placementConfigs := map[addonv1beta1.PlacementRef][]addonv1beta1.AddOnConfig{}
 	for _, cfg := range configs {
-		// If the config is already present in the placement, skip it
-		// Why is this necessary?
-		if containsConfig(placementConfigs[cfg.PlacementRef], cfg.Config) {
-			continue
-		}
 		placementConfigs[cfg.PlacementRef] = append(placementConfigs[cfg.PlacementRef], cfg.Config)
 	}
 
@@ -125,7 +120,7 @@ func removeStaleConfigs(ctx context.Context, k8s client.Client, cmao *addonv1bet
 	for i, placement := range cmao.Spec.InstallStrategy.Placements {
 		filtered := make([]addonv1beta1.AddOnConfig, 0, len(placement.Configs))
 		for _, cfg := range placement.Configs {
-			_, err := isUserDefinedConfig(ctx, k8s, cfg)
+			_, err := doesScrapeConfigOrPrometheusRuleExist(ctx, k8s, cfg)
 			if err != nil {
 				if apierrors.IsNotFound(err) {
 					continue
@@ -139,32 +134,28 @@ func removeStaleConfigs(ctx context.Context, k8s client.Client, cmao *addonv1bet
 	return nil
 }
 
-// isUserDefinedConfig checks whether the config references a user-defined PrometheusRule
-// or ScrapeConfig by fetching the resource and looking for the placement annotation.
+// doesScrapeConfigOrPrometheusRuleExist checks whether the config references an existing ScrapeConfig or PrometheusRule
 // Returns the raw API error on failure so callers can distinguish NotFound from other errors.
-func isUserDefinedConfig(ctx context.Context, k8s client.Client, cfg addonv1beta1.AddOnConfig) (bool, error) {
+func doesScrapeConfigOrPrometheusRuleExist(ctx context.Context, k8s client.Client, cfg addonv1beta1.AddOnConfig) (bool, error) {
 	key := types.NamespacedName{Name: cfg.Name, Namespace: cfg.Namespace}
-
-	var annotations map[string]string
 	switch cfg.Resource {
 	case cooprometheusv1alpha1.ScrapeConfigName:
 		sc := &cooprometheusv1alpha1.ScrapeConfig{}
 		if err := k8s.Get(ctx, key, sc); err != nil {
 			return false, err
+		} else {
+			return true, nil
 		}
-		annotations = sc.Annotations
 	case prometheusv1.PrometheusRuleName:
 		rule := &prometheusv1.PrometheusRule{}
 		if err := k8s.Get(ctx, key, rule); err != nil {
 			return false, err
+		} else {
+			return true, nil
 		}
-		annotations = rule.Annotations
 	default:
 		return false, nil
 	}
-
-	_, hasPlacementAnnotation := annotations[addoncfg.PlacementAnnotationKey]
-	return hasPlacementAnnotation, nil
 }
 
 func ObjectToAddonConfig(obj client.Object) (addonv1beta1.AddOnConfig, error) {

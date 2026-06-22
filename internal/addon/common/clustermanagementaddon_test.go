@@ -351,48 +351,26 @@ func TestRemoveStaleConfigs(t *testing.T) {
 	}
 }
 
-func TestIsUserDefinedConfig(t *testing.T) {
+func TestDoesScrapeConfigOrPrometheusRuleExist(t *testing.T) {
 	scheme := newCMAOTestScheme(t)
 
-	scrapeConfigWithAnnotation := &cooprometheusv1alpha1.ScrapeConfig{
+	existingScrapeConfig := &cooprometheusv1alpha1.ScrapeConfig{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "user-sc",
-			Namespace: addoncfg.InstallNamespace,
-			Annotations: map[string]string{
-				addoncfg.PlacementAnnotationKey: "ns/placement-a",
-			},
-		},
-	}
-
-	scrapeConfigWithoutAnnotation := &cooprometheusv1alpha1.ScrapeConfig{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "mco-sc",
+			Name:      "existing-sc",
 			Namespace: addoncfg.InstallNamespace,
 		},
 	}
 
-	promRuleWithAnnotation := &prometheusv1.PrometheusRule{
+	existingPromRule := &prometheusv1.PrometheusRule{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "user-rule",
-			Namespace: addoncfg.InstallNamespace,
-			Annotations: map[string]string{
-				addoncfg.PlacementAnnotationKey: "ns/placement-a,ns/placement-b",
-			},
-		},
-	}
-
-	promRuleWithoutAnnotation := &prometheusv1.PrometheusRule{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "mco-rule",
+			Name:      "existing-rule",
 			Namespace: addoncfg.InstallNamespace,
 		},
 	}
 
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(
-		scrapeConfigWithAnnotation,
-		scrapeConfigWithoutAnnotation,
-		promRuleWithAnnotation,
-		promRuleWithoutAnnotation,
+		existingScrapeConfig,
+		existingPromRule,
 	).Build()
 
 	testCases := []struct {
@@ -402,32 +380,18 @@ func TestIsUserDefinedConfig(t *testing.T) {
 		expectNotFound bool
 	}{
 		{
-			name: "scrapeconfig with placement annotation",
+			name: "existing scrapeconfig returns true",
 			cfg: addonv1beta1.AddOnConfig{
 				ConfigGroupResource: addonv1beta1.ConfigGroupResource{
 					Group:    cooprometheusv1alpha1.SchemeGroupVersion.Group,
 					Resource: cooprometheusv1alpha1.ScrapeConfigName,
 				},
 				ConfigReferent: addonv1beta1.ConfigReferent{
-					Name:      "user-sc",
+					Name:      "existing-sc",
 					Namespace: addoncfg.InstallNamespace,
 				},
 			},
 			expected: true,
-		},
-		{
-			name: "scrapeconfig without placement annotation",
-			cfg: addonv1beta1.AddOnConfig{
-				ConfigGroupResource: addonv1beta1.ConfigGroupResource{
-					Group:    cooprometheusv1alpha1.SchemeGroupVersion.Group,
-					Resource: cooprometheusv1alpha1.ScrapeConfigName,
-				},
-				ConfigReferent: addonv1beta1.ConfigReferent{
-					Name:      "mco-sc",
-					Namespace: addoncfg.InstallNamespace,
-				},
-			},
-			expected: false,
 		},
 		{
 			name: "non-existent scrapeconfig returns not found",
@@ -444,32 +408,18 @@ func TestIsUserDefinedConfig(t *testing.T) {
 			expectNotFound: true,
 		},
 		{
-			name: "prometheusrule with placement annotation",
+			name: "existing prometheusrule returns true",
 			cfg: addonv1beta1.AddOnConfig{
 				ConfigGroupResource: addonv1beta1.ConfigGroupResource{
 					Group:    prometheusv1.SchemeGroupVersion.Group,
 					Resource: prometheusv1.PrometheusRuleName,
 				},
 				ConfigReferent: addonv1beta1.ConfigReferent{
-					Name:      "user-rule",
+					Name:      "existing-rule",
 					Namespace: addoncfg.InstallNamespace,
 				},
 			},
 			expected: true,
-		},
-		{
-			name: "prometheusrule without placement annotation",
-			cfg: addonv1beta1.AddOnConfig{
-				ConfigGroupResource: addonv1beta1.ConfigGroupResource{
-					Group:    prometheusv1.SchemeGroupVersion.Group,
-					Resource: prometheusv1.PrometheusRuleName,
-				},
-				ConfigReferent: addonv1beta1.ConfigReferent{
-					Name:      "mco-rule",
-					Namespace: addoncfg.InstallNamespace,
-				},
-			},
-			expected: false,
 		},
 		{
 			name: "non-existent prometheusrule returns not found",
@@ -503,7 +453,7 @@ func TestIsUserDefinedConfig(t *testing.T) {
 
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := isUserDefinedConfig(context.Background(), fakeClient, tt.cfg)
+			result, err := doesScrapeConfigOrPrometheusRuleExist(context.Background(), fakeClient, tt.cfg)
 			if tt.expectNotFound {
 				require.Error(t, err)
 				assert.True(t, apierrors.IsNotFound(err), "expected NotFound error, got: %v", err)
