@@ -122,6 +122,153 @@ func GetTypeVariable(datasource string) dashboard.Option {
 	)
 }
 
+func GetCardinalityClusterVariable(datasource string) dashboard.Option {
+	return dashboard.AddVariable("cluster",
+		listVar.List(
+			labelValuesVar.PrometheusLabelValues("cluster",
+				labelValuesVar.Matchers(
+					promql.SetLabelMatchers(
+						"cluster:cardinality",
+						[]promql.LabelMatcher{},
+					),
+				),
+				dashboards.AddVariableDatasource(datasource),
+			),
+			listVar.DisplayName("Cluster"),
+		),
+	)
+}
+
+func GetCardinalityNamespaceVariable(datasource string) dashboard.Option {
+	return dashboard.AddVariable("namespace",
+		listVar.List(
+			labelValuesVar.PrometheusLabelValues("namespace",
+				labelValuesVar.Matchers(
+					promql.SetLabelMatchers(
+						"kube_pod_info",
+						[]promql.LabelMatcher{{Name: "cluster", Type: "=", Value: "$cluster"}},
+					),
+				),
+				dashboards.AddVariableDatasource(datasource),
+			),
+			listVar.DisplayName("Namespace"),
+		),
+	)
+}
+
+func GetCardinalityPodVariable(datasource string) dashboard.Option {
+	return dashboard.AddVariable("pod",
+		listVar.List(
+			labelValuesVar.PrometheusLabelValues("pod",
+				labelValuesVar.Matchers(
+					promql.SetLabelMatchers(
+						"kube_pod_info",
+						[]promql.LabelMatcher{
+							{Name: "cluster", Type: "=", Value: "$cluster"},
+							{Name: "namespace", Type: "=", Value: "$namespace"},
+						},
+					),
+				),
+				dashboards.AddVariableDatasource(datasource),
+			),
+			listVar.DisplayName("Pod"),
+		),
+	)
+}
+
+func GetCardinalityPodMetricVariable(datasource string) dashboard.Option {
+	return dashboard.AddVariable("metric_name",
+		listVar.List(
+			labelValuesVar.PrometheusLabelValues("__name__",
+				labelValuesVar.Matchers(
+					promql.SetLabelMatchers(
+						"{__name__=~\".+\"}",
+						[]promql.LabelMatcher{
+							{Name: "cluster", Type: "=", Value: "$cluster"},
+							{Name: "namespace", Type: "=", Value: "$namespace"},
+							{Name: "pod", Type: "=", Value: "$pod"},
+						},
+					),
+				),
+				dashboards.AddVariableDatasource(datasource),
+			),
+			listVar.DisplayName("Metric Name"),
+		),
+	)
+}
+
+func GetCardinalityMetricNameVariable(datasource string) dashboard.Option {
+	return dashboard.AddVariable("metric_name",
+		listVar.List(
+			labelValuesVar.PrometheusLabelValues("metric_name",
+				labelValuesVar.Matchers(
+					promql.SetLabelMatchers(
+						"cluster_name:cardinality",
+						[]promql.LabelMatcher{},
+					),
+				),
+				dashboards.AddVariableDatasource(datasource),
+			),
+			listVar.DisplayName("Metric Name"),
+		),
+	)
+}
+
+func GetCardinalityClusterForMetricVariable(datasource string) dashboard.Option {
+	return dashboard.AddVariable("cluster",
+		listVar.List(
+			labelValuesVar.PrometheusLabelValues("cluster",
+				labelValuesVar.Matchers(
+					promql.SetLabelMatchers(
+						"cluster_name:cardinality",
+						[]promql.LabelMatcher{{Name: "metric_name", Type: "=", Value: "$metric_name"}},
+					),
+				),
+				dashboards.AddVariableDatasource(datasource),
+			),
+			listVar.DisplayName("Cluster"),
+		),
+	)
+}
+
+func GetCardinalityNamespaceForNameVariable(datasource string) dashboard.Option {
+	return dashboard.AddVariable("namespace",
+		listVar.List(
+			labelValuesVar.PrometheusLabelValues("namespace",
+				labelValuesVar.Matchers(
+					promql.SetLabelMatchers(
+						"cluster_namespace:cardinality",
+						[]promql.LabelMatcher{{Name: "cluster", Type: "=", Value: "$cluster"}},
+					),
+				),
+				dashboards.AddVariableDatasource(datasource),
+			),
+			listVar.DisplayName("Namespace"),
+		),
+	)
+}
+
+func GetCardinalityPodForNameVariable(datasource string) dashboard.Option {
+	return dashboard.AddVariable("pod",
+		listVar.List(
+			labelValuesVar.PrometheusLabelValues("pod",
+				labelValuesVar.Matchers(
+					promql.SetLabelMatchers(
+						"{__name__=~\".+\"}",
+						[]promql.LabelMatcher{
+							{Name: "__name__", Type: "=", Value: "$metric_name"},
+							{Name: "cluster", Type: "=", Value: "$cluster"},
+							{Name: "namespace", Type: "=", Value: "$namespace"},
+						},
+					),
+				),
+				dashboards.AddVariableDatasource(datasource),
+			),
+			listVar.DisplayName("Pod"),
+		),
+	)
+}
+
 func GetInstanceVariable(datasource string) dashboard.Option {
 	return dashboard.AddVariable("instance",
 		listVar.List(
