@@ -76,3 +76,48 @@ func AddCustomPanelGroup(title string, positions []GridItem, panelOpts ...panelg
 		return nil
 	}
 }
+
+func AddCustomPanelGroupCollapsed(title string, positions []GridItem, panelOpts ...panelgroup.Option) dashboard.Option {
+	return func(builder *dashboard.Builder) error {
+		pg, err := panelgroup.New(title, panelOpts...)
+		if err != nil {
+			return err
+		}
+
+		if builder.Dashboard.Spec.Panels == nil {
+			builder.Dashboard.Spec.Panels = make(map[string]*v1.Panel)
+		}
+
+		layoutIdx := len(builder.Dashboard.Spec.Layouts)
+		gridItems := make([]dashboardModel.GridItem, 0, len(pg.Panels))
+
+		for i := range pg.Panels {
+			panelRef := fmt.Sprintf("%d_%d", layoutIdx, i)
+			builder.Dashboard.Spec.Panels[panelRef] = &pg.Panels[i]
+
+			gi := positions[i]
+			gridItems = append(gridItems, dashboardModel.GridItem{
+				X:      gi.X,
+				Y:      gi.Y,
+				Width:  gi.W,
+				Height: gi.H,
+				Content: &v1Common.JSONRef{
+					Ref: fmt.Sprintf("#/spec/panels/%s", panelRef),
+				},
+			})
+		}
+
+		builder.Dashboard.Spec.Layouts = append(builder.Dashboard.Spec.Layouts, dashboardModel.Layout{
+			Kind: "Grid",
+			Spec: dashboardModel.GridLayoutSpec{
+				Display: &dashboardModel.GridLayoutDisplay{
+					Title:    title,
+					Collapse: &dashboardModel.GridLayoutCollapse{Open: false},
+				},
+				Items: gridItems,
+			},
+		})
+
+		return nil
+	}
+}
