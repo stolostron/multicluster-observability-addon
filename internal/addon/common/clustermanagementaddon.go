@@ -96,6 +96,10 @@ func ensureConfigsInAddon(cmao *addonv1beta1.ClusterManagementAddOn, configs []D
 	// Group configs by placement.
 	placementConfigs := map[addonv1beta1.PlacementRef][]addonv1beta1.AddOnConfig{}
 	for _, cfg := range configs {
+		if containsConfig(placementConfigs[cfg.PlacementRef], cfg.Config) {
+			continue
+		}
+
 		placementConfigs[cfg.PlacementRef] = append(placementConfigs[cfg.PlacementRef], cfg.Config)
 	}
 

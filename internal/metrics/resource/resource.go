@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"slices"
 	"strings"
 
 	"github.com/go-logr/logr"
@@ -408,10 +409,14 @@ func (d DefaultStackResources) generatePlacementRefs(placementAnnotations string
 		if len(nameNamespacePair) != 2 || nameNamespacePair[0] == "" || nameNamespacePair[1] == "" {
 			return nil, fmt.Errorf("%w %q: expected format namespace/name", errInvalidPlacementReference, placement)
 		}
-		placementRefs = append(placementRefs, addonv1beta1.PlacementRef{
+		ref := addonv1beta1.PlacementRef{
 			Namespace: nameNamespacePair[0],
 			Name:      nameNamespacePair[1],
-		})
+		}
+		if slices.Contains(placementRefs, ref) {
+			continue
+		}
+		placementRefs = append(placementRefs, ref)
 	}
 	return placementRefs, nil
 }
