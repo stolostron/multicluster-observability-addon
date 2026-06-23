@@ -37,6 +37,7 @@ spec:
         args:
         - mcoa
         - --namespace={{ .Release.Namespace }}
+        - --metrics-bind-address={{ if .Values.deployNonOCPStack }}0.0.0.0:8080{{ else }}127.0.0.1:8080{{ end }}
         {{- if and .Values.alertManagerEndpoint (or .Values.platformAlertsEnabled .Values.userWorkloadAlertsEnabled) }}
         - --hub-alertmanager-url={{ .Values.alertManagerEndpoint }}
         - --hub-alertmanager-ca-secret={{ .Values.alertmanagerRouterCASecretName }}
@@ -47,6 +48,11 @@ spec:
         - --cluster-id={{ .Values.hubClusterID }}
         {{- end }}
         - --enable-uwl-alert-forwarding={{ and .Values.userWorkloadsEnabled .Values.userWorkloadAlertsEnabled }}
+        {{- if .Values.deployNonOCPStack }}
+        ports:
+        - name: metrics
+          containerPort: 8080
+        {{- end }}
         resources:
           requests:
             cpu: 10m
@@ -62,4 +68,44 @@ spec:
           privileged: false
           runAsNonRoot: true
           readOnlyRootFilesystem: true
+      {{- if not .Values.deployNonOCPStack }}
+      - name: kube-rbac-proxy
+        image: {{ .Values.images.rbacProxyImage }}
+        imagePullPolicy: IfNotPresent
+        args:
+        - --secure-listen-address=0.0.0.0:8443
+        - --upstream=http://127.0.0.1:8080
+        - --tls-cert-file=/etc/tls/private/tls.crt
+        - --tls-private-key-file=/etc/tls/private/tls.key
+        - --logtostderr=true
+        - --allow-paths=/metrics
+        ports:
+        - name: metrics
+          containerPort: 8443
+        resources:
+          requests:
+            cpu: 1m
+            memory: 15Mi
+          limits:
+            cpu: 20m
+            memory: 30Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          privileged: false
+          runAsNonRoot: true
+          readOnlyRootFilesystem: true
+        volumeMounts:
+        - name: kube-rbac-proxy-tls
+          mountPath: /etc/tls/private
+          readOnly: true
+      {{- end }}
+      {{- if not .Values.deployNonOCPStack }}
+      volumes:
+      - name: kube-rbac-proxy-tls
+        secret:
+          secretName: endpoint-monitoring-operator-tls
+      {{- end }}
 {{- end }}
