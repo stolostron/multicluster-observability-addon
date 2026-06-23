@@ -49,7 +49,6 @@ metadata:
   labels:
     open-cluster-management.io/addon-pre-delete: ""
     app.kubernetes.io/component: endpoint-monitoring-operator-cleanup
-    {{- include "metricshelm.labels" . | nindent 4 }}
 spec:
   backoffLimit: 2
   activeDeadlineSeconds: 120

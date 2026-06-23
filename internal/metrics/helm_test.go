@@ -141,7 +141,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				}
 				assert.NotNil(t, cooOperator)
 				// ensure that the number of objects is correct
-				expectedCount := 44
+				expectedCount := 48
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
@@ -189,7 +189,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 					t.Fatalf("expected %d objects, but got %d", expectedCount, len(crds))
 				}
 				// ensure that the number of objects is correct
-				expectedCount = 42
+				expectedCount = 46
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
@@ -208,7 +208,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				assert.Equal(t, "observability-operator", agent[0].Labels["app.kubernetes.io/managed-by"])
 				assert.Empty(t, agent[0].Annotations["operator.prometheus.io/controller-id"])
 				// ensure that the number of objects is correct
-				expectedCount := 31
+				expectedCount := 35
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
@@ -240,7 +240,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				cooRecordingRules := common.FilterResourcesByLabelSelector[*cooprometheusv1.PrometheusRule](objects, config.UserWorkloadPrometheusMatchLabels)
 				assert.Len(t, cooRecordingRules, 2)
 				assert.Equal(t, "openshift-user-workload-monitoring/prometheus-operator", cooRecordingRules[0].Annotations["operator.prometheus.io/controller-id"])
-				expectedCount := 46
+				expectedCount := 50
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
@@ -265,7 +265,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				assert.Len(t, crds, 1) // Only the monitoringstacks one
 
 				// ensure that the number of objects is correct
-				expectedCount := 33
+				expectedCount := 37
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
@@ -1138,7 +1138,7 @@ func TestHelmBuild_Metrics_HCP(t *testing.T) {
 	scrapeConfigs := common.FilterResourcesByLabelSelector[*cooprometheusv1alpha1.ScrapeConfig](clientObjs, nil)
 	assert.Len(t, scrapeConfigs, 2)
 	serviceMonitors := common.FilterResourcesByLabelSelector[*prometheusv1.ServiceMonitor](clientObjs, nil)
-	assert.Len(t, serviceMonitors, 4) // 2 for hcps and 1 for meta monitoring, 1 for obo-prometheus operator
+	assert.Len(t, serviceMonitors, 5) // 2 for hcps, 1 for meta monitoring, 1 for obo-prometheus operator, 1 for endpoint-monitoring-operator
 	// keep only hcps serviceMonitors
 	serviceMonitors = slices.DeleteFunc(serviceMonitors, func(e *prometheusv1.ServiceMonitor) bool { return e.Namespace != "clusters-a" })
 	assert.Len(t, serviceMonitors, 2)
