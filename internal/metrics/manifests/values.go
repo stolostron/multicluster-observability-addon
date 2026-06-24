@@ -28,6 +28,7 @@ type MetricsValues struct {
 	ClientCertSecretName           string              `json:"clientCertSecretName"`
 	HubClusterID                   string              `json:"hubClusterID"`
 	ClusterID                      string              `json:"clusterID"`
+	ClusterName                    string              `json:"clusterName"`
 	PlatformAlertsEnabled          bool                `json:"platformAlertsEnabled"`
 	UserWorkloadAlertsEnabled      bool                `json:"userWorkloadAlertsEnabled"`
 	Platform                       Collector           `json:"platform"`
@@ -86,6 +87,7 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 		ClientCertSecretName:           config.GetObsAlertmanagerMtlsCertSecretName(config.GetTrimmedClusterID(opts.HubClusterID)),
 		HubClusterID:                   opts.HubClusterID,
 		ClusterID:                      opts.ClusterID,
+		ClusterName:                    opts.ClusterName,
 		PlatformAlertsEnabled:          opts.PlatformAlertsEnabled,
 		UserWorkloadAlertsEnabled:      opts.UserWorkloadAlertsEnabled,
 		Platform: Collector{

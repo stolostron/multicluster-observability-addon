@@ -105,7 +105,7 @@ func GenerateScrapeConfig(includeNamespace, includeVirtualization bool) *cooprom
 			MetricRelabelConfigs: []cooprometheusv1.RelabelConfig{
 				{
 					Action: "labeldrop",
-					Regex:  "managed_cluster|id",
+					Regex:  "managed_cluster|managed_cluster_name|id",
 				},
 			},
 		},
