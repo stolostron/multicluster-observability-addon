@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	configv1 "github.com/openshift/api/config/v1"
-	operatorv1 "github.com/openshift/api/operator/v1"
 	hyperv1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	cooprometheusv1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1"
@@ -141,7 +140,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				}
 				assert.NotNil(t, cooOperator)
 				// ensure that the number of objects is correct
-				expectedCount := 48
+				expectedCount := 49
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
@@ -154,7 +153,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				assert.Empty(t, ns[0].Labels["app"])
 
 				secrets := common.FilterResourcesByLabelSelector[*corev1.Secret](objects, nil)
-				assert.Len(t, secrets, 4) // 4 secrets (mTLS to hub) + alertmananger secrets (accessor+ca in platform)
+				assert.Len(t, secrets, 5) // 5 secrets (mTLS to hub) + alertmananger secrets (accessor+ca+cert in platform)
 
 				// Ensure that the original resource annotation is set
 				for _, obj := range secrets {
@@ -189,7 +188,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 					t.Fatalf("expected %d objects, but got %d", expectedCount, len(crds))
 				}
 				// ensure that the number of objects is correct
-				expectedCount = 46
+				expectedCount = 47
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
@@ -208,7 +207,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				assert.Equal(t, "observability-operator", agent[0].Labels["app.kubernetes.io/managed-by"])
 				assert.Empty(t, agent[0].Annotations["operator.prometheus.io/controller-id"])
 				// ensure that the number of objects is correct
-				expectedCount := 35
+				expectedCount := 36
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
@@ -240,12 +239,12 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				cooRecordingRules := common.FilterResourcesByLabelSelector[*cooprometheusv1.PrometheusRule](objects, config.UserWorkloadPrometheusMatchLabels)
 				assert.Len(t, cooRecordingRules, 2)
 				assert.Equal(t, "openshift-user-workload-monitoring/prometheus-operator", cooRecordingRules[0].Annotations["operator.prometheus.io/controller-id"])
-				expectedCount := 50
+				expectedCount := 51
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
 
-				assert.Len(t, common.FilterResourcesByLabelSelector[*corev1.Secret](objects, nil), 4) // 2 secrets (mTLS to hub) + alertmananger secrets (accessor+ca in uwl)
+				assert.Len(t, common.FilterResourcesByLabelSelector[*corev1.Secret](objects, nil), 5) // 2 secrets (mTLS to hub) + alertmananger secrets (accessor+ca+cert in uwl)
 				verifyClusterScopedResourcesPrefix(t, objects)
 			},
 		},
@@ -265,7 +264,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				assert.Len(t, crds, 1) // Only the monitoringstacks one
 
 				// ensure that the number of objects is correct
-				expectedCount := 37
+				expectedCount := 38
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
@@ -379,13 +378,14 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				proms := common.FilterResourcesByLabelSelector[*cooprometheusv1.Prometheus](objects, nil)
 				assert.Len(t, proms, 1)
 				trimmedID := config.GetTrimmedClusterID(testClusterID)
-				assert.Contains(t, proms[0].Spec.Secrets, config.GetAlertmanagerRouterCASecretName(trimmedID))
+				assert.Contains(t, proms[0].Spec.Secrets, config.GetObsAlertmanagerMtlsCASecretName(trimmedID))
+				assert.Contains(t, proms[0].Spec.Secrets, config.GetObsAlertmanagerMtlsCertSecretName(trimmedID))
 				assert.Contains(t, proms[0].Spec.Secrets, config.GetAlertmanagerAccessorSecretName(trimmedID))
 
 				verifyClusterScopedResourcesPrefix(t, objects)
 
 				// ensure that the number of objects is correct
-				expectedCount := 80
+				expectedCount := 82
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
@@ -462,7 +462,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				assert.Equal(t, "metrics", ns[0].Labels["app"])
 
 				// ensure that the number of objects is correct
-				expectedCount := 80
+				expectedCount := 82
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
@@ -561,13 +561,13 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 
 	scheme := runtime.NewScheme()
 	assert.NoError(t, kubescheme.AddToScheme(scheme))
+	assert.NoError(t, configv1.AddToScheme(scheme))
 	assert.NoError(t, cooprometheusv1alpha1.AddToScheme(scheme))
 	assert.NoError(t, prometheusv1.AddToScheme(scheme))
 	assert.NoError(t, cooprometheusv1.AddToScheme(scheme))
 	assert.NoError(t, clusterv1.Install(scheme))
 	assert.NoError(t, addonapiv1beta1.Install(scheme))
 	assert.NoError(t, workv1.Install(scheme))
-	assert.NoError(t, operatorv1.AddToScheme(scheme))
 	assert.NoError(t, hyperv1.AddToScheme(scheme))
 
 	for name, tc := range testCases {
@@ -683,17 +683,6 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 
 			// Add alermanager secrets
 			clientObjects = append(clientObjects, newSecret(config.AlertmanagerAccessorSecretName, hubNamespace))
-			routerCertsSecret := newSecret(config.RouterDefaultCertsConfigMapObjKey.Name, config.RouterDefaultCertsConfigMapObjKey.Namespace)
-			routerCertsSecret.Data["tls.crt"] = []byte("toto")
-			clientObjects = append(clientObjects, routerCertsSecret)
-
-			// Add default ingress controller
-			clientObjects = append(clientObjects, &operatorv1.IngressController{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "default",
-					Namespace: "openshift-ingress-operator",
-				},
-			})
 
 			// Setup a managed cluster
 			managedCluster := addontesting.NewManagedCluster("cluster-1")
@@ -890,6 +879,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 func TestHelmBuild_Metrics_HCP(t *testing.T) {
 	scheme := runtime.NewScheme()
 	assert.NoError(t, kubescheme.AddToScheme(scheme))
+	assert.NoError(t, configv1.AddToScheme(scheme))
 	assert.NoError(t, cooprometheusv1alpha1.AddToScheme(scheme))
 	assert.NoError(t, prometheusv1.AddToScheme(scheme))
 	assert.NoError(t, cooprometheusv1.AddToScheme(scheme))
@@ -897,7 +887,6 @@ func TestHelmBuild_Metrics_HCP(t *testing.T) {
 	assert.NoError(t, hyperv1.AddToScheme(scheme))
 	assert.NoError(t, addonapiv1beta1.Install(scheme))
 	assert.NoError(t, workv1.Install(scheme))
-	assert.NoError(t, operatorv1.AddToScheme(scheme))
 
 	// installNamespace := "open-cluster-management-addon-observability"
 	hubNamespace := "open-cluster-management-observability"
@@ -1052,17 +1041,6 @@ func TestHelmBuild_Metrics_HCP(t *testing.T) {
 
 	// Add alermanager secrets
 	clientObjects = append(clientObjects, newSecret(config.AlertmanagerAccessorSecretName, hubNamespace))
-	routerCertsSecret := newSecret(config.RouterDefaultCertsConfigMapObjKey.Name, config.RouterDefaultCertsConfigMapObjKey.Namespace)
-	routerCertsSecret.Data["tls.crt"] = []byte("toto")
-	clientObjects = append(clientObjects, routerCertsSecret)
-
-	// Add default ingress controller
-	clientObjects = append(clientObjects, &operatorv1.IngressController{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "default",
-			Namespace: "openshift-ingress-operator",
-		},
-	})
 
 	// Setup a the local cluster as managed cluster
 	managedCluster := addontesting.NewManagedCluster("cluster-1")

@@ -10,7 +10,6 @@ import (
 
 	"github.com/go-logr/logr"
 	ocinfrav1 "github.com/openshift/api/config/v1"
-	operatorv1 "github.com/openshift/api/operator/v1"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	cooprometheusv1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1"
 	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
@@ -21,7 +20,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
@@ -66,16 +64,12 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1beta1.Man
 
 	ret.ClusterName = managedCluster.Name
 	ret.ClusterID = common.GetManagedClusterID(managedCluster)
-	ret.AlertManagerEndpoint = opts.Platform.Metrics.AlertManagerEndpoint.Host // Just the host othrewise, pronetheus raises error if the scheme is included
+	ret.AlertManagerEndpoint = opts.Platform.Metrics.HubEndpoint.Host // Use the same host as the metrics for alerts forwarding
 	isOpenShiftVendor := common.IsOpenShiftVendor(managedCluster)
 	ret.IsOpenShiftVendor = isOpenShiftVendor
 
 	if fakeVendor := common.VendorIsOverridden(managedCluster); fakeVendor != "" {
 		o.Logger.V(2).Info("Vendor for the managed cluster is overridden. This annotation is for testing prupose only", "managedcluster", managedCluster.Name, "newVendor", fakeVendor)
-	}
-
-	if ret.AlertManagerEndpoint == "" && !isOpenShiftVendor {
-		o.Logger.Info("Alert forwarding is not configured for non OCP cluster as the AlertManager domain is not set in the addOnDeploymentConfig", "managedcluster", managedCluster.Name)
 	}
 
 	// Fetch image overrides
@@ -97,7 +91,7 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1beta1.Man
 	}
 	ret.HubClusterID = hubId
 
-	if err = o.addAlertmanagerSecrets(ctx, &ret.Secrets, config.GetTrimmedClusterID(hubId), opts, isOpenShiftVendor); err != nil {
+	if err = o.addAlertmanagerMtlsSecrets(ctx, &ret.Secrets, config.GetTrimmedClusterID(hubId), opts, isOpenShiftVendor); err != nil {
 		return ret, fmt.Errorf("failed to add alertmanager secrets: %w", err)
 	}
 
@@ -521,81 +515,53 @@ func createWriteRelabelConfigs(clusterName, clusterID string, isHypershiftLocalC
 		})
 }
 
-func (o *OptionsBuilder) getRouterCACert(ctx context.Context) ([]byte, string, string, error) {
-	// Check if BYO certs exist
-	amRouteBYOCaSrt := &corev1.Secret{}
-	err1 := o.Client.Get(ctx, types.NamespacedName{Name: config.AlertmanagerRouteBYOCAName, Namespace: config.HubInstallNamespace}, amRouteBYOCaSrt)
-	amRouteBYOCertSrt := &corev1.Secret{}
-	err2 := o.Client.Get(ctx, types.NamespacedName{Name: config.AlertmanagerRouteBYOCERTName, Namespace: config.HubInstallNamespace}, amRouteBYOCertSrt)
-
-	if err1 == nil && err2 == nil {
-		return amRouteBYOCaSrt.Data["tls.crt"], amRouteBYOCaSrt.Namespace, amRouteBYOCaSrt.Name, nil
-	}
-
-	// No BYO certs, use default ingress certs
-	ingressOperator := &operatorv1.IngressController{}
-	if err := o.Client.Get(ctx, types.NamespacedName{Name: "default", Namespace: "openshift-ingress-operator"}, ingressOperator); err != nil {
-		return nil, "", "", fmt.Errorf("failed to get default ingress controller: %w", err)
-	}
-
-	routerCASrtName := "router-certs-default"
-	// check if custom default certificate is provided or not
-	if ingressOperator.Spec.DefaultCertificate != nil {
-		routerCASrtName = ingressOperator.Spec.DefaultCertificate.Name
-	}
-
-	routerCASecret := &corev1.Secret{}
-	if err := o.Client.Get(ctx, types.NamespacedName{Name: routerCASrtName, Namespace: "openshift-ingress"}, routerCASecret); err != nil {
-		return nil, "", "", fmt.Errorf("failed to get router CA secret: %w", err)
-	}
-	return routerCASecret.Data["tls.crt"], routerCASecret.Namespace, routerCASecret.Name, nil
-}
-
-func (o *OptionsBuilder) addAlertmanagerSecrets(ctx context.Context, secrets *[]*corev1.Secret, trimmedClusterID string, opts addon.Options, isOCP bool) error {
-	// Get the router CA secret
-	routerCACert, routerCANamespace, routerCAName, err := o.getRouterCACert(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get router CA cert: %w", err)
-	}
-
+func (o *OptionsBuilder) addAlertmanagerMtlsSecrets(ctx context.Context, secrets *[]*corev1.Secret, trimmedClusterID string, opts addon.Options, isOCP bool) error {
 	// Add secrets based on enabled metric collection
 	if opts.Platform.Metrics.CollectionEnabled {
 		targetNamespace := config.AlertmanagerPlatformNamespace
 		if !isOCP {
 			targetNamespace = "" // This is replaced by the default value in the help template that is the installation namespace
 		}
-		if err := o.addSecret(ctx, secrets, config.AlertmanagerAccessorSecretName, config.HubInstallNamespace, config.GetAlertmanagerAccessorSecretName(trimmedClusterID), targetNamespace); err != nil {
-			return fmt.Errorf("failed to add accessor secret for platform metrics: %w", err)
+
+		// Copy HubCASecretName (observability-managed-cluster-certs) to obs-alertmanager-mtls-ca-<id>
+		caTargetName := config.GetObsAlertmanagerMtlsCASecretName(trimmedClusterID)
+		if err := o.addSecret(ctx, secrets, config.HubCASecretName, config.HubInstallNamespace, caTargetName, targetNamespace); err != nil {
+			return fmt.Errorf("failed to add platform mtls ca secret: %w", err)
 		}
-		ca := &corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      config.GetAlertmanagerRouterCASecretName(trimmedClusterID),
-				Namespace: targetNamespace,
-				Annotations: map[string]string{
-					addoncfg.AnnotationOriginalResource: fmt.Sprintf("%s/%s", routerCANamespace, routerCAName),
-				},
-			},
-			Data: map[string][]byte{"service-ca.crt": routerCACert},
+
+		// Copy ClientCertSecretName (observability-controller...) to obs-alertmanager-mtls-cert-<id>
+		certTargetName := config.GetObsAlertmanagerMtlsCertSecretName(trimmedClusterID)
+		if err := o.addSecret(ctx, secrets, config.ClientCertSecretName, config.HubInstallNamespace, certTargetName, targetNamespace); err != nil {
+			return fmt.Errorf("failed to add platform mtls cert secret: %w", err)
 		}
-		*secrets = append(*secrets, ca)
+
+		// Copy AlertmanagerAccessorSecretName
+		accessorTargetName := config.GetAlertmanagerAccessorSecretName(trimmedClusterID)
+		if err := o.addSecret(ctx, secrets, config.AlertmanagerAccessorSecretName, config.HubInstallNamespace, accessorTargetName, targetNamespace); err != nil {
+			return fmt.Errorf("failed to add platform accessor secret: %w", err)
+		}
 	}
 
 	if isOCP && opts.UserWorkloads.Metrics.CollectionEnabled {
 		targetNamespace := config.AlertmanagerUWLNamespace
-		if err := o.addSecret(ctx, secrets, config.AlertmanagerAccessorSecretName, config.HubInstallNamespace, config.GetAlertmanagerAccessorSecretName(trimmedClusterID), targetNamespace); err != nil {
-			return fmt.Errorf("failed to add accessor secret for user workload metrics: %w", err)
+
+		// Copy HubCASecretName (observability-managed-cluster-certs) to obs-alertmanager-mtls-ca-<id>
+		caTargetName := config.GetObsAlertmanagerMtlsCASecretName(trimmedClusterID)
+		if err := o.addSecret(ctx, secrets, config.HubCASecretName, config.HubInstallNamespace, caTargetName, targetNamespace); err != nil {
+			return fmt.Errorf("failed to add uwl mtls ca secret: %w", err)
 		}
-		caUWL := &corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      config.GetAlertmanagerRouterCASecretName(trimmedClusterID),
-				Namespace: targetNamespace,
-				Annotations: map[string]string{
-					addoncfg.AnnotationOriginalResource: fmt.Sprintf("%s/%s", routerCANamespace, routerCAName),
-				},
-			},
-			Data: map[string][]byte{"service-ca.crt": routerCACert},
+
+		// Copy ClientCertSecretName (observability-controller...) to obs-alertmanager-mtls-cert-<id>
+		certTargetName := config.GetObsAlertmanagerMtlsCertSecretName(trimmedClusterID)
+		if err := o.addSecret(ctx, secrets, config.ClientCertSecretName, config.HubInstallNamespace, certTargetName, targetNamespace); err != nil {
+			return fmt.Errorf("failed to add uwl mtls cert secret: %w", err)
 		}
-		*secrets = append(*secrets, caUWL)
+
+		// Copy AlertmanagerAccessorSecretName
+		accessorTargetName := config.GetAlertmanagerAccessorSecretName(trimmedClusterID)
+		if err := o.addSecret(ctx, secrets, config.AlertmanagerAccessorSecretName, config.HubInstallNamespace, accessorTargetName, targetNamespace); err != nil {
+			return fmt.Errorf("failed to add uwl accessor secret: %w", err)
+		}
 	}
 
 	return nil
