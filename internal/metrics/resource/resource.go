@@ -7,6 +7,7 @@ import (
 	"maps"
 
 	"github.com/go-logr/logr"
+	routev1 "github.com/openshift/api/route/v1"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	cooprometheusv1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1"
 	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
@@ -28,6 +29,7 @@ import (
 var (
 	errTooManyConfigResources = errors.New("too many configuration resources")
 	errMissingHubEndpoint     = errors.New("hub endpoint is missing")
+	errMissingRouteHost       = errors.New("MCOA obs-api route has no host")
 )
 
 // DefaultStackResources reconciles the configuration resources needed for metrics collection
@@ -256,6 +258,16 @@ func (d DefaultStackResources) reconcileAgentForPlacement(ctx context.Context, p
 			addoncfg.PlacementRefNamespaceLabelKey: placementRef.Namespace,
 		},
 	}
+
+	// When thanos operator is enabled, add a second remote write to the MCOA obs-api
+	if d.AddonOptions.ThanosOperatorEnabled {
+		mcoaEndpoint, mcoaErr := d.getMcoaRemoteWriteEndpoint(ctx)
+		if mcoaErr != nil {
+			d.Logger.Error(mcoaErr, "failed to get MCOA remote write endpoint, skipping mcoa remote write")
+		} else {
+			promBuilder.McoaRemoteWriteEndpoint = mcoaEndpoint
+		}
+	}
 	promSSA := promBuilder.Build()
 
 	// SSA the objects rendered
@@ -350,6 +362,24 @@ func (d DefaultStackResources) generateConfigsForAllPlacements(object []client.O
 
 func makeAgentName(app, placement string) string {
 	return fmt.Sprintf("%s-%s-%s", addoncfg.DefaultStackPrefix, app, placement)
+}
+
+func (d DefaultStackResources) getMcoaRemoteWriteEndpoint(ctx context.Context) (string, error) {
+	route := &routev1.Route{}
+	key := types.NamespacedName{
+		Name:      config.McoaObsApiRouteName,
+		Namespace: config.HubInstallNamespace,
+	}
+	if err := d.Client.Get(ctx, key, route); err != nil {
+		return "", fmt.Errorf("failed to get MCOA obs-api route %s/%s: %w", key.Namespace, key.Name, err)
+	}
+
+	host := route.Spec.Host
+	if host == "" {
+		return "", errMissingRouteHost
+	}
+
+	return fmt.Sprintf("https://%s/api/metrics/v1/default/api/v1/receive", host), nil
 }
 
 func hasControllerUID(ownerRefs []metav1.OwnerReference, uid types.UID) bool {

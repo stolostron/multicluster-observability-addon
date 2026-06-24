@@ -1,0 +1,13 @@
+{{- if and .Values.thanosOperator.enabled .Values.thanosOperator.rulerSpec.data }}
+apiVersion: monitoring.thanos.io/v1alpha1
+kind: ThanosRuler
+metadata:
+  name: mcoa-ruler
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/component: ruler
+    app.kubernetes.io/name: {{ .Values.thanosOperator.appName }}
+    {{ include "metricshelm.labels" . | nindent 4 }}
+spec:
+{{- fromJson .Values.thanosOperator.rulerSpec.data | toYaml | nindent 2 }}
+{{- end }}
