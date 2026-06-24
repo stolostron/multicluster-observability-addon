@@ -160,7 +160,9 @@ func getCOOValues(ctx context.Context, k8s client.Client, logger logr.Logger, cl
 		return nil, err
 	}
 
-	return cmanifests.BuildValues(opts, installCOO, common.IsHubCluster(cluster)), nil
+	hasCardinalityRules := chandlers.HasCardinalityRules(ctx, k8s, common.IsHubCluster(cluster))
+
+	return cmanifests.BuildValues(opts, installCOO, common.IsHubCluster(cluster), hasCardinalityRules), nil
 }
 
 func getRightSizingValues(ctx context.Context, k8s client.Client, logger logr.Logger, cluster *clusterv1.ManagedCluster, opts addon.Options) (*rshandlers.RightSizingValues, error) {

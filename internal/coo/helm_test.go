@@ -66,7 +66,7 @@ func fakeGetValues(ctx context.Context, k8s client.Client) addonfactory.GetValue
 			return nil, err
 		}
 
-		cooValues := manifests.BuildValues(addonOpts, installCOO, isHub)
+		cooValues := manifests.BuildValues(addonOpts, installCOO, isHub, false)
 
 		return addonfactory.JsonStructToValues(cooValues)
 	}
