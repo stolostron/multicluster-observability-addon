@@ -63,6 +63,7 @@ func VMInventoryTable(datasourceName, project string) panelgroup.Option {
 					map[string]any{"name": "value #10", "hide": true},
 					map[string]any{"name": "value #11", "hide": true},
 					map[string]any{"name": "value #12", "hide": true},
+					map[string]any{"name": "value #13", "hide": true},
 					map[string]any{"name": "__name__", "hide": true},
 					map[string]any{"name": "clusterID", "hide": true},
 					map[string]any{"name": "container", "hide": true},
@@ -98,7 +99,7 @@ func VMInventoryTable(datasourceName, project string) panelgroup.Option {
 		//   value #10 → (hidden)       Query 10: inventoryPreferenceQuery
 		//   value #11 → (hidden)       Query 11: inventoryGuestOSQuery
 		//   value #12 → (hidden)       Query 12: inventoryEvictableOutdatedQuery
-		//   value #13 → Live Migratable Query 13: inventoryLiveMigratableQuery
+		//   value #13 → (hidden)       Query 13: inventoryLiveMigratableQuery (label column: live_migratable)
 		// Query 1: VM info with status
 		panel.AddQuery(query.PromQL(
 			inventoryInfoQuery,

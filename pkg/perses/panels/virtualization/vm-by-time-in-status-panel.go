@@ -15,6 +15,7 @@ func TotalAllocatedCPU(datasourceName string) panelgroup.Option {
 		panel.Description("The total CPUs of the VMs that are listed in the dashboard"),
 		statPanel.Chart(
 			statPanel.Calculation("last-number"),
+			statPanel.ValueFontSize(20),
 			statPanel.Format(commonSdk.Format{
 				Unit: &dashboards.DecimalUnit,
 			}),
@@ -32,6 +33,7 @@ func TotalAllocatedMemory(datasourceName string) panelgroup.Option {
 		panel.Description("The total Memory of the VMs that are listed in the dashboard"),
 		statPanel.Chart(
 			statPanel.Calculation("last-number"),
+			statPanel.ValueFontSize(20),
 			statPanel.Format(commonSdk.Format{
 				Unit: &dashboards.BytesUnit,
 			}),
@@ -49,6 +51,7 @@ func TotalAllocatedDisk(datasourceName string) panelgroup.Option {
 		panel.Description("The total disk size of the VMs that are listed in the dashboard"),
 		statPanel.Chart(
 			statPanel.Calculation("last-number"),
+			statPanel.ValueFontSize(20),
 			statPanel.Format(commonSdk.Format{
 				Unit: &dashboards.BytesUnit,
 			}),
@@ -94,7 +97,7 @@ func TimeInStatusTable(datasourceName, project string) panelgroup.Option {
 				},
 				{
 					Name: "value #3", Header: "Time Since Last Migration", EnableSorting: true,
-					Format: &commonSdk.Format{Unit: strPtr(relativeTimeUnit)},
+					Format: &commonSdk.Format{Unit: &dashboards.SecondsUnit},
 				},
 				{
 					Name: "value #4", Header: "Last Migration", Hide: true,
