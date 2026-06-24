@@ -236,6 +236,14 @@ func TestBuildValues(t *testing.T) {
 				assert.Equal(t, config.GetAlertmanagerAccessorSecretName(trimmedID), values.AlertmanagerAccessorSecretName)
 			},
 		},
+		"with cluster name": {
+			Options: handlers.Options{
+				ClusterName: "test-cluster-name",
+			},
+			Expect: func(t *testing.T, values *manifests.MetricsValues) {
+				assert.Equal(t, "test-cluster-name", values.ClusterName)
+			},
+		},
 		"with node exporter options": {
 			Options: handlers.Options{
 				NodeExporter: addon.NodeExporterOptions{
