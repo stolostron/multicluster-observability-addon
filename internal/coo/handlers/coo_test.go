@@ -179,7 +179,7 @@ func TestInstallCOO(t *testing.T) {
 			}
 
 			result, err := InstallOfCOOOnTheHubIsNeeded(context.Background(), k8sClientBuilder.Build(), logr.Discard(), tc.isHub)
-			cooValues := manifests.BuildValues(tc.options, result, tc.isHub)
+			cooValues := manifests.BuildValues(tc.options, result, tc.isHub, false)
 
 			if tc.expectedErrMsg != "" {
 				assert.EqualError(t, err, tc.expectedErrMsg)

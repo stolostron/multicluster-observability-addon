@@ -55,7 +55,7 @@ type UIValues struct {
 }
 
 // BuildValues constructs COO Helm values from addon options, including dashboards and feature gates.
-func BuildValues(opts addon.Options, installOfCOOOnTheHubIsNeeded bool, isHubCluster bool) *COOValues {
+func BuildValues(opts addon.Options, installOfCOOOnTheHubIsNeeded bool, isHubCluster bool, hasCardinalityRules bool) *COOValues {
 	var dashboards []DashboardValue
 	var incidentDetectionEnabled bool
 	var rightSizingEnabled bool
@@ -64,6 +64,9 @@ func BuildValues(opts addon.Options, installOfCOOOnTheHubIsNeeded bool, isHubClu
 		if metricsUI.Enabled {
 			dashboards = append(dashboards, buildACMDashboards()...)
 			dashboards = append(dashboards, buildK8sDashboards()...)
+			if hasCardinalityRules {
+				dashboards = append(dashboards, buildCardinalityDashboards()...)
+			}
 		}
 	}
 
@@ -158,9 +161,6 @@ func buildACMDashboards() []DashboardValue {
 		{acm.BuildACMAlertAnalysis, "ACMAlertAnalysis"},
 		{acm.BuildACMAlertsByCluster, "ACMAlertsByCluster"},
 		{acm.BuildACMClustersByAlert, "ACMClustersByAlert"},
-		{acm.BuildACMMetricsCardinalityOverview, "ACMMetricsCardinalityOverview"},
-		{acm.BuildACMMetricsCardinalityCluster, "ACMMetricsCardinalityCluster"},
-		{acm.BuildACMMetricsCardinalityName, "ACMMetricsCardinalityName"},
 		{hcp.BuildACMHCPOverview, "ACMHCPOverview"},
 		{hcp.BuildACMHCPResources, "ACMHCPResources"},
 		{slo.BuildSLOAPIServer, "SLOAPIServer"},
@@ -175,6 +175,16 @@ func buildACMDashboards() []DashboardValue {
 		{compute.BuildComputeNodePods, "ComputeNodePods"},
 		{compute.BuildComputePod, "ComputePod"},
 		{compute.BuildComputeWorkload, "ComputeWorkload"},
+	}
+
+	return buildDashboards(builders, dsThanos, config.InstallNamespace)
+}
+
+func buildCardinalityDashboards() []DashboardValue {
+	builders := []DashboardBuilder{
+		{acm.BuildACMMetricsCardinalityOverview, "ACMMetricsCardinalityOverview"},
+		{acm.BuildACMMetricsCardinalityCluster, "ACMMetricsCardinalityCluster"},
+		{acm.BuildACMMetricsCardinalityName, "ACMMetricsCardinalityName"},
 	}
 
 	return buildDashboards(builders, dsThanos, config.InstallNamespace)
