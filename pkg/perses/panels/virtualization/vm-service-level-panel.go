@@ -21,6 +21,7 @@ func TotalUptimePercent(datasourceName string) panelgroup.Option {
 		panel.Description("The total uptime % of the VMs that are listed in the dashboard"),
 		statPanel.Chart(
 			statPanel.Calculation("last-number"),
+			statPanel.ValueFontSize(20),
 			statPanel.Format(commonSdk.Format{
 				Unit: &dashboards.PercentDecimalUnit,
 			}),
@@ -38,6 +39,7 @@ func TotalPlannedDowntimePercent(datasourceName string) panelgroup.Option {
 		panel.Description("The total planned downtime % of the VMs that are listed in the dashboard"),
 		statPanel.Chart(
 			statPanel.Calculation("last-number"),
+			statPanel.ValueFontSize(20),
 			statPanel.Format(commonSdk.Format{
 				Unit: &dashboards.PercentDecimalUnit,
 			}),
@@ -55,6 +57,7 @@ func TotalUnplannedDowntimePercent(datasourceName string) panelgroup.Option {
 		panel.Description("The total unplanned downtime % of the VMs that are listed in the dashboard"),
 		statPanel.Chart(
 			statPanel.Calculation("last-number"),
+			statPanel.ValueFontSize(20),
 			statPanel.Format(commonSdk.Format{
 				Unit: &dashboards.PercentDecimalUnit,
 			}),
@@ -72,6 +75,7 @@ func TotalUptimeHours(datasourceName string) panelgroup.Option {
 		panel.Description("The total uptime hours of the VMs that are listed in the dashboard"),
 		statPanel.Chart(
 			statPanel.Calculation("last-number"),
+			statPanel.ValueFontSize(20),
 			statPanel.Format(commonSdk.Format{
 				Unit: &hoursFormatUnit,
 			}),
@@ -89,6 +93,7 @@ func TotalPlannedDowntimeHours(datasourceName string) panelgroup.Option {
 		panel.Description("The total planned downtime hours of the VMs that are listed in the dashboard"),
 		statPanel.Chart(
 			statPanel.Calculation("last-number"),
+			statPanel.ValueFontSize(20),
 			statPanel.Format(commonSdk.Format{
 				Unit: &hoursFormatUnit,
 			}),
@@ -106,6 +111,7 @@ func TotalUnplannedDowntimeHours(datasourceName string) panelgroup.Option {
 		panel.Description("The total unplanned downtime hours of the VMs that are listed in the dashboard"),
 		statPanel.Chart(
 			statPanel.Calculation("last-number"),
+			statPanel.ValueFontSize(20),
 			statPanel.Format(commonSdk.Format{
 				Unit: &hoursFormatUnit,
 			}),

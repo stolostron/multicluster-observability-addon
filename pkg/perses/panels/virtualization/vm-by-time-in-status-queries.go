@@ -161,12 +161,12 @@ const vmByTimeInStatusTableTimeInStatusQuery = `(
 (kubevirt_vm_info{cluster=~"$cluster", name=~"$name", namespace=~"$namespace", status_group=~"$status"} > 0)`
 
 const vmByTimeInStatusTableTimeSinceLastMigrationQuery = `sum by (cluster, namespace, name, status)(
-  (time() - kubevirt_vmi_migration_end_time_seconds{cluster=~"$cluster", name=~"$name", namespace=~"$namespace"})
+  (time() - (kubevirt_vmi_migration_end_time_seconds{cluster=~"$cluster", name=~"$name", namespace=~"$namespace"} > 0))
 ` + vmByTimeInStatusStatusJoin + `
 )`
 
 const vmByTimeInStatusTableMigrationEndMsQuery = `sum by (cluster, namespace, name, status)(
-  (kubevirt_vmi_migration_end_time_seconds{cluster=~"$cluster", name=~"$name", namespace=~"$namespace"}*1000)
+  ((kubevirt_vmi_migration_end_time_seconds{cluster=~"$cluster", name=~"$name", namespace=~"$namespace"} > 0)*1000)
 ` + vmByTimeInStatusStatusJoin + `
 )`
 
