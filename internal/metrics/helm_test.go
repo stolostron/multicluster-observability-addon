@@ -28,6 +28,7 @@ import (
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -131,14 +132,75 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				assert.Equal(t, "openshift-monitoring/prometheus-operator", recordingRules[0].Annotations["operator.prometheus.io/controller-id"])
 				// Ensure the COO Prometheus operator is generated
 				deployments := common.FilterResourcesByLabelSelector[*appsv1.Deployment](objects, nil)
-				var cooOperator *appsv1.Deployment
+				var cooOperator, emoDeployment *appsv1.Deployment
 				for _, dep := range deployments {
 					if dep.GetName() == "prometheus-operator" {
 						cooOperator = dep
-						break
+					}
+					if dep.GetName() == "endpoint-monitoring-operator" {
+						emoDeployment = dep
 					}
 				}
 				assert.NotNil(t, cooOperator)
+				assert.NotNil(t, emoDeployment)
+
+				// Verify always-required and trigger flags on the endpoint-monitoring-operator container
+				var clusterNameArg, clusterIDArg string
+				var hubAlertmanagerURL, hubAlertmanagerCA, hubAlertmanagerCert, hubAlertmanagerAccessor string
+				for _, arg := range emoDeployment.Spec.Template.Spec.Containers[0].Args {
+					if strings.HasPrefix(arg, "--cluster-name=") {
+						clusterNameArg = arg
+					}
+					if strings.HasPrefix(arg, "--cluster-id=") {
+						clusterIDArg = arg
+					}
+					if strings.HasPrefix(arg, "--hub-alertmanager-url=") {
+						hubAlertmanagerURL = arg
+					}
+					if strings.HasPrefix(arg, "--hub-alertmanager-ca-secret=") {
+						hubAlertmanagerCA = arg
+					}
+					if strings.HasPrefix(arg, "--hub-alertmanager-cert-secret=") {
+						hubAlertmanagerCert = arg
+					}
+					if strings.HasPrefix(arg, "--hub-alertmanager-accessor-secret=") {
+						hubAlertmanagerAccessor = arg
+					}
+				}
+
+				// Comment explaining why each flag is needed and when:
+				// 1. --cluster-name and --cluster-id: must always be present to uniquely identify the cluster.
+				// 2. --hub-alertmanager-url: serves as the trigger to enable alert forwarding. In this test case, alert forwarding is disabled, so this flag must be absent.
+				// 3. --hub-alertmanager-ca-secret: must always be present (even when alert forwarding is disabled) so that the operator has the necessary CA secret reference to successfully revert/clean up the CMO configmap.
+				// 4. --hub-alertmanager-cert-secret and --hub-alertmanager-accessor-secret: are only needed when alert forwarding is active/enabled to authenticate against the Hub's Alertmanager, so they are absent in this test case.
+				assert.Equal(t, "--cluster-name=cluster-1", clusterNameArg)
+				assert.Equal(t, "--cluster-id="+testClusterID, clusterIDArg)
+				assert.Empty(t, hubAlertmanagerURL, "hub-alertmanager-url should be absent when alert forwarding is disabled")
+				assert.Empty(t, hubAlertmanagerCert, "hub-alertmanager-cert-secret should be absent when alert forwarding is disabled")
+				assert.Empty(t, hubAlertmanagerAccessor, "hub-alertmanager-accessor-secret should be absent when alert forwarding is disabled")
+				assert.Equal(t, "--hub-alertmanager-ca-secret=obs-alertmanager-mtls-ca-97e513873da14ae489e", hubAlertmanagerCA)
+
+				// Verify --cluster-name and --hub-alertmanager-ca-secret arguments are set on the observability-monitoring-cleanup Job container
+				jobs := common.FilterResourcesByLabelSelector[*batchv1.Job](objects, nil)
+				var cleanupJob *batchv1.Job
+				for _, job := range jobs {
+					if job.GetName() == "observability-monitoring-cleanup" {
+						cleanupJob = job
+						break
+					}
+				}
+				assert.NotNil(t, cleanupJob)
+				var jobClusterNameArg, jobHubCASecretArg string
+				for _, arg := range cleanupJob.Spec.Template.Spec.Containers[0].Args {
+					if strings.HasPrefix(arg, "--cluster-name=") {
+						jobClusterNameArg = arg
+					}
+					if strings.HasPrefix(arg, "--hub-alertmanager-ca-secret=") {
+						jobHubCASecretArg = arg
+					}
+				}
+				assert.Equal(t, "--cluster-name=cluster-1", jobClusterNameArg)
+				assert.Equal(t, "--hub-alertmanager-ca-secret=obs-alertmanager-mtls-ca-97e513873da14ae489e", jobHubCASecretArg)
 				// ensure that the number of objects is correct
 				expectedCount := 49
 				if len(objects) != expectedCount {
@@ -551,6 +613,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 
 	scheme := runtime.NewScheme()
 	assert.NoError(t, kubescheme.AddToScheme(scheme))
+	assert.NoError(t, batchv1.AddToScheme(scheme))
 	assert.NoError(t, configv1.AddToScheme(scheme))
 	assert.NoError(t, cooprometheusv1alpha1.AddToScheme(scheme))
 	assert.NoError(t, prometheusv1.AddToScheme(scheme))
@@ -865,6 +928,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 func TestHelmBuild_Metrics_HCP(t *testing.T) {
 	scheme := runtime.NewScheme()
 	assert.NoError(t, kubescheme.AddToScheme(scheme))
+	assert.NoError(t, batchv1.AddToScheme(scheme))
 	assert.NoError(t, configv1.AddToScheme(scheme))
 	assert.NoError(t, cooprometheusv1alpha1.AddToScheme(scheme))
 	assert.NoError(t, prometheusv1.AddToScheme(scheme))

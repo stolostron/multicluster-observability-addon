@@ -74,9 +74,8 @@ spec:
         - /usr/local/bin/endpoint-monitoring-operator
         args:
         - cleanup
-        {{- if .Values.hubClusterID }}
-        - --hub-id={{ .Values.hubClusterID }}
-        {{- end }}
+        - --cluster-name={{ .Values.clusterName }}
+        - --hub-alertmanager-ca-secret={{ .Values.alertmanagerRouterCASecretName }}
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
