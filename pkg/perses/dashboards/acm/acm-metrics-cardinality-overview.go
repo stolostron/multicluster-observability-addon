@@ -11,6 +11,26 @@ func BuildACMMetricsCardinalityOverview(project string, datasource string, _ str
 		dashboard.ProjectName(project),
 		dashboard.Name("Metrics Cardinality Overview"),
 
+		// Dashboard Guide (collapsed)
+		AddCustomPanelGroupCollapsed("Dashboard Guide (Click to Expand)",
+			[]GridItem{
+				{X: 0, Y: 0, W: 24, H: 10},
+			},
+			panels.CardinalityDashboardGuide(),
+		),
+
+		// Clusters Excluded from Analysis (collapsed)
+		AddCustomPanelGroupCollapsed("Clusters Excluded from Analysis",
+			[]GridItem{
+				{X: 0, Y: 0, W: 3, H: 6},
+				{X: 3, Y: 0, W: 9, H: 6},
+				{X: 12, Y: 0, W: 12, H: 6},
+			},
+			panels.ExcludedClustersCount(datasource),
+			panels.ExcludedClustersTable(datasource),
+			panels.ExcludedClustersNote(),
+		),
+
 		// Cardinality Outliers — custom grid: stat(3) + table(9) + stat(3) + table(9)
 		AddCustomPanelGroup("Cardinality Outliers",
 			[]GridItem{

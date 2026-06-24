@@ -1,6 +1,10 @@
 package acm
 
 var CardinalityQueries = map[string]string{
+	// Overview - Excluded Clusters
+	"ExcludedClustersCount": `count(group by (cluster) (up) unless (group by (cluster) (last_over_time(cluster:cardinality[35m]))))`,
+	"ExcludedClustersList":  `group by (cluster) (up) unless (group by (cluster) (last_over_time(cluster:cardinality[35m])))`,
+
 	// Overview - Outliers
 	"ClusterOutliersCount": `count(last_over_time(cluster:cardinality[35m]) > ignoring(cluster) group_left avg(last_over_time(cluster:cardinality[35m])) + 3 * stddev(last_over_time(cluster:cardinality[35m])))`,
 	"ClusterOutliersTable": `last_over_time(cluster:cardinality[35m]) > ignoring(cluster) group_left avg(last_over_time(cluster:cardinality[35m])) + 3 * stddev(last_over_time(cluster:cardinality[35m]))`,
