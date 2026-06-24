@@ -23,7 +23,6 @@ const (
 	KeyPlatformVirtualizationRightSizing = "platformVirtualizationRightSizing"
 	KeyRightSizingDelegated              = "rightSizingDelegated"
 	KeyMetricsHubHostname                = "metricsHubHostname"
-	KeyMetricsAlertManagerHostname       = "metricsAlertManagerHostname"
 	KeyNodeExporterHostPort              = "nodeExporterHostPort"
 	KeyNodeExporterInternalPort          = "nodeExporterInternalPort"
 	KeyPlatformMetricsAlerts             = "platformMetricsAlerts"
@@ -61,7 +60,6 @@ const (
 type MetricsOptions struct {
 	CollectionEnabled    bool
 	HubEndpoint          url.URL
-	AlertManagerEndpoint url.URL
 	UI                   MetricsUIOptions
 	NodeExporter         NodeExporterOptions
 	AlertsEnabled        bool
@@ -218,24 +216,6 @@ func BuildOptions(addOnDeployment *addonapiv1beta1.AddOnDeploymentConfig) (Optio
 			}
 
 			opts.Platform.Metrics.HubEndpoint = *url
-		case KeyMetricsAlertManagerHostname:
-			val := keyvalue.Value
-			if !strings.HasPrefix(val, "http") {
-				val = "https://" + val
-			}
-			url, err := url.Parse(val)
-			if err != nil {
-				return opts, fmt.Errorf("%w: %s", addoncfg.ErrInvalidMetricsAlertManagerHostname, err.Error())
-			}
-
-			// Hostname validation:
-			// - Check if host is empty
-			// - Check for invalid hostname formats like ":"
-			if strings.TrimSpace(url.Host) == "" || url.Host == ":" || strings.HasPrefix(url.Host, ":") {
-				return opts, fmt.Errorf("%w: invalid hostname format '%s'", addoncfg.ErrInvalidMetricsAlertManagerHostname, url.Host)
-			}
-
-			opts.Platform.Metrics.AlertManagerEndpoint = *url
 		case KeyPlatformMetricsAlerts:
 			if keyvalue.Value == "enabled" {
 				opts.Platform.Metrics.AlertsEnabled = true

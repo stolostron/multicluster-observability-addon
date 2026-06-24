@@ -69,7 +69,6 @@ func TestBuildOptions(t *testing.T) {
 						{Name: KeyPlatformMetricsCollection, Value: string(PrometheusAgentV1alpha1)},
 						{Name: KeyUserWorkloadMetricsCollection, Value: string(PrometheusAgentV1alpha1)},
 						{Name: KeyMetricsHubHostname, Value: "metrics.example.com"},
-						{Name: KeyMetricsAlertManagerHostname, Value: "alerts.example.com"},
 					},
 				},
 			},
@@ -82,11 +81,6 @@ func TestBuildOptions(t *testing.T) {
 							Scheme: "https",
 							Host:   "metrics.example.com",
 							Path:   "api/metrics/v1/default/api/v1/receive",
-						},
-						AlertManagerEndpoint: url.URL{
-							Scheme: "https",
-							Host:   "alerts.example.com",
-							Path:   "",
 						},
 					},
 					AnalyticsOptions: AnalyticsOptions{
@@ -112,7 +106,6 @@ func TestBuildOptions(t *testing.T) {
 						{Name: KeyPlatformMetricsCollection, Value: string(PrometheusAgentV1alpha1)},
 						{Name: KeyUserWorkloadMetricsCollection, Value: string(PrometheusAgentV1alpha1)},
 						{Name: KeyMetricsHubHostname, Value: "https://metrics.example.com"},
-						{Name: KeyMetricsAlertManagerHostname, Value: "https://alerts.example.com"},
 					},
 				},
 			},
@@ -125,11 +118,6 @@ func TestBuildOptions(t *testing.T) {
 							Scheme: "https",
 							Host:   "metrics.example.com",
 							Path:   "api/metrics/v1/default/api/v1/receive",
-						},
-						AlertManagerEndpoint: url.URL{
-							Scheme: "https",
-							Host:   "alerts.example.com",
-							Path:   "",
 						},
 					},
 					AnalyticsOptions: AnalyticsOptions{
