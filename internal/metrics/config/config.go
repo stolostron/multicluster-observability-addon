@@ -65,6 +65,9 @@ const (
 	AlertmanagerRouteBYOCERTName   = "alertmanager-byo-cert"
 	AlertmanagerPlatformNamespace  = "openshift-monitoring"
 	AlertmanagerUWLNamespace       = "openshift-user-workload-monitoring"
+
+	ObsAlertmanagerMtlsCAShortName   = "obs-alertmanager-mtls-ca"
+	ObsAlertmanagerMtlsCertShortName = "obs-alertmanager-mtls-cert"
 )
 
 var (
@@ -84,11 +87,6 @@ var (
 	ImagesConfigMapObjKey = types.NamespacedName{
 		Name:      "images-list",
 		Namespace: "open-cluster-management-observability",
-	}
-
-	RouterDefaultCertsConfigMapObjKey = types.NamespacedName{
-		Name:      "router-certs-default",
-		Namespace: "openshift-ingress",
 	}
 
 	ErrMissingImageOverride = errors.New("missing image override")
@@ -193,10 +191,15 @@ func GetTrimmedClusterID(clusterID string) string {
 	return fmt.Sprintf("%.19s", idTrim)
 }
 
-func GetAlertmanagerRouterCASecretName(trimmedClusterID string) string {
-	return fmt.Sprintf("%s-%s", AlertmanagerRouterCASecretName, trimmedClusterID)
-}
-
 func GetAlertmanagerAccessorSecretName(trimmedClusterID string) string {
 	return fmt.Sprintf("%s-%s", AlertmanagerAccessorSecretName, trimmedClusterID)
 }
+
+func GetObsAlertmanagerMtlsCASecretName(trimmedClusterID string) string {
+	return fmt.Sprintf("%s-%s", ObsAlertmanagerMtlsCAShortName, trimmedClusterID)
+}
+
+func GetObsAlertmanagerMtlsCertSecretName(trimmedClusterID string) string {
+	return fmt.Sprintf("%s-%s", ObsAlertmanagerMtlsCertShortName, trimmedClusterID)
+}
+

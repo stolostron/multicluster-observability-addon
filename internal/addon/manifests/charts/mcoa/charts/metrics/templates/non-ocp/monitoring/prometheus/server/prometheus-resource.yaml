@@ -23,6 +23,7 @@ spec:
   serviceAccountName: {{ .Values.prometheusServerName }}
   secrets:
     - {{ .Values.alertmanagerRouterCASecretName }}
+    - {{ .Values.clientCertSecretName }}
     - {{ .Values.alertmanagerAccessorSecretName }}
   serviceMonitorSelector: {}
   resources:
