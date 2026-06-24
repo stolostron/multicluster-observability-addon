@@ -12,5 +12,4 @@ var (
 	opsPerSecUnit      = "ops/sec"
 	decBytesPerSecUnit = string(commonSdk.BytesDecPerSecondsUnit) // "decbytes/sec"
 	dateTimeLocalUnit  = "datetime-local"
-	relativeTimeUnit   = "relative-time"
 )
