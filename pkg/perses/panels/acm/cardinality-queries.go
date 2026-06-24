@@ -1,74 +1,261 @@
 package acm
 
-var CardinalityQueries = map[string]string{
-	// Overview - Excluded Clusters
-	"ExcludedClustersCount": `count(group by (cluster) (up) unless (group by (cluster) (last_over_time(cluster:cardinality[35m]))))`,
-	"ExcludedClustersList":  `group by (cluster) (up) unless (group by (cluster) (last_over_time(cluster:cardinality[35m])))`,
+import (
+	promqlbuilder "github.com/perses/promql-builder"
+	"github.com/perses/promql-builder/label"
+	"github.com/perses/promql-builder/matrix"
+	"github.com/perses/promql-builder/vector"
+	"github.com/prometheus/prometheus/model/labels"
+	"github.com/prometheus/prometheus/promql/parser"
+)
 
+// Reusable sub-expressions
+
+func clusterCardinalityVector(opts ...vector.Option) *parser.VectorSelector {
+	return vector.New(append([]vector.Option{vector.WithMetricName("cluster:cardinality")}, opts...)...)
+}
+
+func nameCardinalityVector(opts ...vector.Option) *parser.VectorSelector {
+	return vector.New(append([]vector.Option{vector.WithMetricName("name:cardinality")}, opts...)...)
+}
+
+func globalRulesVector(opts ...vector.Option) *parser.VectorSelector {
+	return vector.New(append([]vector.Option{vector.WithMetricName("name:no_cluster:cardinality")}, opts...)...)
+}
+
+func lastOverTime35m(v *parser.VectorSelector) *parser.Call {
+	return promqlbuilder.LastOverTime(matrix.New(v, matrix.WithRangeAsString("35m")))
+}
+
+func allSeriesVector(matchers ...*labels.Matcher) *parser.VectorSelector {
+	return vector.New(vector.WithLabelMatchers(
+		append([]*labels.Matcher{label.New("__name__").EqualRegexp(".+")}, matchers...)...,
+	))
+}
+
+func namedSeriesVector(metricName string, matchers ...*labels.Matcher) *parser.VectorSelector {
+	return vector.New(vector.WithLabelMatchers(
+		append([]*labels.Matcher{label.New("__name__").Equal(metricName)}, matchers...)...,
+	))
+}
+
+// outlierExpr builds: last_over_time(metric[35m]) > ignoring(ignoreLabel) group_left
+//
+//	avg(last_over_time(metric[35m])) + 3 * stddev(last_over_time(metric[35m]))
+func outlierExpr(metricVectorFn func(...vector.Option) *parser.VectorSelector, ignoreLabel string) parser.Expr {
+	lot := lastOverTime35m(metricVectorFn())
+	return promqlbuilder.Gtr(
+		lot,
+		promqlbuilder.Add(
+			promqlbuilder.Avg(lastOverTime35m(metricVectorFn())),
+			promqlbuilder.Mul(
+				promqlbuilder.NewNumber(3),
+				promqlbuilder.Stddev(lastOverTime35m(metricVectorFn())),
+			),
+		),
+	).Ignoring(ignoreLabel).GroupLeft()
+}
+
+var CardinalityQueries = map[string]parser.Expr{
 	// Overview - Outliers
-	"ClusterOutliersCount": `count(last_over_time(cluster:cardinality[35m]) > ignoring(cluster) group_left avg(last_over_time(cluster:cardinality[35m])) + 3 * stddev(last_over_time(cluster:cardinality[35m])))`,
-	"ClusterOutliersTable": `last_over_time(cluster:cardinality[35m]) > ignoring(cluster) group_left avg(last_over_time(cluster:cardinality[35m])) + 3 * stddev(last_over_time(cluster:cardinality[35m]))`,
-	"MetricOutliersCount":  `count(last_over_time(name:cardinality[35m]) > ignoring(metric_name) group_left avg(last_over_time(name:cardinality[35m])) + 3 * stddev(last_over_time(name:cardinality[35m])))`,
-	"MetricOutliersTable":  `last_over_time(name:cardinality[35m]) > ignoring(metric_name) group_left avg(last_over_time(name:cardinality[35m])) + 3 * stddev(last_over_time(name:cardinality[35m]))`,
+	"ClusterOutliersCount": promqlbuilder.Count(outlierExpr(clusterCardinalityVector, "cluster")),
+	"ClusterOutliersTable": outlierExpr(clusterCardinalityVector, "cluster"),
+	"MetricOutliersCount":  promqlbuilder.Count(outlierExpr(nameCardinalityVector, "metric_name")),
+	"MetricOutliersTable":  outlierExpr(nameCardinalityVector, "metric_name"),
+
+	// Overview - Excluded Clusters
+	"ExcludedClustersCount": promqlbuilder.Count(
+		promqlbuilder.Unless(
+			promqlbuilder.Group(vector.New(vector.WithMetricName("up"))).By("cluster"),
+			promqlbuilder.Group(lastOverTime35m(clusterCardinalityVector())).By("cluster"),
+		),
+	),
+	"ExcludedClustersList": promqlbuilder.Unless(
+		promqlbuilder.Group(vector.New(vector.WithMetricName("up"))).By("cluster"),
+		promqlbuilder.Group(lastOverTime35m(clusterCardinalityVector())).By("cluster"),
+	),
 
 	// Overview - Cluster Cardinality
-	"ClusterCardinalityOverTime": `topk(8, cluster:cardinality)`,
-	"ClusterCardinalityNow":     `last_over_time(cluster:cardinality[35m])`,
-	"ClusterCardinality7dAgo":   `last_over_time(cluster:cardinality[35m] offset 7d)`,
-	"ClusterCardinality30dAgo":  `last_over_time(cluster:cardinality[35m] offset 30d)`,
+	"ClusterCardinalityOverTime": promqlbuilder.TopK(clusterCardinalityVector(), 8),
+	"ClusterCardinalityNow":     lastOverTime35m(clusterCardinalityVector()),
+	"ClusterCardinality7dAgo":   lastOverTime35m(clusterCardinalityVector(vector.WithOffsetAsString("7d"))),
+	"ClusterCardinality30dAgo":  lastOverTime35m(clusterCardinalityVector(vector.WithOffsetAsString("30d"))),
 
 	// Overview - Metric Cardinality
-	"MetricCardinalityOverTime": `topk(8, name:cardinality)`,
-	"MetricCardinalityNow":     `last_over_time(name:cardinality[35m])`,
-	"MetricCardinality7dAgo":   `last_over_time(name:cardinality[35m] offset 7d)`,
-	"MetricCardinality30dAgo":  `last_over_time(name:cardinality[35m] offset 30d)`,
+	"MetricCardinalityOverTime": promqlbuilder.TopK(nameCardinalityVector(), 8),
+	"MetricCardinalityNow":     lastOverTime35m(nameCardinalityVector()),
+	"MetricCardinality7dAgo":   lastOverTime35m(nameCardinalityVector(vector.WithOffsetAsString("7d"))),
+	"MetricCardinality30dAgo":  lastOverTime35m(nameCardinalityVector(vector.WithOffsetAsString("30d"))),
 
 	// Overview - Global Recording Rules
-	"GlobalRulesOverTime": `topk(8, name:no_cluster:cardinality)`,
-	"GlobalRulesNow":      `last_over_time(name:no_cluster:cardinality[35m])`,
-	"GlobalRules7dAgo":    `last_over_time(name:no_cluster:cardinality[35m] offset 7d)`,
-	"GlobalRules30dAgo":   `last_over_time(name:no_cluster:cardinality[35m] offset 30d)`,
+	"GlobalRulesOverTime": promqlbuilder.TopK(globalRulesVector(), 8),
+	"GlobalRulesNow":      lastOverTime35m(globalRulesVector()),
+	"GlobalRules7dAgo":    lastOverTime35m(globalRulesVector(vector.WithOffsetAsString("7d"))),
+	"GlobalRules30dAgo":   lastOverTime35m(globalRulesVector(vector.WithOffsetAsString("30d"))),
 
 	// Overview - Total Cardinality
-	"TotalCardinalityOverTime": `sum(cluster:cardinality) + sum(name:no_cluster:cardinality)`,
+	"TotalCardinalityOverTime": promqlbuilder.Add(
+		promqlbuilder.Sum(clusterCardinalityVector()),
+		promqlbuilder.Sum(globalRulesVector()),
+	),
 
 	// Cluster Dashboard - By Namespace
-	"ClusterByNamespaceOverTime":    `topk(8, sum(last_over_time(cluster_namespace:cardinality{cluster="$cluster",namespace!=""}[35m])) by (namespace))`,
-	"ClusterNonNamespacedOverTime":  `sum(last_over_time(cluster_namespace:cardinality{cluster="$cluster",namespace=""}[35m]))`,
-	"ClusterByNamespaceTable":       `sum(last_over_time(cluster_namespace:cardinality{cluster="$cluster"}[35m])) by (namespace)`,
-	"ClusterByNamespaceTotalTable":  `sum(last_over_time(cluster_namespace:cardinality{cluster="$cluster"}[35m]))`,
+	"ClusterByNamespaceOverTime": promqlbuilder.TopK(
+		promqlbuilder.Sum(
+			lastOverTime35m(vector.New(
+				vector.WithMetricName("cluster_namespace:cardinality"),
+				vector.WithLabelMatchers(
+					label.New("cluster").Equal("$cluster"),
+					label.New("namespace").NotEqual(""),
+				),
+			)),
+		).By("namespace"),
+		8,
+	),
+	"ClusterNonNamespacedOverTime": promqlbuilder.Sum(
+		lastOverTime35m(vector.New(
+			vector.WithMetricName("cluster_namespace:cardinality"),
+			vector.WithLabelMatchers(
+				label.New("cluster").Equal("$cluster"),
+				label.New("namespace").Equal(""),
+			),
+		)),
+	),
+	"ClusterByNamespaceTable": promqlbuilder.Sum(
+		lastOverTime35m(vector.New(
+			vector.WithMetricName("cluster_namespace:cardinality"),
+			vector.WithLabelMatchers(label.New("cluster").Equal("$cluster")),
+		)),
+	).By("namespace"),
 
 	// Cluster Dashboard - By Pod
-	"ClusterByPodOverTime":    `topk(8, count({__name__=~".+", namespace="$namespace", cluster="$cluster", pod!=""}) by (pod))`,
-	"ClusterNoPodOverTime":    `count({__name__=~".+", namespace="$namespace", cluster="$cluster", pod=""})`,
-	"ClusterByPodTable":       `count({__name__=~".+", namespace="$namespace", cluster="$cluster"}) by (pod)`,
-	"ClusterByPodTotalTable":  `count({__name__=~".+", namespace="$namespace", cluster="$cluster"})`,
+	"ClusterByPodOverTime": promqlbuilder.TopK(
+		promqlbuilder.Count(
+			allSeriesVector(
+				label.New("namespace").Equal("$namespace"),
+				label.New("cluster").Equal("$cluster"),
+				label.New("pod").NotEqual(""),
+			),
+		).By("pod"),
+		8,
+	),
+	"ClusterNoPodOverTime": promqlbuilder.Count(
+		allSeriesVector(
+			label.New("namespace").Equal("$namespace"),
+			label.New("cluster").Equal("$cluster"),
+			label.New("pod").Equal(""),
+		),
+	),
+	"ClusterByPodTable": promqlbuilder.Count(
+		allSeriesVector(
+			label.New("namespace").Equal("$namespace"),
+			label.New("cluster").Equal("$cluster"),
+		),
+	).By("pod"),
 
 	// Cluster Dashboard - In Pod (by metric name)
-	"ClusterInPodOverTime":   `topk(8, count({__name__=~".+", cluster="$cluster", namespace="$namespace", pod="$pod"}) by (__name__))`,
-	"ClusterInPodTable":      `count({__name__=~".+", cluster="$cluster", namespace="$namespace", pod="$pod"}) by (__name__)`,
-	"ClusterInPodTotalTable": `count({__name__=~".+", cluster="$cluster", namespace="$namespace", pod="$pod"})`,
+	"ClusterInPodOverTime": promqlbuilder.TopK(
+		promqlbuilder.Count(
+			allSeriesVector(
+				label.New("cluster").Equal("$cluster"),
+				label.New("namespace").Equal("$namespace"),
+				label.New("pod").Equal("$pod"),
+			),
+		).By("__name__"),
+		8,
+	),
+	"ClusterInPodTable": promqlbuilder.Count(
+		allSeriesVector(
+			label.New("cluster").Equal("$cluster"),
+			label.New("namespace").Equal("$namespace"),
+			label.New("pod").Equal("$pod"),
+		),
+	).By("__name__"),
 
 	// Cluster Dashboard - Raw Timeseries
-	"ClusterRawTimeseries": `topk(100, {__name__="$metric_name", cluster="$cluster", namespace="$namespace", pod="$pod"})`,
+	"ClusterRawTimeseries": promqlbuilder.TopK(
+		namedSeriesVector("$metric_name",
+			label.New("cluster").Equal("$cluster"),
+			label.New("namespace").Equal("$namespace"),
+			label.New("pod").Equal("$pod"),
+		),
+		100,
+	),
 
 	// Name Dashboard - By Cluster for Metric
-	"NameByClusterOverTime":   `sum(last_over_time(cluster_name:cardinality{metric_name="$metric_name"}[35m])) by (cluster)`,
-	"NameByClusterTable":      `sum(last_over_time(cluster_name:cardinality{metric_name="$metric_name"}[35m])) by (cluster)`,
-	"NameByClusterTotalTable": `sum(last_over_time(cluster_name:cardinality{metric_name="$metric_name"}[35m]))`,
+	"NameByClusterOverTime": promqlbuilder.Sum(
+		lastOverTime35m(vector.New(
+			vector.WithMetricName("cluster_name:cardinality"),
+			vector.WithLabelMatchers(label.New("metric_name").Equal("$metric_name")),
+		)),
+	).By("cluster"),
+	"NameByClusterTable": promqlbuilder.Sum(
+		lastOverTime35m(vector.New(
+			vector.WithMetricName("cluster_name:cardinality"),
+			vector.WithLabelMatchers(label.New("metric_name").Equal("$metric_name")),
+		)),
+	).By("cluster"),
+	"NameByClusterTotalTable": promqlbuilder.Sum(
+		lastOverTime35m(vector.New(
+			vector.WithMetricName("cluster_name:cardinality"),
+			vector.WithLabelMatchers(label.New("metric_name").Equal("$metric_name")),
+		)),
+	),
 
 	// Name Dashboard - By Namespace
-	"NameByNamespaceOverTime":      `topk(8, count({__name__="$metric_name", cluster="$cluster", namespace!=""}) by (namespace))`,
-	"NameNonNamespacedOverTime":    `count({__name__="$metric_name", cluster="$cluster", namespace=""})`,
-	"NameByNamespaceTable":         `count({__name__="$metric_name", cluster="$cluster"}) by (namespace)`,
-	"NameByNamespaceTotalTable":    `count({__name__="$metric_name", cluster="$cluster"})`,
+	"NameByNamespaceOverTime": promqlbuilder.TopK(
+		promqlbuilder.Count(
+			namedSeriesVector("$metric_name",
+				label.New("cluster").Equal("$cluster"),
+				label.New("namespace").NotEqual(""),
+			),
+		).By("namespace"),
+		8,
+	),
+	"NameNonNamespacedOverTime": promqlbuilder.Count(
+		namedSeriesVector("$metric_name",
+			label.New("cluster").Equal("$cluster"),
+			label.New("namespace").Equal(""),
+		),
+	),
+	"NameByNamespaceTable": promqlbuilder.Count(
+		namedSeriesVector("$metric_name",
+			label.New("cluster").Equal("$cluster"),
+		),
+	).By("namespace"),
 
 	// Name Dashboard - By Pod
-	"NameByPodOverTime":   `topk(8, count({__name__="$metric_name", cluster="$cluster", namespace="$namespace", pod!=""}) by (pod))`,
-	"NameNoPodOverTime":   `count({__name__="$metric_name", cluster="$cluster", namespace="$namespace", pod=""})`,
-	"NameByPodTable":      `count({__name__="$metric_name", cluster="$cluster", namespace="$namespace"}) by (pod)`,
-	"NameByPodTotalTable": `count({__name__="$metric_name", cluster="$cluster", namespace="$namespace"})`,
+	"NameByPodOverTime": promqlbuilder.TopK(
+		promqlbuilder.Count(
+			namedSeriesVector("$metric_name",
+				label.New("cluster").Equal("$cluster"),
+				label.New("namespace").Equal("$namespace"),
+				label.New("pod").NotEqual(""),
+			),
+		).By("pod"),
+		8,
+	),
+	"NameNoPodOverTime": promqlbuilder.Count(
+		namedSeriesVector("$metric_name",
+			label.New("cluster").Equal("$cluster"),
+			label.New("namespace").Equal("$namespace"),
+			label.New("pod").Equal(""),
+		),
+	),
+	"NameByPodTable": promqlbuilder.Count(
+		namedSeriesVector("$metric_name",
+			label.New("cluster").Equal("$cluster"),
+			label.New("namespace").Equal("$namespace"),
+		),
+	).By("pod"),
 
 	// Name Dashboard - Raw Timeseries
-	"NameRawTimeseries": `topk(100, {__name__="$metric_name", cluster="$cluster", namespace="$namespace", pod="$pod"})`,
+	"NameRawTimeseries": promqlbuilder.TopK(
+		namedSeriesVector("$metric_name",
+			label.New("cluster").Equal("$cluster"),
+			label.New("namespace").Equal("$namespace"),
+			label.New("pod").Equal("$pod"),
+		),
+		100,
+	),
 }

@@ -7,15 +7,16 @@ import (
 	panelgroup "github.com/perses/perses/go-sdk/panel-group"
 	markdownPanel "github.com/perses/plugins/markdown/sdk/go"
 	"github.com/perses/plugins/prometheus/sdk/go/query"
+	"github.com/prometheus/prometheus/promql/parser"
 	statPanel "github.com/perses/plugins/statchart/sdk/go"
 	tablePanel "github.com/perses/plugins/table/sdk/go"
 	timeSeriesPanel "github.com/perses/plugins/timeserieschart/sdk/go"
 	dl "github.com/stolostron/multicluster-observability-addon/pkg/perses/panels/datalinks"
 )
 
-func addCardinalityQuery(datasourceName string, expr string, opts ...query.Option) panel.Option {
+func addCardinalityQuery(datasourceName string, expr parser.Expr, opts ...query.Option) panel.Option {
 	allOpts := append([]query.Option{dashboards.AddQueryDataSource(datasourceName)}, opts...)
-	return panel.AddQuery(query.PromQL(expr, allOpts...))
+	return panel.AddQuery(query.PromQL(expr.Pretty(0), allOpts...))
 }
 
 func cardinalityStatOptions(threshold float64) panel.Option {
