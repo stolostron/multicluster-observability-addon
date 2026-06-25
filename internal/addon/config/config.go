@@ -57,6 +57,7 @@ const (
 	PartOfK8sLabelKey             = "app.kubernetes.io/part-of"
 	BackupLabelKey                = "cluster.open-cluster-management.io/backup"
 	BackupLabelValue              = ""
+	PlacementAnnotationKey        = "observability.open-cluster-management.io/placements"
 
 	ClusterClaimClusterID        = "id.k8s.io"
 	ManagedClusterLabelClusterID = "clusterID"

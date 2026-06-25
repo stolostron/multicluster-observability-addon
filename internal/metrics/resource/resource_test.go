@@ -614,6 +614,116 @@ func TestReconcileScrapeConfigs(t *testing.T) {
 			},
 		},
 		{
+			name: "user-defined SC with single placement annotation",
+			initObjs: []client.Object{
+				&cooprometheusv1alpha1.ScrapeConfig{
+					TypeMeta: metav1.TypeMeta{
+						Kind: cooprometheusv1alpha1.ScrapeConfigsKind,
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: config.HubInstallNamespace,
+						Name:      "user-sc",
+						Labels: map[string]string{
+							addoncfg.ComponentK8sLabelKey: config.PlatformPrometheusMatchLabels[addoncfg.ComponentK8sLabelKey],
+							addoncfg.PartOfK8sLabelKey:    addoncfg.Name,
+						},
+						Annotations: map[string]string{
+							addoncfg.PlacementAnnotationKey: "ns/a",
+						},
+					},
+				},
+			},
+			expects: func(t *testing.T, objs []cooprometheusv1alpha1.ScrapeConfig) {
+				assert.Len(t, objs, 1)
+				assert.Equal(t, "user-sc", objs[0].Name)
+				assert.Contains(t, objs[0].Labels, addoncfg.BackupLabelKey)
+				assert.Equal(t, addoncfg.BackupLabelValue, objs[0].Labels[addoncfg.BackupLabelKey])
+			},
+		},
+		{
+			name: "user-defined SC with multiple placement annotations",
+			initObjs: []client.Object{
+				&cooprometheusv1alpha1.ScrapeConfig{
+					TypeMeta: metav1.TypeMeta{
+						Kind: cooprometheusv1alpha1.ScrapeConfigsKind,
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: config.HubInstallNamespace,
+						Name:      "user-sc-multi",
+						Labels: map[string]string{
+							addoncfg.ComponentK8sLabelKey: config.PlatformPrometheusMatchLabels[addoncfg.ComponentK8sLabelKey],
+							addoncfg.PartOfK8sLabelKey:    addoncfg.Name,
+						},
+						Annotations: map[string]string{
+							addoncfg.PlacementAnnotationKey: "ns/a,ns/b",
+						},
+					},
+				},
+			},
+			expects: func(t *testing.T, objs []cooprometheusv1alpha1.ScrapeConfig) {
+				assert.Len(t, objs, 2)
+			},
+		},
+		{
+			name: "user-defined SC without placement annotation is skipped",
+			initObjs: []client.Object{
+				&cooprometheusv1alpha1.ScrapeConfig{
+					TypeMeta: metav1.TypeMeta{
+						Kind: cooprometheusv1alpha1.ScrapeConfigsKind,
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: config.HubInstallNamespace,
+						Name:      "user-sc-no-annotation",
+						Labels: map[string]string{
+							addoncfg.ComponentK8sLabelKey: config.PlatformPrometheusMatchLabels[addoncfg.ComponentK8sLabelKey],
+							addoncfg.PartOfK8sLabelKey:    addoncfg.Name,
+						},
+					},
+				},
+			},
+			expects: func(t *testing.T, objs []cooprometheusv1alpha1.ScrapeConfig) {
+				assert.Empty(t, objs)
+			},
+		},
+		{
+			name: "user-defined SC coexists with MCO-managed SC",
+			initObjs: []client.Object{
+				&cooprometheusv1alpha1.ScrapeConfig{
+					TypeMeta: metav1.TypeMeta{
+						Kind: cooprometheusv1alpha1.ScrapeConfigsKind,
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace:       config.HubInstallNamespace,
+						Name:            "mco-sc",
+						Labels:          config.PlatformPrometheusMatchLabels,
+						OwnerReferences: []metav1.OwnerReference{mcoOwnerRef},
+					},
+				},
+				&cooprometheusv1alpha1.ScrapeConfig{
+					TypeMeta: metav1.TypeMeta{
+						Kind: cooprometheusv1alpha1.ScrapeConfigsKind,
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: config.HubInstallNamespace,
+						Name:      "user-sc",
+						Labels: map[string]string{
+							addoncfg.ComponentK8sLabelKey: config.PlatformPrometheusMatchLabels[addoncfg.ComponentK8sLabelKey],
+							addoncfg.PartOfK8sLabelKey:    addoncfg.Name,
+						},
+						Annotations: map[string]string{
+							addoncfg.PlacementAnnotationKey: "ns/a",
+						},
+					},
+				},
+			},
+			expects: func(t *testing.T, objs []cooprometheusv1alpha1.ScrapeConfig) {
+				assert.Len(t, objs, 2)
+				names := []string{objs[0].Name, objs[1].Name}
+				assert.Contains(t, names, "mco-sc")
+				assert.Contains(t, names, "user-sc")
+			},
+		},
+		{
 			name: "hcp SC is handled",
 			initObjs: []client.Object{
 				&cooprometheusv1alpha1.ScrapeConfig{
@@ -783,6 +893,118 @@ func TestGetPrometheusRules(t *testing.T) {
 			},
 		},
 		{
+			name: "user-defined rule with single placement annotation",
+			initObjs: []client.Object{
+				&prometheusv1.PrometheusRule{
+					TypeMeta: metav1.TypeMeta{
+						Kind: prometheusv1.PrometheusRuleKind,
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: config.HubInstallNamespace,
+						Name:      "user-rule",
+						Labels: map[string]string{
+							addoncfg.ComponentK8sLabelKey: config.PlatformPrometheusMatchLabels[addoncfg.ComponentK8sLabelKey],
+							addoncfg.PartOfK8sLabelKey:    addoncfg.Name,
+						},
+						Annotations: map[string]string{
+							addoncfg.PlacementAnnotationKey: "ns/a",
+						},
+					},
+				},
+			},
+			platformEnabled: true,
+			expects: func(t *testing.T, objs []prometheusv1.PrometheusRule) {
+				assert.Len(t, objs, 1)
+				assert.Equal(t, "user-rule", objs[0].Name)
+			},
+		},
+		{
+			name: "user-defined rule with multiple placement annotations",
+			initObjs: []client.Object{
+				&prometheusv1.PrometheusRule{
+					TypeMeta: metav1.TypeMeta{
+						Kind: prometheusv1.PrometheusRuleKind,
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: config.HubInstallNamespace,
+						Name:      "user-rule-multi",
+						Labels: map[string]string{
+							addoncfg.ComponentK8sLabelKey: config.PlatformPrometheusMatchLabels[addoncfg.ComponentK8sLabelKey],
+							addoncfg.PartOfK8sLabelKey:    addoncfg.Name,
+						},
+						Annotations: map[string]string{
+							addoncfg.PlacementAnnotationKey: "ns/a,ns/b",
+						},
+					},
+				},
+			},
+			platformEnabled: true,
+			expects: func(t *testing.T, objs []prometheusv1.PrometheusRule) {
+				assert.Len(t, objs, 2)
+			},
+		},
+		{
+			name: "user-defined rule without placement annotation is skipped",
+			initObjs: []client.Object{
+				&prometheusv1.PrometheusRule{
+					TypeMeta: metav1.TypeMeta{
+						Kind: prometheusv1.PrometheusRuleKind,
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: config.HubInstallNamespace,
+						Name:      "user-rule-no-annotation",
+						Labels: map[string]string{
+							addoncfg.ComponentK8sLabelKey: config.PlatformPrometheusMatchLabels[addoncfg.ComponentK8sLabelKey],
+							addoncfg.PartOfK8sLabelKey:    addoncfg.Name,
+						},
+					},
+				},
+			},
+			platformEnabled: true,
+			expects: func(t *testing.T, objs []prometheusv1.PrometheusRule) {
+				assert.Empty(t, objs)
+			},
+		},
+		{
+			name: "user-defined rule coexists with MCO-managed rule",
+			initObjs: []client.Object{
+				&prometheusv1.PrometheusRule{
+					TypeMeta: metav1.TypeMeta{
+						Kind: prometheusv1.PrometheusRuleKind,
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace:       config.HubInstallNamespace,
+						Name:            "mco-rule",
+						Labels:          config.PlatformPrometheusMatchLabels,
+						OwnerReferences: []metav1.OwnerReference{mcoOwnerRef},
+					},
+				},
+				&prometheusv1.PrometheusRule{
+					TypeMeta: metav1.TypeMeta{
+						Kind: prometheusv1.PrometheusRuleKind,
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: config.HubInstallNamespace,
+						Name:      "user-rule",
+						Labels: map[string]string{
+							addoncfg.ComponentK8sLabelKey: config.PlatformPrometheusMatchLabels[addoncfg.ComponentK8sLabelKey],
+							addoncfg.PartOfK8sLabelKey:    addoncfg.Name,
+						},
+						Annotations: map[string]string{
+							addoncfg.PlacementAnnotationKey: "ns/a",
+						},
+					},
+				},
+			},
+			platformEnabled: true,
+			expects: func(t *testing.T, objs []prometheusv1.PrometheusRule) {
+				assert.Len(t, objs, 2)
+				names := []string{objs[0].Name, objs[1].Name}
+				assert.Contains(t, names, "mco-rule")
+				assert.Contains(t, names, "user-rule")
+			},
+		},
+		{
 			name: "hcp rules are fetched",
 			initObjs: []client.Object{
 				&prometheusv1.PrometheusRule{
@@ -858,6 +1080,72 @@ func TestGetPrometheusRules(t *testing.T) {
 			if tc.expects != nil {
 				tc.expects(t, rules)
 			}
+		})
+	}
+}
+
+func TestGeneratePlacementRefs(t *testing.T) {
+	d := DefaultStackResources{}
+
+	testCases := []struct {
+		name        string
+		annotations string
+		expected    []addonv1beta1.PlacementRef
+		expectErr   bool
+	}{
+		{
+			name:        "empty string returns nil",
+			annotations: "",
+			expected:    nil,
+		},
+		{
+			name:        "single placement",
+			annotations: "ns-a/placement-a",
+			expected: []addonv1beta1.PlacementRef{
+				{Namespace: "ns-a", Name: "placement-a"},
+			},
+		},
+		{
+			name:        "multiple placements",
+			annotations: "ns-a/placement-a,ns-b/placement-b",
+			expected: []addonv1beta1.PlacementRef{
+				{Namespace: "ns-a", Name: "placement-a"},
+				{Namespace: "ns-b", Name: "placement-b"},
+			},
+		},
+		{
+			name:        "trailing comma is tolerated",
+			annotations: "ns-a/placement-a,",
+			expected: []addonv1beta1.PlacementRef{
+				{Namespace: "ns-a", Name: "placement-a"},
+			},
+		},
+		{
+			name:        "missing separator returns error",
+			annotations: "no-separator",
+			expectErr:   true,
+		},
+		{
+			name:        "empty namespace returns error",
+			annotations: "/placement-a",
+			expectErr:   true,
+		},
+		{
+			name:        "empty name returns error",
+			annotations: "ns-a/",
+			expectErr:   true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			refs, err := d.generatePlacementRefs(tc.annotations)
+			if tc.expectErr {
+				assert.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tc.expected, refs)
 		})
 	}
 }
