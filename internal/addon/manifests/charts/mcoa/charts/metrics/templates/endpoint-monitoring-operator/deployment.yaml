@@ -1,4 +1,5 @@
 {{- if or .Values.platformEnabled .Values.userWorkloadsEnabled }}
+{{- $appName := "endpoint-monitoring-operator" }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -53,11 +54,24 @@ spec:
           containerPort: 8080
         {{- end }}
         resources:
+        {{- $matched := false }}
+        {{- if .Values.global.resourceRequirements }}
+        {{- $reverseResourceRequirements := reverse .Values.global.resourceRequirements -}}
+        {{- range $requirement := $reverseResourceRequirements -}}
+          {{- if regexMatch $requirement.containerIDRegex (printf "deployments:%s:%s" $appName "endpoint-monitoring-operator") }}
+            {{- $matched = true }}
+            {{- toYaml $requirement.resources | nindent 10 }}
+            {{- break -}}
+          {{- end -}}
+        {{- end }}
+        {{- end }}
+        {{- if not $matched }}
           requests:
             cpu: 1m
             memory: 31Mi
           limits:
             memory: 50Mi
+        {{- end }}
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
@@ -81,12 +95,25 @@ spec:
         - name: metrics
           containerPort: 8443
         resources:
+        {{- $matched := false }}
+        {{- if .Values.global.resourceRequirements }}
+        {{- $reverseResourceRequirements := reverse .Values.global.resourceRequirements -}}
+        {{- range $requirement := $reverseResourceRequirements -}}
+          {{- if regexMatch $requirement.containerIDRegex (printf "deployments:%s:%s" $appName "kube-rbac-proxy") }}
+            {{- $matched = true }}
+            {{- toYaml $requirement.resources | nindent 10 }}
+            {{- break -}}
+          {{- end -}}
+        {{- end }}
+        {{- end }}
+        {{- if not $matched }}
           requests:
             cpu: 1m
             memory: 15Mi
           limits:
             cpu: 20m
             memory: 30Mi
+        {{- end }}
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
