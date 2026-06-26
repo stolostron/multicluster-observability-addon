@@ -13,23 +13,23 @@ import (
 type Options struct {
 	PlatformAlertsEnabled     bool
 	UserWorkloadAlertsEnabled bool
-	Platform             Collector
-	UserWorkloads        Collector
-	Secrets              []*corev1.Secret
-	ConfigMaps           []*corev1.ConfigMap
-	AlertManagerEndpoint string
-	ClusterName          string
-	HubClusterID         string
-	ClusterID            string
-	IsOpenShiftVendor    bool
-	InstallNamespace     string
-	Images               mconfig.ImageOverrides
-	IsHub                bool
-	COOIsSubscribed      bool
-	Tolerations          []corev1.Toleration
-	NodeSelector         map[string]string
-	ResourceReqs         []addonv1beta1.ContainerResourceRequirements
-	NodeExporter         addon.NodeExporterOptions
+	Platform                  Collector
+	UserWorkloads             Collector
+	Secrets                   []*corev1.Secret
+	ConfigMaps                []*corev1.ConfigMap
+	AlertManagerEndpoint      string
+	ClusterName               string
+	HubClusterID              string
+	ClusterID                 string
+	IsOpenShiftVendor         bool
+	InstallNamespace          string
+	Images                    mconfig.ImageOverrides
+	IsHub                     bool
+	COOIsSubscribed           bool
+	Tolerations               []corev1.Toleration
+	NodeSelector              map[string]string
+	ResourceReqs              []addonv1beta1.ContainerResourceRequirements
+	NodeExporter              addon.NodeExporterOptions
 	// CRDEstablishedAnnotation is injected into the Prometheus Operator Deployment to trigger a
 	// restart when optional CRDs (PrometheusAgent, ScrapeConfig) become available. This
 	// prevents synchronization issues by ensuring the operator can watch these resources upon startup.
