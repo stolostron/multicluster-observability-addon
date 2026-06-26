@@ -1,4 +1,5 @@
 {{- if or .Values.platformEnabled .Values.userWorkloadsEnabled }}
+{{- $appName := "observability-monitoring-cleanup" }}
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -23,7 +24,7 @@ rules:
 - apiGroups: [""]
   resources: ["configmaps"]
   resourceNames: ["cluster-monitoring-config", "user-workload-monitoring-config"]
-  verbs: ["get", "patch", "update"]
+  verbs: ["get", "patch", "update", "delete"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -76,6 +77,25 @@ spec:
         - cleanup
         - --cluster-name={{ .Values.clusterName }}
         - --hub-alertmanager-ca-secret={{ .Values.alertmanagerRouterCASecretName }}
+        resources:
+        {{- $matched := false }}
+        {{- if .Values.global.resourceRequirements }}
+        {{- $reverseResourceRequirements := reverse .Values.global.resourceRequirements -}}
+        {{- range $requirement := $reverseResourceRequirements -}}
+          {{- if regexMatch $requirement.containerIDRegex (printf "jobs:%s:%s" $appName "observability-monitoring-cleanup") }}
+            {{- $matched = true }}
+            {{- toYaml $requirement.resources | nindent 10 }}
+            {{- break -}}
+          {{- end -}}
+        {{- end }}
+        {{- end }}
+        {{- if not $matched }}
+          requests:
+            cpu: 1m
+            memory: 31Mi
+          limits:
+            memory: 50Mi
+        {{- end }}
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:

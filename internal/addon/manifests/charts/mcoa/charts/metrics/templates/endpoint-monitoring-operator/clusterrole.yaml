@@ -7,6 +7,7 @@ metadata:
     app.kubernetes.io/component: endpoint-monitoring-operator
     {{- include "metricshelm.labels" . | nindent 4 }}
 rules:
+# Allows updating/patching only the two specific platform configmaps
 - apiGroups: [""]
   resources: ["configmaps"]
   verbs: ["get", "list", "watch", "update", "patch", "create"]
@@ -15,12 +16,11 @@ rules:
   resources: ["configmaps"]
   verbs: ["get", "list", "watch", "update", "patch", "create"]
   resourceNames: ["user-workload-monitoring-config"]
+# Namespace-wide "create" needed to initialize them if they don't exist yet
 - apiGroups: [""]
   resources: ["configmaps"]
   verbs: ["get", "list", "watch", "create"]
-- apiGroups: [""]
-  resources: ["secrets"]
-  verbs: ["get", "list", "watch", "create", "update", "patch"]
+# warning events for overwritten/mutated configs
 - apiGroups: [""]
   resources: ["events"]
   verbs: ["create", "patch"]
