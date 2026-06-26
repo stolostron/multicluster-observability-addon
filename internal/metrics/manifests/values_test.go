@@ -64,11 +64,13 @@ func TestBuildValues(t *testing.T) {
 				Images: config.ImageOverrides{
 					CooPrometheusOperatorImage: "obo-prometheus-operator:latest",
 					PrometheusConfigReloader:   "prometheus-config-reloader:latest",
+					EndpointMonitoringOperator: "endpoint-monitoring-operator:latest",
 				},
 			},
 			Expect: func(t *testing.T, values *manifests.MetricsValues) {
 				assert.Equal(t, "obo-prometheus-operator:latest", values.Images.CooPrometheusOperator)
 				assert.Equal(t, "prometheus-config-reloader:latest", values.Images.PrometheusConfigReloader)
+				assert.Equal(t, "endpoint-monitoring-operator:latest", values.Images.EndpointMonitoringOperator)
 			},
 		},
 		"with secrets": {
@@ -229,8 +231,17 @@ func TestBuildValues(t *testing.T) {
 			},
 			Expect: func(t *testing.T, values *manifests.MetricsValues) {
 				trimmedID := config.GetTrimmedClusterID("12345-67890-abcdef")
-				assert.Equal(t, config.GetAlertmanagerRouterCASecretName(trimmedID), values.AlertmanagerRouterCASecretName)
+				assert.Equal(t, config.GetObsAlertmanagerMtlsCASecretName(trimmedID), values.AlertmanagerRouterCASecretName)
+				assert.Equal(t, config.GetObsAlertmanagerMtlsCertSecretName(trimmedID), values.ClientCertSecretName)
 				assert.Equal(t, config.GetAlertmanagerAccessorSecretName(trimmedID), values.AlertmanagerAccessorSecretName)
+			},
+		},
+		"with cluster name": {
+			Options: handlers.Options{
+				ClusterName: "test-cluster-name",
+			},
+			Expect: func(t *testing.T, values *manifests.MetricsValues) {
+				assert.Equal(t, "test-cluster-name", values.ClusterName)
 			},
 		},
 		"with node exporter options": {

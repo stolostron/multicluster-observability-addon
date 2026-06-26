@@ -23,15 +23,16 @@ const (
 	KeyPlatformVirtualizationRightSizing = "platformVirtualizationRightSizing"
 	KeyRightSizingDelegated              = "rightSizingDelegated"
 	KeyMetricsHubHostname                = "metricsHubHostname"
-	KeyMetricsAlertManagerHostname       = "metricsAlertManagerHostname"
 	KeyNodeExporterHostPort              = "nodeExporterHostPort"
 	KeyNodeExporterInternalPort          = "nodeExporterInternalPort"
+	KeyPlatformMetricsAlerts             = "platformMetricsAlerts"
 
 	// User Workloads Observability Keys
 	KeyUserWorkloadMetricsCollection = "userWorkloadMetricsCollection"
 	KeyUserWorkloadLogsCollection    = "userWorkloadLogsCollection"
 	KeyUserWorkloadTracesCollection  = "userWorkloadTracesCollection"
 	KeyUserWorkloadInstrumentation   = "userWorkloadInstrumentation"
+	KeyUserWorkloadMetricsAlerts     = "userWorkloadMetricsAlerts"
 
 	KeyPlatformMetricsUI = "platformMetricsUI"
 )
@@ -57,11 +58,11 @@ const (
 )
 
 type MetricsOptions struct {
-	CollectionEnabled    bool
-	HubEndpoint          url.URL
-	AlertManagerEndpoint url.URL
-	UI                   MetricsUIOptions
-	NodeExporter         NodeExporterOptions
+	CollectionEnabled bool
+	HubEndpoint       url.URL
+	UI                MetricsUIOptions
+	NodeExporter      NodeExporterOptions
+	AlertsEnabled     bool
 }
 
 type NodeExporterOptions struct {
@@ -177,6 +178,10 @@ func BuildOptions(addOnDeployment *addonapiv1beta1.AddOnDeploymentConfig) (Optio
 	opts.ProxyConfig.NoProxy = addOnDeployment.Spec.ProxyConfig.NoProxy
 	opts.Registries = addOnDeployment.Spec.Registries
 
+	// Default alerts to disabled
+	opts.Platform.Metrics.AlertsEnabled = false
+	opts.UserWorkloads.Metrics.AlertsEnabled = false
+
 	// Do NOT return early when CustomizedVariables is nil. The for-range
 	// loop below is a safe no-op on a nil slice, and we must always fall
 	// through to the auto-enable right-sizing logic that follows it.
@@ -211,24 +216,14 @@ func BuildOptions(addOnDeployment *addonapiv1beta1.AddOnDeploymentConfig) (Optio
 			}
 
 			opts.Platform.Metrics.HubEndpoint = *url
-		case KeyMetricsAlertManagerHostname:
-			val := keyvalue.Value
-			if !strings.HasPrefix(val, "http") {
-				val = "https://" + val
+		case KeyPlatformMetricsAlerts:
+			if keyvalue.Value == "enabled" {
+				opts.Platform.Metrics.AlertsEnabled = true
 			}
-			url, err := url.Parse(val)
-			if err != nil {
-				return opts, fmt.Errorf("%w: %s", addoncfg.ErrInvalidMetricsAlertManagerHostname, err.Error())
+		case KeyUserWorkloadMetricsAlerts:
+			if keyvalue.Value == "enabled" {
+				opts.UserWorkloads.Metrics.AlertsEnabled = true
 			}
-
-			// Hostname validation:
-			// - Check if host is empty
-			// - Check for invalid hostname formats like ":"
-			if strings.TrimSpace(url.Host) == "" || url.Host == ":" || strings.HasPrefix(url.Host, ":") {
-				return opts, fmt.Errorf("%w: invalid hostname format '%s'", addoncfg.ErrInvalidMetricsAlertManagerHostname, url.Host)
-			}
-
-			opts.Platform.Metrics.AlertManagerEndpoint = *url
 		case KeyNodeExporterHostPort:
 			port, err := parsePort(keyvalue.Name, keyvalue.Value)
 			if err != nil {
