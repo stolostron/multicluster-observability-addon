@@ -58,11 +58,11 @@ const (
 )
 
 type MetricsOptions struct {
-	CollectionEnabled    bool
-	HubEndpoint          url.URL
-	UI                   MetricsUIOptions
-	NodeExporter         NodeExporterOptions
-	AlertsEnabled        bool
+	CollectionEnabled bool
+	HubEndpoint       url.URL
+	UI                MetricsUIOptions
+	NodeExporter      NodeExporterOptions
+	AlertsEnabled     bool
 }
 
 type NodeExporterOptions struct {

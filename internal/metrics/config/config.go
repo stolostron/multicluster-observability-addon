@@ -202,4 +202,3 @@ func GetObsAlertmanagerMtlsCASecretName(trimmedClusterID string) string {
 func GetObsAlertmanagerMtlsCertSecretName(trimmedClusterID string) string {
 	return fmt.Sprintf("%s-%s", ObsAlertmanagerMtlsCertShortName, trimmedClusterID)
 }
-
