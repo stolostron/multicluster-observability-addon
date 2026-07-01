@@ -65,6 +65,9 @@ const (
 	AlertmanagerRouteBYOCERTName   = "alertmanager-byo-cert"
 	AlertmanagerPlatformNamespace  = "openshift-monitoring"
 	AlertmanagerUWLNamespace       = "openshift-user-workload-monitoring"
+
+	ObsAlertmanagerMtlsCAShortName   = "obs-alertmanager-mtls-ca"
+	ObsAlertmanagerMtlsCertShortName = "obs-alertmanager-mtls-cert"
 )
 
 var (
@@ -86,11 +89,6 @@ var (
 		Namespace: "open-cluster-management-observability",
 	}
 
-	RouterDefaultCertsConfigMapObjKey = types.NamespacedName{
-		Name:      "router-certs-default",
-		Namespace: "openshift-ingress",
-	}
-
 	ErrMissingImageOverride = errors.New("missing image override")
 )
 
@@ -101,6 +99,7 @@ type ImageOverrides struct {
 	KubeStateMetrics           string `json:"kube_state_metrics"`
 	NodeExporter               string `json:"node_exporter"`
 	Prometheus                 string `json:"prometheus"`
+	EndpointMonitoringOperator string `json:"endpoint_monitoring_operator"`
 }
 
 func GetImageOverrides(ctx context.Context, c client.Client, registries []addonapiv1beta1.ImageMirror, logger logr.Logger) (ImageOverrides, error) {
@@ -125,7 +124,8 @@ func GetImageOverrides(ctx context.Context, c client.Client, registries []addona
 		ret.KubeRBACProxy == "" ||
 		ret.KubeStateMetrics == "" ||
 		ret.Prometheus == "" ||
-		ret.NodeExporter == "" {
+		ret.NodeExporter == "" ||
+		ret.EndpointMonitoringOperator == "" {
 		return ret, fmt.Errorf("%w: %+v", ErrMissingImageOverride, ret)
 	}
 
@@ -137,6 +137,7 @@ func GetImageOverrides(ctx context.Context, c client.Client, registries []addona
 		ret.KubeStateMetrics = overrideImage(ret.KubeStateMetrics, registries, logger)
 		ret.NodeExporter = overrideImage(ret.NodeExporter, registries, logger)
 		ret.Prometheus = overrideImage(ret.Prometheus, registries, logger)
+		ret.EndpointMonitoringOperator = overrideImage(ret.EndpointMonitoringOperator, registries, logger)
 	}
 
 	return ret, nil
@@ -190,10 +191,14 @@ func GetTrimmedClusterID(clusterID string) string {
 	return fmt.Sprintf("%.19s", idTrim)
 }
 
-func GetAlertmanagerRouterCASecretName(trimmedClusterID string) string {
-	return fmt.Sprintf("%s-%s", AlertmanagerRouterCASecretName, trimmedClusterID)
-}
-
 func GetAlertmanagerAccessorSecretName(trimmedClusterID string) string {
 	return fmt.Sprintf("%s-%s", AlertmanagerAccessorSecretName, trimmedClusterID)
+}
+
+func GetObsAlertmanagerMtlsCASecretName(trimmedClusterID string) string {
+	return fmt.Sprintf("%s-%s", ObsAlertmanagerMtlsCAShortName, trimmedClusterID)
+}
+
+func GetObsAlertmanagerMtlsCertSecretName(trimmedClusterID string) string {
+	return fmt.Sprintf("%s-%s", ObsAlertmanagerMtlsCertShortName, trimmedClusterID)
 }

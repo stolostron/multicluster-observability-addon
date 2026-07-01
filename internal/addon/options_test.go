@@ -69,7 +69,6 @@ func TestBuildOptions(t *testing.T) {
 						{Name: KeyPlatformMetricsCollection, Value: string(PrometheusAgentV1alpha1)},
 						{Name: KeyUserWorkloadMetricsCollection, Value: string(PrometheusAgentV1alpha1)},
 						{Name: KeyMetricsHubHostname, Value: "metrics.example.com"},
-						{Name: KeyMetricsAlertManagerHostname, Value: "alerts.example.com"},
 					},
 				},
 			},
@@ -82,11 +81,6 @@ func TestBuildOptions(t *testing.T) {
 							Scheme: "https",
 							Host:   "metrics.example.com",
 							Path:   "api/metrics/v1/default/api/v1/receive",
-						},
-						AlertManagerEndpoint: url.URL{
-							Scheme: "https",
-							Host:   "alerts.example.com",
-							Path:   "",
 						},
 					},
 					AnalyticsOptions: AnalyticsOptions{
@@ -112,7 +106,6 @@ func TestBuildOptions(t *testing.T) {
 						{Name: KeyPlatformMetricsCollection, Value: string(PrometheusAgentV1alpha1)},
 						{Name: KeyUserWorkloadMetricsCollection, Value: string(PrometheusAgentV1alpha1)},
 						{Name: KeyMetricsHubHostname, Value: "https://metrics.example.com"},
-						{Name: KeyMetricsAlertManagerHostname, Value: "https://alerts.example.com"},
 					},
 				},
 			},
@@ -125,11 +118,6 @@ func TestBuildOptions(t *testing.T) {
 							Scheme: "https",
 							Host:   "metrics.example.com",
 							Path:   "api/metrics/v1/default/api/v1/receive",
-						},
-						AlertManagerEndpoint: url.URL{
-							Scheme: "https",
-							Host:   "alerts.example.com",
-							Path:   "",
 						},
 					},
 					AnalyticsOptions: AnalyticsOptions{
@@ -418,6 +406,36 @@ func TestBuildOptions(t *testing.T) {
 			},
 		},
 		{
+			name: "enabled alerts",
+			addOnDeploy: &addonapiv1beta1.AddOnDeploymentConfig{
+				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+					CustomizedVariables: []addonapiv1beta1.CustomizedVariable{
+						{Name: KeyPlatformMetricsAlerts, Value: "enabled"},
+						{Name: KeyUserWorkloadMetricsAlerts, Value: "enabled"},
+					},
+				},
+			},
+			expectedOpts: Options{
+				Platform: PlatformOptions{
+					Enabled: true,
+					Metrics: MetricsOptions{
+						AlertsEnabled: true,
+					},
+					AnalyticsOptions: AnalyticsOptions{
+						RightSizing: RightSizingOptions{
+							NamespaceEnabled:      true,
+							VirtualizationEnabled: true,
+						},
+					},
+				},
+				UserWorkloads: UserWorkloadOptions{
+					Metrics: MetricsOptions{
+						AlertsEnabled: true,
+					},
+				},
+			},
+		},
+		{
 			name: "invalid node exporter host port - format",
 			addOnDeploy: &addonapiv1beta1.AddOnDeploymentConfig{
 				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
@@ -460,6 +478,20 @@ func TestBuildOptions(t *testing.T) {
 				assert.ErrorContains(t, err, tc.expectedErrMsg)
 			} else {
 				require.NoError(t, err)
+				if tc.addOnDeploy != nil {
+					expectedPlatformAlerts := false
+					expectedUserWorkloadAlerts := false
+					for _, kv := range tc.addOnDeploy.Spec.CustomizedVariables {
+						if kv.Name == KeyPlatformMetricsAlerts && kv.Value == "enabled" {
+							expectedPlatformAlerts = true
+						}
+						if kv.Name == KeyUserWorkloadMetricsAlerts && kv.Value == "enabled" {
+							expectedUserWorkloadAlerts = true
+						}
+					}
+					tc.expectedOpts.Platform.Metrics.AlertsEnabled = expectedPlatformAlerts
+					tc.expectedOpts.UserWorkloads.Metrics.AlertsEnabled = expectedUserWorkloadAlerts
+				}
 				assert.Equal(t, tc.expectedOpts, opts)
 			}
 		})

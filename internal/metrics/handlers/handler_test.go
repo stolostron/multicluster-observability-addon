@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	configv1 "github.com/openshift/api/config/v1"
-	operatorv1 "github.com/openshift/api/operator/v1"
 	hyperv1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	cooprometheusv1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1"
@@ -48,7 +47,7 @@ func TestBuildOptions(t *testing.T) {
 	// Setup scheme
 	scheme := runtime.NewScheme()
 	require.NoError(t, kubescheme.AddToScheme(scheme))
-	require.NoError(t, operatorv1.AddToScheme(scheme))
+	require.NoError(t, configv1.AddToScheme(scheme))
 	require.NoError(t, cooprometheusv1alpha1.AddToScheme(scheme))
 	require.NoError(t, cooprometheusv1.AddToScheme(scheme))
 	require.NoError(t, prometheusv1.AddToScheme(scheme))
@@ -222,15 +221,6 @@ func TestBuildOptions(t *testing.T) {
 			"pass": []byte("data"),
 		},
 	}
-	alertmanagerRouterCA := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      config.RouterDefaultCertsConfigMapObjKey.Name,
-			Namespace: config.RouterDefaultCertsConfigMapObjKey.Namespace,
-		},
-		Data: map[string][]byte{
-			"tls.key": []byte("data"),
-		},
-	}
 
 	createResources := func() []client.Object {
 		return []client.Object{
@@ -242,12 +232,6 @@ func TestBuildOptions(t *testing.T) {
 			&corev1.Namespace{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: spokeName,
-				},
-			},
-			&operatorv1.IngressController{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "default",
-					Namespace: "openshift-ingress-operator",
 				},
 			},
 			&clusterv1.ManagedCluster{
@@ -271,6 +255,7 @@ func TestBuildOptions(t *testing.T) {
 					"kube_state_metrics":            "quay.io/kube/kube-state-metrics",
 					"node_exporter":                 "quay.io/kube/node-exporter",
 					"prometheus":                    "quay.io/prometheus/prometheus",
+					"endpoint_monitoring_operator":  "endpoint-monitoring-operator-image",
 				},
 			},
 			platformAgent.DeepCopy(),
@@ -281,7 +266,25 @@ func TestBuildOptions(t *testing.T) {
 			uwlHAProxyCM.DeepCopy(),
 			cmao.DeepCopy(),
 			alertmanagerAccessorSecret.DeepCopy(),
-			alertmanagerRouterCA.DeepCopy(),
+			&corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      config.ClientCertSecretName,
+					Namespace: config.HubInstallNamespace,
+				},
+				Data: map[string][]byte{
+					"tls.crt": []byte("test-crt"),
+					"tls.key": []byte("test-key"),
+				},
+			},
+			&corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      config.HubCASecretName,
+					Namespace: config.HubInstallNamespace,
+				},
+				Data: map[string][]byte{
+					"ca.crt": []byte("test-ca"),
+				},
+			},
 			&corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      config.ClientCertSecretName,
@@ -412,7 +415,7 @@ func TestBuildOptions(t *testing.T) {
 				assert.Equal(t, config.ClusterNameMetricLabel, opts.Platform.PrometheusAgent.Spec.CommonPrometheusFields.RemoteWrite[0].WriteRelabelConfigs[0].TargetLabel)
 				assert.Len(t, opts.Platform.PrometheusAgent.Spec.CommonPrometheusFields.RemoteWrite[0].WriteRelabelConfigs, 5)
 				// Check that the secrets are set
-				assert.Len(t, opts.Secrets, 4)
+				assert.Len(t, opts.Secrets, 5)
 				// Check that user workloads are not enabled
 				assert.Nil(t, opts.UserWorkloads.PrometheusAgent)
 				// Check that scrape configs are set
