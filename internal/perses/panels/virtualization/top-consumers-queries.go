@@ -29,15 +29,15 @@ func cpuMetric(extra string) string {
 }
 
 func networkMetric(extra string) string {
-	return `sum by (cluster,namespace,name)(rate(kubevirt_vmi_network_receive_bytes_total{` + clusterNSMatchers + extra + `}[10m]) + rate(kubevirt_vmi_network_transmit_bytes_total{` + clusterNSMatchers + extra + `}[10m]))`
+	return `sum by (cluster,namespace,name)(rate(kubevirt_vmi_network_receive_bytes_total{` + clusterNSMatchers + extra + `}[10m])) + sum by (cluster,namespace,name)(rate(kubevirt_vmi_network_transmit_bytes_total{` + clusterNSMatchers + extra + `}[10m]))`
 }
 
 func storageTrafficMetric(extra string) string {
-	return `sum by (cluster,namespace,name)(rate(kubevirt_vmi_storage_read_traffic_bytes_total{` + clusterNSMatchers + extra + `}[10m]) + rate(kubevirt_vmi_storage_write_traffic_bytes_total{` + clusterNSMatchers + extra + `}[10m]))`
+	return `sum by (cluster,namespace,name)(rate(kubevirt_vmi_storage_read_traffic_bytes_total{` + clusterNSMatchers + extra + `}[10m])) + sum by (cluster,namespace,name)(rate(kubevirt_vmi_storage_write_traffic_bytes_total{` + clusterNSMatchers + extra + `}[10m]))`
 }
 
 func storageIOPSMetric(extra string) string {
-	return `sum by (cluster,namespace,name)(rate(kubevirt_vmi_storage_iops_read_total{` + clusterNSMatchers + extra + `}[10m]) + rate(kubevirt_vmi_storage_iops_write_total{` + clusterNSMatchers + extra + `}[10m]))`
+	return `sum by (cluster,namespace,name)(rate(kubevirt_vmi_storage_iops_read_total{` + clusterNSMatchers + extra + `}[10m])) + sum by (cluster,namespace,name)(rate(kubevirt_vmi_storage_iops_write_total{` + clusterNSMatchers + extra + `}[10m]))`
 }
 
 func vcpuWaitMetric(extra string) string {
@@ -45,7 +45,7 @@ func vcpuWaitMetric(extra string) string {
 }
 
 func memorySwapMetric(extra string) string {
-	return `sum by (cluster,namespace,name)(avg_over_time(kubevirt_vmi_memory_swap_in_traffic_bytes{` + clusterNSMatchers + extra + `}[10m]) + avg_over_time(kubevirt_vmi_memory_swap_out_traffic_bytes{` + clusterNSMatchers + extra + `}[10m]))`
+	return `sum by (cluster,namespace,name)(avg_over_time(kubevirt_vmi_memory_swap_in_traffic_bytes{` + clusterNSMatchers + extra + `}[10m])) + sum by (cluster,namespace,name)(avg_over_time(kubevirt_vmi_memory_swap_out_traffic_bytes{` + clusterNSMatchers + extra + `}[10m]))`
 }
 
 // memoryUsageMetric uses memory_used_bytes (MCO allowlisted, no guest agent).
@@ -69,15 +69,15 @@ func cpuMetricInstant(extra string) string {
 }
 
 func networkMetricInstant(extra string) string {
-	return `sum by (cluster,namespace,name)(kubevirt_vmi_network_receive_bytes_total{` + clusterNSMatchers + extra + `} + kubevirt_vmi_network_transmit_bytes_total{` + clusterNSMatchers + extra + `})`
+	return `sum by (cluster,namespace,name)(kubevirt_vmi_network_receive_bytes_total{` + clusterNSMatchers + extra + `}) + sum by (cluster,namespace,name)(kubevirt_vmi_network_transmit_bytes_total{` + clusterNSMatchers + extra + `})`
 }
 
 func storageTrafficMetricInstant(extra string) string {
-	return `sum by (cluster,namespace,name)(kubevirt_vmi_storage_read_traffic_bytes_total{` + clusterNSMatchers + extra + `} + kubevirt_vmi_storage_write_traffic_bytes_total{` + clusterNSMatchers + extra + `})`
+	return `sum by (cluster,namespace,name)(kubevirt_vmi_storage_read_traffic_bytes_total{` + clusterNSMatchers + extra + `}) + sum by (cluster,namespace,name)(kubevirt_vmi_storage_write_traffic_bytes_total{` + clusterNSMatchers + extra + `})`
 }
 
 func storageIOPSMetricInstant(extra string) string {
-	return `sum by (cluster,namespace,name)(kubevirt_vmi_storage_iops_read_total{` + clusterNSMatchers + extra + `} + kubevirt_vmi_storage_iops_write_total{` + clusterNSMatchers + extra + `})`
+	return `sum by (cluster,namespace,name)(kubevirt_vmi_storage_iops_read_total{` + clusterNSMatchers + extra + `}) + sum by (cluster,namespace,name)(kubevirt_vmi_storage_iops_write_total{` + clusterNSMatchers + extra + `})`
 }
 
 func vcpuWaitMetricInstant(extra string) string {
