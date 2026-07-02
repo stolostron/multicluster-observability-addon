@@ -25,7 +25,7 @@ func topNHiddenVariable(varName, expr, datasource string) dashboard.Option {
 				promqlVar.Datasource(datasource),
 			),
 			listVar.Hidden(true),
-			listVar.AllowAllValue(false),
+			listVar.AllowAllValue(true),
 			listVar.AllowMultiple(true),
 			listVar.DefaultValues("$__all"),
 		),
