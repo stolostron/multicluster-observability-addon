@@ -158,12 +158,11 @@ func (h *Hypershift) generateEtcdServiceMonitor(ctx context.Context, namespace s
 	}
 
 	for _, endpoint := range hypershiftEtcdSM.Spec.Endpoints {
-		ret.Spec.Endpoints = append(ret.Spec.Endpoints, prometheusv1.Endpoint{
+		ep := prometheusv1.Endpoint{
 			Interval:             "30s",
 			Scheme:               endpoint.Scheme,
 			Port:                 endpoint.Port,
 			TargetPort:           endpoint.TargetPort,
-			TLSConfig:            endpoint.TLSConfig,
 			MetricRelabelConfigs: h.generateMetricsRelabelConfigs(hostedCluster, metrics),
 			RelabelConfigs: []prometheusv1.RelabelConfig{
 				{
@@ -172,7 +171,9 @@ func (h *Hypershift) generateEtcdServiceMonitor(ctx context.Context, namespace s
 					Replacement: ptr.To("etcd"),
 				},
 			},
-		})
+		}
+		ep.TLSConfig = endpoint.TLSConfig
+		ret.Spec.Endpoints = append(ret.Spec.Endpoints, ep)
 	}
 
 	return ret, nil
@@ -207,12 +208,11 @@ func (h *Hypershift) generateApiServerServiceMonitor(ctx context.Context, namesp
 	}
 
 	for _, endpoint := range hypershiftApiServerSM.Spec.Endpoints {
-		ret.Spec.Endpoints = append(ret.Spec.Endpoints, prometheusv1.Endpoint{
+		ep := prometheusv1.Endpoint{
 			Interval:             "30s",
 			Scheme:               endpoint.Scheme,
 			Port:                 endpoint.Port,
 			TargetPort:           endpoint.TargetPort,
-			TLSConfig:            endpoint.TLSConfig,
 			MetricRelabelConfigs: h.generateMetricsRelabelConfigs(hostedCluster, metrics),
 			RelabelConfigs: []prometheusv1.RelabelConfig{
 				{
@@ -221,7 +221,9 @@ func (h *Hypershift) generateApiServerServiceMonitor(ctx context.Context, namesp
 					Replacement: ptr.To("apiserver"),
 				},
 			},
-		})
+		}
+		ep.TLSConfig = endpoint.TLSConfig
+		ret.Spec.Endpoints = append(ret.Spec.Endpoints, ep)
 	}
 
 	return ret, nil
@@ -258,6 +260,7 @@ func (h *Hypershift) extractDependentMetrics(sc []*cooprometheusv1alpha1.ScrapeC
 // federated metrics list. It ignores metrics resulting from rules evaluation.
 func (h *Hypershift) federatedMetrics(scrapeConfigs []*cooprometheusv1alpha1.ScrapeConfig) ([]string, error) {
 	ret := []string{}
+	promParser := parser.NewParser(parser.Options{})
 
 	for _, scrapeConfig := range scrapeConfigs {
 		if scrapeConfig == nil {
@@ -265,7 +268,7 @@ func (h *Hypershift) federatedMetrics(scrapeConfigs []*cooprometheusv1alpha1.Scr
 		}
 
 		for _, query := range scrapeConfig.Spec.Params["match[]"] {
-			expr, err := parser.ParseExpr(query)
+			expr, err := promParser.ParseExpr(query)
 			if err != nil {
 				return nil, fmt.Errorf("failed to parse query %s: %w", query, err)
 			}
@@ -293,6 +296,7 @@ func (h *Hypershift) federatedMetrics(scrapeConfigs []*cooprometheusv1alpha1.Scr
 
 func (h *Hypershift) rulesDependentMetrics(promRules []*prometheusv1.PrometheusRule) ([]string, error) {
 	ret := []string{}
+	promParser := parser.NewParser(parser.Options{})
 
 	for _, promRule := range promRules {
 		if promRule == nil {
@@ -301,7 +305,7 @@ func (h *Hypershift) rulesDependentMetrics(promRules []*prometheusv1.PrometheusR
 
 		for _, group := range promRule.Spec.Groups {
 			for _, rule := range group.Rules {
-				expr, err := parser.ParseExpr(rule.Expr.StrVal)
+				expr, err := promParser.ParseExpr(rule.Expr.StrVal)
 				if err != nil {
 					return nil, fmt.Errorf("failed to parse query for rule named %q: %w", rule.Record, err)
 				}
