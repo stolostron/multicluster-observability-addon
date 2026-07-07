@@ -27,7 +27,8 @@ rules:
 - apiGroups: ["config.openshift.io"]
   resources: ["apiservers"]
   verbs: ["get", "list", "watch"]
+# CRD management (applied directly on spoke, not via ManifestWork) and TLS profile management
 - apiGroups: ["apiextensions.k8s.io"]
   resources: ["customresourcedefinitions"]
-  verbs: ["get"]
+  verbs: ["get", "list", "watch", "create", "update", "patch"]
 {{- end }}

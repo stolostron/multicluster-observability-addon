@@ -4,13 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strconv"
-	"strings"
 
 	"github.com/go-logr/logr"
 	otelv1alpha1 "github.com/open-telemetry/opentelemetry-operator/apis/v1alpha1"
 	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
-	cooprometheusv1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1"
 	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	uiplugin "github.com/rhobs/observability-operator/pkg/apis/uiplugin/v1alpha1"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
@@ -25,8 +22,7 @@ import (
 )
 
 const (
-	minPrometheusOperatorVersion = "0.79.0"
-	crdResourceName              = "customresourcedefinitions"
+	crdResourceName = "customresourcedefinitions"
 )
 
 var (
@@ -35,13 +31,9 @@ var (
 	errProbeConditionNotSatisfied = errors.New("probe condition is not satisfied")
 	errProbeValueIsNil            = errors.New("probe value is nil")
 	errUnknownProbeKey            = errors.New("probe has key that doesn't match the key defined")
-	errInvalidVersionString       = errors.New("invalid version string")
 
 	prometheusAgentCRDName = fmt.Sprintf("%s.%s", cooprometheusv1alpha1.PrometheusAgentName, cooprometheusv1alpha1.SchemeGroupVersion.Group)
 	scrapeConfigCRDName    = fmt.Sprintf("%s.%s", cooprometheusv1alpha1.ScrapeConfigName, cooprometheusv1alpha1.SchemeGroupVersion.Group)
-	serviceMonitorCRDName  = fmt.Sprintf("%s.%s", cooprometheusv1.ServiceMonitorName, cooprometheusv1.SchemeGroupVersion.Group)
-	podMonitorCRDName      = fmt.Sprintf("%s.%s", cooprometheusv1.PodMonitorName, cooprometheusv1.SchemeGroupVersion.Group)
-	probeCRDName           = fmt.Sprintf("%s.%s", cooprometheusv1.ProbeName, cooprometheusv1.SchemeGroupVersion.Group)
 )
 
 func NewRegistrationOption(agentName string) *agent.RegistrationOption {
@@ -153,7 +145,7 @@ func getMetricsProbeFields() []agent.ProbeField {
 					Type: workv1.JSONPathsType,
 					JsonPaths: []workv1.JsonPath{
 						{
-							Name: addoncfg.IsEstablishedFeedbackName, // needed for generating the sync annotation on the prometheus operator
+							Name: addoncfg.IsEstablishedFeedbackName,
 							Path: addoncfg.IsEstablishedFeedbackPath,
 						},
 						{
@@ -257,14 +249,10 @@ func getAnalyticsProbeFields() []agent.ProbeField {
 }
 
 func ManifestConfigs() []workv1.ManifestConfigOption {
-	crdNames := []string{
-		scrapeConfigCRDName,
-		prometheusAgentCRDName,
-		serviceMonitorCRDName,
-		podMonitorCRDName,
-		probeCRDName,
-	}
-
+	// prometheusagents and scrapeconfigs CRDs use ReadOnly: the Work Agent never creates or
+	// updates them (the endpoint operator owns them), but still reports isEstablished and
+	// timestamp feedback so the hub can compute the prometheus-operator restart annotation.
+	crdNames := []string{scrapeConfigCRDName, prometheusAgentCRDName}
 	manifestConfigs := make([]workv1.ManifestConfigOption, len(crdNames))
 	for i, crdName := range crdNames {
 		manifestConfigs[i] = workv1.ManifestConfigOption{
@@ -274,56 +262,53 @@ func ManifestConfigs() []workv1.ManifestConfigOption {
 				Name:     crdName,
 			},
 			UpdateStrategy: &workv1.UpdateStrategy{
+				Type: workv1.UpdateStrategyTypeReadOnly,
+			},
+		}
+	}
+
+	manifestConfigs = append(manifestConfigs,
+		workv1.ManifestConfigOption{
+			ResourceIdentifier: workv1.ResourceIdentifier{
+				Group:    "",
+				Resource: "configmaps",
+				Name:     mconfig.PrometheusCAConfigMapName,
+			},
+			UpdateStrategy: &workv1.UpdateStrategy{
+				Type: workv1.UpdateStrategyTypeServerSideApply,
+				ServerSideApply: &workv1.ServerSideApplyConfig{
+					IgnoreFields: []workv1.IgnoreField{
+						{
+							Condition: "OnSpokePresent",
+							JSONPaths: []string{".data"},
+						},
+					},
+				},
+			},
+		},
+		workv1.ManifestConfigOption{
+			ResourceIdentifier: workv1.ResourceIdentifier{
+				Group:    apiextensionsv1.GroupName,
+				Resource: crdResourceName,
+				Name:     mconfig.MonitoringStackCRDName,
+			},
+			UpdateStrategy: &workv1.UpdateStrategy{
+				Type: workv1.UpdateStrategyTypeCreateOnly,
+			},
+		},
+		workv1.ManifestConfigOption{
+			ResourceIdentifier: workv1.ResourceIdentifier{
+				Group:    "",
+				Resource: "namespaces",
+			},
+			UpdateStrategy: &workv1.UpdateStrategy{
 				Type: workv1.UpdateStrategyTypeServerSideApply,
 				ServerSideApply: &workv1.ServerSideApplyConfig{
 					Force: false,
 				},
 			},
-		}
-	}
-
-	manifestConfigs = append(manifestConfigs, workv1.ManifestConfigOption{
-		ResourceIdentifier: workv1.ResourceIdentifier{
-			Group:    "",
-			Resource: "configmaps",
-			Name:     mconfig.PrometheusCAConfigMapName,
 		},
-		UpdateStrategy: &workv1.UpdateStrategy{
-			Type: workv1.UpdateStrategyTypeServerSideApply,
-			ServerSideApply: &workv1.ServerSideApplyConfig{
-				IgnoreFields: []workv1.IgnoreField{
-					{
-						Condition: "OnSpokePresent",
-						JSONPaths: []string{".data"},
-					},
-				},
-			},
-		},
-	})
-	manifestConfigs = append(manifestConfigs, workv1.ManifestConfigOption{
-		ResourceIdentifier: workv1.ResourceIdentifier{
-			Group:    apiextensionsv1.GroupName,
-			Resource: crdResourceName,
-			Name:     mconfig.MonitoringStackCRDName,
-		},
-		UpdateStrategy: &workv1.UpdateStrategy{
-			Type: workv1.UpdateStrategyTypeCreateOnly,
-		},
-	})
-
-	manifestConfigs = append(manifestConfigs, workv1.ManifestConfigOption{
-		ResourceIdentifier: workv1.ResourceIdentifier{
-			Group:    "",
-			Resource: "namespaces",
-		},
-		UpdateStrategy: &workv1.UpdateStrategy{
-			Type: workv1.UpdateStrategyTypeServerSideApply,
-			ServerSideApply: &workv1.ServerSideApplyConfig{
-				Force: false,
-			},
-		},
-	})
-
+	)
 	return manifestConfigs
 }
 
@@ -392,13 +377,6 @@ func checkMetrics(fields []agent.FieldResult, opts Options, isOCP bool) error {
 					return fmt.Errorf("failed to check resource %s with name %s: %w", identifier.Resource, identifier.Name, err)
 				}
 				foundUserWorkloadMetrics = true
-			}
-
-		case crdResourceName:
-			if identifier.Name == scrapeConfigCRDName {
-				if err := checkScrapeConfigCRD(field.FeedbackResult.Values); err != nil {
-					return fmt.Errorf("%w: %s with key %s", err, identifier.Resource, identifier.Name)
-				}
 			}
 		}
 	}
@@ -550,81 +528,4 @@ func checkPrometheusAgent(feedbackValues []workv1.FeedbackValue) error {
 	}
 
 	return nil
-}
-
-func checkScrapeConfigCRD(feedbackValues []workv1.FeedbackValue) error {
-	if len(feedbackValues) == 0 {
-		return errProbeValueIsNil
-	}
-
-	var version, isEstablished string
-	for _, value := range feedbackValues {
-		switch value.Name {
-		case addoncfg.PrometheusOperatorVersionFeedbackName:
-			if value.Value.String != nil {
-				version = *value.Value.String
-			}
-		case addoncfg.IsEstablishedFeedbackName:
-			if value.Value.String != nil {
-				isEstablished = *value.Value.String
-			}
-		}
-	}
-
-	if strings.ToLower(isEstablished) != "true" {
-		return fmt.Errorf("%w: resource is not established", errProbeConditionNotSatisfied)
-	}
-
-	if version == "" {
-		return fmt.Errorf("%w: prometheus operator version not found in scrapeconfigs.monitoring.rhobs CRD", errProbeConditionNotSatisfied)
-	}
-
-	isOlder, err := isVersionOlder(version, minPrometheusOperatorVersion)
-	if err != nil {
-		return fmt.Errorf("failed to parse prometheus operator version: %w", err)
-	} else if isOlder {
-		return fmt.Errorf("%w: incompatible prometheus operator version %s, requires %s or above", errProbeConditionNotSatisfied, version, minPrometheusOperatorVersion)
-	}
-
-	return nil
-}
-
-// isVersionOlder checks if v1 is older than v2.
-// It handles versions like "0.80.1-rhobs1".
-func isVersionOlder(v1, v2 string) (bool, error) {
-	v1 = strings.Split(v1, "-")[0]
-	v2 = strings.Split(v2, "-")[0]
-
-	parts1 := strings.Split(v1, ".")
-	parts2 := strings.Split(v2, ".")
-
-	maxLen := max(len(parts1), len(parts2))
-
-	for i := range maxLen {
-		var num1, num2 int
-		var err error
-
-		if i < len(parts1) {
-			num1, err = strconv.Atoi(parts1[i])
-			if err != nil {
-				return false, fmt.Errorf("%w: %s", errInvalidVersionString, v1)
-			}
-		}
-
-		if i < len(parts2) {
-			num2, err = strconv.Atoi(parts2[i])
-			if err != nil {
-				return false, fmt.Errorf("%w: %s", errInvalidVersionString, v2)
-			}
-		}
-
-		if num1 < num2 {
-			return true, nil
-		}
-		if num1 > num2 {
-			return false, nil
-		}
-	}
-
-	return false, nil // equal
 }
