@@ -38,6 +38,7 @@ require (
 	github.com/perses/plugins/timeserieschart v0.12.1
 	github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring v0.90.1-rhobs1
 	github.com/rhobs/observability-operator/pkg/apis v0.0.0-20250902133632-f98bd8a20a80
+	github.com/thanos-community/thanos-operator v0.0.0-20260313095634-17889a0e1c1a
 	golang.org/x/text v0.37.0
 )
 
@@ -56,8 +57,6 @@ require (
 	github.com/go-openapi/swag/yamlutils v0.25.5 // indirect
 	github.com/goccy/go-yaml v1.19.2 // indirect
 	github.com/golang-jwt/jwt/v5 v5.3.1 // indirect
-	github.com/onsi/ginkgo/v2 v2.28.1 // indirect
-	github.com/onsi/gomega v1.39.1 // indirect
 	github.com/perses/plugins/barchart v0.11.1 // indirect
 	github.com/perses/plugins/piechart v0.13.2-0.20260326134814-37e86f6b1c58 // indirect
 	github.com/prometheus/otlptranslator v1.0.0 // indirect
