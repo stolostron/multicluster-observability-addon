@@ -11,7 +11,9 @@ COPY go.sum go.sum
 # Copy the go source
 COPY main.go main.go
 COPY internal/ internal/
+RUN ls
 COPY pkg/ pkg/
+RUN ls
 
 # cache deps before building and copying source so that we don't need to re-download as much
 # and so that source changes don't invalidate our downloaded layer
