@@ -40,7 +40,17 @@ type MetricsValues struct {
 	AlertManagerEndpoint           string              `json:"alertManagerEndpoint,omitempty"`
 	Tolerations                    []corev1.Toleration `json:"tolerations"`
 	NodeSelector                   map[string]string   `json:"nodeSelector"`
-	NodeExporter                   NodeExporterValues  `json:"nodeExporter"`
+	NodeExporter                   NodeExporterValues   `json:"nodeExporter"`
+	ThanosOperator                 ThanosOperatorValues `json:"thanosOperator"`
+}
+
+// ThanosOperatorValues holds the Thanos operator deployment values for Helm rendering.
+type ThanosOperatorValues struct {
+	Enabled   bool   `json:"enabled"`
+	IsHub     bool   `json:"isHub"`
+	AppName   string `json:"appName"`
+	Component string `json:"component"`
+	Image     string `json:"image"`
 }
 
 type NodeExporterValues struct {
@@ -66,6 +76,7 @@ type ImagesValues struct {
 	RBACProxyImage             string `json:"rbacProxyImage"`
 	Prometheus                 string `json:"prometheus"`
 	EndpointMonitoringOperator string `json:"endpointMonitoringOperator"`
+	ThanosOperator             string `json:"thanosOperator,omitempty"`
 }
 
 type ConfigValue struct {
@@ -297,6 +308,18 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 		RBACProxyImage:             opts.Images.KubeRBACProxy,
 		Prometheus:                 opts.Images.Prometheus,
 		EndpointMonitoringOperator: opts.Images.EndpointMonitoringOperator,
+		ThanosOperator:             opts.Images.ThanosOperator,
+	}
+
+	thanosOperatorImage := opts.Images.ThanosOperator
+	if thanosOperatorImage == "" {
+		thanosOperatorImage = config.ThanosOperatorImage
+	}
+	ret.ThanosOperator = ThanosOperatorValues{
+		IsHub:     opts.IsHub,
+		AppName:   config.ThanosOperatorAppName,
+		Component: "controller-manager",
+		Image:     thanosOperatorImage,
 	}
 
 	return ret, nil

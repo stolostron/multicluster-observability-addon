@@ -59,6 +59,11 @@ const (
 	ScrapeClassUWLTarget      = "prometheus-user-workload.openshift-user-workload-monitoring.svc:9092"
 	MonitoringStackCRDName    = "monitoringstacks.monitoring.rhobs"
 
+	// Thanos Operator
+	ThanosOperatorAppName = "thanos-operator"
+	// TODO: replace with image from ACM image overrides ConfigMap once available.
+	ThanosOperatorImage = "quay.io/thanos/thanos-operator:main-2026-04-09-a4dc024"
+
 	AlertmanagerAccessorSecretName = "observability-alertmanager-accessor"
 	AlertmanagerRouterCASecretName = "hub-alertmanager-router-ca"
 	AlertmanagerRouteBYOCAName     = "alertmanager-byo-ca"
@@ -100,6 +105,7 @@ type ImageOverrides struct {
 	NodeExporter               string `json:"node_exporter"`
 	Prometheus                 string `json:"prometheus"`
 	EndpointMonitoringOperator string `json:"endpoint_monitoring_operator"`
+	ThanosOperator             string `json:"thanos_operator,omitempty"`
 }
 
 func GetImageOverrides(ctx context.Context, c client.Client, registries []addonapiv1beta1.ImageMirror, logger logr.Logger) (ImageOverrides, error) {
