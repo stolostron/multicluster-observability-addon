@@ -311,6 +311,7 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 		ThanosOperator:             opts.Images.ThanosOperator,
 	}
 
+	// Fallback to hardcoded image until MCO populates thanos_operator in the images-list ConfigMap (ACM-35775).
 	thanosOperatorImage := opts.Images.ThanosOperator
 	if thanosOperatorImage == "" {
 		thanosOperatorImage = config.ThanosOperatorImage
