@@ -17,7 +17,7 @@ func ServerSideApply(ctx context.Context, c client.Client, obj client.Object, ow
 		}
 	}
 
-	if err := c.Patch(ctx, obj, client.Apply, client.ForceOwnership, client.FieldOwner(addoncfg.Name)); err != nil {
+	if err := c.Patch(ctx, obj, client.Apply, client.ForceOwnership, client.FieldOwner(addoncfg.Name)); err != nil { //nolint:staticcheck
 		return fmt.Errorf("failed to patch with SSA: %w", err)
 	}
 
