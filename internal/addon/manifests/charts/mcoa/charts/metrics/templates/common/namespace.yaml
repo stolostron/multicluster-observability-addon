@@ -3,6 +3,10 @@ apiVersion: v1
 kind: Namespace
 metadata:
   name: {{ .Release.Namespace }}
+  {{- if eq .Release.Namespace "open-cluster-management-agent-addon" }}
+  annotations:
+    addon.open-cluster-management.io/deletion-orphan: ""
+  {{- end }}
   labels:
     {{- if ne .Release.Namespace "open-cluster-management-agent-addon" }}
     {{ include "metricshelm.labels" . | nindent 4 }}
