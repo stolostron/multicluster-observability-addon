@@ -944,6 +944,14 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 					assert.NotEqual(t, "monitoring.coreos.com", obj.GetObjectKind().GroupVersionKind().Group, "Should not deploy monitoring.coreos.com resource on non-OCP: %s/%s", obj.GetObjectKind().GroupVersionKind(), accessor.GetName())
 				}
 
+				if obj.GetObjectKind().GroupVersionKind().Kind == "Namespace" {
+					if accessor.GetName() == "open-cluster-management-agent-addon" {
+						assert.Contains(t, accessor.GetAnnotations(), "addon.open-cluster-management.io/deletion-orphan", "default namespace must contain the deletion-orphan annotation")
+					} else {
+						assert.NotContains(t, accessor.GetAnnotations(), "addon.open-cluster-management.io/deletion-orphan", "custom namespace must not contain the deletion-orphan annotation")
+					}
+				}
+
 				// if not a global object, check namespace
 				// secrets are possible to install in multiple namespaces (such as openshift-monitoring)
 				// and are therefore also ignored.
