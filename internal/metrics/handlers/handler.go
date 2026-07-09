@@ -98,7 +98,7 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1beta1.Man
 	// Build Prometheus agents for platform and user workloads
 	if opts.Platform.Metrics.CollectionEnabled {
 		if err = o.buildPrometheusAgent(ctx, &ret, configResources, config.PlatformMetricsCollectorApp, false); err != nil {
-			return ret, err
+			return ret, fmt.Errorf("failed to build platform metrics collector: %w", err)
 		}
 
 		// Fetch rules and scrape configs
@@ -118,7 +118,7 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1beta1.Man
 
 	if isOpenShiftVendor && opts.UserWorkloads.Metrics.CollectionEnabled {
 		if err = o.buildPrometheusAgent(ctx, &ret, configResources, config.UserWorkloadMetricsCollectorApp, isHypershiftCluster); err != nil {
-			return ret, err
+			return ret, fmt.Errorf("failed to build user workloads metrics collector: %w", err)
 		}
 
 		// Fetch rules and scrape configs
@@ -212,8 +212,17 @@ func (o *OptionsBuilder) buildPrometheusAgent(ctx context.Context, opts *Options
 		labelsMatcher = config.UserWorkloadPrometheusMatchLabels
 	}
 	platformAgents := common.FilterResourcesByLabelSelector[*cooprometheusv1alpha1.PrometheusAgent](configResources, labelsMatcher)
-	if len(platformAgents) != 1 {
-		return fmt.Errorf("%w: for application %s, found %d agents with labels %+v", errInvalidConfigResourcesCount, appName, len(platformAgents), labelsMatcher)
+	if len(platformAgents) == 0 {
+		// Log a warning and return nil instead of an error to prevent failing the Manifests() build.
+		// During uninstallation of the ClusterManagementAddOn, the child configuration resources 
+		// (like the PrometheusAgent) are garbage collected. Returning nil here ensures that the 
+		// manifests rendering completes successfully, allowing the addon framework to retrieve, 
+		// register, and execute the pre-delete cleanup job.
+		o.Logger.Info("Warning: invalid number of configuration resources", "error", fmt.Errorf("%w: for application %s, found %d agents with labels %+v", errInvalidConfigResourcesCount, appName, len(platformAgents), labelsMatcher))
+		return nil
+	}
+	if len(platformAgents) > 1 {
+		o.Logger.Info("Warning: invalid number of configuration resources", "error", fmt.Errorf("%w: for application %s, found %d agents with labels %+v", errInvalidConfigResourcesCount, appName, len(platformAgents), labelsMatcher))
 	}
 	agent := platformAgents[0]
 
