@@ -1,4 +1,11 @@
-{{- if or .Values.platformEnabled .Values.userWorkloadsEnabled }}
+{{- if and .Values.images .Values.images.endpointMonitoringOperator }}
+# Note: The pre-delete job and its ServiceAccount/RBAC resources must be rendered 
+# unconditionally whenever images are defined. When the ClusterManagementAddOn is deleted,
+# the PrometheusAgent configuration resources are garbage collected, making the metrics
+# collection resolve as disabled (platformEnabled: false).
+# To ensure the addon framework can discover and execute this pre-delete cleanup hook 
+# during uninstallation, we must not wrap these resources in 'if .Values.platformEnabled' 
+# conditional checks.
 {{- $appName := "observability-monitoring-cleanup" }}
 apiVersion: v1
 kind: ServiceAccount
@@ -47,8 +54,9 @@ kind: Job
 metadata:
   name: observability-monitoring-cleanup
   namespace: {{ .Release.Namespace }}
+  annotations:
+    addon.open-cluster-management.io/addon-pre-delete: ""
   labels:
-    open-cluster-management.io/addon-pre-delete: ""
     app.kubernetes.io/component: endpoint-monitoring-operator-cleanup
 spec:
   backoffLimit: 2

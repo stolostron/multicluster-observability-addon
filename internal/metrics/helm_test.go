@@ -97,6 +97,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 		ResourceReqs     bool
 		Registries       []addonapiv1beta1.ImageMirror
 		NodeExporterOpts addon.NodeExporterOptions
+		AgentMissing     bool
 		Expects          func(*testing.T, []client.Object)
 	}{
 		"no metrics": {
@@ -105,6 +106,27 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 			IsOCP:           true,
 			Expects: func(t *testing.T, objects []client.Object) {
 				assert.Empty(t, objects)
+			},
+		},
+		"platform metrics enabled but agent missing": {
+			// This test case simulates the ClusterManagementAddOn deletion state where platform metrics
+			// are enabled but its child PrometheusAgent custom resource is already garbage collected.
+			// It ensures that the manifests render successfully (no errors) and return the 4 pre-delete
+			// cleanup resources and the 3 alertmanager MTLS/accessor secrets.
+			PlatformMetrics: true,
+			UserMetrics:     false,
+			IsOCP:           true,
+			AgentMissing:    true,
+			Expects: func(t *testing.T, objects []client.Object) {
+				assert.Len(t, objects, 7)
+				sa := common.FilterResourcesByLabelSelector[*corev1.ServiceAccount](objects, nil)
+				assert.Len(t, sa, 1)
+				assert.Equal(t, "observability-pre-delete-sa", sa[0].GetName())
+				job := common.FilterResourcesByLabelSelector[*batchv1.Job](objects, nil)
+				assert.Len(t, job, 1)
+				assert.Equal(t, "observability-monitoring-cleanup", job[0].GetName())
+				secrets := common.FilterResourcesByLabelSelector[*corev1.Secret](objects, nil)
+				assert.Len(t, secrets, 3)
 			},
 		},
 		"platform metrics, no coo": {
@@ -881,7 +903,9 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 			err = client.List(context.Background(), &updatedPromAgents)
 			require.NoError(t, err)
 
-			configReferences = append(configReferences, newConfigReference(&updatedPromAgents.Items[0]), newConfigReference(&updatedPromAgents.Items[1]))
+			if !tc.AgentMissing {
+				configReferences = append(configReferences, newConfigReference(&updatedPromAgents.Items[0]), newConfigReference(&updatedPromAgents.Items[1]))
+			}
 
 			// Register the addon for the managed cluster
 			managedClusterAddOn := addontesting.NewAddon("test", "cluster-1")

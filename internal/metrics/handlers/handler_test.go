@@ -381,8 +381,8 @@ func TestBuildOptions(t *testing.T) {
 			platformEnabled: true,
 			resources:       createResources,
 			expects: func(t *testing.T, opts Options, err error) {
-				require.Error(t, err)
-				assert.ErrorIs(t, err, errInvalidConfigResourcesCount)
+				require.NoError(t, err)
+				assert.False(t, opts.IsPlatformEnabled())
 			},
 		},
 
