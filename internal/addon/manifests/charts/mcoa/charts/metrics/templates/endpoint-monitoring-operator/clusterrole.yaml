@@ -21,7 +21,7 @@ rules:
   resources: ["configmaps"]
   verbs: ["get", "list", "watch", "create"]
 # warning events for overwritten/mutated configs
-- apiGroups: [""]
+- apiGroups: ["", "events.k8s.io"]
   resources: ["events"]
   verbs: ["create", "patch"]
 {{- end }}
