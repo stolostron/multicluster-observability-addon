@@ -68,9 +68,9 @@ spec:
         {{- if not $matched }}
           requests:
             cpu: 1m
-            memory: 31Mi
+            memory: 55Mi
           limits:
-            memory: 50Mi
+            memory: 100Mi
         {{- end }}
         securityContext:
           allowPrivilegeEscalation: false
