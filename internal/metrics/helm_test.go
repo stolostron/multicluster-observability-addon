@@ -68,6 +68,7 @@ func (m mockAODCGetter) Get(ctx context.Context, namespace, name string) (*addon
 }
 
 func TestHelmBuild_Metrics_All(t *testing.T) {
+	t.Setenv("UNIT_TEST", "true")
 	hubNamespace := "open-cluster-management-observability"
 
 	verifyClusterScopedResourcesPrefix := func(t *testing.T, objects []client.Object) {
@@ -972,6 +973,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 }
 
 func TestHelmBuild_Metrics_HCP(t *testing.T) {
+	t.Setenv("UNIT_TEST", "true")
 	scheme := runtime.NewScheme()
 	assert.NoError(t, kubescheme.AddToScheme(scheme))
 	assert.NoError(t, batchv1.AddToScheme(scheme))

@@ -17,6 +17,7 @@ import (
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
+	tlshelper "github.com/stolostron/multicluster-observability-addon/pkg/util"
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -77,6 +78,11 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1beta1.Man
 	ret.Images, err = config.GetImageOverrides(ctx, o.Client, opts.Registries, o.Logger)
 	if err != nil {
 		return ret, fmt.Errorf("failed to get image overrides: %w", err)
+	}
+
+	ret.TLSMinVersion, ret.TLSCipherSuites, err = tlshelper.GetTLSVersionAndCiphers(ctx)
+	if err != nil {
+		return ret, fmt.Errorf("failed to get TLS profile: %w", err)
 	}
 
 	// Fetch configuration references
