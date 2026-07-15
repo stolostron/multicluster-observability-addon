@@ -265,8 +265,8 @@ github.com/onsi/ginkgo/v2 v2.28.1 h1:S4hj+HbZp40fNKuLUQOYLDgZLwNUVn19N3Atb98NCyI
 github.com/onsi/ginkgo/v2 v2.28.1/go.mod h1:CLtbVInNckU3/+gC8LzkGUb9oF+e8W8TdUsxPwvdOgE=
 github.com/onsi/gomega v1.39.1 h1:1IJLAad4zjPn2PsnhH70V4DKRFlrCzGBNrNaru+Vf28=
 github.com/onsi/gomega v1.39.1/go.mod h1:hL6yVALoTOxeWudERyfppUcZXjMwIMLnuSfruD2lcfg=
-github.com/open-telemetry/opentelemetry-operator v0.147.0 h1:jEIYC/fTexY9hoKdUu1WPhh5jah7r3WDQR+FrqBkEaE=
-github.com/open-telemetry/opentelemetry-operator v0.147.0/go.mod h1:JmAlDAaJzoqIexaoneV4/qDnMFpHvT/6w/0qnaAF0TY=
+github.com/open-telemetry/opentelemetry-operator v0.148.0 h1:kzVgjGDejYi/tS6U9PnNAH5Om82mD/n7hUcbBdUfllE=
+github.com/open-telemetry/opentelemetry-operator v0.148.0/go.mod h1:FyHoJIYYJj9aSkwdUjpJekEhqtTsBz/LgjxiRp94k5k=
 github.com/openshift/api v0.0.0-20260130140113-71e91db96ffc h1:CpPSvA2T+gYMmAIU8haCM00Ch+LBuXhusbKnSuPj6mo=
 github.com/openshift/api v0.0.0-20260130140113-71e91db96ffc/go.mod h1:d5uzF0YN2nQQFA0jIEWzzOZ+edmo6wzlGLvx5Fhz4uY=
 github.com/openshift/cluster-logging-operator/api/observability v0.0.0-20250626181834-6b13ce208eb8 h1:qSqWg+ODxDmVqb4wikxM658yB5T53tsOkDdo9GeLt8U=
@@ -366,6 +366,8 @@ github.com/stretchr/testify v1.8.0/go.mod h1:yNjHg4UonilssWZ8iaSj1OCr/vHnekPRkoO
 github.com/stretchr/testify v1.8.1/go.mod h1:w2LPCIKwWwSfY2zedu0+kehJoqGctiVI29o6fzry7u4=
 github.com/stretchr/testify v1.11.1 h1:7s2iGBzp5EwR7/aIZr8ao5+dra3wiQyKjjFuvgVKu7U=
 github.com/stretchr/testify v1.11.1/go.mod h1:wZwfW3scLgRK+23gO65QZefKpKQRnfz6sD981Nm4B6U=
+github.com/thanos-community/thanos-operator v0.0.0-20260313095634-17889a0e1c1a h1:s4L2OhnhS18fDVUpanomA9YiyvBUeqkUZO0CQnTeDks=
+github.com/thanos-community/thanos-operator v0.0.0-20260313095634-17889a0e1c1a/go.mod h1:/gdS3cTgN4qlBznMNO8XdpgrrPPJ4PFyVSoQlSrD1ac=
 github.com/tmc/grpc-websocket-proxy v0.0.0-20220101234140-673ab2c3ae75 h1:6fotK7otjonDflCTK0BCfls4SPy3NcCVb5dqqmbRknE=
 github.com/tmc/grpc-websocket-proxy v0.0.0-20220101234140-673ab2c3ae75/go.mod h1:KO6IkyS8Y3j8OdNO85qEYBsRPuteD+YciPomcXdrMnk=
 github.com/valyala/bytebufferpool v1.0.0 h1:GqA5TC/0021Y/b9FG4Oi9Mr3q7XYx6KllzawFIhcdPw=

@@ -15,37 +15,63 @@ import (
 )
 
 type MetricsValues struct {
-	PlatformEnabled                bool                `json:"platformEnabled"`
-	UserWorkloadsEnabled           bool                `json:"userWorkloadsEnabled"`
-	Secrets                        []ConfigValue       `json:"secrets"`
-	ConfigMaps                     []ConfigValue       `json:"configMaps"`
-	Images                         ImagesValues        `json:"images"`
-	PrometheusControllerID         string              `json:"prometheusControllerID"`
-	PrometheusCAConfigMapName      string              `json:"prometheusCAConfigMapName"`
-	PrometheusServerName           string              `json:"prometheusServerName"`
-	AlertmanagerRouterCASecretName string              `json:"alertmanagerRouterCASecretName"`
-	AlertmanagerAccessorSecretName string              `json:"alertmanagerAccessorSecretName"`
-	ClientCertSecretName           string              `json:"clientCertSecretName"`
-	HubClusterID                   string              `json:"hubClusterID"`
-	ClusterID                      string              `json:"clusterID"`
-	ClusterName                    string              `json:"clusterName"`
-	PlatformAlertsEnabled          bool                `json:"platformAlertsEnabled"`
-	UserWorkloadAlertsEnabled      bool                `json:"userWorkloadAlertsEnabled"`
-	Platform                       Collector           `json:"platform"`
-	UserWorkload                   Collector           `json:"userWorkload"`
-	DeployNonOCPStack              bool                `json:"deployNonOCPStack"`
-	DeployCOOResources             bool                `json:"deployCOOResources"`
-	IsHub                          bool                `json:"isHub"`
-	PrometheusOperatorAnnotations  string              `json:"prometheusOperatorAnnotations,omitempty"`
-	AlertManagerEndpoint           string              `json:"alertManagerEndpoint,omitempty"`
-	Tolerations                    []corev1.Toleration `json:"tolerations"`
-	NodeSelector                   map[string]string   `json:"nodeSelector"`
-	NodeExporter                   NodeExporterValues  `json:"nodeExporter"`
+	PlatformEnabled                bool                 `json:"platformEnabled"`
+	UserWorkloadsEnabled           bool                 `json:"userWorkloadsEnabled"`
+	Secrets                        []ConfigValue        `json:"secrets"`
+	ConfigMaps                     []ConfigValue        `json:"configMaps"`
+	Images                         ImagesValues         `json:"images"`
+	PrometheusControllerID         string               `json:"prometheusControllerID"`
+	PrometheusCAConfigMapName      string               `json:"prometheusCAConfigMapName"`
+	PrometheusServerName           string               `json:"prometheusServerName"`
+	AlertmanagerRouterCASecretName string               `json:"alertmanagerRouterCASecretName"`
+	AlertmanagerAccessorSecretName string               `json:"alertmanagerAccessorSecretName"`
+	ClientCertSecretName           string               `json:"clientCertSecretName"`
+	HubClusterID                   string               `json:"hubClusterID"`
+	ClusterID                      string               `json:"clusterID"`
+	ClusterName                    string               `json:"clusterName"`
+	PlatformAlertsEnabled          bool                 `json:"platformAlertsEnabled"`
+	UserWorkloadAlertsEnabled      bool                 `json:"userWorkloadAlertsEnabled"`
+	Platform                       Collector            `json:"platform"`
+	UserWorkload                   Collector            `json:"userWorkload"`
+	DeployNonOCPStack              bool                 `json:"deployNonOCPStack"`
+	DeployCOOResources             bool                 `json:"deployCOOResources"`
+	IsHub                          bool                 `json:"isHub"`
+	PrometheusOperatorAnnotations  string               `json:"prometheusOperatorAnnotations,omitempty"`
+	AlertManagerEndpoint           string               `json:"alertManagerEndpoint,omitempty"`
+	Tolerations                    []corev1.Toleration  `json:"tolerations"`
+	NodeSelector                   map[string]string    `json:"nodeSelector"`
+	NodeExporter                   NodeExporterValues   `json:"nodeExporter"`
+	ThanosOperator                 ThanosOperatorValues `json:"thanosOperator"`
 }
 
 type NodeExporterValues struct {
 	HostPort     int32 `json:"hostPort,omitempty"`
 	InternalPort int32 `json:"internalPort,omitempty"`
+}
+
+// ThanosOperatorValues holds the serialized Thanos CR specs for Helm rendering.
+type ThanosOperatorValues struct {
+	Enabled     bool             `json:"enabled"`
+	IsHub       bool             `json:"isHub"`
+	AppName     string           `json:"appName"`
+	Component   string           `json:"component"`
+	Image       string           `json:"image"`
+	Memcached   MemcachedValues  `json:"memcached"`
+	ReceiveSpec ConfigValue      `json:"receiveSpec"`
+	QuerySpec   ConfigValue      `json:"querySpec"`
+	CompactSpec ConfigValue      `json:"compactSpec"`
+	StoreSpec   ConfigValue      `json:"storeSpec"`
+	RulerSpec   ConfigValue      `json:"rulerSpec"`
+}
+
+type MemcachedValues struct {
+	Image                 string `json:"image"`
+	ExporterImage         string `json:"exporterImage"`
+	StoreReplicas         int32  `json:"storeReplicas"`
+	QueryFrontendReplicas int32  `json:"queryFrontendReplicas"`
+	MemoryLimitMB         int32  `json:"memoryLimitMB"`
+	ConnectionLimit       int32  `json:"connectionLimit"`
+	MaxItemSize           string `json:"maxItemSize"`
 }
 
 type Collector struct {
@@ -66,6 +92,7 @@ type ImagesValues struct {
 	RBACProxyImage             string `json:"rbacProxyImage"`
 	Prometheus                 string `json:"prometheus"`
 	EndpointMonitoringOperator string `json:"endpointMonitoringOperator"`
+	ThanosOperator             string `json:"thanosOperator,omitempty"`
 }
 
 type ConfigValue struct {
@@ -297,9 +324,71 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 		RBACProxyImage:             opts.Images.KubeRBACProxy,
 		Prometheus:                 opts.Images.Prometheus,
 		EndpointMonitoringOperator: opts.Images.EndpointMonitoringOperator,
+		ThanosOperator:             opts.Images.ThanosOperator,
+	}
+
+	// Build Thanos operator values (hub-only).
+	// The Enabled field is set by the caller based on the mcoa-thanos-operator annotation.
+	thanosOperatorImage := opts.Images.ThanosOperator
+	if thanosOperatorImage == "" {
+		thanosOperatorImage = config.ThanosOperatorImage
+	}
+	ret.ThanosOperator = ThanosOperatorValues{
+		IsHub:     opts.IsHub,
+		AppName:   config.ThanosOperatorAppName,
+		Component: "controller-manager",
+		Image:     thanosOperatorImage,
+		Memcached: MemcachedValues{
+			Image:                 config.MemcachedImage,
+			ExporterImage:         config.MemcachedExporterImage,
+			StoreReplicas:         int32(config.DefaultMemcachedReplicas),
+			QueryFrontendReplicas: int32(config.DefaultMemcachedReplicas),
+			MemoryLimitMB:         int32(config.DefaultMemcachedMemoryLimitMB),
+			ConnectionLimit:       int32(config.DefaultMemcachedConnectionLimit),
+			MaxItemSize:           config.DefaultMemcachedMaxItemSize,
+		},
+	}
+
+	if opts.IsHub {
+		if opts.Thanos.Receive != nil {
+			if ret.ThanosOperator.ReceiveSpec, err = marshalThanosSpec(opts.Thanos.Receive.Spec); err != nil {
+				return ret, fmt.Errorf("failed to build thanos receive values: %w", err)
+			}
+		}
+		if opts.Thanos.Query != nil {
+			if ret.ThanosOperator.QuerySpec, err = marshalThanosSpec(opts.Thanos.Query.Spec); err != nil {
+				return ret, fmt.Errorf("failed to build thanos query values: %w", err)
+			}
+		}
+		if opts.Thanos.Compact != nil {
+			if ret.ThanosOperator.CompactSpec, err = marshalThanosSpec(opts.Thanos.Compact.Spec); err != nil {
+				return ret, fmt.Errorf("failed to build thanos compact values: %w", err)
+			}
+		}
+		if opts.Thanos.Store != nil {
+			if ret.ThanosOperator.StoreSpec, err = marshalThanosSpec(opts.Thanos.Store.Spec); err != nil {
+				return ret, fmt.Errorf("failed to build thanos store values: %w", err)
+			}
+		}
+		if opts.Thanos.Ruler != nil {
+			if ret.ThanosOperator.RulerSpec, err = marshalThanosSpec(opts.Thanos.Ruler.Spec); err != nil {
+				return ret, fmt.Errorf("failed to build thanos ruler values: %w", err)
+			}
+		}
 	}
 
 	return ret, nil
+}
+
+// marshalThanosSpec serializes a Thanos CR spec into a ConfigValue for Helm rendering.
+func marshalThanosSpec(spec any) (ConfigValue, error) {
+	specJSON, err := json.Marshal(spec)
+	if err != nil {
+		return ConfigValue{}, err
+	}
+	return ConfigValue{
+		Data: string(specJSON),
+	}, nil
 }
 
 func buildSecrets(secrets []*corev1.Secret) ([]ConfigValue, error) {
