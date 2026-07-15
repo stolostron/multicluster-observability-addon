@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	goflag "flag"
 	"fmt"
@@ -10,11 +11,14 @@ import (
 	"os"
 
 	"github.com/ViaQ/logerr/v2/log"
+	"github.com/go-logr/logr"
 	otelv1alpha1 "github.com/open-telemetry/opentelemetry-operator/apis/v1alpha1"
 	otelv1beta1 "github.com/open-telemetry/opentelemetry-operator/apis/v1beta1"
+	configv1 "github.com/openshift/api/config/v1"
 	operatorv1 "github.com/openshift/api/operator/v1"
 	routev1 "github.com/openshift/api/route/v1"
 	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
+	tlsutil "github.com/openshift/controller-runtime-common/pkg/tls"
 	hyperv1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
 	operatorsv1 "github.com/operator-framework/api/pkg/operators/v1"
 	operatorsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
@@ -28,8 +32,11 @@ import (
 	addonctrl "github.com/stolostron/multicluster-observability-addon/internal/controllers/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/controllers/resourcecreator"
 	"github.com/stolostron/multicluster-observability-addon/internal/controllers/watcher"
+	tlshelper "github.com/stolostron/multicluster-observability-addon/pkg/util"
 	thanosv1alpha1 "github.com/thanos-community/thanos-operator/api/v1alpha1"
+	crdClientSet "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -71,6 +78,7 @@ func init() {
 	utilruntime.Must(routev1.AddToScheme(scheme))
 	utilruntime.Must(addonv1beta1.Install(scheme))
 	utilruntime.Must(thanosv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(configv1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 }
 
@@ -92,6 +100,8 @@ func main() {
 		os.Exit(1)
 	}
 }
+
+const ocpAPIServerCRDName = "apiservers.config.openshift.io"
 
 func newCommand() *cobra.Command {
 	cmd := &cobra.Command{
@@ -183,6 +193,11 @@ func runControllers(ctx context.Context, kubeConfig *rest.Config) error {
 		return fmt.Errorf("failed to create addon manager: %w", err)
 	}
 
+	tlsOpts, err := tlshelper.GetOrCreateTLSConfig(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get TLS config: %w", err)
+	}
+
 	// Create a single shared controller-runtime Manager for our custom controllers
 	sharedMgr, err := ctrl.NewManager(kubeConfig, ctrl.Options{
 		Scheme: scheme,
@@ -194,7 +209,9 @@ func runControllers(ctx context.Context, kubeConfig *rest.Config) error {
 			HTTPClient: httpClient,
 		},
 		Metrics: server.Options{
-			BindAddress: ":8084",
+			BindAddress:   ":8084",
+			SecureServing: true,
+			TLSOpts:       []func(*tls.Config){tlsOpts},
 		},
 	})
 	if err != nil {
@@ -205,6 +222,10 @@ func runControllers(ctx context.Context, kubeConfig *rest.Config) error {
 	}
 	if err = sharedMgr.AddReadyzCheck("check", healthz.Ping); err != nil {
 		return fmt.Errorf("failed to set up ready check: %w", err)
+	}
+
+	if err = setupSecurityProfileWatcher(ctx, kubeConfig, sharedMgr, logger); err != nil {
+		logger.Error(err, "unable to set up TLS security profile watcher")
 	}
 
 	disableReconciliation := os.Getenv("DISABLE_WATCHER_CONTROLLER")
@@ -233,4 +254,36 @@ func runControllers(ctx context.Context, kubeConfig *rest.Config) error {
 	<-ctx.Done()
 
 	return nil
+}
+
+func setupSecurityProfileWatcher(ctx context.Context, kubeConfig *rest.Config, mgr ctrl.Manager, logger logr.Logger) error {
+	crdClient, err := crdClientSet.NewForConfig(kubeConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create CRD client: %w", err)
+	}
+
+	_, err = crdClient.ApiextensionsV1().CustomResourceDefinitions().Get(ctx, ocpAPIServerCRDName, metav1.GetOptions{})
+	if err != nil {
+		logger.Info("APIServer CRD not found, skipping TLS security profile watcher", "crd", ocpAPIServerCRDName)
+		return nil
+	}
+
+	tlsProfileSpec, err := tlshelper.GetOrCreateTLSProfileSpec(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get TLS profile spec: %w", err)
+	}
+
+	watcher := &tlsutil.SecurityProfileWatcher{
+		Client:                mgr.GetClient(),
+		InitialTLSProfileSpec: *tlsProfileSpec,
+		OnProfileChange: func(_ context.Context, oldProfile, newProfile configv1.TLSProfileSpec) {
+			logger.Info("TLS profile changed, shutting down to reload",
+				"oldProfile", oldProfile,
+				"newProfile", newProfile,
+			)
+			os.Exit(0)
+		},
+	}
+
+	return watcher.SetupWithManager(mgr)
 }

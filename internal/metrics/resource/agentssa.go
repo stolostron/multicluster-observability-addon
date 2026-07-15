@@ -1,6 +1,7 @@
 package resource
 
 import (
+	"context"
 	"fmt"
 	"maps"
 	"slices"
@@ -9,6 +10,7 @@ import (
 	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
+	tlshelper "github.com/stolostron/multicluster-observability-addon/pkg/util"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -90,8 +92,8 @@ type PrometheusAgentSSA struct {
 	desiredAgent *cooprometheusv1alpha1.PrometheusAgent
 }
 
-// Build generate the prometheusAgent resource containing only fields that must be enforced using server-side apply.
-func (p *PrometheusAgentSSA) Build() *cooprometheusv1alpha1.PrometheusAgent {
+// Build generates the prometheusAgent resource containing only fields that must be enforced using server-side apply.
+func (p *PrometheusAgentSSA) Build(ctx context.Context) *cooprometheusv1alpha1.PrometheusAgent {
 	p.desiredAgent = &cooprometheusv1alpha1.PrometheusAgent{
 		TypeMeta: p.ExistingAgent.TypeMeta,
 		ObjectMeta: metav1.ObjectMeta{
@@ -142,7 +144,7 @@ func (p *PrometheusAgentSSA) Build() *cooprometheusv1alpha1.PrometheusAgent {
 	p.setPrometheusRemoteWriteConfig()
 	p.setWatchedResources()
 	p.setScrapeClasses()
-	p.setKubeRBACProxySidecar()
+	p.setKubeRBACProxySidecar(ctx)
 
 	return p.desiredAgent
 }
@@ -243,7 +245,7 @@ func (p *PrometheusAgentSSA) setScrapeClasses() {
 	})
 }
 
-func (p *PrometheusAgentSSA) setKubeRBACProxySidecar() {
+func (p *PrometheusAgentSSA) setKubeRBACProxySidecar(ctx context.Context) {
 	tlsSecret := config.PlatformRBACProxyTLSSecret
 	if p.IsUwl {
 		tlsSecret = config.UserWorkloadRBACProxyTLSSecret
@@ -260,10 +262,13 @@ func (p *PrometheusAgentSSA) setKubeRBACProxySidecar() {
 	}
 
 	p.desiredAgent.Spec.Volumes = append(p.desiredAgent.Spec.Volumes, newVolumes...)
-	p.desiredAgent.Spec.Containers = append(
-		p.desiredAgent.Spec.Containers,
-		p.createKubeRbacProxyContainer(),
-	)
+
+	container := p.createKubeRbacProxyContainer()
+	args, err := tlshelper.SetTLSSecurityConfiguration(ctx, container.Args, "--tls-cipher-suites=", "--tls-min-version=")
+	if err == nil {
+		container.Args = args
+	}
+	p.desiredAgent.Spec.Containers = append(p.desiredAgent.Spec.Containers, container)
 }
 
 func (p PrometheusAgentSSA) createKubeRbacProxyContainer() corev1.Container {

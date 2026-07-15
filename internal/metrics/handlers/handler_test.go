@@ -38,6 +38,7 @@ import (
 )
 
 func TestBuildOptions(t *testing.T) {
+	t.Setenv("UNIT_TEST", "true")
 	const (
 		hubNamespace = "test-hub-namespace"
 		spokeName    = "test-spoke"
