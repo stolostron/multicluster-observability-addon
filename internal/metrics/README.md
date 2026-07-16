@@ -2,15 +2,19 @@
 
 ## CRD Management for Cluster Observability Operator (COO)
 
-The Metrics package in MCOA leverages the **Cluster Observability Operator (COO)** CRDs when they are present on a managed cluster. MCOA must dynamically detect COO's presence and adapt its configuration to support the installation and uninstallation of COO while the addon is running.
+The Metrics package in MCOA leverages the **Cluster Observability Operator (COO)** CRDs when they are present on a managed cluster. MCOA must dynamically detect COO's presence and adapt its configuration at runtime.
 
-### CRD Ownership
+### CRD Ownership and Footprint Minimization
 
-CRDs are split into two categories based on their size and role:
+When COO is missing on a managed cluster, we do not fully install COO itself because we only need its Prometheus Operator capabilities, and fully installing COO would spawn other workloads that we do not need. To limit our footprint and conserve resources on managed clusters (where CPU and memory can be scarce), we only install the necessary CRDs and run our own lightweight Prometheus Operator instance on the managed cluster to reconcile the metrics collection resources.
+
+Furthermore, as most of these CRDs are large, we avoid storing them in the hub's etcd through ManifestWorks by having the endpoint operator apply them directly on the managed cluster. This avoids storing gigabytes of schema data in the hub's etcd when managing many clusters.
+
+CRDs are split into two categories:
 
 **CRDs managed by the Endpoint Operator (on the spoke)**
 
-The following CRDs have large schemas (~700 KB each) and are owned and applied directly by the endpoint operator on the managed cluster. Keeping them out of the ManifestWork prevents storing megabytes of schema data per cluster in the hub's etcd:
+The following CRDs have large schemas. They are owned and applied directly by the endpoint operator on the managed cluster:
 
 - `prometheusagents.monitoring.rhobs`
 - `scrapeconfigs.monitoring.rhobs`
@@ -22,7 +26,7 @@ The following CRDs have large schemas (~700 KB each) and are owned and applied d
 
 **CRDs managed by ManifestWork (on the hub)**
 
-Two lightweight CRDs remain in the ManifestWork:
+The addon manager still makes use of the following "dummy" CRD to detect the state of the managed cluster and apply relevant configuration. This CRD is small and does not contain the full schema. They are used to leverage the `feedbackRules` API from ManifestWorks to detect COO's presence and the establishment of the CRDs.
 
 | CRD | Strategy | Purpose |
 |-----|----------|---------|
@@ -44,13 +48,20 @@ A key challenge is selecting a stable resource for detection that does not negat
 
 #### The "Dummy" CRD Solution
 The chosen solution is to create a "dummy" `monitoringstacks` CRD with the minimum required fields to be accepted by the API server.
-- **Update Strategy**: Set to `CreateOnly`. This ensures that when OLM installs COO and takes over the CRD, the `ManifestWork` agent does not try to revert OLM's changes, preventing conflicts and keeping the resource clean.
+- **Update Strategy**: Set to `CreateOnly`. This ensures that when OLM installs COO and takes over the CRD, the OCM Work Agent does not try to revert OLM's changes, preventing conflicts and keeping the resource clean.
 - **Continuous Feedback**: This dummy resource allows the OLM presence `feedbackRule` to work regardless of whether COO is currently installed.
+- **Conditional Deletion-Orphan Annotation**: The dummy `monitoringstacks` CRD conditionally applies the deletion-orphan annotation:
+  ```yaml
+  {{- if not .Values.deployCOOResources }}
+  addon.open-cluster-management.io/deletion-orphan: ""
+  {{- end }}
+  ```
+  This is critical for proper uninstallation behavior. When COO is installed (`.Values.deployCOOResources` is `false`), MCOA does not manage the CRDs, so the OCM Work Agent should not delete the `monitoringstacks` CRD at uninstallation time (preserving the COO-managed resource). However, when COO is not installed (`.Values.deployCOOResources` is `true`), MCOA manages the resources and does not apply this annotation, allowing the OCM Work Agent to clean up the dummy `monitoringstacks` CRD along with the other resources listed in the `ManifestWork` during uninstallation.
 
 ### Adaptation Logic
 
-1.  **COO Detected**: When `feedbackRules` indicate COO is present, MCOA removes the other COO CRDs from its `ManifestWork` to yield management to OLM and avoid Server-Side Apply (SSA) conflicts.
-2.  **COO Uninstalled**: If a user uninstalls COO and deletes the `monitoringstacks` CRD, the `WorkAgent` recreates the dummy version (without the OLM label). This triggers MCOA to re-add the necessary CRDs to the `ManifestWork`.
+1.  **COO Detected**: When `feedbackRules` indicate COO is present, MCOA disables the deployment of its own Prometheus Operator manifests (relying on COO to provide/manage the operator) to avoid reconciliation conflicts.
+2.  **COO Uninstalled**: If a user uninstalls COO, MCOA detects its absence and re-installs its own Prometheus Operator manifests on the managed cluster to ensure continuous metrics collection.
 
 ### Operator Synchronization and Restarts
 
@@ -64,8 +75,8 @@ To prevent locked states or synchronization issues:
 ### Ownership and Deletion Handling
 
 To prevent accidental deletion of CRDs during transitions:
-- **`deletion-orphan` label**: The `addon.open-cluster-management.io/deletion-orphan` label is set on the `monitoringstacks` CRD when COO is deployed.
-- **Reasoning**: Since OLM does not override the existing ownership on this specific CRD (while it does on the others), MCOA would normally delete the CRD upon its own uninstallation. This annotation removes the ownership claim, ensuring the resource is not deleted by the `WorkAgent`. For the endpoint-operator-managed CRDs, the endpoint operator is their sole SSA owner. When COO installs and takes over, it displaces that ownership and the endpoint operator stops reconciling them.
+- **`deletion-orphan` annotation**: The `addon.open-cluster-management.io/deletion-orphan` annotation is conditionally set on the `monitoringstacks` CRD based on `.Values.deployCOOResources`.
+- **Reasoning**: Since OLM does not override the existing ownership on this specific CRD (while it does on the others), MCOA would normally delete the CRD upon its own uninstallation. The annotation removes the ownership claim, ensuring the resource is not deleted by the `WorkAgent` when COO is managing the CRDs. If COO is not installed, the annotation is omitted so that MCOA cleans up the CRD upon uninstallation. For the endpoint-operator-managed CRDs, the endpoint operator is their sole SSA owner. When COO installs and takes over, it displaces that ownership and the endpoint operator stops reconciling them.
 - **`ReadOnly` CRDs**: Resources with `ReadOnly` update strategy are never deleted by the Work Agent, regardless of whether they are present in the manifest list.
 
 ### Hub-side CRD Dependencies
