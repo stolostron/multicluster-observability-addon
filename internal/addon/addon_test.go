@@ -481,6 +481,110 @@ func scrapeConfigFieldResult() agent.FieldResult {
 	}
 }
 
+func TestIsVersionOlder(t *testing.T) {
+	testCases := []struct {
+		name        string
+		v1          string
+		v2          string
+		expected    bool
+		expectErr   bool
+		expectedErr string
+	}{
+		{
+			name:     "v1 is older",
+			v1:       "0.78.0",
+			v2:       "0.79.0",
+			expected: true,
+		},
+		{
+			name:     "v1 is newer",
+			v1:       "0.80.0",
+			v2:       "0.79.0",
+			expected: false,
+		},
+		{
+			name:     "versions are equal",
+			v1:       "0.79.0",
+			v2:       "0.79.0",
+			expected: false,
+		},
+		{
+			name:     "v1 has fewer parts and is older",
+			v1:       "0.78",
+			v2:       "0.79.0",
+			expected: true,
+		},
+		{
+			name:     "v2 has fewer parts and v1 is older",
+			v1:       "0.78.1",
+			v2:       "0.79",
+			expected: true,
+		},
+		{
+			name:     "versions are equal with different parts",
+			v1:       "0.79",
+			v2:       "0.79.0",
+			expected: false,
+		},
+		{
+			name:     "v1 is older with suffix",
+			v1:       "0.78.0-rhobs1",
+			v2:       "0.79.0",
+			expected: true,
+		},
+		{
+			name:     "v1 is newer with suffix",
+			v1:       "0.80.0-rhobs1",
+			v2:       "0.79.0",
+			expected: false,
+		},
+		{
+			name:     "versions are equal, v1 with suffix",
+			v1:       "0.79.0-rhobs1",
+			v2:       "0.79.0",
+			expected: false,
+		},
+		{
+			name:     "versions are equal, v2 with suffix",
+			v1:       "0.79.0",
+			v2:       "0.79.0-rhobs1",
+			expected: false,
+		},
+		{
+			name:     "versions are equal, both with suffix",
+			v1:       "0.79.0-rhobs1",
+			v2:       "0.79.0-rhobs2",
+			expected: false,
+		},
+		{
+			name:        "invalid v1",
+			v1:          "a.b.c",
+			v2:          "0.79.0",
+			expectErr:   true,
+			expectedErr: `invalid version string: a.b.c`,
+		},
+		{
+			name:        "invalid v2",
+			v1:          "0.79.0",
+			v2:          "a.b.c",
+			expectErr:   true,
+			expectedErr: `invalid version string: a.b.c`,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			isOlder, err := isVersionOlder(tc.v1, tc.v2)
+			if tc.expectErr {
+				require.EqualError(t, err, tc.expectedErr)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, tc.expected, isOlder)
+			}
+		})
+	}
+}
+
 func newAddonDeploymentConfig() *addonapiv1beta1.AddOnDeploymentConfig {
 	return &addonapiv1beta1.AddOnDeploymentConfig{
 		ObjectMeta: metav1.ObjectMeta{
