@@ -265,8 +265,8 @@ github.com/onsi/ginkgo/v2 v2.28.1 h1:S4hj+HbZp40fNKuLUQOYLDgZLwNUVn19N3Atb98NCyI
 github.com/onsi/ginkgo/v2 v2.28.1/go.mod h1:CLtbVInNckU3/+gC8LzkGUb9oF+e8W8TdUsxPwvdOgE=
 github.com/onsi/gomega v1.39.1 h1:1IJLAad4zjPn2PsnhH70V4DKRFlrCzGBNrNaru+Vf28=
 github.com/onsi/gomega v1.39.1/go.mod h1:hL6yVALoTOxeWudERyfppUcZXjMwIMLnuSfruD2lcfg=
-github.com/open-telemetry/opentelemetry-operator v0.147.0 h1:jEIYC/fTexY9hoKdUu1WPhh5jah7r3WDQR+FrqBkEaE=
-github.com/open-telemetry/opentelemetry-operator v0.147.0/go.mod h1:JmAlDAaJzoqIexaoneV4/qDnMFpHvT/6w/0qnaAF0TY=
+github.com/open-telemetry/opentelemetry-operator v0.148.0 h1:kzVgjGDejYi/tS6U9PnNAH5Om82mD/n7hUcbBdUfllE=
+github.com/open-telemetry/opentelemetry-operator v0.148.0/go.mod h1:FyHoJIYYJj9aSkwdUjpJekEhqtTsBz/LgjxiRp94k5k=
 github.com/openshift/api v0.0.0-20260130140113-71e91db96ffc h1:CpPSvA2T+gYMmAIU8haCM00Ch+LBuXhusbKnSuPj6mo=
 github.com/openshift/api v0.0.0-20260130140113-71e91db96ffc/go.mod h1:d5uzF0YN2nQQFA0jIEWzzOZ+edmo6wzlGLvx5Fhz4uY=
 github.com/openshift/cluster-logging-operator/api/observability v0.0.0-20250626181834-6b13ce208eb8 h1:qSqWg+ODxDmVqb4wikxM658yB5T53tsOkDdo9GeLt8U=
