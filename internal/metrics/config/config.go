@@ -105,7 +105,7 @@ type ImageOverrides struct {
 	NodeExporter               string `json:"node_exporter"`
 	Prometheus                 string `json:"prometheus"`
 	EndpointMonitoringOperator string `json:"endpoint_monitoring_operator"`
-	ThanosOperator             string `json:"thanos_operator,omitempty"`
+	ThanosOperator             string `json:"thanos_operator"`
 }
 
 func GetImageOverrides(ctx context.Context, c client.Client, registries []addonapiv1beta1.ImageMirror, logger logr.Logger) (ImageOverrides, error) {
@@ -144,6 +144,9 @@ func GetImageOverrides(ctx context.Context, c client.Client, registries []addona
 		ret.NodeExporter = overrideImage(ret.NodeExporter, registries, logger)
 		ret.Prometheus = overrideImage(ret.Prometheus, registries, logger)
 		ret.EndpointMonitoringOperator = overrideImage(ret.EndpointMonitoringOperator, registries, logger)
+		if ret.ThanosOperator != "" {
+			ret.ThanosOperator = overrideImage(ret.ThanosOperator, registries, logger)
+		}
 	}
 
 	return ret, nil

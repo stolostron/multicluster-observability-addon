@@ -76,7 +76,7 @@ type ImagesValues struct {
 	RBACProxyImage             string `json:"rbacProxyImage"`
 	Prometheus                 string `json:"prometheus"`
 	EndpointMonitoringOperator string `json:"endpointMonitoringOperator"`
-	ThanosOperator             string `json:"thanosOperator,omitempty"`
+	ThanosOperator             string `json:"thanosOperator"`
 }
 
 type ConfigValue struct {
