@@ -68,7 +68,7 @@ spec:
         {{- if not $matched }}
           requests:
             cpu: 1m
-            memory: 55Mi
+            memory: 50Mi
           limits:
             memory: 100Mi
         {{- end }}
@@ -111,7 +111,6 @@ spec:
             cpu: 1m
             memory: 15Mi
           limits:
-            cpu: 20m
             memory: 30Mi
         {{- end }}
         securityContext:
