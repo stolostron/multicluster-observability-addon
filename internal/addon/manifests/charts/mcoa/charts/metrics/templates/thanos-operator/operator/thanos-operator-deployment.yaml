@@ -9,7 +9,7 @@ metadata:
     control-plane: controller-manager
     {{ include "metricshelm.labels" . | nindent 4 }}
   name: {{ .Values.thanosOperator.appName }}-controller-manager
-  namespace: {{ .Release.Namespace }}
+  namespace: {{ .Values.thanosOperator.namespace }}
 spec:
   replicas: 1
   selector:
