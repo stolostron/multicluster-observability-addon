@@ -3,7 +3,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: {{ .Values.thanosOperator.appName }}-proxy-rolebinding
-  namespace: {{ .Values.thanosOperator.namespace }}
+  namespace: open-cluster-management-observability
   labels:
     app.kubernetes.io/component: {{ .Values.thanosOperator.component }}
     app.kubernetes.io/name: {{ .Values.thanosOperator.appName }}
@@ -15,5 +15,5 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: {{ .Values.thanosOperator.appName }}-controller-manager
-  namespace: {{ .Values.thanosOperator.namespace }}
+  namespace: open-cluster-management-observability
 {{- end }}
