@@ -1,0 +1,23 @@
+{{- if .Values.thanosOperator.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    service.beta.openshift.io/serving-cert-secret-name: {{ .Values.thanosOperator.appName }}-kube-rbac-proxy-tls
+  labels:
+    app.kubernetes.io/component: kube-rbac-proxy
+    app.kubernetes.io/name: {{ .Values.thanosOperator.appName }}
+    control-plane: controller-manager
+    {{ include "metricshelm.labels" . | nindent 4 }}
+  name: {{ .Values.thanosOperator.appName }}-controller-manager-metrics-service
+  namespace: open-cluster-management-observability
+spec:
+  ports:
+  - name: https
+    port: 8443
+    protocol: TCP
+    targetPort: https
+  selector:
+    control-plane: controller-manager
+    app.kubernetes.io/name: {{ .Values.thanosOperator.appName }}
+{{- end }}
