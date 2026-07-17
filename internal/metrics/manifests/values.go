@@ -51,6 +51,7 @@ type ThanosOperatorValues struct {
 	AppName   string `json:"appName"`
 	Component string `json:"component"`
 	Image     string `json:"image"`
+	Namespace string `json:"namespace"`
 }
 
 type NodeExporterValues struct {
@@ -321,6 +322,7 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 		AppName:   config.ThanosOperatorAppName,
 		Component: "controller-manager",
 		Image:     thanosOperatorImage,
+		Namespace: config.HubInstallNamespace,
 	}
 
 	return ret, nil
