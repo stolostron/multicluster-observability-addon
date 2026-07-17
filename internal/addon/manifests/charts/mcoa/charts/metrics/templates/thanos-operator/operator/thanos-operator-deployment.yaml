@@ -33,6 +33,8 @@ spec:
         - --upstream=http://127.0.0.1:8080/
         - --logtostderr=true
         - --v=0
+        - --tls-cert-file=/etc/tls/private/tls.crt
+        - --tls-private-key-file=/etc/tls/private/tls.key
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8443
@@ -43,6 +45,10 @@ spec:
           capabilities:
             drop:
             - ALL
+        volumeMounts:
+        - mountPath: /etc/tls/private
+          name: tls
+          readOnly: true
         resources:
         {{- $matched := false }}
         {{- if .Values.global.resourceRequirements }}
@@ -69,7 +75,6 @@ spec:
         - /manager
         args:
         - --leader-elect
-        - --metrics-secure
         - --metrics-bind-address=127.0.0.1:8080
         - --health-probe-bind-address=:8081
         - --log.format=logfmt
@@ -130,4 +135,9 @@ spec:
         runAsNonRoot: true
       serviceAccountName: {{ .Values.thanosOperator.appName }}-controller-manager
       terminationGracePeriodSeconds: 10
+      volumes:
+      - name: tls
+        secret:
+          defaultMode: 420
+          secretName: {{ .Values.thanosOperator.appName }}-kube-rbac-proxy-tls
 {{- end }}
