@@ -46,15 +46,15 @@ const serviceLevelUnplannedDowntimePercentQuery = `sum(` + serviceLevelUnplanned
 sum(` + serviceLevelTotalSamplesExpr + `) or vector(0)`
 
 const serviceLevelUptimeHoursQuery = `sum(
-(` + serviceLevelRunningSamplesExpr + ` *300 )/3600
+((` + serviceLevelRunningSamplesExpr + `) *300 )/3600
 ) or vector(0)`
 
 const serviceLevelPlannedDowntimeHoursQuery = `sum(
-(` + serviceLevelPlannedDowntimeSamplesExpr + ` *300 )/3600
+((` + serviceLevelPlannedDowntimeSamplesExpr + `) *300 )/3600
 ) or vector(0)`
 
 const serviceLevelUnplannedDowntimeHoursQuery = `sum(
-(` + serviceLevelUnplannedDowntimeSamplesExpr + ` *300 )/3600
+((` + serviceLevelUnplannedDowntimeSamplesExpr + `) *300 )/3600
 ) or vector(0)`
 
 // Per-VM table sample sub-expressions (no status filter appended — composed below).
