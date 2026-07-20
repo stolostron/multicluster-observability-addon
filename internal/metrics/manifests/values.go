@@ -41,8 +41,6 @@ type MetricsValues struct {
 	Tolerations                    []corev1.Toleration  `json:"tolerations"`
 	NodeSelector                   map[string]string    `json:"nodeSelector"`
 	NodeExporter                   NodeExporterValues   `json:"nodeExporter"`
-	TLSMinVersion                  string               `json:"tlsMinVersion,omitempty"`
-	TLSCipherSuites                string               `json:"tlsCipherSuites,omitempty"`
 	ThanosOperator                 ThanosOperatorValues `json:"thanosOperator"`
 }
 
@@ -121,8 +119,6 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 			HostPort:     opts.NodeExporter.HostPort,
 			InternalPort: opts.NodeExporter.InternalPort,
 		},
-		TLSMinVersion:   opts.TLSMinVersion,
-		TLSCipherSuites: opts.TLSCipherSuites,
 	}
 
 	if opts.IsOpenShiftVendor {

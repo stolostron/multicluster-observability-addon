@@ -303,7 +303,7 @@ func (d DefaultStackResources) reconcileAgentForPlacement(ctx context.Context, p
 			addoncfg.PlacementRefNamespaceLabelKey: placementRef.Namespace,
 		},
 	}
-	promSSA := promBuilder.Build(ctx)
+	promSSA := promBuilder.Build()
 
 	// SSA the objects rendered
 	if !equality.Semantic.DeepDerivative(promSSA.Spec, agent.Spec) || !maps.Equal(promSSA.Labels, agent.Labels) {
