@@ -1,7 +1,6 @@
 package resource_test
 
 import (
-	"context"
 	"slices"
 	"testing"
 
@@ -166,7 +165,7 @@ func TestPrometheusAgentSSA(t *testing.T) {
 				Labels:              tc.Labels,
 			}
 
-			result := builder.Build(context.Background())
+			result := builder.Build()
 			tc.Expect(t, result)
 		})
 	}
