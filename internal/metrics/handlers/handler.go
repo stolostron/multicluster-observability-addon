@@ -161,6 +161,7 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1beta1.Man
 			certTargetName,
 			&ret.Secrets,
 			isOpenShiftVendor,
+			config.AlertmanagerPlatformNamespace,
 		)
 		if err != nil {
 			return ret, err
@@ -183,6 +184,7 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1beta1.Man
 			certTargetName,
 			&ret.Secrets,
 			isOpenShiftVendor,
+			config.AlertmanagerUWLNamespace,
 		)
 		if err != nil {
 			return ret, err
@@ -273,7 +275,7 @@ func (o *OptionsBuilder) buildPrometheusAgent(ctx context.Context, opts *Options
 	if len(platformAgents) > 1 {
 		o.Logger.Info("Warning: invalid number of configuration resources", "error", fmt.Errorf("%w: for application %s, found %d agents with labels %+v", errInvalidConfigResourcesCount, appName, len(platformAgents), labelsMatcher))
 	}
-	agent := platformAgents[0]
+	agent := platformAgents[0].DeepCopy()
 
 	isOwned, err := common.HasCMAOOwnerReference(ctx, o.Client, agent)
 	if err != nil {
@@ -326,10 +328,53 @@ func (o *OptionsBuilder) buildPrometheusAgent(ctx context.Context, opts *Options
 		return fmt.Errorf("%w: %s", errUnsupportedAppName, appName)
 	}
 
+	trimmedClusterID := config.GetTrimmedClusterID(opts.HubClusterID)
+	caTargetName := config.GetObsAlertmanagerMtlsCASecretName(trimmedClusterID)
+	certTargetName := config.GetObsAlertmanagerMtlsCertSecretName(trimmedClusterID)
+
+	// Note: We dynamically rename the secrets referenced in the PrometheusAgent (and their corresponding TLSConfig file paths)
+	// on the managed cluster to use the caTargetName and certTargetName secret names.
+	// This maintains 100% naming consistency with the Alertmanager mTLS secrets deployed across all target namespaces
+	// (addon installation namespace, openshift-monitoring, openshift-user-workload-monitoring, and COO namespaces).
+	// Crucially, this consistency is what allows the raw metrics transpilation pipeline (processScrapeConfigs) to safely
+	// reuse/copy the RemoteWrite configuration specified in the PrometheusAgent when configuring raw metrics collection
+	// directly on the source Prometheus servers (since the file paths inside /etc/prometheus/secrets/... will perfectly align).
+	for idx, secret := range agent.Spec.Secrets {
+		switch secret {
+		case config.HubCASecretName:
+			agent.Spec.Secrets[idx] = caTargetName
+		case config.ClientCertSecretName:
+			agent.Spec.Secrets[idx] = certTargetName
+		}
+	}
+
+	// Dynamically update the main acm-observability remote write TLSFilesConfig paths to use the new target secret names
+	mainRw := &agent.Spec.RemoteWrite[remoteWriteSpecIdx]
+	if mainRw.TLSConfig != nil {
+		mainRw.TLSConfig.CAFile = fmt.Sprintf("/etc/prometheus/secrets/%s/%s", caTargetName, config.MTLSCASecretKey)
+		mainRw.TLSConfig.CertFile = fmt.Sprintf("/etc/prometheus/secrets/%s/%s", certTargetName, config.MTLSCertSecretKey)
+		mainRw.TLSConfig.KeyFile = fmt.Sprintf("/etc/prometheus/secrets/%s/%s", certTargetName, config.MTLSCertKeySecretKey)
+	}
+
 	// Fetch related secrets
 	for _, secretName := range agent.Spec.Secrets {
+		var sourceName string
+		sourceNamespace := agent.Namespace
+		if secretName == caTargetName {
+			sourceName = config.HubCASecretName
+			sourceNamespace = config.HubInstallNamespace
+		} else if secretName == certTargetName {
+			sourceName = config.ClientCertSecretName
+			sourceNamespace = config.HubInstallNamespace
+		} else if secretName == config.GetAlertmanagerAccessorSecretName(trimmedClusterID) {
+			sourceName = config.AlertmanagerAccessorSecretName
+			sourceNamespace = config.HubInstallNamespace
+		} else {
+			sourceName = secretName
+		}
+
 		// empty target namespace result in using default $.Release.Namespace in yaml
-		if err := o.addSecret(ctx, &opts.Secrets, secretName, agent.Namespace, secretName, ""); err != nil {
+		if err := o.addSecret(ctx, &opts.Secrets, sourceName, sourceNamespace, secretName, ""); err != nil {
 			return err
 		}
 	}
@@ -382,7 +427,7 @@ func (o *OptionsBuilder) buildHypershiftResources(ctx context.Context, opts *Opt
 // Simplified addSecret function (unchanged)
 // empty target namespace result in using default $.Release.Namespace in yaml
 func (o *OptionsBuilder) addSecret(ctx context.Context, secrets *[]*corev1.Secret, secretName, secretNamespace string, targetName string, targetNamespace string) error {
-	if slices.IndexFunc(*secrets, func(s *corev1.Secret) bool { return s.Name == secretName && s.Namespace == secretNamespace }) != -1 {
+	if slices.IndexFunc(*secrets, func(s *corev1.Secret) bool { return s.Name == targetName && s.Namespace == targetNamespace }) != -1 {
 		return nil
 	}
 
@@ -391,6 +436,7 @@ func (o *OptionsBuilder) addSecret(ctx context.Context, secrets *[]*corev1.Secre
 		return fmt.Errorf("failed to get secret %s in namespace %s: %w", secretName, secretNamespace, err)
 	}
 
+	secret = secret.DeepCopy()
 	if secret.Annotations == nil {
 		secret.Annotations = map[string]string{}
 	}
@@ -404,7 +450,7 @@ func (o *OptionsBuilder) addSecret(ctx context.Context, secrets *[]*corev1.Secre
 }
 
 func (o *OptionsBuilder) addConfigMap(ctx context.Context, configMaps *[]*corev1.ConfigMap, configMapName, configMapNamespace string, targetName string, targetNamespace string) error {
-	if slices.IndexFunc(*configMaps, func(cm *corev1.ConfigMap) bool { return cm.Name == configMapName && cm.Namespace == configMapNamespace }) != -1 {
+	if slices.IndexFunc(*configMaps, func(cm *corev1.ConfigMap) bool { return cm.Name == targetName && cm.Namespace == targetNamespace }) != -1 {
 		return nil
 	}
 
@@ -413,6 +459,7 @@ func (o *OptionsBuilder) addConfigMap(ctx context.Context, configMaps *[]*corev1
 		return fmt.Errorf("failed to get configmap %s in namespace %s: %w", configMapName, configMapNamespace, err)
 	}
 
+	configMap = configMap.DeepCopy()
 	if configMap.Annotations == nil {
 		configMap.Annotations = map[string]string{}
 	}
@@ -644,12 +691,14 @@ func (o *OptionsBuilder) processScrapeConfigs(
 	caTargetName, certTargetName string,
 	secrets *[]*corev1.Secret,
 	isOCP bool,
+	defaultNamespace string,
 ) ([]*cooprometheusv1alpha1.ScrapeConfig, []MonitoringStackPatch, []cooprometheusv1.RemoteWriteSpec, error) {
 	var filtered []*cooprometheusv1alpha1.ScrapeConfig
 	var patches []MonitoringStackPatch
 	var serverRemoteWrites []cooprometheusv1.RemoteWriteSpec
 
 	for _, sc := range scrapeConfigs {
+		sc = sc.DeepCopy()
 		if sc.Annotations == nil {
 			sc.Annotations = map[string]string{}
 		}
@@ -673,6 +722,19 @@ func (o *OptionsBuilder) processScrapeConfigs(
 		if isOCP {
 			targetStacks := parseCOOMonitoringStacks(sc.Annotations)
 			if len(targetStacks) == 0 {
+				// For standard platform/user-workloads on OCP, copy mTLS secrets to the standard target namespace (openshift-monitoring or openshift-user-workload-monitoring)
+				// so that the default Prometheus instances can authenticate with the hub.
+				if slices.IndexFunc(*secrets, func(s *corev1.Secret) bool { return s.Name == caTargetName && s.Namespace == defaultNamespace }) == -1 {
+					if scErr := o.addSecret(ctx, secrets, config.HubCASecretName, config.HubInstallNamespace, caTargetName, defaultNamespace); scErr != nil {
+						return nil, nil, nil, fmt.Errorf("failed to add standard mtls ca secret to %s: %w", defaultNamespace, scErr)
+					}
+				}
+				if slices.IndexFunc(*secrets, func(s *corev1.Secret) bool { return s.Name == certTargetName && s.Namespace == defaultNamespace }) == -1 {
+					if scErr := o.addSecret(ctx, secrets, config.ClientCertSecretName, config.HubInstallNamespace, certTargetName, defaultNamespace); scErr != nil {
+						return nil, nil, nil, fmt.Errorf("failed to add standard mtls cert secret to %s: %w", defaultNamespace, scErr)
+					}
+				}
+
 				// No COO stacks targeted, let it fall through to standard platform export
 				filtered = append(filtered, sc)
 				continue
