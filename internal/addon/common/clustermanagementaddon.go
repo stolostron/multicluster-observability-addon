@@ -118,13 +118,13 @@ func ensureConfigsInAddon(cmao *addonv1beta1.ClusterManagementAddOn, configs []D
 	}
 }
 
-// removeStaleConfigs removes any user-defined PrometheusRule or ScrapeConfig
+// removeStaleConfigs removes any user-defined PrometheusRule or ScrapeConfig, along with any PrometheusAgent
 // entries from the CMAO placements whose underlying resource no longer exists.
 func removeStaleConfigs(ctx context.Context, k8s client.Client, cmao *addonv1beta1.ClusterManagementAddOn) error {
 	for i, placement := range cmao.Spec.InstallStrategy.Placements {
 		filtered := make([]addonv1beta1.AddOnConfig, 0, len(placement.Configs))
 		for _, cfg := range placement.Configs {
-			_, err := doesScrapeConfigOrPrometheusRuleExist(ctx, k8s, cfg)
+			_, err := doesScrapeConfigOrPrometheusRuleorPrometheusAgentExist(ctx, k8s, cfg)
 			if err != nil {
 				if apierrors.IsNotFound(err) {
 					continue
@@ -138,9 +138,7 @@ func removeStaleConfigs(ctx context.Context, k8s client.Client, cmao *addonv1bet
 	return nil
 }
 
-// doesScrapeConfigOrPrometheusRuleExist checks whether the config references an existing ScrapeConfig or PrometheusRule
-// Returns the raw API error on failure so callers can distinguish NotFound from other errors.
-func doesScrapeConfigOrPrometheusRuleExist(ctx context.Context, k8s client.Client, cfg addonv1beta1.AddOnConfig) (bool, error) {
+func doesScrapeConfigOrPrometheusRuleorPrometheusAgentExist(ctx context.Context, k8s client.Client, cfg addonv1beta1.AddOnConfig) (bool, error) {
 	key := types.NamespacedName{Name: cfg.Name, Namespace: cfg.Namespace}
 	switch cfg.Resource {
 	case cooprometheusv1alpha1.ScrapeConfigName:
@@ -153,6 +151,13 @@ func doesScrapeConfigOrPrometheusRuleExist(ctx context.Context, k8s client.Clien
 	case prometheusv1.PrometheusRuleName:
 		rule := &prometheusv1.PrometheusRule{}
 		if err := k8s.Get(ctx, key, rule); err != nil {
+			return false, err
+		} else {
+			return true, nil
+		}
+	case cooprometheusv1alpha1.PrometheusAgentName:
+		agent := &cooprometheusv1alpha1.PrometheusAgent{}
+		if err := k8s.Get(ctx, key, agent); err != nil {
 			return false, err
 		} else {
 			return true, nil

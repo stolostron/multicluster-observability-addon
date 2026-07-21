@@ -277,6 +277,24 @@ func TestRemoveStaleConfigs(t *testing.T) {
 		},
 	}
 
+	existingAgent := &cooprometheusv1alpha1.PrometheusAgent{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "my-agent",
+			Namespace: addoncfg.InstallNamespace,
+		},
+	}
+
+	otherCfg := addonv1beta1.AddOnConfig{
+		ConfigGroupResource: addonv1beta1.ConfigGroupResource{
+			Group:    "apps",
+			Resource: "deployments",
+		},
+		ConfigReferent: addonv1beta1.ConfigReferent{
+			Name:      "some-deployment",
+			Namespace: addoncfg.InstallNamespace,
+		},
+	}
+
 	testCases := []struct {
 		name            string
 		existingObjects []client.Object
@@ -286,33 +304,39 @@ func TestRemoveStaleConfigs(t *testing.T) {
 	}{
 		{
 			name:            "existing resources are kept",
-			existingObjects: []client.Object{existingScrapeConfig.DeepCopy(), existingPromRule.DeepCopy()},
+			existingObjects: []client.Object{existingScrapeConfig.DeepCopy(), existingPromRule.DeepCopy(), existingAgent.DeepCopy()},
 			initialConfigs:  []addonv1beta1.AddOnConfig{scrapeConfigCfg, promRuleCfg, agentCfg},
 			expectedConfigs: []addonv1beta1.AddOnConfig{scrapeConfigCfg, promRuleCfg, agentCfg},
 		},
 		{
 			name:            "non-existent scrapeconfig is removed",
-			existingObjects: []client.Object{existingPromRule.DeepCopy()},
+			existingObjects: []client.Object{existingPromRule.DeepCopy(), existingAgent.DeepCopy()},
 			initialConfigs:  []addonv1beta1.AddOnConfig{scrapeConfigCfg, promRuleCfg, agentCfg},
 			expectedConfigs: []addonv1beta1.AddOnConfig{promRuleCfg, agentCfg},
 		},
 		{
 			name:            "non-existent prometheusrule is removed",
-			existingObjects: []client.Object{existingScrapeConfig.DeepCopy()},
+			existingObjects: []client.Object{existingScrapeConfig.DeepCopy(), existingAgent.DeepCopy()},
 			initialConfigs:  []addonv1beta1.AddOnConfig{scrapeConfigCfg, promRuleCfg, agentCfg},
 			expectedConfigs: []addonv1beta1.AddOnConfig{scrapeConfigCfg, agentCfg},
+		},
+		{
+			name:            "non-existent agent is removed",
+			existingObjects: []client.Object{existingScrapeConfig.DeepCopy(), existingPromRule.DeepCopy()},
+			initialConfigs:  []addonv1beta1.AddOnConfig{scrapeConfigCfg, promRuleCfg, agentCfg},
+			expectedConfigs: []addonv1beta1.AddOnConfig{scrapeConfigCfg, promRuleCfg},
 		},
 		{
 			name:            "all stale configs removed",
 			existingObjects: []client.Object{},
 			initialConfigs:  []addonv1beta1.AddOnConfig{scrapeConfigCfg, promRuleCfg, agentCfg},
-			expectedConfigs: []addonv1beta1.AddOnConfig{agentCfg},
+			expectedConfigs: []addonv1beta1.AddOnConfig{},
 		},
 		{
-			name:            "non-scrapeconfig-or-promrule configs are never removed",
+			name:            "unsupported resource types are never removed",
 			existingObjects: []client.Object{},
-			initialConfigs:  []addonv1beta1.AddOnConfig{agentCfg},
-			expectedConfigs: []addonv1beta1.AddOnConfig{agentCfg},
+			initialConfigs:  []addonv1beta1.AddOnConfig{otherCfg},
+			expectedConfigs: []addonv1beta1.AddOnConfig{otherCfg},
 		},
 		{
 			name:            "empty configs - no change",
@@ -351,7 +375,7 @@ func TestRemoveStaleConfigs(t *testing.T) {
 	}
 }
 
-func TestDoesScrapeConfigOrPrometheusRuleExist(t *testing.T) {
+func TestDoesScrapeConfigOrPrometheusRuleOrPrometheusAgentExist(t *testing.T) {
 	scheme := newCMAOTestScheme(t)
 
 	existingScrapeConfig := &cooprometheusv1alpha1.ScrapeConfig{
@@ -368,9 +392,17 @@ func TestDoesScrapeConfigOrPrometheusRuleExist(t *testing.T) {
 		},
 	}
 
+	existingAgent := &cooprometheusv1alpha1.PrometheusAgent{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "existing-agent",
+			Namespace: addoncfg.InstallNamespace,
+		},
+	}
+
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(
 		existingScrapeConfig,
 		existingPromRule,
+		existingAgent,
 	).Build()
 
 	testCases := []struct {
@@ -436,7 +468,21 @@ func TestDoesScrapeConfigOrPrometheusRuleExist(t *testing.T) {
 			expectNotFound: true,
 		},
 		{
-			name: "other resource type returns false with no error",
+			name: "existing prometheusagent returns true",
+			cfg: addonv1beta1.AddOnConfig{
+				ConfigGroupResource: addonv1beta1.ConfigGroupResource{
+					Group:    cooprometheusv1alpha1.SchemeGroupVersion.Group,
+					Resource: cooprometheusv1alpha1.PrometheusAgentName,
+				},
+				ConfigReferent: addonv1beta1.ConfigReferent{
+					Name:      "existing-agent",
+					Namespace: addoncfg.InstallNamespace,
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "non-existent prometheusagent returns not found",
 			cfg: addonv1beta1.AddOnConfig{
 				ConfigGroupResource: addonv1beta1.ConfigGroupResource{
 					Group:    cooprometheusv1alpha1.SchemeGroupVersion.Group,
@@ -447,13 +493,27 @@ func TestDoesScrapeConfigOrPrometheusRuleExist(t *testing.T) {
 					Namespace: addoncfg.InstallNamespace,
 				},
 			},
+			expectNotFound: true,
+		},
+		{
+			name: "unsupported resource type returns false with no error",
+			cfg: addonv1beta1.AddOnConfig{
+				ConfigGroupResource: addonv1beta1.ConfigGroupResource{
+					Group:    "apps",
+					Resource: "deployments",
+				},
+				ConfigReferent: addonv1beta1.ConfigReferent{
+					Name:      "some-deployment",
+					Namespace: addoncfg.InstallNamespace,
+				},
+			},
 			expected: false,
 		},
 	}
 
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := doesScrapeConfigOrPrometheusRuleExist(context.Background(), fakeClient, tt.cfg)
+			result, err := doesScrapeConfigOrPrometheusRuleorPrometheusAgentExist(context.Background(), fakeClient, tt.cfg)
 			if tt.expectNotFound {
 				require.Error(t, err)
 				assert.True(t, apierrors.IsNotFound(err), "expected NotFound error, got: %v", err)
