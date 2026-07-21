@@ -17,6 +17,7 @@ import (
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
+	thanosv1alpha1 "github.com/thanos-community/thanos-operator/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -198,6 +199,13 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1beta1.Man
 				}
 				ret.CRDEstablishedAnnotation = string(jsonBytes)
 			}
+		}
+	}
+
+	// Build Thanos components for hub clusters
+	if ret.IsHub && opts.ThanosOperatorEnabled {
+		if err = o.buildThanosComponents(ctx, &ret); err != nil {
+			return ret, fmt.Errorf("failed to build Thanos components: %w", err)
 		}
 	}
 
@@ -584,4 +592,89 @@ func getClusterID(ctx context.Context, c client.Client) (string, error) {
 	}
 
 	return string(clusterVersion.Spec.ClusterID), nil
+}
+
+// buildThanosComponents builds Thanos component CRs for hub deployments.
+// Currently only builds ThanosStore; other components (Receive, Query, etc.) will be added in subsequent PRs.
+func (o *OptionsBuilder) buildThanosComponents(ctx context.Context, opts *Options) error {
+	// Fetch the object storage secret reference from config resources.
+	// This is required by Store (and later by Receive, Compact, and Ruler).
+	objStoreSecret, err := o.getObjectStorageConfig(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get object storage config: %w", err)
+	}
+
+	// Add the object storage secret to the list of secrets to be forwarded
+	if err := o.addSecret(ctx, &opts.Secrets, objStoreSecret.Name, objStoreSecret.Namespace, objStoreSecret.Name, ""); err != nil {
+		return fmt.Errorf("failed to add object storage secret: %w", err)
+	}
+
+	objStoreCfg := thanosv1alpha1.ObjectStorageConfig{
+		LocalObjectReference: corev1.LocalObjectReference{Name: objStoreSecret.Name},
+		Key:                  config.ObjectStorageSecretKey,
+	}
+
+	o.buildThanosStore(opts, objStoreCfg)
+
+	return nil
+}
+
+// getObjectStorageConfig fetches the thanos object storage secret from the hub namespace.
+func (o *OptionsBuilder) getObjectStorageConfig(ctx context.Context) (*corev1.Secret, error) {
+	secret := &corev1.Secret{}
+	if err := o.Client.Get(ctx, types.NamespacedName{
+		Name:      config.ObjectStorageSecretName,
+		Namespace: config.HubInstallNamespace,
+	}, secret); err != nil {
+		return nil, fmt.Errorf("failed to get object storage secret %s/%s: %w", config.HubInstallNamespace, config.ObjectStorageSecretName, err)
+	}
+	return secret, nil
+}
+
+// buildThanosStore creates the ThanosStore CR spec for long-term metrics storage.
+// Store reads from object storage and serves historical data via StoreAPI.
+func (o *OptionsBuilder) buildThanosStore(opts *Options, objStore thanosv1alpha1.ObjectStorageConfig) {
+	// Unmanaged defaults: shards, storage size — users can modify these on the CR directly.
+	shards := int32(config.DefaultStoreShards)
+
+	opts.Thanos.Store = &thanosv1alpha1.ThanosStore{
+		Spec: thanosv1alpha1.ThanosStoreSpec{
+			Replicas:            1,
+			ObjectStorageConfig: objStore,
+			StorageConfiguration: thanosv1alpha1.StorageConfiguration{
+				Size: thanosv1alpha1.StorageSize(config.DefaultStoreStorageSize),
+			},
+			ShardingStrategy: thanosv1alpha1.ShardingStrategy{
+				Type:   thanosv1alpha1.Block,
+				Shards: shards,
+			},
+			// IndexCacheConfig will be added in ACM-35785 (Memcached caching)
+		},
+	}
+
+	// Managed fields: node selectors, tolerations, and resource requirements from AddOnDeploymentConfig.
+	o.applyCommonThanosFields(&opts.Thanos.Store.Spec.CommonFields, opts, config.ThanosStoreContainerID)
+}
+
+// applyCommonThanosFields applies node selector, tolerations, and resource requirements to Thanos components.
+// Also sets SecurityContext to work with OpenShift's restricted-v2 SCC.
+func (o *OptionsBuilder) applyCommonThanosFields(fields *thanosv1alpha1.CommonFields, opts *Options, containerID string) {
+	if len(opts.NodeSelector) > 0 {
+		fields.NodeSelector = opts.NodeSelector
+	}
+	if len(opts.Tolerations) > 0 {
+		fields.Tolerations = opts.Tolerations
+	}
+	for _, resReq := range opts.ResourceReqs {
+		if resReq.ContainerID == containerID {
+			fields.ResourceRequirements = &resReq.Resources
+		}
+	}
+	// Override the operator default of FSGroup=1001 which is rejected by OpenShift's
+	// restricted-v2 SCC. Setting an empty SecurityContext lets OpenShift assign the
+	// FSGroup from the namespace's allocated range.
+	runAsNonRoot := true
+	fields.SecurityContext = &corev1.PodSecurityContext{
+		RunAsNonRoot: &runAsNonRoot,
+	}
 }

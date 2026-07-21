@@ -64,6 +64,15 @@ const (
 	// TODO: replace with image from ACM image overrides ConfigMap once available.
 	ThanosOperatorImage = "quay.io/thanos/thanos-operator:main-2026-04-09-a4dc024"
 
+	// Thanos Store defaults
+	DefaultStoreShards      = 3
+	DefaultStoreStorageSize = "10Gi"
+	ThanosStoreContainerID  = "statefulsets:mcoa-store:thanos"
+
+	// Thanos object storage configuration
+	ObjectStorageSecretName = "thanos-object-storage"
+	ObjectStorageSecretKey  = "thanos.yaml"
+
 	AlertmanagerAccessorSecretName = "observability-alertmanager-accessor"
 	AlertmanagerRouterCASecretName = "hub-alertmanager-router-ca"
 	AlertmanagerRouteBYOCAName     = "alertmanager-byo-ca"
