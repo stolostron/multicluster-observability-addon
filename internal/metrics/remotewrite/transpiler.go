@@ -3,6 +3,7 @@ package remotewrite
 import (
 	"cmp"
 	"fmt"
+	"maps"
 	"regexp"
 	"slices"
 	"strings"
@@ -51,7 +52,7 @@ func Transpile(scrapeConfig *cooprometheusv1alpha1.ScrapeConfig, agent *cooprome
 		var posMatchers []posMatcher
 		for _, lm := range sel {
 			if lm.Type == labels.MatchEqual || lm.Type == labels.MatchRegexp {
-				val := lm.Value
+				var val string
 				if lm.Type == labels.MatchEqual {
 					val = regexp.QuoteMeta(lm.Value)
 				} else {
@@ -100,7 +101,7 @@ func Transpile(scrapeConfig *cooprometheusv1alpha1.ScrapeConfig, agent *cooprome
 		// Negative Matchers Phase (Clear __tmp_keep_i to "" if any negative matcher matches)
 		for _, lm := range sel {
 			if lm.Type == labels.MatchNotEqual || lm.Type == labels.MatchNotRegexp {
-				regexVal := lm.Value
+				var regexVal string
 				if lm.Type == labels.MatchNotEqual {
 					regexVal = regexp.QuoteMeta(lm.Value)
 				} else {
@@ -203,9 +204,7 @@ func Transpile(scrapeConfig *cooprometheusv1alpha1.ScrapeConfig, agent *cooprome
 		}
 		if standardRw.Headers != nil {
 			spec.Headers = make(map[string]string)
-			for k, v := range standardRw.Headers {
-				spec.Headers[k] = v
-			}
+			maps.Copy(spec.Headers, standardRw.Headers)
 		}
 	}
 

@@ -26,6 +26,10 @@ spec:
     - {{ .Values.clientCertSecretName }}
     - {{ .Values.alertmanagerAccessorSecretName }}
   serviceMonitorSelector: {}
+  {{- if .Values.prometheusServerRemoteWrite }}
+  remoteWrite:
+    {{- toYaml .Values.prometheusServerRemoteWrite | nindent 4 }}
+  {{- end }}
   resources:
     requests:
       memory: 400Mi

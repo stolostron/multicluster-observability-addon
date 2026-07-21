@@ -914,7 +914,7 @@ func newManifestWork(name string, isOLMSubscrided bool) *workv1.ManifestWork {
 						ResourceMeta: workv1.ManifestResourceMeta{
 							Group:    apiextensionsv1.GroupName,
 							Resource: "customresourcedefinitions",
-							Name:     config.MonitoringStackCRDName,
+							Name:     config.AlertmanagerCRDName,
 						},
 						StatusFeedbacks: workv1.StatusFeedbackResult{
 							Values: []workv1.FeedbackValue{
