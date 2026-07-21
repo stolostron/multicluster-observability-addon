@@ -533,6 +533,7 @@ func TestProcessScrapeConfigs(t *testing.T) {
 			"cert-secret",
 			secrets,
 			true, // isOCP
+			"default-ns",
 		)
 		require.NoError(t, err)
 
@@ -547,6 +548,62 @@ func TestProcessScrapeConfigs(t *testing.T) {
 		assert.NotNil(t, patches[0].RemoteWriteSpec)
 	})
 
+	t.Run("OCP - Raw Metrics ScrapeConfig without COO stack (CMO target) should deploy secrets in default-ns and fall through as ScrapeConfig", func(t *testing.T) {
+		secrets := &[]*corev1.Secret{}
+		// ScrapeConfig with Raw resolution but no COO target stack annotation
+		scCmo := &cooprometheusv1alpha1.ScrapeConfig{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "raw-cmo-sc",
+				Annotations: map[string]string{
+					config.RawResolutionAnnotation: config.RawResolutionValue,
+				},
+			},
+			Spec: cooprometheusv1alpha1.ScrapeConfigSpec{
+				Params: map[string][]string{
+					"match[]": {"up"},
+				},
+			},
+		}
+
+		input := []*cooprometheusv1alpha1.ScrapeConfig{scCmo}
+
+		filtered, patches, _, err := builder.processScrapeConfigs(
+			context.Background(),
+			input,
+			agent,
+			"ca-secret",
+			"cert-secret",
+			secrets,
+			true, // isOCP
+			"default-ns",
+		)
+		require.NoError(t, err)
+
+		// Since it's standard platform/user workload CMO target, it should fall through to filtered (exported to managed cluster)
+		assert.Len(t, filtered, 1)
+		assert.Equal(t, "raw-cmo-sc", filtered[0].Name)
+
+		// No MonitoringStack patches should be generated
+		assert.Empty(t, patches)
+
+		// Secrets should be deployed directly to default-ns so default Prometheus instances can authenticate
+		assert.NotEmpty(t, *secrets)
+		caFound := false
+		certFound := false
+		for _, s := range *secrets {
+			if s.Namespace == "default-ns" {
+				if s.Name == "ca-secret" {
+					caFound = true
+				}
+				if s.Name == "cert-secret" {
+					certFound = true
+				}
+			}
+		}
+		assert.True(t, caFound)
+		assert.True(t, certFound)
+	})
+
 	t.Run("Non-OCP - Raw Metrics ScrapeConfig should be transpiled for Prometheus Server directly and filtered out", func(t *testing.T) {
 		secrets := &[]*corev1.Secret{}
 		input := []*cooprometheusv1alpha1.ScrapeConfig{scRaw, scStandard}
@@ -559,6 +616,7 @@ func TestProcessScrapeConfigs(t *testing.T) {
 			"cert-secret",
 			secrets,
 			false, // isOCP
+			"default-ns",
 		)
 		require.NoError(t, err)
 
