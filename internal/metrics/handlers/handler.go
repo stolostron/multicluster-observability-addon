@@ -17,6 +17,7 @@ import (
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
+	"github.com/stolostron/multicluster-observability-addon/internal/metrics/remotewrite"
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -142,6 +143,54 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1beta1.Man
 			o.Logger.Info("User workload monitoring is needed to monitor Hosted Control Planes managed by the hypershift addon. Ignoring related resources creation.")
 		}
 	}
+
+	caTargetName := config.GetObsAlertmanagerMtlsCASecretName(config.GetTrimmedClusterID(ret.HubClusterID))
+	certTargetName := config.GetObsAlertmanagerMtlsCertSecretName(config.GetTrimmedClusterID(ret.HubClusterID))
+
+	var rawPatches []MonitoringStackPatch
+
+	// Process Platform ScrapeConfigs
+	if opts.Platform.Metrics.CollectionEnabled && len(ret.Platform.ScrapeConfigs) > 0 {
+		var patches []MonitoringStackPatch
+		var serverRemoteWrites []cooprometheusv1.RemoteWriteSpec
+		ret.Platform.ScrapeConfigs, patches, serverRemoteWrites, err = o.processScrapeConfigs(
+			ctx,
+			ret.Platform.ScrapeConfigs,
+			ret.Platform.PrometheusAgent,
+			caTargetName,
+			certTargetName,
+			&ret.Secrets,
+			isOpenShiftVendor,
+		)
+		if err != nil {
+			return ret, err
+		}
+		if isOpenShiftVendor {
+			rawPatches = append(rawPatches, patches...)
+		} else {
+			ret.PrometheusServerRemoteWrite = append(ret.PrometheusServerRemoteWrite, serverRemoteWrites...)
+		}
+	}
+
+	// Process UserWorkloads ScrapeConfigs (OCP only)
+	if isOpenShiftVendor && opts.UserWorkloads.Metrics.CollectionEnabled && len(ret.UserWorkloads.ScrapeConfigs) > 0 {
+		var patches []MonitoringStackPatch
+		ret.UserWorkloads.ScrapeConfigs, patches, _, err = o.processScrapeConfigs(
+			ctx,
+			ret.UserWorkloads.ScrapeConfigs,
+			ret.UserWorkloads.PrometheusAgent,
+			caTargetName,
+			certTargetName,
+			&ret.Secrets,
+			isOpenShiftVendor,
+		)
+		if err != nil {
+			return ret, err
+		}
+		rawPatches = append(rawPatches, patches...)
+	}
+
+	ret.MonitoringStackPatches = rawPatches
 
 	if isOpenShiftVendor {
 		if ret.COOIsSubscribed, err = o.cooIsSubscribed(ctx, managedCluster); err != nil {
@@ -422,7 +471,7 @@ func (o *OptionsBuilder) cooIsSubscribed(ctx context.Context, managedCluster *cl
 	crdID := workv1.ResourceIdentifier{
 		Group:    apiextensionsv1.GroupName,
 		Resource: crdResourceName,
-		Name:     config.MonitoringStackCRDName,
+		Name:     config.AlertmanagerCRDName,
 	}
 
 	feedback, err := common.GetFeedbackValuesForResources(ctx, o.Client, managedCluster.Name, addoncfg.Name, crdID)
@@ -432,19 +481,19 @@ func (o *OptionsBuilder) cooIsSubscribed(ctx context.Context, managedCluster *cl
 
 	crdFeedback, ok := feedback[crdID]
 	if !ok || len(crdFeedback) == 0 {
-		o.Logger.V(2).Info(fmt.Sprintf("%s CRD not found in manifestwork status, considering COO as not subscribed", config.MonitoringStackCRDName))
+		o.Logger.V(2).Info(fmt.Sprintf("%s CRD not found in manifestwork status, considering COO as not subscribed", config.AlertmanagerCRDName))
 		return false, nil
 	}
 
 	olmValues := common.FilterFeedbackValuesByName(crdFeedback, addoncfg.IsOLMManagedFeedbackName)
 	for _, v := range olmValues {
 		if v.Value.String != nil && strings.ToLower(*v.Value.String) == "true" {
-			o.Logger.V(2).Info(fmt.Sprintf("found %s CRD with OLM label, considering COO as subscribed", config.MonitoringStackCRDName))
+			o.Logger.V(2).Info(fmt.Sprintf("found %s CRD with OLM label, considering COO as subscribed", config.AlertmanagerCRDName))
 			return true, nil
 		}
 	}
 
-	o.Logger.V(2).Info(fmt.Sprintf("%s CRD missing the OLM label, considering COO as not subscribed", config.MonitoringStackCRDName))
+	o.Logger.V(2).Info(fmt.Sprintf("%s CRD missing the OLM label, considering COO as not subscribed", config.AlertmanagerCRDName))
 	return false, nil
 }
 
@@ -576,6 +625,125 @@ func (o *OptionsBuilder) addAlertmanagerMtlsSecrets(ctx context.Context, secrets
 	return nil
 }
 
+// processScrapeConfigs filters, mutates, and transpiles scrape configs into MonitoringStack patches when targeted at COO on OCP,
+// or directly into Prometheus Server remoteWrite configurations on non-OCP managed clusters.
+//
+// We return the filtered scrapeConfigs slice in addition to the transpiled remoteWrite patches because
+// scrapeConfigs that do NOT have the raw resolution strategy annotation are preserved as-is (not transpiled)
+// and must be returned so they can be exported to the managed cluster for standard, downsampled collection
+// via the standard Prometheus Agent federation pipeline.
+//
+// Note: For standard platform/user-workload ScrapeConfigs targeted at the Cluster Monitoring Operator (CMO) ConfigMap,
+// updates are managed asynchronously by the endpoint operator. For those, we do not transpile or generate patches;
+// instead, we simply append the "-raw" suffix to their "app.kubernetes.io/component" label to ensure the endpoint
+// operator recognizes them and updates the CMO ConfigMap correctly, keeping the ScrapeConfig in the returned filtered slice.
+func (o *OptionsBuilder) processScrapeConfigs(
+	ctx context.Context,
+	scrapeConfigs []*cooprometheusv1alpha1.ScrapeConfig,
+	agent *cooprometheusv1alpha1.PrometheusAgent,
+	caTargetName, certTargetName string,
+	secrets *[]*corev1.Secret,
+	isOCP bool,
+) ([]*cooprometheusv1alpha1.ScrapeConfig, []MonitoringStackPatch, []cooprometheusv1.RemoteWriteSpec, error) {
+	var filtered []*cooprometheusv1alpha1.ScrapeConfig
+	var patches []MonitoringStackPatch
+	var serverRemoteWrites []cooprometheusv1.RemoteWriteSpec
+
+	for _, sc := range scrapeConfigs {
+		if sc.Annotations == nil {
+			sc.Annotations = map[string]string{}
+		}
+
+		// 1. Raw Resolution Strategy (OCP & Non-OCP). Standard ScrapeConfigs (without raw strategy) are bypassed and kept as-is.
+		if sc.Annotations[config.RawResolutionAnnotation] != config.RawResolutionValue {
+			filtered = append(filtered, sc)
+			continue
+		}
+
+		if sc.Labels == nil {
+			sc.Labels = map[string]string{}
+		}
+		if comp, ok := sc.Labels[addoncfg.ComponentK8sLabelKey]; ok {
+			if !strings.HasSuffix(comp, config.RawLabelSuffix) {
+				sc.Labels[addoncfg.ComponentK8sLabelKey] = comp + config.RawLabelSuffix
+			}
+		}
+
+		// 2. Check for COO target stack annotation (for OCP) or transpile directly for Prometheus Server (for non-OCP)
+		if isOCP {
+			targetStacks := parseCOOMonitoringStacks(sc.Annotations)
+			if len(targetStacks) == 0 {
+				// No COO stacks targeted, let it fall through to standard platform export
+				filtered = append(filtered, sc)
+				continue
+			}
+
+			for _, tStack := range targetStacks {
+				targetNamespace := tStack.Namespace
+				targetName := tStack.Name
+
+				// Copy mTLS secrets to targetNamespace.
+				// Note: The outer slices.IndexFunc guards are critical because addSecret appends directly to the output slice.
+				// Since multiple ScrapeConfigs can target the exact same COO stack/namespace, the outer guard prevents
+				// creating duplicate target secrets in secrets across multiple scrape config iterations.
+				if slices.IndexFunc(*secrets, func(s *corev1.Secret) bool { return s.Name == caTargetName && s.Namespace == targetNamespace }) == -1 {
+					if scErr := o.addSecret(ctx, secrets, config.HubCASecretName, config.HubInstallNamespace, caTargetName, targetNamespace); scErr != nil {
+						return nil, nil, nil, fmt.Errorf("failed to add COO mtls ca secret: %w", scErr)
+					}
+				}
+				if slices.IndexFunc(*secrets, func(s *corev1.Secret) bool { return s.Name == certTargetName && s.Namespace == targetNamespace }) == -1 {
+					if scErr := o.addSecret(ctx, secrets, config.ClientCertSecretName, config.HubInstallNamespace, certTargetName, targetNamespace); scErr != nil {
+						return nil, nil, nil, fmt.Errorf("failed to add COO mtls cert secret: %w", scErr)
+					}
+				}
+
+				// Transpile to MonitoringStack patch
+				rwSpec, scErr := remotewrite.Transpile(sc, agent)
+				if scErr != nil {
+					return nil, nil, nil, fmt.Errorf("failed to transpile scrape config %s/%s: %w", sc.Namespace, sc.Name, scErr)
+				}
+				if rwSpec == nil {
+					o.Logger.Info("transpilation returned empty remote write spec for raw scrape config, no selectors parsed", "namespace", sc.Namespace, "name", sc.Name)
+					continue
+				}
+
+				// We must override the agent's TLSFilesConfig (disk files) to use SafeTLSConfig (kubernetes secret selectors).
+				// We do this because we rename the deployed secret to limit its name length and prevent duplicated mount
+				// paths on the target Prometheus pod.
+				rwSpec.TLSConfig = createSafeTLSConfig(caTargetName, certTargetName)
+
+				patches = append(patches, MonitoringStackPatch{
+					Namespace:       targetNamespace,
+					Name:            targetName,
+					RemoteWriteSpec: rwSpec,
+				})
+			}
+			// Since it's targeted for COO, we do NOT export the ScrapeConfig itself to the managed cluster
+			continue
+		} else {
+			// For non-OCP managed clusters, transpile directly for our Prometheus Server (acm-prometheus-k8s)
+			rwSpec, scErr := remotewrite.Transpile(sc, agent)
+			if scErr != nil {
+				return nil, nil, nil, fmt.Errorf("failed to transpile scrape config %s/%s: %w", sc.Namespace, sc.Name, scErr)
+			}
+			if rwSpec == nil {
+				o.Logger.Info("transpilation returned empty remote write spec for raw scrape config, no selectors parsed", "namespace", sc.Namespace, "name", sc.Name)
+				continue
+			}
+
+			// We must override the agent's TLSFilesConfig (disk files) to use SafeTLSConfig (kubernetes secret selectors).
+			// We do this because we rename the deployed secret to limit its name length and prevent duplicated mount
+			// paths on the target Prometheus pod.
+			rwSpec.TLSConfig = createSafeTLSConfig(caTargetName, certTargetName)
+
+			serverRemoteWrites = append(serverRemoteWrites, *rwSpec)
+			// Since it's transpiled directly into the Prometheus Server's RemoteWrite, we do NOT export the ScrapeConfig itself
+			continue
+		}
+	}
+	return filtered, patches, serverRemoteWrites, nil
+}
+
 // getClusterID is used to get the cluster uid.
 func getClusterID(ctx context.Context, c client.Client) (string, error) {
 	clusterVersion := &ocinfrav1.ClusterVersion{}
@@ -584,4 +752,58 @@ func getClusterID(ctx context.Context, c client.Client) (string, error) {
 	}
 
 	return string(clusterVersion.Spec.ClusterID), nil
+}
+
+// createSafeTLSConfig generates a TLSConfig configured to use SafeTLSConfig Kubernetes secret selectors.
+func createSafeTLSConfig(caTargetName, certTargetName string) *cooprometheusv1.TLSConfig {
+	return &cooprometheusv1.TLSConfig{
+		SafeTLSConfig: cooprometheusv1.SafeTLSConfig{
+			CA: cooprometheusv1.SecretOrConfigMap{
+				Secret: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: caTargetName,
+					},
+					Key: config.MTLSCASecretKey,
+				},
+			},
+			Cert: cooprometheusv1.SecretOrConfigMap{
+				Secret: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: certTargetName,
+					},
+					Key: config.MTLSCertSecretKey,
+				},
+			},
+		},
+	}
+}
+
+// TargetStack represents a parsed namespace/name COO MonitoringStack target.
+type TargetStack struct {
+	Namespace string
+	Name      string
+}
+
+// parseCOOMonitoringStacks parses the coo-monitoring-stacks annotation into a list of TargetStack pairs.
+func parseCOOMonitoringStacks(annotations map[string]string) []TargetStack {
+	if annotations == nil {
+		return nil
+	}
+	cooStacks, ok := annotations[config.COOMonitoringStacksAnnotation]
+	if !ok || cooStacks == "" {
+		return nil
+	}
+
+	var parsed []TargetStack
+	stacks := strings.SplitSeq(cooStacks, ",")
+	for stack := range stacks {
+		parts := strings.Split(strings.TrimSpace(stack), "/")
+		if len(parts) == 2 {
+			parsed = append(parsed, TargetStack{
+				Namespace: parts[0],
+				Name:      parts[1],
+			})
+		}
+	}
+	return parsed
 }

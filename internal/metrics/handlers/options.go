@@ -40,6 +40,16 @@ type Options struct {
 	// Thanos holds the hub-only Thanos component specifications.
 	// These are only populated when IsHub is true and platform metrics collection is enabled.
 	Thanos ThanosOptions
+
+	MonitoringStackPatches []MonitoringStackPatch
+
+	PrometheusServerRemoteWrite []cooprometheusv1.RemoteWriteSpec
+}
+
+type MonitoringStackPatch struct {
+	Namespace       string
+	Name            string
+	RemoteWriteSpec *cooprometheusv1.RemoteWriteSpec
 }
 
 // ThanosOptions holds the Thanos operator CR specs for hub deployment.

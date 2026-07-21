@@ -267,7 +267,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 			IsHub:           true,
 			Expects: func(t *testing.T, objects []client.Object) {
 				crds := common.FilterResourcesByLabelSelector[*apiextensionsv1.CustomResourceDefinition](objects, nil)
-				expectedCount := 3 // monitoringstacks + prometheusagents + scrapeconfigs (ReadOnly stubs for feedback)
+				expectedCount := 3 // alertmanagers + prometheusagents + scrapeconfigs (ReadOnly stubs for feedback)
 				if len(crds) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d", expectedCount, len(crds))
 				}
@@ -345,7 +345,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				assert.Empty(t, agent[0].Annotations["operator.prometheus.io/controller-id"])
 
 				crds := common.FilterResourcesByLabelSelector[*apiextensionsv1.CustomResourceDefinition](objects, nil)
-				assert.Len(t, crds, 3) // monitoringstacks + prometheusagents + scrapeconfigs (ReadOnly stubs, always present when metrics enabled)
+				assert.Len(t, crds, 3) // alertmanagers + prometheusagents + scrapeconfigs (ReadOnly stubs, always present when metrics enabled)
 
 				// ensure that the number of objects is correct
 				expectedCount := 40
@@ -1459,7 +1459,7 @@ func newManifestWork(name string, isOLMSubscrided bool) *workv1.ManifestWork {
 						ResourceMeta: workv1.ManifestResourceMeta{
 							Group:    apiextensionsv1.GroupName,
 							Resource: "customresourcedefinitions",
-							Name:     config.MonitoringStackCRDName,
+							Name:     config.AlertmanagerCRDName,
 						},
 						StatusFeedbacks: workv1.StatusFeedbackResult{
 							Values: []workv1.FeedbackValue{
