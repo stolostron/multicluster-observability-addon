@@ -98,6 +98,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 		Registries       []addonapiv1beta1.ImageMirror
 		NodeExporterOpts addon.NodeExporterOptions
 		AgentMissing     bool
+		AlertsEnabled    bool
 		Expects          func(*testing.T, []client.Object)
 	}{
 		"no metrics": {
@@ -466,6 +467,9 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				assert.Contains(t, proms[0].Spec.Secrets, config.GetObsAlertmanagerMtlsCertSecretName(trimmedID))
 				assert.Contains(t, proms[0].Spec.Secrets, config.GetAlertmanagerAccessorSecretName(trimmedID))
 
+				// Assert that externalLabels is not rendered when alert forwarding is disabled
+				assert.Empty(t, proms[0].Spec.ExternalLabels)
+
 				verifyClusterScopedResourcesPrefix(t, objects)
 
 				// ensure that the number of objects is correct
@@ -473,6 +477,22 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
+			},
+		},
+		"is non ocp with alert forwarding": {
+			PlatformMetrics: true,
+			UserMetrics:     false,
+			COOIsInstalled:  false,
+			IsOCP:           false,
+			AlertsEnabled:   true,
+			Expects: func(t *testing.T, objects []client.Object) {
+				proms := common.FilterResourcesByLabelSelector[*cooprometheusv1.Prometheus](objects, nil)
+				assert.Len(t, proms, 1)
+
+				// Assert that externalLabels is rendered with correct values when alert forwarding is enabled
+				assert.NotEmpty(t, proms[0].Spec.ExternalLabels)
+				assert.Equal(t, testClusterID, proms[0].Spec.ExternalLabels["managed_cluster"])
+				assert.Equal(t, "cluster-1", proms[0].Spec.ExternalLabels["managed_cluster_name"])
 			},
 		},
 		"node exporter custom ports": {
@@ -914,7 +934,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 
 			// Wire everything together to a fake addon instance
 			agentAddon, err := addonfactory.NewAgentAddonFactory(addoncfg.Name, addon.FS, addoncfg.MetricsChartDir).
-				WithGetValuesFuncs(addonConfigValuesFn, fakeGetValues(client, tc.PlatformMetrics, tc.UserMetrics, tc.InstallNamespace, aodc.Spec.ResourceRequirements, tc.Registries, tc.NodeExporterOpts)).
+				WithGetValuesFuncs(addonConfigValuesFn, fakeGetValues(client, tc.PlatformMetrics, tc.UserMetrics, tc.InstallNamespace, aodc.Spec.ResourceRequirements, tc.Registries, tc.NodeExporterOpts, tc.AlertsEnabled)).
 				WithAgentRegistrationOption(&agent.RegistrationOption{}).
 				WithAgentInstallNamespace(
 					// Set agent install namespace from addon deployment config if it exists
@@ -1208,7 +1228,7 @@ func TestHelmBuild_Metrics_HCP(t *testing.T) {
 
 	// Wire everything together to a fake addon instance
 	agentAddon, err := addonfactory.NewAgentAddonFactory(addoncfg.Name, addon.FS, addoncfg.MetricsChartDir).
-		WithGetValuesFuncs(addonConfigValuesFn, fakeGetValues(client, false, true, "", nil, nil, addon.NodeExporterOptions{})).
+		WithGetValuesFuncs(addonConfigValuesFn, fakeGetValues(client, false, true, "", nil, nil, addon.NodeExporterOptions{}, false)).
 		WithAgentRegistrationOption(&agent.RegistrationOption{}).
 		WithScheme(scheme).
 		BuildHelmAgentAddon()
@@ -1268,7 +1288,7 @@ func newSecret(name, ns string) *corev1.Secret {
 	}
 }
 
-func fakeGetValues(k8s client.Client, platformMetrics, userWorkloadMetrics bool, installNs string, resReqs []addonapiv1beta1.ContainerResourceRequirements, registries []addonapiv1beta1.ImageMirror, nodeExporterOpts addon.NodeExporterOptions) addonfactory.GetValuesFunc {
+func fakeGetValues(k8s client.Client, platformMetrics, userWorkloadMetrics bool, installNs string, resReqs []addonapiv1beta1.ContainerResourceRequirements, registries []addonapiv1beta1.ImageMirror, nodeExporterOpts addon.NodeExporterOptions, alertsEnabled bool) addonfactory.GetValuesFunc {
 	return func(
 		cluster *clusterv1.ManagedCluster,
 		mcAddon *addonapiv1beta1.ManagedClusterAddOn,
@@ -1285,10 +1305,14 @@ func fakeGetValues(k8s client.Client, platformMetrics, userWorkloadMetrics bool,
 					CollectionEnabled: platformMetrics,
 					HubEndpoint:       *hubEp,
 					NodeExporter:      nodeExporterOpts,
+					AlertsEnabled:     alertsEnabled,
 				},
 			},
 			UserWorkloads: addon.UserWorkloadOptions{
-				Metrics: addon.MetricsOptions{CollectionEnabled: userWorkloadMetrics},
+				Metrics: addon.MetricsOptions{
+					CollectionEnabled: userWorkloadMetrics,
+					AlertsEnabled:     alertsEnabled,
+				},
 			},
 			Registries: registries,
 		}
