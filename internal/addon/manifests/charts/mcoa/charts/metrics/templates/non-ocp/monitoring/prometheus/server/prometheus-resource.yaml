@@ -33,8 +33,11 @@ spec:
   resources:
     requests:
       memory: 400Mi
+  {{- if and .Values.alertManagerEndpoint (or .Values.platformAlertsEnabled .Values.userWorkloadAlertsEnabled) }}
   externalLabels:
-    managed_cluster: CLUSTER
+    managed_cluster: {{ .Values.clusterID }}
+    managed_cluster_name: {{ .Values.clusterName }}
+  {{- end }}
   listenLocal: true
   initContainers:
     - name: init-config-reloader
