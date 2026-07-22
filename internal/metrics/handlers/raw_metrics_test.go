@@ -230,10 +230,10 @@ func TestBuildOptionsRawMetrics(t *testing.T) {
 	certFound := false
 	for _, s := range retOpts.Secrets {
 		if s.Namespace == "stack-namespace" {
-			if s.Name == config.GetObsAlertmanagerMtlsCASecretName(config.GetTrimmedClusterID(clusterID)) {
+			if s.Name == config.GetHubMtlsCASecretName(config.GetTrimmedClusterID(clusterID)) {
 				caFound = true
 			}
-			if s.Name == config.GetObsAlertmanagerMtlsCertSecretName(config.GetTrimmedClusterID(clusterID)) {
+			if s.Name == config.GetHubMtlsCertSecretName(config.GetTrimmedClusterID(clusterID)) {
 				certFound = true
 			}
 		}
@@ -246,7 +246,8 @@ func TestBuildOptionsRawMetrics(t *testing.T) {
 	patch := retOpts.MonitoringStackPatches[0]
 	assert.Equal(t, "stack-namespace", patch.Namespace)
 	assert.Equal(t, "stack-name", patch.Name)
-	assert.NotNil(t, patch.RemoteWriteSpec)
+	require.Len(t, patch.RemoteWriteSpecs, 1)
+	assert.NotNil(t, patch.RemoteWriteSpecs[0])
 }
 
 func TestBuildOptionsRawMetricsNonOCP(t *testing.T) {
@@ -453,8 +454,8 @@ func TestBuildOptionsRawMetricsNonOCP(t *testing.T) {
 	require.Len(t, retOpts.PrometheusServerRemoteWrite, 1)
 	rwSpec := retOpts.PrometheusServerRemoteWrite[0]
 	assert.NotNil(t, rwSpec)
-	assert.Equal(t, config.GetObsAlertmanagerMtlsCASecretName(config.GetTrimmedClusterID(clusterID)), rwSpec.TLSConfig.CA.Secret.Name)
-	assert.Equal(t, config.GetObsAlertmanagerMtlsCertSecretName(config.GetTrimmedClusterID(clusterID)), rwSpec.TLSConfig.Cert.Secret.Name)
+	assert.Equal(t, config.GetHubMtlsCASecretName(config.GetTrimmedClusterID(clusterID)), rwSpec.TLSConfig.CA.Secret.Name)
+	assert.Equal(t, config.GetHubMtlsCertSecretName(config.GetTrimmedClusterID(clusterID)), rwSpec.TLSConfig.Cert.Secret.Name)
 }
 
 func TestProcessScrapeConfigs(t *testing.T) {
@@ -545,7 +546,8 @@ func TestProcessScrapeConfigs(t *testing.T) {
 		assert.Len(t, patches, 1)
 		assert.Equal(t, "ns1", patches[0].Namespace)
 		assert.Equal(t, "stack1", patches[0].Name)
-		assert.NotNil(t, patches[0].RemoteWriteSpec)
+		require.Len(t, patches[0].RemoteWriteSpecs, 1)
+		assert.NotNil(t, patches[0].RemoteWriteSpecs[0])
 	})
 
 	t.Run("OCP - Raw Metrics ScrapeConfig without COO stack (CMO target) should deploy secrets in default-ns and fall through as ScrapeConfig", func(t *testing.T) {

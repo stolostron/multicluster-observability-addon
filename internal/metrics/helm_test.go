@@ -207,9 +207,9 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				assert.Equal(t, "--cluster-name=cluster-1", clusterNameArg)
 				assert.Equal(t, "--cluster-id="+testClusterID, clusterIDArg)
 				assert.Empty(t, hubAlertmanagerURL, "hub-alertmanager-url should be absent when alert forwarding is disabled")
-				assert.Equal(t, "--hub-alertmanager-cert-secret=obs-alertmanager-mtls-cert-97e513873da14ae489e", hubAlertmanagerCert)
+				assert.Equal(t, "--hub-alertmanager-cert-secret=hub-mtls-cert-97e513873da14ae489e", hubAlertmanagerCert)
 				assert.Equal(t, "--hub-alertmanager-accessor-secret=observability-alertmanager-accessor-97e513873da14ae489e", hubAlertmanagerAccessor)
-				assert.Equal(t, "--hub-alertmanager-ca-secret=obs-alertmanager-mtls-ca-97e513873da14ae489e", hubAlertmanagerCA)
+				assert.Equal(t, "--hub-alertmanager-ca-secret=hub-mtls-ca-97e513873da14ae489e", hubAlertmanagerCA)
 				assert.Equal(t, "--enable-platform-alert-forwarding=false", enablePlatformAlertForwarding)
 				assert.Equal(t, "--enable-uwl-alert-forwarding=false", enableUWLAlertForwarding)
 
@@ -233,7 +233,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 					}
 				}
 				assert.Equal(t, "--cluster-name=cluster-1", jobClusterNameArg)
-				assert.Equal(t, "--hub-alertmanager-ca-secret=obs-alertmanager-mtls-ca-97e513873da14ae489e", jobHubCASecretArg)
+				assert.Equal(t, "--hub-alertmanager-ca-secret=hub-mtls-ca-97e513873da14ae489e", jobHubCASecretArg)
 				// ensure that the number of objects is correct
 				expectedCount := 46
 				if len(objects) != expectedCount {
@@ -502,8 +502,8 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				proms := common.FilterResourcesByLabelSelector[*cooprometheusv1.Prometheus](objects, nil)
 				assert.Len(t, proms, 1)
 				trimmedID := config.GetTrimmedClusterID(testClusterID)
-				assert.Contains(t, proms[0].Spec.Secrets, config.GetObsAlertmanagerMtlsCASecretName(trimmedID))
-				assert.Contains(t, proms[0].Spec.Secrets, config.GetObsAlertmanagerMtlsCertSecretName(trimmedID))
+				assert.Contains(t, proms[0].Spec.Secrets, config.GetHubMtlsCASecretName(trimmedID))
+				assert.Contains(t, proms[0].Spec.Secrets, config.GetHubMtlsCertSecretName(trimmedID))
 				assert.Contains(t, proms[0].Spec.Secrets, config.GetAlertmanagerAccessorSecretName(trimmedID))
 
 				// Assert that externalLabels is not rendered when alert forwarding is disabled

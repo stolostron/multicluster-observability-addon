@@ -101,9 +101,9 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 		PrometheusControllerID:         config.PrometheusControllerID,
 		PrometheusCAConfigMapName:      config.PrometheusCAConfigMapName,
 		PrometheusServerName:           config.PrometheusServerName,
-		AlertmanagerRouterCASecretName: config.GetObsAlertmanagerMtlsCASecretName(config.GetTrimmedClusterID(opts.HubClusterID)),
+		AlertmanagerRouterCASecretName: config.GetHubMtlsCASecretName(config.GetTrimmedClusterID(opts.HubClusterID)),
 		AlertmanagerAccessorSecretName: config.GetAlertmanagerAccessorSecretName(config.GetTrimmedClusterID(opts.HubClusterID)),
-		ClientCertSecretName:           config.GetObsAlertmanagerMtlsCertSecretName(config.GetTrimmedClusterID(opts.HubClusterID)),
+		ClientCertSecretName:           config.GetHubMtlsCertSecretName(config.GetTrimmedClusterID(opts.HubClusterID)),
 		HubClusterID:                   opts.HubClusterID,
 		ClusterID:                      opts.ClusterID,
 		ClusterName:                    opts.ClusterName,
@@ -335,7 +335,12 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 
 	var patches []MonitoringStackPatchValues
 	for _, p := range opts.MonitoringStackPatches {
-		rwList := []cooprometheusv1.RemoteWriteSpec{*p.RemoteWriteSpec}
+		var rwList []cooprometheusv1.RemoteWriteSpec
+		for _, rwSpec := range p.RemoteWriteSpecs {
+			if rwSpec != nil {
+				rwList = append(rwList, *rwSpec)
+			}
+		}
 		rwJson, err := json.Marshal(rwList)
 		if err != nil {
 			return ret, fmt.Errorf("failed to marshal remoteWriteSpec for MonitoringStack patch: %w", err)

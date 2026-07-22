@@ -144,8 +144,8 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1beta1.Man
 		}
 	}
 
-	caTargetName := config.GetObsAlertmanagerMtlsCASecretName(config.GetTrimmedClusterID(ret.HubClusterID))
-	certTargetName := config.GetObsAlertmanagerMtlsCertSecretName(config.GetTrimmedClusterID(ret.HubClusterID))
+	caTargetName := config.GetHubMtlsCASecretName(config.GetTrimmedClusterID(ret.HubClusterID))
+	certTargetName := config.GetHubMtlsCertSecretName(config.GetTrimmedClusterID(ret.HubClusterID))
 
 	var rawPatches []MonitoringStackPatch
 
@@ -329,8 +329,8 @@ func (o *OptionsBuilder) buildPrometheusAgent(ctx context.Context, opts *Options
 	}
 
 	trimmedClusterID := config.GetTrimmedClusterID(opts.HubClusterID)
-	caTargetName := config.GetObsAlertmanagerMtlsCASecretName(trimmedClusterID)
-	certTargetName := config.GetObsAlertmanagerMtlsCertSecretName(trimmedClusterID)
+	caTargetName := config.GetHubMtlsCASecretName(trimmedClusterID)
+	certTargetName := config.GetHubMtlsCertSecretName(trimmedClusterID)
 
 	// Note: We dynamically rename the secrets referenced in the PrometheusAgent (and their corresponding TLSConfig file paths)
 	// on the managed cluster to use the caTargetName and certTargetName secret names.
@@ -628,14 +628,14 @@ func (o *OptionsBuilder) addAlertmanagerMtlsSecrets(ctx context.Context, secrets
 			targetNamespace = "" // This is replaced by the default value in the help template that is the installation namespace
 		}
 
-		// Copy HubCASecretName (observability-managed-cluster-certs) to obs-alertmanager-mtls-ca-<id>
-		caTargetName := config.GetObsAlertmanagerMtlsCASecretName(trimmedClusterID)
+		// Copy HubCASecretName (observability-managed-cluster-certs) to hub-mtls-ca-<id>
+		caTargetName := config.GetHubMtlsCASecretName(trimmedClusterID)
 		if err := o.addSecret(ctx, secrets, config.HubCASecretName, config.HubInstallNamespace, caTargetName, targetNamespace); err != nil {
 			return fmt.Errorf("failed to add platform mtls ca secret: %w", err)
 		}
 
-		// Copy ClientCertSecretName (observability-controller...) to obs-alertmanager-mtls-cert-<id>
-		certTargetName := config.GetObsAlertmanagerMtlsCertSecretName(trimmedClusterID)
+		// Copy ClientCertSecretName (observability-controller...) to hub-mtls-cert-<id>
+		certTargetName := config.GetHubMtlsCertSecretName(trimmedClusterID)
 		if err := o.addSecret(ctx, secrets, config.ClientCertSecretName, config.HubInstallNamespace, certTargetName, targetNamespace); err != nil {
 			return fmt.Errorf("failed to add platform mtls cert secret: %w", err)
 		}
@@ -650,14 +650,14 @@ func (o *OptionsBuilder) addAlertmanagerMtlsSecrets(ctx context.Context, secrets
 	if isOCP && opts.UserWorkloads.Metrics.CollectionEnabled {
 		targetNamespace := config.AlertmanagerUWLNamespace
 
-		// Copy HubCASecretName (observability-managed-cluster-certs) to obs-alertmanager-mtls-ca-<id>
-		caTargetName := config.GetObsAlertmanagerMtlsCASecretName(trimmedClusterID)
+		// Copy HubCASecretName (observability-managed-cluster-certs) to hub-mtls-ca-<id>
+		caTargetName := config.GetHubMtlsCASecretName(trimmedClusterID)
 		if err := o.addSecret(ctx, secrets, config.HubCASecretName, config.HubInstallNamespace, caTargetName, targetNamespace); err != nil {
 			return fmt.Errorf("failed to add uwl mtls ca secret: %w", err)
 		}
 
-		// Copy ClientCertSecretName (observability-controller...) to obs-alertmanager-mtls-cert-<id>
-		certTargetName := config.GetObsAlertmanagerMtlsCertSecretName(trimmedClusterID)
+		// Copy ClientCertSecretName (observability-controller...) to hub-mtls-cert-<id>
+		certTargetName := config.GetHubMtlsCertSecretName(trimmedClusterID)
 		if err := o.addSecret(ctx, secrets, config.ClientCertSecretName, config.HubInstallNamespace, certTargetName, targetNamespace); err != nil {
 			return fmt.Errorf("failed to add uwl mtls cert secret: %w", err)
 		}
@@ -760,45 +760,48 @@ func (o *OptionsBuilder) processScrapeConfigs(
 				}
 
 				// Transpile to MonitoringStack patch
-				rwSpec, scErr := remotewrite.Transpile(sc, agent)
+				rwSpecs, scErr := remotewrite.Transpile(sc, agent)
 				if scErr != nil {
 					return nil, nil, nil, fmt.Errorf("failed to transpile scrape config %s/%s: %w", sc.Namespace, sc.Name, scErr)
 				}
-				if rwSpec == nil {
-					o.Logger.Info("transpilation returned empty remote write spec for raw scrape config, no selectors parsed", "namespace", sc.Namespace, "name", sc.Name)
+				if len(rwSpecs) == 0 {
+					o.Logger.Info("transpilation returned empty remote write specs for raw scrape config, no selectors parsed", "namespace", sc.Namespace, "name", sc.Name)
 					continue
 				}
 
 				// We must override the agent's TLSFilesConfig (disk files) to use SafeTLSConfig (kubernetes secret selectors).
 				// We do this because we rename the deployed secret to limit its name length and prevent duplicated mount
 				// paths on the target Prometheus pod.
-				rwSpec.TLSConfig = createSafeTLSConfig(caTargetName, certTargetName)
+				for _, spec := range rwSpecs {
+					spec.TLSConfig = createSafeTLSConfig(caTargetName, certTargetName)
+				}
 
 				patches = append(patches, MonitoringStackPatch{
-					Namespace:       targetNamespace,
-					Name:            targetName,
-					RemoteWriteSpec: rwSpec,
+					Namespace:        targetNamespace,
+					Name:             targetName,
+					RemoteWriteSpecs: rwSpecs,
 				})
 			}
 			// Since it's targeted for COO, we do NOT export the ScrapeConfig itself to the managed cluster
 			continue
 		} else {
 			// For non-OCP managed clusters, transpile directly for our Prometheus Server (acm-prometheus-k8s)
-			rwSpec, scErr := remotewrite.Transpile(sc, agent)
+			rwSpecs, scErr := remotewrite.Transpile(sc, agent)
 			if scErr != nil {
 				return nil, nil, nil, fmt.Errorf("failed to transpile scrape config %s/%s: %w", sc.Namespace, sc.Name, scErr)
 			}
-			if rwSpec == nil {
-				o.Logger.Info("transpilation returned empty remote write spec for raw scrape config, no selectors parsed", "namespace", sc.Namespace, "name", sc.Name)
+			if len(rwSpecs) == 0 {
+				o.Logger.Info("transpilation returned empty remote write specs for raw scrape config, no selectors parsed", "namespace", sc.Namespace, "name", sc.Name)
 				continue
 			}
 
 			// We must override the agent's TLSFilesConfig (disk files) to use SafeTLSConfig (kubernetes secret selectors).
 			// We do this because we rename the deployed secret to limit its name length and prevent duplicated mount
 			// paths on the target Prometheus pod.
-			rwSpec.TLSConfig = createSafeTLSConfig(caTargetName, certTargetName)
-
-			serverRemoteWrites = append(serverRemoteWrites, *rwSpec)
+			for _, spec := range rwSpecs {
+				spec.TLSConfig = createSafeTLSConfig(caTargetName, certTargetName)
+				serverRemoteWrites = append(serverRemoteWrites, *spec)
+			}
 			// Since it's transpiled directly into the Prometheus Server's RemoteWrite, we do NOT export the ScrapeConfig itself
 			continue
 		}
