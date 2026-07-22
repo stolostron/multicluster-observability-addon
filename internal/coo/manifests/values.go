@@ -3,6 +3,7 @@ package manifests
 import (
 	"encoding/json"
 	"log"
+	"strings"
 
 	persesv1 "github.com/perses/perses-operator/api/v1alpha1"
 	"github.com/perses/perses/go-sdk/dashboard"
@@ -16,12 +17,14 @@ import (
 	networking "github.com/stolostron/multicluster-observability-addon/pkg/perses/dashboards/acm/k8s/networking"
 	slo "github.com/stolostron/multicluster-observability-addon/pkg/perses/dashboards/acm/k8s/slo"
 	incident_management "github.com/stolostron/multicluster-observability-addon/pkg/perses/dashboards/incident-management"
+	"github.com/stolostron/multicluster-observability-addon/pkg/perses/dashboards/thanos"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
 var (
-	dsThanos         = "rbac-query-proxy-datasource"
-	clusterLabelName = ""
+	dsThanos             = "rbac-query-proxy-datasource"
+	dsPlatformPrometheus = "platform-prometheus-datasource"
+	clusterLabelName     = ""
 )
 
 type DashboardValue struct {
@@ -64,6 +67,7 @@ func BuildValues(opts addon.Options, installOfCOOOnTheHubIsNeeded bool, isHubClu
 		if metricsUI.Enabled {
 			dashboards = append(dashboards, buildACMDashboards()...)
 			dashboards = append(dashboards, buildK8sDashboards()...)
+			dashboards = append(dashboards, buildThanosDashboards()...)
 			if hasCardinalityRules {
 				dashboards = append(dashboards, buildCardinalityDashboards()...)
 			}
@@ -178,6 +182,44 @@ func buildACMDashboards() []DashboardValue {
 	}
 
 	return buildDashboards(builders, dsThanos, config.InstallNamespace)
+}
+
+// thanosVariableMetricRenames covers the small set of metric names referenced
+// directly by community-mixins' Thanos dashboard-level variables (job/
+// namespace/cluster/tenant), which aren't covered by the
+// ThanosCommonPanelQueries override in pkg/perses/dashboards/thanos since
+// they're not panel queries.
+var thanosVariableMetricRenames = strings.NewReplacer(
+	"thanos_build_info", "acm_thanos_build_info",
+	"thanos_status", "acm_thanos_status",
+	"prometheus_tsdb_head_max_time", "acm_prometheus_tsdb_head_max_time",
+)
+
+func buildThanosDashboards() []DashboardValue {
+	objs, err := thanos.BuildThanosDashboards(config.InstallNamespace, dsPlatformPrometheus, clusterLabelName)
+	if err != nil {
+		log.Printf("Failed to build Thanos dashboards: %v", err)
+		return nil
+	}
+
+	var dashboards []DashboardValue
+	for _, obj := range objs {
+		db, ok := obj.(*persesv1.PersesDashboard)
+		if !ok {
+			log.Printf("Failed to convert object to PersesDashboard: %v", obj)
+			continue
+		}
+		data, err := json.Marshal(db.Spec)
+		if err != nil {
+			log.Printf("Failed to marshal Thanos dashboard %s: %v", db.Name, err)
+			continue
+		}
+		dashboards = append(dashboards, DashboardValue{
+			Name: db.Name,
+			Data: thanosVariableMetricRenames.Replace(string(data)),
+		})
+	}
+	return dashboards
 }
 
 func buildCardinalityDashboards() []DashboardValue {
