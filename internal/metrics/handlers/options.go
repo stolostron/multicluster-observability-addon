@@ -49,9 +49,9 @@ type Options struct {
 }
 
 type MonitoringStackPatch struct {
-	Namespace       string
-	Name            string
-	RemoteWriteSpec *cooprometheusv1.RemoteWriteSpec
+	Namespace        string
+	Name             string
+	RemoteWriteSpecs []*cooprometheusv1.RemoteWriteSpec
 }
 
 // ThanosOptions holds the Thanos operator CR specs for hub deployment.

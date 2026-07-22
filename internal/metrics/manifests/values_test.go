@@ -233,8 +233,8 @@ func TestBuildValues(t *testing.T) {
 			},
 			Expect: func(t *testing.T, values *manifests.MetricsValues) {
 				trimmedID := config.GetTrimmedClusterID("12345-67890-abcdef")
-				assert.Equal(t, config.GetObsAlertmanagerMtlsCASecretName(trimmedID), values.AlertmanagerRouterCASecretName)
-				assert.Equal(t, config.GetObsAlertmanagerMtlsCertSecretName(trimmedID), values.ClientCertSecretName)
+				assert.Equal(t, config.GetHubMtlsCASecretName(trimmedID), values.AlertmanagerRouterCASecretName)
+				assert.Equal(t, config.GetHubMtlsCertSecretName(trimmedID), values.ClientCertSecretName)
 				assert.Equal(t, config.GetAlertmanagerAccessorSecretName(trimmedID), values.AlertmanagerAccessorSecretName)
 			},
 		},
