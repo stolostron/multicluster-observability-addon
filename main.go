@@ -22,6 +22,7 @@ import (
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	cooprometheusv1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1"
 	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
+	monitoringv1alpha1 "github.com/rhobs/observability-operator/pkg/apis/monitoring/v1alpha1"
 	uiplugin "github.com/rhobs/observability-operator/pkg/apis/uiplugin/v1alpha1"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -64,6 +65,7 @@ func init() {
 	utilruntime.Must(operatorv1.AddToScheme(scheme))
 	utilruntime.Must(cooprometheusv1.AddToScheme(scheme))
 	utilruntime.Must(cooprometheusv1alpha1.AddToScheme(scheme)) // Adds prometheusAgent and scrapeConfig
+	utilruntime.Must(monitoringv1alpha1.AddToScheme(scheme))    // Adds monitoringstack
 	utilruntime.Must(prometheusv1.AddToScheme(scheme))          // Adds prometheusRule
 	utilruntime.Must(uiplugin.AddToScheme(scheme))
 	utilruntime.Must(hyperv1.AddToScheme(scheme))
