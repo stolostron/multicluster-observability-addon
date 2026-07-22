@@ -84,6 +84,11 @@ spec:
       - name: kube-rbac-proxy
         image: {{ .Values.images.rbacProxyImage }}
         imagePullPolicy: IfNotPresent
+        env:
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
         args:
         - --secure-listen-address=0.0.0.0:8443
         - --upstream=http://127.0.0.1:8080
