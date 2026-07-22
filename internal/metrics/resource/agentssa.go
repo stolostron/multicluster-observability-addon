@@ -283,16 +283,6 @@ func (p PrometheusAgentSSA) createKubeRbacProxyContainer() corev1.Container {
 			"--logtostderr=true",
 			"--allow-paths=/metrics",
 		},
-		Env: []corev1.EnvVar{
-			{
-				Name: "POD_NAMESPACE",
-				ValueFrom: &corev1.EnvVarSource{
-					FieldRef: &corev1.ObjectFieldSelector{
-						FieldPath: "metadata.namespace",
-					},
-				},
-			},
-		},
 		VolumeMounts: []corev1.VolumeMount{
 			{
 				Name:      "kube-rbac-proxy-tls",
