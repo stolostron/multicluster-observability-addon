@@ -225,7 +225,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				assert.Equal(t, "--cluster-name=cluster-1", jobClusterNameArg)
 				assert.Equal(t, "--hub-alertmanager-ca-secret=obs-alertmanager-mtls-ca-97e513873da14ae489e", jobHubCASecretArg)
 				// ensure that the number of objects is correct
-				expectedCount := 48
+				expectedCount := 46
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
@@ -273,7 +273,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 					t.Fatalf("expected %d objects, but got %d", expectedCount, len(crds))
 				}
 				// ensure that the number of objects is correct
-				expectedCount = 48
+				expectedCount = 46
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
@@ -292,7 +292,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				assert.Equal(t, "observability-operator", agent[0].Labels["app.kubernetes.io/managed-by"])
 				assert.Empty(t, agent[0].Annotations["operator.prometheus.io/controller-id"])
 				// ensure that the number of objects is correct
-				expectedCount := 40
+				expectedCount := 38
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
@@ -324,7 +324,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				cooRecordingRules := common.FilterResourcesByLabelSelector[*cooprometheusv1.PrometheusRule](objects, config.UserWorkloadPrometheusMatchLabels)
 				assert.Len(t, cooRecordingRules, 2)
 				assert.Equal(t, "openshift-user-workload-monitoring/prometheus-operator", cooRecordingRules[0].Annotations["operator.prometheus.io/controller-id"])
-				expectedCount := 50
+				expectedCount := 48
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
@@ -349,7 +349,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				assert.Len(t, crds, 3) // monitoringstacks + prometheusagents + scrapeconfigs (ReadOnly stubs, always present when metrics enabled)
 
 				// ensure that the number of objects is correct
-				expectedCount := 42
+				expectedCount := 40
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
@@ -470,7 +470,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				verifyClusterScopedResourcesPrefix(t, objects)
 
 				// ensure that the number of objects is correct
-				expectedCount := 79
+				expectedCount := 77
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
@@ -547,7 +547,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				assert.Equal(t, "metrics", ns[0].Labels["app"])
 
 				// ensure that the number of objects is correct
-				expectedCount := 79
+				expectedCount := 77
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
