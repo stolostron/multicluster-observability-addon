@@ -37,7 +37,7 @@ type MetricsValues struct {
 	DeployCOOResources             bool                              `json:"deployCOOResources"`
 	IsHub                          bool                              `json:"isHub"`
 	PrometheusOperatorAnnotations  string                            `json:"prometheusOperatorAnnotations,omitempty"`
-	AlertManagerEndpoint           string                            `json:"alertManagerEndpoint,omitempty"`
+	HubEndpoint                    string                            `json:"hubEndpoint,omitempty"`
 	Tolerations                    []corev1.Toleration               `json:"tolerations"`
 	NodeSelector                   map[string]string                 `json:"nodeSelector"`
 	NodeExporter                   NodeExporterValues                `json:"nodeExporter"`
@@ -119,7 +119,7 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 			RBACProxyTLSSecret: config.UserWorkloadRBACProxyTLSSecret,
 			RBACProxyPort:      strconv.Itoa(config.RBACProxyPort),
 		},
-		AlertManagerEndpoint: opts.AlertManagerEndpoint,
+		HubEndpoint:          opts.HubEndpoint,
 		NodeSelector:         opts.NodeSelector,
 		Tolerations:          opts.Tolerations,
 		IsHub:                opts.IsHub,

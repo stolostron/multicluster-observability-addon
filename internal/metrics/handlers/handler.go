@@ -65,7 +65,7 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1beta1.Man
 
 	ret.ClusterName = managedCluster.Name
 	ret.ClusterID = common.GetManagedClusterID(managedCluster)
-	ret.AlertManagerEndpoint = opts.Platform.Metrics.HubEndpoint.Host // Use the same host as the metrics for alerts forwarding
+	ret.HubEndpoint = opts.Platform.Metrics.HubEndpoint.Host // Use the same host as the metrics for alerts forwarding
 	isOpenShiftVendor := common.IsOpenShiftVendor(managedCluster)
 	ret.IsOpenShiftVendor = isOpenShiftVendor
 

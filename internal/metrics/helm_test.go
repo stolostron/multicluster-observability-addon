@@ -169,7 +169,8 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 
 				// Verify always-required and trigger flags on the endpoint-monitoring-operator container
 				var clusterNameArg, clusterIDArg string
-				var hubAlertmanagerURL, hubAlertmanagerCA, hubAlertmanagerCert, hubAlertmanagerAccessor string
+				var hubEndpointURL, hubAlertmanagerCA, hubAlertmanagerCert, hubAlertmanagerAccessor string
+				var enablePlatformAlertForwarding, enableUWLAlertForwarding string
 				for _, arg := range emoDeployment.Spec.Template.Spec.Containers[0].Args {
 					if strings.HasPrefix(arg, "--cluster-name=") {
 						clusterNameArg = arg
@@ -177,8 +178,8 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 					if strings.HasPrefix(arg, "--cluster-id=") {
 						clusterIDArg = arg
 					}
-					if strings.HasPrefix(arg, "--hub-alertmanager-url=") {
-						hubAlertmanagerURL = arg
+					if strings.HasPrefix(arg, "--hub-endpoint-url=") {
+						hubEndpointURL = arg
 					}
 					if strings.HasPrefix(arg, "--hub-alertmanager-ca-secret=") {
 						hubAlertmanagerCA = arg
@@ -189,19 +190,27 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 					if strings.HasPrefix(arg, "--hub-alertmanager-accessor-secret=") {
 						hubAlertmanagerAccessor = arg
 					}
+					if strings.HasPrefix(arg, "--enable-platform-alert-forwarding=") {
+						enablePlatformAlertForwarding = arg
+					}
+					if strings.HasPrefix(arg, "--enable-uwl-alert-forwarding=") {
+						enableUWLAlertForwarding = arg
+					}
 				}
 
 				// Comment explaining why each flag is needed and when:
 				// 1. --cluster-name and --cluster-id: must always be present to uniquely identify the cluster.
-				// 2. --hub-alertmanager-url: serves as the trigger to enable alert forwarding. In this test case, alert forwarding is disabled, so this flag must be absent.
-				// 3. --hub-alertmanager-ca-secret: must always be present (even when alert forwarding is disabled) so that the operator has the necessary CA secret reference to successfully revert/clean up the CMO configmap.
-				// 4. --hub-alertmanager-cert-secret and --hub-alertmanager-accessor-secret: are only needed when alert forwarding is active/enabled to authenticate against the Hub's Alertmanager, so they are absent in this test case.
+				// 2. --hub-endpoint-url: point to the Hub's Alertmanager.
+				// 3. --hub-alertmanager-ca-secret, --hub-alertmanager-cert-secret, and --hub-alertmanager-accessor-secret are always rendered when hubEndpoint is set.
+				// 4. --enable-platform-alert-forwarding and --enable-uwl-alert-forwarding: toggle actual alert forwarding.
 				assert.Equal(t, "--cluster-name=cluster-1", clusterNameArg)
 				assert.Equal(t, "--cluster-id="+testClusterID, clusterIDArg)
-				assert.Empty(t, hubAlertmanagerURL, "hub-alertmanager-url should be absent when alert forwarding is disabled")
-				assert.Empty(t, hubAlertmanagerCert, "hub-alertmanager-cert-secret should be absent when alert forwarding is disabled")
-				assert.Empty(t, hubAlertmanagerAccessor, "hub-alertmanager-accessor-secret should be absent when alert forwarding is disabled")
+				assert.Equal(t, "--hub-endpoint-url=https://remote-write.example.com/api/alertmanager/v2/default", hubEndpointURL)
+				assert.Equal(t, "--hub-alertmanager-cert-secret=obs-alertmanager-mtls-cert-97e513873da14ae489e", hubAlertmanagerCert)
+				assert.Equal(t, "--hub-alertmanager-accessor-secret=observability-alertmanager-accessor-97e513873da14ae489e", hubAlertmanagerAccessor)
 				assert.Equal(t, "--hub-alertmanager-ca-secret=obs-alertmanager-mtls-ca-97e513873da14ae489e", hubAlertmanagerCA)
+				assert.Equal(t, "--enable-platform-alert-forwarding=false", enablePlatformAlertForwarding)
+				assert.Equal(t, "--enable-uwl-alert-forwarding=false", enableUWLAlertForwarding)
 
 				// Verify --cluster-name and --hub-alertmanager-ca-secret arguments are set on the observability-monitoring-cleanup Job container
 				jobs := common.FilterResourcesByLabelSelector[*batchv1.Job](objects, nil)

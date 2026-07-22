@@ -18,7 +18,7 @@ type Options struct {
 	UserWorkloads             Collector
 	Secrets                   []*corev1.Secret
 	ConfigMaps                []*corev1.ConfigMap
-	AlertManagerEndpoint      string
+	HubEndpoint               string
 	ClusterName               string
 	HubClusterID              string
 	ClusterID                 string
