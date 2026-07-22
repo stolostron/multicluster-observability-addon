@@ -199,9 +199,10 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 		}
 
 		ret.Platform.ScrapeConfigs = append(ret.Platform.ScrapeConfigs, ConfigValue{
-			Name:   scrapeConfig.Name,
-			Data:   string(scrapeConfigJson),
-			Labels: scrapeConfig.Labels,
+			Name:        scrapeConfig.Name,
+			Data:        string(scrapeConfigJson),
+			Labels:      scrapeConfig.Labels,
+			Annotations: scrapeConfig.Annotations,
 		})
 	}
 
@@ -224,9 +225,10 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 		}
 
 		ret.UserWorkload.ScrapeConfigs = append(ret.UserWorkload.ScrapeConfigs, ConfigValue{
-			Name:   scrapeConfig.Name,
-			Data:   string(scrapeConfigJson),
-			Labels: scrapeConfig.Labels,
+			Name:        scrapeConfig.Name,
+			Data:        string(scrapeConfigJson),
+			Labels:      scrapeConfig.Labels,
+			Annotations: scrapeConfig.Annotations,
 		})
 	}
 
