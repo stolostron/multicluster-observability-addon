@@ -33,7 +33,7 @@ spec:
   resources:
     requests:
       memory: 400Mi
-  {{- if and .Values.alertManagerEndpoint (or .Values.platformAlertsEnabled .Values.userWorkloadAlertsEnabled) }}
+  {{- if and .Values.hubEndpoint (or .Values.platformAlertsEnabled .Values.userWorkloadAlertsEnabled) }}
   externalLabels:
     managed_cluster: {{ .Values.clusterID }}
     managed_cluster_name: {{ .Values.clusterName }}
@@ -110,7 +110,7 @@ spec:
   additionalScrapeConfigs:
     name: prometheus-scrape-targets
     key: scrape-targets.yaml
-  {{- if .Values.alertManagerEndpoint }}
+  {{- if .Values.hubEndpoint }}
   additionalAlertManagerConfigs:
     name: prometheus-alertmanager
     key: alertmanager.yaml

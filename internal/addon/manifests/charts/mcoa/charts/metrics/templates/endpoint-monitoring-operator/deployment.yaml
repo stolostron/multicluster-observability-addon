@@ -39,15 +39,18 @@ spec:
         - mcoa
         - --namespace={{ .Release.Namespace }}
         - --metrics-bind-address={{ if .Values.deployNonOCPStack }}0.0.0.0:8080{{ else }}127.0.0.1:8080{{ end }}
-        {{- if and .Values.alertManagerEndpoint (or .Values.platformAlertsEnabled .Values.userWorkloadAlertsEnabled) }}
-        - --hub-alertmanager-url=https://{{ .Values.alertManagerEndpoint }}/api/alertmanager/v2/default
-        - --hub-alertmanager-cert-secret={{ .Values.clientCertSecretName }}
-        - --hub-alertmanager-accessor-secret={{ .Values.alertmanagerAccessorSecretName }}
-        {{- end }}
-        - --hub-alertmanager-ca-secret={{ .Values.alertmanagerRouterCASecretName }}
         - --cluster-id={{ .Values.clusterID }}
         - --cluster-name={{ .Values.clusterName }}
+        - --enable-platform-alert-forwarding={{ and .Values.platformEnabled .Values.platformAlertsEnabled }}
         - --enable-uwl-alert-forwarding={{ and .Values.userWorkloadsEnabled .Values.userWorkloadAlertsEnabled }}
+        {{- if and .Values.hubEndpoint (or .Values.platformAlertsEnabled .Values.userWorkloadAlertsEnabled) }}
+        - --hub-alertmanager-url=https://{{ .Values.hubEndpoint }}/api/alertmanager/v2/default
+        {{- end }}
+        {{- if .Values.hubEndpoint }}
+        - --hub-alertmanager-cert-secret={{ .Values.clientCertSecretName }}
+        - --hub-alertmanager-accessor-secret={{ .Values.alertmanagerAccessorSecretName }}
+        - --hub-alertmanager-ca-secret={{ .Values.alertmanagerRouterCASecretName }}
+        {{- end }}
         {{- if .Values.deployNonOCPStack }}
         ports:
         - name: metrics
