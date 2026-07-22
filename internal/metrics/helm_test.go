@@ -88,18 +88,19 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 	}
 
 	testCases := map[string]struct {
-		PlatformMetrics  bool
-		UserMetrics      bool
-		COOIsInstalled   bool
-		IsOCP            bool
-		IsHub            bool
-		InstallNamespace string
-		ResourceReqs     bool
-		Registries       []addonapiv1beta1.ImageMirror
-		NodeExporterOpts addon.NodeExporterOptions
-		AgentMissing     bool
-		AlertsEnabled    bool
-		Expects          func(*testing.T, []client.Object)
+		PlatformMetrics     bool
+		UserMetrics         bool
+		COOIsInstalled      bool
+		IsOCP               bool
+		IsHub               bool
+		InstallNamespace    string
+		ResourceReqs        bool
+		Registries          []addonapiv1beta1.ImageMirror
+		NodeExporterOpts    addon.NodeExporterOptions
+		AgentMissing        bool
+		AlertsEnabled       bool
+		WithRawScrapeConfig bool
+		Expects             func(*testing.T, []client.Object)
 	}{
 		"no metrics": {
 			PlatformMetrics: false,
@@ -169,7 +170,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 
 				// Verify always-required and trigger flags on the endpoint-monitoring-operator container
 				var clusterNameArg, clusterIDArg string
-				var hubEndpointURL, hubAlertmanagerCA, hubAlertmanagerCert, hubAlertmanagerAccessor string
+				var hubAlertmanagerURL, hubAlertmanagerCA, hubAlertmanagerCert, hubAlertmanagerAccessor string
 				var enablePlatformAlertForwarding, enableUWLAlertForwarding string
 				for _, arg := range emoDeployment.Spec.Template.Spec.Containers[0].Args {
 					if strings.HasPrefix(arg, "--cluster-name=") {
@@ -178,8 +179,8 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 					if strings.HasPrefix(arg, "--cluster-id=") {
 						clusterIDArg = arg
 					}
-					if strings.HasPrefix(arg, "--hub-endpoint-url=") {
-						hubEndpointURL = arg
+					if strings.HasPrefix(arg, "--hub-alertmanager-url=") {
+						hubAlertmanagerURL = arg
 					}
 					if strings.HasPrefix(arg, "--hub-alertmanager-ca-secret=") {
 						hubAlertmanagerCA = arg
@@ -200,12 +201,12 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 
 				// Comment explaining why each flag is needed and when:
 				// 1. --cluster-name and --cluster-id: must always be present to uniquely identify the cluster.
-				// 2. --hub-endpoint-url: point to the Hub's Alertmanager.
+				// 2. --hub-alertmanager-url: point to the Hub's Alertmanager. Rendered only if alert forwarding is enabled.
 				// 3. --hub-alertmanager-ca-secret, --hub-alertmanager-cert-secret, and --hub-alertmanager-accessor-secret are always rendered when hubEndpoint is set.
 				// 4. --enable-platform-alert-forwarding and --enable-uwl-alert-forwarding: toggle actual alert forwarding.
 				assert.Equal(t, "--cluster-name=cluster-1", clusterNameArg)
 				assert.Equal(t, "--cluster-id="+testClusterID, clusterIDArg)
-				assert.Equal(t, "--hub-endpoint-url=https://remote-write.example.com/api/alertmanager/v2/default", hubEndpointURL)
+				assert.Empty(t, hubAlertmanagerURL, "hub-alertmanager-url should be absent when alert forwarding is disabled")
 				assert.Equal(t, "--hub-alertmanager-cert-secret=obs-alertmanager-mtls-cert-97e513873da14ae489e", hubAlertmanagerCert)
 				assert.Equal(t, "--hub-alertmanager-accessor-secret=observability-alertmanager-accessor-97e513873da14ae489e", hubAlertmanagerAccessor)
 				assert.Equal(t, "--hub-alertmanager-ca-secret=obs-alertmanager-mtls-ca-97e513873da14ae489e", hubAlertmanagerCA)
@@ -266,6 +267,35 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 					origin := obj.Annotations[addoncfg.AnnotationOriginalResource]
 					assert.NotEmpty(t, origin, "original resource annotation should not be empty", "name", obj.Name, "annotation", origin)
 				}
+				verifyClusterScopedResourcesPrefix(t, objects)
+			},
+		},
+		"platform metrics with raw scrape configs": {
+			PlatformMetrics:     true,
+			UserMetrics:         false,
+			COOIsInstalled:      false,
+			IsOCP:               true,
+			WithRawScrapeConfig: true,
+			Expects: func(t *testing.T, objects []client.Object) {
+				// ensure the agent is created
+				agent := common.FilterResourcesByLabelSelector[*cooprometheusv1alpha1.PrometheusAgent](objects, config.PlatformPrometheusMatchLabels)
+				assert.Len(t, agent, 1)
+
+				// Ensure standard scrape config is created and has standard component label
+				scrapeCfgs := common.FilterResourcesByLabelSelector[*cooprometheusv1alpha1.ScrapeConfig](objects, config.PlatformPrometheusMatchLabels)
+				assert.Len(t, scrapeCfgs, 1)
+				assert.Equal(t, "platform", scrapeCfgs[0].Name)
+				assert.Equal(t, "platform-metrics-collector", scrapeCfgs[0].Labels[addoncfg.ComponentK8sLabelKey])
+
+				// Verify that the ScrapeConfig with raw resolution strategy preserves its component label as platform-metrics-collector-raw
+				rawScrapeCfgs := common.FilterResourcesByLabelSelector[*cooprometheusv1alpha1.ScrapeConfig](objects, map[string]string{
+					addoncfg.ComponentK8sLabelKey: "platform-metrics-collector-raw",
+				})
+				assert.Len(t, rawScrapeCfgs, 1)
+				assert.Equal(t, "platform- additional", rawScrapeCfgs[0].Name)
+				assert.Equal(t, "platform-metrics-collector-raw", rawScrapeCfgs[0].Labels[addoncfg.ComponentK8sLabelKey])
+				assert.Equal(t, "raw", rawScrapeCfgs[0].Annotations[config.RawResolutionAnnotation])
+
 				verifyClusterScopedResourcesPrefix(t, objects)
 			},
 		},
@@ -502,6 +532,34 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				assert.NotEmpty(t, proms[0].Spec.ExternalLabels)
 				assert.Equal(t, testClusterID, proms[0].Spec.ExternalLabels["managed_cluster"])
 				assert.Equal(t, "cluster-1", proms[0].Spec.ExternalLabels["managed_cluster_name"])
+
+				deployments := common.FilterResourcesByLabelSelector[*appsv1.Deployment](objects, nil)
+				var emoDeployment *appsv1.Deployment
+				for _, dep := range deployments {
+					if dep.GetName() == "endpoint-monitoring-operator" {
+						emoDeployment = dep
+						break
+					}
+				}
+				require.NotNil(t, emoDeployment)
+
+				var hubAlertmanagerURL string
+				var enablePlatformAlertForwarding, enableUWLAlertForwarding string
+				for _, arg := range emoDeployment.Spec.Template.Spec.Containers[0].Args {
+					if strings.HasPrefix(arg, "--hub-alertmanager-url=") {
+						hubAlertmanagerURL = arg
+					}
+					if strings.HasPrefix(arg, "--enable-platform-alert-forwarding=") {
+						enablePlatformAlertForwarding = arg
+					}
+					if strings.HasPrefix(arg, "--enable-uwl-alert-forwarding=") {
+						enableUWLAlertForwarding = arg
+					}
+				}
+
+				assert.Equal(t, "--hub-alertmanager-url=https://remote-write.example.com/api/alertmanager/v2/default", hubAlertmanagerURL)
+				assert.Equal(t, "--enable-platform-alert-forwarding=true", enablePlatformAlertForwarding)
+				assert.Equal(t, "--enable-uwl-alert-forwarding=false", enableUWLAlertForwarding)
 			},
 		},
 		"node exporter custom ports": {
@@ -702,6 +760,11 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 			}
 			platformScrapeConfigAdditional := platformScrapeConfig.DeepCopy() // Checks that the helm loop is well set
 			platformScrapeConfigAdditional.Name = platformScrapeConfigAdditional.Name + "- additional"
+			if tc.WithRawScrapeConfig {
+				platformScrapeConfigAdditional.Annotations = map[string]string{
+					config.RawResolutionAnnotation: config.RawResolutionValue,
+				}
+			}
 			defaultAgentResources = append(defaultAgentResources, platformScrapeConfig, platformScrapeConfigAdditional)
 			platformRules := &prometheusv1.PrometheusRule{
 				TypeMeta: metav1.TypeMeta{

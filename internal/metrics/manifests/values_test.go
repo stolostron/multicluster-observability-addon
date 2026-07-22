@@ -111,6 +111,7 @@ func TestBuildValues(t *testing.T) {
 			Expect: func(t *testing.T, values *manifests.MetricsValues) {
 				assert.Len(t, values.Platform.ScrapeConfigs, 2)
 				assert.Equal(t, "a", values.Platform.ScrapeConfigs[0].Name)
+				assert.Equal(t, "raw", values.Platform.ScrapeConfigs[0].Annotations["observability.open-cluster-management.io/resolution-strategy"])
 				assert.Equal(t, "b", values.Platform.ScrapeConfigs[1].Name)
 			},
 		},
@@ -126,6 +127,7 @@ func TestBuildValues(t *testing.T) {
 			Expect: func(t *testing.T, values *manifests.MetricsValues) {
 				assert.Len(t, values.UserWorkload.ScrapeConfigs, 2)
 				assert.Equal(t, "a", values.UserWorkload.ScrapeConfigs[0].Name)
+				assert.Equal(t, "raw", values.UserWorkload.ScrapeConfigs[0].Annotations["observability.open-cluster-management.io/resolution-strategy"])
 				assert.Equal(t, "b", values.UserWorkload.ScrapeConfigs[1].Name)
 			},
 		},
@@ -296,6 +298,9 @@ func newScrapeConfig(name string) *cooprometheusv1alpha1.ScrapeConfig {
 	return &cooprometheusv1alpha1.ScrapeConfig{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
+			Annotations: map[string]string{
+				"observability.open-cluster-management.io/resolution-strategy": "raw",
+			},
 		},
 	}
 }

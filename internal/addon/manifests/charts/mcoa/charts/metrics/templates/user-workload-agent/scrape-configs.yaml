@@ -8,7 +8,8 @@ metadata:
   labels:
     {{- $incomingLabels := $scrapeconfig.labels }}
     {{- $metricsHelmLabels := fromYaml (include "metricshelm.labels" $) }}
-    {{- $customLabel := dict "app.kubernetes.io/component" $.Values.userWorkload.component }}
+    {{- $comp := index $incomingLabels "app.kubernetes.io/component" | default $.Values.userWorkload.component }}
+    {{- $customLabel := dict "app.kubernetes.io/component" $comp }}
     {{- if not $.Values.deployCOOResources }}
     {{- $_ := set $customLabel "app.kubernetes.io/managed-by" "observability-operator" }}
     {{- end }}
