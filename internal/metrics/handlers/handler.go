@@ -694,8 +694,14 @@ func (o *OptionsBuilder) processScrapeConfigs(
 	defaultNamespace string,
 ) ([]*cooprometheusv1alpha1.ScrapeConfig, []MonitoringStackPatch, []cooprometheusv1.RemoteWriteSpec, error) {
 	var filtered []*cooprometheusv1alpha1.ScrapeConfig
-	var patches []MonitoringStackPatch
 	var serverRemoteWrites []cooprometheusv1.RemoteWriteSpec
+
+	type patchKey struct {
+		namespace string
+		name      string
+	}
+	patchMap := make(map[patchKey][]*cooprometheusv1.RemoteWriteSpec)
+	var patchKeys []patchKey
 
 	for _, sc := range scrapeConfigs {
 		sc = sc.DeepCopy()
@@ -776,11 +782,11 @@ func (o *OptionsBuilder) processScrapeConfigs(
 					spec.TLSConfig = createSafeTLSConfig(caTargetName, certTargetName)
 				}
 
-				patches = append(patches, MonitoringStackPatch{
-					Namespace:        targetNamespace,
-					Name:             targetName,
-					RemoteWriteSpecs: rwSpecs,
-				})
+				key := patchKey{namespace: targetNamespace, name: targetName}
+				if _, exists := patchMap[key]; !exists {
+					patchKeys = append(patchKeys, key)
+				}
+				patchMap[key] = append(patchMap[key], rwSpecs...)
 			}
 			// Since it's targeted for COO, we do NOT export the ScrapeConfig itself to the managed cluster
 			continue
@@ -806,6 +812,16 @@ func (o *OptionsBuilder) processScrapeConfigs(
 			continue
 		}
 	}
+
+	patches := make([]MonitoringStackPatch, 0, len(patchKeys))
+	for _, key := range patchKeys {
+		patches = append(patches, MonitoringStackPatch{
+			Namespace:        key.namespace,
+			Name:             key.name,
+			RemoteWriteSpecs: patchMap[key],
+		})
+	}
+
 	return filtered, patches, serverRemoteWrites, nil
 }
 

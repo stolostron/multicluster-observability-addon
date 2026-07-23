@@ -550,6 +550,50 @@ func TestProcessScrapeConfigs(t *testing.T) {
 		assert.NotNil(t, patches[0].RemoteWriteSpecs[0])
 	})
 
+	t.Run("OCP - Multiple Raw Metrics ScrapeConfigs targeting the same COO stack should aggregate remoteWrite specs", func(t *testing.T) {
+		secrets := &[]*corev1.Secret{}
+		scRaw2 := &cooprometheusv1alpha1.ScrapeConfig{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "raw-sc-2",
+				Annotations: map[string]string{
+					config.RawResolutionAnnotation:       config.RawResolutionValue,
+					config.COOMonitoringStacksAnnotation: "ns1/stack1",
+				},
+			},
+			Spec: cooprometheusv1alpha1.ScrapeConfigSpec{
+				Params: map[string][]string{
+					"match[]": {"node_cpu_seconds_total"},
+				},
+			},
+		}
+
+		input := []*cooprometheusv1alpha1.ScrapeConfig{scRaw, scRaw2, scStandard}
+
+		filtered, patches, _, err := builder.processScrapeConfigs(
+			context.Background(),
+			input,
+			agent,
+			"ca-secret",
+			"cert-secret",
+			secrets,
+			true, // isOCP
+			"default-ns",
+		)
+		require.NoError(t, err)
+
+		// Only standard remains as-is, both Raws are filtered out
+		assert.Len(t, filtered, 1)
+		assert.Equal(t, "standard-sc", filtered[0].Name)
+
+		// Should generate exactly 1 patch representing the unique (ns1, stack1) COO target
+		require.Len(t, patches, 1)
+		assert.Equal(t, "ns1", patches[0].Namespace)
+		assert.Equal(t, "stack1", patches[0].Name)
+
+		// The patch should cleanly aggregate remote write specs from both raw scrape configs
+		assert.Len(t, patches[0].RemoteWriteSpecs, 2)
+	})
+
 	t.Run("OCP - Raw Metrics ScrapeConfig without COO stack (CMO target) should deploy secrets in default-ns and fall through as ScrapeConfig", func(t *testing.T) {
 		secrets := &[]*corev1.Secret{}
 		// ScrapeConfig with Raw resolution but no COO target stack annotation
