@@ -147,16 +147,22 @@ func doesScrapeConfigOrPrometheusRuleExist(ctx context.Context, k8s client.Clien
 	var obj client.Object
 	switch cfg.Resource {
 	case cooprometheusv1alpha1.ScrapeConfigName:
-		if cfg.Group == cooprometheusv1alpha1.SchemeGroupVersion.Group {
+		switch cfg.Group {
+		case cooprometheusv1alpha1.SchemeGroupVersion.Group:
 			obj = &cooprometheusv1alpha1.ScrapeConfig{}
-		} else {
+		case prometheusv1alpha1.SchemeGroupVersion.Group:
 			obj = &prometheusv1alpha1.ScrapeConfig{}
+		default:
+			return false, nil
 		}
 	case prometheusv1.PrometheusRuleName:
-		if cfg.Group == cooprometheusv1.SchemeGroupVersion.Group {
+		switch cfg.Group {
+		case cooprometheusv1.SchemeGroupVersion.Group:
 			obj = &cooprometheusv1.PrometheusRule{}
-		} else {
+		case prometheusv1.SchemeGroupVersion.Group:
 			obj = &prometheusv1.PrometheusRule{}
+		default:
+			return false, nil
 		}
 	default:
 		return false, nil
