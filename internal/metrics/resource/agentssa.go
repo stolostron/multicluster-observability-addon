@@ -13,12 +13,11 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
-	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 )
 
 // NewDefaultPrometheusAgent generates the default prometheusAgent resource containing sensible
 // defaults that can be overridden by the user.
-func NewDefaultPrometheusAgent(ns, name string, isUWL bool, placementRef addonv1beta1.PlacementRef) *cooprometheusv1alpha1.PrometheusAgent {
+func NewDefaultPrometheusAgent(ns, name string, isUWL bool) *cooprometheusv1alpha1.PrometheusAgent {
 	agent := &cooprometheusv1alpha1.PrometheusAgent{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       cooprometheusv1alpha1.PrometheusAgentsKind,
@@ -59,21 +58,19 @@ func NewDefaultPrometheusAgent(ns, name string, isUWL bool, placementRef addonv1
 		agent.Spec.ScrapeConfigNamespaceSelector = &metav1.LabelSelector{}
 	}
 
-	maps.Copy(agent.Labels, makeConfigResourceLabels(isUWL, placementRef))
+	maps.Copy(agent.Labels, makeUWLOrPlatformLabels(isUWL))
 
 	return agent
 }
 
-func makeConfigResourceLabels(isUWL bool, placementRef addonv1beta1.PlacementRef) map[string]string {
+func makeUWLOrPlatformLabels(isUWL bool) map[string]string {
 	appName := config.PlatformMetricsCollectorApp
 	if isUWL {
 		appName = config.UserWorkloadMetricsCollectorApp
 	}
 	return map[string]string{
-		addoncfg.ManagedByK8sLabelKey:          addoncfg.Name,
-		addoncfg.ComponentK8sLabelKey:          appName,
-		addoncfg.PlacementRefNameLabelKey:      placementRef.Name,
-		addoncfg.PlacementRefNamespaceLabelKey: placementRef.Namespace,
+		addoncfg.ManagedByK8sLabelKey: addoncfg.Name,
+		addoncfg.ComponentK8sLabelKey: appName,
 	}
 }
 
@@ -86,6 +83,7 @@ type PrometheusAgentSSA struct {
 	KubeRBACProxyImage  string
 	Labels              map[string]string
 	RemoteWriteEndpoint string
+	Annotations         map[string]string
 
 	desiredAgent *cooprometheusv1alpha1.PrometheusAgent
 }
@@ -138,6 +136,14 @@ func (p *PrometheusAgentSSA) Build() *cooprometheusv1alpha1.PrometheusAgent {
 		p.desiredAgent.Labels = map[string]string{}
 	}
 	p.desiredAgent.Labels[addoncfg.BackupLabelKey] = addoncfg.BackupLabelValue
+
+	if len(p.Annotations) > 0 {
+		p.desiredAgent.Annotations = maps.Clone(p.ExistingAgent.Annotations)
+		if p.desiredAgent.Annotations == nil {
+			p.desiredAgent.Annotations = map[string]string{}
+		}
+		maps.Copy(p.desiredAgent.Annotations, p.Annotations)
+	}
 
 	p.setPrometheusRemoteWriteConfig()
 	p.setWatchedResources()

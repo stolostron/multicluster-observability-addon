@@ -164,9 +164,11 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	if err := r.Get(ctx, types.NamespacedName{Name: addoncfg.Name}, cmao); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to get ClusterManagementAddOn: %w", err)
 	}
-	if err := common.DeleteOrphanResources(ctx, r.Log, r.Client, cmao, &cooprometheusv1alpha1.PrometheusAgentList{}); err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to clean orphan resources: %w", err)
-	}
+	// Commenting out below code for now
+	// This deletes orphaned PrometheusAgents, but this code was assuming one PrometheusAgent per placement, which is no longer the case
+	//if err := common.DeleteOrphanResources(ctx, r.Log, r.Client, cmao, &cooprometheusv1alpha1.PrometheusAgentList{}); err != nil {
+	//	return ctrl.Result{}, fmt.Errorf("failed to clean orphan resources: %w", err)
+	//}
 
 	return ctrl.Result{}, nil
 }
