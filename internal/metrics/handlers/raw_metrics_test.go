@@ -548,6 +548,7 @@ func TestProcessScrapeConfigs(t *testing.T) {
 		assert.Equal(t, "stack1", patches[0].Name)
 		require.Len(t, patches[0].RemoteWriteSpecs, 1)
 		assert.NotNil(t, patches[0].RemoteWriteSpecs[0])
+		assert.Equal(t, "acm-observability-raw-sc", *patches[0].RemoteWriteSpecs[0].Name)
 	})
 
 	t.Run("OCP - Multiple Raw Metrics ScrapeConfigs targeting the same COO stack should aggregate remoteWrite specs", func(t *testing.T) {
@@ -677,5 +678,6 @@ func TestProcessScrapeConfigs(t *testing.T) {
 		require.Len(t, serverRemoteWrites, 1)
 		assert.Equal(t, "ca-secret", serverRemoteWrites[0].TLSConfig.CA.Secret.Name)
 		assert.Equal(t, "cert-secret", serverRemoteWrites[0].TLSConfig.Cert.Secret.Name)
+		assert.Equal(t, "acm-observability-raw-sc", *serverRemoteWrites[0].Name)
 	})
 }
