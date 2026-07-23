@@ -456,6 +456,8 @@ func TestBuildOptionsRawMetricsNonOCP(t *testing.T) {
 	assert.NotNil(t, rwSpec)
 	assert.Equal(t, config.GetHubMtlsCASecretName(config.GetTrimmedClusterID(clusterID)), rwSpec.TLSConfig.CA.Secret.Name)
 	assert.Equal(t, config.GetHubMtlsCertSecretName(config.GetTrimmedClusterID(clusterID)), rwSpec.TLSConfig.Cert.Secret.Name)
+	assert.Equal(t, config.GetHubMtlsCertSecretName(config.GetTrimmedClusterID(clusterID)), rwSpec.TLSConfig.KeySecret.Name)
+	assert.Equal(t, config.MTLSCertKeySecretKey, rwSpec.TLSConfig.KeySecret.Key)
 }
 
 func TestProcessScrapeConfigs(t *testing.T) {
@@ -678,6 +680,8 @@ func TestProcessScrapeConfigs(t *testing.T) {
 		require.Len(t, serverRemoteWrites, 1)
 		assert.Equal(t, "ca-secret", serverRemoteWrites[0].TLSConfig.CA.Secret.Name)
 		assert.Equal(t, "cert-secret", serverRemoteWrites[0].TLSConfig.Cert.Secret.Name)
+		assert.Equal(t, "cert-secret", serverRemoteWrites[0].TLSConfig.KeySecret.Name)
+		assert.Equal(t, config.MTLSCertKeySecretKey, serverRemoteWrites[0].TLSConfig.KeySecret.Key)
 		assert.Equal(t, "acm-observability-raw-sc", *serverRemoteWrites[0].Name)
 	})
 }
