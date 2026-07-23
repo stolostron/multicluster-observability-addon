@@ -780,6 +780,7 @@ func (o *OptionsBuilder) processScrapeConfigs(
 				// paths on the target Prometheus pod.
 				for _, spec := range rwSpecs {
 					spec.TLSConfig = createSafeTLSConfig(caTargetName, certTargetName)
+					spec.Name = ptr.To(getRemoteWriteName(spec.Name, sc.Name))
 				}
 
 				key := patchKey{namespace: targetNamespace, name: targetName}
@@ -806,6 +807,7 @@ func (o *OptionsBuilder) processScrapeConfigs(
 			// paths on the target Prometheus pod.
 			for _, spec := range rwSpecs {
 				spec.TLSConfig = createSafeTLSConfig(caTargetName, certTargetName)
+				spec.Name = ptr.To(getRemoteWriteName(spec.Name, sc.Name))
 				serverRemoteWrites = append(serverRemoteWrites, *spec)
 			}
 			// Since it's transpiled directly into the Prometheus Server's RemoteWrite, we do NOT export the ScrapeConfig itself
@@ -863,6 +865,26 @@ func createSafeTLSConfig(caTargetName, certTargetName string) *cooprometheusv1.T
 			},
 		},
 	}
+}
+
+// getRemoteWriteName computes a unique name for the RemoteWrite configuration
+// by prefixing the base name (if not already prefixed with "acm-") and
+// suffixing the scrape config name to ensure uniqueness.
+func getRemoteWriteName(specName *string, scrapeConfigName string) string {
+	if specName != nil {
+		baseName := *specName
+		if !strings.HasPrefix(baseName, "acm-") {
+			baseName = "acm-" + baseName
+		}
+		if scrapeConfigName != "" {
+			return fmt.Sprintf("%s-%s", baseName, scrapeConfigName)
+		}
+		return baseName
+	}
+	if scrapeConfigName != "" {
+		return fmt.Sprintf("acm-%s", scrapeConfigName)
+	}
+	return config.RemoteWriteCfgName
 }
 
 // TargetStack represents a parsed namespace/name COO MonitoringStack target.
