@@ -142,7 +142,7 @@ func MemUtilizationPanel(datasourceName string) panelgroup.Option {
 }
 
 func CPUTopNamespacesPanel(datasourceName string) panelgroup.Option {
-	return panelgroup.AddPanel("CPU Utilization of Top Namespaces",
+	return panelgroup.AddPanel("CPU Usage to Request Ratio of Top Namespaces",
 		panel.Description("CPU utilization of the top 20 namespaces by usage/request ratio"),
 		timeSeriesPanel.Chart(
 			timeSeriesPanel.WithYAxis(timeSeriesPanel.YAxis{
@@ -174,7 +174,7 @@ func CPUTopNamespacesPanel(datasourceName string) panelgroup.Option {
 }
 
 func MemTopNamespacesPanel(datasourceName string) panelgroup.Option {
-	return panelgroup.AddPanel("Memory Utilization of Top Namespaces",
+	return panelgroup.AddPanel("Memory Usage to Request Ratio of Top Namespaces",
 		panel.Description("Memory utilization of the top 20 namespaces by usage/request ratio"),
 		timeSeriesPanel.Chart(
 			timeSeriesPanel.WithYAxis(timeSeriesPanel.YAxis{
