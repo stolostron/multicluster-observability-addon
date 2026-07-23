@@ -14,6 +14,7 @@ import (
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	cooprometheusv1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1"
 	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
+	monitoringv1alpha1 "github.com/rhobs/observability-operator/pkg/apis/monitoring/v1alpha1"
 	clusterinfov1beta1 "github.com/stolostron/cluster-lifecycle-api/clusterinfo/v1beta1"
 	clusterlifecycleconstants "github.com/stolostron/cluster-lifecycle-api/constants"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
@@ -735,6 +736,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 	assert.NoError(t, batchv1.AddToScheme(scheme))
 	assert.NoError(t, configv1.AddToScheme(scheme))
 	assert.NoError(t, cooprometheusv1alpha1.AddToScheme(scheme))
+	assert.NoError(t, monitoringv1alpha1.AddToScheme(scheme))
 	assert.NoError(t, prometheusv1.AddToScheme(scheme))
 	assert.NoError(t, cooprometheusv1.AddToScheme(scheme))
 	assert.NoError(t, clusterv1.Install(scheme))
@@ -1069,6 +1071,7 @@ func TestHelmBuild_Metrics_HCP(t *testing.T) {
 	assert.NoError(t, batchv1.AddToScheme(scheme))
 	assert.NoError(t, configv1.AddToScheme(scheme))
 	assert.NoError(t, cooprometheusv1alpha1.AddToScheme(scheme))
+	assert.NoError(t, monitoringv1alpha1.AddToScheme(scheme))
 	assert.NoError(t, prometheusv1.AddToScheme(scheme))
 	assert.NoError(t, cooprometheusv1.AddToScheme(scheme))
 	assert.NoError(t, clusterv1.Install(scheme))
