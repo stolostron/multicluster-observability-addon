@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-logr/logr"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	prometheusv1alpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	cooprometheusv1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1"
 	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
@@ -153,6 +154,8 @@ func doesScrapeConfigOrPrometheusRuleOrPrometheusAgentExist(ctx context.Context,
 	switch {
 	case cfg.Group == cooprometheusv1alpha1.SchemeGroupVersion.Group && cfg.Resource == cooprometheusv1alpha1.ScrapeConfigName:
 		return k8s.Get(ctx, key, &cooprometheusv1alpha1.ScrapeConfig{})
+	case cfg.Group == prometheusv1alpha1.SchemeGroupVersion.Group && cfg.Resource == prometheusv1alpha1.ScrapeConfigName:
+		return k8s.Get(ctx, key, &prometheusv1alpha1.ScrapeConfig{})
 	case cfg.Group == cooprometheusv1.SchemeGroupVersion.Group && cfg.Resource == cooprometheusv1.PrometheusRuleName:
 		return k8s.Get(ctx, key, &cooprometheusv1.PrometheusRule{})
 	case cfg.Group == prometheusv1.SchemeGroupVersion.Group && cfg.Resource == prometheusv1.PrometheusRuleName:
