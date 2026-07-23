@@ -855,6 +855,12 @@ func createSafeTLSConfig(caTargetName, certTargetName string) *cooprometheusv1.T
 					Key: config.MTLSCertSecretKey,
 				},
 			},
+			KeySecret: &corev1.SecretKeySelector{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: certTargetName,
+				},
+				Key: config.MTLSCertKeySecretKey,
+			},
 		},
 	}
 }
