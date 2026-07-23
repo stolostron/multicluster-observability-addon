@@ -33,7 +33,7 @@ spec:
   resources:
     requests:
       memory: 400Mi
-  {{- if and .Values.hubEndpoint (or .Values.platformAlertsEnabled .Values.userWorkloadAlertsEnabled) }}
+  {{- if and .Values.hubEndpoint (or (and .Values.platformEnabled .Values.platformAlertsEnabled) (and .Values.userWorkloadsEnabled .Values.userWorkloadAlertsEnabled)) }}
   externalLabels:
     managed_cluster: {{ .Values.clusterID }}
     managed_cluster_name: {{ .Values.clusterName }}

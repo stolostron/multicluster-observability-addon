@@ -43,7 +43,7 @@ spec:
         - --cluster-name={{ .Values.clusterName }}
         - --enable-platform-alert-forwarding={{ and .Values.platformEnabled .Values.platformAlertsEnabled }}
         - --enable-uwl-alert-forwarding={{ and .Values.userWorkloadsEnabled .Values.userWorkloadAlertsEnabled }}
-        {{- if and .Values.hubEndpoint (or .Values.platformAlertsEnabled .Values.userWorkloadAlertsEnabled) }}
+        {{- if and .Values.hubEndpoint (or (and .Values.platformEnabled .Values.platformAlertsEnabled) (and .Values.userWorkloadsEnabled .Values.userWorkloadAlertsEnabled)) }}
         - --hub-alertmanager-url=https://{{ .Values.hubEndpoint }}/api/alertmanager/v2/default
         {{- end }}
         {{- if .Values.hubEndpoint }}
