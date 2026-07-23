@@ -68,6 +68,7 @@ func (m mockAODCGetter) Get(ctx context.Context, namespace, name string) (*addon
 }
 
 func TestHelmBuild_Metrics_All(t *testing.T) {
+	t.Setenv("UNIT_TEST", "true")
 	hubNamespace := "open-cluster-management-observability"
 
 	verifyClusterScopedResourcesPrefix := func(t *testing.T, objects []client.Object) {
@@ -224,7 +225,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				assert.Equal(t, "--cluster-name=cluster-1", jobClusterNameArg)
 				assert.Equal(t, "--hub-alertmanager-ca-secret=obs-alertmanager-mtls-ca-97e513873da14ae489e", jobHubCASecretArg)
 				// ensure that the number of objects is correct
-				expectedCount := 46
+				expectedCount := 47
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
@@ -249,8 +250,8 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 
 				// Ensure that the original resource annotation is set
 				for _, obj := range configmaps {
-					if obj.Name == config.PrometheusCAConfigMapName {
-						// ignore this configmap directly defined in helm charts
+					if obj.Name == config.PrometheusCAConfigMapName || obj.Name == addoncfg.TLSProfileConfigMapName {
+						// ignore configmaps directly defined in helm charts
 						continue
 					}
 					origin := obj.Annotations[addoncfg.AnnotationOriginalResource]
@@ -272,7 +273,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 					t.Fatalf("expected %d objects, but got %d", expectedCount, len(crds))
 				}
 				// ensure that the number of objects is correct
-				expectedCount = 46
+				expectedCount = 47
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
@@ -291,7 +292,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				assert.Equal(t, "observability-operator", agent[0].Labels["app.kubernetes.io/managed-by"])
 				assert.Empty(t, agent[0].Annotations["operator.prometheus.io/controller-id"])
 				// ensure that the number of objects is correct
-				expectedCount := 38
+				expectedCount := 39
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
@@ -323,7 +324,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				cooRecordingRules := common.FilterResourcesByLabelSelector[*cooprometheusv1.PrometheusRule](objects, config.UserWorkloadPrometheusMatchLabels)
 				assert.Len(t, cooRecordingRules, 2)
 				assert.Equal(t, "openshift-user-workload-monitoring/prometheus-operator", cooRecordingRules[0].Annotations["operator.prometheus.io/controller-id"])
-				expectedCount := 48
+				expectedCount := 49
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
@@ -348,7 +349,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				assert.Len(t, crds, 3) // monitoringstacks + prometheusagents + scrapeconfigs (ReadOnly stubs, always present when metrics enabled)
 
 				// ensure that the number of objects is correct
-				expectedCount := 40
+				expectedCount := 41
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
@@ -469,7 +470,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				verifyClusterScopedResourcesPrefix(t, objects)
 
 				// ensure that the number of objects is correct
-				expectedCount := 77
+				expectedCount := 78
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
@@ -546,7 +547,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				assert.Equal(t, "metrics", ns[0].Labels["app"])
 
 				// ensure that the number of objects is correct
-				expectedCount := 77
+				expectedCount := 78
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
@@ -972,6 +973,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 }
 
 func TestHelmBuild_Metrics_HCP(t *testing.T) {
+	t.Setenv("UNIT_TEST", "true")
 	scheme := runtime.NewScheme()
 	assert.NoError(t, kubescheme.AddToScheme(scheme))
 	assert.NoError(t, batchv1.AddToScheme(scheme))
@@ -1468,6 +1470,31 @@ func newManifestWork(name string, isOLMSubscrided bool) *workv1.ManifestWork {
 									Value: workv1.FieldValue{
 										Type:   workv1.String,
 										String: ptr.To(cases.Title(language.English).String(strconv.FormatBool(isOLMSubscrided))),
+									},
+								},
+							},
+						},
+					},
+					{
+						ResourceMeta: workv1.ManifestResourceMeta{
+							Group:    "",
+							Resource: "configmaps",
+							Name:     addoncfg.TLSProfileConfigMapName,
+						},
+						StatusFeedbacks: workv1.StatusFeedbackResult{
+							Values: []workv1.FeedbackValue{
+								{
+									Name: addoncfg.TLSMinVersionFeedbackName,
+									Value: workv1.FieldValue{
+										Type:   workv1.String,
+										String: ptr.To("VersionTLS13"),
+									},
+								},
+								{
+									Name: addoncfg.TLSCipherSuitesFeedbackName,
+									Value: workv1.FieldValue{
+										Type:   workv1.String,
+										String: ptr.To("TLS_AES_128_GCM_SHA256,TLS_AES_256_GCM_SHA384"),
 									},
 								},
 							},

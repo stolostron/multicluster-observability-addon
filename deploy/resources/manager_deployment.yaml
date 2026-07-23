@@ -21,6 +21,10 @@ spec:
           imagePullPolicy: Always
           args:
             - "controller"
+          ports:
+            - name: metrics
+              containerPort: 8084
+              protocol: TCP
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
