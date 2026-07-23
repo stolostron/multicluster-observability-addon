@@ -307,6 +307,9 @@ func ManifestConfigs() []workv1.ManifestConfigOption {
 			},
 			UpdateStrategy: &workv1.UpdateStrategy{
 				Type: workv1.UpdateStrategyTypeServerSideApply,
+				ServerSideApply: &workv1.ServerSideApplyConfig{
+					Force: false,
+				},
 			},
 		},
 		workv1.ManifestConfigOption{
