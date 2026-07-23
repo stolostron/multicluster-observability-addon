@@ -35,6 +35,12 @@ spec:
         - --v=0
         - --tls-cert-file=/etc/tls/private/tls.crt
         - --tls-private-key-file=/etc/tls/private/tls.key
+        {{- if .Values.tlsMinVersion }}
+        - --tls-min-version={{ .Values.tlsMinVersion }}
+        {{- end }}
+        {{- if .Values.tlsCipherSuites }}
+        - --tls-cipher-suites={{ .Values.tlsCipherSuites }}
+        {{- end }}
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8443

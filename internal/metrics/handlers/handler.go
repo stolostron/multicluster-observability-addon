@@ -143,6 +143,25 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1beta1.Man
 		}
 	}
 
+	// Read TLS profile from ManifestWork feedback
+	tlsProfileCM := workv1.ResourceIdentifier{
+		Group:    "",
+		Resource: "configmaps",
+		Name:     addoncfg.TLSProfileConfigMapName,
+	}
+	feedback, err := common.GetFeedbackValuesForResources(ctx, o.Client, managedCluster.Name, addoncfg.Name, tlsProfileCM)
+	if err != nil {
+		return ret, fmt.Errorf("failed to get TLS profile feedback: %w", err)
+	}
+
+	tlsFeedback := feedback[tlsProfileCM]
+	if minVersionValues := common.FilterFeedbackValuesByName(tlsFeedback, addoncfg.TLSMinVersionFeedbackName); len(minVersionValues) > 0 && minVersionValues[0].Value.String != nil {
+		ret.TLSMinVersion = *minVersionValues[0].Value.String
+	}
+	if cipherValues := common.FilterFeedbackValuesByName(tlsFeedback, addoncfg.TLSCipherSuitesFeedbackName); len(cipherValues) > 0 && cipherValues[0].Value.String != nil {
+		ret.TLSCipherSuites = *cipherValues[0].Value.String
+	}
+
 	if isOpenShiftVendor {
 		if ret.COOIsSubscribed, err = o.cooIsSubscribed(ctx, managedCluster); err != nil {
 			return ret, fmt.Errorf("failed to check if coo is subscribed on the managed cluster: %w", err)
@@ -160,7 +179,7 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1beta1.Man
 				Name:     fmt.Sprintf("%s.%s", cooprometheusv1alpha1.ScrapeConfigName, cooprometheusv1alpha1.SchemeGroupVersion.Group),
 			}
 
-			feedback, err := common.GetFeedbackValuesForResources(ctx, o.Client, managedCluster.Name, addoncfg.Name, promAgentCRD, scrapeConfigCRD)
+			feedback, err = common.GetFeedbackValuesForResources(ctx, o.Client, managedCluster.Name, addoncfg.Name, promAgentCRD, scrapeConfigCRD)
 			if err != nil {
 				return ret, fmt.Errorf("failed to get feedback for CRDs: %w", err)
 			}
