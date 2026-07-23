@@ -443,6 +443,20 @@ func TestBuildOptions(t *testing.T) {
 				assert.Empty(t, opts.CRDEstablishedAnnotation)
 			},
 		},
+		"TLS profile values are extracted from feedback": {
+			resources: func() []client.Object {
+				ret := createResources()
+				ret = append(ret, newManifestWork(spokeName, false))
+				return ret
+			},
+			addon:           platformManagedClusterAddOn,
+			platformEnabled: true,
+			expects: func(t *testing.T, opts Options, err error) {
+				require.NoError(t, err)
+				assert.Equal(t, "VersionTLS13", opts.TLSMinVersion)
+				assert.Equal(t, "TLS_AES_128_GCM_SHA256,TLS_AES_256_GCM_SHA384", opts.TLSCipherSuites)
+			},
+		},
 		"user workloads collection is enabled": {
 			resources: createResources,
 			addon: &addonapiv1beta1.ManagedClusterAddOn{
@@ -909,6 +923,31 @@ func newManifestWork(name string, isOLMSubscrided bool) *workv1.ManifestWork {
 									Value: workv1.FieldValue{
 										Type:   workv1.String,
 										String: ptr.To(cases.Title(language.English).String(strconv.FormatBool(isOLMSubscrided))),
+									},
+								},
+							},
+						},
+					},
+					{
+						ResourceMeta: workv1.ManifestResourceMeta{
+							Group:    "",
+							Resource: "configmaps",
+							Name:     addoncfg.TLSProfileConfigMapName,
+						},
+						StatusFeedbacks: workv1.StatusFeedbackResult{
+							Values: []workv1.FeedbackValue{
+								{
+									Name: addoncfg.TLSMinVersionFeedbackName,
+									Value: workv1.FieldValue{
+										Type:   workv1.String,
+										String: ptr.To("VersionTLS13"),
+									},
+								},
+								{
+									Name: addoncfg.TLSCipherSuitesFeedbackName,
+									Value: workv1.FieldValue{
+										Type:   workv1.String,
+										String: ptr.To("TLS_AES_128_GCM_SHA256,TLS_AES_256_GCM_SHA384"),
 									},
 								},
 							},
