@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	prometheusv1alpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
+	cooprometheusv1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1"
 	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"github.com/stretchr/testify/assert"
@@ -221,6 +223,8 @@ func newCMAOTestScheme(t *testing.T) *runtime.Scheme {
 	t.Helper()
 	scheme := runtime.NewScheme()
 	require.NoError(t, prometheusv1.AddToScheme(scheme))
+	require.NoError(t, prometheusv1alpha1.AddToScheme(scheme))
+	require.NoError(t, cooprometheusv1.AddToScheme(scheme))
 	require.NoError(t, cooprometheusv1alpha1.AddToScheme(scheme))
 	return scheme
 }
@@ -241,6 +245,17 @@ func TestRemoveStaleConfigs(t *testing.T) {
 		},
 	}
 
+	coreosScrapeConfigCfg := addonv1beta1.AddOnConfig{
+		ConfigGroupResource: addonv1beta1.ConfigGroupResource{
+			Group:    prometheusv1alpha1.SchemeGroupVersion.Group,
+			Resource: prometheusv1alpha1.ScrapeConfigName,
+		},
+		ConfigReferent: addonv1beta1.ConfigReferent{
+			Name:      "my-coreos-scrapeconfig",
+			Namespace: addoncfg.InstallNamespace,
+		},
+	}
+
 	promRuleCfg := addonv1beta1.AddOnConfig{
 		ConfigGroupResource: addonv1beta1.ConfigGroupResource{
 			Group:    prometheusv1.SchemeGroupVersion.Group,
@@ -248,6 +263,17 @@ func TestRemoveStaleConfigs(t *testing.T) {
 		},
 		ConfigReferent: addonv1beta1.ConfigReferent{
 			Name:      "my-promrule",
+			Namespace: addoncfg.InstallNamespace,
+		},
+	}
+
+	cooPromRuleCfg := addonv1beta1.AddOnConfig{
+		ConfigGroupResource: addonv1beta1.ConfigGroupResource{
+			Group:    cooprometheusv1.SchemeGroupVersion.Group,
+			Resource: cooprometheusv1.PrometheusRuleName,
+		},
+		ConfigReferent: addonv1beta1.ConfigReferent{
+			Name:      "my-coo-promrule",
 			Namespace: addoncfg.InstallNamespace,
 		},
 	}
@@ -270,9 +296,23 @@ func TestRemoveStaleConfigs(t *testing.T) {
 		},
 	}
 
+	existingCoreosScrapeConfig := &prometheusv1alpha1.ScrapeConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "my-coreos-scrapeconfig",
+			Namespace: addoncfg.InstallNamespace,
+		},
+	}
+
 	existingPromRule := &prometheusv1.PrometheusRule{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "my-promrule",
+			Namespace: addoncfg.InstallNamespace,
+		},
+	}
+
+	existingCooPromRule := &cooprometheusv1.PrometheusRule{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "my-coo-promrule",
 			Namespace: addoncfg.InstallNamespace,
 		},
 	}
@@ -286,26 +326,38 @@ func TestRemoveStaleConfigs(t *testing.T) {
 	}{
 		{
 			name:            "existing resources are kept",
-			existingObjects: []client.Object{existingScrapeConfig.DeepCopy(), existingPromRule.DeepCopy()},
-			initialConfigs:  []addonv1beta1.AddOnConfig{scrapeConfigCfg, promRuleCfg, agentCfg},
-			expectedConfigs: []addonv1beta1.AddOnConfig{scrapeConfigCfg, promRuleCfg, agentCfg},
+			existingObjects: []client.Object{existingScrapeConfig.DeepCopy(), existingCoreosScrapeConfig.DeepCopy(), existingPromRule.DeepCopy(), existingCooPromRule.DeepCopy()},
+			initialConfigs:  []addonv1beta1.AddOnConfig{scrapeConfigCfg, coreosScrapeConfigCfg, promRuleCfg, cooPromRuleCfg, agentCfg},
+			expectedConfigs: []addonv1beta1.AddOnConfig{scrapeConfigCfg, coreosScrapeConfigCfg, promRuleCfg, cooPromRuleCfg, agentCfg},
 		},
 		{
 			name:            "non-existent scrapeconfig is removed",
-			existingObjects: []client.Object{existingPromRule.DeepCopy()},
-			initialConfigs:  []addonv1beta1.AddOnConfig{scrapeConfigCfg, promRuleCfg, agentCfg},
-			expectedConfigs: []addonv1beta1.AddOnConfig{promRuleCfg, agentCfg},
+			existingObjects: []client.Object{existingCoreosScrapeConfig.DeepCopy(), existingPromRule.DeepCopy(), existingCooPromRule.DeepCopy()},
+			initialConfigs:  []addonv1beta1.AddOnConfig{scrapeConfigCfg, coreosScrapeConfigCfg, promRuleCfg, cooPromRuleCfg, agentCfg},
+			expectedConfigs: []addonv1beta1.AddOnConfig{coreosScrapeConfigCfg, promRuleCfg, cooPromRuleCfg, agentCfg},
+		},
+		{
+			name:            "non-existent coreos scrapeconfig is removed",
+			existingObjects: []client.Object{existingScrapeConfig.DeepCopy(), existingPromRule.DeepCopy(), existingCooPromRule.DeepCopy()},
+			initialConfigs:  []addonv1beta1.AddOnConfig{scrapeConfigCfg, coreosScrapeConfigCfg, promRuleCfg, cooPromRuleCfg, agentCfg},
+			expectedConfigs: []addonv1beta1.AddOnConfig{scrapeConfigCfg, promRuleCfg, cooPromRuleCfg, agentCfg},
 		},
 		{
 			name:            "non-existent prometheusrule is removed",
-			existingObjects: []client.Object{existingScrapeConfig.DeepCopy()},
-			initialConfigs:  []addonv1beta1.AddOnConfig{scrapeConfigCfg, promRuleCfg, agentCfg},
-			expectedConfigs: []addonv1beta1.AddOnConfig{scrapeConfigCfg, agentCfg},
+			existingObjects: []client.Object{existingScrapeConfig.DeepCopy(), existingCoreosScrapeConfig.DeepCopy(), existingCooPromRule.DeepCopy()},
+			initialConfigs:  []addonv1beta1.AddOnConfig{scrapeConfigCfg, coreosScrapeConfigCfg, promRuleCfg, cooPromRuleCfg, agentCfg},
+			expectedConfigs: []addonv1beta1.AddOnConfig{scrapeConfigCfg, coreosScrapeConfigCfg, cooPromRuleCfg, agentCfg},
+		},
+		{
+			name:            "non-existent coo prometheusrule is removed",
+			existingObjects: []client.Object{existingScrapeConfig.DeepCopy(), existingCoreosScrapeConfig.DeepCopy(), existingPromRule.DeepCopy()},
+			initialConfigs:  []addonv1beta1.AddOnConfig{scrapeConfigCfg, coreosScrapeConfigCfg, promRuleCfg, cooPromRuleCfg, agentCfg},
+			expectedConfigs: []addonv1beta1.AddOnConfig{scrapeConfigCfg, coreosScrapeConfigCfg, promRuleCfg, agentCfg},
 		},
 		{
 			name:            "all stale configs removed",
 			existingObjects: []client.Object{},
-			initialConfigs:  []addonv1beta1.AddOnConfig{scrapeConfigCfg, promRuleCfg, agentCfg},
+			initialConfigs:  []addonv1beta1.AddOnConfig{scrapeConfigCfg, coreosScrapeConfigCfg, promRuleCfg, cooPromRuleCfg, agentCfg},
 			expectedConfigs: []addonv1beta1.AddOnConfig{agentCfg},
 		},
 		{
@@ -361,6 +413,13 @@ func TestDoesScrapeConfigOrPrometheusRuleExist(t *testing.T) {
 		},
 	}
 
+	existingCoreosScrapeConfig := &prometheusv1alpha1.ScrapeConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "existing-coreos-sc",
+			Namespace: addoncfg.InstallNamespace,
+		},
+	}
+
 	existingPromRule := &prometheusv1.PrometheusRule{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "existing-rule",
@@ -368,9 +427,18 @@ func TestDoesScrapeConfigOrPrometheusRuleExist(t *testing.T) {
 		},
 	}
 
+	existingCooRule := &cooprometheusv1.PrometheusRule{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "existing-coo-rule",
+			Namespace: addoncfg.InstallNamespace,
+		},
+	}
+
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(
 		existingScrapeConfig,
+		existingCoreosScrapeConfig,
 		existingPromRule,
+		existingCooRule,
 	).Build()
 
 	testCases := []struct {
@@ -379,6 +447,62 @@ func TestDoesScrapeConfigOrPrometheusRuleExist(t *testing.T) {
 		expected       bool
 		expectNotFound bool
 	}{
+		{
+			name: "existing coreos scrapeconfig returns true",
+			cfg: addonv1beta1.AddOnConfig{
+				ConfigGroupResource: addonv1beta1.ConfigGroupResource{
+					Group:    prometheusv1alpha1.SchemeGroupVersion.Group,
+					Resource: prometheusv1alpha1.ScrapeConfigName,
+				},
+				ConfigReferent: addonv1beta1.ConfigReferent{
+					Name:      "existing-coreos-sc",
+					Namespace: addoncfg.InstallNamespace,
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "non-existent coreos scrapeconfig returns not found",
+			cfg: addonv1beta1.AddOnConfig{
+				ConfigGroupResource: addonv1beta1.ConfigGroupResource{
+					Group:    prometheusv1alpha1.SchemeGroupVersion.Group,
+					Resource: prometheusv1alpha1.ScrapeConfigName,
+				},
+				ConfigReferent: addonv1beta1.ConfigReferent{
+					Name:      "does-not-exist",
+					Namespace: addoncfg.InstallNamespace,
+				},
+			},
+			expectNotFound: true,
+		},
+		{
+			name: "existing coo prometheusrule returns true",
+			cfg: addonv1beta1.AddOnConfig{
+				ConfigGroupResource: addonv1beta1.ConfigGroupResource{
+					Group:    cooprometheusv1.SchemeGroupVersion.Group,
+					Resource: cooprometheusv1.PrometheusRuleName,
+				},
+				ConfigReferent: addonv1beta1.ConfigReferent{
+					Name:      "existing-coo-rule",
+					Namespace: addoncfg.InstallNamespace,
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "non-existent coo prometheusrule returns not found",
+			cfg: addonv1beta1.AddOnConfig{
+				ConfigGroupResource: addonv1beta1.ConfigGroupResource{
+					Group:    cooprometheusv1.SchemeGroupVersion.Group,
+					Resource: cooprometheusv1.PrometheusRuleName,
+				},
+				ConfigReferent: addonv1beta1.ConfigReferent{
+					Name:      "does-not-exist",
+					Namespace: addoncfg.InstallNamespace,
+				},
+			},
+			expectNotFound: true,
+		},
 		{
 			name: "existing scrapeconfig returns true",
 			cfg: addonv1beta1.AddOnConfig{
