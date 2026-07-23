@@ -664,6 +664,32 @@ func TestDoesScrapeConfigOrPrometheusRuleOrPrometheusAgentExist(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "unsupported group for scrapeconfig returns no error",
+			cfg: addonv1beta1.AddOnConfig{
+				ConfigGroupResource: addonv1beta1.ConfigGroupResource{
+					Group:    "invalid-group.com",
+					Resource: cooprometheusv1alpha1.ScrapeConfigName,
+				},
+				ConfigReferent: addonv1beta1.ConfigReferent{
+					Name:      "existing-sc",
+					Namespace: addoncfg.InstallNamespace,
+				},
+			},
+		},
+		{
+			name: "unsupported group for prometheusrule returns no error",
+			cfg: addonv1beta1.AddOnConfig{
+				ConfigGroupResource: addonv1beta1.ConfigGroupResource{
+					Group:    "invalid-group.com",
+					Resource: prometheusv1.PrometheusRuleName,
+				},
+				ConfigReferent: addonv1beta1.ConfigReferent{
+					Name:      "existing-rule",
+					Namespace: addoncfg.InstallNamespace,
+				},
+			},
+		},
 	}
 
 	for _, tt := range testCases {
