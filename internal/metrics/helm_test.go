@@ -363,7 +363,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				// ensure that COO recording rules are created
 				cooRecordingRules := common.FilterResourcesByLabelSelector[*cooprometheusv1.PrometheusRule](objects, config.UserWorkloadPrometheusMatchLabels)
 				assert.Len(t, cooRecordingRules, 2)
-				assert.Equal(t, "openshift-user-workload-monitoring/prometheus-operator", cooRecordingRules[0].Annotations["operator.prometheus.io/controller-id"])
+				assert.Empty(t, cooRecordingRules[0].Annotations["operator.prometheus.io/controller-id"])
 				expectedCount := 48
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
