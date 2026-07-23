@@ -46,11 +46,12 @@ type MetricsValues struct {
 
 // ThanosOperatorValues holds the Thanos operator deployment values for Helm rendering.
 type ThanosOperatorValues struct {
-	Enabled   bool   `json:"enabled"`
-	IsHub     bool   `json:"isHub"`
-	AppName   string `json:"appName"`
-	Component string `json:"component"`
-	Image     string `json:"image"`
+	Enabled   bool        `json:"enabled"`
+	IsHub     bool        `json:"isHub"`
+	AppName   string      `json:"appName"`
+	Component string      `json:"component"`
+	Image     string      `json:"image"`
+	StoreSpec ConfigValue `json:"storeSpec"`
 }
 
 type NodeExporterValues struct {
@@ -323,7 +324,24 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 		Image:     thanosOperatorImage,
 	}
 
+	if opts.IsHub && opts.Thanos.Store != nil {
+		if ret.ThanosOperator.StoreSpec, err = marshalThanosSpec(opts.Thanos.Store.Spec); err != nil {
+			return ret, fmt.Errorf("failed to build thanos store values: %w", err)
+		}
+	}
+
 	return ret, nil
+}
+
+// marshalThanosSpec serializes a Thanos CR spec into a ConfigValue for Helm rendering.
+func marshalThanosSpec(spec any) (ConfigValue, error) {
+	specJSON, err := json.Marshal(spec)
+	if err != nil {
+		return ConfigValue{}, err
+	}
+	return ConfigValue{
+		Data: string(specJSON),
+	}, nil
 }
 
 func buildSecrets(secrets []*corev1.Secret) ([]ConfigValue, error) {
