@@ -167,8 +167,13 @@ func Transpile(scrapeConfig *cooprometheusv1alpha1.ScrapeConfig, agent *cooprome
 
 	var specs []*cooprometheusv1.RemoteWriteSpec
 	for _, agentRw := range agent.Spec.RemoteWrite {
+		relabelConfigsCopy := make([]cooprometheusv1.RelabelConfig, len(relabelConfigs))
+		for i, cfg := range relabelConfigs {
+			cfg.DeepCopyInto(&relabelConfigsCopy[i])
+		}
+
 		spec := &cooprometheusv1.RemoteWriteSpec{
-			WriteRelabelConfigs: slices.Clone(relabelConfigs),
+			WriteRelabelConfigs: relabelConfigsCopy,
 		}
 
 		spec.URL = agentRw.URL
