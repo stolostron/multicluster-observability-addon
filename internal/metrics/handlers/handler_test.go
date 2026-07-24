@@ -930,9 +930,10 @@ func newManifestWork(name string, isOLMSubscrided bool) *workv1.ManifestWork {
 					},
 					{
 						ResourceMeta: workv1.ManifestResourceMeta{
-							Group:    "",
-							Resource: "configmaps",
-							Name:     addoncfg.TLSProfileConfigMapName,
+							Group:     "",
+							Resource:  "configmaps",
+							Name:      addoncfg.TLSProfileConfigMapName,
+							Namespace: addoncfg.TLSProfileConfigMapNamespace,
 						},
 						StatusFeedbacks: workv1.StatusFeedbackResult{
 							Values: []workv1.FeedbackValue{

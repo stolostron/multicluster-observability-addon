@@ -957,7 +957,9 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				// secrets are possible to install in multiple namespaces (such as openshift-monitoring)
 				// and are therefore also ignored.
 				if !slices.Contains([]string{"ClusterRole", "ClusterRoleBinding", "CustomResourceDefinition", "Secret", "Namespace"}, obj.GetObjectKind().GroupVersionKind().Kind) {
-					if obj.GetObjectKind().GroupVersionKind().Kind == "PrometheusRule" && accessor.GetName() == "uwl-rules-additional" {
+					if obj.GetObjectKind().GroupVersionKind().Kind == "ConfigMap" && accessor.GetName() == "ocm-tls-profile" {
+						assert.Equal(t, "open-cluster-management-agent", accessor.GetNamespace(), "Object: %s/%s", obj.GetObjectKind().GroupVersionKind(), accessor.GetName())
+					} else if obj.GetObjectKind().GroupVersionKind().Kind == "PrometheusRule" && accessor.GetName() == "uwl-rules-additional" {
 						assert.Equal(t, "target-namespace", accessor.GetNamespace(), "Object: %s/%s", obj.GetObjectKind().GroupVersionKind(), accessor.GetName())
 					} else {
 						installNamespace := addonfactory.AddonDefaultInstallNamespace

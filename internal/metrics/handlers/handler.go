@@ -145,9 +145,10 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1beta1.Man
 
 	// Read TLS profile from ManifestWork feedback
 	tlsProfileCM := workv1.ResourceIdentifier{
-		Group:    "",
-		Resource: "configmaps",
-		Name:     addoncfg.TLSProfileConfigMapName,
+		Group:     "",
+		Resource:  "configmaps",
+		Name:      addoncfg.TLSProfileConfigMapName,
+		Namespace: addoncfg.TLSProfileConfigMapNamespace,
 	}
 	feedback, err := common.GetFeedbackValuesForResources(ctx, o.Client, managedCluster.Name, addoncfg.Name, tlsProfileCM)
 	if err != nil {

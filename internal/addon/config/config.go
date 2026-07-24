@@ -73,14 +73,15 @@ const (
 	IsOLMManagedFeedbackPath              = `.metadata.labels.olm\.managed`
 
 	// TLS profile feedback
-	TLSProfileConfigMapName     = "ocm-tls-profile"
-	TLSProfileTypeFeedbackName  = "profileType"
-	TLSProfileTypeFeedbackPath  = ".data.profileType"
-	TLSMinVersionFeedbackName   = "minTLSVersion"
-	TLSMinVersionFeedbackPath   = ".data.minTLSVersion"
-	TLSCipherSuitesFeedbackName = "cipherSuites"
-	TLSCipherSuitesFeedbackPath = ".data.cipherSuites"
-	TLSDefaultMinVersion        = "VersionTLS12"
+	TLSProfileConfigMapNamespace = "open-cluster-management-agent"
+	TLSProfileConfigMapName      = "ocm-tls-profile"
+	TLSProfileTypeFeedbackName   = "profileType"
+	TLSProfileTypeFeedbackPath   = ".data.profileType"
+	TLSMinVersionFeedbackName    = "minTLSVersion"
+	TLSMinVersionFeedbackPath    = ".data.minTLSVersion"
+	TLSCipherSuitesFeedbackName  = "cipherSuites"
+	TLSCipherSuitesFeedbackPath  = ".data.cipherSuites"
+	TLSDefaultMinVersion         = "VersionTLS12"
 
 	VendorOverrideAnnotationKey = "mcoa-override-vendor"
 	AnnotationOriginalResource  = "mcoa.openshift.io/original-resource"
