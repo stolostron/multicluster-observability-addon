@@ -140,7 +140,9 @@ func TestBuildValues(t *testing.T) {
 			Expect: func(t *testing.T, values *manifests.MetricsValues) {
 				assert.Len(t, values.Platform.Rules, 2)
 				assert.Equal(t, "a", values.Platform.Rules[0].Name)
+				assert.Equal(t, "monitoring.coreos.com/v1", values.Platform.Rules[0].APIVersion)
 				assert.Equal(t, "b", values.Platform.Rules[1].Name)
+				assert.Equal(t, "monitoring.coreos.com/v1", values.Platform.Rules[1].APIVersion)
 			},
 		},
 		"with user workload rules": {
@@ -152,7 +154,9 @@ func TestBuildValues(t *testing.T) {
 			Expect: func(t *testing.T, values *manifests.MetricsValues) {
 				assert.Len(t, values.UserWorkload.Rules, 2)
 				assert.Equal(t, "a", values.UserWorkload.Rules[0].Name)
+				assert.Equal(t, "monitoring.coreos.com/v1", values.UserWorkload.Rules[0].APIVersion)
 				assert.Equal(t, "b", values.UserWorkload.Rules[1].Name)
+				assert.Equal(t, "monitoring.coreos.com/v1", values.UserWorkload.Rules[1].APIVersion)
 			},
 		},
 		"with user workload COO rules": {
@@ -179,7 +183,7 @@ func TestBuildValues(t *testing.T) {
 			Expect: func(t *testing.T, values *manifests.MetricsValues) {
 				assert.Len(t, values.UserWorkload.Rules, 2)
 				assert.Equal(t, "coreos-a", values.UserWorkload.Rules[0].Name)
-				assert.Empty(t, values.UserWorkload.Rules[0].APIVersion)
+				assert.Equal(t, "monitoring.coreos.com/v1", values.UserWorkload.Rules[0].APIVersion)
 				assert.Equal(t, "rhobs-a", values.UserWorkload.Rules[1].Name)
 				assert.Equal(t, "monitoring.rhobs/v1", values.UserWorkload.Rules[1].APIVersion)
 			},
@@ -307,6 +311,9 @@ func newScrapeConfig(name string) *cooprometheusv1alpha1.ScrapeConfig {
 
 func newRule(name string) *prometheusv1.PrometheusRule {
 	return &prometheusv1.PrometheusRule{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "monitoring.coreos.com/v1",
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
