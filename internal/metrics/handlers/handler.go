@@ -17,6 +17,7 @@ import (
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
+	"github.com/stolostron/multicluster-observability-addon/internal/metrics/remotewrite"
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -64,7 +65,7 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1beta1.Man
 
 	ret.ClusterName = managedCluster.Name
 	ret.ClusterID = common.GetManagedClusterID(managedCluster)
-	ret.AlertManagerEndpoint = opts.Platform.Metrics.HubEndpoint.Host // Use the same host as the metrics for alerts forwarding
+	ret.HubEndpoint = opts.Platform.Metrics.HubEndpoint.Host // Use the same host as the metrics for alerts forwarding
 	isOpenShiftVendor := common.IsOpenShiftVendor(managedCluster)
 	ret.IsOpenShiftVendor = isOpenShiftVendor
 
@@ -142,6 +143,56 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1beta1.Man
 			o.Logger.Info("User workload monitoring is needed to monitor Hosted Control Planes managed by the hypershift addon. Ignoring related resources creation.")
 		}
 	}
+
+	caTargetName := config.GetHubMtlsCASecretName(config.GetTrimmedClusterID(ret.HubClusterID))
+	certTargetName := config.GetHubMtlsCertSecretName(config.GetTrimmedClusterID(ret.HubClusterID))
+
+	var rawPatches []MonitoringStackPatch
+
+	// Process Platform ScrapeConfigs
+	if opts.Platform.Metrics.CollectionEnabled && len(ret.Platform.ScrapeConfigs) > 0 {
+		var patches []MonitoringStackPatch
+		var serverRemoteWrites []cooprometheusv1.RemoteWriteSpec
+		ret.Platform.ScrapeConfigs, patches, serverRemoteWrites, err = o.processScrapeConfigs(
+			ctx,
+			ret.Platform.ScrapeConfigs,
+			ret.Platform.PrometheusAgent,
+			caTargetName,
+			certTargetName,
+			&ret.Secrets,
+			isOpenShiftVendor,
+			config.AlertmanagerPlatformNamespace,
+		)
+		if err != nil {
+			return ret, err
+		}
+		if isOpenShiftVendor {
+			rawPatches = append(rawPatches, patches...)
+		} else {
+			ret.PrometheusServerRemoteWrite = append(ret.PrometheusServerRemoteWrite, serverRemoteWrites...)
+		}
+	}
+
+	// Process UserWorkloads ScrapeConfigs (OCP only)
+	if isOpenShiftVendor && opts.UserWorkloads.Metrics.CollectionEnabled && len(ret.UserWorkloads.ScrapeConfigs) > 0 {
+		var patches []MonitoringStackPatch
+		ret.UserWorkloads.ScrapeConfigs, patches, _, err = o.processScrapeConfigs(
+			ctx,
+			ret.UserWorkloads.ScrapeConfigs,
+			ret.UserWorkloads.PrometheusAgent,
+			caTargetName,
+			certTargetName,
+			&ret.Secrets,
+			isOpenShiftVendor,
+			config.AlertmanagerUWLNamespace,
+		)
+		if err != nil {
+			return ret, err
+		}
+		rawPatches = append(rawPatches, patches...)
+	}
+
+	ret.MonitoringStackPatches = rawPatches
 
 	if isOpenShiftVendor {
 		if ret.COOIsSubscribed, err = o.cooIsSubscribed(ctx, managedCluster); err != nil {
@@ -224,7 +275,7 @@ func (o *OptionsBuilder) buildPrometheusAgent(ctx context.Context, opts *Options
 	if len(platformAgents) > 1 {
 		o.Logger.Info("Warning: invalid number of configuration resources", "error", fmt.Errorf("%w: for application %s, found %d agents with labels %+v", errInvalidConfigResourcesCount, appName, len(platformAgents), labelsMatcher))
 	}
-	agent := platformAgents[0]
+	agent := platformAgents[0].DeepCopy()
 
 	isOwned, err := common.HasCMAOOwnerReference(ctx, o.Client, agent)
 	if err != nil {
@@ -277,10 +328,53 @@ func (o *OptionsBuilder) buildPrometheusAgent(ctx context.Context, opts *Options
 		return fmt.Errorf("%w: %s", errUnsupportedAppName, appName)
 	}
 
+	trimmedClusterID := config.GetTrimmedClusterID(opts.HubClusterID)
+	caTargetName := config.GetHubMtlsCASecretName(trimmedClusterID)
+	certTargetName := config.GetHubMtlsCertSecretName(trimmedClusterID)
+
+	// Note: We dynamically rename the secrets referenced in the PrometheusAgent (and their corresponding TLSConfig file paths)
+	// on the managed cluster to use the caTargetName and certTargetName secret names.
+	// This maintains 100% naming consistency with the Alertmanager mTLS secrets deployed across all target namespaces
+	// (addon installation namespace, openshift-monitoring, openshift-user-workload-monitoring, and COO namespaces).
+	// Crucially, this consistency is what allows the raw metrics transpilation pipeline (processScrapeConfigs) to safely
+	// reuse/copy the RemoteWrite configuration specified in the PrometheusAgent when configuring raw metrics collection
+	// directly on the source Prometheus servers (since the file paths inside /etc/prometheus/secrets/... will perfectly align).
+	for idx, secret := range agent.Spec.Secrets {
+		switch secret {
+		case config.HubCASecretName:
+			agent.Spec.Secrets[idx] = caTargetName
+		case config.ClientCertSecretName:
+			agent.Spec.Secrets[idx] = certTargetName
+		}
+	}
+
+	// Dynamically update the main acm-observability remote write TLSFilesConfig paths to use the new target secret names
+	mainRw := &agent.Spec.RemoteWrite[remoteWriteSpecIdx]
+	if mainRw.TLSConfig != nil {
+		mainRw.TLSConfig.CAFile = fmt.Sprintf("/etc/prometheus/secrets/%s/%s", caTargetName, config.MTLSCASecretKey)
+		mainRw.TLSConfig.CertFile = fmt.Sprintf("/etc/prometheus/secrets/%s/%s", certTargetName, config.MTLSCertSecretKey)
+		mainRw.TLSConfig.KeyFile = fmt.Sprintf("/etc/prometheus/secrets/%s/%s", certTargetName, config.MTLSCertKeySecretKey)
+	}
+
 	// Fetch related secrets
 	for _, secretName := range agent.Spec.Secrets {
+		var sourceName string
+		sourceNamespace := agent.Namespace
+		if secretName == caTargetName {
+			sourceName = config.HubCASecretName
+			sourceNamespace = config.HubInstallNamespace
+		} else if secretName == certTargetName {
+			sourceName = config.ClientCertSecretName
+			sourceNamespace = config.HubInstallNamespace
+		} else if secretName == config.GetAlertmanagerAccessorSecretName(trimmedClusterID) {
+			sourceName = config.AlertmanagerAccessorSecretName
+			sourceNamespace = config.HubInstallNamespace
+		} else {
+			sourceName = secretName
+		}
+
 		// empty target namespace result in using default $.Release.Namespace in yaml
-		if err := o.addSecret(ctx, &opts.Secrets, secretName, agent.Namespace, secretName, ""); err != nil {
+		if err := o.addSecret(ctx, &opts.Secrets, sourceName, sourceNamespace, secretName, ""); err != nil {
 			return err
 		}
 	}
@@ -333,7 +427,7 @@ func (o *OptionsBuilder) buildHypershiftResources(ctx context.Context, opts *Opt
 // Simplified addSecret function (unchanged)
 // empty target namespace result in using default $.Release.Namespace in yaml
 func (o *OptionsBuilder) addSecret(ctx context.Context, secrets *[]*corev1.Secret, secretName, secretNamespace string, targetName string, targetNamespace string) error {
-	if slices.IndexFunc(*secrets, func(s *corev1.Secret) bool { return s.Name == secretName && s.Namespace == secretNamespace }) != -1 {
+	if slices.IndexFunc(*secrets, func(s *corev1.Secret) bool { return s.Name == targetName && s.Namespace == targetNamespace }) != -1 {
 		return nil
 	}
 
@@ -342,6 +436,7 @@ func (o *OptionsBuilder) addSecret(ctx context.Context, secrets *[]*corev1.Secre
 		return fmt.Errorf("failed to get secret %s in namespace %s: %w", secretName, secretNamespace, err)
 	}
 
+	secret = secret.DeepCopy()
 	if secret.Annotations == nil {
 		secret.Annotations = map[string]string{}
 	}
@@ -355,7 +450,7 @@ func (o *OptionsBuilder) addSecret(ctx context.Context, secrets *[]*corev1.Secre
 }
 
 func (o *OptionsBuilder) addConfigMap(ctx context.Context, configMaps *[]*corev1.ConfigMap, configMapName, configMapNamespace string, targetName string, targetNamespace string) error {
-	if slices.IndexFunc(*configMaps, func(cm *corev1.ConfigMap) bool { return cm.Name == configMapName && cm.Namespace == configMapNamespace }) != -1 {
+	if slices.IndexFunc(*configMaps, func(cm *corev1.ConfigMap) bool { return cm.Name == targetName && cm.Namespace == targetNamespace }) != -1 {
 		return nil
 	}
 
@@ -364,6 +459,7 @@ func (o *OptionsBuilder) addConfigMap(ctx context.Context, configMaps *[]*corev1
 		return fmt.Errorf("failed to get configmap %s in namespace %s: %w", configMapName, configMapNamespace, err)
 	}
 
+	configMap = configMap.DeepCopy()
 	if configMap.Annotations == nil {
 		configMap.Annotations = map[string]string{}
 	}
@@ -422,7 +518,7 @@ func (o *OptionsBuilder) cooIsSubscribed(ctx context.Context, managedCluster *cl
 	crdID := workv1.ResourceIdentifier{
 		Group:    apiextensionsv1.GroupName,
 		Resource: crdResourceName,
-		Name:     config.MonitoringStackCRDName,
+		Name:     config.AlertmanagerCRDName,
 	}
 
 	feedback, err := common.GetFeedbackValuesForResources(ctx, o.Client, managedCluster.Name, addoncfg.Name, crdID)
@@ -432,19 +528,19 @@ func (o *OptionsBuilder) cooIsSubscribed(ctx context.Context, managedCluster *cl
 
 	crdFeedback, ok := feedback[crdID]
 	if !ok || len(crdFeedback) == 0 {
-		o.Logger.V(2).Info(fmt.Sprintf("%s CRD not found in manifestwork status, considering COO as not subscribed", config.MonitoringStackCRDName))
+		o.Logger.V(2).Info(fmt.Sprintf("%s CRD not found in manifestwork status, considering COO as not subscribed", config.AlertmanagerCRDName))
 		return false, nil
 	}
 
 	olmValues := common.FilterFeedbackValuesByName(crdFeedback, addoncfg.IsOLMManagedFeedbackName)
 	for _, v := range olmValues {
 		if v.Value.String != nil && strings.ToLower(*v.Value.String) == "true" {
-			o.Logger.V(2).Info(fmt.Sprintf("found %s CRD with OLM label, considering COO as subscribed", config.MonitoringStackCRDName))
+			o.Logger.V(2).Info(fmt.Sprintf("found %s CRD with OLM label, considering COO as subscribed", config.AlertmanagerCRDName))
 			return true, nil
 		}
 	}
 
-	o.Logger.V(2).Info(fmt.Sprintf("%s CRD missing the OLM label, considering COO as not subscribed", config.MonitoringStackCRDName))
+	o.Logger.V(2).Info(fmt.Sprintf("%s CRD missing the OLM label, considering COO as not subscribed", config.AlertmanagerCRDName))
 	return false, nil
 }
 
@@ -532,14 +628,14 @@ func (o *OptionsBuilder) addAlertmanagerMtlsSecrets(ctx context.Context, secrets
 			targetNamespace = "" // This is replaced by the default value in the help template that is the installation namespace
 		}
 
-		// Copy HubCASecretName (observability-managed-cluster-certs) to obs-alertmanager-mtls-ca-<id>
-		caTargetName := config.GetObsAlertmanagerMtlsCASecretName(trimmedClusterID)
+		// Copy HubCASecretName (observability-managed-cluster-certs) to hub-mtls-ca-<id>
+		caTargetName := config.GetHubMtlsCASecretName(trimmedClusterID)
 		if err := o.addSecret(ctx, secrets, config.HubCASecretName, config.HubInstallNamespace, caTargetName, targetNamespace); err != nil {
 			return fmt.Errorf("failed to add platform mtls ca secret: %w", err)
 		}
 
-		// Copy ClientCertSecretName (observability-controller...) to obs-alertmanager-mtls-cert-<id>
-		certTargetName := config.GetObsAlertmanagerMtlsCertSecretName(trimmedClusterID)
+		// Copy ClientCertSecretName (observability-controller...) to hub-mtls-cert-<id>
+		certTargetName := config.GetHubMtlsCertSecretName(trimmedClusterID)
 		if err := o.addSecret(ctx, secrets, config.ClientCertSecretName, config.HubInstallNamespace, certTargetName, targetNamespace); err != nil {
 			return fmt.Errorf("failed to add platform mtls cert secret: %w", err)
 		}
@@ -554,14 +650,14 @@ func (o *OptionsBuilder) addAlertmanagerMtlsSecrets(ctx context.Context, secrets
 	if isOCP && opts.UserWorkloads.Metrics.CollectionEnabled {
 		targetNamespace := config.AlertmanagerUWLNamespace
 
-		// Copy HubCASecretName (observability-managed-cluster-certs) to obs-alertmanager-mtls-ca-<id>
-		caTargetName := config.GetObsAlertmanagerMtlsCASecretName(trimmedClusterID)
+		// Copy HubCASecretName (observability-managed-cluster-certs) to hub-mtls-ca-<id>
+		caTargetName := config.GetHubMtlsCASecretName(trimmedClusterID)
 		if err := o.addSecret(ctx, secrets, config.HubCASecretName, config.HubInstallNamespace, caTargetName, targetNamespace); err != nil {
 			return fmt.Errorf("failed to add uwl mtls ca secret: %w", err)
 		}
 
-		// Copy ClientCertSecretName (observability-controller...) to obs-alertmanager-mtls-cert-<id>
-		certTargetName := config.GetObsAlertmanagerMtlsCertSecretName(trimmedClusterID)
+		// Copy ClientCertSecretName (observability-controller...) to hub-mtls-cert-<id>
+		certTargetName := config.GetHubMtlsCertSecretName(trimmedClusterID)
 		if err := o.addSecret(ctx, secrets, config.ClientCertSecretName, config.HubInstallNamespace, certTargetName, targetNamespace); err != nil {
 			return fmt.Errorf("failed to add uwl mtls cert secret: %w", err)
 		}
@@ -576,6 +672,161 @@ func (o *OptionsBuilder) addAlertmanagerMtlsSecrets(ctx context.Context, secrets
 	return nil
 }
 
+// processScrapeConfigs filters, mutates, and transpiles scrape configs into MonitoringStack patches when targeted at COO on OCP,
+// or directly into Prometheus Server remoteWrite configurations on non-OCP managed clusters.
+//
+// We return the filtered scrapeConfigs slice in addition to the transpiled remoteWrite patches because
+// scrapeConfigs that do NOT have the raw resolution strategy annotation are preserved as-is (not transpiled)
+// and must be returned so they can be exported to the managed cluster for standard, downsampled collection
+// via the standard Prometheus Agent federation pipeline.
+//
+// Note: For standard platform/user-workload ScrapeConfigs targeted at the Cluster Monitoring Operator (CMO) ConfigMap,
+// updates are managed asynchronously by the endpoint operator. For those, we do not transpile or generate patches;
+// instead, we simply append the "-raw" suffix to their "app.kubernetes.io/component" label to ensure the endpoint
+// operator recognizes them and updates the CMO ConfigMap correctly, keeping the ScrapeConfig in the returned filtered slice.
+func (o *OptionsBuilder) processScrapeConfigs(
+	ctx context.Context,
+	scrapeConfigs []*cooprometheusv1alpha1.ScrapeConfig,
+	agent *cooprometheusv1alpha1.PrometheusAgent,
+	caTargetName, certTargetName string,
+	secrets *[]*corev1.Secret,
+	isOCP bool,
+	defaultNamespace string,
+) ([]*cooprometheusv1alpha1.ScrapeConfig, []MonitoringStackPatch, []cooprometheusv1.RemoteWriteSpec, error) {
+	var filtered []*cooprometheusv1alpha1.ScrapeConfig
+	var serverRemoteWrites []cooprometheusv1.RemoteWriteSpec
+
+	type patchKey struct {
+		namespace string
+		name      string
+	}
+	patchMap := make(map[patchKey][]*cooprometheusv1.RemoteWriteSpec)
+	var patchKeys []patchKey
+
+	for _, sc := range scrapeConfigs {
+		sc = sc.DeepCopy()
+		if sc.Annotations == nil {
+			sc.Annotations = map[string]string{}
+		}
+
+		// 1. Raw Resolution Strategy (OCP & Non-OCP). Standard ScrapeConfigs (without raw strategy) are bypassed and kept as-is.
+		if sc.Annotations[config.RawResolutionAnnotation] != config.RawResolutionValue {
+			filtered = append(filtered, sc)
+			continue
+		}
+
+		if sc.Labels == nil {
+			sc.Labels = map[string]string{}
+		}
+		if comp, ok := sc.Labels[addoncfg.ComponentK8sLabelKey]; ok {
+			if !strings.HasSuffix(comp, config.RawLabelSuffix) {
+				sc.Labels[addoncfg.ComponentK8sLabelKey] = comp + config.RawLabelSuffix
+			}
+		}
+
+		// 2. Check for COO target stack annotation (for OCP) or transpile directly for Prometheus Server (for non-OCP)
+		if isOCP {
+			targetStacks := parseCOOMonitoringStacks(sc.Annotations)
+			if len(targetStacks) == 0 {
+				// For standard platform/user-workloads on OCP, copy mTLS secrets to the standard target namespace (openshift-monitoring or openshift-user-workload-monitoring)
+				// so that the default Prometheus instances can authenticate with the hub.
+				if slices.IndexFunc(*secrets, func(s *corev1.Secret) bool { return s.Name == caTargetName && s.Namespace == defaultNamespace }) == -1 {
+					if scErr := o.addSecret(ctx, secrets, config.HubCASecretName, config.HubInstallNamespace, caTargetName, defaultNamespace); scErr != nil {
+						return nil, nil, nil, fmt.Errorf("failed to add standard mtls ca secret to %s: %w", defaultNamespace, scErr)
+					}
+				}
+				if slices.IndexFunc(*secrets, func(s *corev1.Secret) bool { return s.Name == certTargetName && s.Namespace == defaultNamespace }) == -1 {
+					if scErr := o.addSecret(ctx, secrets, config.ClientCertSecretName, config.HubInstallNamespace, certTargetName, defaultNamespace); scErr != nil {
+						return nil, nil, nil, fmt.Errorf("failed to add standard mtls cert secret to %s: %w", defaultNamespace, scErr)
+					}
+				}
+
+				// No COO stacks targeted, let it fall through to standard platform export
+				filtered = append(filtered, sc)
+				continue
+			}
+
+			for _, tStack := range targetStacks {
+				targetNamespace := tStack.Namespace
+				targetName := tStack.Name
+
+				// Copy mTLS secrets to targetNamespace.
+				// Note: The outer slices.IndexFunc guards are critical because addSecret appends directly to the output slice.
+				// Since multiple ScrapeConfigs can target the exact same COO stack/namespace, the outer guard prevents
+				// creating duplicate target secrets in secrets across multiple scrape config iterations.
+				if slices.IndexFunc(*secrets, func(s *corev1.Secret) bool { return s.Name == caTargetName && s.Namespace == targetNamespace }) == -1 {
+					if scErr := o.addSecret(ctx, secrets, config.HubCASecretName, config.HubInstallNamespace, caTargetName, targetNamespace); scErr != nil {
+						return nil, nil, nil, fmt.Errorf("failed to add COO mtls ca secret: %w", scErr)
+					}
+				}
+				if slices.IndexFunc(*secrets, func(s *corev1.Secret) bool { return s.Name == certTargetName && s.Namespace == targetNamespace }) == -1 {
+					if scErr := o.addSecret(ctx, secrets, config.ClientCertSecretName, config.HubInstallNamespace, certTargetName, targetNamespace); scErr != nil {
+						return nil, nil, nil, fmt.Errorf("failed to add COO mtls cert secret: %w", scErr)
+					}
+				}
+
+				// Transpile to MonitoringStack patch
+				rwSpecs, scErr := remotewrite.Transpile(sc, agent)
+				if scErr != nil {
+					return nil, nil, nil, fmt.Errorf("failed to transpile scrape config %s/%s: %w", sc.Namespace, sc.Name, scErr)
+				}
+				if len(rwSpecs) == 0 {
+					o.Logger.Info("transpilation returned empty remote write specs for raw scrape config, no selectors parsed", "namespace", sc.Namespace, "name", sc.Name)
+					continue
+				}
+
+				// We must override the agent's TLSFilesConfig (disk files) to use SafeTLSConfig (kubernetes secret selectors).
+				// We do this because we rename the deployed secret to limit its name length and prevent duplicated mount
+				// paths on the target Prometheus pod.
+				for _, spec := range rwSpecs {
+					spec.TLSConfig = createSafeTLSConfig(caTargetName, certTargetName)
+					spec.Name = ptr.To(getRemoteWriteName(spec.Name, sc.Name))
+				}
+
+				key := patchKey{namespace: targetNamespace, name: targetName}
+				if _, exists := patchMap[key]; !exists {
+					patchKeys = append(patchKeys, key)
+				}
+				patchMap[key] = append(patchMap[key], rwSpecs...)
+			}
+			// Since it's targeted for COO, we do NOT export the ScrapeConfig itself to the managed cluster
+			continue
+		} else {
+			// For non-OCP managed clusters, transpile directly for our Prometheus Server (acm-prometheus-k8s)
+			rwSpecs, scErr := remotewrite.Transpile(sc, agent)
+			if scErr != nil {
+				return nil, nil, nil, fmt.Errorf("failed to transpile scrape config %s/%s: %w", sc.Namespace, sc.Name, scErr)
+			}
+			if len(rwSpecs) == 0 {
+				o.Logger.Info("transpilation returned empty remote write specs for raw scrape config, no selectors parsed", "namespace", sc.Namespace, "name", sc.Name)
+				continue
+			}
+
+			// We must override the agent's TLSFilesConfig (disk files) to use SafeTLSConfig (kubernetes secret selectors).
+			// We do this because we rename the deployed secret to limit its name length and prevent duplicated mount
+			// paths on the target Prometheus pod.
+			for _, spec := range rwSpecs {
+				spec.TLSConfig = createSafeTLSConfig(caTargetName, certTargetName)
+				spec.Name = ptr.To(getRemoteWriteName(spec.Name, sc.Name))
+				serverRemoteWrites = append(serverRemoteWrites, *spec)
+			}
+			// Since it's transpiled directly into the Prometheus Server's RemoteWrite, we do NOT export the ScrapeConfig itself
+			continue
+		}
+	}
+
+	patches := make([]MonitoringStackPatch, 0, len(patchKeys))
+	for _, key := range patchKeys {
+		patches = append(patches, MonitoringStackPatch{
+			Namespace:        key.namespace,
+			Name:             key.name,
+			RemoteWriteSpecs: patchMap[key],
+		})
+	}
+
+	return filtered, patches, serverRemoteWrites, nil
+}
+
 // getClusterID is used to get the cluster uid.
 func getClusterID(ctx context.Context, c client.Client) (string, error) {
 	clusterVersion := &ocinfrav1.ClusterVersion{}
@@ -584,4 +835,84 @@ func getClusterID(ctx context.Context, c client.Client) (string, error) {
 	}
 
 	return string(clusterVersion.Spec.ClusterID), nil
+}
+
+// createSafeTLSConfig generates a TLSConfig configured to use SafeTLSConfig Kubernetes secret selectors.
+func createSafeTLSConfig(caTargetName, certTargetName string) *cooprometheusv1.TLSConfig {
+	return &cooprometheusv1.TLSConfig{
+		SafeTLSConfig: cooprometheusv1.SafeTLSConfig{
+			CA: cooprometheusv1.SecretOrConfigMap{
+				Secret: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: caTargetName,
+					},
+					Key: config.MTLSCASecretKey,
+				},
+			},
+			Cert: cooprometheusv1.SecretOrConfigMap{
+				Secret: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: certTargetName,
+					},
+					Key: config.MTLSCertSecretKey,
+				},
+			},
+			KeySecret: &corev1.SecretKeySelector{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: certTargetName,
+				},
+				Key: config.MTLSCertKeySecretKey,
+			},
+		},
+	}
+}
+
+// getRemoteWriteName computes a unique name for the RemoteWrite configuration
+// by prefixing the base name (if not already prefixed with "acm-") and
+// suffixing the scrape config name to ensure uniqueness.
+func getRemoteWriteName(specName *string, scrapeConfigName string) string {
+	if specName != nil {
+		baseName := *specName
+		if !strings.HasPrefix(baseName, "acm-") {
+			baseName = "acm-" + baseName
+		}
+		if scrapeConfigName != "" {
+			return fmt.Sprintf("%s-%s", baseName, scrapeConfigName)
+		}
+		return baseName
+	}
+	if scrapeConfigName != "" {
+		return fmt.Sprintf("acm-%s", scrapeConfigName)
+	}
+	return config.RemoteWriteCfgName
+}
+
+// TargetStack represents a parsed namespace/name COO MonitoringStack target.
+type TargetStack struct {
+	Namespace string
+	Name      string
+}
+
+// parseCOOMonitoringStacks parses the coo-monitoring-stacks annotation into a list of TargetStack pairs.
+func parseCOOMonitoringStacks(annotations map[string]string) []TargetStack {
+	if annotations == nil {
+		return nil
+	}
+	cooStacks, ok := annotations[config.COOMonitoringStacksAnnotation]
+	if !ok || cooStacks == "" {
+		return nil
+	}
+
+	var parsed []TargetStack
+	stacks := strings.SplitSeq(cooStacks, ",")
+	for stack := range stacks {
+		parts := strings.Split(strings.TrimSpace(stack), "/")
+		if len(parts) == 2 {
+			parsed = append(parsed, TargetStack{
+				Namespace: parts[0],
+				Name:      parts[1],
+			})
+		}
+	}
+	return parsed
 }

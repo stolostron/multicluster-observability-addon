@@ -15,10 +15,12 @@ import (
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	coomonitoringv1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1"
 	coomonitoringv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
+	monitoringv1alpha1 "github.com/rhobs/observability-operator/pkg/apis/monitoring/v1alpha1"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	addonhelm "github.com/stolostron/multicluster-observability-addon/internal/addon/helm"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
@@ -133,6 +135,12 @@ func (a *AgentAddonWithSortedManifests) Manifests(ctx context.Context, cluster *
 		return nil, err
 	}
 
+	for i, obj := range objects {
+		if ms, ok := obj.(*monitoringv1alpha1.MonitoringStack); ok {
+			objects[i] = a.toUnstructuredMonitoringStack(ms)
+		}
+	}
+
 	// Sort the manifests to ensure a stable order of resources, which is crucial for
 	// fields like 'orphaningRules' in ManifestWork to prevent constant reconciliations.
 	slices.SortStableFunc(objects, func(a, b runtime.Object) int {
@@ -173,4 +181,22 @@ func (a *AgentAddonWithSortedManifests) GetAgentAddonOptions() agent.AgentAddonO
 	options := a.agent.GetAgentAddonOptions()
 	options.ManifestConfigs = addon.ManifestConfigs()
 	return options
+}
+
+// toUnstructuredMonitoringStack drops spec.resources/alertmanagerConfig when empty: omitempty does not omit zero-value structs.
+func (a *AgentAddonWithSortedManifests) toUnstructuredMonitoringStack(ms *monitoringv1alpha1.MonitoringStack) runtime.Object {
+	obj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(ms)
+	if err != nil {
+		a.logger.Error(err, "failed to convert MonitoringStack to unstructured, empty fields may overwrite spoke values", "name", ms.Name, "namespace", ms.Namespace)
+		return ms
+	}
+	if spec, ok := obj["spec"].(map[string]any); ok {
+		if v, ok := spec["resources"].(map[string]any); ok && len(v) == 0 {
+			delete(spec, "resources")
+		}
+		if v, ok := spec["alertmanagerConfig"].(map[string]any); ok && len(v) == 0 {
+			delete(spec, "alertmanagerConfig")
+		}
+	}
+	return &unstructured.Unstructured{Object: obj}
 }

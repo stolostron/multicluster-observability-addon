@@ -18,7 +18,7 @@ type Options struct {
 	UserWorkloads             Collector
 	Secrets                   []*corev1.Secret
 	ConfigMaps                []*corev1.ConfigMap
-	AlertManagerEndpoint      string
+	HubEndpoint               string
 	ClusterName               string
 	HubClusterID              string
 	ClusterID                 string
@@ -40,6 +40,16 @@ type Options struct {
 	// Thanos holds the hub-only Thanos component specifications.
 	// These are only populated when IsHub is true and platform metrics collection is enabled.
 	Thanos ThanosOptions
+
+	MonitoringStackPatches []MonitoringStackPatch
+
+	PrometheusServerRemoteWrite []cooprometheusv1.RemoteWriteSpec
+}
+
+type MonitoringStackPatch struct {
+	Namespace        string
+	Name             string
+	RemoteWriteSpecs []*cooprometheusv1.RemoteWriteSpec
 }
 
 // ThanosOptions holds the Thanos operator CR specs for hub deployment.

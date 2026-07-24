@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-logr/logr"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	prometheusv1alpha1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	cooprometheusv1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1"
 	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
@@ -142,24 +143,35 @@ func removeStaleConfigs(ctx context.Context, k8s client.Client, cmao *addonv1bet
 // Returns the raw API error on failure so callers can distinguish NotFound from other errors.
 func doesScrapeConfigOrPrometheusRuleExist(ctx context.Context, k8s client.Client, cfg addonv1beta1.AddOnConfig) (bool, error) {
 	key := types.NamespacedName{Name: cfg.Name, Namespace: cfg.Namespace}
+
+	var obj client.Object
 	switch cfg.Resource {
 	case cooprometheusv1alpha1.ScrapeConfigName:
-		sc := &cooprometheusv1alpha1.ScrapeConfig{}
-		if err := k8s.Get(ctx, key, sc); err != nil {
-			return false, err
-		} else {
-			return true, nil
+		switch cfg.Group {
+		case cooprometheusv1alpha1.SchemeGroupVersion.Group:
+			obj = &cooprometheusv1alpha1.ScrapeConfig{}
+		case prometheusv1alpha1.SchemeGroupVersion.Group:
+			obj = &prometheusv1alpha1.ScrapeConfig{}
+		default:
+			return false, nil
 		}
 	case prometheusv1.PrometheusRuleName:
-		rule := &prometheusv1.PrometheusRule{}
-		if err := k8s.Get(ctx, key, rule); err != nil {
-			return false, err
-		} else {
-			return true, nil
+		switch cfg.Group {
+		case cooprometheusv1.SchemeGroupVersion.Group:
+			obj = &cooprometheusv1.PrometheusRule{}
+		case prometheusv1.SchemeGroupVersion.Group:
+			obj = &prometheusv1.PrometheusRule{}
+		default:
+			return false, nil
 		}
 	default:
 		return false, nil
 	}
+
+	if err := k8s.Get(ctx, key, obj); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 func ObjectToAddonConfig(obj client.Object) (addonv1beta1.AddOnConfig, error) {

@@ -164,7 +164,7 @@ func getMetricsProbeFields() []agent.ProbeField {
 			ResourceIdentifier: workv1.ResourceIdentifier{
 				Group:    apiextensionsv1.GroupName,
 				Resource: crdResourceName,
-				Name:     mconfig.MonitoringStackCRDName,
+				Name:     mconfig.AlertmanagerCRDName,
 			},
 			ProbeRules: []workv1.FeedbackRule{
 				{
@@ -294,10 +294,22 @@ func ManifestConfigs() []workv1.ManifestConfigOption {
 			ResourceIdentifier: workv1.ResourceIdentifier{
 				Group:    apiextensionsv1.GroupName,
 				Resource: crdResourceName,
-				Name:     mconfig.MonitoringStackCRDName,
+				Name:     mconfig.AlertmanagerCRDName,
 			},
 			UpdateStrategy: &workv1.UpdateStrategy{
 				Type: workv1.UpdateStrategyTypeCreateOnly,
+			},
+		},
+		workv1.ManifestConfigOption{
+			ResourceIdentifier: workv1.ResourceIdentifier{
+				Group:    cooprometheusv1alpha1.SchemeGroupVersion.Group,
+				Resource: mconfig.MonitoringStackResource,
+			},
+			UpdateStrategy: &workv1.UpdateStrategy{
+				Type: workv1.UpdateStrategyTypeServerSideApply,
+				ServerSideApply: &workv1.ServerSideApplyConfig{
+					Force: false,
+				},
 			},
 		},
 		workv1.ManifestConfigOption{
