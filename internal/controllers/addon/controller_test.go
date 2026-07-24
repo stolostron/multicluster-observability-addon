@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
+	monitoringv1alpha1 "github.com/rhobs/observability-operator/pkg/apis/monitoring/v1alpha1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	monitoringv1alpha1 "github.com/rhobs/observability-operator/pkg/apis/monitoring/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -104,7 +104,7 @@ func TestManifestsConvertsMonitoringStackToUnstructured(t *testing.T) {
 			APIVersion: "monitoring.rhobs/v1alpha1",
 		},
 		ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "default"},
-		Spec: monitoringv1alpha1.MonitoringStackSpec{
+		Spec:       monitoringv1alpha1.MonitoringStackSpec{
 			// resources and alertmanagerConfig are zero-value (empty structs)
 		},
 	}
