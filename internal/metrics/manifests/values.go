@@ -240,9 +240,10 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 		}
 
 		ret.Platform.Rules = append(ret.Platform.Rules, ConfigValue{
-			Name:   rule.Name,
-			Data:   string(ruleJson),
-			Labels: rule.Labels,
+			Name:       rule.Name,
+			Data:       string(ruleJson),
+			Labels:     rule.Labels,
+			APIVersion: rule.APIVersion,
 		})
 	}
 
@@ -253,9 +254,10 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 		}
 
 		configValueItem := ConfigValue{
-			Name:   rule.Name,
-			Data:   string(ruleJson),
-			Labels: rule.Labels,
+			Name:       rule.Name,
+			Data:       string(ruleJson),
+			Labels:     rule.Labels,
+			APIVersion: rule.APIVersion,
 		}
 		targetNamespace := rule.Annotations[config.TargetNamespaceAnnotation]
 		if targetNamespace != "" {

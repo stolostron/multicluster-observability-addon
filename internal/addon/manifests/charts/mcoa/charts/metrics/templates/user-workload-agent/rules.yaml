@@ -14,7 +14,7 @@ metadata:
   annotations:
     {{- $incomingAnnotations := $rule.annotations }}
     {{- $stdAnnotations := dict }}
-    {{- if not (contains "monitoring.rhobs" (default "" $rule.apiVersion)) }}
+    {{- if not (hasPrefix "monitoring.rhobs/" (default "" $rule.apiVersion)) }}
     {{- $stdAnnotations = dict "operator.prometheus.io/controller-id" "openshift-user-workload-monitoring/prometheus-operator" }}
     {{- end }}
     {{- $mergedAnnotations := mergeOverwrite $incomingAnnotations $stdAnnotations }}
