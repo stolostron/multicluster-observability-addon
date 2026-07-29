@@ -118,13 +118,13 @@ func ensureConfigsInAddon(cmao *addonv1beta1.ClusterManagementAddOn, configs []D
 	}
 }
 
-// removeStaleConfigs removes any user-defined PrometheusRule or ScrapeConfig
+// removeStaleConfigs removes any user-defined PrometheusRule or ScrapeConfig, along with any PrometheusAgent
 // entries from the CMAO placements whose underlying resource no longer exists.
 func removeStaleConfigs(ctx context.Context, k8s client.Client, cmao *addonv1beta1.ClusterManagementAddOn) error {
 	for i, placement := range cmao.Spec.InstallStrategy.Placements {
 		filtered := make([]addonv1beta1.AddOnConfig, 0, len(placement.Configs))
 		for _, cfg := range placement.Configs {
-			_, err := doesScrapeConfigOrPrometheusRuleExist(ctx, k8s, cfg)
+			err := doesScrapeConfigOrPrometheusRuleOrPrometheusAgentExist(ctx, k8s, cfg)
 			if err != nil {
 				if apierrors.IsNotFound(err) {
 					continue
@@ -138,27 +138,29 @@ func removeStaleConfigs(ctx context.Context, k8s client.Client, cmao *addonv1bet
 	return nil
 }
 
-// doesScrapeConfigOrPrometheusRuleExist checks whether the config references an existing ScrapeConfig or PrometheusRule
-// Returns the raw API error on failure so callers can distinguish NotFound from other errors.
-func doesScrapeConfigOrPrometheusRuleExist(ctx context.Context, k8s client.Client, cfg addonv1beta1.AddOnConfig) (bool, error) {
+// doesScrapeConfigOrPrometheusRuleOrPrometheusAgentExist checks whether the config references an existing
+// ScrapeConfig, PrometheusRule, or PrometheusAgent. Returns the raw API error on failure so callers can
+// distinguish NotFound from other errors. Returns nil for resource kinds it doesn't recognize.
+//
+// The switch below matches on both cfg.Group and cfg.Resource (i.e. the full GVR), not on cfg.Resource
+// alone: the Prometheus Operator's PrometheusRule ("monitoring.coreos.com") and OBO's PrometheusRule
+// ("monitoring.rhobs") share the exact same resource name ("prometheusrules"), so matching on Resource
+// alone would make an OBO PrometheusRule config incorrectly resolve to a Get against the Prometheus
+// Operator's type (or vice versa), returning a spurious NotFound and causing removeStaleConfigs to drop
+// a config that actually still exists.
+func doesScrapeConfigOrPrometheusRuleOrPrometheusAgentExist(ctx context.Context, k8s client.Client, cfg addonv1beta1.AddOnConfig) error {
 	key := types.NamespacedName{Name: cfg.Name, Namespace: cfg.Namespace}
-	switch cfg.Resource {
-	case cooprometheusv1alpha1.ScrapeConfigName:
-		sc := &cooprometheusv1alpha1.ScrapeConfig{}
-		if err := k8s.Get(ctx, key, sc); err != nil {
-			return false, err
-		} else {
-			return true, nil
-		}
-	case prometheusv1.PrometheusRuleName:
-		rule := &prometheusv1.PrometheusRule{}
-		if err := k8s.Get(ctx, key, rule); err != nil {
-			return false, err
-		} else {
-			return true, nil
-		}
+	switch {
+	case cfg.Group == cooprometheusv1alpha1.SchemeGroupVersion.Group && cfg.Resource == cooprometheusv1alpha1.ScrapeConfigName:
+		return k8s.Get(ctx, key, &cooprometheusv1alpha1.ScrapeConfig{})
+	case cfg.Group == cooprometheusv1.SchemeGroupVersion.Group && cfg.Resource == cooprometheusv1.PrometheusRuleName:
+		return k8s.Get(ctx, key, &cooprometheusv1.PrometheusRule{})
+	case cfg.Group == prometheusv1.SchemeGroupVersion.Group && cfg.Resource == prometheusv1.PrometheusRuleName:
+		return k8s.Get(ctx, key, &prometheusv1.PrometheusRule{})
+	case cfg.Group == cooprometheusv1alpha1.SchemeGroupVersion.Group && cfg.Resource == cooprometheusv1alpha1.PrometheusAgentName:
+		return k8s.Get(ctx, key, &cooprometheusv1alpha1.PrometheusAgent{})
 	default:
-		return false, nil
+		return nil
 	}
 }
 

@@ -52,9 +52,8 @@ func TestCleanOrphanResources(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "agent-1",
 						Namespace: testNamespace,
-						Labels: map[string]string{
-							addoncfg.PlacementRefNameLabelKey:      placementName,
-							addoncfg.PlacementRefNamespaceLabelKey: placementNs,
+						Annotations: map[string]string{
+							addoncfg.PlacementAnnotationKey: placementNs + "/" + placementName,
 						},
 						// Not owned by CMAO
 					},
@@ -62,6 +61,99 @@ func TestCleanOrphanResources(t *testing.T) {
 			},
 			expectDeleted: map[string]bool{
 				"agent-1": false, // Resource not owned by CMAO, shouldn't be deleted
+			},
+		},
+		{
+			name: "user-defined resource (part-of label, not owned) is deleted when none of its placements exist",
+			cmao: &addonapiv1beta1.ClusterManagementAddOn{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: cmaoName,
+				},
+				Spec: addonapiv1beta1.ClusterManagementAddOnSpec{
+					// No placements
+				},
+			},
+			extraResources: []client.Object{
+				&cooprometheusv1alpha1.PrometheusAgent{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "user-agent-orphan",
+						Namespace: testNamespace,
+						Labels: map[string]string{
+							addoncfg.PartOfK8sLabelKey: addoncfg.Name,
+						},
+						Annotations: map[string]string{
+							addoncfg.PlacementAnnotationKey: placementNs + "/" + placementName,
+						},
+						// Not owned by CMAO, opted in via part-of label instead
+					},
+				},
+			},
+			expectDeleted: map[string]bool{
+				"user-agent-orphan": true, // User-defined and none of its placements exist, should be deleted
+			},
+		},
+		{
+			name: "user-defined resource (part-of label, not owned) is kept while its placement still exists",
+			cmao: &addonapiv1beta1.ClusterManagementAddOn{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: cmaoName,
+				},
+				Spec: addonapiv1beta1.ClusterManagementAddOnSpec{
+					InstallStrategy: addonapiv1beta1.InstallStrategy{
+						Placements: []addonapiv1beta1.PlacementStrategy{
+							{
+								PlacementRef: addonapiv1beta1.PlacementRef{
+									Name:      placementName,
+									Namespace: placementNs,
+								},
+							},
+						},
+					},
+				},
+			},
+			extraResources: []client.Object{
+				&cooprometheusv1alpha1.PrometheusAgent{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "user-agent-covered",
+						Namespace: testNamespace,
+						Labels: map[string]string{
+							addoncfg.PartOfK8sLabelKey: addoncfg.Name,
+						},
+						Annotations: map[string]string{
+							addoncfg.PlacementAnnotationKey: placementNs + "/" + placementName,
+						},
+						// Not owned by CMAO, opted in via part-of label instead
+					},
+				},
+			},
+			expectDeleted: map[string]bool{
+				"user-agent-covered": false, // Its placement still exists, shouldn't be deleted
+			},
+		},
+		{
+			name: "resource with neither CMAO ownership nor part-of label is never touched",
+			cmao: &addonapiv1beta1.ClusterManagementAddOn{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: cmaoName,
+				},
+				Spec: addonapiv1beta1.ClusterManagementAddOnSpec{
+					// No placements
+				},
+			},
+			extraResources: []client.Object{
+				&cooprometheusv1alpha1.PrometheusAgent{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "rogue-agent",
+						Namespace: testNamespace,
+						Annotations: map[string]string{
+							addoncfg.PlacementAnnotationKey: placementNs + "/" + placementName,
+						},
+						// Neither owned by CMAO nor opted in via part-of label
+					},
+				},
+			},
+			expectDeleted: map[string]bool{
+				"rogue-agent": false, // Not recognized by MCOA at all, must never be touched
 			},
 		},
 		{
@@ -80,9 +172,8 @@ func TestCleanOrphanResources(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "agent-2",
 						Namespace: testNamespace,
-						Labels: map[string]string{
-							addoncfg.PlacementRefNameLabelKey:      placementName,
-							addoncfg.PlacementRefNamespaceLabelKey: placementNs,
+						Annotations: map[string]string{
+							addoncfg.PlacementAnnotationKey: placementNs + "/" + placementName,
 						},
 						// Will be set as owned by CMAO in the test
 					},
@@ -116,9 +207,8 @@ func TestCleanOrphanResources(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "agent-3",
 						Namespace: testNamespace,
-						Labels: map[string]string{
-							addoncfg.PlacementRefNameLabelKey:      placementName,
-							addoncfg.PlacementRefNamespaceLabelKey: placementNs,
+						Annotations: map[string]string{
+							addoncfg.PlacementAnnotationKey: placementNs + "/" + placementName,
 						},
 						// Not owned by CMAO
 					},
@@ -129,9 +219,8 @@ func TestCleanOrphanResources(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "agent-4",
 						Namespace: testNamespace,
-						Labels: map[string]string{
-							addoncfg.PlacementRefNameLabelKey:      placementName,
-							addoncfg.PlacementRefNamespaceLabelKey: placementNs,
+						Annotations: map[string]string{
+							addoncfg.PlacementAnnotationKey: placementNs + "/" + placementName,
 						},
 						// Not owned by CMAO
 					},
@@ -167,9 +256,8 @@ func TestCleanOrphanResources(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "agent-5",
 						Namespace: testNamespace,
-						Labels: map[string]string{
-							addoncfg.PlacementRefNameLabelKey:      placementName,
-							addoncfg.PlacementRefNamespaceLabelKey: placementNs,
+						Annotations: map[string]string{
+							addoncfg.PlacementAnnotationKey: placementNs + "/" + placementName,
 						},
 						// Will be set as owned by CMAO in the test
 					},
@@ -179,9 +267,8 @@ func TestCleanOrphanResources(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "agent-6",
 						Namespace: testNamespace,
-						Labels: map[string]string{
-							addoncfg.PlacementRefNameLabelKey:      "other-placement",
-							addoncfg.PlacementRefNamespaceLabelKey: placementNs,
+						Annotations: map[string]string{
+							addoncfg.PlacementAnnotationKey: placementNs + "/other-placement",
 						},
 						// Will be set as owned by CMAO in the test
 					},
@@ -190,6 +277,131 @@ func TestCleanOrphanResources(t *testing.T) {
 			expectDeleted: map[string]bool{
 				"agent-5": false, // Matches placement, shouldn't be deleted
 				"agent-6": true,  // Owned by CMAO but doesn't match any placement, should be deleted
+			},
+		},
+		{
+			name: "resource referencing multiple placements is kept while at least one still exists",
+			cmao: &addonapiv1beta1.ClusterManagementAddOn{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: cmaoName,
+				},
+				Spec: addonapiv1beta1.ClusterManagementAddOnSpec{
+					InstallStrategy: addonapiv1beta1.InstallStrategy{
+						Placements: []addonapiv1beta1.PlacementStrategy{
+							{
+								PlacementRef: addonapiv1beta1.PlacementRef{
+									Name:      placementName,
+									Namespace: placementNs,
+								},
+							},
+						},
+					},
+				},
+			},
+			cmaoOwnedResources: []*cooprometheusv1alpha1.PrometheusAgent{
+				// Will not be deleted because one of its referenced placements still exists
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "agent-7",
+						Namespace: testNamespace,
+						Annotations: map[string]string{
+							addoncfg.PlacementAnnotationKey: placementNs + "/other-placement," + placementNs + "/" + placementName,
+						},
+						// Will be set as owned by CMAO in the test
+					},
+				},
+			},
+			expectDeleted: map[string]bool{
+				"agent-7": false, // At least one referenced placement still exists, shouldn't be deleted
+			},
+		},
+		{
+			name: "resource referencing multiple placements is deleted once none of them exist",
+			cmao: &addonapiv1beta1.ClusterManagementAddOn{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: cmaoName,
+				},
+				Spec: addonapiv1beta1.ClusterManagementAddOnSpec{
+					// No placements
+				},
+			},
+			cmaoOwnedResources: []*cooprometheusv1alpha1.PrometheusAgent{
+				// Will be deleted because none of its referenced placements exist anymore
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "agent-8",
+						Namespace: testNamespace,
+						Annotations: map[string]string{
+							addoncfg.PlacementAnnotationKey: placementNs + "/other-placement," + placementNs + "/" + placementName,
+						},
+						// Will be set as owned by CMAO in the test
+					},
+				},
+			},
+			expectDeleted: map[string]bool{
+				"agent-8": true, // None of the referenced placements exist, should be deleted
+			},
+		},
+		{
+			name: "resource referencing the dummy sentinel is never deleted, even with no placements",
+			cmao: &addonapiv1beta1.ClusterManagementAddOn{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: cmaoName,
+				},
+				Spec: addonapiv1beta1.ClusterManagementAddOnSpec{
+					// No placements
+				},
+			},
+			cmaoOwnedResources: []*cooprometheusv1alpha1.PrometheusAgent{
+				// The "dummy" sentinel never corresponds to a real placement by design, so it must
+				// never be treated as orphaned (otherwise CreateDefaultAgent and DeleteOrphanResources
+				// would thrash: create the dummy agent, immediately delete it, repeat).
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "agent-dummy",
+						Namespace: testNamespace,
+						Annotations: map[string]string{
+							addoncfg.PlacementAnnotationKey: testNamespace + "/dummy",
+						},
+						// Will be set as owned by CMAO in the test
+					},
+				},
+			},
+			expectDeleted: map[string]bool{
+				"agent-dummy": false, // dummy is a sentinel, never orphaned
+			},
+		},
+		{
+			name: "resource with no placement-ref annotation owned by CMAO is deleted",
+			cmao: &addonapiv1beta1.ClusterManagementAddOn{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: cmaoName,
+				},
+				Spec: addonapiv1beta1.ClusterManagementAddOnSpec{
+					InstallStrategy: addonapiv1beta1.InstallStrategy{
+						Placements: []addonapiv1beta1.PlacementStrategy{
+							{
+								PlacementRef: addonapiv1beta1.PlacementRef{
+									Name:      placementName,
+									Namespace: placementNs,
+								},
+							},
+						},
+					},
+				},
+			},
+			cmaoOwnedResources: []*cooprometheusv1alpha1.PrometheusAgent{
+				// Will be deleted because it has no placement-ref annotation at all
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "agent-9",
+						Namespace: testNamespace,
+						// Will be set as owned by CMAO in the test
+					},
+				},
+			},
+			expectDeleted: map[string]bool{
+				"agent-9": true, // No placement-ref annotation, should be deleted
 			},
 		},
 	}

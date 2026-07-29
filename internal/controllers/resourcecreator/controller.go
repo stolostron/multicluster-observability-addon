@@ -164,6 +164,9 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	if err := r.Get(ctx, types.NamespacedName{Name: addoncfg.Name}, cmao); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to get ClusterManagementAddOn: %w", err)
 	}
+	// Deletes owned PrometheusAgents whose placement-ref annotation no longer references any
+	// placement declared on the CMAO. Agents referencing multiple placements are kept as long as
+	// at least one of them still exists.
 	if err := common.DeleteOrphanResources(ctx, r.Log, r.Client, cmao, &cooprometheusv1alpha1.PrometheusAgentList{}); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to clean orphan resources: %w", err)
 	}
