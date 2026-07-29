@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	cooprometheusv1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1"
 	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"github.com/stretchr/testify/assert"
@@ -221,6 +222,7 @@ func newCMAOTestScheme(t *testing.T) *runtime.Scheme {
 	t.Helper()
 	scheme := runtime.NewScheme()
 	require.NoError(t, prometheusv1.AddToScheme(scheme))
+	require.NoError(t, cooprometheusv1.AddToScheme(scheme))
 	require.NoError(t, cooprometheusv1alpha1.AddToScheme(scheme))
 	return scheme
 }
@@ -277,6 +279,24 @@ func TestRemoveStaleConfigs(t *testing.T) {
 		},
 	}
 
+	existingAgent := &cooprometheusv1alpha1.PrometheusAgent{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "my-agent",
+			Namespace: addoncfg.InstallNamespace,
+		},
+	}
+
+	otherCfg := addonv1beta1.AddOnConfig{
+		ConfigGroupResource: addonv1beta1.ConfigGroupResource{
+			Group:    "apps",
+			Resource: "deployments",
+		},
+		ConfigReferent: addonv1beta1.ConfigReferent{
+			Name:      "some-deployment",
+			Namespace: addoncfg.InstallNamespace,
+		},
+	}
+
 	testCases := []struct {
 		name            string
 		existingObjects []client.Object
@@ -286,33 +306,39 @@ func TestRemoveStaleConfigs(t *testing.T) {
 	}{
 		{
 			name:            "existing resources are kept",
-			existingObjects: []client.Object{existingScrapeConfig.DeepCopy(), existingPromRule.DeepCopy()},
+			existingObjects: []client.Object{existingScrapeConfig.DeepCopy(), existingPromRule.DeepCopy(), existingAgent.DeepCopy()},
 			initialConfigs:  []addonv1beta1.AddOnConfig{scrapeConfigCfg, promRuleCfg, agentCfg},
 			expectedConfigs: []addonv1beta1.AddOnConfig{scrapeConfigCfg, promRuleCfg, agentCfg},
 		},
 		{
 			name:            "non-existent scrapeconfig is removed",
-			existingObjects: []client.Object{existingPromRule.DeepCopy()},
+			existingObjects: []client.Object{existingPromRule.DeepCopy(), existingAgent.DeepCopy()},
 			initialConfigs:  []addonv1beta1.AddOnConfig{scrapeConfigCfg, promRuleCfg, agentCfg},
 			expectedConfigs: []addonv1beta1.AddOnConfig{promRuleCfg, agentCfg},
 		},
 		{
 			name:            "non-existent prometheusrule is removed",
-			existingObjects: []client.Object{existingScrapeConfig.DeepCopy()},
+			existingObjects: []client.Object{existingScrapeConfig.DeepCopy(), existingAgent.DeepCopy()},
 			initialConfigs:  []addonv1beta1.AddOnConfig{scrapeConfigCfg, promRuleCfg, agentCfg},
 			expectedConfigs: []addonv1beta1.AddOnConfig{scrapeConfigCfg, agentCfg},
+		},
+		{
+			name:            "non-existent agent is removed",
+			existingObjects: []client.Object{existingScrapeConfig.DeepCopy(), existingPromRule.DeepCopy()},
+			initialConfigs:  []addonv1beta1.AddOnConfig{scrapeConfigCfg, promRuleCfg, agentCfg},
+			expectedConfigs: []addonv1beta1.AddOnConfig{scrapeConfigCfg, promRuleCfg},
 		},
 		{
 			name:            "all stale configs removed",
 			existingObjects: []client.Object{},
 			initialConfigs:  []addonv1beta1.AddOnConfig{scrapeConfigCfg, promRuleCfg, agentCfg},
-			expectedConfigs: []addonv1beta1.AddOnConfig{agentCfg},
+			expectedConfigs: []addonv1beta1.AddOnConfig{},
 		},
 		{
-			name:            "non-scrapeconfig-or-promrule configs are never removed",
+			name:            "unsupported resource types are never removed",
 			existingObjects: []client.Object{},
-			initialConfigs:  []addonv1beta1.AddOnConfig{agentCfg},
-			expectedConfigs: []addonv1beta1.AddOnConfig{agentCfg},
+			initialConfigs:  []addonv1beta1.AddOnConfig{otherCfg},
+			expectedConfigs: []addonv1beta1.AddOnConfig{otherCfg},
 		},
 		{
 			name:            "empty configs - no change",
@@ -351,7 +377,7 @@ func TestRemoveStaleConfigs(t *testing.T) {
 	}
 }
 
-func TestDoesScrapeConfigOrPrometheusRuleExist(t *testing.T) {
+func TestDoesScrapeConfigOrPrometheusRuleOrPrometheusAgentExist(t *testing.T) {
 	scheme := newCMAOTestScheme(t)
 
 	existingScrapeConfig := &cooprometheusv1alpha1.ScrapeConfig{
@@ -368,19 +394,38 @@ func TestDoesScrapeConfigOrPrometheusRuleExist(t *testing.T) {
 		},
 	}
 
+	existingAgent := &cooprometheusv1alpha1.PrometheusAgent{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "existing-agent",
+			Namespace: addoncfg.InstallNamespace,
+		},
+	}
+
+	// Same name as existingPromRule, but registered under OBO's PrometheusRule group
+	// (monitoring.rhobs) instead of the Prometheus Operator's (monitoring.coreos.com). Both
+	// share the identical "prometheusrules" resource name, so this fixture is what exercises the
+	// Group+Resource disambiguation.
+	existingOboPromRule := &cooprometheusv1.PrometheusRule{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "existing-obo-rule",
+			Namespace: addoncfg.InstallNamespace,
+		},
+	}
+
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(
 		existingScrapeConfig,
 		existingPromRule,
+		existingOboPromRule,
+		existingAgent,
 	).Build()
 
 	testCases := []struct {
 		name           string
 		cfg            addonv1beta1.AddOnConfig
-		expected       bool
 		expectNotFound bool
 	}{
 		{
-			name: "existing scrapeconfig returns true",
+			name: "existing scrapeconfig returns no error",
 			cfg: addonv1beta1.AddOnConfig{
 				ConfigGroupResource: addonv1beta1.ConfigGroupResource{
 					Group:    cooprometheusv1alpha1.SchemeGroupVersion.Group,
@@ -391,7 +436,6 @@ func TestDoesScrapeConfigOrPrometheusRuleExist(t *testing.T) {
 					Namespace: addoncfg.InstallNamespace,
 				},
 			},
-			expected: true,
 		},
 		{
 			name: "non-existent scrapeconfig returns not found",
@@ -408,7 +452,7 @@ func TestDoesScrapeConfigOrPrometheusRuleExist(t *testing.T) {
 			expectNotFound: true,
 		},
 		{
-			name: "existing prometheusrule returns true",
+			name: "existing prometheusrule returns no error",
 			cfg: addonv1beta1.AddOnConfig{
 				ConfigGroupResource: addonv1beta1.ConfigGroupResource{
 					Group:    prometheusv1.SchemeGroupVersion.Group,
@@ -419,7 +463,6 @@ func TestDoesScrapeConfigOrPrometheusRuleExist(t *testing.T) {
 					Namespace: addoncfg.InstallNamespace,
 				},
 			},
-			expected: true,
 		},
 		{
 			name: "non-existent prometheusrule returns not found",
@@ -436,7 +479,81 @@ func TestDoesScrapeConfigOrPrometheusRuleExist(t *testing.T) {
 			expectNotFound: true,
 		},
 		{
-			name: "other resource type returns false with no error",
+			name: "existing OBO prometheusrule returns no error",
+			cfg: addonv1beta1.AddOnConfig{
+				ConfigGroupResource: addonv1beta1.ConfigGroupResource{
+					Group:    cooprometheusv1.SchemeGroupVersion.Group,
+					Resource: cooprometheusv1.PrometheusRuleName,
+				},
+				ConfigReferent: addonv1beta1.ConfigReferent{
+					Name:      "existing-obo-rule",
+					Namespace: addoncfg.InstallNamespace,
+				},
+			},
+		},
+		{
+			name: "non-existent OBO prometheusrule returns not found",
+			cfg: addonv1beta1.AddOnConfig{
+				ConfigGroupResource: addonv1beta1.ConfigGroupResource{
+					Group:    cooprometheusv1.SchemeGroupVersion.Group,
+					Resource: cooprometheusv1.PrometheusRuleName,
+				},
+				ConfigReferent: addonv1beta1.ConfigReferent{
+					Name:      "gone-obo-rule",
+					Namespace: addoncfg.InstallNamespace,
+				},
+			},
+			expectNotFound: true,
+		},
+		{
+			// Regression test: "existing-rule" only exists as a Prometheus Operator (monitoring.coreos.com)
+			// PrometheusRule. Both groups share the identical "prometheusrules" resource name, so a
+			// Resource-only match would incorrectly resolve this OBO-group lookup against the Prometheus
+			// Operator's type and report it as existing.
+			name: "prometheusrule existing under a different group is reported as not found",
+			cfg: addonv1beta1.AddOnConfig{
+				ConfigGroupResource: addonv1beta1.ConfigGroupResource{
+					Group:    cooprometheusv1.SchemeGroupVersion.Group,
+					Resource: cooprometheusv1.PrometheusRuleName,
+				},
+				ConfigReferent: addonv1beta1.ConfigReferent{
+					Name:      "existing-rule",
+					Namespace: addoncfg.InstallNamespace,
+				},
+			},
+			expectNotFound: true,
+		},
+		{
+			// Symmetric regression test in the other direction: "existing-obo-rule" only exists as an
+			// OBO PrometheusRule, not a Prometheus Operator one.
+			name: "OBO prometheusrule looked up under prometheus-operator group is reported as not found",
+			cfg: addonv1beta1.AddOnConfig{
+				ConfigGroupResource: addonv1beta1.ConfigGroupResource{
+					Group:    prometheusv1.SchemeGroupVersion.Group,
+					Resource: prometheusv1.PrometheusRuleName,
+				},
+				ConfigReferent: addonv1beta1.ConfigReferent{
+					Name:      "existing-obo-rule",
+					Namespace: addoncfg.InstallNamespace,
+				},
+			},
+			expectNotFound: true,
+		},
+		{
+			name: "existing prometheusagent returns no error",
+			cfg: addonv1beta1.AddOnConfig{
+				ConfigGroupResource: addonv1beta1.ConfigGroupResource{
+					Group:    cooprometheusv1alpha1.SchemeGroupVersion.Group,
+					Resource: cooprometheusv1alpha1.PrometheusAgentName,
+				},
+				ConfigReferent: addonv1beta1.ConfigReferent{
+					Name:      "existing-agent",
+					Namespace: addoncfg.InstallNamespace,
+				},
+			},
+		},
+		{
+			name: "non-existent prometheusagent returns not found",
 			cfg: addonv1beta1.AddOnConfig{
 				ConfigGroupResource: addonv1beta1.ConfigGroupResource{
 					Group:    cooprometheusv1alpha1.SchemeGroupVersion.Group,
@@ -447,20 +564,32 @@ func TestDoesScrapeConfigOrPrometheusRuleExist(t *testing.T) {
 					Namespace: addoncfg.InstallNamespace,
 				},
 			},
-			expected: false,
+			expectNotFound: true,
+		},
+		{
+			name: "unsupported resource type returns no error",
+			cfg: addonv1beta1.AddOnConfig{
+				ConfigGroupResource: addonv1beta1.ConfigGroupResource{
+					Group:    "apps",
+					Resource: "deployments",
+				},
+				ConfigReferent: addonv1beta1.ConfigReferent{
+					Name:      "some-deployment",
+					Namespace: addoncfg.InstallNamespace,
+				},
+			},
 		},
 	}
 
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := doesScrapeConfigOrPrometheusRuleExist(context.Background(), fakeClient, tt.cfg)
+			err := doesScrapeConfigOrPrometheusRuleOrPrometheusAgentExist(context.Background(), fakeClient, tt.cfg)
 			if tt.expectNotFound {
 				require.Error(t, err)
 				assert.True(t, apierrors.IsNotFound(err), "expected NotFound error, got: %v", err)
 				return
 			}
 			require.NoError(t, err)
-			assert.Equal(t, tt.expected, result)
 		})
 	}
 }
