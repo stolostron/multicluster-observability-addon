@@ -26,11 +26,18 @@ spec:
     - {{ .Values.clientCertSecretName }}
     - {{ .Values.alertmanagerAccessorSecretName }}
   serviceMonitorSelector: {}
+  {{- if .Values.prometheusServerRemoteWrite }}
+  remoteWrite:
+    {{- toYaml .Values.prometheusServerRemoteWrite | nindent 4 }}
+  {{- end }}
   resources:
     requests:
       memory: 400Mi
+  {{- if and .Values.hubEndpoint (or (and .Values.platformEnabled .Values.platformAlertsEnabled) (and .Values.userWorkloadsEnabled .Values.userWorkloadAlertsEnabled)) }}
   externalLabels:
-    managed_cluster: CLUSTER
+    managed_cluster: {{ .Values.clusterID }}
+    managed_cluster_name: {{ .Values.clusterName }}
+  {{- end }}
   listenLocal: true
   initContainers:
     - name: init-config-reloader
@@ -103,7 +110,7 @@ spec:
   additionalScrapeConfigs:
     name: prometheus-scrape-targets
     key: scrape-targets.yaml
-  {{- if .Values.alertManagerEndpoint }}
+  {{- if .Values.hubEndpoint }}
   additionalAlertManagerConfigs:
     name: prometheus-alertmanager
     key: alertmanager.yaml

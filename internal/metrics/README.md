@@ -30,7 +30,7 @@ The addon manager still makes use of the following "dummy" CRD to detect the sta
 
 | CRD | Strategy | Purpose |
 |-----|----------|---------|
-| `monitoringstacks.monitoring.rhobs` | `CreateOnly` | COO detection anchor — OLM takes it over when COO is installed |
+| `alertmanagers.monitoring.rhobs` | `CreateOnly` | COO detection anchor — OLM takes it over when COO is installed. Feedback rule fetches the OLM label from it. |
 | `prometheusagents.monitoring.rhobs` | `ReadOnly` | Feedback only — hub reads `isEstablished` and timestamps to trigger prometheus-operator restart |
 | `scrapeconfigs.monitoring.rhobs` | `ReadOnly` | Feedback only — same as above, also carries `prometheusOperatorVersion` |
 
@@ -47,16 +47,16 @@ A key challenge is selecting a stable resource for detection that does not negat
 - **Why not always include the full CRDs?**: If MCOA provides the CRDs and OLM (via COO) also tries to manage them, it leads to reconciliation conflicts and a degraded health status.
 
 #### The "Dummy" CRD Solution
-The chosen solution is to create a "dummy" `monitoringstacks` CRD with the minimum required fields to be accepted by the API server.
+The chosen solution is to create a "dummy" `alertmanagers.monitoring.rhobs` CRD with the minimum required fields to be accepted by the API server.
 - **Update Strategy**: Set to `CreateOnly`. This ensures that when OLM installs COO and takes over the CRD, the OCM Work Agent does not try to revert OLM's changes, preventing conflicts and keeping the resource clean.
-- **Continuous Feedback**: This dummy resource allows the OLM presence `feedbackRule` to work regardless of whether COO is currently installed.
-- **Conditional Deletion-Orphan Annotation**: The dummy `monitoringstacks` CRD conditionally applies the deletion-orphan annotation:
+- **Continuous Feedback**: This dummy resource allows the OLM presence `feedbackRule` to fetch the OLM subscription label, determining whether COO is currently installed/subscribed.
+- **Conditional Deletion-Orphan Annotation**: The dummy `alertmanagers.monitoring.rhobs` CRD conditionally applies the deletion-orphan annotation:
   ```yaml
   {{- if not .Values.deployCOOResources }}
   addon.open-cluster-management.io/deletion-orphan: ""
   {{- end }}
   ```
-  This is critical for proper uninstallation behavior. When COO is installed (`.Values.deployCOOResources` is `false`), MCOA does not manage the CRDs, so the OCM Work Agent should not delete the `monitoringstacks` CRD at uninstallation time (preserving the COO-managed resource). However, when COO is not installed (`.Values.deployCOOResources` is `true`), MCOA manages the resources and does not apply this annotation, allowing the OCM Work Agent to clean up the dummy `monitoringstacks` CRD along with the other resources listed in the `ManifestWork` during uninstallation.
+  This is critical for proper uninstallation behavior. When COO is installed (`.Values.deployCOOResources` is `false`), MCOA does not manage the CRDs, so the OCM Work Agent should not delete the `alertmanagers.monitoring.rhobs` CRD at uninstallation time (preserving the COO-managed resource). However, when COO is not installed (`.Values.deployCOOResources` is `true`), MCOA manages the resources and does not apply this annotation, allowing the OCM Work Agent to clean up the dummy `alertmanagers.monitoring.rhobs` CRD along with the other resources listed in the `ManifestWork` during uninstallation.
 
 ### Adaptation Logic
 
@@ -100,14 +100,14 @@ sequenceDiagram
     participant EndpointOp as Endpoint Operator (Spoke)
     participant PromOperator as Prometheus Operator (Spoke)
 
-    AddonManager->>ManifestWork: Adds "dummy" MonitoringStack CRD (CreateOnly)
+    AddonManager->>ManifestWork: Adds "dummy" Alertmanager CRD (CreateOnly)
     AddonManager->>ManifestWork: Adds ReadOnly stubs for PrometheusAgent & ScrapeConfig CRDs
     AddonManager->>ManifestWork: Sets feedbackRules for OLM detection & CRD establishment
     AddonManager->>ManifestWork: Adds Endpoint Operator + Prometheus Operator manifests
     WorkAgent->>ManifestWork: Watches ManifestWork, detects new revision
     WorkAgent->>ManifestWork: Reads manifest list
     WorkAgent->>ManagedCluster: Deploys all resources (CRD stubs, Endpoint Op, Prometheus Op, ...)
-    ManagedCluster-->>WorkAgent: Returns status (MonitoringStack CRD conditions)
+    ManagedCluster-->>WorkAgent: Returns status (Alertmanager CRD conditions)
     WorkAgent->>ManifestWork: Updates feedback: COO not detected
     EndpointOp->>ManagedCluster: Applies full CRD schemas (PrometheusAgent, ScrapeConfig, etc.)
     ManagedCluster-->>WorkAgent: CRDs become Established (detected via ReadOnly stubs)
@@ -136,10 +136,10 @@ sequenceDiagram
 
     User->>OLM: Installs COO
     OLM->>OLM: Takes over all COO CRDs (adds OLM label)
-    WorkAgent->>OLM: Detects OLM label on MonitoringStack (via feedbackRule)
+    WorkAgent->>OLM: Detects OLM label on Alertmanager (via feedbackRule)
     WorkAgent->>ManifestWork: Updates feedback: COOIsInstalled=true
     ManifestWork-->>AddonManager: Status update trigger
-    AddonManager->>ManifestWork: Adds 'deletion-orphan' to MonitoringStack
+    AddonManager->>ManifestWork: Adds 'deletion-orphan' to Alertmanager
     AddonManager->>ManifestWork: Sets deployCOOResources=false (removes prometheus-operator)
     EndpointOp->>EndpointOp: Detects COO, stops reconciling CRDs
     Note over WorkAgent: ReadOnly CRD stubs remain in ManifestWork<br/>but Work Agent never deletes ReadOnly resources
@@ -159,8 +159,8 @@ sequenceDiagram
     participant EndpointOp as Endpoint Operator (Spoke)
     participant User
 
-    User->>ManagedCluster: Uninstalls COO & deletes MonitoringStack CRD
-    WorkAgent->>ManagedCluster: Detects MonitoringStack is missing and recreates it (CreateOnly)
+    User->>ManagedCluster: Uninstalls COO & deletes Alertmanager CRD
+    WorkAgent->>ManagedCluster: Detects Alertmanager is missing and recreates it (CreateOnly)
     WorkAgent->>ManifestWork: Updates feedback: COO not detected
     ManifestWork-->>AddonManager: Status update trigger
     AddonManager->>ManifestWork: Re-enables deployCOOResources (restores prometheus-operator)

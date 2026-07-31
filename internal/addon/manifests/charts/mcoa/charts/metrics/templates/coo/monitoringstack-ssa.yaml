@@ -1,0 +1,11 @@
+{{- range .Values.monitoringStackPatches }}
+---
+apiVersion: monitoring.rhobs/v1alpha1
+kind: MonitoringStack
+metadata:
+  name: {{ .name }}
+  namespace: {{ .namespace }}
+spec:
+  prometheusConfig:
+    remoteWrite: {{ .data }}
+{{- end }}
