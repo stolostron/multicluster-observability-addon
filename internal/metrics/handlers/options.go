@@ -36,6 +36,8 @@ type Options struct {
 	// prevents synchronization issues by ensuring the operator can watch these resources upon startup.
 	CRDEstablishedAnnotation string
 	ProxyConfig              addon.ProxyConfig
+	TLSMinVersion            string
+	TLSCipherSuites          string
 
 	// Thanos holds the hub-only Thanos component specifications.
 	// These are only populated when IsHub is true and platform metrics collection is enabled.

@@ -28,6 +28,8 @@ require (
 )
 
 require (
+	github.com/openshift/controller-runtime-common v0.0.0-20260428152732-64ee174f5e2e
+	github.com/openshift/library-go v0.0.0-20260713143403-795ac1a480b5
 	github.com/perses/community-mixins v0.0.0-20251209094652-b91692c6ac00
 	github.com/perses/perses v0.53.1
 	github.com/perses/perses-operator v0.2.0
@@ -123,7 +125,7 @@ require (
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/mwitkow/go-conntrack v0.0.0-20190716064945-2f068394615f // indirect
 	github.com/nexucis/lamenv v0.5.2 // indirect
-	github.com/openshift/api v0.0.0-20260130140113-71e91db96ffc
+	github.com/openshift/api v0.0.0-20260619095050-5346161d1bf2
 	github.com/perses/common v0.30.2 // indirect
 	github.com/perses/plugins/gaugechart v0.12.1 // indirect
 	github.com/perses/plugins/markdown v0.11.1
@@ -178,12 +180,12 @@ require (
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/crypto v0.52.0 // indirect
 	golang.org/x/exp v0.0.0-20260312153236-7ab1446f8b90 // indirect
-	golang.org/x/net v0.55.0 // indirect
+	golang.org/x/net v0.55.1-0.20260602153038-42abb857022c // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect
 	golang.org/x/sync v0.20.0 // indirect
 	golang.org/x/sys v0.45.0 // indirect
 	golang.org/x/term v0.43.0 // indirect
-	golang.org/x/time v0.14.0 // indirect
+	golang.org/x/time v0.15.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.5.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260406210006-6f92a3bedf2d // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260406210006-6f92a3bedf2d // indirect
@@ -196,7 +198,7 @@ require (
 	helm.sh/helm/v3 v3.19.4 // indirect
 	k8s.io/apiserver v0.35.4 // indirect
 	k8s.io/kms v0.35.4 // indirect
-	k8s.io/kube-openapi v0.0.0-20260317180543-43fb72c5454a // indirect
+	k8s.io/kube-openapi v0.0.0-20260519202549-bbf5c5577288 // indirect
 	open-cluster-management.io/sdk-go v1.3.0 // indirect
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.34.0 // indirect
 	sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730 // indirect

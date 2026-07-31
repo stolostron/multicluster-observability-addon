@@ -42,6 +42,8 @@ type MetricsValues struct {
 	NodeSelector                   map[string]string    `json:"nodeSelector"`
 	NodeExporter                   NodeExporterValues   `json:"nodeExporter"`
 	ThanosOperator                 ThanosOperatorValues `json:"thanosOperator"`
+	TLSMinVersion                  string               `json:"tlsMinVersion,omitempty"`
+	TLSCipherSuites                string               `json:"tlsCipherSuites,omitempty"`
 }
 
 // ThanosOperatorValues holds the Thanos operator deployment values for Helm rendering.
@@ -119,6 +121,8 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 			HostPort:     opts.NodeExporter.HostPort,
 			InternalPort: opts.NodeExporter.InternalPort,
 		},
+		TLSMinVersion:   opts.TLSMinVersion,
+		TLSCipherSuites: opts.TLSCipherSuites,
 	}
 
 	if opts.IsOpenShiftVendor {
@@ -128,6 +132,9 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 		configureAgentForNonOCP(opts.Platform.PrometheusAgent)
 		configureAgentForNonOCP(opts.UserWorkloads.PrometheusAgent)
 	}
+
+	configureKubeRBACProxyTLS(opts.Platform.PrometheusAgent, opts.TLSMinVersion, opts.TLSCipherSuites)
+	configureKubeRBACProxyTLS(opts.UserWorkloads.PrometheusAgent, opts.TLSMinVersion, opts.TLSCipherSuites)
 
 	// Build Prometheus Agent Spec for Platform
 	if opts.IsPlatformEnabled() {
@@ -401,6 +408,26 @@ func configureAgentForOCP(agent *cooprometheusv1alpha1.PrometheusAgent) {
 	} else {
 		// Add new scrape class
 		agent.Spec.ScrapeClasses = append(agent.Spec.ScrapeClasses, desiredScrapeClass)
+	}
+}
+
+func configureKubeRBACProxyTLS(agent *cooprometheusv1alpha1.PrometheusAgent, minVersion, cipherSuites string) {
+	if agent == nil || (minVersion == "" && cipherSuites == "") {
+		return
+	}
+
+	for i, container := range agent.Spec.Containers {
+		if container.Name == "kube-rbac-proxy" {
+			if minVersion != "" {
+				agent.Spec.Containers[i].Args = append(agent.Spec.Containers[i].Args,
+					fmt.Sprintf("--tls-min-version=%s", minVersion))
+			}
+			if cipherSuites != "" {
+				agent.Spec.Containers[i].Args = append(agent.Spec.Containers[i].Args,
+					fmt.Sprintf("--tls-cipher-suites=%s", cipherSuites))
+			}
+			return
+		}
 	}
 }
 
