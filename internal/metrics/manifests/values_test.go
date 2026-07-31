@@ -111,6 +111,7 @@ func TestBuildValues(t *testing.T) {
 			Expect: func(t *testing.T, values *manifests.MetricsValues) {
 				assert.Len(t, values.Platform.ScrapeConfigs, 2)
 				assert.Equal(t, "a", values.Platform.ScrapeConfigs[0].Name)
+				assert.Equal(t, "raw", values.Platform.ScrapeConfigs[0].Annotations["observability.open-cluster-management.io/resolution-strategy"])
 				assert.Equal(t, "b", values.Platform.ScrapeConfigs[1].Name)
 			},
 		},
@@ -126,6 +127,7 @@ func TestBuildValues(t *testing.T) {
 			Expect: func(t *testing.T, values *manifests.MetricsValues) {
 				assert.Len(t, values.UserWorkload.ScrapeConfigs, 2)
 				assert.Equal(t, "a", values.UserWorkload.ScrapeConfigs[0].Name)
+				assert.Equal(t, "raw", values.UserWorkload.ScrapeConfigs[0].Annotations["observability.open-cluster-management.io/resolution-strategy"])
 				assert.Equal(t, "b", values.UserWorkload.ScrapeConfigs[1].Name)
 			},
 		},
@@ -138,7 +140,9 @@ func TestBuildValues(t *testing.T) {
 			Expect: func(t *testing.T, values *manifests.MetricsValues) {
 				assert.Len(t, values.Platform.Rules, 2)
 				assert.Equal(t, "a", values.Platform.Rules[0].Name)
+				assert.Equal(t, "monitoring.coreos.com/v1", values.Platform.Rules[0].APIVersion)
 				assert.Equal(t, "b", values.Platform.Rules[1].Name)
+				assert.Equal(t, "monitoring.coreos.com/v1", values.Platform.Rules[1].APIVersion)
 			},
 		},
 		"with user workload rules": {
@@ -150,7 +154,9 @@ func TestBuildValues(t *testing.T) {
 			Expect: func(t *testing.T, values *manifests.MetricsValues) {
 				assert.Len(t, values.UserWorkload.Rules, 2)
 				assert.Equal(t, "a", values.UserWorkload.Rules[0].Name)
+				assert.Equal(t, "monitoring.coreos.com/v1", values.UserWorkload.Rules[0].APIVersion)
 				assert.Equal(t, "b", values.UserWorkload.Rules[1].Name)
+				assert.Equal(t, "monitoring.coreos.com/v1", values.UserWorkload.Rules[1].APIVersion)
 			},
 		},
 		"with user workload COO rules": {
@@ -177,7 +183,7 @@ func TestBuildValues(t *testing.T) {
 			Expect: func(t *testing.T, values *manifests.MetricsValues) {
 				assert.Len(t, values.UserWorkload.Rules, 2)
 				assert.Equal(t, "coreos-a", values.UserWorkload.Rules[0].Name)
-				assert.Empty(t, values.UserWorkload.Rules[0].APIVersion)
+				assert.Equal(t, "monitoring.coreos.com/v1", values.UserWorkload.Rules[0].APIVersion)
 				assert.Equal(t, "rhobs-a", values.UserWorkload.Rules[1].Name)
 				assert.Equal(t, "monitoring.rhobs/v1", values.UserWorkload.Rules[1].APIVersion)
 			},
@@ -231,8 +237,8 @@ func TestBuildValues(t *testing.T) {
 			},
 			Expect: func(t *testing.T, values *manifests.MetricsValues) {
 				trimmedID := config.GetTrimmedClusterID("12345-67890-abcdef")
-				assert.Equal(t, config.GetObsAlertmanagerMtlsCASecretName(trimmedID), values.AlertmanagerRouterCASecretName)
-				assert.Equal(t, config.GetObsAlertmanagerMtlsCertSecretName(trimmedID), values.ClientCertSecretName)
+				assert.Equal(t, config.GetHubMtlsCASecretName(trimmedID), values.AlertmanagerRouterCASecretName)
+				assert.Equal(t, config.GetHubMtlsCertSecretName(trimmedID), values.ClientCertSecretName)
 				assert.Equal(t, config.GetAlertmanagerAccessorSecretName(trimmedID), values.AlertmanagerAccessorSecretName)
 			},
 		},
@@ -296,12 +302,18 @@ func newScrapeConfig(name string) *cooprometheusv1alpha1.ScrapeConfig {
 	return &cooprometheusv1alpha1.ScrapeConfig{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
+			Annotations: map[string]string{
+				"observability.open-cluster-management.io/resolution-strategy": "raw",
+			},
 		},
 	}
 }
 
 func newRule(name string) *prometheusv1.PrometheusRule {
 	return &prometheusv1.PrometheusRule{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "monitoring.coreos.com/v1",
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},

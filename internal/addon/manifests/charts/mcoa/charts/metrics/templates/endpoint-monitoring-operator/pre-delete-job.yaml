@@ -35,6 +35,9 @@ rules:
 - apiGroups: ["apiextensions.k8s.io"]
   resources: ["customresourcedefinitions"]
   verbs: ["get", "list", "watch", "update", "patch", "delete"]
+- apiGroups: ["monitoring.rhobs"]
+  resources: ["prometheusagents", "scrapeconfigs"]
+  verbs: ["get", "list", "watch", "update", "patch", "delete"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding

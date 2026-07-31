@@ -57,7 +57,13 @@ const (
 	NonOCPScrapeClassName     = "non-ocp-monitoring"
 	ScrapeClassPlatformTarget = "prometheus-k8s.openshift-monitoring.svc:9091"
 	ScrapeClassUWLTarget      = "prometheus-user-workload.openshift-user-workload-monitoring.svc:9092"
-	MonitoringStackCRDName    = "monitoringstacks.monitoring.rhobs"
+	AlertmanagerCRDName       = "alertmanagers.monitoring.rhobs"
+
+	RawResolutionAnnotation       = "observability.open-cluster-management.io/resolution-strategy"
+	RawResolutionValue            = "raw"
+	RawLabelSuffix                = "-raw"
+	COOMonitoringStacksAnnotation = "observability.open-cluster-management.io/coo-monitoring-stacks"
+	MonitoringStackResource       = "monitoringstacks"
 
 	// Thanos Operator
 	ThanosOperatorAppName = "thanos-operator"
@@ -71,8 +77,12 @@ const (
 	AlertmanagerPlatformNamespace  = "openshift-monitoring"
 	AlertmanagerUWLNamespace       = "openshift-user-workload-monitoring"
 
-	ObsAlertmanagerMtlsCAShortName   = "obs-alertmanager-mtls-ca"
-	ObsAlertmanagerMtlsCertShortName = "obs-alertmanager-mtls-cert"
+	HubMtlsCAShortName   = "hub-mtls-ca"
+	HubMtlsCertShortName = "hub-mtls-cert"
+
+	MTLSCASecretKey      = "ca.crt"
+	MTLSCertSecretKey    = "tls.crt"
+	MTLSCertKeySecretKey = "tls.key"
 )
 
 var (
@@ -204,10 +214,10 @@ func GetAlertmanagerAccessorSecretName(trimmedClusterID string) string {
 	return fmt.Sprintf("%s-%s", AlertmanagerAccessorSecretName, trimmedClusterID)
 }
 
-func GetObsAlertmanagerMtlsCASecretName(trimmedClusterID string) string {
-	return fmt.Sprintf("%s-%s", ObsAlertmanagerMtlsCAShortName, trimmedClusterID)
+func GetHubMtlsCASecretName(trimmedClusterID string) string {
+	return fmt.Sprintf("%s-%s", HubMtlsCAShortName, trimmedClusterID)
 }
 
-func GetObsAlertmanagerMtlsCertSecretName(trimmedClusterID string) string {
-	return fmt.Sprintf("%s-%s", ObsAlertmanagerMtlsCertShortName, trimmedClusterID)
+func GetHubMtlsCertSecretName(trimmedClusterID string) string {
+	return fmt.Sprintf("%s-%s", HubMtlsCertShortName, trimmedClusterID)
 }
