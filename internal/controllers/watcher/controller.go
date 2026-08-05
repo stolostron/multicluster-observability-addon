@@ -9,12 +9,14 @@ import (
 	"github.com/go-logr/logr"
 	hyperv1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	rshandlers "github.com/stolostron/multicluster-observability-addon/internal/analytics/rightsizing/handlers"
 	coohandlers "github.com/stolostron/multicluster-observability-addon/internal/coo/handlers"
 	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -64,6 +66,14 @@ func SetupWithManager(mgr ctrl.Manager, addonManager addonmanager.AddonManager, 
 		Cache:        NewReferenceCache(),
 	}
 
+	// Unstructured watch keeps spec.networkPolicies even when typed MCH API lacks the field.
+	mch := &unstructured.Unstructured{}
+	mch.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   "operator.open-cluster-management.io",
+		Version: "v1",
+		Kind:    "MultiClusterHub",
+	})
+
 	return ctrl.NewControllerManagedBy(mgr).
 		Named("watcher").
 		Watches(&workv1.ManifestWork{}, r.enqueueForManifestWork(), builder.WithPredicates(manifestWorkPredicate)).
@@ -73,6 +83,7 @@ func SetupWithManager(mgr ctrl.Manager, addonManager addonmanager.AddonManager, 
 		Watches(&corev1.ConfigMap{}, r.enqueueForLocalCluster(), builder.WithPredicates(coohandlers.CardinalityRulesConfigMapPredicate()), builder.OnlyMetadata).
 		Watches(&hyperv1.HostedCluster{}, r.enqueueForLocalCluster(), hostedClusterPredicate).
 		Watches(&prometheusv1.ServiceMonitor{}, r.enqueueForLocalCluster(), hypershiftServiceMonitorsPredicate(r.Log), builder.OnlyMetadata).
+		Watches(mch, r.enqueueForAllManagedClusters(), builder.WithPredicates(mchNetworkPoliciesPredicate)).
 		Complete(r)
 }
 
@@ -298,4 +309,28 @@ func isHypershiftServiceMonitor(logger logr.Logger, obj client.Object) bool {
 	}
 
 	return false
+}
+
+func mchNetworkPoliciesEnabled(o client.Object) bool {
+	u, ok := o.(*unstructured.Unstructured)
+	if !ok {
+		return false
+	}
+	return common.IsNetworkPoliciesEnabled(u)
+}
+
+func mchNetworkPoliciesChanged(oldObj, newObj client.Object) bool {
+	return mchNetworkPoliciesEnabled(oldObj) != mchNetworkPoliciesEnabled(newObj)
+}
+
+// mchNetworkPoliciesPredicate filters MultiClusterHub events to networkPolicies.enabled flips.
+var mchNetworkPoliciesPredicate = predicate.Funcs{
+	CreateFunc: func(e event.CreateEvent) bool {
+		return mchNetworkPoliciesEnabled(e.Object)
+	},
+	UpdateFunc: func(e event.UpdateEvent) bool {
+		return mchNetworkPoliciesChanged(e.ObjectOld, e.ObjectNew)
+	},
+	DeleteFunc:  func(e event.DeleteEvent) bool { return false },
+	GenericFunc: func(e event.GenericEvent) bool { return false },
 }
