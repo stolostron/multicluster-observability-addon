@@ -311,7 +311,23 @@ func TestRightSizing_DashboardSpecStructure(t *testing.T) {
 			require.True(t, ok, "dashboard spec must have variables")
 			varSlice, ok := variables.([]any)
 			require.True(t, ok)
-			assert.GreaterOrEqual(t, len(varSlice), 3, "all RS dashboards have at least cluster, profile, days")
+			assert.GreaterOrEqual(t, len(varSlice), 4, "all RS dashboards have at least cluster, cpu_profile, memory_profile, days")
+
+			varNames := extractDashboardVarNames(varSlice)
+			assert.Contains(t, varNames, "cluster")
+			assert.Contains(t, varNames, "cpu_profile")
+			assert.Contains(t, varNames, "memory_profile")
+			assert.Contains(t, varNames, "days")
+			assert.NotContains(t, varNames, "profile", "shared profile variable should be split into cpu/memory profiles")
+		})
+
+		t.Run(db.Name+"/spec_uses_split_profile_vars", func(t *testing.T) {
+			raw, err := json.Marshal(db.Spec)
+			require.NoError(t, err)
+			specStr := string(raw)
+			assert.Contains(t, specStr, "$cpu_profile")
+			assert.Contains(t, specStr, "$memory_profile")
+			assert.NotContains(t, specStr, `profile="$profile"`)
 		})
 
 		t.Run(db.Name+"/spec_references_datasource", func(t *testing.T) {
@@ -397,4 +413,22 @@ func dashboardNames(dbs []*persesv1.PersesDashboard) []string {
 
 func contains(slice []string, val string) bool {
 	return slices.Contains(slice, val)
+}
+
+func extractDashboardVarNames(vars []any) []string {
+	names := make([]string, 0, len(vars))
+	for _, v := range vars {
+		m, ok := v.(map[string]any)
+		if !ok {
+			continue
+		}
+		spec, ok := m["spec"].(map[string]any)
+		if !ok {
+			continue
+		}
+		if name, ok := spec["name"].(string); ok {
+			names = append(names, name)
+		}
+	}
+	return names
 }
