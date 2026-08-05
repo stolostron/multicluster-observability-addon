@@ -192,3 +192,8 @@ replace github.com/google/cel-go => github.com/google/cel-go v0.23.2
 
 // remove after latest tag for table plugin is available
 replace github.com/perses/plugins/table => github.com/perses/plugins/table v0.0.0-20250709083656-34e29fed0083
+
+// CVE-2026-42151: Azure AD OAuth client_secret exposed via config API.
+// Upstream fix is in v0.311.3 but requires incompatible API changes (parser.ParseExpr removal).
+// This replace points to katekeiroz-dev/prometheus with the fix cherry-picked onto v0.307.2.
+replace github.com/prometheus/prometheus => github.com/katekeiroz-dev/prometheus v0.0.0-20260805152148-3e63de110bdd
