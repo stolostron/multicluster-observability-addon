@@ -66,14 +66,6 @@ func SetupWithManager(mgr ctrl.Manager, addonManager addonmanager.AddonManager, 
 		Cache:        NewReferenceCache(),
 	}
 
-	// Unstructured watch keeps spec.networkPolicies even when typed MCH API lacks the field.
-	mch := &unstructured.Unstructured{}
-	mch.SetGroupVersionKind(schema.GroupVersionKind{
-		Group:   "operator.open-cluster-management.io",
-		Version: "v1",
-		Kind:    "MultiClusterHub",
-	})
-
 	return ctrl.NewControllerManagedBy(mgr).
 		Named("watcher").
 		Watches(&workv1.ManifestWork{}, r.enqueueForManifestWork(), builder.WithPredicates(manifestWorkPredicate)).
@@ -83,7 +75,7 @@ func SetupWithManager(mgr ctrl.Manager, addonManager addonmanager.AddonManager, 
 		Watches(&corev1.ConfigMap{}, r.enqueueForLocalCluster(), builder.WithPredicates(coohandlers.CardinalityRulesConfigMapPredicate()), builder.OnlyMetadata).
 		Watches(&hyperv1.HostedCluster{}, r.enqueueForLocalCluster(), hostedClusterPredicate).
 		Watches(&prometheusv1.ServiceMonitor{}, r.enqueueForLocalCluster(), hypershiftServiceMonitorsPredicate(r.Log), builder.OnlyMetadata).
-		Watches(mch, r.enqueueForAllManagedClusters(), builder.WithPredicates(mchNetworkPoliciesPredicate)).
+		Watches(common.NewMultiClusterHub(), r.enqueueForAllManagedClusters(), builder.WithPredicates(mchNetworkPoliciesPredicate)).
 		Complete(r)
 }
 

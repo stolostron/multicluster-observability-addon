@@ -99,7 +99,7 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, getter addonutils.Add
 			userValues.Metrics.ThanosOperator.Enabled = opts.ThanosOperatorEnabled && common.IsHubCluster(cluster)
 		}
 
-		npEnabled, err := getNetworkPoliciesEnabled(ctx, k8s)
+		npEnabled, err := common.GetNetworkPoliciesEnabled(ctx, k8s)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get networkPolicies enabled: %w", err)
 		}
@@ -107,10 +107,6 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, getter addonutils.Add
 
 		return addonfactory.JsonStructToValues(userValues)
 	}
-}
-
-func getNetworkPoliciesEnabled(ctx context.Context, k8s client.Client) (bool, error) {
-	return common.GetNetworkPoliciesEnabled(ctx, k8s)
 }
 
 func getMonitoringValues(ctx context.Context, k8s client.Client, logger logr.Logger, cluster *clusterv1.ManagedCluster, mcAddon *addonapiv1beta1.ManagedClusterAddOn, opts addon.Options) (*mmanifests.MetricsValues, error) {

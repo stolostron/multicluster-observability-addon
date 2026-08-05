@@ -16,6 +16,18 @@ const (
 	mchKind    = "MultiClusterHub"
 )
 
+var MchGVK = schema.GroupVersionKind{
+	Group:   mchGroup,
+	Version: mchVersion,
+	Kind:    mchKind,
+}
+
+func NewMultiClusterHub() *unstructured.Unstructured {
+	u := &unstructured.Unstructured{}
+	u.SetGroupVersionKind(MchGVK)
+	return u
+}
+
 // IsNetworkPoliciesEnabled reports whether MCH has spec.networkPolicies.enabled set.
 // Future change this to use multiclusterhub apiv1
 func IsNetworkPoliciesEnabled(u *unstructured.Unstructured) bool {
