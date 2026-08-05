@@ -1,0 +1,27 @@
+{{- if .Values.global.networkPoliciesEnabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: endpoint-monitoring-operator
+  namespace: {{ .Release.Namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: endpoint-monitoring-operator
+      app.kubernetes.io/part-of: multicluster-observability-addon
+      app.kubernetes.io/managed-by: multicluster-observability-addon
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - ports:
+        {{- if .Values.deployNonOCPStack }}
+        - port: 8080
+          protocol: TCP
+        {{- else }}
+        - port: 8443
+          protocol: TCP
+        {{- end }}
+  egress:
+    - {}
+{{- end }}

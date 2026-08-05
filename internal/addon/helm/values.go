@@ -24,8 +24,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+type GlobalValues struct {
+	NetworkPoliciesEnabled bool `json:"networkPoliciesEnabled"`
+}
+
 type HelmChartValues struct {
 	Enabled     bool                          `json:"enabled"`
+	Global      *GlobalValues                 `json:"global,omitempty"`
 	Metrics     *mmanifests.MetricsValues     `json:"metrics,omitempty"`
 	Logging     *lmanifests.LoggingValues     `json:"logging,omitempty"`
 	Tracing     *tmanifests.TracingValues     `json:"tracing,omitempty"`
@@ -94,8 +99,18 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, getter addonutils.Add
 			userValues.Metrics.ThanosOperator.Enabled = opts.ThanosOperatorEnabled && common.IsHubCluster(cluster)
 		}
 
+		npEnabled, err := getNetworkPoliciesEnabled(ctx, k8s)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get networkPolicies enabled: %w", err)
+		}
+		userValues.Global = &GlobalValues{NetworkPoliciesEnabled: npEnabled}
+
 		return addonfactory.JsonStructToValues(userValues)
 	}
+}
+
+func getNetworkPoliciesEnabled(ctx context.Context, k8s client.Client) (bool, error) {
+	return common.GetNetworkPoliciesEnabled(ctx, k8s)
 }
 
 func getMonitoringValues(ctx context.Context, k8s client.Client, logger logr.Logger, cluster *clusterv1.ManagedCluster, mcAddon *addonapiv1beta1.ManagedClusterAddOn, opts addon.Options) (*mmanifests.MetricsValues, error) {

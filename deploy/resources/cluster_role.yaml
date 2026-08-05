@@ -88,5 +88,9 @@
     - apiGroups: ["apiextensions.k8s.io"]
       resources: ["customresourcedefinitions"]
       verbs: ["get"]
+    # Watch MultiClusterHub.spec.networkPolicies.enabled to toggle spoke NetworkPolicies
+    - apiGroups: ["operator.open-cluster-management.io"]
+      resources: ["multiclusterhubs"]
+      verbs: ["get", "list", "watch"]
 
 
