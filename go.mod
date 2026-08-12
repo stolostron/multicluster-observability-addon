@@ -37,7 +37,7 @@ require (
 	github.com/perses/plugins/timeserieschart v0.11.1
 	github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring v0.83.0-rhobs1
 	github.com/rhobs/observability-operator/pkg/apis v0.0.0-20250902133632-f98bd8a20a80
-	golang.org/x/text v0.32.0
+	golang.org/x/text v0.36.0
 )
 
 require (
@@ -91,11 +91,11 @@ require (
 	github.com/jpillora/backoff v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/kylelemons/godebug v1.1.0 // indirect
-	github.com/labstack/echo/v4 v4.13.4 // indirect
-	github.com/labstack/gommon v0.4.2 // indirect
+	github.com/labstack/echo/v4 v4.15.3 // indirect
+	github.com/labstack/gommon v0.5.0 // indirect
 	github.com/mailru/easyjson v0.9.0 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
-	github.com/mattn/go-isatty v0.0.20 // indirect
+	github.com/mattn/go-isatty v0.0.22 // indirect
 	github.com/mitchellh/copystructure v1.2.0 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/mitchellh/reflectwalk v1.0.2 // indirect
@@ -158,14 +158,14 @@ require (
 	go.uber.org/zap v1.27.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.3 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
-	golang.org/x/crypto v0.46.0 // indirect
+	golang.org/x/crypto v0.50.0 // indirect
 	golang.org/x/exp v0.0.0-20250911091902-df9299821621 // indirect
-	golang.org/x/net v0.48.0 // indirect
+	golang.org/x/net v0.53.0 // indirect
 	golang.org/x/oauth2 v0.34.0 // indirect
-	golang.org/x/sync v0.19.0 // indirect
-	golang.org/x/sys v0.42.0 // indirect
-	golang.org/x/term v0.38.0 // indirect
-	golang.org/x/time v0.13.0 // indirect
+	golang.org/x/sync v0.20.0 // indirect
+	golang.org/x/sys v0.43.0 // indirect
+	golang.org/x/term v0.42.0 // indirect
+	golang.org/x/time v0.15.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.4.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20251202230838-ff82c1b0f217 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20251202230838-ff82c1b0f217 // indirect
