@@ -649,12 +649,6 @@ func TestReconcile(t *testing.T) {
 			},
 		},
 	}
-	hostedCluster := &hyperv1.HostedCluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "hcp",
-			Namespace: "hcpns",
-		},
-	}
 	hcpApiserverSC := &cooprometheusv1alpha1.ScrapeConfig{
 		TypeMeta: metav1.TypeMeta{
 			Kind: cooprometheusv1alpha1.ScrapeConfigsKind,
@@ -770,7 +764,7 @@ func TestReconcile(t *testing.T) {
 			platformEnabled: true,
 			uwlEnabled:      true,
 			initObjs: []client.Object{
-				hostedCluster, hcpApiserverSC, hcpEtcdSC, hcpApiserverRule, hcpEtcdRule,
+				hcpApiserverSC, hcpEtcdSC, hcpApiserverRule, hcpEtcdRule,
 			},
 			expectAgentsCount:  2, // one default platform agent + one default uwl agent
 			expectConfigsCount: 6, // platform agent + uwl agent + 2 hcp scrapeConfigs + 2 hcp rules
@@ -863,11 +857,10 @@ func TestReconcileScrapeConfigs(t *testing.T) {
 		Name:      "a",
 	}
 	testCases := []struct {
-		name              string
-		initObjs          []client.Object
-		isUWL             bool
-		hasHostedClusters bool
-		expects           func(*testing.T, []cooprometheusv1alpha1.ScrapeConfig)
+		name     string
+		initObjs []client.Object
+		isUWL    bool
+		expects  func(*testing.T, []cooprometheusv1alpha1.ScrapeConfig)
 	}{
 		{
 			name: "no scrape configs",
@@ -1071,13 +1064,46 @@ func TestReconcileScrapeConfigs(t *testing.T) {
 					},
 				},
 			},
-			isUWL:             true,
-			hasHostedClusters: true,
+			isUWL: true,
 			expects: func(t *testing.T, objs []cooprometheusv1alpha1.ScrapeConfig) {
 				assert.Len(t, objs, 1)
 				assert.Empty(t, objs[0].Spec.ScrapeClassName)
 				assert.Contains(t, objs[0].Labels, addoncfg.BackupLabelKey, "backup label key should be present")
 				assert.Equal(t, addoncfg.BackupLabelValue, objs[0].Labels[addoncfg.BackupLabelKey])
+			},
+		},
+		{
+			name: "hcp scrapeConfigs are fetched",
+			initObjs: []client.Object{
+				&cooprometheusv1alpha1.ScrapeConfig{
+					TypeMeta: metav1.TypeMeta{
+						Kind: cooprometheusv1alpha1.ScrapeConfigsKind,
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace:       config.HubInstallNamespace,
+						Name:            "etcd",
+						Labels:          config.EtcdHcpUserWorkloadPrometheusMatchLabels,
+						OwnerReferences: []metav1.OwnerReference{mcoOwnerRef},
+					},
+				},
+				&cooprometheusv1alpha1.ScrapeConfig{
+					TypeMeta: metav1.TypeMeta{
+						Kind: cooprometheusv1alpha1.ScrapeConfigsKind,
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace:       config.HubInstallNamespace,
+						Name:            "apiserver",
+						Labels:          config.ApiserverHcpUserWorkloadPrometheusMatchLabels,
+						OwnerReferences: []metav1.OwnerReference{mcoOwnerRef},
+					},
+				},
+			},
+			isUWL: true,
+			expects: func(t *testing.T, objs []cooprometheusv1alpha1.ScrapeConfig) {
+				assert.Len(t, objs, 2)
+				names := []string{objs[0].Name, objs[1].Name}
+				assert.Contains(t, names, "etcd")
+				assert.Contains(t, names, "apiserver")
 			},
 		},
 	}
@@ -1098,7 +1124,7 @@ func TestReconcileScrapeConfigs(t *testing.T) {
 				KubeRBACProxyImage: "dummy",
 			}
 
-			dc, err := d.reconcileScrapeConfigs(context.Background(), mcoUID, tc.isUWL, tc.hasHostedClusters)
+			dc, err := d.reconcileScrapeConfigs(context.Background(), mcoUID, tc.isUWL)
 			require.NoError(t, err)
 
 			scrapeConfigs := []cooprometheusv1alpha1.ScrapeConfig{}
@@ -1126,12 +1152,11 @@ func TestGetPrometheusRules(t *testing.T) {
 		Name:      "a",
 	}
 	testCases := []struct {
-		name              string
-		initObjs          []client.Object
-		platformEnabled   bool
-		uwlEnabled        bool
-		hasHostedClusters bool
-		expects           func(*testing.T, []prometheusv1.PrometheusRule)
+		name            string
+		initObjs        []client.Object
+		platformEnabled bool
+		uwlEnabled      bool
+		expects         func(*testing.T, []prometheusv1.PrometheusRule)
 	}{
 		{
 			name: "no rule",
@@ -1363,9 +1388,8 @@ func TestGetPrometheusRules(t *testing.T) {
 					},
 				},
 			},
-			uwlEnabled:        true,
-			platformEnabled:   true,
-			hasHostedClusters: true,
+			uwlEnabled:      true,
+			platformEnabled: true,
 			expects: func(t *testing.T, objs []prometheusv1.PrometheusRule) {
 				assert.Len(t, objs, 2)
 			},
@@ -1400,7 +1424,7 @@ func TestGetPrometheusRules(t *testing.T) {
 				},
 			}
 
-			dc, err := d.getPrometheusRules(context.Background(), mcoUID, tc.hasHostedClusters)
+			dc, err := d.getPrometheusRules(context.Background(), mcoUID)
 			require.NoError(t, err)
 
 			rules := []prometheusv1.PrometheusRule{}
