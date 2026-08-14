@@ -129,6 +129,9 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1beta1.Man
 		if len(ret.UserWorkloads.Rules) == 0 && len(ret.UserWorkloads.COORules) == 0 {
 			o.Logger.V(2).Info("No rules found for user workloads")
 		}
+
+		// Deliver the HCP etcd/apiserver ScrapeConfigs.
+		o.buildHypershiftResources(&ret, ret.ClusterID, configResources)
 	}
 
 	// Read TLS profile from ManifestWork feedback
