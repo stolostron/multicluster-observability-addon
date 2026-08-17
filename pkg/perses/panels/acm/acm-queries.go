@@ -12,47 +12,43 @@ import (
 
 var ACMCommonPanelQueries = map[string]parser.Expr{
 	// Top50MaxLatencyAPIServer queries from acm-clusters-overview-panel.go
-	"Top50MaxLatencyAPIServer_MaxLatency": promqlbuilder.Mul(
-		promqlbuilder.TopK(
-			promqlbuilder.Max(
+	// Split into separate queries so Perses can join columns via
+	// MergeIndexedColumns / JoinByColumnValue (count_values + group_left
+	// jumbles columns compared to Grafana's labelsToFields).
+	"Top50MaxLatencyAPIServer_MaxLatency": promqlbuilder.TopK(
+		promqlbuilder.Max(
+			vector.New(
+				vector.WithMetricName("apiserver_request_duration_seconds:histogram_quantile_99"),
+				vector.WithLabelMatchers(
+					label.New("cluster").EqualRegexp("$cluster"),
+				),
+			),
+		).By("cluster"),
+		50,
+	),
+	"Top50MaxLatencyAPIServer_APIUp": promqlbuilder.Round(promqlbuilder.Mul(promqlbuilder.Div(
+		promqlbuilder.Sum(
+			promqlbuilder.Eqlc(
 				vector.New(
-					vector.WithMetricName("apiserver_request_duration_seconds:histogram_quantile_99"),
+					vector.WithMetricName("up"),
 					vector.WithLabelMatchers(
 						label.New("cluster").EqualRegexp("$cluster"),
+						label.New("service").Equal("kubernetes"),
 					),
 				),
-			).By("cluster"),
-			50,
-		),
-		&parser.AggregateExpr{
-			Op: parser.COUNT_VALUES,
-			Expr: promqlbuilder.Round(promqlbuilder.Mul(promqlbuilder.Div(
-				promqlbuilder.Sum(
-					promqlbuilder.Eql(
-						vector.New(
-							vector.WithMetricName("up"),
-							vector.WithLabelMatchers(
-								label.New("cluster").EqualRegexp("$cluster"),
-								label.New("service").Equal("kubernetes"),
-							),
-						),
-						promqlbuilder.NewNumber(1),
-					),
-				).By("cluster"),
-				promqlbuilder.Count(
-					vector.New(
-						vector.WithMetricName("up"),
-						vector.WithLabelMatchers(
-							label.New("cluster").EqualRegexp("$cluster"),
-							label.New("service").Equal("kubernetes"),
-						),
-					),
-				).By("cluster"),
-			), promqlbuilder.NewNumber(100)), 1),
-			Param:   promqlbuilder.NewString("api_up"),
-			Without: true,
-		},
-	).On("cluster").GroupLeft("api_up"),
+				promqlbuilder.NewNumber(1),
+			),
+		).By("cluster"),
+		promqlbuilder.Count(
+			vector.New(
+				vector.WithMetricName("up"),
+				vector.WithLabelMatchers(
+					label.New("cluster").EqualRegexp("$cluster"),
+					label.New("service").Equal("kubernetes"),
+				),
+			),
+		).By("cluster"),
+	), promqlbuilder.NewNumber(100)), 1),
 	"APIServerRequestTotal_ErrorRate": promqlbuilder.Sum(
 		vector.New(
 			vector.WithMetricName("sum:apiserver_request_total:1h"),
