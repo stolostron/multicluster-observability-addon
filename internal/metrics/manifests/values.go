@@ -55,13 +55,14 @@ type MonitoringStackPatchValues struct {
 }
 
 // ThanosOperatorValues holds the Thanos operator deployment values for Helm rendering.
+// Thanos CRs (ThanosStore, etc.) are built programmatically in the thanos package
+// and injected via the wrapper — they do not flow through Helm values.
 type ThanosOperatorValues struct {
-	Enabled   bool        `json:"enabled"`
-	IsHub     bool        `json:"isHub"`
-	AppName   string      `json:"appName"`
-	Component string      `json:"component"`
-	Image     string      `json:"image"`
-	StoreSpec ConfigValue `json:"storeSpec"`
+	Enabled   bool   `json:"enabled"`
+	IsHub     bool   `json:"isHub"`
+	AppName   string `json:"appName"`
+	Component string `json:"component"`
+	Image     string `json:"image"`
 }
 
 type NodeExporterValues struct {
@@ -364,24 +365,7 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 	ret.MonitoringStackPatches = patches
 	ret.PrometheusServerRemoteWrite = opts.PrometheusServerRemoteWrite
 
-	if opts.IsHub && opts.Thanos.Store != nil {
-		if ret.ThanosOperator.StoreSpec, err = marshalThanosSpec(opts.Thanos.Store.Spec); err != nil {
-			return ret, fmt.Errorf("failed to build thanos store values: %w", err)
-		}
-	}
-
 	return ret, nil
-}
-
-// marshalThanosSpec serializes a Thanos CR spec into a ConfigValue for Helm rendering.
-func marshalThanosSpec(spec any) (ConfigValue, error) {
-	specJSON, err := json.Marshal(spec)
-	if err != nil {
-		return ConfigValue{}, err
-	}
-	return ConfigValue{
-		Data: string(specJSON),
-	}, nil
 }
 
 func buildSecrets(secrets []*corev1.Secret) ([]ConfigValue, error) {
