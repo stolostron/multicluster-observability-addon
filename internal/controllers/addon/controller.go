@@ -19,6 +19,7 @@ import (
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	addonhelm "github.com/stolostron/multicluster-observability-addon/internal/addon/helm"
+	thanosbuilder "github.com/stolostron/multicluster-observability-addon/internal/metrics/thanos"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -111,10 +112,17 @@ func NewAddonManager(ctx context.Context, kubeConfig *rest.Config, scheme *runti
 		return nil, fmt.Errorf("failed to build helm agent addon: %w", err)
 	}
 
+	thanosObjBuilder := &thanosbuilder.ObjectBuilder{
+		Client: k8sClient,
+		Getter: getter,
+		Logger: agentLogger.WithName("thanos"),
+	}
+
 	err = mgr.AddAgent(&AgentAddonWithSortedManifests{
-		agent:  mcoaAgentAddon,
-		logger: agentLogger,
-		client: k8sClient,
+		agent:          mcoaAgentAddon,
+		logger:         agentLogger,
+		client:         k8sClient,
+		objectBuilders: []ObjectBuilderFunc{thanosObjBuilder.Build},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to add mcoa agent to manager: %w", err)
@@ -123,10 +131,13 @@ func NewAddonManager(ctx context.Context, kubeConfig *rest.Config, scheme *runti
 	return mgr, nil
 }
 
+type ObjectBuilderFunc func(ctx context.Context, cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) ([]runtime.Object, error)
+
 type AgentAddonWithSortedManifests struct {
-	agent  agent.AgentAddon
-	logger logr.Logger
-	client client.Client
+	agent          agent.AgentAddon
+	logger         logr.Logger
+	client         client.Client
+	objectBuilders []ObjectBuilderFunc
 }
 
 func (a *AgentAddonWithSortedManifests) Manifests(ctx context.Context, cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) ([]runtime.Object, error) {
@@ -139,6 +150,14 @@ func (a *AgentAddonWithSortedManifests) Manifests(ctx context.Context, cluster *
 		if ms, ok := obj.(*monitoringv1alpha1.MonitoringStack); ok {
 			objects[i] = a.toUnstructuredMonitoringStack(ms)
 		}
+	}
+
+	for _, builder := range a.objectBuilders {
+		objs, buildErr := builder(ctx, cluster, addon)
+		if buildErr != nil {
+			return nil, fmt.Errorf("failed to build programmatic objects: %w", buildErr)
+		}
+		objects = append(objects, objs...)
 	}
 
 	// Sort the manifests to ensure a stable order of resources, which is crucial for

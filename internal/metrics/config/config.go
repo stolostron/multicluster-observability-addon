@@ -73,7 +73,9 @@ const (
 	// Thanos Store defaults
 	DefaultStoreShards      = 3
 	DefaultStoreStorageSize = "10Gi"
-	ThanosStoreContainerID  = "statefulsets:mcoa-store:thanos"
+	DefaultStoreCPURequest  = "100m"
+	DefaultStoreMemRequest  = "1Gi"
+	ThanosStoreContainerID  = "statefulsets:mcoa:thanos"
 
 	// Thanos object storage configuration
 	ObjectStorageSecretName = "thanos-object-storage"
