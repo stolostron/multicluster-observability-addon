@@ -23,7 +23,7 @@ func vmDataLink(project, targetDashboard, title string) *DataLink {
 		OpenNewTab: false,
 		Title:      title,
 		URL: fmt.Sprintf(
-			"/monitoring/v2/dashboards/view?dashboard=%s&project=%s&var-cluster=${__data.fields[\"cluster\"]}&var-namespace=${__data.fields[\"namespace\"]}&var-vm=${__data.fields[\"name\"]}&var-days=$days&var-profile=${__data.fields[\"profile\"]}",
+			"/monitoring/v2/dashboards/view?dashboard=%s&project=%s&var-cluster=${__data.fields[\"cluster\"]}&var-namespace=${__data.fields[\"namespace\"]}&var-vm=${__data.fields[\"name\"]}&var-days=$days&var-profile=${__data.fields[\"profile\"]}&start=$__range",
 			targetDashboard, project,
 		),
 	}
@@ -572,7 +572,7 @@ func VMMemoryUnderestimationStatPanel(datasourceName string) panelgroup.Option {
 
 // VMBackToMainDashboardPanel creates a "Back to Main Dashboard" markdown panel with a link
 func VMBackToMainDashboardPanel(datasourceName string, project string) panelgroup.Option {
-	backURL := fmt.Sprintf("/monitoring/v2/dashboards/view?dashboard=acm-rightsizing-openshift-virtualization&project=%s", project)
+	backURL := fmt.Sprintf("/monitoring/v2/dashboards/view?dashboard=acm-rightsizing-openshift-virtualization&project=%s&start=$__range", project)
 	return panelgroup.AddPanel("Back to Main Dashboard",
 		panel.Description("Back to Main Dashboard"),
 		markdownPanel.Markdown(fmt.Sprintf("[Back to Main Dashboard](%s)", backURL)),

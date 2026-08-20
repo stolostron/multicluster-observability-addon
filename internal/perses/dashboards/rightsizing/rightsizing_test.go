@@ -118,6 +118,7 @@ func TestBuildVMOverview(t *testing.T) {
 		specStr := string(raw)
 		assert.Contains(t, specStr, "acm-rightsizing-vm-overestimation")
 		assert.Contains(t, specStr, "acm-rightsizing-vm-underestimation")
+		assert.Contains(t, specStr, "start=$__range", "drill-down links must pass the current time range")
 	})
 }
 
@@ -160,7 +161,9 @@ func TestBuildVMOverestimation(t *testing.T) {
 	t.Run("contains back to main dashboard link", func(t *testing.T) {
 		raw, err := json.Marshal(spec)
 		require.NoError(t, err)
-		assert.Contains(t, string(raw), "acm-rightsizing-openshift-virtualization")
+		specStr := string(raw)
+		assert.Contains(t, specStr, "acm-rightsizing-openshift-virtualization")
+		assert.Contains(t, specStr, "start=$__range", "back link must pass the current time range")
 	})
 
 	t.Run("overestimation queries use acm_rs_vm metrics", func(t *testing.T) {
@@ -213,7 +216,9 @@ func TestBuildVMUnderestimation(t *testing.T) {
 	t.Run("contains back to main dashboard link", func(t *testing.T) {
 		raw, err := json.Marshal(spec)
 		require.NoError(t, err)
-		assert.Contains(t, string(raw), "acm-rightsizing-openshift-virtualization")
+		specStr := string(raw)
+		assert.Contains(t, specStr, "acm-rightsizing-openshift-virtualization")
+		assert.Contains(t, specStr, "start=$__range", "back link must pass the current time range")
 	})
 
 	t.Run("underestimation queries use acm_rs_vm metrics", func(t *testing.T) {
@@ -290,6 +295,7 @@ func TestVMDashboards_DrillDownLinksUseCorrectProject(t *testing.T) {
 			specStr := string(raw)
 			assert.Contains(t, specStr, tc.linkID)
 			assert.Contains(t, specStr, "project="+customProject)
+			assert.Contains(t, specStr, "start=$__range")
 		})
 	}
 }
