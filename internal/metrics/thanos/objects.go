@@ -3,21 +3,21 @@ package thanos
 import (
 	"context"
 	"fmt"
+	"maps"
 
 	"github.com/go-logr/logr"
+	"github.com/stolostron/multicluster-observability-addon/internal/addon"
+	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
+	"github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	thanosv1alpha1 "github.com/thanos-community/thanos-operator/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	addonutils "open-cluster-management.io/addon-framework/pkg/utils"
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	"github.com/stolostron/multicluster-observability-addon/internal/addon"
-	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
-	"github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
-	addonutils "open-cluster-management.io/addon-framework/pkg/utils"
 )
 
 var mcoaLabels = map[string]string{
@@ -91,9 +91,7 @@ func (b *ObjectBuilder) buildStore(opts addon.Options) *thanosv1alpha1.ThanosSto
 
 func storeLabels() map[string]string {
 	labels := make(map[string]string, len(mcoaLabels)+2)
-	for k, v := range mcoaLabels {
-		labels[k] = v
-	}
+	maps.Copy(labels, mcoaLabels)
 	labels["app.kubernetes.io/component"] = "store"
 	labels["app.kubernetes.io/name"] = config.ThanosOperatorAppName
 	return labels
