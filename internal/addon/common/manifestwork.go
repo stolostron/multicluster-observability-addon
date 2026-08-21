@@ -8,6 +8,7 @@ import (
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	workv1 "open-cluster-management.io/api/work/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -82,6 +83,32 @@ func FilterFeedbackValuesByName(values []workv1.FeedbackValue, name string) []wo
 	return filtered
 }
 
+// GetManifestCondition returns the ManifestCondition reported by the work agent for a given
+// resource, across all ManifestWorks for the addon on the given cluster. It returns nil if no
+// ManifestWork has reported status for that resource yet.
+func GetManifestCondition(ctx context.Context, kubeClient client.Client, clusterName, addonName string, resourceID workv1.ResourceIdentifier) (*workv1.ManifestCondition, error) {
+	workList, err := ListAddonManifestWorks(ctx, kubeClient, clusterName, addonName)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, work := range workList.Items {
+		for i, manifestStatus := range work.Status.ResourceStatus.Manifests {
+			currentID := workv1.ResourceIdentifier{
+				Group:     manifestStatus.ResourceMeta.Group,
+				Resource:  manifestStatus.ResourceMeta.Resource,
+				Name:      manifestStatus.ResourceMeta.Name,
+				Namespace: manifestStatus.ResourceMeta.Namespace,
+			}
+			if currentID == resourceID {
+				return &work.Status.ResourceStatus.Manifests[i], nil
+			}
+		}
+	}
+
+	return nil, nil
+}
+
 // IsCOOSubscribedOnSpoke reports whether the Cluster Observability Operator is already
 // present on the given managed cluster. Since the hub has no direct API access to the
 // spoke, this relies on status feedback the work agent reports back for the
@@ -92,6 +119,12 @@ func FilterFeedbackValuesByName(values []workv1.FeedbackValue, name string) []wo
 // on the very first reconcile for a cluster before any ManifestWork exists or before it has
 // been picked up on the spoke. Callers should treat that as "unknown" rather than "not
 // installed", since the CRD may in fact already exist and simply hasn't been observed yet.
+//
+// Note this is deliberately based on whether the resource itself was observed (its Available
+// condition), not on whether the "olm.managed" JSONPath produced a value. A CRD that exists but
+// carries no "olm.managed" label (e.g. MCOA's own placeholder) yields zero feedback values, which
+// is a confirmed "not OLM-managed" signal, not an "unknown" one; conflating the two would leave a
+// cluster stuck deferring forever after COO is fully removed instead of self-healing.
 func IsCOOSubscribedOnSpoke(ctx context.Context, kubeClient client.Client, clusterName, addonName string) (subscribed bool, hasFeedback bool, err error) {
 	crdID := workv1.ResourceIdentifier{
 		Group:    apiextensionsv1.GroupName,
@@ -99,17 +132,16 @@ func IsCOOSubscribedOnSpoke(ctx context.Context, kubeClient client.Client, clust
 		Name:     mconfig.AlertmanagerCRDName,
 	}
 
-	feedback, err := GetFeedbackValuesForResources(ctx, kubeClient, clusterName, addonName, crdID)
+	condition, err := GetManifestCondition(ctx, kubeClient, clusterName, addonName, crdID)
 	if err != nil {
-		return false, false, fmt.Errorf("failed to get feedback values for %s: %w", crdID.Name, err)
+		return false, false, fmt.Errorf("failed to get manifest condition for %s: %w", crdID.Name, err)
 	}
 
-	crdFeedback, ok := feedback[crdID]
-	if !ok || len(crdFeedback) == 0 {
+	if condition == nil || !meta.IsStatusConditionTrue(condition.Conditions, workv1.WorkAvailable) {
 		return false, false, nil
 	}
 
-	for _, v := range FilterFeedbackValuesByName(crdFeedback, addoncfg.IsOLMManagedFeedbackName) {
+	for _, v := range FilterFeedbackValuesByName(condition.StatusFeedbacks.Values, addoncfg.IsOLMManagedFeedbackName) {
 		if v.Value.String != nil && strings.ToLower(*v.Value.String) == "true" {
 			return true, true, nil
 		}
