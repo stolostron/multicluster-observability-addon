@@ -114,11 +114,8 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1beta1.Man
 
 	}
 
-	// Check both if hypershift is enabled and has hosted clusters to limit noisy logs when uwl monitoring is disabled while there is no hostedCluster
-	isHypershiftCluster := IsHypershiftEnabled(managedCluster) && HasHostedCLusters(ctx, o.Client, o.Logger)
-
 	if isOpenShiftVendor && opts.UserWorkloads.Metrics.CollectionEnabled {
-		if err = o.buildPrometheusAgent(ctx, &ret, configResources, config.UserWorkloadMetricsCollectorApp, isHypershiftCluster); err != nil {
+		if err = o.buildPrometheusAgent(ctx, &ret, configResources, config.UserWorkloadMetricsCollectorApp, true); err != nil {
 			return ret, fmt.Errorf("failed to build user workloads metrics collector: %w", err)
 		}
 
@@ -132,16 +129,9 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1beta1.Man
 		if len(ret.UserWorkloads.Rules) == 0 && len(ret.UserWorkloads.COORules) == 0 {
 			o.Logger.V(2).Info("No rules found for user workloads")
 		}
-	}
 
-	if isHypershiftCluster {
-		if opts.UserWorkloads.Metrics.CollectionEnabled {
-			if err = o.buildHypershiftResources(ctx, &ret, managedCluster, configResources); err != nil {
-				return ret, fmt.Errorf("failed to generate hypershift resources: %w", err)
-			}
-		} else {
-			o.Logger.Info("User workload monitoring is needed to monitor Hosted Control Planes managed by the hypershift addon. Ignoring related resources creation.")
-		}
+		// Deliver the HCP etcd/apiserver ScrapeConfigs.
+		o.buildHypershiftResources(&ret, ret.ClusterID, configResources)
 	}
 
 	// Read TLS profile from ManifestWork feedback
@@ -276,7 +266,7 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1beta1.Man
 }
 
 // buildPrometheusAgent abstracts the logic of building a Prometheus agent for platform or user workloads
-func (o *OptionsBuilder) buildPrometheusAgent(ctx context.Context, opts *Options, configResources []client.Object, appName string, isHypershift bool) error {
+func (o *OptionsBuilder) buildPrometheusAgent(ctx context.Context, opts *Options, configResources []client.Object, appName string, preserveHostedClusterID bool) error {
 	// Fetch Prometheus agent resource
 	labelsMatcher := config.PlatformPrometheusMatchLabels
 	if appName == config.UserWorkloadMetricsCollectorApp {
@@ -316,7 +306,7 @@ func (o *OptionsBuilder) buildPrometheusAgent(ctx context.Context, opts *Options
 	// add the relabel cfg to all remote write configs
 	for i := range agent.Spec.RemoteWrite {
 		agent.Spec.RemoteWrite[i].WriteRelabelConfigs = append(agent.Spec.RemoteWrite[i].WriteRelabelConfigs,
-			createWriteRelabelConfigs(opts.ClusterName, opts.ClusterID, isHypershift)...)
+			createWriteRelabelConfigs(opts.ClusterName, opts.ClusterID, preserveHostedClusterID)...)
 	}
 
 	// Add proxy configuration to all remoteWrite configurations
@@ -407,40 +397,6 @@ func (o *OptionsBuilder) buildPrometheusAgent(ctx context.Context, opts *Options
 		}
 	}
 
-	return nil
-}
-
-func (o *OptionsBuilder) buildHypershiftResources(ctx context.Context, opts *Options, managedCluster *clusterv1.ManagedCluster, configResources []client.Object) error {
-	etcdScrapeConfigs := common.FilterResourcesByLabelSelector[*cooprometheusv1alpha1.ScrapeConfig](configResources, config.EtcdHcpUserWorkloadPrometheusMatchLabels)
-	etcdRules := common.FilterResourcesByLabelSelector[*prometheusv1.PrometheusRule](configResources, config.EtcdHcpUserWorkloadPrometheusMatchLabels)
-	apiserverScrapeConfigs := common.FilterResourcesByLabelSelector[*cooprometheusv1alpha1.ScrapeConfig](configResources, config.ApiserverHcpUserWorkloadPrometheusMatchLabels)
-	apiserverRules := common.FilterResourcesByLabelSelector[*prometheusv1.PrometheusRule](configResources, config.ApiserverHcpUserWorkloadPrometheusMatchLabels)
-
-	if len(etcdScrapeConfigs) == 0 {
-		o.Logger.V(1).Info("no scrapeConfigs found in configuration resources for etcd HPCs", "expectedLabel", fmt.Sprintf("%+v", config.EtcdHcpUserWorkloadPrometheusMatchLabels))
-	}
-
-	if len(apiserverScrapeConfigs) == 0 {
-		o.Logger.V(1).Info("no scrapeConfigs found in configuration resources for apiserver HPCs", "expectedLabel", fmt.Sprintf("%+v", config.ApiserverHcpUserWorkloadPrometheusMatchLabels))
-	}
-
-	hyper := Hypershift{
-		Client:         o.Client,
-		ManagedCluster: managedCluster,
-		Logger:         o.Logger,
-	}
-
-	hyperResources, err := hyper.GenerateResources(ctx,
-		CollectionConfig{ScrapeConfigs: etcdScrapeConfigs, Rules: etcdRules},
-		CollectionConfig{ScrapeConfigs: apiserverScrapeConfigs, Rules: apiserverRules},
-	)
-	if err != nil {
-		return fmt.Errorf("failed to generate hypershift resources: %w", err)
-	}
-
-	opts.UserWorkloads.ScrapeConfigs = append(opts.UserWorkloads.ScrapeConfigs, hyperResources.ScrapeConfigs...)
-	opts.UserWorkloads.Rules = append(opts.UserWorkloads.Rules, hyperResources.Rules...)
-	opts.UserWorkloads.ServiceMonitors = append(opts.UserWorkloads.ServiceMonitors, hyperResources.ServiceMonitors...)
 	return nil
 }
 
@@ -564,12 +520,12 @@ func (o *OptionsBuilder) cooIsSubscribed(ctx context.Context, managedCluster *cl
 	return false, nil
 }
 
-func createWriteRelabelConfigs(clusterName, clusterID string, isHypershiftLocalCluster bool) []cooprometheusv1.RelabelConfig {
+func createWriteRelabelConfigs(clusterName, clusterID string, preserveHostedClusterID bool) []cooprometheusv1.RelabelConfig {
 	ret := []cooprometheusv1.RelabelConfig{}
-	if isHypershiftLocalCluster {
-		// Don't overwrite the clusterID label as some are set to the hosted cluster ID (for hosted etcd and apiserver)
-		// These rules ensure that the correct management cluster labels are set if the clusterID label differs from the current cluster one.
-		// If the clusterID it the current cluster one, nothing is done.
+	if preserveHostedClusterID {
+		// Don't overwrite clusterID when it is already set to a hosted cluster ID (HCP etcd/apiserver).
+		// When clusterID differs from this cluster's ID, stamp managementcluster* with this cluster's identity.
+		// When clusterID is empty or matches this cluster's ID, fill in cluster/clusterID as needed.
 		var isNotHcpTmpLabel cooprometheusv1.LabelName = "__tmp_is_not_hcp"
 		ret = append(ret,
 			cooprometheusv1.RelabelConfig{
@@ -609,7 +565,6 @@ func createWriteRelabelConfigs(clusterName, clusterID string, isHypershiftLocalC
 			},
 		)
 	} else {
-		// If not hypershift hub, enforce the clusterID and Name on all metrics
 		ret = append(ret,
 			cooprometheusv1.RelabelConfig{
 				Replacement: &clusterName,

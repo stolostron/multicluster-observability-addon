@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/go-logr/logr"
-	hyperv1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -185,16 +184,6 @@ func overrideImage(image string, registries []addonapiv1beta1.ImageMirror, logge
 		logger.Info("Registry override ignored as it does not reference a full image", "source", registry.Source, "mirror", registry.Mirror, "image", image)
 	}
 	return image
-}
-
-func HasHostedCLusters(ctx context.Context, c client.Client, logger logr.Logger) bool {
-	hostedClusters := &hyperv1.HostedClusterList{}
-	if err := c.List(ctx, hostedClusters, &client.ListOptions{}); err != nil {
-		logger.Error(err, "failed to list HostedClusterList")
-		return false
-	}
-
-	return len(hostedClusters.Items) != 0
 }
 
 func GetTrimmedClusterID(clusterID string) string {

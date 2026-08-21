@@ -7,13 +7,10 @@ import (
 	"testing"
 
 	"github.com/go-logr/logr"
-	hyperv1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
-	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -253,64 +250,6 @@ func TestEnqueueForConfigResource(t *testing.T) {
 			assert.ElementsMatch(t, tc.expectedReconcileRequests, actual)
 		})
 	}
-}
-
-func TestIsHypershiftServiceMonitor(t *testing.T) {
-	hypershiftOwner := metav1.OwnerReference{APIVersion: hyperv1.GroupVersion.String()}
-	nonHypershiftOwner := metav1.OwnerReference{APIVersion: "apps/v1"}
-	alphaApiVersion := hyperv1.GroupVersion
-	alphaApiVersion.Version = "v1alpha1"
-	hypershiftWithOtherAPIVersionOwner := metav1.OwnerReference{APIVersion: alphaApiVersion.String()}
-
-	testCases := []struct {
-		name           string
-		inputObject    client.Object
-		expectedResult bool
-	}{
-		{
-			name:           "hypershift etcd serviceMonitor with correct owner",
-			inputObject:    createTestObject(mconfig.HypershiftEtcdServiceMonitorName, []metav1.OwnerReference{hypershiftOwner}),
-			expectedResult: true,
-		},
-		{
-			name:           "hypershift apiServer serviceMonitor with correct owner",
-			inputObject:    createTestObject(mconfig.HypershiftApiServerServiceMonitorName, []metav1.OwnerReference{hypershiftOwner}),
-			expectedResult: true,
-		},
-		{
-			name:           "hypershift serviceMonitor with non-hypershift owner",
-			inputObject:    createTestObject(mconfig.HypershiftEtcdServiceMonitorName, []metav1.OwnerReference{nonHypershiftOwner}),
-			expectedResult: false,
-		},
-		{
-			name:           "hypershift serviceMonitor with multiple owners, one correct",
-			inputObject:    createTestObject(mconfig.HypershiftEtcdServiceMonitorName, []metav1.OwnerReference{nonHypershiftOwner, hypershiftOwner}),
-			expectedResult: true,
-		},
-		{
-			name:           "hypershift serviceMonitor with other APIVersion owner",
-			inputObject:    createTestObject(mconfig.HypershiftApiServerServiceMonitorName, []metav1.OwnerReference{hypershiftWithOtherAPIVersionOwner}),
-			expectedResult: true,
-		},
-		{
-			name:           "unrelated serviceMonitor name",
-			inputObject:    createTestObject("random-monitor", []metav1.OwnerReference{hypershiftOwner}),
-			expectedResult: false,
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			assert.Equal(t, tc.expectedResult, isHypershiftServiceMonitor(logr.Discard(), tc.inputObject))
-		})
-	}
-}
-
-func createTestObject(name string, owners []metav1.OwnerReference) client.Object {
-	u := &unstructured.Unstructured{}
-	u.SetName(name)
-	u.SetOwnerReferences(owners)
-	return u
 }
 
 func TestUpdateCache(t *testing.T) {

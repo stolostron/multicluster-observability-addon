@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/url"
 	"strconv"
-	"strings"
 	"testing"
 
 	configv1 "github.com/openshift/api/config/v1"
@@ -26,7 +25,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	intstr "k8s.io/apimachinery/pkg/util/intstr"
 	kubescheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/utils/ptr"
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
@@ -502,7 +500,7 @@ func TestBuildOptions(t *testing.T) {
 				// Check that relabelling is added to the remote write config
 				assert.Equal(t, spokeName, *opts.UserWorkloads.PrometheusAgent.Spec.CommonPrometheusFields.RemoteWrite[0].WriteRelabelConfigs[0].Replacement)
 				assert.Equal(t, config.ClusterNameMetricLabel, opts.UserWorkloads.PrometheusAgent.Spec.CommonPrometheusFields.RemoteWrite[0].WriteRelabelConfigs[0].TargetLabel)
-				assert.Len(t, opts.UserWorkloads.PrometheusAgent.Spec.CommonPrometheusFields.RemoteWrite[0].WriteRelabelConfigs, 5)
+				assert.Len(t, opts.UserWorkloads.PrometheusAgent.Spec.CommonPrometheusFields.RemoteWrite[0].WriteRelabelConfigs, 8)
 				assert.False(t, opts.COOIsSubscribed)
 			},
 		},
@@ -565,132 +563,6 @@ func TestBuildOptions(t *testing.T) {
 				require.Len(t, opts.UserWorkloads.COORules, 1, "expected one monitoring.rhobs PrometheusRule for UWL")
 				assert.Equal(t, uwlCooRule.Name, opts.UserWorkloads.COORules[0].Name, "expected RHOBS UWL PrometheusRule to be loaded")
 				assert.False(t, opts.COOIsSubscribed)
-			},
-		},
-		"user workload is enabled and is hypershift hub": {
-			addon: &addonapiv1beta1.ManagedClusterAddOn{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: spokeName,
-					Name:      "observability-controller",
-				},
-				Status: addonapiv1beta1.ManagedClusterAddOnStatus{
-					ConfigReferences: []addonapiv1beta1.ConfigReference{
-						{
-							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
-								Group:    "monitoring.rhobs",
-								Resource: cooprometheusv1alpha1.PrometheusAgentName,
-							},
-							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
-								ConfigReferent: addonapiv1beta1.ConfigReferent{
-									Name:      uwlAgent.Name,
-									Namespace: uwlAgent.Namespace,
-								},
-							},
-						},
-						{
-							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
-								Group:    "",
-								Resource: "configmaps",
-							},
-							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
-								ConfigReferent: addonapiv1beta1.ConfigReferent{
-									Name:      uwlHAProxyCM.Name,
-									Namespace: uwlHAProxyCM.Namespace,
-								},
-							},
-						},
-						{
-							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
-								Group:    "",
-								Resource: "scrapeconfigs",
-							},
-							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
-								ConfigReferent: addonapiv1beta1.ConfigReferent{
-									Name:      "etcd-base",
-									Namespace: hubNamespace,
-								},
-							},
-						},
-						{
-							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
-								Group:    "",
-								Resource: "scrapeconfigs",
-							},
-							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
-								ConfigReferent: addonapiv1beta1.ConfigReferent{
-									Name:      "apiserver-base",
-									Namespace: hubNamespace,
-								},
-							},
-						},
-						{
-							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
-								Group:    "",
-								Resource: "prometheusrules",
-							},
-							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
-								ConfigReferent: addonapiv1beta1.ConfigReferent{
-									Name:      "etcd-base",
-									Namespace: hubNamespace,
-								},
-							},
-						},
-						{
-							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
-								Group:    "",
-								Resource: "prometheusrules",
-							},
-							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
-								ConfigReferent: addonapiv1beta1.ConfigReferent{
-									Name:      "apiserver-base",
-									Namespace: hubNamespace,
-								},
-							},
-						},
-					},
-				},
-			},
-			resources: func() []client.Object {
-				res := filterOutResource[*clusterv1.ManagedCluster](createResources(), "")
-				res = append(res, &clusterv1.ManagedCluster{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "local-cluster-custom-name",
-						Labels: map[string]string{
-							addoncfg.ManagedClusterLabelClusterID:                       "test-cluster-id",
-							"feature.open-cluster-management.io/addon-hypershift-addon": "available",
-							"local-cluster":                    "true",
-							clusterinfov1beta1.LabelKubeVendor: string(clusterinfov1beta1.KubeVendorOpenShift),
-						},
-					},
-				})
-				res = append(res, newHCPResources()...)
-				res = append(res, newHCPConfigResources(hubNamespace)...)
-				return res
-			},
-			userWorkloadsEnabled: true,
-			expects: func(t *testing.T, opts Options, err error) {
-				require.NoError(t, err)
-				assert.NotNil(t, opts.UserWorkloads.ServiceMonitors)
-				assert.Len(t, opts.UserWorkloads.ServiceMonitors, 2)
-				assert.NotNil(t, opts.UserWorkloads.ScrapeConfigs)
-				assert.Len(t, opts.UserWorkloads.ScrapeConfigs, 2)
-				assert.NotNil(t, opts.UserWorkloads.Rules)
-				assert.Len(t, opts.UserWorkloads.Rules, 2)
-
-				var etcdMetrics, apiserverMetrics []string
-				for _, sm := range opts.UserWorkloads.ServiceMonitors {
-					if sm.Name == config.AcmEtcdServiceMonitorName {
-						etcdMetrics = extractMetricsFilterFromServiceMonitor(sm)
-					}
-					if sm.Name == config.AcmApiServerServiceMonitorName {
-						apiserverMetrics = extractMetricsFilterFromServiceMonitor(sm)
-					}
-				}
-
-				assert.Equal(t, []string{"etcd_metric", "etcd_rule_dependent_metric"}, etcdMetrics)
-				assert.Equal(t, []string{"apiserver_metric", "apiserver_rule_dependent_metric"}, apiserverMetrics)
-
-				assert.Len(t, opts.UserWorkloads.PrometheusAgent.Spec.CommonPrometheusFields.RemoteWrite[0].WriteRelabelConfigs, 8)
 			},
 		},
 		"proxy configuration is enabled": {
@@ -958,131 +830,4 @@ func newManifestWork(name string, isOLMSubscrided bool) *workv1.ManifestWork {
 			},
 		},
 	}
-}
-
-func newHCPResources() []client.Object {
-	targetPort := intstr.FromString("target")
-	return []client.Object{
-		&hyperv1.HostedCluster{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "name",
-				Namespace: "namespace",
-			},
-			Spec: hyperv1.HostedClusterSpec{
-				ClusterID: "cluster-id",
-			},
-		},
-		&prometheusv1.ServiceMonitor{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      config.HypershiftEtcdServiceMonitorName,
-				Namespace: "namespace-name",
-			},
-			Spec: prometheusv1.ServiceMonitorSpec{
-				Endpoints: []prometheusv1.Endpoint{
-					{
-						Port: "metrics",
-					},
-				},
-			},
-		},
-		&prometheusv1.ServiceMonitor{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      config.HypershiftApiServerServiceMonitorName,
-				Namespace: "namespace-name",
-			},
-			Spec: prometheusv1.ServiceMonitorSpec{
-				Endpoints: []prometheusv1.Endpoint{
-					{
-						TargetPort: &targetPort,
-						Port:       "client",
-					},
-				},
-			},
-		},
-	}
-}
-
-func newHCPConfigResources(ns string) []client.Object {
-	return []client.Object{
-		&cooprometheusv1alpha1.ScrapeConfig{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "etcd-base",
-				Namespace: ns,
-				Labels:    config.EtcdHcpUserWorkloadPrometheusMatchLabels,
-			},
-			Spec: cooprometheusv1alpha1.ScrapeConfigSpec{
-				Params: map[string][]string{
-					"match[]": {
-						`{__name__="etcd_metric"}`,
-					},
-				},
-			},
-		},
-		&cooprometheusv1alpha1.ScrapeConfig{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "apiserver-base",
-				Namespace: ns,
-				Labels:    config.ApiserverHcpUserWorkloadPrometheusMatchLabels,
-			},
-			Spec: cooprometheusv1alpha1.ScrapeConfigSpec{
-				Params: map[string][]string{
-					"match[]": {
-						`{__name__="apiserver_metric"}`,
-					},
-				},
-			},
-		},
-		&prometheusv1.PrometheusRule{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "etcd-base",
-				Namespace: ns,
-				Labels:    config.EtcdHcpUserWorkloadPrometheusMatchLabels,
-			},
-			Spec: prometheusv1.PrometheusRuleSpec{
-				Groups: []prometheusv1.RuleGroup{
-					{
-						Rules: []prometheusv1.Rule{
-							{
-								Expr: intstr.FromString("sum(etcd_rule_dependent_metric)"),
-							},
-						},
-					},
-				},
-			},
-		},
-		&prometheusv1.PrometheusRule{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "apiserver-base",
-				Namespace: ns,
-				Labels:    config.ApiserverHcpUserWorkloadPrometheusMatchLabels,
-			},
-			Spec: prometheusv1.PrometheusRuleSpec{
-				Groups: []prometheusv1.RuleGroup{
-					{
-						Rules: []prometheusv1.Rule{
-							{
-								Expr: intstr.FromString("apiserver_rule_dependent_metric"),
-							},
-						},
-					},
-				},
-			},
-		},
-	}
-}
-
-func extractMetricsFilterFromServiceMonitor(sm *prometheusv1.ServiceMonitor) []string {
-	for _, relabel := range sm.Spec.Endpoints[0].MetricRelabelConfigs {
-		if relabel.Action != "keep" {
-			continue
-		}
-
-		if relabel.SourceLabels[0] != "__name__" {
-			continue
-		}
-
-		return strings.Split(strings.Trim(relabel.Regex, "()"), "|")
-	}
-
-	return []string{}
 }
