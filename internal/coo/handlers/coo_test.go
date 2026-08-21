@@ -17,6 +17,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/utils/ptr"
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	workv1 "open-cluster-management.io/api/work/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -203,8 +204,20 @@ func manifestWorkWithNoFeedback(name string) *workv1.ManifestWork {
 
 // manifestWorkWithCRDFeedback builds a ManifestWork carrying status feedback for the
 // alertmanagers.monitoring.rhobs CRD, mimicking what the work agent reports back once it
-// has observed the CRD on the spoke.
-func manifestWorkWithCRDFeedback(name string, olmManaged string) *workv1.ManifestWork {
+// has observed the CRD on the spoke. When olmManaged is nil, the CRD is reported as observed
+// (Available) but carries no "olm.managed" label value at all, e.g. because the label is
+// absent on the object (as opposed to present with value "false").
+func manifestWorkWithCRDFeedback(name string, olmManaged *string) *workv1.ManifestWork {
+	var values []workv1.FeedbackValue
+	if olmManaged != nil {
+		values = []workv1.FeedbackValue{
+			{
+				Name:  addoncfg.IsOLMManagedFeedbackName,
+				Value: workv1.FieldValue{Type: workv1.String, String: olmManaged},
+			},
+		}
+	}
+
 	return &workv1.ManifestWork{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -220,13 +233,16 @@ func manifestWorkWithCRDFeedback(name string, olmManaged string) *workv1.Manifes
 							Resource: "customresourcedefinitions",
 							Name:     mconfig.AlertmanagerCRDName,
 						},
-						StatusFeedbacks: workv1.StatusFeedbackResult{
-							Values: []workv1.FeedbackValue{
-								{
-									Name:  addoncfg.IsOLMManagedFeedbackName,
-									Value: workv1.FieldValue{Type: workv1.String, String: &olmManaged},
-								},
+						Conditions: []metav1.Condition{
+							{
+								Type:               workv1.WorkAvailable,
+								Status:             metav1.ConditionTrue,
+								Reason:             "ResourceAvailable",
+								LastTransitionTime: metav1.Now(),
 							},
+						},
+						StatusFeedbacks: workv1.StatusFeedbackResult{
+							Values: values,
 						},
 					},
 				},
@@ -284,12 +300,17 @@ func TestInstallOfCOOOnSpokeIsNeeded(t *testing.T) {
 		},
 		{
 			name:            "COO already OLM-managed on spoke: don't install our own",
-			objects:         []client.Object{manifestWorkWithCRDFeedback("addon-deploy-0", "True")},
+			objects:         []client.Object{manifestWorkWithCRDFeedback("addon-deploy-0", ptr.To("True"))},
 			expectedInstall: false,
 		},
 		{
 			name:            "COO CRD reported but not OLM-managed: safe to install",
-			objects:         []client.Object{manifestWorkWithCRDFeedback("addon-deploy-0", "False")},
+			objects:         []client.Object{manifestWorkWithCRDFeedback("addon-deploy-0", ptr.To("False"))},
+			expectedInstall: true,
+		},
+		{
+			name:            "COO CRD observed but olm.managed label absent entirely (e.g. after a full COO purge): safe to install",
+			objects:         []client.Object{manifestWorkWithCRDFeedback("addon-deploy-0", nil)},
 			expectedInstall: true,
 		},
 		{

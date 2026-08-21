@@ -3,6 +3,7 @@ package common
 import (
 	"testing"
 
+	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -159,4 +160,99 @@ func TestGetFeedbackValuesForResources(t *testing.T) {
 	val3, ok3 := results[resID3]
 	assert.True(t, ok3)
 	assert.Empty(t, val3)
+}
+
+func TestIsCOOSubscribedOnSpoke(t *testing.T) {
+	crdID := workv1.ResourceIdentifier{
+		Group:    "apiextensions.k8s.io",
+		Resource: crdResourceName,
+		Name:     "alertmanagers.monitoring.rhobs",
+	}
+
+	newWork := func(manifests ...workv1.ManifestCondition) *workv1.ManifestWork {
+		return &workv1.ManifestWork{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "addon-deploy-0",
+				Namespace: testClusterName,
+				Labels:    map[string]string{"open-cluster-management.io/addon-name": testAddonName},
+			},
+			Status: workv1.ManifestWorkStatus{
+				ResourceStatus: workv1.ManifestResourceStatus{Manifests: manifests},
+			},
+		}
+	}
+
+	availableCondition := metav1.Condition{
+		Type:               "Available",
+		Status:             metav1.ConditionTrue,
+		Reason:             "ResourceAvailable",
+		LastTransitionTime: metav1.Now(),
+	}
+
+	tests := []struct {
+		name             string
+		works            []client.Object
+		expectedSub      bool
+		expectedFeedback bool
+	}{
+		{
+			name:             "no manifestwork yet",
+			works:            nil,
+			expectedSub:      false,
+			expectedFeedback: false,
+		},
+		{
+			name: "manifestwork exists but CRD not yet observed",
+			works: []client.Object{
+				newWork(workv1.ManifestCondition{
+					ResourceMeta: workv1.ManifestResourceMeta{Group: "unrelated", Resource: "unrelated", Name: "unrelated"},
+				}),
+			},
+			expectedSub:      false,
+			expectedFeedback: false,
+		},
+		{
+			name: "CRD observed and OLM-managed",
+			works: []client.Object{
+				newWork(workv1.ManifestCondition{
+					ResourceMeta: workv1.ManifestResourceMeta{Group: crdID.Group, Resource: crdID.Resource, Name: crdID.Name},
+					Conditions:   []metav1.Condition{availableCondition},
+					StatusFeedbacks: workv1.StatusFeedbackResult{
+						Values: []workv1.FeedbackValue{
+							{Name: addoncfg.IsOLMManagedFeedbackName, Value: workv1.FieldValue{Type: workv1.String, String: ptr.To("True")}},
+						},
+					},
+				}),
+			},
+			expectedSub:      true,
+			expectedFeedback: true,
+		},
+		{
+			// Regression test: after a full COO CRD purge, the CRD may be re-created (e.g. by
+			// MCOA's own placeholder) without the "olm.managed" label at all, producing zero
+			// feedback values even though the resource itself was fully observed. This must be
+			// treated as a confirmed "not subscribed" rather than "unknown".
+			name: "CRD observed but olm.managed label absent entirely",
+			works: []client.Object{
+				newWork(workv1.ManifestCondition{
+					ResourceMeta: workv1.ManifestResourceMeta{Group: crdID.Group, Resource: crdID.Resource, Name: crdID.Name},
+					Conditions:   []metav1.Condition{availableCondition},
+				}),
+			},
+			expectedSub:      false,
+			expectedFeedback: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			scheme := newTestScheme(t)
+			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(tc.works...).Build()
+
+			sub, hasFeedback, err := IsCOOSubscribedOnSpoke(t.Context(), fakeClient, testClusterName, testAddonName)
+			require.NoError(t, err)
+			assert.Equal(t, tc.expectedSub, sub)
+			assert.Equal(t, tc.expectedFeedback, hasFeedback)
+		})
+	}
 }
