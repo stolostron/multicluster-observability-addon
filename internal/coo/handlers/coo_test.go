@@ -25,8 +25,10 @@ import (
 
 const testClusterName = "spoke-1"
 
-var _ = operatorv1alpha1.AddToScheme(scheme.Scheme)
-var _ = workv1.Install(scheme.Scheme)
+var (
+	_ = operatorv1alpha1.AddToScheme(scheme.Scheme)
+	_ = workv1.Install(scheme.Scheme)
+)
 
 func TestInstallCOO(t *testing.T) {
 	tests := []struct {
@@ -238,10 +240,10 @@ func manifestWorkWithCRDFeedback(name string, olmManaged string) *workv1.Manifes
 // installing COO on the spoke.
 func manifestWorkWithCommittedSubscription(name string) *workv1.ManifestWork {
 	sub := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "operators.coreos.com/v1alpha1",
 			"kind":       "Subscription",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name":      addoncfg.CooSubscriptionName,
 				"namespace": addoncfg.CooSubscriptionNamespace,
 			},
