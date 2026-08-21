@@ -276,12 +276,22 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				}
 
 				// Ensure the ServiceMonitor is configured for HTTP
-				sms := common.FilterResourcesByLabelSelector[*prometheusv1.ServiceMonitor](objects, matchLabels)
+				sms := common.FilterResourcesByLabelSelector[*cooprometheusv1.ServiceMonitor](objects, matchLabels)
 				assert.Len(t, sms, 1)
 				operatorSM := sms[0]
 				assert.NotNil(t, operatorSM.Spec.Endpoints[0].Scheme)
-				assert.Equal(t, prometheusv1.Scheme("http"), *operatorSM.Spec.Endpoints[0].Scheme)
+				assert.Equal(t, cooprometheusv1.Scheme("http"), *operatorSM.Spec.Endpoints[0].Scheme)
 				assert.Nil(t, operatorSM.Spec.Endpoints[0].TLSConfig)
+
+				// Ensure the platform-metrics-collector ServiceMonitor is also configured for HTTP
+				platformSMs := common.FilterResourcesByLabelSelector[*cooprometheusv1.ServiceMonitor](objects, map[string]string{
+					"app.kubernetes.io/component": "platform-metrics-collector",
+				})
+				assert.Len(t, platformSMs, 1)
+				platformSM := platformSMs[0]
+				assert.NotNil(t, platformSM.Spec.Endpoints[0].Scheme)
+				assert.Equal(t, cooprometheusv1.Scheme("http"), *platformSM.Spec.Endpoints[0].Scheme)
+				assert.Nil(t, platformSM.Spec.Endpoints[0].TLSConfig)
 
 				// Ensure the Service is targeting the correct port
 				svcs := common.FilterResourcesByLabelSelector[*corev1.Service](objects, matchLabels)
@@ -832,6 +842,10 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 			for _, obj := range objects {
 				accessor, err := meta.Accessor(obj)
 				assert.NoError(t, err)
+
+				if !tc.IsOCP {
+					assert.NotEqual(t, "monitoring.coreos.com", obj.GetObjectKind().GroupVersionKind().Group, "Should not deploy monitoring.coreos.com resource on non-OCP: %s/%s", obj.GetObjectKind().GroupVersionKind(), accessor.GetName())
+				}
 
 				// if not a global object, check namespace
 				// secrets are possible to install in multiple namespaces (such as openshift-monitoring)
