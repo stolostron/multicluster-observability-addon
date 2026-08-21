@@ -58,7 +58,11 @@ type UIValues struct {
 }
 
 // BuildValues constructs COO Helm values from addon options, including dashboards and feature gates.
-func BuildValues(opts addon.Options, installOfCOOOnTheHubIsNeeded bool, isHubCluster bool, hasCardinalityRules bool) *COOValues {
+// installCOOIsNeeded is the caller's resolved decision on whether MCOA should install and
+// manage its own COO subscription on this cluster (see handlers.InstallOfCOOOnTheHubIsNeeded
+// and handlers.InstallOfCOOOnSpokeIsNeeded), and is only applied when a COO-dependent
+// feature (metrics UI, incident detection, or right-sizing) is actually enabled.
+func BuildValues(opts addon.Options, installCOOIsNeeded bool, isHubCluster bool, hasCardinalityRules bool) *COOValues {
 	var dashboards []DashboardValue
 	var incidentDetectionEnabled bool
 	var rightSizingEnabled bool
@@ -100,11 +104,7 @@ func BuildValues(opts addon.Options, installOfCOOOnTheHubIsNeeded bool, isHubClu
 
 	var installCOO bool
 	if (metricsUI != nil && metricsUI.Enabled) || incidentDetectionEnabled || rightSizingEnabled {
-		if isHubCluster {
-			installCOO = installOfCOOOnTheHubIsNeeded
-		} else {
-			installCOO = true
-		}
+		installCOO = installCOOIsNeeded
 	}
 
 	return &COOValues{
