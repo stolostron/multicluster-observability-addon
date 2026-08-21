@@ -533,31 +533,21 @@ func (o *OptionsBuilder) getAvailableConfigResources(ctx context.Context, mcAddo
 }
 
 // cooIsSubscribed returns true if coo is considered installed, preventing conflicting resources creation.
-// It checks the feedback rules for the monitoringstacks.monitoring.rhobs CRD.
+// It checks the feedback rules for the alertmanagers.monitoring.rhobs CRD.
 func (o *OptionsBuilder) cooIsSubscribed(ctx context.Context, managedCluster *clusterv1.ManagedCluster) (bool, error) {
-	crdID := workv1.ResourceIdentifier{
-		Group:    apiextensionsv1.GroupName,
-		Resource: crdResourceName,
-		Name:     config.AlertmanagerCRDName,
-	}
-
-	feedback, err := common.GetFeedbackValuesForResources(ctx, o.Client, managedCluster.Name, addoncfg.Name, crdID)
+	subscribed, hasFeedback, err := common.IsCOOSubscribedOnSpoke(ctx, o.Client, managedCluster.Name, addoncfg.Name)
 	if err != nil {
-		return false, fmt.Errorf("failed to get feedback values for %s: %w", crdID.Name, err)
+		return false, fmt.Errorf("failed to check if coo is subscribed on the managed cluster: %w", err)
 	}
 
-	crdFeedback, ok := feedback[crdID]
-	if !ok || len(crdFeedback) == 0 {
+	if !hasFeedback {
 		o.Logger.V(2).Info(fmt.Sprintf("%s CRD not found in manifestwork status, considering COO as not subscribed", config.AlertmanagerCRDName))
 		return false, nil
 	}
 
-	olmValues := common.FilterFeedbackValuesByName(crdFeedback, addoncfg.IsOLMManagedFeedbackName)
-	for _, v := range olmValues {
-		if v.Value.String != nil && strings.ToLower(*v.Value.String) == "true" {
-			o.Logger.V(2).Info(fmt.Sprintf("found %s CRD with OLM label, considering COO as subscribed", config.AlertmanagerCRDName))
-			return true, nil
-		}
+	if subscribed {
+		o.Logger.V(2).Info(fmt.Sprintf("found %s CRD with OLM label, considering COO as subscribed", config.AlertmanagerCRDName))
+		return true, nil
 	}
 
 	o.Logger.V(2).Info(fmt.Sprintf("%s CRD missing the OLM label, considering COO as not subscribed", config.AlertmanagerCRDName))

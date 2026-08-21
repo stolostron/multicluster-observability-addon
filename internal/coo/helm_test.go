@@ -26,6 +26,7 @@ import (
 	addonutils "open-cluster-management.io/addon-framework/pkg/utils"
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	workv1 "open-cluster-management.io/api/work/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
@@ -36,6 +37,7 @@ var (
 	_ = addonapiv1beta1.Install(scheme.Scheme)
 	_ = uiplugin.AddToScheme(scheme.Scheme)
 	_ = persesv1.AddToScheme(scheme.Scheme) // Assuming persesv1alpha1 is imported correctly
+	_ = workv1.Install(scheme.Scheme)
 )
 
 func fakeGetValues(ctx context.Context, k8s client.Client) addonfactory.GetValuesFunc {
@@ -61,7 +63,12 @@ func fakeGetValues(ctx context.Context, k8s client.Client) addonfactory.GetValue
 			}
 		}
 
-		installCOO, err := handlers.InstallOfCOOOnTheHubIsNeeded(ctx, k8s, logr.Discard(), isHub)
+		var installCOO bool
+		if isHub {
+			installCOO, err = handlers.InstallOfCOOOnTheHubIsNeeded(ctx, k8s, logr.Discard(), isHub)
+		} else {
+			installCOO, err = handlers.InstallOfCOOOnSpokeIsNeeded(ctx, k8s, logr.Discard(), cluster.Name)
+		}
 		if err != nil {
 			return nil, err
 		}

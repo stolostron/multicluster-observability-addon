@@ -25,6 +25,7 @@ import (
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	fakeaddon "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	workv1 "open-cluster-management.io/api/work/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
@@ -37,6 +38,7 @@ var (
 	_ = addonapiv1beta1.Install(scheme.Scheme)
 	_ = apiextensionsv1.AddToScheme(scheme.Scheme)
 	_ = uiplugin.AddToScheme(scheme.Scheme)
+	_ = workv1.Install(scheme.Scheme)
 )
 
 func newTestGetter(aodc *addonapiv1beta1.AddOnDeploymentConfig) addonutils.AddOnDeploymentConfigGetter {
