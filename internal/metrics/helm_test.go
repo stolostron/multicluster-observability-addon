@@ -1564,6 +1564,14 @@ func newManifestWork(name string, isOLMSubscrided bool) *workv1.ManifestWork {
 							Resource: "customresourcedefinitions",
 							Name:     config.AlertmanagerCRDName,
 						},
+						Conditions: []metav1.Condition{
+							{
+								Type:               workv1.WorkAvailable,
+								Status:             metav1.ConditionTrue,
+								Reason:             "ResourceAvailable",
+								LastTransitionTime: metav1.Now(),
+							},
+						},
 						StatusFeedbacks: workv1.StatusFeedbackResult{
 							Values: []workv1.FeedbackValue{
 								{
