@@ -55,6 +55,8 @@ type MonitoringStackPatchValues struct {
 }
 
 // ThanosOperatorValues holds the Thanos operator deployment values for Helm rendering.
+// Thanos CRs (ThanosStore, etc.) are built programmatically in the thanos package
+// and injected via the wrapper — they do not flow through Helm values.
 type ThanosOperatorValues struct {
 	Enabled   bool   `json:"enabled"`
 	IsHub     bool   `json:"isHub"`

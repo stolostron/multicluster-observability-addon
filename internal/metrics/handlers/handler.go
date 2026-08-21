@@ -231,9 +231,9 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1beta1.Man
 				Name:     fmt.Sprintf("%s.%s", cooprometheusv1alpha1.ScrapeConfigName, cooprometheusv1alpha1.SchemeGroupVersion.Group),
 			}
 
-			feedback, err = common.GetFeedbackValuesForResources(ctx, o.Client, managedCluster.Name, addoncfg.Name, promAgentCRD, scrapeConfigCRD)
-			if err != nil {
-				return ret, fmt.Errorf("failed to get feedback for CRDs: %w", err)
+			feedback, feedbackErr := common.GetFeedbackValuesForResources(ctx, o.Client, managedCluster.Name, addoncfg.Name, promAgentCRD, scrapeConfigCRD)
+			if feedbackErr != nil {
+				return ret, fmt.Errorf("failed to get feedback for CRDs: %w", feedbackErr)
 			}
 
 			type CrdTimestamps struct {
@@ -263,12 +263,19 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1beta1.Man
 			}
 
 			if timestamps.PrometheusAgent != "" && timestamps.ScrapeConfig != "" {
-				jsonBytes, err := json.Marshal(timestamps)
-				if err != nil {
-					return ret, fmt.Errorf("failed to marshal CRD timestamps: %w", err)
+				jsonBytes, marshalErr := json.Marshal(timestamps)
+				if marshalErr != nil {
+					return ret, fmt.Errorf("failed to marshal CRD timestamps: %w", marshalErr)
 				}
 				ret.CRDEstablishedAnnotation = string(jsonBytes)
 			}
+		}
+	}
+
+	// Build Thanos components for hub clusters
+	if ret.IsHub && opts.ThanosOperatorEnabled {
+		if err = o.buildThanosComponents(ctx, &ret); err != nil {
+			return ret, fmt.Errorf("failed to build Thanos components: %w", err)
 		}
 	}
 
@@ -935,4 +942,31 @@ func parseCOOMonitoringStacks(annotations map[string]string) []TargetStack {
 		}
 	}
 	return parsed
+}
+
+// buildThanosComponents prepares hub-only Thanos resources.
+// Thanos CRs (ThanosStore, etc.) are built programmatically in the thanos package
+// and injected via the wrapper; this method only forwards the object storage secret.
+func (o *OptionsBuilder) buildThanosComponents(ctx context.Context, opts *Options) error {
+	objStoreSecret, err := o.getObjectStorageConfig(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get object storage config: %w", err)
+	}
+
+	if err := o.addSecret(ctx, &opts.Secrets, objStoreSecret.Name, objStoreSecret.Namespace, objStoreSecret.Name, ""); err != nil {
+		return fmt.Errorf("failed to add object storage secret: %w", err)
+	}
+
+	return nil
+}
+
+func (o *OptionsBuilder) getObjectStorageConfig(ctx context.Context) (*corev1.Secret, error) {
+	secret := &corev1.Secret{}
+	if err := o.Client.Get(ctx, types.NamespacedName{
+		Name:      config.ObjectStorageSecretName,
+		Namespace: config.HubInstallNamespace,
+	}, secret); err != nil {
+		return nil, fmt.Errorf("failed to get object storage secret %s/%s: %w", config.HubInstallNamespace, config.ObjectStorageSecretName, err)
+	}
+	return secret, nil
 }

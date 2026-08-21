@@ -54,12 +54,12 @@ type MonitoringStackPatch struct {
 	RemoteWriteSpecs []*cooprometheusv1.RemoteWriteSpec
 }
 
-// ThanosOptions holds the Thanos operator CR specs for hub deployment.
+// ThanosOptions holds hub-only Thanos state built during metrics option construction.
+// Thanos CRs are built programmatically in the thanos package and injected via the wrapper.
 type ThanosOptions struct {
 	Receive *thanosv1alpha1.ThanosReceive
 	Query   *thanosv1alpha1.ThanosQuery
 	Compact *thanosv1alpha1.ThanosCompact
-	Store   *thanosv1alpha1.ThanosStore
 	Ruler   *thanosv1alpha1.ThanosRuler
 }
 
