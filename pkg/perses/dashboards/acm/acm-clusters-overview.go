@@ -74,10 +74,14 @@ func BuildACMClustersOverview(project string, datasource string, clusterLabelNam
 				listVar.DisplayName("Value"),
 				listVar.AllowAllValue(true),
 				listVar.AllowMultiple(true),
+				listVar.DefaultValue("All"),
 			),
 		),
 
-		// Cluster variable - third level (depends on acm_label_names and value)
+		// Cluster variable - third level (depends on acm_label_names and value).
+		// Default to Perses "All" so the overview is fleet-wide; without a
+		// default Perses picks the first cluster. Do not set customAllValue
+		// to ".*" — that makes All match everything and breaks Value filtering.
 		dashboard.AddVariable("cluster",
 			listVar.List(
 				labelValuesVar.PrometheusLabelValues("name",
@@ -94,6 +98,7 @@ func BuildACMClustersOverview(project string, datasource string, clusterLabelNam
 				listVar.DisplayName("Cluster"),
 				listVar.AllowAllValue(true),
 				listVar.AllowMultiple(true),
+				listVar.DefaultValue("All"),
 				listVar.Hidden(true),
 			),
 		),
