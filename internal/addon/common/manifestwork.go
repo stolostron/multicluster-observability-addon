@@ -3,11 +3,17 @@ package common
 import (
 	"context"
 	"fmt"
+	"strings"
 
+	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
+	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	workv1 "open-cluster-management.io/api/work/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+const crdResourceName = "customresourcedefinitions"
 
 // GetFeedbackValuesForResources finds all feedback values for a list of specific resources
 // across all ManifestWorks for the addon. It performs a single pass over the ManifestWorks
@@ -74,4 +80,40 @@ func FilterFeedbackValuesByName(values []workv1.FeedbackValue, name string) []wo
 		}
 	}
 	return filtered
+}
+
+// IsCOOSubscribedOnSpoke reports whether the Cluster Observability Operator is already
+// present on the given managed cluster. Since the hub has no direct API access to the
+// spoke, this relies on status feedback the work agent reports back for the
+// alertmanagers.monitoring.rhobs CRD (owned by COO), specifically the "olm.managed" label
+// that OLM stamps on CRDs it installed via a Subscription/CSV.
+//
+// hasFeedback is false when the work agent hasn't reported anything for that CRD yet, e.g.
+// on the very first reconcile for a cluster before any ManifestWork exists or before it has
+// been picked up on the spoke. Callers should treat that as "unknown" rather than "not
+// installed", since the CRD may in fact already exist and simply hasn't been observed yet.
+func IsCOOSubscribedOnSpoke(ctx context.Context, kubeClient client.Client, clusterName, addonName string) (subscribed bool, hasFeedback bool, err error) {
+	crdID := workv1.ResourceIdentifier{
+		Group:    apiextensionsv1.GroupName,
+		Resource: crdResourceName,
+		Name:     mconfig.AlertmanagerCRDName,
+	}
+
+	feedback, err := GetFeedbackValuesForResources(ctx, kubeClient, clusterName, addonName, crdID)
+	if err != nil {
+		return false, false, fmt.Errorf("failed to get feedback values for %s: %w", crdID.Name, err)
+	}
+
+	crdFeedback, ok := feedback[crdID]
+	if !ok || len(crdFeedback) == 0 {
+		return false, false, nil
+	}
+
+	for _, v := range FilterFeedbackValuesByName(crdFeedback, addoncfg.IsOLMManagedFeedbackName) {
+		if v.Value.String != nil && strings.ToLower(*v.Value.String) == "true" {
+			return true, true, nil
+		}
+	}
+
+	return false, true, nil
 }
