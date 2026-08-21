@@ -92,5 +92,15 @@
     - apiGroups: ["operator.open-cluster-management.io"]
       resources: ["multiclusterhubs"]
       verbs: ["get", "list", "watch"]
+    # Hub-only Perses resources managed directly by HubResourceReconciler
+    - apiGroups: [""]
+      resources: ["namespaces"]
+      verbs: ["get", "list", "watch", "create"]
+    - apiGroups: ["perses.dev"]
+      resources: ["persesdashboards", "persesdatasources"]
+      verbs: ["get", "list", "watch", "create", "update", "delete", "patch"]
+    - apiGroups: ["observability.openshift.io"]
+      resources: ["uiplugins"]
+      verbs: ["get", "list", "watch", "create", "update", "delete", "patch"]
 
 
