@@ -196,6 +196,42 @@ func TestParseAggregatorNames(t *testing.T) {
 			input:   []string{},
 			wantLen: 0,
 		},
+		{
+			name:    "case insensitive percentile names",
+			input:   []string{"p90", "p75"},
+			wantLen: 2,
+			wantExpr: map[string]string{
+				"p90": "quantile_over_time(0.9,",
+				"p75": "quantile_over_time(0.75,",
+			},
+		},
+		{
+			name:    "whitespace is trimmed",
+			input:   []string{" Max OverAll ", " P99 "},
+			wantLen: 2,
+			wantExpr: map[string]string{
+				"Max OverAll": "max_over_time(",
+				"P99":         "quantile_over_time(0.99,",
+			},
+		},
+		{
+			name:    "boundary values P0 and P100 are rejected",
+			input:   []string{"P0", "P100"},
+			wantLen: 0,
+		},
+		{
+			name:    "single Max OverAll profile",
+			input:   []string{"Max OverAll"},
+			wantLen: 1,
+			wantExpr: map[string]string{
+				"Max OverAll": "max_over_time(",
+			},
+		},
+		{
+			name:    "duplicate profiles are preserved",
+			input:   []string{"P99", "P99"},
+			wantLen: 2,
+		},
 	}
 
 	for _, tt := range tests {
@@ -209,6 +245,36 @@ func TestParseAggregatorNames(t *testing.T) {
 						"profile %q should produce expression with %s", p.Name, expectedPrefix)
 				}
 			}
+		})
+	}
+}
+
+func TestParseAggregatorNamesPreservesOrder(t *testing.T) {
+	input := []string{"P75", "Max OverAll", "P99", "P50", "P95"}
+	profiles := ParseAggregatorNames(input)
+	require.Len(t, profiles, 5)
+	assert.Equal(t, "P75", profiles[0].Name)
+	assert.Equal(t, "Max OverAll", profiles[1].Name)
+	assert.Equal(t, "P99", profiles[2].Name)
+	assert.Equal(t, "P50", profiles[3].Name)
+	assert.Equal(t, "P95", profiles[4].Name)
+}
+
+func TestBuildPercentileAggregationExpr(t *testing.T) {
+	tests := []struct {
+		name       string
+		percentile float64
+		wantExpr   string
+	}{
+		{"P90", 0.9, `quantile_over_time(0.9, test_metric:5m[1d])`},
+		{"P75", 0.75, `quantile_over_time(0.75, test_metric:5m[1d])`},
+		{"P50", 0.5, `quantile_over_time(0.5, test_metric:5m[1d])`},
+		{"P1", 0.01, `quantile_over_time(0.01, test_metric:5m[1d])`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fn := BuildPercentileAggregationExpr(tt.percentile)
+			assert.Equal(t, tt.wantExpr, fn("test_metric:5m"))
 		})
 	}
 }
@@ -256,6 +322,68 @@ func TestDifferentCpuAndMemoryProfiles(t *testing.T) {
 	memProfiles := ResolveMemoryProfiles(config)
 	assert.Len(t, cpuProfiles, 5, "CPU should have 5 profiles")
 	assert.Len(t, memProfiles, 3, "Memory should have 3 profiles")
+}
+
+func TestProfileRemovalScenario(t *testing.T) {
+	t.Run("shrinking from 5 to 3 profiles drops removed profiles", func(t *testing.T) {
+		expanded := ParseAggregatorNames([]string{"Max OverAll", "P99", "P95", "P90", "P75"})
+		assert.Len(t, expanded, 5)
+
+		shrunk := ParseAggregatorNames([]string{"Max OverAll", "P99", "P90"})
+		assert.Len(t, shrunk, 3)
+
+		shrunkNames := map[string]bool{}
+		for _, p := range shrunk {
+			shrunkNames[p.Name] = true
+		}
+		assert.True(t, shrunkNames["Max OverAll"])
+		assert.True(t, shrunkNames["P99"])
+		assert.True(t, shrunkNames["P90"])
+		assert.False(t, shrunkNames["P95"], "P95 should be absent after removal")
+		assert.False(t, shrunkNames["P75"], "P75 should be absent after removal")
+	})
+}
+
+func TestBackwardCompatConfigWithoutAggregators(t *testing.T) {
+	data := map[string]string{
+		"prometheusRuleConfig": `{"namespaceFilterCriteria":{"exclusionCriteria":["openshift.*"]},"recommendationPercentage":110}`,
+	}
+	result, err := ParseConfigMapData(data)
+	require.NoError(t, err)
+
+	cpuProfiles := ResolveCpuProfiles(result.PrometheusRuleConfig)
+	memProfiles := ResolveMemoryProfiles(result.PrometheusRuleConfig)
+	assert.Len(t, cpuProfiles, len(RecommendationProfiles), "should fall back to defaults when aggregators absent")
+	assert.Len(t, memProfiles, len(RecommendationProfiles), "should fall back to defaults when aggregators absent")
+}
+
+func TestDefaultConfigDataSerializationRoundTrip(t *testing.T) {
+	configData := GetDefaultNamespaceConfigData()
+	result, err := ParseConfigMapData(configData)
+	require.NoError(t, err)
+
+	assert.Equal(t, DefaultCpuAggregator, result.PrometheusRuleConfig.CpuAggregator)
+	assert.Equal(t, DefaultMemoryAggregator, result.PrometheusRuleConfig.MemoryAggregator)
+	assert.Equal(t, DefaultRecommendationPercentage, result.PrometheusRuleConfig.RecommendationPercentage)
+}
+
+func TestYAMLConfigMapWithAggregators(t *testing.T) {
+	data := map[string]string{
+		"prometheusRuleConfig": "namespaceFilterCriteria:\n  exclusionCriteria:\n  - openshift.*\nrecommendationPercentage: 110\ncpuAggregator:\n- Max OverAll\n- P99\n- P90\nmemoryAggregator:\n- Max OverAll\n- P99\n",
+	}
+	result, err := ParseConfigMapData(data)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"Max OverAll", "P99", "P90"}, result.PrometheusRuleConfig.CpuAggregator)
+	assert.Equal(t, []string{"Max OverAll", "P99"}, result.PrometheusRuleConfig.MemoryAggregator)
+}
+
+func TestNilInput(t *testing.T) {
+	profiles := ParseAggregatorNames(nil)
+	assert.Empty(t, profiles)
+
+	config := RSPrometheusRuleConfig{}
+	assert.Len(t, ResolveCpuProfiles(config), len(RecommendationProfiles))
+	assert.Len(t, ResolveMemoryProfiles(config), len(RecommendationProfiles))
 }
 
 func TestParseConfigMapData(t *testing.T) {
