@@ -109,23 +109,63 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 			UserMetrics:     false,
 			IsOCP:           true,
 			Expects: func(t *testing.T, objects []client.Object) {
-				assert.Empty(t, objects)
+				// 8 endpoint-monitoring-operator resources + 4 pre-delete cleanup hook resources
+				assert.Len(t, objects, 12)
+				deployments := common.FilterResourcesByLabelSelector[*appsv1.Deployment](objects, nil)
+				assert.Len(t, deployments, 1)
+				assert.Equal(t, "endpoint-monitoring-operator", deployments[0].GetName())
+
+				var hubAlertmanagerURL, enablePlatformAlertForwarding, enableUWLAlertForwarding string
+				for _, arg := range deployments[0].Spec.Template.Spec.Containers[0].Args {
+					if strings.HasPrefix(arg, "--hub-alertmanager-url=") {
+						hubAlertmanagerURL = arg
+					}
+					if strings.HasPrefix(arg, "--enable-platform-alert-forwarding=") {
+						enablePlatformAlertForwarding = arg
+					}
+					if strings.HasPrefix(arg, "--enable-uwl-alert-forwarding=") {
+						enableUWLAlertForwarding = arg
+					}
+				}
+				assert.Empty(t, hubAlertmanagerURL)
+				assert.Equal(t, "--enable-platform-alert-forwarding=false", enablePlatformAlertForwarding)
+				assert.Equal(t, "--enable-uwl-alert-forwarding=false", enableUWLAlertForwarding)
+
+				sa := common.FilterResourcesByLabelSelector[*corev1.ServiceAccount](objects, nil)
+				assert.Len(t, sa, 2)
+
+				cr := common.FilterResourcesByLabelSelector[*rbacv1.ClusterRole](objects, nil)
+				assert.Len(t, cr, 3)
+
+				crb := common.FilterResourcesByLabelSelector[*rbacv1.ClusterRoleBinding](objects, nil)
+				assert.Len(t, crb, 3)
+
+				svc := common.FilterResourcesByLabelSelector[*corev1.Service](objects, nil)
+				assert.Len(t, svc, 1)
+				assert.Equal(t, "endpoint-monitoring-operator-metrics", svc[0].GetName())
+
+				sm := common.FilterResourcesByLabelSelector[*prometheusv1.ServiceMonitor](objects, nil)
+				assert.Len(t, sm, 1)
+				assert.Equal(t, "endpoint-monitoring-operator-metrics", sm[0].GetName())
+
+				job := common.FilterResourcesByLabelSelector[*batchv1.Job](objects, nil)
+				assert.Len(t, job, 1)
+				assert.Equal(t, "observability-monitoring-cleanup", job[0].GetName())
 			},
 		},
 		"platform metrics enabled but agent missing": {
 			// This test case simulates the ClusterManagementAddOn deletion state where platform metrics
 			// are enabled but its child PrometheusAgent custom resource is already garbage collected.
 			// It ensures that the manifests render successfully (no errors) and return the 4 pre-delete
-			// cleanup resources and the 3 alertmanager MTLS/accessor secrets.
+			// cleanup resources, the 8 endpoint-monitoring-operator resources, and the 3 alertmanager MTLS/accessor secrets.
 			PlatformMetrics: true,
 			UserMetrics:     false,
 			IsOCP:           true,
 			AgentMissing:    true,
 			Expects: func(t *testing.T, objects []client.Object) {
-				assert.Len(t, objects, 7)
+				assert.Len(t, objects, 15)
 				sa := common.FilterResourcesByLabelSelector[*corev1.ServiceAccount](objects, nil)
-				assert.Len(t, sa, 1)
-				assert.Equal(t, "observability-pre-delete-sa", sa[0].GetName())
+				assert.Len(t, sa, 2)
 				job := common.FilterResourcesByLabelSelector[*batchv1.Job](objects, nil)
 				assert.Len(t, job, 1)
 				assert.Equal(t, "observability-monitoring-cleanup", job[0].GetName())
