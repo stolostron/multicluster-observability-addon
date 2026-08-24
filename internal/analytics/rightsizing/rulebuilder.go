@@ -2,6 +2,8 @@ package rightsizing
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
 
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -116,10 +118,75 @@ func BuildP95AggregationExpr(metric5m string) string {
 	return fmt.Sprintf(`quantile_over_time(0.95, %s[1d])`, metric5m)
 }
 
+// BuildPercentileAggregationExpr builds a quantile_over_time expression for an arbitrary percentile.
+func BuildPercentileAggregationExpr(percentile float64) func(string) string {
+	return func(metric5m string) string {
+		return fmt.Sprintf(`quantile_over_time(%s, %s[1d])`,
+			strconv.FormatFloat(percentile, 'f', -1, 64), metric5m)
+	}
+}
+
 // Build1dAggregationExpr is an alias for Build1dMaxAggregationExpr (backward compat).
 var Build1dAggregationExpr = Build1dMaxAggregationExpr
 
 // BuildRecommendationExpr builds a max-based recommendation expression (backward compat).
 func BuildRecommendationExpr(usageMetric string, recommendationPercentage int) string {
 	return BuildProfiledRecommendationExpr(usageMetric, recommendationPercentage, RecommendationProfiles[0])
+}
+
+// knownProfiles maps well-known profile names to their aggregation functions.
+var knownProfiles = map[string]func(string) string{
+	"Max OverAll": Build1dMaxAggregationExpr,
+	"P99":         BuildP99AggregationExpr,
+	"P95":         BuildP95AggregationExpr,
+}
+
+// ParseAggregatorNames converts a list of profile name strings (e.g. "Max OverAll", "P99", "P90")
+// into ProfileConfig slices. Well-known names use pre-built functions; "Pxx" names are parsed
+// dynamically. Unrecognized names are skipped.
+func ParseAggregatorNames(names []string) []ProfileConfig {
+	var profiles []ProfileConfig
+	for _, name := range names {
+		name = strings.TrimSpace(name)
+		if fn, ok := knownProfiles[name]; ok {
+			profiles = append(profiles, ProfileConfig{Name: name, AggExpr: fn})
+			continue
+		}
+		if p, ok := parsePercentileName(name); ok {
+			profiles = append(profiles, ProfileConfig{
+				Name:    name,
+				AggExpr: BuildPercentileAggregationExpr(p),
+			})
+		}
+	}
+	return profiles
+}
+
+// parsePercentileName extracts the percentile value from names like "P90", "P75", "P50".
+func parsePercentileName(name string) (float64, bool) {
+	upper := strings.ToUpper(strings.TrimSpace(name))
+	if !strings.HasPrefix(upper, "P") {
+		return 0, false
+	}
+	val, err := strconv.ParseFloat(upper[1:], 64)
+	if err != nil || val <= 0 || val >= 100 {
+		return 0, false
+	}
+	return val / 100, true
+}
+
+// ResolveCpuProfiles returns the CPU ProfileConfig list from config, falling back to defaults.
+func ResolveCpuProfiles(config RSPrometheusRuleConfig) []ProfileConfig {
+	if len(config.CpuAggregator) > 0 {
+		return ParseAggregatorNames(config.CpuAggregator)
+	}
+	return RecommendationProfiles
+}
+
+// ResolveMemoryProfiles returns the memory ProfileConfig list from config, falling back to defaults.
+func ResolveMemoryProfiles(config RSPrometheusRuleConfig) []ProfileConfig {
+	if len(config.MemoryAggregator) > 0 {
+		return ParseAggregatorNames(config.MemoryAggregator)
+	}
+	return RecommendationProfiles
 }
