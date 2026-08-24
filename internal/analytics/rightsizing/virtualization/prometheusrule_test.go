@@ -3,6 +3,7 @@ package virtualization
 import (
 	"testing"
 
+	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"github.com/stolostron/multicluster-observability-addon/internal/analytics/rightsizing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -200,4 +201,192 @@ func TestCustomCpuAggregatorVirtualization(t *testing.T) {
 	assert.True(t, cpuProfiles["P90"])
 	assert.True(t, cpuProfiles["P75"])
 	assert.Len(t, memProfiles, 3, "Memory should keep default 3 profiles")
+}
+
+// TestDifferentCpuAndMemoryAggregatorsVirtualization verifies that VM rules generate
+// different counts for CPU and memory when their aggregator lists differ.
+func TestDifferentCpuAndMemoryAggregatorsVirtualization(t *testing.T) {
+	config := rightsizing.GetDefaultRSPrometheusRuleConfig()
+	config.CpuAggregator = []string{"Max OverAll", "P99", "P95", "P90", "P75"}
+	config.MemoryAggregator = []string{"Max OverAll", "P99", "P95"}
+
+	configData := rightsizing.RSConfigMapData{PrometheusRuleConfig: config}
+	rule, err := GeneratePrometheusRule(configData)
+	require.NoError(t, err)
+
+	cpuRecommendationCount := 0
+	memRecommendationCount := 0
+	for _, group := range rule.Spec.Groups {
+		for _, r := range group.Rules {
+			if r.Record == "acm_rs_vm:namespace:cpu_recommendation" || r.Record == "acm_rs_vm:cluster:cpu_recommendation" {
+				cpuRecommendationCount++
+			}
+			if r.Record == "acm_rs_vm:namespace:memory_recommendation" || r.Record == "acm_rs_vm:cluster:memory_recommendation" {
+				memRecommendationCount++
+			}
+		}
+	}
+
+	assert.Equal(t, 10, cpuRecommendationCount, "5 CPU profiles x 2 levels (namespace+cluster)")
+	assert.Equal(t, 6, memRecommendationCount, "3 memory profiles x 2 levels (namespace+cluster)")
+}
+
+// TestProfileRemovalVirtualization verifies that shrinking the profile list
+// removes the old profiles from generated VM rules.
+func TestProfileRemovalVirtualization(t *testing.T) {
+	expandedConfig := rightsizing.GetDefaultRSPrometheusRuleConfig()
+	expandedConfig.CpuAggregator = []string{"Max OverAll", "P99", "P95", "P90", "P75"}
+	expandedConfig.MemoryAggregator = []string{"Max OverAll", "P99", "P95"}
+
+	shrunkConfig := rightsizing.GetDefaultRSPrometheusRuleConfig()
+	shrunkConfig.CpuAggregator = []string{"Max OverAll", "P99", "P90"}
+	shrunkConfig.MemoryAggregator = []string{"Max OverAll", "P99"}
+
+	expandedRule, err := GeneratePrometheusRule(rightsizing.RSConfigMapData{PrometheusRuleConfig: expandedConfig})
+	require.NoError(t, err)
+
+	shrunkRule, err := GeneratePrometheusRule(rightsizing.RSConfigMapData{PrometheusRuleConfig: shrunkConfig})
+	require.NoError(t, err)
+
+	expandedCpu := collectProfiles(expandedRule, "acm_rs_vm:namespace:cpu_recommendation")
+	shrunkCpu := collectProfiles(shrunkRule, "acm_rs_vm:namespace:cpu_recommendation")
+	expandedMem := collectProfiles(expandedRule, "acm_rs_vm:namespace:memory_recommendation")
+	shrunkMem := collectProfiles(shrunkRule, "acm_rs_vm:namespace:memory_recommendation")
+
+	assert.Len(t, expandedCpu, 5)
+	assert.Len(t, shrunkCpu, 3)
+	assert.NotContains(t, shrunkCpu, "P95", "P95 should be removed from VM CPU rules")
+	assert.NotContains(t, shrunkCpu, "P75", "P75 should be removed from VM CPU rules")
+
+	assert.Len(t, expandedMem, 3)
+	assert.Len(t, shrunkMem, 2)
+	assert.NotContains(t, shrunkMem, "P95", "P95 should be removed from VM memory rules")
+}
+
+// TestSingleProfileVirtualization verifies VM rule generation with a single profile per resource.
+func TestSingleProfileVirtualization(t *testing.T) {
+	config := rightsizing.GetDefaultRSPrometheusRuleConfig()
+	config.CpuAggregator = []string{"Max OverAll"}
+	config.MemoryAggregator = []string{"P99"}
+
+	configData := rightsizing.RSConfigMapData{PrometheusRuleConfig: config}
+	rule, err := GeneratePrometheusRule(configData)
+	require.NoError(t, err)
+
+	cpuProfiles := collectProfiles(rule, "acm_rs_vm:namespace:cpu_recommendation")
+	memProfiles := collectProfiles(rule, "acm_rs_vm:namespace:memory_recommendation")
+
+	assert.Equal(t, []string{"Max OverAll"}, cpuProfiles)
+	assert.Equal(t, []string{"P99"}, memProfiles)
+}
+
+// TestDynamicPercentilePromQLVirtualization verifies that P90 and P75 produce correct
+// quantile_over_time expressions in VM rules.
+func TestDynamicPercentilePromQLVirtualization(t *testing.T) {
+	config := rightsizing.GetDefaultRSPrometheusRuleConfig()
+	config.CpuAggregator = []string{"P90", "P75"}
+
+	configData := rightsizing.RSConfigMapData{PrometheusRuleConfig: config}
+	rule, err := GeneratePrometheusRule(configData)
+	require.NoError(t, err)
+
+	expectedExprs := map[string]string{
+		"P90": "quantile_over_time(0.9,",
+		"P75": "quantile_over_time(0.75,",
+	}
+
+	for _, group := range rule.Spec.Groups {
+		for _, r := range group.Rules {
+			if r.Record == "acm_rs_vm:namespace:cpu_usage" {
+				profile := r.Labels["profile"]
+				if expected, ok := expectedExprs[profile]; ok {
+					assert.Contains(t, r.Expr.String(), expected,
+						"VM profile %q should produce %s expression", profile, expected)
+				}
+			}
+		}
+	}
+}
+
+// TestCustomRecommendationPercentageVirtualization verifies that a custom recommendation
+// percentage is applied alongside custom profiles in VM rules.
+func TestCustomRecommendationPercentageVirtualization(t *testing.T) {
+	config := rightsizing.GetDefaultRSPrometheusRuleConfig()
+	config.RecommendationPercentage = 125
+	config.CpuAggregator = []string{"P90"}
+	config.MemoryAggregator = []string{"P75"}
+
+	configData := rightsizing.RSConfigMapData{PrometheusRuleConfig: config}
+	rule, err := GeneratePrometheusRule(configData)
+	require.NoError(t, err)
+
+	for _, group := range rule.Spec.Groups {
+		for _, r := range group.Rules {
+			if r.Record == "acm_rs_vm:namespace:cpu_recommendation" {
+				assert.Contains(t, r.Expr.String(), "125/100")
+				assert.Contains(t, r.Expr.String(), "quantile_over_time(0.9,")
+				assert.Equal(t, "P90", r.Labels["profile"])
+			}
+			if r.Record == "acm_rs_vm:namespace:memory_recommendation" {
+				assert.Contains(t, r.Expr.String(), "125/100")
+				assert.Contains(t, r.Expr.String(), "quantile_over_time(0.75,")
+				assert.Equal(t, "P75", r.Labels["profile"])
+			}
+		}
+	}
+}
+
+// TestVMRuleCountConsistency verifies that each profile generates
+// exactly 3 CPU rules and 3 memory rules at each level (namespace and cluster).
+func TestVMRuleCountConsistency(t *testing.T) {
+	config := rightsizing.GetDefaultRSPrometheusRuleConfig()
+	config.CpuAggregator = []string{"Max OverAll", "P99"}
+	config.MemoryAggregator = []string{"Max OverAll", "P99", "P95"}
+
+	configData := rightsizing.RSConfigMapData{PrometheusRuleConfig: config}
+	rule, err := GeneratePrometheusRule(configData)
+	require.NoError(t, err)
+
+	cpuRecords := map[string]int{}
+	memRecords := map[string]int{}
+	for _, group := range rule.Spec.Groups {
+		for _, r := range group.Rules {
+			if r.Labels != nil {
+				switch {
+				case containsPrefix(r.Record, "acm_rs_vm:namespace:cpu_") || containsPrefix(r.Record, "acm_rs_vm:cluster:cpu_"):
+					cpuRecords[r.Labels["profile"]]++
+				case containsPrefix(r.Record, "acm_rs_vm:namespace:memory_") || containsPrefix(r.Record, "acm_rs_vm:cluster:memory_"):
+					memRecords[r.Labels["profile"]]++
+				}
+			}
+		}
+	}
+
+	for profile, count := range cpuRecords {
+		assert.Equal(t, 6, count, "VM CPU profile %q should have 6 rules (3 namespace + 3 cluster)", profile)
+	}
+	for profile, count := range memRecords {
+		assert.Equal(t, 6, count, "VM Memory profile %q should have 6 rules (3 namespace + 3 cluster)", profile)
+	}
+}
+
+func collectProfiles(rule monitoringv1.PrometheusRule, recordName string) []string {
+	seen := map[string]bool{}
+	var profiles []string
+	for _, group := range rule.Spec.Groups {
+		for _, r := range group.Rules {
+			if r.Record == recordName {
+				p := r.Labels["profile"]
+				if !seen[p] {
+					seen[p] = true
+					profiles = append(profiles, p)
+				}
+			}
+		}
+	}
+	return profiles
+}
+
+func containsPrefix(s, prefix string) bool {
+	return len(s) >= len(prefix) && s[:len(prefix)] == prefix
 }
