@@ -1,4 +1,4 @@
-{{- if and (or .Values.platformEnabled .Values.userWorkloadsEnabled) (not .Values.deployNonOCPStack) }}
+{{- if not .Values.deployNonOCPStack }}
 apiVersion: v1
 kind: Service
 metadata:
