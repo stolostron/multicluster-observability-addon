@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
+	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
 )
 
 var (
@@ -53,7 +54,11 @@ func buildSecrets(resources Options) ([]ResourceValue, error) {
 
 func buildClusterLogForwarderSpec(opts Options) (*loggingv1.ClusterLogForwarderSpec, error) {
 	clf := opts.ClusterLogForwarder
-	clf.Spec.ManagementState = loggingv1.ManagementStateManaged
+	overrides := loggingv1.ClusterLogForwarderSpec{
+		ManagementState: loggingv1.ManagementStateManaged,
+	}
+	clf.Spec.ManagementState = overrides.ManagementState
+	common.SetSSAManagedFieldsAnnotation(clf, common.DeriveSSAManagedFields(&loggingv1.ClusterLogForwarder{Spec: overrides}))
 
 	// Validate Platform Logs enabled
 	var (

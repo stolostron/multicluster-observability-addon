@@ -7,6 +7,7 @@ import (
 
 	cooprometheusv1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1"
 	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
+	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	corev1 "k8s.io/api/core/v1"
@@ -152,11 +153,13 @@ func (p *PrometheusAgentSSA) Build() *cooprometheusv1alpha1.PrometheusAgent {
 	}
 	p.desiredAgent.Labels[addoncfg.BackupLabelKey] = addoncfg.BackupLabelValue
 
+	// Keep existing annotations in the apply so SSA does not drop user-set keys such as
+	// the placement-ref annotation. The managed-fields annotation is overlaid last.
+	p.desiredAgent.Annotations = maps.Clone(p.ExistingAgent.Annotations)
+	if p.desiredAgent.Annotations == nil {
+		p.desiredAgent.Annotations = map[string]string{}
+	}
 	if len(p.Annotations) > 0 {
-		p.desiredAgent.Annotations = maps.Clone(p.ExistingAgent.Annotations)
-		if p.desiredAgent.Annotations == nil {
-			p.desiredAgent.Annotations = map[string]string{}
-		}
 		maps.Copy(p.desiredAgent.Annotations, p.Annotations)
 	}
 
@@ -164,6 +167,8 @@ func (p *PrometheusAgentSSA) Build() *cooprometheusv1alpha1.PrometheusAgent {
 	p.setWatchedResources()
 	p.setScrapeClasses()
 	p.setKubeRBACProxySidecar()
+
+	common.SetSSAManagedFieldsAnnotationFromObject(p.desiredAgent)
 
 	return p.desiredAgent
 }

@@ -143,28 +143,13 @@ func (d DefaultStackResources) reconcileScrapeConfigs(ctx context.Context, mcoUI
 
 		desiredSC := existingSC.DeepCopy()
 		desiredSC.ManagedFields = nil // required for patching with ssa
-
-		if desiredSC.Labels == nil {
-			desiredSC.Labels = map[string]string{}
-		}
-		desiredSC.Labels[addoncfg.BackupLabelKey] = addoncfg.BackupLabelValue
-
-		if !isUWL {
-			// Enforce empty values, they are set when generating the manifests for a given managedCluster
-			desiredSC.Spec.ScrapeClassName = ptr.To("not-configurable")
-			desiredSC.Spec.Scheme = ptr.To(cooprometheusv1.Scheme("HTTPS"))
-			desiredSC.Spec.StaticConfigs = []cooprometheusv1alpha1.StaticConfig{
-				{
-					Targets: []cooprometheusv1alpha1.Target{
-						"not-configurable",
-					},
-				},
-			}
-		}
+		applyScrapeConfigSSAInvariants(desiredSC, isUWL)
+		common.SetSSAManagedFieldsAnnotation(desiredSC, common.DeriveSSAManagedFields(scrapeConfigSSAIntent(isUWL)))
 
 		// SSA the objects rendered
 		if !equality.Semantic.DeepDerivative(desiredSC.Spec, existingSC.Spec) ||
-			!equality.Semantic.DeepDerivative(desiredSC.Labels, existingSC.Labels) {
+			!equality.Semantic.DeepDerivative(desiredSC.Labels, existingSC.Labels) ||
+			common.SSAManagedFieldsAnnotation(desiredSC) != common.SSAManagedFieldsAnnotation(&existingSC) {
 			if err = common.ServerSideApply(ctx, d.Client, desiredSC, nil); err != nil { // object is controlled by MCO, no owner
 				return nil, fmt.Errorf("failed to patch with with server-side apply: %w", err)
 			}
@@ -364,7 +349,8 @@ func (d DefaultStackResources) reconcileAgents(ctx context.Context, isUWL bool) 
 		}
 		promSSA := promBuilder.Build()
 
-		if !equality.Semantic.DeepDerivative(promSSA.Spec, agent.Spec) {
+		if !equality.Semantic.DeepDerivative(promSSA.Spec, agent.Spec) ||
+			common.SSAManagedFieldsAnnotation(promSSA) != common.SSAManagedFieldsAnnotation(agent) {
 			if err := common.ServerSideApply(ctx, d.Client, promSSA, d.CMAO); err != nil {
 				return nil, fmt.Errorf("failed to server-side apply for %s/%s: %w", promSSA.Namespace, promSSA.Name, err)
 			}
@@ -545,6 +531,37 @@ func (d DefaultStackResources) generatePlacementRefs(placementAnnotations string
 
 func makeAgentName(app, placement string) string {
 	return fmt.Sprintf("%s-%s-%s", addoncfg.DefaultStackPrefix, app, placement)
+}
+
+// scrapeConfigSSAIntent returns a sparse object containing only the fields MCOA
+// enforces on ScrapeConfigs. DeriveSSAManagedFields walks this object so the
+// annotation stays in sync with applyScrapeConfigSSAInvariants.
+func scrapeConfigSSAIntent(isUWL bool) *cooprometheusv1alpha1.ScrapeConfig {
+	intent := &cooprometheusv1alpha1.ScrapeConfig{}
+	applyScrapeConfigSSAInvariants(intent, isUWL)
+	return intent
+}
+
+func applyScrapeConfigSSAInvariants(sc *cooprometheusv1alpha1.ScrapeConfig, isUWL bool) {
+	if sc.Labels == nil {
+		sc.Labels = map[string]string{}
+	}
+	sc.Labels[addoncfg.BackupLabelKey] = addoncfg.BackupLabelValue
+
+	if isUWL {
+		return
+	}
+
+	// Enforce empty values, they are set when generating the manifests for a given managedCluster
+	sc.Spec.ScrapeClassName = ptr.To("not-configurable")
+	sc.Spec.Scheme = ptr.To(cooprometheusv1.Scheme("HTTPS"))
+	sc.Spec.StaticConfigs = []cooprometheusv1alpha1.StaticConfig{
+		{
+			Targets: []cooprometheusv1alpha1.Target{
+				"not-configurable",
+			},
+		},
+	}
 }
 
 func hasControllerUID(ownerRefs []metav1.OwnerReference, uid types.UID) bool {
