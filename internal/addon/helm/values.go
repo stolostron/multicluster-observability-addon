@@ -110,11 +110,6 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, getter addonutils.Add
 }
 
 func getMonitoringValues(ctx context.Context, k8s client.Client, logger logr.Logger, cluster *clusterv1.ManagedCluster, mcAddon *addonapiv1beta1.ManagedClusterAddOn, opts addon.Options) (*mmanifests.MetricsValues, error) {
-	if !opts.Platform.Metrics.CollectionEnabled && !opts.UserWorkloads.Metrics.CollectionEnabled {
-		logger.V(2).Info("both platform and userWorkloads metrics are disabled, ignoring cluster")
-		return nil, nil
-	}
-
 	optsBuilder := mhandlers.OptionsBuilder{
 		Client: k8s,
 		Logger: logger,
