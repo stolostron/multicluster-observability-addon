@@ -38,6 +38,12 @@ type RSLabelFilter struct {
 	ExclusionCriteria []string `json:"exclusionCriteria,omitempty"`
 }
 
+// DefaultCpuAggregator is the default set of CPU aggregation profiles.
+var DefaultCpuAggregator = []string{"Max OverAll", "P99", "P95"}
+
+// DefaultMemoryAggregator is the default set of memory aggregation profiles.
+var DefaultMemoryAggregator = []string{"Max OverAll", "P99", "P95"}
+
 // RSPrometheusRuleConfig represents the Prometheus rule configuration for right-sizing
 type RSPrometheusRuleConfig struct {
 	NamespaceFilterCriteria struct {
@@ -46,6 +52,8 @@ type RSPrometheusRuleConfig struct {
 	} `json:"namespaceFilterCriteria"`
 	LabelFilterCriteria      []RSLabelFilter `json:"labelFilterCriteria"`
 	RecommendationPercentage int             `json:"recommendationPercentage"`
+	CpuAggregator            []string        `json:"cpuAggregator,omitempty"`
+	MemoryAggregator         []string        `json:"memoryAggregator,omitempty"`
 }
 
 // RSConfigMapData represents the configmap data structure for right-sizing
