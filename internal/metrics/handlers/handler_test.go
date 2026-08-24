@@ -327,10 +327,13 @@ func TestBuildOptions(t *testing.T) {
 		"no metrics collection enabled": {
 			resources: createResources,
 			expects: func(t *testing.T, opts Options, err error) {
-				assert.Empty(t, opts.ClusterName)
-				assert.Empty(t, opts.ClusterID)
+				require.NoError(t, err)
+				assert.Equal(t, spokeName, opts.ClusterName)
+				assert.Equal(t, clusterID, opts.ClusterID)
 				assert.Nil(t, opts.Platform.PrometheusAgent)
 				assert.Nil(t, opts.UserWorkloads.PrometheusAgent)
+				assert.False(t, opts.IsPlatformEnabled())
+				assert.False(t, opts.IsUserWorkloadsEnabled())
 			},
 		},
 		"missing cluster ID": {

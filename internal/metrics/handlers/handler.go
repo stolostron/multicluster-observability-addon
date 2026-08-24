@@ -59,10 +59,6 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1beta1.Man
 		UserWorkloadAlertsEnabled: opts.UserWorkloads.Metrics.AlertsEnabled,
 	}
 
-	if !opts.Platform.Metrics.CollectionEnabled && !opts.UserWorkloads.Metrics.CollectionEnabled {
-		return ret, nil
-	}
-
 	ret.ClusterName = managedCluster.Name
 	ret.ClusterID = common.GetManagedClusterID(managedCluster)
 	ret.HubEndpoint = opts.Platform.Metrics.HubEndpoint.Host // Use the same host as the metrics for alerts forwarding
@@ -494,6 +490,9 @@ func (o *OptionsBuilder) addConfigMap(ctx context.Context, configMaps *[]*corev1
 
 func (o *OptionsBuilder) getAvailableConfigResources(ctx context.Context, mcAddon *addonapiv1beta1.ManagedClusterAddOn) ([]client.Object, error) {
 	ret := []client.Object{}
+	if mcAddon == nil {
+		return ret, nil
+	}
 
 	for _, cfg := range mcAddon.Status.ConfigReferences {
 		var obj client.Object
