@@ -172,3 +172,32 @@ func TestProfileAggregationExpressions(t *testing.T) {
 		}
 	}
 }
+
+// TestCustomCpuAggregatorVirtualization verifies that custom CPU aggregator profiles
+// generate additional VM-level PrometheusRules.
+func TestCustomCpuAggregatorVirtualization(t *testing.T) {
+	config := rightsizing.GetDefaultRSPrometheusRuleConfig()
+	config.CpuAggregator = []string{"Max OverAll", "P99", "P95", "P90", "P75"}
+
+	configData := rightsizing.RSConfigMapData{PrometheusRuleConfig: config}
+	rule, err := GeneratePrometheusRule(configData)
+	require.NoError(t, err)
+
+	cpuProfiles := map[string]bool{}
+	memProfiles := map[string]bool{}
+	for _, group := range rule.Spec.Groups {
+		for _, r := range group.Rules {
+			if r.Record == "acm_rs_vm:namespace:cpu_recommendation" {
+				cpuProfiles[r.Labels["profile"]] = true
+			}
+			if r.Record == "acm_rs_vm:namespace:memory_recommendation" {
+				memProfiles[r.Labels["profile"]] = true
+			}
+		}
+	}
+
+	assert.Len(t, cpuProfiles, 5, "CPU should have 5 profiles including P90 and P75")
+	assert.True(t, cpuProfiles["P90"])
+	assert.True(t, cpuProfiles["P75"])
+	assert.Len(t, memProfiles, 3, "Memory should keep default 3 profiles")
+}

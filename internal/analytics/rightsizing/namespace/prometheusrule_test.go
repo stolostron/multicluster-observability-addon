@@ -174,3 +174,59 @@ func TestProfileAggregationExpressions(t *testing.T) {
 		}
 	}
 }
+
+// TestCustomCpuAggregatorProfiles verifies that custom CPU aggregator profiles from ConfigMap
+// generate the correct PrometheusRules with additional percentiles.
+func TestCustomCpuAggregatorProfiles(t *testing.T) {
+	config := rightsizing.GetDefaultRSPrometheusRuleConfig()
+	config.CpuAggregator = []string{"Max OverAll", "P99", "P95", "P90", "P75"}
+
+	configData := rightsizing.RSConfigMapData{PrometheusRuleConfig: config}
+	rule, err := GeneratePrometheusRule(configData)
+	require.NoError(t, err)
+
+	cpuProfiles := map[string]bool{}
+	memProfiles := map[string]bool{}
+	for _, group := range rule.Spec.Groups {
+		for _, r := range group.Rules {
+			if r.Record == "acm_rs:namespace:cpu_recommendation" {
+				cpuProfiles[r.Labels["profile"]] = true
+			}
+			if r.Record == "acm_rs:namespace:memory_recommendation" {
+				memProfiles[r.Labels["profile"]] = true
+			}
+		}
+	}
+
+	assert.Len(t, cpuProfiles, 5, "CPU should have 5 profiles")
+	assert.True(t, cpuProfiles["P90"], "CPU should have P90 profile")
+	assert.True(t, cpuProfiles["P75"], "CPU should have P75 profile")
+	assert.Len(t, memProfiles, 3, "Memory should keep default 3 profiles")
+}
+
+// TestDifferentCpuAndMemoryAggregators verifies that CPU and memory can have different profile sets.
+func TestDifferentCpuAndMemoryAggregators(t *testing.T) {
+	config := rightsizing.GetDefaultRSPrometheusRuleConfig()
+	config.CpuAggregator = []string{"Max OverAll", "P99", "P95", "P90", "P75"}
+	config.MemoryAggregator = []string{"Max OverAll", "P99", "P95"}
+
+	configData := rightsizing.RSConfigMapData{PrometheusRuleConfig: config}
+	rule, err := GeneratePrometheusRule(configData)
+	require.NoError(t, err)
+
+	cpuRecommendationCount := 0
+	memRecommendationCount := 0
+	for _, group := range rule.Spec.Groups {
+		for _, r := range group.Rules {
+			if r.Record == "acm_rs:namespace:cpu_recommendation" || r.Record == "acm_rs:cluster:cpu_recommendation" {
+				cpuRecommendationCount++
+			}
+			if r.Record == "acm_rs:namespace:memory_recommendation" || r.Record == "acm_rs:cluster:memory_recommendation" {
+				memRecommendationCount++
+			}
+		}
+	}
+
+	assert.Equal(t, 10, cpuRecommendationCount, "5 CPU profiles x 2 levels (namespace+cluster)")
+	assert.Equal(t, 6, memRecommendationCount, "3 memory profiles x 2 levels (namespace+cluster)")
+}
