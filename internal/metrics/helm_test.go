@@ -115,10 +115,19 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				assert.Len(t, deployments, 1)
 				assert.Equal(t, "endpoint-monitoring-operator", deployments[0].GetName())
 
-				var hubAlertmanagerURL, enablePlatformAlertForwarding, enableUWLAlertForwarding string
+				var hubAlertmanagerURL, enablePlatformAlertForwarding, enableUWLAlertForwarding, hubAlertmanagerCA, hubAlertmanagerCert, hubAlertmanagerAccessor string
 				for _, arg := range deployments[0].Spec.Template.Spec.Containers[0].Args {
 					if strings.HasPrefix(arg, "--hub-alertmanager-url=") {
 						hubAlertmanagerURL = arg
+					}
+					if strings.HasPrefix(arg, "--hub-alertmanager-ca-secret=") {
+						hubAlertmanagerCA = arg
+					}
+					if strings.HasPrefix(arg, "--hub-alertmanager-cert-secret=") {
+						hubAlertmanagerCert = arg
+					}
+					if strings.HasPrefix(arg, "--hub-alertmanager-accessor-secret=") {
+						hubAlertmanagerAccessor = arg
 					}
 					if strings.HasPrefix(arg, "--enable-platform-alert-forwarding=") {
 						enablePlatformAlertForwarding = arg
@@ -128,6 +137,9 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 					}
 				}
 				assert.Empty(t, hubAlertmanagerURL)
+				assert.Equal(t, "--hub-alertmanager-cert-secret=hub-mtls-cert-97e513873da14ae489e", hubAlertmanagerCert)
+				assert.Equal(t, "--hub-alertmanager-accessor-secret=observability-alertmanager-accessor-97e513873da14ae489e", hubAlertmanagerAccessor)
+				assert.Equal(t, "--hub-alertmanager-ca-secret=hub-mtls-ca-97e513873da14ae489e", hubAlertmanagerCA)
 				assert.Equal(t, "--enable-platform-alert-forwarding=false", enablePlatformAlertForwarding)
 				assert.Equal(t, "--enable-uwl-alert-forwarding=false", enableUWLAlertForwarding)
 
@@ -244,7 +256,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				// Comment explaining why each flag is needed and when:
 				// 1. --cluster-name and --cluster-id: must always be present to uniquely identify the cluster.
 				// 2. --hub-alertmanager-url: point to the Hub's Alertmanager. Rendered only if alert forwarding is enabled.
-				// 3. --hub-alertmanager-ca-secret, --hub-alertmanager-cert-secret, and --hub-alertmanager-accessor-secret are always rendered when hubEndpoint is set.
+				// 3. --hub-alertmanager-ca-secret, --hub-alertmanager-cert-secret, and --hub-alertmanager-accessor-secret are always rendered for endpoint-monitoring-operator.
 				// 4. --enable-platform-alert-forwarding and --enable-uwl-alert-forwarding: toggle actual alert forwarding.
 				assert.Equal(t, "--cluster-name=cluster-1", clusterNameArg)
 				assert.Equal(t, "--cluster-id="+testClusterID, clusterIDArg)
