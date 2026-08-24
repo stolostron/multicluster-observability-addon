@@ -332,6 +332,8 @@ func Test_Logging_Unmanaged_CLF(t *testing.T) {
 			require.Equal(t, "latest-version", obj.Spec.Channel)
 		case *loggingv1.ClusterLogForwarder:
 			require.Equal(t, "true", obj.GetAnnotations()["observability.openshift.io/tech-preview-otlp-output"])
+			require.Equal(t, ".spec.managementState", obj.GetAnnotations()[addoncfg.SSAManagedFieldsAnnotationKey])
+			require.Equal(t, loggingv1.ManagementStateManaged, obj.Spec.ManagementState)
 			require.NotNil(t, obj.Spec.Outputs[0].Loki.Authentication.Token.Secret)
 			require.NotNil(t, obj.Spec.Outputs[1].Cloudwatch.Authentication.AWSAccessKey)
 			require.Equal(t, "static-authentication", obj.Spec.Outputs[0].Loki.Authentication.Token.Secret.Name)

@@ -58,6 +58,10 @@ const (
 	BackupLabelKey                = "cluster.open-cluster-management.io/backup"
 	BackupLabelValue              = ""
 	PlacementAnnotationKey        = "observability.open-cluster-management.io/placements"
+	// SSAManagedFieldsAnnotationKey is set on resources where MCOA enforces fields
+	// (hub server-side apply, or spoke manifests). The value is a newline-separated
+	// list of JSON paths for the fields MCOA will override if changed by the user.
+	SSAManagedFieldsAnnotationKey = "observability.open-cluster-management.io/ssa-managed-fields"
 
 	ClusterClaimClusterID        = "id.k8s.io"
 	ManagedClusterLabelClusterID = "clusterID"

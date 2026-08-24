@@ -44,19 +44,20 @@ func BuildValues(opts Options) (*LoggingValues, error) {
 	}
 	values.Secrets = secrets
 
+	clfSpec, err := buildClusterLogForwarderSpec(opts)
+	if err != nil {
+		return nil, err
+	}
+
 	// CLO uses annotations to signal feature flags so users must be able to set
-	// them
+	// them. Marshal after buildClusterLogForwarderSpec so the SSA managed-fields
+	// annotation is included.
 	clfAnnotations := opts.ClusterLogForwarder.GetAnnotations()
 	clfAnnotationsJson, err := json.Marshal(clfAnnotations)
 	if err != nil {
 		return nil, err
 	}
 	values.CLFAnnotations = string(clfAnnotationsJson)
-
-	clfSpec, err := buildClusterLogForwarderSpec(opts)
-	if err != nil {
-		return nil, err
-	}
 
 	b, err := json.Marshal(clfSpec)
 	if err != nil {

@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
+	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -195,4 +196,6 @@ func Test_BuildCLFSpec(t *testing.T) {
 	require.NotNil(t, clfSpec.Outputs[1].Cloudwatch.Authentication.AWSAccessKey)
 	require.Equal(t, "app-logs-secret", clfSpec.Outputs[0].Loki.Authentication.Token.Secret.Name)
 	require.Equal(t, "cluster-logs-secret", clfSpec.Outputs[1].Cloudwatch.Authentication.AWSAccessKey.KeySecret.SecretName)
+	require.Equal(t, loggingv1.ManagementStateManaged, clfSpec.ManagementState)
+	require.Equal(t, ".spec.managementState", clf.Annotations[addoncfg.SSAManagedFieldsAnnotationKey])
 }
