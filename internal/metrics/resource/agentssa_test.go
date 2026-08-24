@@ -154,6 +154,29 @@ func TestPrometheusAgentSSA(t *testing.T) {
 				assert.Len(t, agent.Spec.ScrapeClasses[index].MetricRelabelings, 1)
 			},
 		},
+		{
+			Name: "ssa managed-fields annotation is set for platform agents",
+			ExistingAgent: &cooprometheusv1alpha1.PrometheusAgent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test",
+					Namespace: "test",
+					Annotations: map[string]string{
+						addoncfg.PlacementAnnotationKey: "ns/global",
+					},
+				},
+				Spec: cooprometheusv1alpha1.PrometheusAgentSpec{},
+			},
+			Expect: func(t *testing.T, agent *cooprometheusv1alpha1.PrometheusAgent) {
+				got := agent.Annotations[addoncfg.SSAManagedFieldsAnnotationKey]
+				assert.NotEmpty(t, got)
+				assert.Contains(t, got, ".spec.image")
+				assert.Contains(t, got, ".spec.serviceAccountName")
+				assert.Contains(t, got, ".spec.containers")
+				assert.Contains(t, got, ".spec.remoteWrite")
+				assert.NotContains(t, got, ".spec.scrapeConfigNamespaceSelector")
+				assert.Equal(t, "ns/global", agent.Annotations[addoncfg.PlacementAnnotationKey], "existing annotations must be preserved")
+			},
+		},
 	}
 
 	for _, tc := range testCases {
@@ -169,4 +192,24 @@ func TestPrometheusAgentSSA(t *testing.T) {
 			tc.Expect(t, result)
 		})
 	}
+}
+
+func TestPrometheusAgentSSAManagedFieldsAnnotationUWL(t *testing.T) {
+	builder := resource.PrometheusAgentSSA{
+		ExistingAgent: &cooprometheusv1alpha1.PrometheusAgent{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test",
+				Namespace: "test",
+			},
+		},
+		IsUwl:               true,
+		RemoteWriteEndpoint: "https://example.com/write",
+		KubeRBACProxyImage:  "kube-rbac-proxy:latest",
+	}
+
+	result := builder.Build()
+	got := result.Annotations[addoncfg.SSAManagedFieldsAnnotationKey]
+	assert.NotEmpty(t, got)
+	assert.Contains(t, got, ".spec.image")
+	assert.NotContains(t, got, ".spec.scrapeConfigNamespaceSelector")
 }

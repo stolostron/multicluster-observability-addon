@@ -3,6 +3,7 @@ package resource
 import (
 	"context"
 	"net/url"
+	"strings"
 	"testing"
 
 	hyperv1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
@@ -217,6 +218,10 @@ func TestReconcileAgents(t *testing.T) {
 	assert.Nil(t, foundAgent.Spec.ScrapeConfigNamespaceSelector)
 	// Check placement annotation
 	assert.Contains(t, foundAgent.Annotations[addoncfg.PlacementAnnotationKey], "global")
+	// Check SSA managed-fields annotation is derived from the apply payload
+	assert.Contains(t, foundAgent.Annotations[addoncfg.SSAManagedFieldsAnnotationKey], ".spec.image")
+	assert.Contains(t, foundAgent.Annotations[addoncfg.SSAManagedFieldsAnnotationKey], ".spec.serviceAccountName")
+	assert.Contains(t, foundAgent.Annotations[addoncfg.SSAManagedFieldsAnnotationKey], ".spec.containers")
 
 	// Subsequent reconcile does not create additional agents
 	configs2, err := d.reconcileAgents(context.Background(), false)
@@ -246,6 +251,8 @@ func TestReconcileAgents(t *testing.T) {
 	// Check uwl specific values: appName and ScrapeConfigNamespaceSelector
 	assert.Equal(t, config.UserWorkloadMetricsCollectorApp, foundAgent.Spec.ServiceAccountName)
 	assert.Equal(t, &metav1.LabelSelector{}, foundAgent.Spec.ScrapeConfigNamespaceSelector)
+	assert.Contains(t, foundAgent.Annotations[addoncfg.SSAManagedFieldsAnnotationKey], ".spec.image")
+	assert.NotContains(t, foundAgent.Annotations[addoncfg.SSAManagedFieldsAnnotationKey], ".spec.scrapeConfigNamespaceSelector")
 }
 
 func TestReconcileAgentsUserDefined(t *testing.T) {
@@ -305,6 +312,8 @@ func TestReconcileAgentsUserDefined(t *testing.T) {
 		assert.True(t, foundAgent.Spec.ArbitraryFSAccessThroughSMs.Deny)
 		assert.NotEmpty(t, foundAgent.Spec.Containers, "kube-rbac-proxy sidecar should be injected")
 		assert.Equal(t, kubeRbacImage, foundAgent.Spec.Containers[0].Image)
+		assert.Contains(t, foundAgent.Annotations[addoncfg.SSAManagedFieldsAnnotationKey], ".spec.image")
+		assert.Equal(t, testGlobalNamespace+"/global", foundAgent.Annotations[addoncfg.PlacementAnnotationKey])
 	})
 
 	t.Run("user agent with multiple placement annotations", func(t *testing.T) {
@@ -913,6 +922,9 @@ func TestReconcileScrapeConfigs(t *testing.T) {
 				assert.Equal(t, "not-configurable", *objs[0].Spec.ScrapeClassName)
 				assert.Contains(t, objs[0].Labels, addoncfg.BackupLabelKey, "backup label key should be present")
 				assert.Equal(t, addoncfg.BackupLabelValue, objs[0].Labels[addoncfg.BackupLabelKey])
+				assert.Contains(t, objs[0].Annotations[addoncfg.SSAManagedFieldsAnnotationKey], ".spec.scrapeClass")
+				assert.Contains(t, objs[0].Annotations[addoncfg.SSAManagedFieldsAnnotationKey], ".spec.staticConfigs")
+				assert.Contains(t, objs[0].Annotations[addoncfg.SSAManagedFieldsAnnotationKey], ".spec.scheme")
 			},
 		},
 		{
@@ -944,6 +956,8 @@ func TestReconcileScrapeConfigs(t *testing.T) {
 				assert.Equal(t, "custom", *objs[0].Spec.ScrapeClassName)
 				assert.Contains(t, objs[0].Labels, addoncfg.BackupLabelKey, "backup label key should be present")
 				assert.Equal(t, addoncfg.BackupLabelValue, objs[0].Labels[addoncfg.BackupLabelKey])
+				assert.Contains(t, objs[0].Annotations[addoncfg.SSAManagedFieldsAnnotationKey], ".metadata.labels")
+				assert.NotContains(t, objs[0].Annotations[addoncfg.SSAManagedFieldsAnnotationKey], ".spec.scrapeClass")
 			},
 		},
 		{
@@ -1669,4 +1683,38 @@ func ensureGVKIsSet(scheme *runtime.Scheme) interceptor.Funcs {
 			})
 		},
 	}
+}
+
+func TestSSAManagedFields(t *testing.T) {
+	backupLabel := ".metadata.labels['" + addoncfg.BackupLabelKey + "']"
+
+	t.Run("prometheus agent annotation is derived from the SSA object", func(t *testing.T) {
+		builder := PrometheusAgentSSA{
+			ExistingAgent: &cooprometheusv1alpha1.PrometheusAgent{
+				ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "test"},
+			},
+			RemoteWriteEndpoint: "https://example.com/write",
+			KubeRBACProxyImage:  "kube-rbac-proxy:latest",
+			PrometheusImage:     "prometheus:version",
+		}
+		agent := builder.Build()
+		got := strings.Split(agent.Annotations[addoncfg.SSAManagedFieldsAnnotationKey], "\n")
+		assert.Contains(t, got, backupLabel)
+		assert.Contains(t, got, ".spec.image")
+		assert.Contains(t, got, ".spec.containers")
+		assert.NotContains(t, got, ".spec.scrapeConfigNamespaceSelector")
+	})
+
+	t.Run("platform scrape config annotation is derived from invariants", func(t *testing.T) {
+		assert.Equal(t, []string{
+			backupLabel,
+			".spec.scheme",
+			".spec.scrapeClass",
+			".spec.staticConfigs",
+		}, common.DeriveSSAManagedFields(scrapeConfigSSAIntent(false)))
+	})
+
+	t.Run("uwl scrape config annotation is derived from invariants", func(t *testing.T) {
+		assert.Equal(t, []string{backupLabel}, common.DeriveSSAManagedFields(scrapeConfigSSAIntent(true)))
+	})
 }
