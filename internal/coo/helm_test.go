@@ -65,7 +65,7 @@ func fakeGetValues(ctx context.Context, k8s client.Client) addonfactory.GetValue
 
 		var installCOO bool
 		if isHub {
-			installCOO, err = handlers.InstallOfCOOOnTheHubIsNeeded(ctx, k8s, logr.Discard(), isHub)
+			installCOO, err = handlers.InstallOfCOOOnTheHubIsNeeded(ctx, k8s, logr.Discard())
 		} else {
 			installCOO, err = handlers.InstallOfCOOOnSpokeIsNeeded(ctx, k8s, logr.Discard(), cluster.Name)
 		}

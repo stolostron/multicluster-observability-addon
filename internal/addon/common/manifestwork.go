@@ -92,8 +92,8 @@ func GetManifestCondition(ctx context.Context, kubeClient client.Client, cluster
 		return nil, err
 	}
 
-	for _, work := range workList.Items {
-		for i, manifestStatus := range work.Status.ResourceStatus.Manifests {
+	for w := range workList.Items {
+		for i, manifestStatus := range workList.Items[w].Status.ResourceStatus.Manifests {
 			currentID := workv1.ResourceIdentifier{
 				Group:     manifestStatus.ResourceMeta.Group,
 				Resource:  manifestStatus.ResourceMeta.Resource,
@@ -101,7 +101,7 @@ func GetManifestCondition(ctx context.Context, kubeClient client.Client, cluster
 				Namespace: manifestStatus.ResourceMeta.Namespace,
 			}
 			if currentID == resourceID {
-				return &work.Status.ResourceStatus.Manifests[i], nil
+				return &workList.Items[w].Status.ResourceStatus.Manifests[i], nil
 			}
 		}
 	}
