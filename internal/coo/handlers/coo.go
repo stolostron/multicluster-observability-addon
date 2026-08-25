@@ -18,13 +18,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
-func InstallOfCOOOnTheHubIsNeeded(ctx context.Context, k8s client.Client, logger logr.Logger, isHub bool) (bool, error) {
-	// Currently, the InstallCOO option is only relevant for hub clusters
-	// since we don't have k8s clients for the spokes
-	if !isHub {
-		return false, nil
-	}
-
+// InstallOfCOOOnTheHubIsNeeded decides whether MCOA should install and manage its own
+// Cluster Observability Operator subscription on the hub. Callers must only invoke this for
+// hub clusters, since it's currently only relevant there (we don't have k8s clients for the
+// spokes; see InstallOfCOOOnSpokeIsNeeded for that case).
+func InstallOfCOOOnTheHubIsNeeded(ctx context.Context, k8s client.Client, logger logr.Logger) (bool, error) {
 	cooSub := &operatorv1alpha1.Subscription{}
 	key := client.ObjectKey{Name: addoncfg.CooSubscriptionName, Namespace: addoncfg.CooSubscriptionNamespace}
 	if err := k8s.Get(ctx, key, cooSub, &client.GetOptions{}); err != nil && !k8serrors.IsNotFound(err) {
@@ -146,11 +144,9 @@ func manifestToUnstructured(m workv1.Manifest) (*unstructured.Unstructured, erro
 
 const thanosRulerCustomRulesName = "thanos-ruler-custom-rules"
 
-func HasCardinalityRules(ctx context.Context, k8s client.Client, isHub bool) bool {
-	if !isHub {
-		return false
-	}
-
+// HasCardinalityRules reports whether the cardinality recording rules ConfigMap is present.
+// Callers must only invoke this for hub clusters, since the ConfigMap only exists there.
+func HasCardinalityRules(ctx context.Context, k8s client.Client) bool {
 	cm, err := common.GetConfigMap(ctx, k8s, addoncfg.InstallNamespace, thanosRulerCustomRulesName)
 	if err != nil {
 		return false
