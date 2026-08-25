@@ -2,7 +2,6 @@ package thanos
 
 import (
 	"context"
-	"fmt"
 	"maps"
 
 	"github.com/go-logr/logr"
@@ -14,8 +13,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	addonutils "open-cluster-management.io/addon-framework/pkg/utils"
-	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -27,23 +24,12 @@ var mcoaLabels = map[string]string{
 
 type ObjectBuilder struct {
 	Client client.Client
-	Getter addonutils.AddOnDeploymentConfigGetter
 	Logger logr.Logger
 }
 
-func (b *ObjectBuilder) Build(ctx context.Context, cluster *clusterv1.ManagedCluster, mcAddon *addonapiv1beta1.ManagedClusterAddOn) ([]runtime.Object, error) {
+func (b *ObjectBuilder) Build(ctx context.Context, cluster *clusterv1.ManagedCluster, opts addon.Options) ([]runtime.Object, error) {
 	if !common.IsHubCluster(cluster) {
 		return nil, nil
-	}
-
-	aodc, err := common.GetAddOnDeploymentConfig(ctx, b.Getter, mcAddon)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get AddOnDeploymentConfig: %w", err)
-	}
-
-	opts, err := addon.BuildOptions(aodc)
-	if err != nil {
-		return nil, fmt.Errorf("failed to build addon options: %w", err)
 	}
 
 	if !opts.ThanosOperatorEnabled {
