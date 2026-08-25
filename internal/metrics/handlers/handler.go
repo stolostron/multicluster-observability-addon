@@ -541,16 +541,16 @@ func (o *OptionsBuilder) cooIsSubscribed(ctx context.Context, managedCluster *cl
 	}
 
 	if !hasFeedback {
-		o.Logger.V(2).Info(fmt.Sprintf("%s CRD not found in manifestwork status, considering COO as not subscribed", config.AlertmanagerCRDName))
+		o.Logger.V(2).Info("CRD not found in manifestwork status, considering COO as not subscribed", "crd", config.AlertmanagerCRDName)
 		return false, nil
 	}
 
 	if subscribed {
-		o.Logger.V(2).Info(fmt.Sprintf("found %s CRD with OLM label, considering COO as subscribed", config.AlertmanagerCRDName))
+		o.Logger.V(2).Info("found CRD with OLM label, considering COO as subscribed", "crd", config.AlertmanagerCRDName)
 		return true, nil
 	}
 
-	o.Logger.V(2).Info(fmt.Sprintf("%s CRD missing the OLM label, considering COO as not subscribed", config.AlertmanagerCRDName))
+	o.Logger.V(2).Info("CRD missing the OLM label, considering COO as not subscribed", "crd", config.AlertmanagerCRDName)
 	return false, nil
 }
 
