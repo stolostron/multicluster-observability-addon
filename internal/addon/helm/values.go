@@ -8,7 +8,6 @@ import (
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
 	rshandlers "github.com/stolostron/multicluster-observability-addon/internal/analytics/rightsizing/handlers"
-	chandlers "github.com/stolostron/multicluster-observability-addon/internal/coo/handlers"
 	cmanifests "github.com/stolostron/multicluster-observability-addon/internal/coo/manifests"
 	lhandlers "github.com/stolostron/multicluster-observability-addon/internal/logging/handlers"
 	lmanifests "github.com/stolostron/multicluster-observability-addon/internal/logging/manifests"
@@ -80,7 +79,7 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, getter addonutils.Add
 			return nil, fmt.Errorf("failed to get tracing values: %w", err)
 		}
 
-		userValues.COO, err = getCOOValues(ctx, k8s, logger, cluster, opts)
+		userValues.COO, err = getCOOValues(cluster, opts)
 		if err != nil {
 			return nil, err
 		}
@@ -166,19 +165,12 @@ func getTracingValues(ctx context.Context, k8s client.Client, cluster *clusterv1
 	return &tracing, nil
 }
 
-func getCOOValues(ctx context.Context, k8s client.Client, logger logr.Logger, cluster *clusterv1.ManagedCluster, opts addon.Options) (*cmanifests.COOValues, error) {
+func getCOOValues(cluster *clusterv1.ManagedCluster, opts addon.Options) (*cmanifests.COOValues, error) {
 	if !common.IsOpenShiftVendor(cluster) {
 		return nil, nil
 	}
 
-	installCOO, err := chandlers.InstallOfCOOOnTheHubIsNeeded(ctx, k8s, logger, common.IsHubCluster(cluster))
-	if err != nil {
-		return nil, err
-	}
-
-	hasCardinalityRules := chandlers.HasCardinalityRules(ctx, k8s, common.IsHubCluster(cluster))
-
-	return cmanifests.BuildValues(opts, installCOO, common.IsHubCluster(cluster), hasCardinalityRules), nil
+	return cmanifests.BuildValues(opts, common.IsHubCluster(cluster)), nil
 }
 
 func getRightSizingValues(ctx context.Context, k8s client.Client, logger logr.Logger, cluster *clusterv1.ManagedCluster, opts addon.Options) (*rshandlers.RightSizingValues, error) {

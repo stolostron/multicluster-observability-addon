@@ -83,20 +83,19 @@ func (r *DefaultHubStackReconciler) Reconcile(ctx context.Context, _ ctrl.Reques
 		}
 	}
 
-	cmao := &addonv1beta1.ClusterManagementAddOn{}
-	if err := r.Get(ctx, types.NamespacedName{Name: addoncfg.Name}, cmao); err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to get ClusterManagementAddOn: %w", err)
-	}
-
 	hasCardinalityRules := chandlers.HasCardinalityRules(ctx, r.Client, true)
+
+	installCOO, err := chandlers.InstallOfCOOOnTheHubIsNeeded(ctx, r.Client, r.Log, true)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to check COO installation: %w", err)
+	}
 
 	hubReconciler := &cooresource.HubResourceReconciler{
 		Client: r.Client,
-		CMAO:   cmao,
 		Logger: r.Log,
 		Opts:   opts,
 	}
-	if err := hubReconciler.Reconcile(ctx, hasCardinalityRules); err != nil {
+	if err := hubReconciler.Reconcile(ctx, hasCardinalityRules, installCOO); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to reconcile COO hub resources: %w", err)
 	}
 

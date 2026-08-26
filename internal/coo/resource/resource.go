@@ -8,6 +8,8 @@ import (
 	"strings"
 
 	"github.com/go-logr/logr"
+	operatorsv1 "github.com/operator-framework/api/pkg/operators/v1"
+	operatorsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	persesv1 "github.com/perses/perses-operator/api/v1alpha1"
 	"github.com/perses/perses/go-sdk/dashboard"
 	persesmodelv1 "github.com/perses/perses/pkg/model/api/v1"
@@ -31,7 +33,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -62,12 +63,11 @@ var thanosVariableMetricRenames = strings.NewReplacer(
 // independent of the ManifestWork lifecycle.
 type HubResourceReconciler struct {
 	Client client.Client
-	CMAO   *addonv1beta1.ClusterManagementAddOn
 	Logger logr.Logger
 	Opts   addon.Options
 }
 
-func (r *HubResourceReconciler) Reconcile(ctx context.Context, hasCardinalityRules bool) error {
+func (r *HubResourceReconciler) Reconcile(ctx context.Context, hasCardinalityRules, installCOO bool) error {
 	metricsUI := cmanifests.EnableUI(r.Opts.Platform.Metrics, true)
 	hasDashboards := metricsUI != nil && metricsUI.Enabled
 
@@ -80,6 +80,11 @@ func (r *HubResourceReconciler) Reconcile(ctx context.Context, hasCardinalityRul
 				r.Opts.Platform.AnalyticsOptions.RightSizing.VirtualizationEnabled))
 
 	persesEnabled := hasDashboards || hasAnalyticsDashboards
+	cooNeeded := persesEnabled && installCOO
+
+	if err := r.reconcileCOOOperator(ctx, cooNeeded); err != nil {
+		return fmt.Errorf("failed to reconcile COO operator: %w", err)
+	}
 
 	if hasAnalyticsDashboards {
 		if err := r.ensureAnalyticsNamespace(ctx); err != nil {
@@ -97,6 +102,102 @@ func (r *HubResourceReconciler) Reconcile(ctx context.Context, hasCardinalityRul
 
 	if err := r.reconcileUIPlugin(ctx, persesEnabled, incidentDetectionEnabled); err != nil {
 		return fmt.Errorf("failed to reconcile UIPlugin: %w", err)
+	}
+
+	if !hasAnalyticsDashboards {
+		if err := r.deleteIfManaged(ctx, &corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{Name: addoncfg.AnalyticsNamespace},
+		}); err != nil {
+			return fmt.Errorf("failed to delete analytics namespace: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// --- COO Operator ---
+
+func (r *HubResourceReconciler) reconcileCOOOperator(ctx context.Context, installCOO bool) error {
+	if !installCOO {
+		for _, obj := range []client.Object{
+			&operatorsv1alpha1.Subscription{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      addoncfg.CooSubscriptionName,
+					Namespace: addoncfg.CooSubscriptionNamespace,
+				},
+			},
+			&operatorsv1.OperatorGroup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      addoncfg.CooSubscriptionNamespace,
+					Namespace: addoncfg.CooSubscriptionNamespace,
+				},
+			},
+			&corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{Name: addoncfg.CooSubscriptionNamespace},
+			},
+		} {
+			if err := r.deleteIfManaged(ctx, obj); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
+	ns := &corev1.Namespace{
+		TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "Namespace"},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: addoncfg.CooSubscriptionNamespace,
+			Labels: map[string]string{
+				addoncfg.ManagedByK8sLabelKey:     ManagedByLabelValue,
+				"openshift.io/cluster-monitoring": "true",
+			},
+		},
+	}
+	if err := r.applyResource(ctx, ns); err != nil {
+		return fmt.Errorf("failed to apply COO namespace: %w", err)
+	}
+
+	og := &operatorsv1.OperatorGroup{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "operators.coreos.com/v1",
+			Kind:       "OperatorGroup",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      addoncfg.CooSubscriptionNamespace,
+			Namespace: addoncfg.CooSubscriptionNamespace,
+			Labels:    managedResourceLabels,
+		},
+		Spec: operatorsv1.OperatorGroupSpec{
+			UpgradeStrategy: operatorsv1.UpgradeStrategyDefault,
+		},
+	}
+	if err := r.applyResource(ctx, og); err != nil {
+		return fmt.Errorf("failed to apply COO OperatorGroup: %w", err)
+	}
+
+	sub := &operatorsv1alpha1.Subscription{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "operators.coreos.com/v1alpha1",
+			Kind:       "Subscription",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      addoncfg.CooSubscriptionName,
+			Namespace: addoncfg.CooSubscriptionNamespace,
+			Labels: map[string]string{
+				addoncfg.ManagedByK8sLabelKey: ManagedByLabelValue,
+				"release":                     "multicluster-observability-addon",
+			},
+		},
+		Spec: &operatorsv1alpha1.SubscriptionSpec{
+			Channel:                addoncfg.CooSubscriptionChannel,
+			InstallPlanApproval:    operatorsv1alpha1.ApprovalAutomatic,
+			Package:                addoncfg.CooSubscriptionName,
+			CatalogSource:          "redhat-operators",
+			CatalogSourceNamespace: "openshift-marketplace",
+		},
+	}
+	if err := r.applyResource(ctx, sub); err != nil {
+		return fmt.Errorf("failed to apply COO Subscription: %w", err)
 	}
 
 	return nil
@@ -292,9 +393,8 @@ func buildPlatformPrometheusDatasource(namespace string) *persesv1.PersesDatasou
 
 func (r *HubResourceReconciler) applyResource(ctx context.Context, obj client.Object) error {
 	if err := common.ServerSideApply(ctx, r.Client, obj, nil); err != nil {
-		return fmt.Errorf("failed to apply %s %s/%s: %w",
-			obj.GetObjectKind().GroupVersionKind().Kind,
-			obj.GetNamespace(), obj.GetName(), err)
+		return fmt.Errorf("failed to apply %T %s/%s: %w",
+			obj, obj.GetNamespace(), obj.GetName(), err)
 	}
 	return nil
 }
@@ -305,20 +405,18 @@ func (r *HubResourceReconciler) deleteIfManaged(ctx context.Context, obj client.
 		if errors.IsNotFound(err) {
 			return nil
 		}
-		return fmt.Errorf("failed to get %s %s/%s: %w",
-			obj.GetObjectKind().GroupVersionKind().Kind,
-			obj.GetNamespace(), obj.GetName(), err)
+		return fmt.Errorf("failed to get %T %s/%s: %w",
+			obj, obj.GetNamespace(), obj.GetName(), err)
 	}
 	if existing.GetLabels()[addoncfg.ManagedByK8sLabelKey] != ManagedByLabelValue {
 		return nil
 	}
 	if err := r.Client.Delete(ctx, existing); err != nil && !errors.IsNotFound(err) {
-		return fmt.Errorf("failed to delete %s %s/%s: %w",
-			obj.GetObjectKind().GroupVersionKind().Kind,
-			obj.GetNamespace(), obj.GetName(), err)
+		return fmt.Errorf("failed to delete %T %s/%s: %w",
+			obj, obj.GetNamespace(), obj.GetName(), err)
 	}
 	r.Logger.Info("deleted managed resource",
-		"kind", obj.GetObjectKind().GroupVersionKind().Kind,
+		"kind", fmt.Sprintf("%T", obj),
 		"namespace", obj.GetNamespace(), "name", obj.GetName())
 	return nil
 }

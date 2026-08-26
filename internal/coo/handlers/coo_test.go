@@ -65,7 +65,7 @@ func TestInstallCOO(t *testing.T) {
 				},
 			},
 			expectedUIPluginInstall: true,
-			expectedCOOInstall:      true,
+			expectedCOOInstall:      false, // hub COO installation handled by HubResourceReconciler
 		},
 		{
 			name:                    "Hub cluster with no features enabled",
@@ -125,7 +125,7 @@ func TestInstallCOO(t *testing.T) {
 				},
 			},
 			expectedUIPluginInstall: true,
-			expectedCOOInstall:      true,
+			expectedCOOInstall:      false, // hub COO installation handled by HubResourceReconciler
 		},
 		{
 			name:  "Hub cluster with wrong version of COO installed and incident detection enabled",
@@ -178,8 +178,8 @@ func TestInstallCOO(t *testing.T) {
 				k8sClientBuilder = k8sClientBuilder.WithObjects(tc.subscription)
 			}
 
-			result, err := InstallOfCOOOnTheHubIsNeeded(context.Background(), k8sClientBuilder.Build(), logr.Discard(), tc.isHub)
-			cooValues := manifests.BuildValues(tc.options, result, tc.isHub, false)
+			_, err := InstallOfCOOOnTheHubIsNeeded(context.Background(), k8sClientBuilder.Build(), logr.Discard(), tc.isHub)
+			cooValues := manifests.BuildValues(tc.options, tc.isHub)
 
 			if tc.expectedErrMsg != "" {
 				assert.EqualError(t, err, tc.expectedErrMsg)

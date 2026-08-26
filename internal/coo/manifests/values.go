@@ -21,7 +21,7 @@ type UIValues struct {
 // Hub-only Perses resources (dashboards, datasources, UIPlugin) are now
 // reconciled directly by HubResourceReconciler; this function only computes
 // the flags that remaining Helm templates (COO subscription) still need.
-func BuildValues(opts addon.Options, installOfCOOOnTheHubIsNeeded bool, isHubCluster bool, _ bool) *COOValues {
+func BuildValues(opts addon.Options, isHubCluster bool) *COOValues {
 	var incidentDetectionEnabled bool
 	var rightSizingEnabled bool
 	metricsUI := EnableUI(opts.Platform.Metrics, isHubCluster)
@@ -44,7 +44,9 @@ func BuildValues(opts addon.Options, installOfCOOOnTheHubIsNeeded bool, isHubClu
 	var installCOO bool
 	if hasDashboards || incidentDetectionEnabled || rightSizingEnabled {
 		if isHubCluster {
-			installCOO = installOfCOOOnTheHubIsNeeded
+			// Hub COO installation is handled directly by HubResourceReconciler,
+			// not via ManifestWork, so Helm should not render it.
+			installCOO = false
 		} else {
 			installCOO = true
 		}

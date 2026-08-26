@@ -30,7 +30,8 @@ var (
 	allRSDashboardIDs = append([]string{namespaceDashboardID}, vmDashboardIDs...)
 )
 
-func buildOpts(cv []addonapiv1beta1.CustomizedVariable) addon.Options {
+func buildOpts(t *testing.T, cv []addonapiv1beta1.CustomizedVariable) addon.Options {
+	t.Helper()
 	aodc := &addonapiv1beta1.AddOnDeploymentConfig{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      addoncfg.Name,
@@ -41,32 +42,24 @@ func buildOpts(cv []addonapiv1beta1.CustomizedVariable) addon.Options {
 		},
 	}
 	opts, err := addon.BuildOptions(aodc)
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err)
 	return opts
 }
 
 func reconcileHubResources(t *testing.T, cv []addonapiv1beta1.CustomizedVariable) client.Client {
 	t.Helper()
 
-	cmao := &addonapiv1beta1.ClusterManagementAddOn{
-		ObjectMeta: metav1.ObjectMeta{Name: addoncfg.Name},
-	}
-
 	k8s := fake.NewClientBuilder().
 		WithScheme(scheme.Scheme).
-		WithObjects(cmao).
 		Build()
 
 	reconciler := &cooresource.HubResourceReconciler{
 		Client: k8s,
-		CMAO:   cmao,
 		Logger: klog.Background(),
-		Opts:   buildOpts(cv),
+		Opts:   buildOpts(t, cv),
 	}
 
-	err := reconciler.Reconcile(t.Context(), false)
+	err := reconciler.Reconcile(t.Context(), false, false)
 	require.NoError(t, err)
 	return k8s
 }

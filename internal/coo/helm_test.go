@@ -4,7 +4,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/go-logr/logr"
 	operatorsv1 "github.com/operator-framework/api/pkg/operators/v1"
 	operatorsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	persesv1 "github.com/perses/perses-operator/api/v1alpha1"
@@ -12,7 +11,6 @@ import (
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
-	"github.com/stolostron/multicluster-observability-addon/internal/coo/handlers"
 	"github.com/stolostron/multicluster-observability-addon/internal/coo/manifests"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -60,12 +58,7 @@ func fakeGetValues(ctx context.Context, k8s client.Client) addonfactory.GetValue
 			}
 		}
 
-		installCOO, err := handlers.InstallOfCOOOnTheHubIsNeeded(ctx, k8s, logr.Discard(), isHub)
-		if err != nil {
-			return nil, err
-		}
-
-		cooValues := manifests.BuildValues(addonOpts, installCOO, isHub, false)
+		cooValues := manifests.BuildValues(addonOpts, isHub)
 
 		return addonfactory.JsonStructToValues(cooValues)
 	}
