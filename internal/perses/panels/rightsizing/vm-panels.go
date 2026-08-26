@@ -572,7 +572,10 @@ func VMMemoryUnderestimationStatPanel(datasourceName string) panelgroup.Option {
 
 // VMBackToMainDashboardPanel creates a "Back to Main Dashboard" markdown panel with a link
 func VMBackToMainDashboardPanel(datasourceName string, project string) panelgroup.Option {
-	backURL := fmt.Sprintf("/monitoring/v2/dashboards/view?dashboard=acm-rightsizing-openshift-virtualization&project=%s&start=$__range", project)
+	backURL := fmt.Sprintf(
+		"/monitoring/v2/dashboards/view?dashboard=acm-rightsizing-openshift-virtualization&project=%s&var-cluster=$cluster&var-namespace=$namespace&var-days=$days&var-profile=$profile&start=$__range",
+		project,
+	)
 	return panelgroup.AddPanel("Back to Main Dashboard",
 		panel.Description("Back to Main Dashboard"),
 		markdownPanel.Markdown(fmt.Sprintf("[Back to Main Dashboard](%s)", backURL)),
