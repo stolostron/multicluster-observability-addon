@@ -82,8 +82,12 @@ func (r *HubResourceReconciler) Reconcile(ctx context.Context, hasCardinalityRul
 	persesEnabled := hasDashboards || hasAnalyticsDashboards
 	cooNeeded := persesEnabled && installCOO
 
-	if err := r.reconcileCOOOperator(ctx, cooNeeded); err != nil {
-		return fmt.Errorf("failed to reconcile COO operator: %w", err)
+	// Install COO first — Perses CRD conversion webhooks must be available
+	// before we can create/update dashboards and datasources.
+	if cooNeeded {
+		if err := r.reconcileCOOOperator(ctx, true); err != nil {
+			return fmt.Errorf("failed to reconcile COO operator: %w", err)
+		}
 	}
 
 	if hasAnalyticsDashboards {
@@ -109,6 +113,14 @@ func (r *HubResourceReconciler) Reconcile(ctx context.Context, hasCardinalityRul
 			ObjectMeta: metav1.ObjectMeta{Name: addoncfg.AnalyticsNamespace},
 		}); err != nil {
 			return fmt.Errorf("failed to delete analytics namespace: %w", err)
+		}
+	}
+
+	// Uninstall COO last — dashboards/datasources must be cleaned up while
+	// the Perses CRD conversion webhooks are still running.
+	if !cooNeeded {
+		if err := r.reconcileCOOOperator(ctx, false); err != nil {
+			return fmt.Errorf("failed to reconcile COO operator: %w", err)
 		}
 	}
 
