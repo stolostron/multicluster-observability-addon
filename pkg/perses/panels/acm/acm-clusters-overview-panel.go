@@ -17,6 +17,20 @@ func Top50MaxLatencyAPIServer(datasourceName string, labelMatchers ...*labels.Ma
 	return panelgroup.AddPanel("Top 50 Max Latency API Server",
 		panel.Description("Shows the top 50 clusters with highest API server latency, their API server status, and error rates."),
 		tablePanel.Table(
+			tablePanel.Transform([]commonSdk.Transform{
+				{
+					Kind: commonSdk.MergeIndexedColumnsKind,
+					Spec: commonSdk.MergeIndexedColumnsSpec{
+						Column: "cluster",
+					},
+				},
+				{
+					Kind: commonSdk.JoinByColumValueKind,
+					Spec: commonSdk.JoinByColumnValueSpec{
+						Columns: []string{"cluster"},
+					},
+				},
+			}),
 			tablePanel.WithColumnSettings([]tablePanel.ColumnSettings{
 				{
 					Name: "timestamp",
@@ -38,12 +52,12 @@ func Top50MaxLatencyAPIServer(datasourceName string, labelMatchers ...*labels.Ma
 					},
 				},
 				{
-					Name:   "api_up",
+					Name:   "value #2",
 					Header: "API servers up (%)",
 					Align:  tablePanel.LeftAlign,
 				},
 				{
-					Name:   "value #2",
+					Name:   "value #3",
 					Header: "API Errors [1h]",
 					Align:  tablePanel.LeftAlign,
 					Format: &commonSdk.Format{
@@ -56,6 +70,15 @@ func Top50MaxLatencyAPIServer(datasourceName string, labelMatchers ...*labels.Ma
 			query.PromQL(
 				promql.SetLabelMatchersV2(
 					ACMCommonPanelQueries["Top50MaxLatencyAPIServer_MaxLatency"],
+					labelMatchers,
+				).Pretty(0),
+				dashboards.AddQueryDataSource(datasourceName),
+			),
+		),
+		panel.AddQuery(
+			query.PromQL(
+				promql.SetLabelMatchersV2(
+					ACMCommonPanelQueries["Top50MaxLatencyAPIServer_APIUp"],
 					labelMatchers,
 				).Pretty(0),
 				dashboards.AddQueryDataSource(datasourceName),
