@@ -52,8 +52,8 @@ type RSPrometheusRuleConfig struct {
 	} `json:"namespaceFilterCriteria"`
 	LabelFilterCriteria      []RSLabelFilter `json:"labelFilterCriteria"`
 	RecommendationPercentage int             `json:"recommendationPercentage"`
-	CpuAggregator            []string        `json:"cpuAggregator,omitempty"`
-	MemoryAggregator         []string        `json:"memoryAggregator,omitempty"`
+	CpuAggregator            []string        `json:"cpuAggregator"`
+	MemoryAggregator         []string        `json:"memoryAggregator"`
 }
 
 // RSConfigMapData represents the configmap data structure for right-sizing
