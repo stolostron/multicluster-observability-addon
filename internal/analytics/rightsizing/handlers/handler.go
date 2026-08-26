@@ -149,6 +149,12 @@ func (o *OptionsBuilder) getConfigData(ctx context.Context, configMapName string
 	return rightsizing.ParseConfigMapData(cm.Data)
 }
 
+//
+// Both MCO and MCOA use a "create if not exists" pattern for these ConfigMaps,
+// so user customizations (namespace filters, recommendation %, placement predicates)
+// are preserved across mode switches (MCO <=> MCOA).
+//
+
 // ensureNamespaceConfigMap ensures the namespace right-sizing ConfigMap exists on the hub.
 // MCOA owns all right-sizing resources including ConfigMaps for cleaner architecture.
 func (o *OptionsBuilder) ensureNamespaceConfigMap(ctx context.Context) error {
@@ -162,7 +168,6 @@ func (o *OptionsBuilder) ensureNamespaceConfigMap(ctx context.Context) error {
 		}
 		return err
 	}
-	// ConfigMap already exists
 	return nil
 }
 
@@ -179,16 +184,11 @@ func (o *OptionsBuilder) ensureVirtualizationConfigMap(ctx context.Context) erro
 		}
 		return err
 	}
-	// ConfigMap already exists
 	return nil
 }
 
 // createDefaultConfigMap creates a ConfigMap with the provided data.
 // The ConfigMap is labeled to indicate it's managed for right-sizing.
-//
-// Both MCO and MCOA use a "create if not exists" pattern for these ConfigMaps,
-// so user customizations (namespace filters, recommendation %, placement predicates)
-// are preserved across mode switches (MCO <=> MCOA).
 func (o *OptionsBuilder) createDefaultConfigMap(ctx context.Context, name string, data map[string]string) error {
 	cm := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
