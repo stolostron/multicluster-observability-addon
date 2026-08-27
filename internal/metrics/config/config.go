@@ -121,6 +121,8 @@ var (
 	}
 
 	ErrMissingImageOverride = errors.New("missing image override")
+	ErrMCHManifestNotFound  = errors.New("no mch-image-manifest configmap found")
+	ErrMCHManifestKeyNotSet = errors.New("key not found in mch-image-manifest configmap")
 )
 
 type ImageOverrides struct {
@@ -215,12 +217,12 @@ func GetImageFromMCHManifest(ctx context.Context, c client.Client, key string, r
 	}
 
 	if len(cmList.Items) == 0 {
-		return "", fmt.Errorf("no mch-image-manifest configmap found in %s", HubInstallNamespace)
+		return "", fmt.Errorf("%w: namespace %s", ErrMCHManifestNotFound, HubInstallNamespace)
 	}
 
 	image, ok := cmList.Items[0].Data[key]
 	if !ok || image == "" {
-		return "", fmt.Errorf("key %q not found in mch-image-manifest configmap %s", key, cmList.Items[0].Name)
+		return "", fmt.Errorf("%w: %q in configmap %s", ErrMCHManifestKeyNotSet, key, cmList.Items[0].Name)
 	}
 
 	if len(registries) > 0 {
