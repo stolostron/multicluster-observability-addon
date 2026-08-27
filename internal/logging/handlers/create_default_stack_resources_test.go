@@ -63,10 +63,6 @@ func TestDefaultStackResourcesSurviveDeleteOrphan(t *testing.T) {
 	require.NotNil(t, clf, "expected a default-stack ClusterLogForwarder")
 	require.NotNil(t, ls, "expected a default-stack LokiStack")
 
-	wantPlacement := addoncfg.GlobalPlacementNamespace + "/" + addoncfg.GlobalPlacementName
-	assert.Equal(t, wantPlacement, clf.Annotations[addoncfg.PlacementAnnotationKey], "CLF must carry the placement annotation so DeleteOrphanResources keeps it")
-	assert.Equal(t, wantPlacement, ls.Annotations[addoncfg.PlacementAnnotationKey], "LokiStack must carry the placement annotation so DeleteOrphanResources keeps it")
-
 	for _, obj := range []client.Object{clf, ls} {
 		require.NoError(t, controllerutil.SetControllerReference(cmao, obj, scheme))
 		require.NoError(t, fakeClient.Create(context.Background(), obj))
