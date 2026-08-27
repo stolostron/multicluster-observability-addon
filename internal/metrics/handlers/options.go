@@ -39,6 +39,8 @@ type Options struct {
 	TLSMinVersion            string
 	TLSCipherSuites          string
 
+	ThanosOperatorEnabled bool
+
 	// Thanos holds the hub-only Thanos component specifications.
 	// These are only populated when IsHub is true and platform metrics collection is enabled.
 	Thanos ThanosOptions

@@ -338,6 +338,7 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 		thanosOperatorImage = config.ThanosOperatorImage
 	}
 	ret.ThanosOperator = ThanosOperatorValues{
+		Enabled:   opts.ThanosOperatorEnabled,
 		IsHub:     opts.IsHub,
 		AppName:   config.ThanosOperatorAppName,
 		Component: "controller-manager",
