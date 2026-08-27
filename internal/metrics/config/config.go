@@ -81,6 +81,11 @@ const (
 	ObjectStorageSecretName = "thanos-object-storage"
 	ObjectStorageSecretKey  = "thanos.yaml"
 
+	// mch-image-manifest ConfigMap labels and keys
+	MCHImageManifestLabelType = "ocm-configmap-type"
+	MCHImageManifestLabelVal  = "image-manifest"
+	ThanosImageKey            = "thanos"
+
 	AlertmanagerAccessorSecretName = "observability-alertmanager-accessor"
 	AlertmanagerRouterCASecretName = "hub-alertmanager-router-ca"
 	AlertmanagerRouteBYOCAName     = "alertmanager-byo-ca"
@@ -196,6 +201,33 @@ func overrideImage(image string, registries []addonapiv1beta1.ImageMirror, logge
 		logger.Info("Registry override ignored as it does not reference a full image", "source", registry.Source, "mirror", registry.Mirror, "image", image)
 	}
 	return image
+}
+
+// GetImageFromMCHManifest reads a component image from the mch-image-manifest ConfigMap,
+// matching the pattern used by multicluster-observability-operator.
+func GetImageFromMCHManifest(ctx context.Context, c client.Client, key string, registries []addonapiv1beta1.ImageMirror, logger logr.Logger) (string, error) {
+	cmList := &corev1.ConfigMapList{}
+	if err := c.List(ctx, cmList,
+		client.InNamespace(HubInstallNamespace),
+		client.MatchingLabels{MCHImageManifestLabelType: MCHImageManifestLabelVal},
+	); err != nil {
+		return "", fmt.Errorf("failed to list mch-image-manifest configmaps: %w", err)
+	}
+
+	if len(cmList.Items) == 0 {
+		return "", fmt.Errorf("no mch-image-manifest configmap found in %s", HubInstallNamespace)
+	}
+
+	image, ok := cmList.Items[0].Data[key]
+	if !ok || image == "" {
+		return "", fmt.Errorf("key %q not found in mch-image-manifest configmap %s", key, cmList.Items[0].Name)
+	}
+
+	if len(registries) > 0 {
+		image = overrideImage(image, registries, logger)
+	}
+
+	return image, nil
 }
 
 func HasHostedCLusters(ctx context.Context, c client.Client, logger logr.Logger) bool {
