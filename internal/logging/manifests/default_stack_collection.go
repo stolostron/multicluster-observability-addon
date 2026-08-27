@@ -80,6 +80,9 @@ func BuildSSAClusterLogForwarder(opts Options, clfName, placementNamespace, plac
 				addoncfg.PlacementRefNameLabelKey:      placementName,
 				addoncfg.PlacementRefNamespaceLabelKey: placementNamespace,
 			},
+			Annotations: map[string]string{
+				addoncfg.PlacementAnnotationKey: placementNamespace + "/" + placementName,
+			},
 		},
 		Spec: clfSpec,
 	}, nil
