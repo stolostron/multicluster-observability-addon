@@ -71,6 +71,9 @@ func BuildSSALokiStack(opts Options, lsName, placementNamespace, placementName s
 				addoncfg.PlacementRefNameLabelKey:      placementName,
 				addoncfg.PlacementRefNamespaceLabelKey: placementNamespace,
 			},
+			Annotations: map[string]string{
+				addoncfg.PlacementAnnotationKey: placementNamespace + "/" + placementName,
+			},
 		},
 		Spec: lokistackSpec,
 	}, nil
