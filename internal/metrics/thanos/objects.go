@@ -36,12 +36,22 @@ func (b *ObjectBuilder) Build(ctx context.Context, cluster *clusterv1.ManagedClu
 		return nil, nil
 	}
 
-	store := b.buildStore(opts)
+	var storeImage string
+	if b.Client != nil {
+		img, err := config.GetImageFromMCHManifest(ctx, b.Client, config.ThanosImageKey, opts.Registries, b.Logger)
+		if err != nil {
+			b.Logger.Error(err, "failed to get thanos image from mch-image-manifest, thanos store will use operator default image")
+		} else {
+			storeImage = img
+		}
+	}
+
+	store := b.buildStore(opts, storeImage)
 
 	return []runtime.Object{store}, nil
 }
 
-func (b *ObjectBuilder) buildStore(opts addon.Options) *thanosv1alpha1.ThanosStore {
+func (b *ObjectBuilder) buildStore(opts addon.Options, storeImage string) *thanosv1alpha1.ThanosStore {
 	shards := int32(config.DefaultStoreShards)
 
 	store := &thanosv1alpha1.ThanosStore{
@@ -68,6 +78,10 @@ func (b *ObjectBuilder) buildStore(opts addon.Options) *thanosv1alpha1.ThanosSto
 				Shards: shards,
 			},
 		},
+	}
+
+	if storeImage != "" {
+		store.Spec.Image = &storeImage
 	}
 
 	ApplyCommonThanosFields(&store.Spec.CommonFields, opts, config.ThanosStoreContainerID)
