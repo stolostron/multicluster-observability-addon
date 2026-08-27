@@ -155,6 +155,56 @@ func Test_IncidentDetection_AllConfigsTogether_AllResources(t *testing.T) {
 			},
 		},
 		{
+			name: "spoke COO subscription uses default catalog source",
+			cv: []addonapiv1beta1.CustomizedVariable{
+				{
+					Name:  addon.KeyPlatformIncidentDetection,
+					Value: "uiplugins.v1alpha1.observability.openshift.io",
+				},
+			},
+			expectedFunc: func(t *testing.T, objects []runtime.Object) {
+				var sub *operatorsv1alpha1.Subscription
+				for _, o := range objects {
+					if s, ok := o.(*operatorsv1alpha1.Subscription); ok {
+						sub = s
+						break
+					}
+				}
+				require.NotNil(t, sub, "expected a COO Subscription on the spoke")
+				require.Equal(t, addoncfg.DefaultCooCatalogSource, sub.Spec.CatalogSource)
+				require.Equal(t, addoncfg.DefaultCooCatalogSourceNamespace, sub.Spec.CatalogSourceNamespace)
+			},
+		},
+		{
+			name: "spoke COO subscription uses custom catalog source",
+			cv: []addonapiv1beta1.CustomizedVariable{
+				{
+					Name:  addon.KeyPlatformIncidentDetection,
+					Value: "uiplugins.v1alpha1.observability.openshift.io",
+				},
+				{
+					Name:  addon.KeyCOOCatalogSource,
+					Value: "cs-redhat-operator-index-v4-20",
+				},
+				{
+					Name:  addon.KeyCOOCatalogSourceNamespace,
+					Value: "openshift-marketplace",
+				},
+			},
+			expectedFunc: func(t *testing.T, objects []runtime.Object) {
+				var sub *operatorsv1alpha1.Subscription
+				for _, o := range objects {
+					if s, ok := o.(*operatorsv1alpha1.Subscription); ok {
+						sub = s
+						break
+					}
+				}
+				require.NotNil(t, sub, "expected a COO Subscription on the spoke")
+				require.Equal(t, "cs-redhat-operator-index-v4-20", sub.Spec.CatalogSource)
+				require.Equal(t, "openshift-marketplace", sub.Spec.CatalogSourceNamespace)
+			},
+		},
+		{
 			name: "incident detection dashboards in observability-analytics namespace",
 			cv: []addonapiv1beta1.CustomizedVariable{
 				{
