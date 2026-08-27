@@ -16,7 +16,9 @@ import (
 
 const (
 	// Operator Subscription Channels
-	KeyOpenShiftLoggingChannel = "openshiftLoggingChannel"
+	KeyOpenShiftLoggingChannel   = "openshiftLoggingChannel"
+	KeyCOOCatalogSource          = "cooCatalogSource"
+	KeyCOOCatalogSourceNamespace = "cooCatalogSourceNamespace"
 
 	// Platform Observability Keys
 	KeyPlatformMetricsCollection         = "platformMetricsCollection"
@@ -193,9 +195,15 @@ func validateCABundle(bundle []byte) error {
 	return nil
 }
 
+type COOOptions struct {
+	CatalogSource          string
+	CatalogSourceNamespace string
+}
+
 type Options struct {
 	Platform              PlatformOptions
 	UserWorkloads         UserWorkloadOptions
+	COO                   COOOptions
 	InstallNamespace      string
 	InstanceSize          string
 	Tolerations           []corev1.Toleration
@@ -283,6 +291,10 @@ func BuildOptions(addOnDeployment *addonapiv1beta1.AddOnDeploymentConfig) (Optio
 		case KeyOpenShiftLoggingChannel:
 			opts.Platform.Logs.SubscriptionChannel = keyvalue.Value
 			opts.UserWorkloads.Logs.SubscriptionChannel = keyvalue.Value
+		case KeyCOOCatalogSource:
+			opts.COO.CatalogSource = keyvalue.Value
+		case KeyCOOCatalogSourceNamespace:
+			opts.COO.CatalogSourceNamespace = keyvalue.Value
 		// Platform Observability Options
 		case KeyMetricsHubHostname:
 			val := keyvalue.Value

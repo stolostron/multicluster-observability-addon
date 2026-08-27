@@ -13,8 +13,8 @@ spec:
   channel: stable
   installPlanApproval: Automatic
   name: cluster-observability-operator
-  source: redhat-operators
-  sourceNamespace: openshift-marketplace
+  source: {{ .Values.catalogSource | default "redhat-operators" }}
+  sourceNamespace: {{ .Values.catalogSourceNamespace | default "openshift-marketplace" }}
 {{- else if and .Values.enabled .Values.isHub }}
 apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
@@ -27,6 +27,6 @@ spec:
   channel: stable
   installPlanApproval: Automatic
   name: cluster-observability-operator
-  source: redhat-operators
-  sourceNamespace: openshift-marketplace
+  source: {{ .Values.catalogSource | default "redhat-operators" }}
+  sourceNamespace: {{ .Values.catalogSourceNamespace | default "openshift-marketplace" }}
 {{- end }}

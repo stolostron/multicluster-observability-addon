@@ -16,3 +16,6 @@ metrics:
 
 incidentDetection:
   enabled: false
+
+catalogSource: redhat-operators
+catalogSourceNamespace: openshift-marketplace
