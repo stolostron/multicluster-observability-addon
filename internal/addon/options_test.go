@@ -210,6 +210,32 @@ func TestBuildOptions(t *testing.T) {
 			},
 		},
 		{
+			name: "valid COO catalog source override",
+			addOnDeploy: &addonapiv1beta1.AddOnDeploymentConfig{
+				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+					CustomizedVariables: []addonapiv1beta1.CustomizedVariable{
+						{Name: KeyCOOCatalogSource, Value: "cs-redhat-operator-index-v4-20"},
+						{Name: KeyCOOCatalogSourceNamespace, Value: "openshift-marketplace"},
+					},
+				},
+			},
+			expectedOpts: Options{
+				Platform: PlatformOptions{
+					Enabled: true,
+					AnalyticsOptions: AnalyticsOptions{
+						RightSizing: RightSizingOptions{
+							NamespaceEnabled:      true,
+							VirtualizationEnabled: true,
+						},
+					},
+				},
+				COO: COOOptions{
+					CatalogSource:          "cs-redhat-operator-index-v4-20",
+					CatalogSourceNamespace: "openshift-marketplace",
+				},
+			},
+		},
+		{
 			name: "valid incident detection",
 			addOnDeploy: &addonapiv1beta1.AddOnDeploymentConfig{
 				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
