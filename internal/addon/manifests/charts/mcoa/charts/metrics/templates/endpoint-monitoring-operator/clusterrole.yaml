@@ -35,4 +35,10 @@ rules:
 - apiGroups: ["apiextensions.k8s.io"]
   resources: ["customresourcedefinitions"]
   verbs: ["get", "list", "watch", "create", "update", "patch"]
+- apiGroups: ["hypershift.openshift.io"]
+  resources: ["hostedclusters"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["monitoring.coreos.com"]
+  resources: ["servicemonitors", "prometheusrules"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 {{- end }}
