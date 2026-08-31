@@ -38,11 +38,11 @@ func (b *ObjectBuilder) Build(ctx context.Context, cluster *clusterv1.ManagedClu
 
 	var storeImage string
 	if b.Client != nil {
-		img, err := config.GetImageFromMCHManifest(ctx, b.Client, config.ThanosImageKey, opts.Registries, b.Logger)
+		images, err := config.GetImageOverrides(ctx, b.Client, opts.Registries, b.Logger)
 		if err != nil {
-			b.Logger.Error(err, "failed to get thanos image from mch-image-manifest, thanos store will use operator default image")
+			b.Logger.Error(err, "failed to get image overrides, thanos store will use operator default image")
 		} else {
-			storeImage = img
+			storeImage = images.ThanosStore
 		}
 	}
 
