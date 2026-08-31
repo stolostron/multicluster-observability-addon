@@ -133,6 +133,7 @@ type Options struct {
 	ProxyConfig           ProxyConfig
 	Registries            []addonapiv1beta1.ImageMirror
 	ThanosOperatorEnabled bool
+	LokiOperatorEnabled   bool
 	HubHostname           string
 }
 
@@ -184,6 +185,7 @@ func BuildOptions(addOnDeployment *addonapiv1beta1.AddOnDeploymentConfig) (Optio
 	opts.ProxyConfig.NoProxy = addOnDeployment.Spec.ProxyConfig.NoProxy
 	opts.Registries = addOnDeployment.Spec.Registries
 	opts.ThanosOperatorEnabled = addOnDeployment.Annotations["mcoa-thanos-operator"] == "true"
+	opts.LokiOperatorEnabled = addOnDeployment.Annotations["mcoa-loki-operator"] == "true"
 
 	// Default alerts to disabled
 	opts.Platform.Metrics.AlertsEnabled = false

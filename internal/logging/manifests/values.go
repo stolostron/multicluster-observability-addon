@@ -7,11 +7,12 @@ import (
 )
 
 type LoggingValues struct {
-	Enabled                 bool            `json:"enabled"`
-	InstallCLO              bool            `json:"installCLO"`
-	OpenshiftLoggingChannel string          `json:"openshiftLoggingChannel"`
-	Unmanaged               UnmanagedValues `json:"unmanaged"`
-	Managed                 ManagedValues   `json:"managed"`
+	Enabled                 bool               `json:"enabled"`
+	InstallCLO              bool               `json:"installCLO"`
+	OpenshiftLoggingChannel string             `json:"openshiftLoggingChannel"`
+	Unmanaged               UnmanagedValues    `json:"unmanaged"`
+	Managed                 ManagedValues      `json:"managed"`
+	LokiOperator            LokiOperatorValues `json:"lokiOperator"`
 }
 
 type UnmanagedValues struct {
@@ -21,6 +22,10 @@ type UnmanagedValues struct {
 type ManagedValues struct {
 	Collection CollectionValues `json:"collection"`
 	Storage    StorageValues    `json:"storage"`
+}
+
+type LokiOperatorValues struct {
+	Enabled bool `json:"enabled"`
 }
 
 type CollectionValues struct {

@@ -101,6 +101,10 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, getter addonutils.Add
 		if userValues.Metrics != nil {
 			userValues.Metrics.ThanosOperator.Enabled = opts.ThanosOperatorEnabled && common.IsHubCluster(cluster)
 		}
+		// WIP: Temporary solution to enable loki-operator and will require to delete the mcoa pod to take effect.
+		if userValues.Logging != nil {
+			userValues.Logging.LokiOperator.Enabled = opts.LokiOperatorEnabled && common.IsHubCluster(cluster)
+		}
 
 		npEnabled, err := common.GetNetworkPoliciesEnabled(ctx, k8s)
 		if err != nil {
