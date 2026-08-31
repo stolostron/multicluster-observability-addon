@@ -81,11 +81,6 @@ const (
 	ObjectStorageSecretName = "thanos-object-storage"
 	ObjectStorageSecretKey  = "thanos.yaml"
 
-	// mch-image-manifest ConfigMap labels and keys
-	MCHImageManifestLabelType = "ocm-configmap-type"
-	MCHImageManifestLabelVal  = "image-manifest"
-	ThanosImageKey            = "thanos"
-
 	AlertmanagerAccessorSecretName = "observability-alertmanager-accessor"
 	AlertmanagerRouterCASecretName = "hub-alertmanager-router-ca"
 	AlertmanagerRouteBYOCAName     = "alertmanager-byo-ca"
@@ -121,8 +116,6 @@ var (
 	}
 
 	ErrMissingImageOverride = errors.New("missing image override")
-	ErrMCHManifestNotFound  = errors.New("no mch-image-manifest configmap found")
-	ErrMCHManifestKeyNotSet = errors.New("key not found in mch-image-manifest configmap")
 )
 
 type ImageOverrides struct {
@@ -134,6 +127,7 @@ type ImageOverrides struct {
 	Prometheus                 string `json:"prometheus"`
 	EndpointMonitoringOperator string `json:"endpoint_monitoring_operator"`
 	ThanosOperator             string `json:"thanos_operator"`
+	ThanosStore                string `json:"thanos_store"`
 }
 
 func GetImageOverrides(ctx context.Context, c client.Client, registries []addonapiv1beta1.ImageMirror, logger logr.Logger) (ImageOverrides, error) {
@@ -175,6 +169,9 @@ func GetImageOverrides(ctx context.Context, c client.Client, registries []addona
 		if ret.ThanosOperator != "" {
 			ret.ThanosOperator = overrideImage(ret.ThanosOperator, registries, logger)
 		}
+		if ret.ThanosStore != "" {
+			ret.ThanosStore = overrideImage(ret.ThanosStore, registries, logger)
+		}
 	}
 
 	return ret, nil
@@ -203,33 +200,6 @@ func overrideImage(image string, registries []addonapiv1beta1.ImageMirror, logge
 		logger.Info("Registry override ignored as it does not reference a full image", "source", registry.Source, "mirror", registry.Mirror, "image", image)
 	}
 	return image
-}
-
-// GetImageFromMCHManifest reads a component image from the mch-image-manifest ConfigMap,
-// matching the pattern used by multicluster-observability-operator.
-func GetImageFromMCHManifest(ctx context.Context, c client.Client, key string, registries []addonapiv1beta1.ImageMirror, logger logr.Logger) (string, error) {
-	cmList := &corev1.ConfigMapList{}
-	if err := c.List(ctx, cmList,
-		client.InNamespace(HubInstallNamespace),
-		client.MatchingLabels{MCHImageManifestLabelType: MCHImageManifestLabelVal},
-	); err != nil {
-		return "", fmt.Errorf("failed to list mch-image-manifest configmaps: %w", err)
-	}
-
-	if len(cmList.Items) == 0 {
-		return "", fmt.Errorf("%w: namespace %s", ErrMCHManifestNotFound, HubInstallNamespace)
-	}
-
-	image, ok := cmList.Items[0].Data[key]
-	if !ok || image == "" {
-		return "", fmt.Errorf("%w: %q in configmap %s", ErrMCHManifestKeyNotSet, key, cmList.Items[0].Name)
-	}
-
-	if len(registries) > 0 {
-		image = overrideImage(image, registries, logger)
-	}
-
-	return image, nil
 }
 
 func HasHostedCLusters(ctx context.Context, c client.Client, logger logr.Logger) bool {
