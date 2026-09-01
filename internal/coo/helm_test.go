@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/go-logr/logr"
 	operatorsv1 "github.com/operator-framework/api/pkg/operators/v1"
 	operatorsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	persesv1 "github.com/perses/perses-operator/api/v1alpha1"
@@ -11,6 +12,7 @@ import (
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
+	"github.com/stolostron/multicluster-observability-addon/internal/coo/handlers"
 	"github.com/stolostron/multicluster-observability-addon/internal/coo/manifests"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -24,6 +26,7 @@ import (
 	addonutils "open-cluster-management.io/addon-framework/pkg/utils"
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	workv1 "open-cluster-management.io/api/work/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
@@ -34,6 +37,7 @@ var (
 	_ = addonapiv1beta1.Install(scheme.Scheme)
 	_ = uiplugin.AddToScheme(scheme.Scheme)
 	_ = persesv1.AddToScheme(scheme.Scheme)
+	_ = workv1.Install(scheme.Scheme)
 )
 
 func fakeGetValues(ctx context.Context, k8s client.Client) addonfactory.GetValuesFunc {
@@ -58,7 +62,17 @@ func fakeGetValues(ctx context.Context, k8s client.Client) addonfactory.GetValue
 			}
 		}
 
-		cooValues := manifests.BuildValues(addonOpts, isHub)
+		var installCOO bool
+		if isHub {
+			installCOO, err = handlers.InstallOfCOOOnTheHubIsNeeded(ctx, k8s, logr.Discard())
+		} else {
+			installCOO, err = handlers.InstallOfCOOOnSpokeIsNeeded(ctx, k8s, logr.Discard(), cluster.Name)
+		}
+		if err != nil {
+			return nil, err
+		}
+
+		cooValues := manifests.BuildValues(addonOpts, installCOO, isHub, false)
 
 		return addonfactory.JsonStructToValues(cooValues)
 	}

@@ -9,14 +9,27 @@ import (
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"github.com/stolostron/multicluster-observability-addon/internal/coo/manifests"
+	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/utils/ptr"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
+	workv1 "open-cluster-management.io/api/work/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
-var _ = operatorv1alpha1.AddToScheme(scheme.Scheme)
+const testClusterName = "spoke-1"
+
+var (
+	_ = operatorv1alpha1.AddToScheme(scheme.Scheme)
+	_ = workv1.Install(scheme.Scheme)
+)
 
 func TestInstallCOO(t *testing.T) {
 	tests := []struct {
@@ -34,22 +47,6 @@ func TestInstallCOO(t *testing.T) {
 			options:                 addon.Options{},
 			expectedUIPluginInstall: false,
 			expectedCOOInstall:      false,
-		},
-		{
-			name:  "Non-hub cluster with incident detection enabled",
-			isHub: false,
-			options: addon.Options{
-				Platform: addon.PlatformOptions{
-					Enabled: true,
-					AnalyticsOptions: addon.AnalyticsOptions{
-						IncidentDetection: addon.IncidentDetection{
-							Enabled: true,
-						},
-					},
-				},
-			},
-			expectedUIPluginInstall: true,
-			expectedCOOInstall:      true,
 		},
 		{
 			name:  "Hub cluster with incident detection enabled but no COO installed",
@@ -178,8 +175,14 @@ func TestInstallCOO(t *testing.T) {
 				k8sClientBuilder = k8sClientBuilder.WithObjects(tc.subscription)
 			}
 
-			_, err := InstallOfCOOOnTheHubIsNeeded(context.Background(), k8sClientBuilder.Build(), logr.Discard(), tc.isHub)
-			cooValues := manifests.BuildValues(tc.options, tc.isHub)
+			var installCOO bool
+			var err error
+			if tc.isHub {
+				// Hub COO installation is handled by HubResourceReconciler, not ManifestWork.
+				_, err = InstallOfCOOOnTheHubIsNeeded(context.Background(), k8sClientBuilder.Build(), logr.Discard())
+				installCOO = false
+			}
+			cooValues := manifests.BuildValues(tc.options, installCOO, tc.isHub, false)
 
 			if tc.expectedErrMsg != "" {
 				assert.EqualError(t, err, tc.expectedErrMsg)
@@ -188,6 +191,151 @@ func TestInstallCOO(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, tc.expectedUIPluginInstall, cooValues.Enabled)
 			assert.Equal(t, tc.expectedCOOInstall, cooValues.InstallCOO)
+		})
+	}
+}
+
+// manifestWorkWithNoFeedback builds a ManifestWork for the addon that hasn't reported any
+// status feedback yet, mimicking the very first reconcile(s) for a cluster before the work
+// agent has observed anything on the spoke.
+func manifestWorkWithNoFeedback(name string) *workv1.ManifestWork {
+	return &workv1.ManifestWork{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: testClusterName,
+			Labels:    map[string]string{addonapiv1beta1.AddonLabelKey: addoncfg.Name},
+		},
+	}
+}
+
+// manifestWorkWithCRDFeedback builds a ManifestWork carrying status feedback for the
+// alertmanagers.monitoring.rhobs CRD, mimicking what the work agent reports back once it
+// has observed the CRD on the spoke. When olmManaged is nil, the CRD is reported as observed
+// (Available) but carries no "olm.managed" label value at all, e.g. because the label is
+// absent on the object (as opposed to present with value "false").
+func manifestWorkWithCRDFeedback(name string, olmManaged *string) *workv1.ManifestWork {
+	var values []workv1.FeedbackValue
+	if olmManaged != nil {
+		values = []workv1.FeedbackValue{
+			{
+				Name:  addoncfg.IsOLMManagedFeedbackName,
+				Value: workv1.FieldValue{Type: workv1.String, String: olmManaged},
+			},
+		}
+	}
+
+	return &workv1.ManifestWork{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: testClusterName,
+			Labels:    map[string]string{addonapiv1beta1.AddonLabelKey: addoncfg.Name},
+		},
+		Status: workv1.ManifestWorkStatus{
+			ResourceStatus: workv1.ManifestResourceStatus{
+				Manifests: []workv1.ManifestCondition{
+					{
+						ResourceMeta: workv1.ManifestResourceMeta{
+							Group:    apiextensionsv1.GroupName,
+							Resource: "customresourcedefinitions",
+							Name:     mconfig.AlertmanagerCRDName,
+						},
+						Conditions: []metav1.Condition{
+							{
+								Type:               workv1.WorkAvailable,
+								Status:             metav1.ConditionTrue,
+								Reason:             "ResourceAvailable",
+								LastTransitionTime: metav1.Now(),
+							},
+						},
+						StatusFeedbacks: workv1.StatusFeedbackResult{
+							Values: values,
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+// manifestWorkWithCommittedSubscription builds a ManifestWork whose spec already renders
+// the COO Subscription manifest, mimicking a previous reconcile where MCOA committed to
+// installing COO on the spoke.
+func manifestWorkWithCommittedSubscription(name string) *workv1.ManifestWork {
+	sub := &unstructured.Unstructured{
+		Object: map[string]any{
+			"apiVersion": "operators.coreos.com/v1alpha1",
+			"kind":       "Subscription",
+			"metadata": map[string]any{
+				"name":      addoncfg.CooSubscriptionName,
+				"namespace": addoncfg.CooSubscriptionNamespace,
+			},
+		},
+	}
+
+	return &workv1.ManifestWork{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: testClusterName,
+			Labels:    map[string]string{addonapiv1beta1.AddonLabelKey: addoncfg.Name},
+		},
+		Spec: workv1.ManifestWorkSpec{
+			Workload: workv1.ManifestsTemplate{
+				Manifests: []workv1.Manifest{
+					{RawExtension: runtime.RawExtension{Object: sub}},
+				},
+			},
+		},
+	}
+}
+
+func TestInstallOfCOOOnSpokeIsNeeded(t *testing.T) {
+	tests := []struct {
+		name            string
+		objects         []client.Object
+		expectedInstall bool
+	}{
+		{
+			name:            "no manifestwork yet: bootstrap, defer decision",
+			objects:         nil,
+			expectedInstall: false,
+		},
+		{
+			name:            "manifestwork exists but no status feedback yet: defer decision",
+			objects:         []client.Object{manifestWorkWithNoFeedback("addon-deploy-0")},
+			expectedInstall: false,
+		},
+		{
+			name:            "COO already OLM-managed on spoke: don't install our own",
+			objects:         []client.Object{manifestWorkWithCRDFeedback("addon-deploy-0", ptr.To("True"))},
+			expectedInstall: false,
+		},
+		{
+			name:            "COO CRD reported but not OLM-managed: safe to install",
+			objects:         []client.Object{manifestWorkWithCRDFeedback("addon-deploy-0", ptr.To("False"))},
+			expectedInstall: true,
+		},
+		{
+			name:            "COO CRD observed but olm.managed label absent entirely (e.g. after a full COO purge): safe to install",
+			objects:         []client.Object{manifestWorkWithCRDFeedback("addon-deploy-0", nil)},
+			expectedInstall: true,
+		},
+		{
+			name:            "previously committed to install: sticky, keep installing even though CRD now looks OLM-managed",
+			objects:         []client.Object{manifestWorkWithCommittedSubscription("addon-deploy-0")},
+			expectedInstall: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			k8sClient := fake.NewClientBuilder().
+				WithScheme(scheme.Scheme).
+				WithObjects(tc.objects...).
+				Build()
+
+			result, err := InstallOfCOOOnSpokeIsNeeded(context.Background(), k8sClient, logr.Discard(), testClusterName)
+			require.NoError(t, err)
+			assert.Equal(t, tc.expectedInstall, result)
 		})
 	}
 }

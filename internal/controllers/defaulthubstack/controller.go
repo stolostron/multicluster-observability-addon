@@ -83,9 +83,9 @@ func (r *DefaultHubStackReconciler) Reconcile(ctx context.Context, _ ctrl.Reques
 		}
 	}
 
-	hasCardinalityRules := chandlers.HasCardinalityRules(ctx, r.Client, true)
+	hasCardinalityRules := chandlers.HasCardinalityRules(ctx, r.Client)
 
-	installCOO, err := chandlers.InstallOfCOOOnTheHubIsNeeded(ctx, r.Client, r.Log, true)
+	installCOO, err := chandlers.InstallOfCOOOnTheHubIsNeeded(ctx, r.Client, r.Log)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to check COO installation: %w", err)
 	}

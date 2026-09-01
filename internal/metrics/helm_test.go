@@ -109,23 +109,75 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 			UserMetrics:     false,
 			IsOCP:           true,
 			Expects: func(t *testing.T, objects []client.Object) {
-				assert.Empty(t, objects)
+				// 8 endpoint-monitoring-operator resources + 4 pre-delete cleanup hook resources
+				assert.Len(t, objects, 12)
+				deployments := common.FilterResourcesByLabelSelector[*appsv1.Deployment](objects, nil)
+				assert.Len(t, deployments, 1)
+				assert.Equal(t, "endpoint-monitoring-operator", deployments[0].GetName())
+
+				var hubAlertmanagerURL, enablePlatformAlertForwarding, enableUWLAlertForwarding, hubAlertmanagerCA, hubAlertmanagerCert, hubAlertmanagerAccessor string
+				for _, arg := range deployments[0].Spec.Template.Spec.Containers[0].Args {
+					if strings.HasPrefix(arg, "--hub-alertmanager-url=") {
+						hubAlertmanagerURL = arg
+					}
+					if strings.HasPrefix(arg, "--hub-alertmanager-ca-secret=") {
+						hubAlertmanagerCA = arg
+					}
+					if strings.HasPrefix(arg, "--hub-alertmanager-cert-secret=") {
+						hubAlertmanagerCert = arg
+					}
+					if strings.HasPrefix(arg, "--hub-alertmanager-accessor-secret=") {
+						hubAlertmanagerAccessor = arg
+					}
+					if strings.HasPrefix(arg, "--enable-platform-alert-forwarding=") {
+						enablePlatformAlertForwarding = arg
+					}
+					if strings.HasPrefix(arg, "--enable-uwl-alert-forwarding=") {
+						enableUWLAlertForwarding = arg
+					}
+				}
+				assert.Empty(t, hubAlertmanagerURL)
+				assert.Equal(t, "--hub-alertmanager-cert-secret=hub-mtls-cert-97e513873da14ae489e", hubAlertmanagerCert)
+				assert.Equal(t, "--hub-alertmanager-accessor-secret=observability-alertmanager-accessor-97e513873da14ae489e", hubAlertmanagerAccessor)
+				assert.Equal(t, "--hub-alertmanager-ca-secret=hub-mtls-ca-97e513873da14ae489e", hubAlertmanagerCA)
+				assert.Equal(t, "--enable-platform-alert-forwarding=false", enablePlatformAlertForwarding)
+				assert.Equal(t, "--enable-uwl-alert-forwarding=false", enableUWLAlertForwarding)
+
+				sa := common.FilterResourcesByLabelSelector[*corev1.ServiceAccount](objects, nil)
+				assert.Len(t, sa, 2)
+
+				cr := common.FilterResourcesByLabelSelector[*rbacv1.ClusterRole](objects, nil)
+				assert.Len(t, cr, 3)
+
+				crb := common.FilterResourcesByLabelSelector[*rbacv1.ClusterRoleBinding](objects, nil)
+				assert.Len(t, crb, 3)
+
+				svc := common.FilterResourcesByLabelSelector[*corev1.Service](objects, nil)
+				assert.Len(t, svc, 1)
+				assert.Equal(t, "endpoint-monitoring-operator-metrics", svc[0].GetName())
+
+				sm := common.FilterResourcesByLabelSelector[*prometheusv1.ServiceMonitor](objects, nil)
+				assert.Len(t, sm, 1)
+				assert.Equal(t, "endpoint-monitoring-operator-metrics", sm[0].GetName())
+
+				job := common.FilterResourcesByLabelSelector[*batchv1.Job](objects, nil)
+				assert.Len(t, job, 1)
+				assert.Equal(t, "observability-monitoring-cleanup", job[0].GetName())
 			},
 		},
 		"platform metrics enabled but agent missing": {
 			// This test case simulates the ClusterManagementAddOn deletion state where platform metrics
 			// are enabled but its child PrometheusAgent custom resource is already garbage collected.
 			// It ensures that the manifests render successfully (no errors) and return the 4 pre-delete
-			// cleanup resources and the 3 alertmanager MTLS/accessor secrets.
+			// cleanup resources, the 8 endpoint-monitoring-operator resources, and the 3 alertmanager MTLS/accessor secrets.
 			PlatformMetrics: true,
 			UserMetrics:     false,
 			IsOCP:           true,
 			AgentMissing:    true,
 			Expects: func(t *testing.T, objects []client.Object) {
-				assert.Len(t, objects, 7)
+				assert.Len(t, objects, 15)
 				sa := common.FilterResourcesByLabelSelector[*corev1.ServiceAccount](objects, nil)
-				assert.Len(t, sa, 1)
-				assert.Equal(t, "observability-pre-delete-sa", sa[0].GetName())
+				assert.Len(t, sa, 2)
 				job := common.FilterResourcesByLabelSelector[*batchv1.Job](objects, nil)
 				assert.Len(t, job, 1)
 				assert.Equal(t, "observability-monitoring-cleanup", job[0].GetName())
@@ -204,7 +256,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				// Comment explaining why each flag is needed and when:
 				// 1. --cluster-name and --cluster-id: must always be present to uniquely identify the cluster.
 				// 2. --hub-alertmanager-url: point to the Hub's Alertmanager. Rendered only if alert forwarding is enabled.
-				// 3. --hub-alertmanager-ca-secret, --hub-alertmanager-cert-secret, and --hub-alertmanager-accessor-secret are always rendered when hubEndpoint is set.
+				// 3. --hub-alertmanager-ca-secret, --hub-alertmanager-cert-secret, and --hub-alertmanager-accessor-secret are always rendered for endpoint-monitoring-operator.
 				// 4. --enable-platform-alert-forwarding and --enable-uwl-alert-forwarding: toggle actual alert forwarding.
 				assert.Equal(t, "--cluster-name=cluster-1", clusterNameArg)
 				assert.Equal(t, "--cluster-id="+testClusterID, clusterIDArg)
@@ -1563,6 +1615,14 @@ func newManifestWork(name string, isOLMSubscrided bool) *workv1.ManifestWork {
 							Group:    apiextensionsv1.GroupName,
 							Resource: "customresourcedefinitions",
 							Name:     config.AlertmanagerCRDName,
+						},
+						Conditions: []metav1.Condition{
+							{
+								Type:               workv1.WorkAvailable,
+								Status:             metav1.ConditionTrue,
+								Reason:             "ResourceAvailable",
+								LastTransitionTime: metav1.Now(),
+							},
 						},
 						StatusFeedbacks: workv1.StatusFeedbackResult{
 							Values: []workv1.FeedbackValue{

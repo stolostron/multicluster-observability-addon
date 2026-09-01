@@ -59,10 +59,6 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1beta1.Man
 		UserWorkloadAlertsEnabled: opts.UserWorkloads.Metrics.AlertsEnabled,
 	}
 
-	if !opts.Platform.Metrics.CollectionEnabled && !opts.UserWorkloads.Metrics.CollectionEnabled {
-		return ret, nil
-	}
-
 	ret.ClusterName = managedCluster.Name
 	ret.ClusterID = common.GetManagedClusterID(managedCluster)
 	ret.HubEndpoint = opts.Platform.Metrics.HubEndpoint.Host // Use the same host as the metrics for alerts forwarding
@@ -494,6 +490,9 @@ func (o *OptionsBuilder) addConfigMap(ctx context.Context, configMaps *[]*corev1
 
 func (o *OptionsBuilder) getAvailableConfigResources(ctx context.Context, mcAddon *addonapiv1beta1.ManagedClusterAddOn) ([]client.Object, error) {
 	ret := []client.Object{}
+	if mcAddon == nil {
+		return ret, nil
+	}
 
 	for _, cfg := range mcAddon.Status.ConfigReferences {
 		var obj client.Object
@@ -533,34 +532,24 @@ func (o *OptionsBuilder) getAvailableConfigResources(ctx context.Context, mcAddo
 }
 
 // cooIsSubscribed returns true if coo is considered installed, preventing conflicting resources creation.
-// It checks the feedback rules for the monitoringstacks.monitoring.rhobs CRD.
+// It checks the feedback rules for the alertmanagers.monitoring.rhobs CRD.
 func (o *OptionsBuilder) cooIsSubscribed(ctx context.Context, managedCluster *clusterv1.ManagedCluster) (bool, error) {
-	crdID := workv1.ResourceIdentifier{
-		Group:    apiextensionsv1.GroupName,
-		Resource: crdResourceName,
-		Name:     config.AlertmanagerCRDName,
-	}
-
-	feedback, err := common.GetFeedbackValuesForResources(ctx, o.Client, managedCluster.Name, addoncfg.Name, crdID)
+	subscribed, hasFeedback, err := common.IsCOOSubscribedOnSpoke(ctx, o.Client, managedCluster.Name, addoncfg.Name)
 	if err != nil {
-		return false, fmt.Errorf("failed to get feedback values for %s: %w", crdID.Name, err)
+		return false, fmt.Errorf("failed to check if coo is subscribed on the managed cluster: %w", err)
 	}
 
-	crdFeedback, ok := feedback[crdID]
-	if !ok || len(crdFeedback) == 0 {
-		o.Logger.V(2).Info(fmt.Sprintf("%s CRD not found in manifestwork status, considering COO as not subscribed", config.AlertmanagerCRDName))
+	if !hasFeedback {
+		o.Logger.V(2).Info("CRD not found in manifestwork status, considering COO as not subscribed", "crd", config.AlertmanagerCRDName)
 		return false, nil
 	}
 
-	olmValues := common.FilterFeedbackValuesByName(crdFeedback, addoncfg.IsOLMManagedFeedbackName)
-	for _, v := range olmValues {
-		if v.Value.String != nil && strings.ToLower(*v.Value.String) == "true" {
-			o.Logger.V(2).Info(fmt.Sprintf("found %s CRD with OLM label, considering COO as subscribed", config.AlertmanagerCRDName))
-			return true, nil
-		}
+	if subscribed {
+		o.Logger.V(2).Info("found CRD with OLM label, considering COO as subscribed", "crd", config.AlertmanagerCRDName)
+		return true, nil
 	}
 
-	o.Logger.V(2).Info(fmt.Sprintf("%s CRD missing the OLM label, considering COO as not subscribed", config.AlertmanagerCRDName))
+	o.Logger.V(2).Info("CRD missing the OLM label, considering COO as not subscribed", "crd", config.AlertmanagerCRDName)
 	return false, nil
 }
 

@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/go-logr/logr"
+	ocinfrav1 "github.com/openshift/api/config/v1"
 	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
 	operatorsv1 "github.com/operator-framework/api/pkg/operators/v1"
 	operatorsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
@@ -12,6 +13,7 @@ import (
 	uiplugin "github.com/rhobs/observability-operator/pkg/apis/uiplugin/v1alpha1"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
+	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -25,8 +27,36 @@ import (
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	fakeaddon "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	workv1 "open-cluster-management.io/api/work/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
+
+func newImagesConfigMap() *corev1.ConfigMap {
+	return &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      mconfig.ImagesConfigMapObjKey.Name,
+			Namespace: mconfig.ImagesConfigMapObjKey.Namespace,
+		},
+		Data: map[string]string{
+			"obo_prometheus_rhel9_operator": "quay.io/prometheus/obo-operator",
+			"prometheus_config_reloader":    "quay.io/prometheus/config-reloader",
+			"kube_rbac_proxy":               "quay.io/kube/rbac-proxy",
+			"kube_state_metrics":            "quay.io/kube/kube-state-metrics",
+			"node_exporter":                 "quay.io/kube/node-exporter",
+			"prometheus":                    "quay.io/prometheus/prometheus",
+			"endpoint_monitoring_operator":  "quay.io/stolostron/endpoint-monitoring-operator",
+		},
+	}
+}
+
+func newClusterVersion() *ocinfrav1.ClusterVersion {
+	return &ocinfrav1.ClusterVersion{
+		ObjectMeta: metav1.ObjectMeta{Name: "version"},
+		Spec: ocinfrav1.ClusterVersionSpec{
+			ClusterID: "hub-cluster-id",
+		},
+	}
+}
 
 var (
 	_ = loggingv1.AddToScheme(scheme.Scheme)
@@ -37,6 +67,8 @@ var (
 	_ = addonapiv1beta1.Install(scheme.Scheme)
 	_ = apiextensionsv1.AddToScheme(scheme.Scheme)
 	_ = uiplugin.AddToScheme(scheme.Scheme)
+	_ = ocinfrav1.AddToScheme(scheme.Scheme)
+	_ = workv1.Install(scheme.Scheme)
 )
 
 func newTestGetter(aodc *addonapiv1beta1.AddOnDeploymentConfig) addonutils.AddOnDeploymentConfigGetter {
@@ -197,7 +229,7 @@ func Test_Supported_Vendors(t *testing.T) {
 
 			fakeKubeClient := fake.NewClientBuilder().
 				WithScheme(scheme.Scheme).
-				WithObjects(addOnDeploymentConfig, clf, staticCred).
+				WithObjects(addOnDeploymentConfig, clf, staticCred, newImagesConfigMap(), newClusterVersion()).
 				Build()
 
 			loggingAgentAddon, err := addonfactory.NewAgentAddonFactory(addoncfg.Name, addon.FS, addoncfg.McoaChartDir).
@@ -263,7 +295,7 @@ func TestRSOnlyBothDisabled_ManifestsNotEmpty(t *testing.T) {
 
 	fakeKubeClient := fake.NewClientBuilder().
 		WithScheme(scheme.Scheme).
-		WithObjects(addOnDeploymentConfig).
+		WithObjects(addOnDeploymentConfig, newImagesConfigMap(), newClusterVersion()).
 		Build()
 
 	agentAddon, err := addonfactory.NewAgentAddonFactory(addoncfg.Name, addon.FS, addoncfg.McoaChartDir).
@@ -283,6 +315,83 @@ func TestRSOnlyBothDisabled_ManifestsNotEmpty(t *testing.T) {
 	for _, obj := range objects {
 		if obj.GetObjectKind().GroupVersionKind().Kind == "PrometheusRule" {
 			t.Errorf("unexpected PrometheusRule in manifests when both RS features are disabled: %s", obj.GetObjectKind())
+		}
+	}
+}
+
+// TestRSOnlyMetricsCollectionMissing_NoMonitoringStack verifies that when only
+// Right-Sizing variables are configured in the AddOnDeploymentConfig (and metrics
+// collection variables are missing/disabled), the rendering pipeline does NOT render
+// any PrometheusAgent, prometheus-operator Deployment, ScrapeConfigs, secrets, or
+// unneeded NetworkPolicies.
+func TestRSOnlyMetricsCollectionMissing_NoMonitoringStack(t *testing.T) {
+	managedCluster := addontesting.NewManagedCluster("cluster-1")
+	managedCluster.Labels = map[string]string{"vendor": "OpenShift"}
+
+	managedClusterAddOn := addontesting.NewAddon("test", "cluster-1")
+	managedClusterAddOn.Status.ConfigReferences = []addonapiv1beta1.ConfigReference{
+		{
+			ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
+				Group:    "addon.open-cluster-management.io",
+				Resource: "addondeploymentconfigs",
+			},
+			DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+				ConfigReferent: addonapiv1beta1.ConfigReferent{
+					Name:      "multicluster-observability-addon",
+					Namespace: "open-cluster-management-observability",
+				},
+			},
+		},
+	}
+
+	addOnDeploymentConfig := &addonapiv1beta1.AddOnDeploymentConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "multicluster-observability-addon",
+			Namespace: "open-cluster-management-observability",
+		},
+		Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+			CustomizedVariables: []addonapiv1beta1.CustomizedVariable{
+				{Name: addon.KeyRightSizingDelegated, Value: "true"},
+				{Name: addon.KeyPlatformNamespaceRightSizing, Value: "enabled"},
+				{Name: addon.KeyPlatformVirtualizationRightSizing, Value: "enabled"},
+			},
+		},
+	}
+
+	fakeKubeClient := fake.NewClientBuilder().
+		WithScheme(scheme.Scheme).
+		WithObjects(addOnDeploymentConfig, newImagesConfigMap(), newClusterVersion()).
+		Build()
+
+	agentAddon, err := addonfactory.NewAgentAddonFactory(addoncfg.Name, addon.FS, addoncfg.McoaChartDir).
+		WithGetValuesFuncs(GetValuesFunc(t.Context(), fakeKubeClient, newTestGetter(addOnDeploymentConfig), logr.Discard())).
+		WithAgentRegistrationOption(&agent.RegistrationOption{}).
+		WithScheme(scheme.Scheme).
+		BuildHelmAgentAddon()
+	require.NoError(t, err)
+
+	objects, err := agentAddon.Manifests(t.Context(), managedCluster, managedClusterAddOn)
+	require.NoError(t, err)
+	require.NotEmpty(t, objects)
+
+	for _, obj := range objects {
+		gvk := obj.GetObjectKind().GroupVersionKind()
+		name := ""
+		if metaObj, ok := obj.(metav1.Object); ok {
+			name = metaObj.GetName()
+		}
+
+		if gvk.Kind == "PrometheusAgent" {
+			t.Errorf("unexpected PrometheusAgent rendered when metrics collection is missing: %s", name)
+		}
+		if gvk.Kind == "Deployment" && name == "prometheus-operator" {
+			t.Errorf("unexpected prometheus-operator Deployment rendered when metrics collection is missing")
+		}
+		if gvk.Kind == "NetworkPolicy" && (name == "platform-metrics-collector" || name == "prometheus-operator") {
+			t.Errorf("unexpected NetworkPolicy %s rendered when metrics collection is missing", name)
+		}
+		if gvk.Kind == "ScrapeConfig" {
+			t.Errorf("unexpected ScrapeConfig %s rendered when metrics collection is missing", name)
 		}
 	}
 }

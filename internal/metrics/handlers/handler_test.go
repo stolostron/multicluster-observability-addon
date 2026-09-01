@@ -327,10 +327,13 @@ func TestBuildOptions(t *testing.T) {
 		"no metrics collection enabled": {
 			resources: createResources,
 			expects: func(t *testing.T, opts Options, err error) {
-				assert.Empty(t, opts.ClusterName)
-				assert.Empty(t, opts.ClusterID)
+				require.NoError(t, err)
+				assert.Equal(t, spokeName, opts.ClusterName)
+				assert.Equal(t, clusterID, opts.ClusterID)
 				assert.Nil(t, opts.Platform.PrometheusAgent)
 				assert.Nil(t, opts.UserWorkloads.PrometheusAgent)
+				assert.False(t, opts.IsPlatformEnabled())
+				assert.False(t, opts.IsUserWorkloadsEnabled())
 			},
 		},
 		"missing cluster ID": {
@@ -915,6 +918,14 @@ func newManifestWork(name string, isOLMSubscrided bool) *workv1.ManifestWork {
 							Group:    apiextensionsv1.GroupName,
 							Resource: "customresourcedefinitions",
 							Name:     config.AlertmanagerCRDName,
+						},
+						Conditions: []metav1.Condition{
+							{
+								Type:               workv1.WorkAvailable,
+								Status:             metav1.ConditionTrue,
+								Reason:             "ResourceAvailable",
+								LastTransitionTime: metav1.Now(),
+							},
 						},
 						StatusFeedbacks: workv1.StatusFeedbackResult{
 							Values: []workv1.FeedbackValue{

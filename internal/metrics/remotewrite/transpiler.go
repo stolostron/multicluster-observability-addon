@@ -172,6 +172,12 @@ func Transpile(scrapeConfig *cooprometheusv1alpha1.ScrapeConfig, agent *cooprome
 			cfg.DeepCopyInto(&relabelConfigsCopy[i])
 		}
 
+		// Append identification relabel configs from the original agent remoteWrite
+		// (e.g. cluster/clusterID label assignments) after our filtering rules.
+		for _, cfg := range agentRw.WriteRelabelConfigs {
+			relabelConfigsCopy = append(relabelConfigsCopy, *cfg.DeepCopy())
+		}
+
 		spec := &cooprometheusv1.RemoteWriteSpec{
 			WriteRelabelConfigs: relabelConfigsCopy,
 		}

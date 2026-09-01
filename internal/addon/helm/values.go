@@ -8,6 +8,7 @@ import (
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
 	rshandlers "github.com/stolostron/multicluster-observability-addon/internal/analytics/rightsizing/handlers"
+	chandlers "github.com/stolostron/multicluster-observability-addon/internal/coo/handlers"
 	cmanifests "github.com/stolostron/multicluster-observability-addon/internal/coo/manifests"
 	lhandlers "github.com/stolostron/multicluster-observability-addon/internal/logging/handlers"
 	lmanifests "github.com/stolostron/multicluster-observability-addon/internal/logging/manifests"
@@ -79,7 +80,7 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, getter addonutils.Add
 			return nil, fmt.Errorf("failed to get tracing values: %w", err)
 		}
 
-		userValues.COO, err = getCOOValues(cluster, opts)
+		userValues.COO, err = getCOOValues(ctx, k8s, logger, cluster, opts)
 		if err != nil {
 			return nil, err
 		}
@@ -109,11 +110,6 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, getter addonutils.Add
 }
 
 func getMonitoringValues(ctx context.Context, k8s client.Client, logger logr.Logger, cluster *clusterv1.ManagedCluster, mcAddon *addonapiv1beta1.ManagedClusterAddOn, opts addon.Options) (*mmanifests.MetricsValues, error) {
-	if !opts.Platform.Metrics.CollectionEnabled && !opts.UserWorkloads.Metrics.CollectionEnabled {
-		logger.V(2).Info("both platform and userWorkloads metrics are disabled, ignoring cluster")
-		return nil, nil
-	}
-
 	optsBuilder := mhandlers.OptionsBuilder{
 		Client: k8s,
 		Logger: logger,
@@ -165,12 +161,28 @@ func getTracingValues(ctx context.Context, k8s client.Client, cluster *clusterv1
 	return &tracing, nil
 }
 
-func getCOOValues(cluster *clusterv1.ManagedCluster, opts addon.Options) (*cmanifests.COOValues, error) {
+func getCOOValues(ctx context.Context, k8s client.Client, logger logr.Logger, cluster *clusterv1.ManagedCluster, opts addon.Options) (*cmanifests.COOValues, error) {
 	if !common.IsOpenShiftVendor(cluster) {
 		return nil, nil
 	}
 
-	return cmanifests.BuildValues(opts, common.IsHubCluster(cluster)), nil
+	isHub := common.IsHubCluster(cluster)
+
+	var installCOO bool
+	var err error
+	var hasCardinalityRules bool
+	if isHub {
+		// Hub COO installation is handled by HubResourceReconciler, not ManifestWork.
+		installCOO = false
+		hasCardinalityRules = chandlers.HasCardinalityRules(ctx, k8s)
+	} else {
+		installCOO, err = chandlers.InstallOfCOOOnSpokeIsNeeded(ctx, k8s, logger, cluster.Name)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return cmanifests.BuildValues(opts, installCOO, isHub, hasCardinalityRules), nil
 }
 
 func getRightSizingValues(ctx context.Context, k8s client.Client, logger logr.Logger, cluster *clusterv1.ManagedCluster, opts addon.Options) (*rshandlers.RightSizingValues, error) {
