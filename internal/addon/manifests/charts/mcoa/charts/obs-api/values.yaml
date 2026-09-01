@@ -1,3 +1,4 @@
 nameOverride: null
 
 enabled: false
+metricsWriteEndpoint: "http://observability-thanos-receive.open-cluster-management-observability.svc.cluster.local:19291"

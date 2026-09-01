@@ -127,7 +127,7 @@ spec:
             - '--web.listen=0.0.0.0:8080'
             - '--web.internal.listen=0.0.0.0:8081'
             - '--metrics.read.endpoint=http://observability-thanos-query-frontend.open-cluster-management-observability.svc.cluster.local:9090'
-            - '--metrics.write.endpoint=http://observability-thanos-receive.open-cluster-management-observability.svc.cluster.local:19291'
+            - '--metrics.write.endpoint={{ .Values.metricsWriteEndpoint }}'
             - '--log.level=warn'
             - '--rbac.config=/etc/observatorium/rbac.yaml'
             - '--tenants.config=/etc/observatorium/tenants.yaml'
