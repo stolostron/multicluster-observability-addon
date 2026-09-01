@@ -47,8 +47,9 @@ func (b *ObjectBuilder) Build(ctx context.Context, cluster *clusterv1.ManagedClu
 	}
 
 	store := b.buildStore(opts, storeImage)
+	receive := b.buildReceive(opts)
 
-	return []runtime.Object{store}, nil
+	return []runtime.Object{store, receive}, nil
 }
 
 func (b *ObjectBuilder) buildStore(opts addon.Options, storeImage string) *thanosv1alpha1.ThanosStore {
@@ -89,6 +90,60 @@ func (b *ObjectBuilder) buildStore(opts addon.Options, storeImage string) *thano
 	return store
 }
 
+func (b *ObjectBuilder) buildReceive(opts addon.Options) *thanosv1alpha1.ThanosReceive {
+	retention := thanosv1alpha1.Duration(config.DefaultReceiveRetention)
+
+	receive := &thanosv1alpha1.ThanosReceive{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: thanosv1alpha1.GroupVersion.String(),
+			Kind:       "ThanosReceive",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "mcoa",
+			Namespace: config.HubInstallNamespace,
+			Labels:    receiveLabels(),
+		},
+		Spec: thanosv1alpha1.ThanosReceiveSpec{
+			Router: thanosv1alpha1.RouterSpec{
+				Replicas:          config.DefaultReceiveRouterReplicas,
+				ReplicationFactor: config.DefaultReceiveRouterReplication,
+				ExternalLabels:    thanosv1alpha1.ExternalLabels{"receive": "true"},
+			},
+			Ingester: thanosv1alpha1.IngesterSpec{
+				DefaultObjectStorageConfig: thanosv1alpha1.ObjectStorageConfig{
+					LocalObjectReference: corev1.LocalObjectReference{Name: config.ObjectStorageSecretName},
+					Key:                  config.ObjectStorageSecretKey,
+				},
+				Hashrings: []thanosv1alpha1.IngesterHashringSpec{
+					{
+						Name:     config.DefaultReceiveHashringName,
+						Replicas: config.DefaultReceiveIngesterReplicas,
+						TSDBConfig: thanosv1alpha1.TSDBConfig{
+							Retention: retention,
+						},
+						StorageConfiguration: thanosv1alpha1.StorageConfiguration{
+							Size: thanosv1alpha1.StorageSize(config.DefaultReceiveIngesterStorageSize),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	ApplyCommonThanosFields(&receive.Spec.Router.CommonFields, opts, config.ThanosReceiveRouterContainerID)
+	ApplyCommonThanosFields(&receive.Spec.Ingester.Hashrings[0].CommonFields, opts, config.ThanosReceiveIngesterContainerID)
+
+	return receive
+}
+
+func receiveLabels() map[string]string {
+	labels := make(map[string]string, len(mcoaLabels)+2)
+	maps.Copy(labels, mcoaLabels)
+	labels["app.kubernetes.io/component"] = "receive"
+	labels["app.kubernetes.io/name"] = config.ThanosOperatorAppName
+	return labels
+}
+
 func storeLabels() map[string]string {
 	labels := make(map[string]string, len(mcoaLabels)+2)
 	maps.Copy(labels, mcoaLabels)
@@ -111,7 +166,7 @@ func ApplyCommonThanosFields(fields *thanosv1alpha1.CommonFields, opts addon.Opt
 		fields.Tolerations = opts.Tolerations
 	}
 
-	fields.ResourceRequirements = defaultStoreResources()
+	fields.ResourceRequirements = defaultResources(containerID)
 	for _, resReq := range opts.ResourceReqs {
 		if resReq.ContainerID == containerID {
 			fields.ResourceRequirements = &resReq.Resources
@@ -124,11 +179,28 @@ func ApplyCommonThanosFields(fields *thanosv1alpha1.CommonFields, opts addon.Opt
 	}
 }
 
-func defaultStoreResources() *corev1.ResourceRequirements {
-	return &corev1.ResourceRequirements{
-		Requests: corev1.ResourceList{
-			corev1.ResourceCPU:    resource.MustParse(config.DefaultStoreCPURequest),
-			corev1.ResourceMemory: resource.MustParse(config.DefaultStoreMemRequest),
-		},
+func defaultResources(containerID string) *corev1.ResourceRequirements {
+	switch containerID {
+	case config.ThanosReceiveRouterContainerID:
+		return &corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse(config.DefaultReceiveRouterCPURequest),
+				corev1.ResourceMemory: resource.MustParse(config.DefaultReceiveRouterMemRequest),
+			},
+		}
+	case config.ThanosReceiveIngesterContainerID:
+		return &corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse(config.DefaultReceiveIngesterCPURequest),
+				corev1.ResourceMemory: resource.MustParse(config.DefaultReceiveIngesterMemRequest),
+			},
+		}
+	default:
+		return &corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse(config.DefaultStoreCPURequest),
+				corev1.ResourceMemory: resource.MustParse(config.DefaultStoreMemRequest),
+			},
+		}
 	}
 }

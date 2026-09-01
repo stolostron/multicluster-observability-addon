@@ -77,6 +77,20 @@ const (
 	DefaultStoreMemRequest  = "1Gi"
 	ThanosStoreContainerID  = "statefulsets:mcoa:thanos"
 
+	// Thanos Receive defaults
+	DefaultReceiveRouterReplicas      = 1
+	DefaultReceiveRouterReplication   = 1
+	DefaultReceiveIngesterReplicas    = 3
+	DefaultReceiveIngesterStorageSize = "10Gi"
+	DefaultReceiveRetention           = "15d"
+	DefaultReceiveRouterCPURequest    = "100m"
+	DefaultReceiveRouterMemRequest    = "256Mi"
+	DefaultReceiveIngesterCPURequest  = "100m"
+	DefaultReceiveIngesterMemRequest  = "1Gi"
+	ThanosReceiveRouterContainerID    = "deployments:mcoa:thanos-receive-router"
+	ThanosReceiveIngesterContainerID  = "statefulsets:mcoa:thanos-receive-ingester"
+	DefaultReceiveHashringName        = "default"
+
 	// Thanos object storage configuration
 	ObjectStorageSecretName = "thanos-object-storage"
 	ObjectStorageSecretKey  = "thanos.yaml"
