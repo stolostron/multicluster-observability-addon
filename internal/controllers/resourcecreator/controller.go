@@ -65,6 +65,10 @@ var cmaoPredicate = builder.WithPredicates(predicate.Funcs{
 	GenericFunc: func(e event.GenericEvent) bool { return false },
 })
 
+var hubMCAOPredicate = builder.WithPredicates(predicate.NewPredicateFuncs(func(obj client.Object) bool {
+	return obj.GetName() == addoncfg.Name
+}))
+
 var rsConfigMapPredicate = builder.WithPredicates(rshandlers.RSConfigMapPredicate())
 
 var partOfMCOALabelSelector = labels.SelectorFromSet(labels.Set{
@@ -100,6 +104,8 @@ func SetupWithManager(mgr ctrl.Manager, logger logr.Logger) error {
 		// Trigger reconciliations if logging resources change
 		Watches(&lokiv1.LokiStack{}, r.enqueueForMCOAOwnedResources()).
 		Watches(&loggingv1.ClusterLogForwarder{}, r.enqueueForMCOAOwnedResources()).
+		// Trigger when the hub ManagedClusterAddOn is created so LokiStack can be attached to it
+		Watches(&addonv1beta1.ManagedClusterAddOn{}, r.enqueueAODC(), hubMCAOPredicate).
 		Complete(r)
 }
 
@@ -180,7 +186,7 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		objs = append(objs, lCLFDefaultConfig...)
 	}
 
-	lsObjs, lsDefaultConfig, lsErr := lhandlers.BuildLokiStackResources(ctx, r.Client, opts.Platform.Logs, opts.UserWorkloads.Logs, opts.HubHostname)
+	lsObjs, lsClusterConfig, lsErr := lhandlers.BuildLokiStackResources(ctx, r.Client, opts.Platform.Logs, opts.UserWorkloads.Logs, opts.HubHostname)
 	if lsErr != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to build LokiStack resources: %w", lsErr)
 	}
@@ -189,7 +195,25 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 			return ctrl.Result{}, fmt.Errorf("failed to apply LokiStack resource %s/%s: %w", obj.GetNamespace(), obj.GetName(), err)
 		}
 	}
-	objs = append(objs, lsDefaultConfig...)
+
+	hubName, err := common.LookupHubClusterName(ctx, r.Client)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to look up hub cluster: %w", err)
+	}
+	desiredLokiStackConfigs := make([]addonv1beta1.AddOnConfig, 0, len(lsClusterConfig))
+	for _, cfg := range lsClusterConfig {
+		if cfg.ClusterNamespace == hubName {
+			desiredLokiStackConfigs = append(desiredLokiStackConfigs, cfg.Config)
+		}
+	}
+	if err := common.ApplyManagedClusterAddOnConfigs(ctx, r.Log, r.Client, hubName, desiredLokiStackConfigs, lokiv1.GroupVersion.Group, addoncfg.LokiStacksResource); err != nil {
+		if apierrors.IsNotFound(err) && len(desiredLokiStackConfigs) > 0 {
+			r.Log.Info("hub ManagedClusterAddOn not found, requeueing", "namespace", hubName)
+			return ctrl.Result{RequeueAfter: addoncfg.DefaultContextTimeout}, nil
+		}
+		return ctrl.Result{}, fmt.Errorf("failed to apply LokiStack config on ManagedClusterAddOn: %w", err)
+	}
+
 	// If CLF had errors, requeue after LokiStack is applied
 	if clfErr != nil {
 		return ctrl.Result{}, clfErr
