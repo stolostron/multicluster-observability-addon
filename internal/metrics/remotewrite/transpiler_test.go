@@ -378,6 +378,67 @@ func TestSharedPointerCacheIsolation(t *testing.T) {
 	}
 }
 
+func TestTranspile_PreservesIdentificationRelabelConfigs(t *testing.T) {
+	scrapeConfig := &cooprometheusv1alpha1.ScrapeConfig{
+		Spec: cooprometheusv1alpha1.ScrapeConfigSpec{
+			Params: map[string][]string{
+				"match[]": {"up"},
+			},
+		},
+	}
+
+	agent := &cooprometheusv1alpha1.PrometheusAgent{
+		Spec: cooprometheusv1alpha1.PrometheusAgentSpec{
+			CommonPrometheusFields: cooprometheusv1.CommonPrometheusFields{
+				RemoteWrite: []cooprometheusv1.RemoteWriteSpec{
+					{
+						Name: ptr.To("acm-observability"),
+						URL:  "https://example.com/write",
+						WriteRelabelConfigs: []cooprometheusv1.RelabelConfig{
+							{
+								Action:      "replace",
+								Replacement: ptr.To("local-cluster"),
+								TargetLabel: "cluster",
+							},
+							{
+								Action:      "replace",
+								Replacement: ptr.To("cc983d7a-2cd2-4171-b55c-d978e587a978"),
+								TargetLabel: "clusterID",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	gotList, err := Transpile(scrapeConfig, agent)
+	if err != nil {
+		t.Fatalf("Transpile returned error: %v", err)
+	}
+	if len(gotList) != 1 {
+		t.Fatalf("Expected exactly 1 transpiled spec, got %d", len(gotList))
+	}
+	got := gotList[0]
+
+	promCfgs := convertToPromRelabel(got.WriteRelabelConfigs)
+
+	input := labels.FromMap(map[string]string{"__name__": "up", "job": "prometheus"})
+	lb := labels.NewBuilder(input)
+	keep := relabel.ProcessBuilder(lb, promCfgs...)
+	if !keep {
+		t.Fatal("Expected 'up' metric to be kept, but it was dropped")
+	}
+
+	res := lb.Labels()
+	if got := res.Get("cluster"); got != "local-cluster" {
+		t.Errorf("Expected cluster label to be 'local-cluster', got %q", got)
+	}
+	if got := res.Get("clusterID"); got != "cc983d7a-2cd2-4171-b55c-d978e587a978" {
+		t.Errorf("Expected clusterID label to be 'cc983d7a-2cd2-4171-b55c-d978e587a978', got %q", got)
+	}
+}
+
 func TestTranspile_MultipleRemoteWrites(t *testing.T) {
 	scrapeConfig := &cooprometheusv1alpha1.ScrapeConfig{
 		Spec: cooprometheusv1alpha1.ScrapeConfigSpec{
