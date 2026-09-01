@@ -39,7 +39,7 @@ func IsCRDEstablished(ctx context.Context, k8s client.Client, name string) (bool
 		return false, nil
 	}
 	for _, c := range conditions {
-		condition, ok := c.(map[string]interface{})
+		condition, ok := c.(map[string]any)
 		if !ok {
 			continue
 		}
