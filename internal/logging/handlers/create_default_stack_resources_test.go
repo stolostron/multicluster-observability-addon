@@ -8,6 +8,7 @@ import (
 
 	lokiv1 "github.com/grafana/loki/operator/api/loki/v1"
 	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
+	"github.com/stolostron/cluster-lifecycle-api/constants"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
@@ -70,19 +71,21 @@ func buildObjStorageSecret() *corev1.Secret {
 	}
 }
 
+func hubCluster(name string) *clusterv1.ManagedCluster {
+	return &clusterv1.ManagedCluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   name,
+			Labels: map[string]string{constants.SelfManagedClusterLabelKey: "true"},
+		},
+	}
+}
+
 func TestDeleteOrphanResources_KeepsMatchingResources(t *testing.T) {
 	ctx := t.Context()
 	scheme := buildTestScheme(t)
 	cmao := buildTestCMAO(globalPlacement())
 
-	objStorageSecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      lmanifests.DefaultStorageObjStorageSecretName,
-			Namespace: addoncfg.InstallNamespace,
-		},
-	}
-
-	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cmao, objStorageSecret).Build()
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cmao, buildObjStorageSecret()).Build()
 
 	platform := addon.LogsOptions{DefaultStack: true}
 
@@ -129,31 +132,15 @@ func TestUnmanagedStackReturnsEmpty(t *testing.T) {
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cmao).Build()
 	unmanagedOpts := addon.LogsOptions{DefaultStack: false}
 
-	cases := []struct {
-		name string
-		call func() ([]client.Object, []common.DefaultConfig, error)
-	}{
-		{
-			name: "BuildCLFResources",
-			call: func() ([]client.Object, []common.DefaultConfig, error) {
-				return BuildCLFResources(ctx, fakeClient, cmao, unmanagedOpts, addon.LogsOptions{}, "hub.example.com")
-			},
-		},
-		{
-			name: "BuildLokiStackResources",
-			call: func() ([]client.Object, []common.DefaultConfig, error) {
-				return BuildLokiStackResources(ctx, fakeClient, unmanagedOpts, addon.LogsOptions{}, "hub.example.com")
-			},
-		},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			objs, cfgs, err := tc.call()
-			require.NoError(t, err)
-			assert.Empty(t, objs)
-			assert.Empty(t, cfgs)
-		})
-	}
+	clfObjs, clfCfgs, err := BuildCLFResources(ctx, fakeClient, cmao, unmanagedOpts, addon.LogsOptions{}, "hub.example.com")
+	require.NoError(t, err)
+	assert.Empty(t, clfObjs)
+	assert.Empty(t, clfCfgs)
+
+	lsObjs, lsCfgs, err := BuildLokiStackResources(ctx, fakeClient, unmanagedOpts, addon.LogsOptions{}, "hub.example.com")
+	require.NoError(t, err)
+	assert.Empty(t, lsObjs)
+	assert.Empty(t, lsCfgs)
 }
 
 func TestBuildCLFResources(t *testing.T) {
@@ -210,27 +197,60 @@ func TestBuildCLFResources(t *testing.T) {
 }
 
 func TestBuildLokiStackResources(t *testing.T) {
-	t.Run("managed stack: creates LokiStack with global placement config", func(t *testing.T) {
+	t.Run("managed stack: LokiStack is a hub cluster config, not a CMAO placement config", func(t *testing.T) {
 		ctx := t.Context()
 		scheme := buildTestScheme(t)
-		// No managed clusters — no per-tenant certs generated.
-		fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(buildObjStorageSecret()).Build()
+		cmao := buildTestCMAO(globalPlacement())
+		hub := hubCluster("local-cluster")
+		spoke := &clusterv1.ManagedCluster{ObjectMeta: metav1.ObjectMeta{Name: "spoke-1"}}
+		fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cmao, hub, spoke, buildObjStorageSecret()).Build()
 
-		objs, cfgs, err := BuildLokiStackResources(ctx, fakeClient, addon.LogsOptions{DefaultStack: true}, addon.LogsOptions{}, "hub.example.com")
+		clfObjs, placementConfigs, err := BuildCLFResources(ctx, fakeClient, cmao, addon.LogsOptions{DefaultStack: true}, addon.LogsOptions{}, "hub.example.com")
 		require.NoError(t, err)
-		require.NotEmpty(t, objs, "at least the LokiStack must be returned")
-		require.Len(t, cfgs, 1, "exactly one defaultConfig for the global LokiStack placement")
+		require.Len(t, placementConfigs, 1)
+		assert.Equal(t, addoncfg.GlobalPlacementRef, placementConfigs[0].PlacementRef)
+		assert.Equal(t, addoncfg.ClusterLogForwardersResource, placementConfigs[0].Config.Resource)
+		for _, cfg := range placementConfigs {
+			assert.NotEqual(t, addoncfg.LokiStacksResource, cfg.Config.Resource)
+		}
 
-		// Verify the LokiStack object.
-		ls, ok := objs[0].(*lokiv1.LokiStack)
-		require.True(t, ok, "first returned object must be a LokiStack")
-		assert.Equal(t, fmt.Sprintf("%s-%s", addoncfg.DefaultStackPrefix, addoncfg.GlobalPlacementName), ls.Name)
-		assert.Equal(t, addoncfg.InstallNamespace, ls.Namespace)
-		assert.Equal(t, lokiv1.ManagementStateUnmanaged, ls.Spec.ManagementState)
+		lsObjs, clusterConfigs, err := BuildLokiStackResources(ctx, fakeClient, addon.LogsOptions{DefaultStack: true}, addon.LogsOptions{}, "hub.example.com")
+		require.NoError(t, err)
+		require.Len(t, clusterConfigs, 1)
+		assert.Equal(t, "local-cluster", clusterConfigs[0].ClusterNamespace)
+		assert.Equal(t, addoncfg.LokiStacksResource, clusterConfigs[0].Config.Resource)
+		assert.Equal(t, "loki.grafana.com", clusterConfigs[0].Config.Group)
+		assert.Equal(t, "mcoa-default-global", clusterConfigs[0].Config.Name)
 
-		// Verify the defaultConfig points to the global placement.
-		assert.Equal(t, addoncfg.GlobalPlacementRef, cfgs[0].PlacementRef)
-		assert.Equal(t, addoncfg.LokiStacksResource, cfgs[0].Config.Resource)
+		var foundLS bool
+		for _, obj := range lsObjs {
+			if ls, ok := obj.(*lokiv1.LokiStack); ok {
+				foundLS = true
+				assert.Equal(t, fmt.Sprintf("%s-%s", addoncfg.DefaultStackPrefix, addoncfg.GlobalPlacementName), ls.Name)
+				assert.Equal(t, addoncfg.InstallNamespace, ls.Namespace)
+				assert.Equal(t, lokiv1.ManagementStateUnmanaged, ls.Spec.ManagementState)
+				assert.Equal(t, addoncfg.GlobalPlacementNamespace+"/"+addoncfg.GlobalPlacementName, ls.Annotations[addoncfg.PlacementAnnotationKey])
+			}
+		}
+		assert.True(t, foundLS, "expected a LokiStack object")
+
+		kinds := map[string]int{}
+		for _, obj := range append(clfObjs, lsObjs...) {
+			kinds[obj.GetObjectKind().GroupVersionKind().Kind]++
+		}
+		assert.Equal(t, 1, kinds["ClusterLogForwarder"])
+		assert.Equal(t, 1, kinds["LokiStack"])
+	})
+
+	t.Run("uses labeled hub cluster name as MCAO namespace", func(t *testing.T) {
+		ctx := t.Context()
+		scheme := buildTestScheme(t)
+		fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(hubCluster("my-hub"), buildObjStorageSecret()).Build()
+
+		_, clusterConfigs, err := BuildLokiStackResources(ctx, fakeClient, addon.LogsOptions{DefaultStack: true}, addon.LogsOptions{}, "hub.example.com")
+		require.NoError(t, err)
+		require.Len(t, clusterConfigs, 1)
+		assert.Equal(t, "my-hub", clusterConfigs[0].ClusterNamespace)
 	})
 }
 
@@ -265,7 +285,7 @@ func TestBuildLokiStackResourcesWhenCLFFails(t *testing.T) {
 	require.Error(t, clfErr, "BuildCLFResources must fail when CLF Get returns an API error")
 	require.ErrorIs(t, clfErr, errSimulatedCLFGet)
 
-	lsObjs, lsDefaultConfig, err := BuildLokiStackResources(ctx, brokenClient, platform, addon.LogsOptions{}, "hub.example.com")
+	lsObjs, lsClusterConfig, err := BuildLokiStackResources(ctx, brokenClient, platform, addon.LogsOptions{}, "hub.example.com")
 	require.NoError(t, err, "BuildLokiStackResources must succeed even when CLF Get fails")
 
 	// Verify the LokiStack is present and correctly formed.
@@ -275,7 +295,8 @@ func TestBuildLokiStackResourcesWhenCLFFails(t *testing.T) {
 	assert.Equal(t, fmt.Sprintf("%s-%s", addoncfg.DefaultStackPrefix, addoncfg.GlobalPlacementName), ls.Name)
 	assert.Equal(t, addoncfg.InstallNamespace, ls.Namespace)
 
-	// Verify the defaultConfig is present so the CMAO placement is updated.
-	require.Len(t, lsDefaultConfig, 1, "LokiStack defaultConfig must be present")
-	assert.Equal(t, addoncfg.GlobalPlacementRef, lsDefaultConfig[0].PlacementRef)
+	// Verify the hub MCAO cluster config is present so storage is not fanned out via CMAO.
+	require.Len(t, lsClusterConfig, 1, "LokiStack cluster config must be present")
+	assert.Equal(t, addoncfg.HubNamespace, lsClusterConfig[0].ClusterNamespace)
+	assert.Equal(t, addoncfg.LokiStacksResource, lsClusterConfig[0].Config.Resource)
 }
