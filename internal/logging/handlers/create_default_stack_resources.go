@@ -59,7 +59,9 @@ func BuildCLFResources(ctx context.Context, k8s client.Client, cmao *addonv1beta
 }
 
 // BuildLokiStackResources builds the hub-global LokiStack and per-tenant certificates.
-func BuildLokiStackResources(ctx context.Context, k8s client.Client, platform, userWorkloads addon.LogsOptions, hubHostname string) ([]client.Object, []common.DefaultConfig, error) {
+// LokiStack is returned as a hub ManagedClusterAddOn config rather than a CMAO placement
+// config, so the addon-manager does not fan it out to every spoke.
+func BuildLokiStackResources(ctx context.Context, k8s client.Client, platform, userWorkloads addon.LogsOptions, hubHostname string) ([]client.Object, []common.ClusterAddonConfig, error) {
 	if !platform.DefaultStack {
 		return nil, nil, nil
 	}
@@ -101,9 +103,9 @@ func BuildLokiStackResources(ctx context.Context, k8s client.Client, platform, u
 		return nil, nil, err
 	}
 	objects := []client.Object{ls}
-	defaultConfig := []common.DefaultConfig{{
-		PlacementRef: addoncfg.GlobalPlacementRef,
-		Config:       addonConfig,
+	clusterConfig := []common.ClusterAddonConfig{{
+		ClusterNamespace: common.HubClusterName(managedClusters.Items),
+		Config:           addonConfig,
 	}}
 	for _, tenant := range tenants {
 		certObjs, err := manifests.BuildSSAClusterCertificates(tenant)
@@ -113,5 +115,5 @@ func BuildLokiStackResources(ctx context.Context, k8s client.Client, platform, u
 		objects = append(objects, certObjs...)
 	}
 
-	return objects, defaultConfig, nil
+	return objects, clusterConfig, nil
 }

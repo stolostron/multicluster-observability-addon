@@ -28,6 +28,13 @@ type DefaultConfig struct {
 	Config       addonv1beta1.AddOnConfig
 }
 
+// ClusterAddonConfig is an addon config applied to a single ManagedClusterAddOn
+// (the cluster namespace on the hub) rather than fanned out through CMAO placements.
+type ClusterAddonConfig struct {
+	ClusterNamespace string
+	Config           addonv1beta1.AddOnConfig
+}
+
 func NewMCOAClusterManagementAddOn() *addonv1beta1.ClusterManagementAddOn {
 	return &addonv1beta1.ClusterManagementAddOn{
 		TypeMeta: metav1.TypeMeta{
@@ -86,18 +93,17 @@ func EnsureAddonConfig(ctx context.Context, logger logr.Logger, k8s client.Clien
 	return nil
 }
 
-func ensureConfigsInAddon(cmao *addonv1beta1.ClusterManagementAddOn, configs []DefaultConfig) {
-	containsConfig := func(configs []addonv1beta1.AddOnConfig, cfg addonv1beta1.AddOnConfig) bool {
-		// Loops through each of the configs and checks if config is equal to the config passed in
-		return slices.ContainsFunc(configs, func(e addonv1beta1.AddOnConfig) bool {
-			return e == cfg
-		})
-	}
+func containsAddOnConfig(configs []addonv1beta1.AddOnConfig, cfg addonv1beta1.AddOnConfig) bool {
+	return slices.ContainsFunc(configs, func(e addonv1beta1.AddOnConfig) bool {
+		return e == cfg
+	})
+}
 
+func ensureConfigsInAddon(cmao *addonv1beta1.ClusterManagementAddOn, configs []DefaultConfig) {
 	// Group configs by placement.
 	placementConfigs := map[addonv1beta1.PlacementRef][]addonv1beta1.AddOnConfig{}
 	for _, cfg := range configs {
-		if containsConfig(placementConfigs[cfg.PlacementRef], cfg.Config) {
+		if containsAddOnConfig(placementConfigs[cfg.PlacementRef], cfg.Config) {
 			continue
 		}
 
@@ -110,7 +116,7 @@ func ensureConfigsInAddon(cmao *addonv1beta1.ClusterManagementAddOn, configs []D
 		desiredConfigs := placementConfigs[placement.PlacementRef]
 		dedupConfigs := make([]addonv1beta1.AddOnConfig, 0, len(desiredConfigs))
 		for _, cfg := range desiredConfigs {
-			if containsConfig(placement.Configs, cfg) {
+			if containsAddOnConfig(placement.Configs, cfg) {
 				continue
 			}
 			dedupConfigs = append(dedupConfigs, cfg)

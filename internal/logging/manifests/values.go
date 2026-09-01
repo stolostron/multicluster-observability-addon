@@ -176,7 +176,7 @@ func buildManagedValues(opts Options) (ManagedValues, error) {
 	}
 	mValues.Collection.CLFSpec = string(clfMarshaled)
 
-	if opts.IsHub {
+	if opts.DefaultStack.Storage.LokiStack != nil {
 		mValues.Storage = StorageValues{
 			Enabled: true,
 		}
