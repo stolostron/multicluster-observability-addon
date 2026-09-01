@@ -3,7 +3,9 @@ package common
 import (
 	"testing"
 
+	clusterlifecycleconstants "github.com/stolostron/cluster-lifecycle-api/constants"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
+	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 )
@@ -168,6 +170,44 @@ func TestIsOpenShiftVendor(t *testing.T) {
 			if isOpenShift != c.expected {
 				t.Errorf("expected IsOpenShiftVendor to be %v, got %v", c.expected, isOpenShift)
 			}
+		})
+	}
+}
+
+func TestHubClusterName(t *testing.T) {
+	tests := []struct {
+		name     string
+		clusters []clusterv1.ManagedCluster
+		want     string
+	}{
+		{
+			name:     "no clusters falls back to local-cluster",
+			clusters: nil,
+			want:     addoncfg.HubNamespace,
+		},
+		{
+			name: "spoke only falls back to local-cluster",
+			clusters: []clusterv1.ManagedCluster{
+				{ObjectMeta: metav1.ObjectMeta{Name: "spoke-1"}},
+			},
+			want: addoncfg.HubNamespace,
+		},
+		{
+			name: "labeled hub is selected even when not named local-cluster",
+			clusters: []clusterv1.ManagedCluster{
+				{ObjectMeta: metav1.ObjectMeta{Name: "spoke-1"}},
+				{ObjectMeta: metav1.ObjectMeta{
+					Name:   "my-hub",
+					Labels: map[string]string{clusterlifecycleconstants.SelfManagedClusterLabelKey: "true"},
+				}},
+			},
+			want: "my-hub",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, HubClusterName(tt.clusters))
 		})
 	}
 }

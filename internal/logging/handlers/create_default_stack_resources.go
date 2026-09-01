@@ -16,12 +16,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func BuildDefaultStackResources(ctx context.Context, k8s client.Client, cmao *addonv1beta1.ClusterManagementAddOn, platform, userWorkloads addon.LogsOptions, hubHostname string) ([]client.Object, []common.DefaultConfig, error) {
+func BuildDefaultStackResources(ctx context.Context, k8s client.Client, cmao *addonv1beta1.ClusterManagementAddOn, platform, userWorkloads addon.LogsOptions, hubHostname string) ([]client.Object, []common.DefaultConfig, []common.ClusterAddonConfig, error) {
 	objects := []client.Object{}
 	defaultConfig := []common.DefaultConfig{}
+	clusterConfig := []common.ClusterAddonConfig{}
 
 	if !platform.DefaultStack {
-		return objects, defaultConfig, nil
+		return objects, defaultConfig, clusterConfig, nil
 	}
 
 	defaultOpts := manifests.BuildDefaultStackOptions(platform, userWorkloads, hubHostname)
@@ -31,19 +32,19 @@ func BuildDefaultStackResources(ctx context.Context, k8s client.Client, cmao *ad
 		resourceName := fmt.Sprintf("%s-%s", addoncfg.DefaultStackPrefix, placement.Name)
 		key := client.ObjectKey{Namespace: addoncfg.InstallNamespace, Name: resourceName}
 		if err := k8s.Get(ctx, key, existingCLF); err != nil && !apierrors.IsNotFound(err) {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 
 		defaultOpts.DefaultStack.Collection.ClusterLogForwarder = existingCLF
 		clf, err := manifests.BuildSSAClusterLogForwarder(defaultOpts, resourceName, placement.Namespace, placement.Name)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 		objects = append(objects, clf)
 
 		addonConfig, err := common.ObjectToAddonConfig(clf)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 
 		defaultConfig = append(defaultConfig, common.DefaultConfig{
@@ -54,7 +55,7 @@ func BuildDefaultStackResources(ctx context.Context, k8s client.Client, cmao *ad
 
 	managedClusters := &clusterv1.ManagedClusterList{}
 	if err := k8s.List(ctx, managedClusters, &client.ListOptions{}); err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	tenants := make([]string, 0, len(managedClusters.Items))
 	for _, cluster := range managedClusters.Items {
@@ -65,7 +66,7 @@ func BuildDefaultStackResources(ctx context.Context, k8s client.Client, cmao *ad
 	resourceName := fmt.Sprintf("%s-%s", addoncfg.DefaultStackPrefix, addoncfg.GlobalPlacementName)
 	key := client.ObjectKey{Namespace: addoncfg.InstallNamespace, Name: resourceName}
 	if err := k8s.Get(ctx, key, existingLS); err != nil && !apierrors.IsNotFound(err) {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	defaultOpts.DefaultStack.Storage.LokiStack = existingLS
@@ -73,27 +74,29 @@ func BuildDefaultStackResources(ctx context.Context, k8s client.Client, cmao *ad
 
 	ls, err := manifests.BuildSSALokiStack(defaultOpts, resourceName, addoncfg.GlobalPlacementNamespace, addoncfg.GlobalPlacementName)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	objects = append(objects, ls)
 
 	addonConfig, err := common.ObjectToAddonConfig(ls)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
-	defaultConfig = append(defaultConfig, common.DefaultConfig{
-		PlacementRef: addoncfg.GlobalPlacementRef,
-		Config:       addonConfig,
+	// LokiStack is hub-only storage: attach it to the hub ManagedClusterAddOn rather than a CMAO
+	// placement, so the addon-manager does not fan it out to every spoke.
+	clusterConfig = append(clusterConfig, common.ClusterAddonConfig{
+		ClusterNamespace: common.HubClusterName(managedClusters.Items),
+		Config:           addonConfig,
 	})
 
 	for _, tenant := range tenants {
 		certObjs, err := manifests.BuildSSAClusterCertificates(tenant)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 		objects = append(objects, certObjs...)
 	}
 
-	return objects, defaultConfig, nil
+	return objects, defaultConfig, clusterConfig, nil
 }

@@ -33,28 +33,30 @@ func buildDefaultStackOptions(ctx context.Context, k8s client.Client, mcAddon *a
 
 	opts.DefaultStack.LokiURL = fmt.Sprintf("https://mcoa-observability-observatorium-api.%s.svc:8080/api/logs/v1/%s/otlp/v1/logs", addoncfg.InstallNamespace, mcAddon.Namespace)
 
-	if opts.IsHub {
-		ls, err := common.GetResourceWithOwnerRef(ctx, k8s, mcAddon, lokiv1.GroupVersion.Group, addoncfg.LokiStacksResource, &lokiv1.LokiStack{})
-		if err != nil {
-			return err
-		}
-
-		opts.DefaultStack.Storage.LokiStack = ls
-
-		objStorageSecret, err := common.GetSecret(ctx, k8s, ls.Namespace, mcAddon.Namespace, ls.Spec.Storage.Secret.Name)
-		if err != nil {
-			return err
-		}
-		opts.DefaultStack.Storage.ObjStorageSecret = *objStorageSecret
-
-		mTLSSecret, err := common.GetSecret(ctx, k8s, ls.Namespace, mcAddon.Namespace, manifests.DefaultStorageMTLSSecretName)
-		if err != nil {
-			return err
-		}
-		opts.DefaultStack.Storage.MTLSSecret = *mTLSSecret
-
+	// Storage is enabled only on clusters whose ManagedClusterAddOn references a LokiStack
+	// (the hub today; another cluster later). Spokes without that ref skip storage.
+	if len(common.GetObjectKeys(mcAddon.Status.ConfigReferences, lokiv1.GroupVersion.Group, addoncfg.LokiStacksResource)) == 0 {
 		return nil
 	}
+
+	ls, err := common.GetResourceWithOwnerRef(ctx, k8s, mcAddon, lokiv1.GroupVersion.Group, addoncfg.LokiStacksResource, &lokiv1.LokiStack{})
+	if err != nil {
+		return err
+	}
+
+	opts.DefaultStack.Storage.LokiStack = ls
+
+	objStorageSecret, err := common.GetSecret(ctx, k8s, ls.Namespace, mcAddon.Namespace, ls.Spec.Storage.Secret.Name)
+	if err != nil {
+		return err
+	}
+	opts.DefaultStack.Storage.ObjStorageSecret = *objStorageSecret
+
+	mTLSSecret, err = common.GetSecret(ctx, k8s, ls.Namespace, mcAddon.Namespace, manifests.DefaultStorageMTLSSecretName)
+	if err != nil {
+		return err
+	}
+	opts.DefaultStack.Storage.MTLSSecret = *mTLSSecret
 
 	return nil
 }
