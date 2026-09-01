@@ -165,7 +165,7 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	// Install Loki Operator directly on the hub via OLM when requested. This is applied as its
 	// own step, independent of the default logging stack resources below: the operator (and its
 	// CRDs) should be ready well before any LokiStack is built.
-	if err := lhandlers.ReconcileLokiOperator(ctx, r.Client, cmao, opts.LokiOperatorEnabled); err != nil {
+	if err = lhandlers.ReconcileLokiOperator(ctx, r.Client, cmao, opts.LokiOperatorEnabled); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to reconcile loki operator: %w", err)
 	}
 
