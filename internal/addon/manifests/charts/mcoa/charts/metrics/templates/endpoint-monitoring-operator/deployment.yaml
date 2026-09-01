@@ -1,4 +1,3 @@
-{{- if or .Values.platformEnabled .Values.userWorkloadsEnabled }}
 {{- $appName := "endpoint-monitoring-operator" }}
 apiVersion: apps/v1
 kind: Deployment
@@ -46,11 +45,9 @@ spec:
         {{- if and .Values.hubEndpoint (or (and .Values.platformEnabled .Values.platformAlertsEnabled) (and .Values.userWorkloadsEnabled .Values.userWorkloadAlertsEnabled)) }}
         - --hub-alertmanager-url=https://{{ .Values.hubEndpoint }}/api/alertmanager/v2/default
         {{- end }}
-        {{- if .Values.hubEndpoint }}
         - --hub-alertmanager-cert-secret={{ .Values.clientCertSecretName }}
         - --hub-alertmanager-accessor-secret={{ .Values.alertmanagerAccessorSecretName }}
         - --hub-alertmanager-ca-secret={{ .Values.alertmanagerRouterCASecretName }}
-        {{- end }}
         {{- if .Values.deployNonOCPStack }}
         ports:
         - name: metrics
@@ -141,4 +138,3 @@ spec:
         secret:
           secretName: endpoint-monitoring-operator-tls
       {{- end }}
-{{- end }}
