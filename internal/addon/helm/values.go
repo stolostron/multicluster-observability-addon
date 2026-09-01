@@ -92,7 +92,7 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, getter addonutils.Add
 
 		// WIP: Temporary solution to enable obs-api and will require to delete the mcoa pod to take effect.
 		obsAPIEnabled := aodc.Annotations["mcoa-obs-api"] == "true"
-		userValues.ObsAPI = omanifests.BuildValues(common.IsHubCluster(cluster), obsAPIEnabled)
+		userValues.ObsAPI = omanifests.BuildValues(common.IsHubCluster(cluster), obsAPIEnabled, opts.ThanosOperatorEnabled)
 
 		// WIP: Temporary solution to enable thanos-operator and will require to delete the mcoa pod to take effect.
 		if userValues.Metrics != nil {
