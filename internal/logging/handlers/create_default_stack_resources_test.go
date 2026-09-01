@@ -22,27 +22,8 @@ import (
 
 func TestDefaultStackResourcesSurviveDeleteOrphan(t *testing.T) {
 	ctx := t.Context()
-	scheme := runtime.NewScheme()
-	require.NoError(t, addonapiv1beta1.Install(scheme))
-	require.NoError(t, clusterv1.Install(scheme))
-	require.NoError(t, loggingv1.AddToScheme(scheme))
-	require.NoError(t, lokiv1.AddToScheme(scheme))
-
-	cmao := &addonapiv1beta1.ClusterManagementAddOn{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: addoncfg.Name,
-			UID:  "cmao-uid",
-		},
-		Spec: addonapiv1beta1.ClusterManagementAddOnSpec{
-			InstallStrategy: addonapiv1beta1.InstallStrategy{
-				Placements: []addonapiv1beta1.PlacementStrategy{
-					{
-						PlacementRef: addoncfg.GlobalPlacementRef,
-					},
-				},
-			},
-		},
-	}
+	scheme := newTestScheme(t)
+	cmao := newTestCMAO()
 
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cmao).Build()
 
@@ -63,4 +44,29 @@ func TestDefaultStackResourcesSurviveDeleteOrphan(t *testing.T) {
 	}
 	require.NoError(t, fakeClient.Get(ctx, key, &loggingv1.ClusterLogForwarder{}), "CMAO-owned ClusterLogForwarder with a matching placement annotation must not be deleted")
 	require.NoError(t, fakeClient.Get(ctx, key, &lokiv1.LokiStack{}), "CMAO-owned LokiStack with a matching placement annotation must not be deleted")
+}
+
+func newTestScheme(t *testing.T) *runtime.Scheme {
+	scheme := runtime.NewScheme()
+	require.NoError(t, addonapiv1beta1.Install(scheme))
+	require.NoError(t, clusterv1.Install(scheme))
+	require.NoError(t, loggingv1.AddToScheme(scheme))
+	require.NoError(t, lokiv1.AddToScheme(scheme))
+	return scheme
+}
+
+func newTestCMAO() *addonapiv1beta1.ClusterManagementAddOn {
+	return &addonapiv1beta1.ClusterManagementAddOn{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: addoncfg.Name,
+			UID:  "cmao-uid",
+		},
+		Spec: addonapiv1beta1.ClusterManagementAddOnSpec{
+			InstallStrategy: addonapiv1beta1.InstallStrategy{
+				Placements: []addonapiv1beta1.PlacementStrategy{
+					{PlacementRef: addoncfg.GlobalPlacementRef},
+				},
+			},
+		},
+	}
 }

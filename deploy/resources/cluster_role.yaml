@@ -59,11 +59,19 @@
     - apiGroups: [""]
       resources: ["secrets"]
       verbs: ["get", "list", "watch"]
-    # The addon will need to pull subscriptions to know if certain operators
-    # are installed in the hub cluster
+    # The addon reads subscriptions to know if certain operators are installed in the hub
+    # cluster, and creates/manages the Loki Operator Subscription+OperatorGroup directly on the
+    # hub (via the resourcecreator controller) when the mcoa-loki-operator annotation is set.
     - apiGroups: ["operators.coreos.com"]
       resources: ["subscriptions"]
-      verbs: ["get", "list", "watch"]
+      verbs: ["get", "list", "watch", "create", "update", "patch"]
+    - apiGroups: ["operators.coreos.com"]
+      resources: ["operatorgroups"]
+      verbs: ["get", "list", "watch", "create", "update", "patch"]
+    # Needed to create the openshift-operators-redhat Namespace Loki Operator is installed into.
+    - apiGroups: [""]
+      resources: ["namespaces"]
+      verbs: ["get", "list", "watch", "create", "update", "patch"]
     # Roles for addon to perform logging specific actions
     - apiGroups: ["observability.openshift.io"]
       resources: ["clusterlogforwarders"]

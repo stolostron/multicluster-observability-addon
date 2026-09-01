@@ -2,10 +2,6 @@ nameOverride: null
 
 enabled: true
 
-lokiOperator:
-  enabled: false
-  channel: stable-6.3
-
 installCLO: false
 
 openshiftLoggingChannel: channelName

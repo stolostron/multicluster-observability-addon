@@ -14,6 +14,7 @@ import (
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	rshandlers "github.com/stolostron/multicluster-observability-addon/internal/analytics/rightsizing/handlers"
 	lhandlers "github.com/stolostron/multicluster-observability-addon/internal/logging/handlers"
+	lmanifests "github.com/stolostron/multicluster-observability-addon/internal/logging/manifests"
 	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	mresources "github.com/stolostron/multicluster-observability-addon/internal/metrics/resource"
 	corev1 "k8s.io/api/core/v1"
@@ -161,17 +162,42 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, fmt.Errorf("failed to reconcile right-sizing resources: %w", rsErr)
 	}
 
-	// Reconcile logging resources
-	lObjs, lDefaultConfig, err := lhandlers.BuildDefaultStackResources(ctx, r.Client, cmao, opts.Platform.Logs, opts.UserWorkloads.Logs, opts.HubHostname)
+	// Install Loki Operator directly on the hub via OLM when requested. This is applied as its
+	// own step, independent of the default logging stack resources below: the operator (and its
+	// CRDs) should be ready well before any LokiStack is built.
+	if err := lhandlers.ReconcileLokiOperator(ctx, r.Client, cmao, opts.LokiOperatorEnabled); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to reconcile loki operator: %w", err)
+	}
+
+	// The LokiStack CR (built and applied inside BuildDefaultStackResources) can only be applied
+	// once Loki Operator has registered its CRD; doing so earlier would fail with "no kind
+	// LokiStack is registered" and abort the whole reconcile. So when the default stack is
+	// enabled, gate building/applying the default-stack logging resources on that CRD being
+	// Established, and requeue until it is. This check runs regardless of who is expected to
+	// install the operator: MCOA via ReconcileLokiOperator above, or an admin installing it
+	// out-of-band.
+	lokiStackCRDReady, err := common.IsCRDEstablished(ctx, r.Client, lmanifests.LokiStackCRDName)
 	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to build default stack logging resources: %w", err)
+		return ctrl.Result{}, fmt.Errorf("failed to check LokiStack CRD status: %w", err)
 	}
-	for _, obj := range lObjs {
-		if err := common.ServerSideApply(ctx, r.Client, obj, cmao); err != nil {
-			return ctrl.Result{}, fmt.Errorf("failed to apply logging resource %s/%s: %w", obj.GetNamespace(), obj.GetName(), err)
+
+	lokiStackPending := opts.Platform.Logs.DefaultStack && !lokiStackCRDReady
+	if lokiStackPending {
+		r.Log.Info("LokiStack CRD not yet established, skipping default stack logging resources and requeueing until Loki Operator is ready",
+			"crd", lmanifests.LokiStackCRDName, "requeueAfter", addoncfg.DefaultContextTimeout)
+	} else {
+		// Reconcile logging resources
+		lObjs, lDefaultConfig, err := lhandlers.BuildDefaultStackResources(ctx, r.Client, cmao, opts.Platform.Logs, opts.UserWorkloads.Logs, opts.HubHostname)
+		if err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to build default stack logging resources: %w", err)
 		}
+		for _, obj := range lObjs {
+			if err := common.ServerSideApply(ctx, r.Client, obj, cmao); err != nil {
+				return ctrl.Result{}, fmt.Errorf("failed to apply logging resource %s/%s: %w", obj.GetNamespace(), obj.GetName(), err)
+			}
+		}
+		objs = append(objs, lDefaultConfig...)
 	}
-	objs = append(objs, lDefaultConfig...)
 
 	if err := common.EnsureAddonConfig(ctx, r.Log, r.Client, objs); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to patch default configs of the clustermanageraddon: %w", err)
@@ -193,6 +219,10 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 	if err := common.DeleteOrphanResources(ctx, r.Log, r.Client, cmao, &loggingv1.ClusterLogForwarderList{}); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to clean orphan logging collection resources: %w", err)
+	}
+
+	if lokiStackPending {
+		return ctrl.Result{RequeueAfter: addoncfg.DefaultContextTimeout}, nil
 	}
 
 	return ctrl.Result{}, nil
