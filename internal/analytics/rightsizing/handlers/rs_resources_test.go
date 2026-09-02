@@ -447,3 +447,104 @@ func TestClusterMatchesPlacement_CombinedLabelAndClaim(t *testing.T) {
 	cluster.Labels["env"] = "staging"
 	assert.False(t, clusterMatchesPlacement(cluster, placement), "label no longer matches")
 }
+
+func TestBackfillAggregatorKeys_AddsMissingKeys(t *testing.T) {
+	cm := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      rightsizing.NamespaceConfigMapName,
+			Namespace: addoncfg.InstallNamespace,
+		},
+		Data: map[string]string{
+			"prometheusRuleConfig": `{"namespaceFilterCriteria":{"exclusionCriteria":["openshift.*"]},"recommendationPercentage":110}`,
+		},
+	}
+	ob := newTestOptionsBuilder(t, cm)
+
+	err := ob.backfillAggregatorKeys(t.Context(), cm)
+	require.NoError(t, err)
+
+	var updated corev1.ConfigMap
+	require.NoError(t, ob.Client.Get(t.Context(), types.NamespacedName{
+		Name: rightsizing.NamespaceConfigMapName, Namespace: addoncfg.InstallNamespace,
+	}, &updated))
+
+	assert.Contains(t, updated.Data["prometheusRuleConfig"], `"cpuAggregator"`)
+	assert.Contains(t, updated.Data["prometheusRuleConfig"], `"memoryAggregator"`)
+	assert.Contains(t, updated.Data["prometheusRuleConfig"], `"recommendationPercentage":110`)
+}
+
+func TestBackfillAggregatorKeys_SkipsWhenKeysExist(t *testing.T) {
+	original := `{"recommendationPercentage":110,"cpuAggregator":["P90"],"memoryAggregator":["P99"]}`
+	cm := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      rightsizing.NamespaceConfigMapName,
+			Namespace: addoncfg.InstallNamespace,
+		},
+		Data: map[string]string{
+			"prometheusRuleConfig": original,
+		},
+	}
+	ob := newTestOptionsBuilder(t, cm)
+
+	err := ob.backfillAggregatorKeys(t.Context(), cm)
+	require.NoError(t, err)
+
+	var updated corev1.ConfigMap
+	require.NoError(t, ob.Client.Get(t.Context(), types.NamespacedName{
+		Name: rightsizing.NamespaceConfigMapName, Namespace: addoncfg.InstallNamespace,
+	}, &updated))
+
+	assert.Equal(t, original, updated.Data["prometheusRuleConfig"],
+		"should not modify ConfigMap when both keys already exist")
+}
+
+func TestBackfillAggregatorKeys_PreservesExistingFields(t *testing.T) {
+	cm := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      rightsizing.NamespaceConfigMapName,
+			Namespace: addoncfg.InstallNamespace,
+		},
+		Data: map[string]string{
+			"prometheusRuleConfig": `{"recommendationPercentage":120,"namespaceFilterCriteria":{"exclusionCriteria":["kube-.*"]}}`,
+		},
+	}
+	ob := newTestOptionsBuilder(t, cm)
+
+	err := ob.backfillAggregatorKeys(t.Context(), cm)
+	require.NoError(t, err)
+
+	var updated corev1.ConfigMap
+	require.NoError(t, ob.Client.Get(t.Context(), types.NamespacedName{
+		Name: rightsizing.NamespaceConfigMapName, Namespace: addoncfg.InstallNamespace,
+	}, &updated))
+
+	assert.Contains(t, updated.Data["prometheusRuleConfig"], `"recommendationPercentage":120`)
+	assert.Contains(t, updated.Data["prometheusRuleConfig"], `kube-.*`)
+	assert.Contains(t, updated.Data["prometheusRuleConfig"], `"cpuAggregator"`)
+	assert.Contains(t, updated.Data["prometheusRuleConfig"], `"memoryAggregator"`)
+}
+
+func TestBackfillAggregatorKeys_OnlyOneMissing(t *testing.T) {
+	cm := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      rightsizing.NamespaceConfigMapName,
+			Namespace: addoncfg.InstallNamespace,
+		},
+		Data: map[string]string{
+			"prometheusRuleConfig": `{"recommendationPercentage":110,"cpuAggregator":["P90","P75"]}`,
+		},
+	}
+	ob := newTestOptionsBuilder(t, cm)
+
+	err := ob.backfillAggregatorKeys(t.Context(), cm)
+	require.NoError(t, err)
+
+	var updated corev1.ConfigMap
+	require.NoError(t, ob.Client.Get(t.Context(), types.NamespacedName{
+		Name: rightsizing.NamespaceConfigMapName, Namespace: addoncfg.InstallNamespace,
+	}, &updated))
+
+	assert.Contains(t, updated.Data["prometheusRuleConfig"], `"memoryAggregator"`)
+	assert.Contains(t, updated.Data["prometheusRuleConfig"], `"P90"`,
+		"existing cpuAggregator values should be preserved")
+}
