@@ -175,6 +175,24 @@ func parsePercentileName(name string) (float64, bool) {
 	return val / 100, true
 }
 
+// ValidateAggregatorNames checks every name in the list and returns any that are
+// not recognized as valid profile names. Valid names are well-known profiles
+// (e.g. "Max OverAll", "P99", "P95") or any "Pxx" where xx is between 1 and 99.
+func ValidateAggregatorNames(names []string) []string {
+	var invalid []string
+	for _, name := range names {
+		name = strings.TrimSpace(name)
+		if _, ok := knownProfiles[name]; ok {
+			continue
+		}
+		if _, ok := parsePercentileName(name); ok {
+			continue
+		}
+		invalid = append(invalid, name)
+	}
+	return invalid
+}
+
 // ResolveCpuProfiles returns the CPU ProfileConfig list from config, falling back to defaults.
 func ResolveCpuProfiles(config RSPrometheusRuleConfig) []ProfileConfig {
 	if len(config.CpuAggregator) > 0 {
