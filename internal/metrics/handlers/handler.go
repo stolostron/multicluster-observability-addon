@@ -10,6 +10,7 @@ import (
 
 	"github.com/go-logr/logr"
 	ocinfrav1 "github.com/openshift/api/config/v1"
+	routev1 "github.com/openshift/api/route/v1"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	cooprometheusv1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1"
 	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
@@ -30,7 +31,9 @@ import (
 )
 
 const (
-	crdResourceName = "customresourcedefinitions"
+	crdResourceName       = "customresourcedefinitions"
+	mcoaObsAPIRouteName   = "mcoa-observatorium-api"
+	remoteWritePathSuffix = "/api/metrics/v1/default/api/v1/receive"
 )
 
 var (
@@ -273,6 +276,13 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1beta1.Man
 	if ret.IsHub && opts.ThanosOperatorEnabled {
 		if err = o.buildThanosComponents(ctx, &ret); err != nil {
 			return ret, fmt.Errorf("failed to build Thanos components: %w", err)
+		}
+	}
+
+	// Override remote write URL to point to MCOA obs-api when thanos-operator is enabled
+	if opts.ThanosOperatorEnabled {
+		if err = o.overrideRemoteWriteEndpoint(ctx, &ret); err != nil {
+			o.Logger.Error(err, "failed to override remote write endpoint, keeping original")
 		}
 	}
 
@@ -945,6 +955,35 @@ func (o *OptionsBuilder) buildThanosComponents(ctx context.Context, opts *Option
 
 	if err := o.addSecret(ctx, &opts.Secrets, objStoreSecret.Name, objStoreSecret.Namespace, objStoreSecret.Name, ""); err != nil {
 		return fmt.Errorf("failed to add object storage secret: %w", err)
+	}
+
+	return nil
+}
+
+func (o *OptionsBuilder) overrideRemoteWriteEndpoint(ctx context.Context, opts *Options) error {
+	route := &routev1.Route{}
+	if err := o.Client.Get(ctx, types.NamespacedName{
+		Name:      mcoaObsAPIRouteName,
+		Namespace: config.HubInstallNamespace,
+	}, route); err != nil {
+		return fmt.Errorf("failed to get MCOA obs-api route: %w", err)
+	}
+
+	if route.Spec.Host == "" {
+		return fmt.Errorf("MCOA obs-api route %s has no host", mcoaObsAPIRouteName)
+	}
+
+	endpoint := "https://" + route.Spec.Host + remoteWritePathSuffix
+
+	for _, agent := range []*cooprometheusv1alpha1.PrometheusAgent{opts.Platform.PrometheusAgent, opts.UserWorkloads.PrometheusAgent} {
+		if agent == nil {
+			continue
+		}
+		for i := range agent.Spec.RemoteWrite {
+			if agent.Spec.RemoteWrite[i].Name != nil && *agent.Spec.RemoteWrite[i].Name == config.RemoteWriteCfgName {
+				agent.Spec.RemoteWrite[i].URL = cooprometheusv1.URL(endpoint)
+			}
+		}
 	}
 
 	return nil
