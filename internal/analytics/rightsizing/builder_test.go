@@ -449,3 +449,151 @@ func TestParseConfigMapData(t *testing.T) {
 		assert.Error(t, err)
 	})
 }
+
+func TestValidateAggregatorNames(t *testing.T) {
+	tests := []struct {
+		name        string
+		input       []string
+		wantInvalid []string
+	}{
+		{
+			name:        "all valid known profiles",
+			input:       []string{"Max OverAll", "P99", "P95"},
+			wantInvalid: nil,
+		},
+		{
+			name:        "all valid with dynamic Pxx",
+			input:       []string{"Max OverAll", "P90", "P75", "P50"},
+			wantInvalid: nil,
+		},
+		{
+			name:        "one invalid among valid",
+			input:       []string{"Max OverAll", "P99", "foo"},
+			wantInvalid: []string{"foo"},
+		},
+		{
+			name:        "multiple invalid",
+			input:       []string{"Max OverAll", "bar", "baz", "P99"},
+			wantInvalid: []string{"bar", "baz"},
+		},
+		{
+			name:        "all invalid",
+			input:       []string{"foo", "bar", "P0", "P100"},
+			wantInvalid: []string{"foo", "bar", "P0", "P100"},
+		},
+		{
+			name:        "empty input",
+			input:       []string{},
+			wantInvalid: nil,
+		},
+		{
+			name:        "nil input",
+			input:       nil,
+			wantInvalid: nil,
+		},
+		{
+			name:        "case insensitive Pxx are valid",
+			input:       []string{"p90", "p75"},
+			wantInvalid: nil,
+		},
+		{
+			name:        "whitespace-padded valid entries",
+			input:       []string{" Max OverAll ", " P99 "},
+			wantInvalid: nil,
+		},
+		{
+			name:        "P999 is invalid",
+			input:       []string{"P999"},
+			wantInvalid: []string{"P999"},
+		},
+		{
+			name:        "negative percentile is invalid",
+			input:       []string{"P-5"},
+			wantInvalid: []string{"P-5"},
+		},
+		{
+			name:        "non-numeric after P is invalid",
+			input:       []string{"Pabc"},
+			wantInvalid: []string{"Pabc"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			invalid := ValidateAggregatorNames(tt.input)
+			assert.Equal(t, tt.wantInvalid, invalid)
+		})
+	}
+}
+
+func TestValidationRejectsEntireEditOnInvalid(t *testing.T) {
+	t.Run("any invalid entry causes entire list to be rejected", func(t *testing.T) {
+		currentConfig := []string{"P90", "P80"}
+		editedConfig := []string{"P90", "P75", "M80"}
+
+		invalid := ValidateAggregatorNames(editedConfig)
+		assert.Equal(t, []string{"M80"}, invalid, "M80 should be detected as invalid")
+
+		config := RSPrometheusRuleConfig{CpuAggregator: currentConfig}
+		profiles := ResolveCpuProfiles(config)
+		assert.Len(t, profiles, 2)
+		assert.Equal(t, "P90", profiles[0].Name)
+		assert.Equal(t, "P80", profiles[1].Name)
+	})
+
+	t.Run("all valid entries are accepted", func(t *testing.T) {
+		config := RSPrometheusRuleConfig{
+			CpuAggregator:    []string{"Max OverAll", "P99", "P90"},
+			MemoryAggregator: []string{"Max OverAll", "P95"},
+		}
+		assert.Empty(t, ValidateAggregatorNames(config.CpuAggregator))
+		assert.Empty(t, ValidateAggregatorNames(config.MemoryAggregator))
+
+		cpuProfiles := ResolveCpuProfiles(config)
+		memProfiles := ResolveMemoryProfiles(config)
+		assert.Len(t, cpuProfiles, 3)
+		assert.Len(t, memProfiles, 2)
+	})
+
+	t.Run("all invalid falls back to defaults when no previous config", func(t *testing.T) {
+		editedConfig := []string{"foo", "bar"}
+		invalid := ValidateAggregatorNames(editedConfig)
+		assert.Len(t, invalid, 2)
+
+		config := RSPrometheusRuleConfig{CpuAggregator: nil}
+		profiles := ResolveCpuProfiles(config)
+		assert.Len(t, profiles, len(RecommendationProfiles), "should fall back to defaults")
+	})
+
+	t.Run("invalid CPU does not affect valid memory", func(t *testing.T) {
+		cpuEdited := []string{"Max OverAll", "bad-value"}
+		memEdited := []string{"Max OverAll", "P99"}
+
+		assert.NotEmpty(t, ValidateAggregatorNames(cpuEdited), "CPU edit has invalid entry")
+		assert.Empty(t, ValidateAggregatorNames(memEdited), "memory edit is fully valid")
+
+		previousCpu := []string{"P90", "P80"}
+		config := RSPrometheusRuleConfig{
+			CpuAggregator:    previousCpu,
+			MemoryAggregator: memEdited,
+		}
+		cpuProfiles := ResolveCpuProfiles(config)
+		memProfiles := ResolveMemoryProfiles(config)
+		assert.Len(t, cpuProfiles, 2, "CPU should use previous valid config")
+		assert.Equal(t, "P90", cpuProfiles[0].Name)
+		assert.Equal(t, "P80", cpuProfiles[1].Name)
+		assert.Len(t, memProfiles, 2, "memory should use the valid edit")
+	})
+
+	t.Run("valid edit with P75 added is accepted", func(t *testing.T) {
+		editedConfig := []string{"P90", "P80", "P75"}
+		assert.Empty(t, ValidateAggregatorNames(editedConfig))
+
+		config := RSPrometheusRuleConfig{CpuAggregator: editedConfig}
+		profiles := ResolveCpuProfiles(config)
+		assert.Len(t, profiles, 3)
+		assert.Equal(t, "P90", profiles[0].Name)
+		assert.Equal(t, "P80", profiles[1].Name)
+		assert.Equal(t, "P75", profiles[2].Name)
+	})
+}
