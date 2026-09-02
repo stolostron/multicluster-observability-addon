@@ -79,14 +79,15 @@ const (
 
 	// Thanos Receive defaults
 	DefaultReceiveRouterReplicas      = 1
-	DefaultReceiveRouterReplication   = 1
+	DefaultReceiveRouterReplication   = 3
 	DefaultReceiveIngesterReplicas    = 3
 	DefaultReceiveIngesterStorageSize = "10Gi"
-	DefaultReceiveRetention           = "15d"
+	DefaultReceiveRetention           = "24h"
+	DefaultReceiveTooFarInFuture      = "5m"
 	DefaultReceiveRouterCPURequest    = "100m"
 	DefaultReceiveRouterMemRequest    = "256Mi"
-	DefaultReceiveIngesterCPURequest  = "100m"
-	DefaultReceiveIngesterMemRequest  = "1Gi"
+	DefaultReceiveIngesterCPURequest  = "300m"
+	DefaultReceiveIngesterMemRequest  = "512Mi"
 	ThanosReceiveRouterContainerID    = "deployments:mcoa:thanos-receive-router"
 	ThanosReceiveIngesterContainerID  = "statefulsets:mcoa:thanos-receive-ingester"
 	DefaultReceiveHashringName        = "default"

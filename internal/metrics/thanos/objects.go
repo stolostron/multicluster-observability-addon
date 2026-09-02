@@ -92,6 +92,7 @@ func (b *ObjectBuilder) buildStore(opts addon.Options, storeImage string) *thano
 
 func (b *ObjectBuilder) buildReceive(opts addon.Options) *thanosv1alpha1.ThanosReceive {
 	retention := thanosv1alpha1.Duration(config.DefaultReceiveRetention)
+	tooFarInFuture := thanosv1alpha1.Duration(config.DefaultReceiveTooFarInFuture)
 
 	receive := &thanosv1alpha1.ThanosReceive{
 		TypeMeta: metav1.TypeMeta{
@@ -118,12 +119,17 @@ func (b *ObjectBuilder) buildReceive(opts addon.Options) *thanosv1alpha1.ThanosR
 					{
 						Name:     config.DefaultReceiveHashringName,
 						Replicas: config.DefaultReceiveIngesterReplicas,
+						ExternalLabels: thanosv1alpha1.ExternalLabels{
+							"receive": "true",
+							"replica": "$(POD_NAME)",
+						},
 						TSDBConfig: thanosv1alpha1.TSDBConfig{
 							Retention: retention,
 						},
 						StorageConfiguration: thanosv1alpha1.StorageConfiguration{
 							Size: thanosv1alpha1.StorageSize(config.DefaultReceiveIngesterStorageSize),
 						},
+						TooFarInFutureTimeWindow: &tooFarInFuture,
 					},
 				},
 			},
