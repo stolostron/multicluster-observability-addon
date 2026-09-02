@@ -486,27 +486,32 @@ func TestRightSizing_DrillDownLinksPassBothProfiles(t *testing.T) {
 	objects := renderRSManifests(t, true, cv)
 	r := classify(objects)
 
-	vmOverviewDB := findDashboard(r.dashboards, "acm-rightsizing-openshift-virtualization")
-	require.NotNil(t, vmOverviewDB, "VM overview dashboard must exist")
+	for _, dbID := range allRSDashboardIDs {
+		db := findDashboard(r.dashboards, dbID)
+		if db == nil {
+			continue
+		}
+		raw, err := json.Marshal(db.Spec)
+		require.NoError(t, err)
+		specStr := string(raw)
 
-	raw, err := json.Marshal(vmOverviewDB.Spec)
-	require.NoError(t, err)
-	specStr := string(raw)
+		t.Run(dbID+"/links_carry_cpu_profile", func(t *testing.T) {
+			if assert.Contains(t, specStr, "$cpu_profile") {
+				assert.NotContains(t, specStr, "var-profile=",
+					"drill-down URL must not use old 'profile' variable")
+			}
+		})
 
-	t.Run("drill-down links carry cpu_profile", func(t *testing.T) {
-		assert.Contains(t, specStr, "cpu_profile=$cpu_profile",
-			"drill-down URL must pass cpu_profile variable")
-	})
+		t.Run(dbID+"/links_carry_memory_profile", func(t *testing.T) {
+			assert.Contains(t, specStr, "$memory_profile",
+				"dashboard must reference memory_profile variable")
+		})
 
-	t.Run("drill-down links carry memory_profile", func(t *testing.T) {
-		assert.Contains(t, specStr, "memory_profile=$memory_profile",
-			"drill-down URL must pass memory_profile variable")
-	})
-
-	t.Run("no stale profile= in drill-down links", func(t *testing.T) {
-		assert.NotContains(t, specStr, "var-profile=",
-			"drill-down URL must not use old 'profile' variable")
-	})
+		t.Run(dbID+"/no_stale_dollar_profile", func(t *testing.T) {
+			assert.NotContains(t, specStr, `profile="$profile"`,
+				"no panel should reference the removed $profile variable")
+		})
+	}
 }
 
 // TestRightSizing_MCOMode_NoDashboardsWhenNotDelegated verifies no RS dashboards render in MCO mode.

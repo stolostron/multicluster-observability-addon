@@ -197,16 +197,16 @@ func TestParseAggregatorNames(t *testing.T) {
 			wantLen: 0,
 		},
 		{
-			name:    "case insensitive percentile names",
+			name:    "case insensitive percentile names are canonicalized",
 			input:   []string{"p90", "p75"},
 			wantLen: 2,
 			wantExpr: map[string]string{
-				"p90": "quantile_over_time(0.9,",
-				"p75": "quantile_over_time(0.75,",
+				"P90": "quantile_over_time(0.9,",
+				"P75": "quantile_over_time(0.75,",
 			},
 		},
 		{
-			name:    "whitespace is trimmed",
+			name:    "whitespace is trimmed and names canonicalized",
 			input:   []string{" Max OverAll ", " P99 "},
 			wantLen: 2,
 			wantExpr: map[string]string{
@@ -228,9 +228,9 @@ func TestParseAggregatorNames(t *testing.T) {
 			},
 		},
 		{
-			name:    "duplicate profiles are preserved",
+			name:    "duplicate profiles are collapsed",
 			input:   []string{"P99", "P99"},
-			wantLen: 2,
+			wantLen: 1,
 		},
 	}
 
