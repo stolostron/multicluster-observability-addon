@@ -2,7 +2,7 @@ package manifests
 
 const (
 	legacyReceiveEndpoint = "http://observability-thanos-receive.open-cluster-management-observability.svc.cluster.local:19291"
-	mcoaReceiveEndpoint   = "http://thanos-receive-mcoa-router.open-cluster-management-observability.svc.cluster.local:19291"
+	mcoaReceiveEndpoint   = "http://thanos-receive-router-mcoa.open-cluster-management-observability.svc.cluster.local:19291"
 )
 
 type ObsAPIValues struct {
