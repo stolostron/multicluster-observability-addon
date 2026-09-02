@@ -232,6 +232,24 @@ func TestParseAggregatorNames(t *testing.T) {
 			input:   []string{"P99", "P99"},
 			wantLen: 1,
 		},
+		{
+			name:    "mixed case duplicates are collapsed to canonical",
+			input:   []string{"p95", "P95"},
+			wantLen: 1,
+			wantExpr: map[string]string{
+				"P95": "quantile_over_time(0.95,",
+			},
+		},
+		{
+			name:    "P+5 is rejected by regex",
+			input:   []string{"P+5"},
+			wantLen: 0,
+		},
+		{
+			name:    "P0.0000001 is rejected by regex",
+			input:   []string{"P0.0000001"},
+			wantLen: 0,
+		},
 	}
 
 	for _, tt := range tests {
@@ -515,6 +533,21 @@ func TestValidateAggregatorNames(t *testing.T) {
 			name:        "non-numeric after P is invalid",
 			input:       []string{"Pabc"},
 			wantInvalid: []string{"Pabc"},
+		},
+		{
+			name:        "P+5 is invalid (no sign allowed)",
+			input:       []string{"P+5"},
+			wantInvalid: []string{"P+5"},
+		},
+		{
+			name:        "P0.5 is invalid (no decimals allowed)",
+			input:       []string{"P0.5"},
+			wantInvalid: []string{"P0.5"},
+		},
+		{
+			name:        "P0.0000001 is invalid (no decimals allowed)",
+			input:       []string{"P0.0000001"},
+			wantInvalid: []string{"P0.0000001"},
 		},
 	}
 
