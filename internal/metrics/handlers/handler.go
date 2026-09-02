@@ -42,6 +42,7 @@ var (
 	errMissingDesiredConfig        = errors.New("missing desiredConfig in managedClusterAddon.Status.ConfigReferences")
 	errMissingRemoteWriteConfig    = errors.New("missing expected remote write spec in the prometheusAgent")
 	errMissingCMAOOwnership        = errors.New("object is not owned by the ClusterManagementAddOn")
+	errMissingRouteHost            = errors.New("MCOA obs-api route has no host")
 )
 
 type OptionsBuilder struct {
@@ -970,7 +971,7 @@ func (o *OptionsBuilder) overrideRemoteWriteEndpoint(ctx context.Context, opts *
 	}
 
 	if route.Spec.Host == "" {
-		return fmt.Errorf("MCOA obs-api route %s has no host", mcoaObsAPIRouteName)
+		return fmt.Errorf("%w: %s", errMissingRouteHost, mcoaObsAPIRouteName)
 	}
 
 	endpoint := "https://" + route.Spec.Host + remoteWritePathSuffix
