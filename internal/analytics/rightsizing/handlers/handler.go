@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"slices"
 	"sync"
@@ -222,16 +223,12 @@ func (o *OptionsBuilder) validateAndSanitizeConfig(configData *rightsizing.RSCon
 	}
 }
 
-//
-// Both MCO and MCOA use a "create if not exists" pattern for these ConfigMaps,
-// so user customizations (namespace filters, recommendation %, placement predicates)
-// are preserved across mode switches (MCO <=> MCOA). While upgrading from ACM 2.17 to ACM 5.0
-//
-
 // ensureNamespaceConfigMap ensures the namespace right-sizing ConfigMap exists on the hub.
-// MCOA owns all right-sizing resources including ConfigMaps for cleaner architecture.
+// Uses a "create if not exists" pattern so that user customizations (namespace filters,
+// recommendation %, placement predicates) are preserved across upgrades (ACM 2.17 -> ACM 5.0).
+// In ACM 5.0 only MCOA mode is supported; the MCO/MCOA mode switch no longer applies.
 func (o *OptionsBuilder) ensureNamespaceConfigMap(ctx context.Context) error {
-	_, err := common.GetConfigMap(ctx, o.Client, addoncfg.InstallNamespace, rightsizing.NamespaceConfigMapName)
+	cm, err := common.GetConfigMap(ctx, o.Client, addoncfg.InstallNamespace, rightsizing.NamespaceConfigMapName)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			o.Logger.Info("Creating namespace right-sizing ConfigMap with defaults",
@@ -241,13 +238,13 @@ func (o *OptionsBuilder) ensureNamespaceConfigMap(ctx context.Context) error {
 		}
 		return err
 	}
-	return nil
+	return o.backfillAggregatorKeys(ctx, cm)
 }
 
 // ensureVirtualizationConfigMap ensures the virtualization right-sizing ConfigMap exists on the hub.
-// MCOA owns all right-sizing resources including ConfigMaps for cleaner architecture.
+// Same "create if not exists" pattern as ensureNamespaceConfigMap.
 func (o *OptionsBuilder) ensureVirtualizationConfigMap(ctx context.Context) error {
-	_, err := common.GetConfigMap(ctx, o.Client, addoncfg.InstallNamespace, rightsizing.VirtualizationConfigMapName)
+	cm, err := common.GetConfigMap(ctx, o.Client, addoncfg.InstallNamespace, rightsizing.VirtualizationConfigMapName)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			o.Logger.Info("Creating virtualization right-sizing ConfigMap with defaults",
@@ -257,7 +254,7 @@ func (o *OptionsBuilder) ensureVirtualizationConfigMap(ctx context.Context) erro
 		}
 		return err
 	}
-	return nil
+	return o.backfillAggregatorKeys(ctx, cm)
 }
 
 // createDefaultConfigMap creates a ConfigMap with the provided data.
@@ -277,6 +274,49 @@ func (o *OptionsBuilder) createDefaultConfigMap(ctx context.Context, name string
 	}
 
 	o.Logger.V(1).Info("Created right-sizing ConfigMap", "name", name, "namespace", addoncfg.InstallNamespace)
+	return nil
+}
+
+// backfillAggregatorKeys patches an existing ConfigMap to add cpuAggregator and
+// memoryAggregator with default values when they are absent. This covers upgraded
+// clusters where the ConfigMap was created before these keys existed.
+// Only missing keys are added — existing user customizations are never overwritten.
+func (o *OptionsBuilder) backfillAggregatorKeys(ctx context.Context, cm *corev1.ConfigMap) error {
+	raw, ok := cm.Data["prometheusRuleConfig"]
+	if !ok {
+		return nil
+	}
+
+	var config map[string]any
+	if err := json.Unmarshal([]byte(raw), &config); err != nil {
+		return nil
+	}
+
+	_, hasCpu := config["cpuAggregator"]
+	_, hasMem := config["memoryAggregator"]
+	if hasCpu && hasMem {
+		return nil
+	}
+
+	if !hasCpu {
+		config["cpuAggregator"] = rightsizing.DefaultCpuAggregator
+	}
+	if !hasMem {
+		config["memoryAggregator"] = rightsizing.DefaultMemoryAggregator
+	}
+
+	updated, err := json.Marshal(config)
+	if err != nil {
+		return fmt.Errorf("failed to marshal backfilled config: %w", err)
+	}
+
+	cm.Data["prometheusRuleConfig"] = string(updated)
+	if err := o.Client.Update(ctx, cm); err != nil {
+		return fmt.Errorf("failed to backfill aggregator keys in ConfigMap %s: %w", cm.Name, err)
+	}
+
+	o.Logger.Info("Backfilled missing aggregator keys in ConfigMap",
+		"name", cm.Name, "addedCpu", !hasCpu, "addedMem", !hasMem)
 	return nil
 }
 

@@ -2,12 +2,15 @@ package rightsizing
 
 import (
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
+
+var percentileNamePattern = regexp.MustCompile(`^[Pp]([0-9]{1,2})$`)
 
 // Standard evaluation intervals for PrometheusRules
 var (
@@ -126,14 +129,6 @@ func BuildPercentileAggregationExpr(percentile float64) func(string) string {
 	}
 }
 
-// Build1dAggregationExpr is an alias for Build1dMaxAggregationExpr (backward compat).
-var Build1dAggregationExpr = Build1dMaxAggregationExpr
-
-// BuildRecommendationExpr builds a max-based recommendation expression (backward compat).
-func BuildRecommendationExpr(usageMetric string, recommendationPercentage int) string {
-	return BuildProfiledRecommendationExpr(usageMetric, recommendationPercentage, RecommendationProfiles[0])
-}
-
 // knownProfiles maps well-known profile names to their aggregation functions.
 var knownProfiles = map[string]func(string) string{
 	"Max OverAll": Build1dMaxAggregationExpr,
@@ -143,36 +138,47 @@ var knownProfiles = map[string]func(string) string{
 
 // ParseAggregatorNames converts a list of profile name strings (e.g. "Max OverAll", "P99", "P90")
 // into ProfileConfig slices. Well-known names use pre-built functions; "Pxx" names are parsed
-// dynamically. Unrecognized names are skipped.
+// dynamically and canonicalized (e.g. "p90" -> "P90"). Duplicates are collapsed and
+// unrecognized names are skipped.
 func ParseAggregatorNames(names []string) []ProfileConfig {
+	seen := make(map[string]bool)
 	var profiles []ProfileConfig
 	for _, name := range names {
 		name = strings.TrimSpace(name)
 		if fn, ok := knownProfiles[name]; ok {
-			profiles = append(profiles, ProfileConfig{Name: name, AggExpr: fn})
+			if !seen[name] {
+				seen[name] = true
+				profiles = append(profiles, ProfileConfig{Name: name, AggExpr: fn})
+			}
 			continue
 		}
-		if p, ok := parsePercentileName(name); ok {
-			profiles = append(profiles, ProfileConfig{
-				Name:    name,
-				AggExpr: BuildPercentileAggregationExpr(p),
-			})
+		if canonical, p, ok := parsePercentileName(name); ok {
+			if !seen[canonical] {
+				seen[canonical] = true
+				profiles = append(profiles, ProfileConfig{
+					Name:    canonical,
+					AggExpr: BuildPercentileAggregationExpr(p),
+				})
+			}
 		}
 	}
 	return profiles
 }
 
 // parsePercentileName extracts the percentile value from names like "P90", "P75", "P50".
-func parsePercentileName(name string) (float64, bool) {
-	upper := strings.ToUpper(strings.TrimSpace(name))
-	if !strings.HasPrefix(upper, "P") {
-		return 0, false
+// Returns the canonical name (e.g. "P90"), the quantile fraction (e.g. 0.9), and whether
+// the name was valid. Only integer percentiles 1-99 are accepted (no floats, no P0/P100).
+func parsePercentileName(name string) (string, float64, bool) {
+	match := percentileNamePattern.FindStringSubmatch(strings.TrimSpace(name))
+	if match == nil {
+		return "", 0, false
 	}
-	val, err := strconv.ParseFloat(upper[1:], 64)
+	val, err := strconv.Atoi(match[1])
 	if err != nil || val <= 0 || val >= 100 {
-		return 0, false
+		return "", 0, false
 	}
-	return val / 100, true
+	canonical := fmt.Sprintf("P%d", val)
+	return canonical, float64(val) / 100, true
 }
 
 // ValidateAggregatorNames checks every name in the list and returns any that are
@@ -185,7 +191,7 @@ func ValidateAggregatorNames(names []string) []string {
 		if _, ok := knownProfiles[name]; ok {
 			continue
 		}
-		if _, ok := parsePercentileName(name); ok {
+		if _, _, ok := parsePercentileName(name); ok {
 			continue
 		}
 		invalid = append(invalid, name)
@@ -195,16 +201,19 @@ func ValidateAggregatorNames(names []string) []string {
 
 // ResolveCpuProfiles returns the CPU ProfileConfig list from config, falling back to defaults.
 func ResolveCpuProfiles(config RSPrometheusRuleConfig) []ProfileConfig {
-	if len(config.CpuAggregator) > 0 {
-		return ParseAggregatorNames(config.CpuAggregator)
-	}
-	return RecommendationProfiles
+	return resolveProfiles(config.CpuAggregator)
 }
 
 // ResolveMemoryProfiles returns the memory ProfileConfig list from config, falling back to defaults.
 func ResolveMemoryProfiles(config RSPrometheusRuleConfig) []ProfileConfig {
-	if len(config.MemoryAggregator) > 0 {
-		return ParseAggregatorNames(config.MemoryAggregator)
+	return resolveProfiles(config.MemoryAggregator)
+}
+
+// resolveProfiles falls back to RecommendationProfiles when the list is absent or
+// contains no valid entry, so a typo cannot leave the 1d rule groups empty.
+func resolveProfiles(names []string) []ProfileConfig {
+	if profiles := ParseAggregatorNames(names); len(profiles) > 0 {
+		return profiles
 	}
 	return RecommendationProfiles
 }
