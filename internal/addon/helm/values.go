@@ -172,7 +172,8 @@ func getCOOValues(ctx context.Context, k8s client.Client, logger logr.Logger, cl
 	var err error
 	var hasCardinalityRules bool
 	if isHub {
-		installCOO, err = chandlers.InstallOfCOOOnTheHubIsNeeded(ctx, k8s, logger)
+		// Hub COO installation is handled by HubResourceReconciler, not ManifestWork.
+		installCOO = false
 		hasCardinalityRules = chandlers.HasCardinalityRules(ctx, k8s)
 	} else {
 		installCOO, err = chandlers.InstallOfCOOOnSpokeIsNeeded(ctx, k8s, logger, cluster.Name)

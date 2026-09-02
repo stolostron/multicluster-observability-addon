@@ -14,8 +14,8 @@ import (
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"github.com/stolostron/multicluster-observability-addon/internal/coo/handlers"
 	"github.com/stolostron/multicluster-observability-addon/internal/coo/manifests"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -36,7 +36,7 @@ var (
 	_ = operatorsv1alpha1.AddToScheme(scheme.Scheme)
 	_ = addonapiv1beta1.Install(scheme.Scheme)
 	_ = uiplugin.AddToScheme(scheme.Scheme)
-	_ = persesv1.AddToScheme(scheme.Scheme) // Assuming persesv1alpha1 is imported correctly
+	_ = persesv1.AddToScheme(scheme.Scheme)
 	_ = workv1.Install(scheme.Scheme)
 )
 
@@ -55,7 +55,6 @@ func fakeGetValues(ctx context.Context, k8s client.Client) addonfactory.GetValue
 			return nil, err
 		}
 
-		// Check if this is a hub cluster by looking for the local-cluster label
 		isHub := false
 		if cluster != nil {
 			if val, ok := cluster.Labels["local-cluster"]; ok {
@@ -81,7 +80,6 @@ func fakeGetValues(ctx context.Context, k8s client.Client) addonfactory.GetValue
 
 func newCOOAgentAddon(initObjects []client.Object, addOnDeploymentConfig *addonapiv1beta1.AddOnDeploymentConfig) agent.AgentAddon {
 	initObjects = append(initObjects, addOnDeploymentConfig)
-	// Setup the fake k8s client
 	fakeKubeClient := fake.NewClientBuilder().
 		WithScheme(scheme.Scheme).
 		WithObjects(initObjects...).
@@ -94,7 +92,6 @@ func newCOOAgentAddon(initObjects []client.Object, addOnDeploymentConfig *addona
 	)
 	ctx := context.Background()
 
-	// Wire everything together to a fake addon instance
 	oboAgentAddon, err := addonfactory.NewAgentAddonFactory(addoncfg.Name, addon.FS, addoncfg.COOChartDir).
 		WithGetValuesFuncs(addonConfigValuesFn, fakeGetValues(ctx, fakeKubeClient)).
 		WithAgentRegistrationOption(&agent.RegistrationOption{}).
@@ -106,7 +103,10 @@ func newCOOAgentAddon(initObjects []client.Object, addOnDeploymentConfig *addona
 	return oboAgentAddon
 }
 
-func Test_IncidentDetection_AllConfigsTogether_AllResources(t *testing.T) {
+// Test_COOHelmRendering tests that the COO Helm chart renders only COO
+// subscription resources. Hub-only Perses resources (dashboards, datasources,
+// UIPlugin) are now reconciled directly by HubResourceReconciler.
+func Test_COOHelmRendering(t *testing.T) {
 	for _, tc := range []struct {
 		name         string
 		isHub        bool
@@ -114,13 +114,13 @@ func Test_IncidentDetection_AllConfigsTogether_AllResources(t *testing.T) {
 		expectedFunc func(*testing.T, []runtime.Object)
 	}{
 		{
-			name: "no config",
+			name: "no config produces no manifests",
 			expectedFunc: func(t *testing.T, objects []runtime.Object) {
 				require.Empty(t, objects)
 			},
 		},
 		{
-			name:  "right-sizing dashboards in observability-analytics namespace",
+			name:  "hub with right-sizing enabled renders no Perses resources",
 			isHub: true,
 			cv: []addonapiv1beta1.CustomizedVariable{
 				{Name: addon.KeyRightSizingDelegated, Value: "true"},
@@ -128,143 +128,36 @@ func Test_IncidentDetection_AllConfigsTogether_AllResources(t *testing.T) {
 				{Name: addon.KeyPlatformVirtualizationRightSizing, Value: "enabled"},
 			},
 			expectedFunc: func(t *testing.T, objects []runtime.Object) {
-				require.GreaterOrEqual(t, len(objects), 3, "expected at least namespace + datasource + dashboards")
-
-				var analyticsNS bool
-				var analyticsDatasource bool
-				var analyticsDashboards []string
-				var obsDashboards []string
-
 				for _, o := range objects {
-					switch obj := o.(type) {
-					case *corev1.Namespace:
-						if obj.Name == addoncfg.AnalyticsNamespace {
-							analyticsNS = true
-						}
-					case *persesv1.PersesDatasource:
-						if obj.Namespace == addoncfg.AnalyticsNamespace {
-							analyticsDatasource = true
-						}
-					case *persesv1.PersesDashboard:
-						switch obj.Namespace {
-						case addoncfg.AnalyticsNamespace:
-							analyticsDashboards = append(analyticsDashboards, obj.Name)
-						case addoncfg.InstallNamespace:
-							obsDashboards = append(obsDashboards, obj.Name)
-						}
-					}
+					assert.IsNotType(t, &persesv1.PersesDashboard{}, o, "dashboards should not come from Helm")
+					assert.IsNotType(t, &persesv1.PersesDatasource{}, o, "datasources should not come from Helm")
+					assert.IsNotType(t, &uiplugin.UIPlugin{}, o, "UIPlugin should not come from Helm")
 				}
-
-				require.True(t, analyticsNS, "observability-analytics namespace should be created")
-				require.True(t, analyticsDatasource, "datasource should exist in observability-analytics")
-				require.GreaterOrEqual(t, len(analyticsDashboards), 2, "expected at least 2 RS dashboards in observability-analytics")
-				require.Empty(t, obsDashboards, "no RS dashboards should be in obs namespace")
 			},
 		},
 		{
-			name: "incident detection dashboards in observability-analytics namespace",
-			cv: []addonapiv1beta1.CustomizedVariable{
-				{
-					Name:  "platformIncidentDetection",
-					Value: "uiplugins.v1alpha1.observability.openshift.io",
-				},
-			},
-			isHub: true,
-			expectedFunc: func(t *testing.T, objects []runtime.Object) {
-				require.GreaterOrEqual(t, len(objects), 4)
-				// ACM block is only rendered when metrics are enabled;
-				// this test only enables incident detection.
-				expectedUIPluginSpec := uiplugin.UIPluginSpec{
-					Type: "Monitoring",
-					Monitoring: &uiplugin.MonitoringConfig{
-						Perses: &uiplugin.PersesReference{
-							Enabled: true,
-						},
-						Incidents: &uiplugin.IncidentsReference{
-							Enabled: true,
-						},
-					},
-				}
-
-				var analyticsNS bool
-				var analyticsDashboards int
-
-				for _, o := range objects {
-					switch obj := o.(type) {
-					case *uiplugin.UIPlugin:
-						require.Equal(t, "monitoring", obj.Name)
-						require.Equal(t, expectedUIPluginSpec, obj.Spec)
-					case *corev1.Namespace:
-						if obj.Name == addoncfg.AnalyticsNamespace {
-							analyticsNS = true
-						}
-					case *persesv1.PersesDashboard:
-						require.Equal(t, addoncfg.AnalyticsNamespace, obj.Namespace, "incident detection dashboard should be in analytics namespace")
-						analyticsDashboards++
-					}
-				}
-
-				require.True(t, analyticsNS, "observability-analytics namespace should be created")
-				require.GreaterOrEqual(t, analyticsDashboards, 1, "expected at least 1 incident detection dashboard in analytics namespace")
-			},
-		},
-		{
-			name:  "platform metrics collection & UI",
+			name:  "hub with metrics UI renders no Perses resources from Helm",
 			isHub: true,
 			cv: []addonapiv1beta1.CustomizedVariable{
-				{
-					Name:  "platformMetricsCollection",
-					Value: "prometheusagents.v1alpha1.monitoring.rhobs",
-				},
-				{
-					Name:  addon.KeyMetricsHubHostname,
-					Value: "metrics.hub.com",
-				},
-				{
-					Name:  "platformMetricsUI",
-					Value: "uiplugins.v1alpha1.observability.openshift.io",
-				},
+				{Name: "platformMetricsCollection", Value: "prometheusagents.v1alpha1.monitoring.rhobs"},
+				{Name: addon.KeyMetricsHubHostname, Value: "metrics.hub.com"},
+				{Name: "platformMetricsUI", Value: "uiplugins.v1alpha1.observability.openshift.io"},
 			},
 			expectedFunc: func(t *testing.T, objects []runtime.Object) {
-				require.GreaterOrEqual(t, len(objects), 4)
-				expectedUIPluginSpec := uiplugin.UIPluginSpec{
-					Type: "Monitoring",
-					Monitoring: &uiplugin.MonitoringConfig{
-						ACM: &uiplugin.AdvancedClusterManagementReference{
-							Enabled: true,
-							Alertmanager: uiplugin.AlertmanagerReference{
-								Url: "https://alertmanager.open-cluster-management-observability.svc:9095",
-							},
-							ThanosQuerier: uiplugin.ThanosQuerierReference{
-								Url: "https://rbac-query-proxy.open-cluster-management-observability.svc:8443",
-							},
-						},
-						Perses: &uiplugin.PersesReference{
-							Enabled: true,
-						},
-					},
-				}
-
 				for _, o := range objects {
-					switch o := o.(type) {
-					case *uiplugin.UIPlugin:
-						require.Equal(t, "monitoring", o.Name)
-						require.Equal(t, expectedUIPluginSpec, o.Spec)
-					}
+					assert.IsNotType(t, &persesv1.PersesDashboard{}, o, "dashboards should not come from Helm")
+					assert.IsNotType(t, &persesv1.PersesDatasource{}, o, "datasources should not come from Helm")
+					assert.IsNotType(t, &uiplugin.UIPlugin{}, o, "UIPlugin should not come from Helm")
 				}
 			},
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			// Setup a managed cluster
 			mc := addontesting.NewManagedCluster("cluster-1")
 			if tc.isHub {
-				mc.Labels = map[string]string{
-					"local-cluster": "true",
-				}
+				mc.Labels = map[string]string{"local-cluster": "true"}
 			}
 
-			// Register the addon for the managed cluster
 			mcao := addontesting.NewAddon("test", "cluster-1")
 			mcao.Status.ConfigReferences = []addonapiv1beta1.ConfigReference{
 				{
@@ -292,10 +185,7 @@ func Test_IncidentDetection_AllConfigsTogether_AllResources(t *testing.T) {
 				},
 			}
 
-			// Create the COOAgentAddon
 			cooAgentAddon := newCOOAgentAddon([]client.Object{mcao}, addc)
-
-			// Render manifests and return them as k8s runtime objects
 			objects, err := cooAgentAddon.Manifests(t.Context(), mc, mcao)
 			require.NoError(t, err)
 			tc.expectedFunc(t, objects)

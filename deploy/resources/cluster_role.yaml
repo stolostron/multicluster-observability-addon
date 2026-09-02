@@ -59,11 +59,13 @@
     - apiGroups: [""]
       resources: ["secrets"]
       verbs: ["get", "list", "watch"]
-    # The addon will need to pull subscriptions to know if certain operators
-    # are installed in the hub cluster
+    # The addon manages COO subscriptions on the hub and checks spoke subscriptions
     - apiGroups: ["operators.coreos.com"]
       resources: ["subscriptions"]
-      verbs: ["get", "list", "watch"]
+      verbs: ["get", "list", "watch", "create", "update", "delete", "patch"]
+    - apiGroups: ["operators.coreos.com"]
+      resources: ["operatorgroups"]
+      verbs: ["get", "list", "watch", "create", "update", "delete", "patch"]
     # Roles for addon to perform logging specific actions
     - apiGroups: ["observability.openshift.io"]
       resources: ["clusterlogforwarders"]
@@ -92,5 +94,15 @@
     - apiGroups: ["operator.open-cluster-management.io"]
       resources: ["multiclusterhubs"]
       verbs: ["get", "list", "watch"]
+    # Hub-only Perses resources managed directly by HubResourceReconciler
+    - apiGroups: [""]
+      resources: ["namespaces"]
+      verbs: ["get", "list", "watch", "create", "update", "delete", "patch"]
+    - apiGroups: ["perses.dev"]
+      resources: ["persesdashboards", "persesdatasources"]
+      verbs: ["get", "list", "watch", "create", "update", "delete", "patch"]
+    - apiGroups: ["observability.openshift.io"]
+      resources: ["uiplugins"]
+      verbs: ["get", "list", "watch", "create", "update", "delete", "patch"]
 
 

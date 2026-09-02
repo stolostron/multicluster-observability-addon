@@ -1,104 +1,45 @@
 package manifests
 
 import (
-	"encoding/json"
-	"log"
-	"strings"
-
-	persesv1 "github.com/perses/perses-operator/api/v1alpha1"
-	"github.com/perses/perses/go-sdk/dashboard"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
-	"github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	imanifests "github.com/stolostron/multicluster-observability-addon/internal/analytics/incident-detection/manifests"
-	rsperses "github.com/stolostron/multicluster-observability-addon/internal/perses/dashboards/rightsizing"
-	"github.com/stolostron/multicluster-observability-addon/pkg/perses/dashboards/acm"
-	hcp "github.com/stolostron/multicluster-observability-addon/pkg/perses/dashboards/acm/hosted-control-plane"
-	compute "github.com/stolostron/multicluster-observability-addon/pkg/perses/dashboards/acm/k8s/compute"
-	networking "github.com/stolostron/multicluster-observability-addon/pkg/perses/dashboards/acm/k8s/networking"
-	slo "github.com/stolostron/multicluster-observability-addon/pkg/perses/dashboards/acm/k8s/slo"
-	incident_management "github.com/stolostron/multicluster-observability-addon/pkg/perses/dashboards/incident-management"
-	"github.com/stolostron/multicluster-observability-addon/pkg/perses/dashboards/thanos"
-	"k8s.io/apimachinery/pkg/runtime"
 )
 
-var (
-	dsThanos             = "rbac-query-proxy-datasource"
-	dsPlatformPrometheus = "platform-prometheus-datasource"
-	clusterLabelName     = ""
-)
-
-type DashboardValue struct {
-	Name string `json:"name"`
-	Data string `json:"data"`
-}
-
-type DashboardBuilderFunc func(project string, datasource string, clusterLabelName string) (dashboard.Builder, error)
-
-type DashboardBuilder struct {
-	fn   DashboardBuilderFunc
-	name string
-}
-
+// COOValues contains only the flags that remaining Helm templates (COO
+// subscription/operatorgroup) still need. Hub-only Perses resources are
+// now reconciled directly by HubResourceReconciler.
 type COOValues struct {
-	Enabled            bool `json:"enabled"`
-	InstallCOO         bool `json:"installCOO"`
-	MonitoringUIPlugin bool `json:"monitoringUIPlugin"`
-	Perses             bool `json:"perses"`
-	// omitempty removed: when no regular dashboards are needed, the key must
-	// still appear in the serialized JSON so Helm uses the empty list instead
-	// of falling back to the default in values.yaml.
-	Dashboards          []DashboardValue                    `json:"dashboards"`
-	AnalyticsDashboards []DashboardValue                    `json:"analyticsDashboards,omitempty"`
-	Metrics             *UIValues                           `json:"metrics,omitempty"`
-	IncidentDetection   *imanifests.IncidentDetectionValues `json:"incidentDetection,omitempty"`
+	Enabled    bool `json:"enabled"`
+	InstallCOO bool `json:"installCOO"`
 }
 
 type UIValues struct {
 	Enabled bool `json:"enabled"`
 }
 
-// BuildValues constructs COO Helm values from addon options, including dashboards and feature gates.
-// installCOOIsNeeded is the caller's resolved decision on whether MCOA should install and
-// manage its own COO subscription on this cluster (see handlers.InstallOfCOOOnTheHubIsNeeded
-// and handlers.InstallOfCOOOnSpokeIsNeeded), and is only applied when a COO-dependent
-// feature (metrics UI, incident detection, or right-sizing) is actually enabled.
+// BuildValues constructs COO Helm values from addon options.
+// Hub-only Perses resources (dashboards, datasources, UIPlugin) are now
+// reconciled directly by HubResourceReconciler; this function only computes
+// the flags that remaining Helm templates (COO subscription) still need.
+// installCOOIsNeeded is the caller's resolved decision on whether MCOA should
+// install and manage its own COO subscription on this cluster.
 func BuildValues(opts addon.Options, installCOOIsNeeded bool, isHubCluster bool, hasCardinalityRules bool) *COOValues {
-	var dashboards []DashboardValue
 	var incidentDetectionEnabled bool
 	var rightSizingEnabled bool
-	metricsUI := enableUI(opts.Platform.Metrics, isHubCluster)
-	if metricsUI != nil {
-		if metricsUI.Enabled {
-			dashboards = append(dashboards, buildACMDashboards()...)
-			dashboards = append(dashboards, buildK8sDashboards()...)
-			dashboards = append(dashboards, buildThanosDashboards()...)
-			if hasCardinalityRules {
-				dashboards = append(dashboards, buildCardinalityDashboards()...)
-			}
-		}
-	}
+	metricsUI := EnableUI(opts.Platform.Metrics, isHubCluster)
+	hasDashboards := metricsUI != nil && metricsUI.Enabled
 
 	incidentDetection := imanifests.EnableUI(opts.Platform.AnalyticsOptions.IncidentDetection)
-	if incidentDetection != nil {
-		if incidentDetection.Enabled {
-			incidentDetectionEnabled = true
-		}
+	if incidentDetection != nil && incidentDetection.Enabled {
+		incidentDetectionEnabled = true
 	}
 
-	var analyticsDashboards []DashboardValue
-	if isHubCluster {
-		if incidentDetectionEnabled {
-			analyticsDashboards = append(analyticsDashboards, buildIncidentDetetctionDashboards()...)
+	if isHubCluster && opts.Platform.AnalyticsOptions.RightSizing.Delegated {
+		if opts.Platform.AnalyticsOptions.RightSizing.NamespaceEnabled {
+			rightSizingEnabled = true
 		}
-		if opts.Platform.AnalyticsOptions.RightSizing.Delegated {
-			if opts.Platform.AnalyticsOptions.RightSizing.NamespaceEnabled {
-				rightSizingEnabled = true
-				analyticsDashboards = append(analyticsDashboards, buildNamespaceRSDashboards()...)
-			}
-			if opts.Platform.AnalyticsOptions.RightSizing.VirtualizationEnabled {
-				rightSizingEnabled = true
-				analyticsDashboards = append(analyticsDashboards, buildVMRSDashboards()...)
-			}
+		if opts.Platform.AnalyticsOptions.RightSizing.VirtualizationEnabled {
+			rightSizingEnabled = true
 		}
 	}
 
@@ -108,18 +49,12 @@ func BuildValues(opts addon.Options, installCOOIsNeeded bool, isHubCluster bool,
 	}
 
 	return &COOValues{
-		Enabled:             len(dashboards) > 0 || len(analyticsDashboards) > 0 || incidentDetectionEnabled,
-		InstallCOO:          installCOO,
-		MonitoringUIPlugin:  len(dashboards) > 0 || len(analyticsDashboards) > 0 || incidentDetectionEnabled,
-		Perses:              len(dashboards) > 0 || len(analyticsDashboards) > 0,
-		Dashboards:          dashboards,
-		AnalyticsDashboards: analyticsDashboards,
-		Metrics:             metricsUI,
-		IncidentDetection:   incidentDetection,
+		Enabled:    hasDashboards || incidentDetectionEnabled || rightSizingEnabled,
+		InstallCOO: installCOO,
 	}
 }
 
-func enableUI(opts addon.MetricsOptions, isHub bool) *UIValues {
+func EnableUI(opts addon.MetricsOptions, isHub bool) *UIValues {
 	if !isHub {
 		return nil
 	}
@@ -131,166 +66,4 @@ func enableUI(opts addon.MetricsOptions, isHub bool) *UIValues {
 	return &UIValues{
 		Enabled: true,
 	}
-}
-
-func buildDashboards(builders []DashboardBuilder, datasource string, project string) []DashboardValue {
-	var dashboards []DashboardValue
-
-	for _, builder := range builders {
-		db, err := builder.fn(project, datasource, clusterLabelName)
-		if err != nil {
-			log.Printf("Failed to build %s dashboard: %v", builder.name, err)
-			continue
-		}
-		data, err := json.Marshal(db.Dashboard.Spec)
-		if err != nil {
-			log.Printf("Failed to marshal %s dashboard: %v", builder.name, err)
-			continue
-		}
-		dashboards = append(dashboards, DashboardValue{
-			Name: db.Dashboard.Metadata.Name,
-			Data: string(data),
-		})
-	}
-
-	return dashboards
-}
-
-func buildACMDashboards() []DashboardValue {
-	builders := []DashboardBuilder{
-		{acm.BuildClusterResourceUse, "ClusterResourceUse"},
-		{acm.BuildNodeResourceUse, "NodeResourceUse"},
-		{acm.BuildACMOptimizationOverview, "ACMOptimizationOverview"},
-		{acm.BuildACMClustersOverview, "ACMClustersOverview"},
-		{acm.BuildACMAlertAnalysis, "ACMAlertAnalysis"},
-		{acm.BuildACMAlertsByCluster, "ACMAlertsByCluster"},
-		{acm.BuildACMClustersByAlert, "ACMClustersByAlert"},
-		{hcp.BuildACMHCPOverview, "ACMHCPOverview"},
-		{hcp.BuildACMHCPResources, "ACMHCPResources"},
-		{slo.BuildSLOAPIServer, "SLOAPIServer"},
-		{slo.BuildSLOAPIServerCluster, "SLOAPIServerCluster"},
-		{networking.BuildNetworkingCluster, "NetworkingCluster"},
-		{networking.BuildNetworkingNamespacePods, "NetworkingNamespacePods"},
-		{networking.BuildNetworkingNode, "NetworkingNode"},
-		{networking.BuildNetworkingPod, "NetworkingPod"},
-		{compute.BuildComputeCluster, "ComputeCluster"},
-		{compute.BuildComputeNamespacePods, "ComputeNamespacePods"},
-		{compute.BuildComputeNamespaceWorkloads, "ComputeNamespaceWorkloads"},
-		{compute.BuildComputeNodePods, "ComputeNodePods"},
-		{compute.BuildComputePod, "ComputePod"},
-		{compute.BuildComputeWorkload, "ComputeWorkload"},
-	}
-
-	return buildDashboards(builders, dsThanos, config.InstallNamespace)
-}
-
-// thanosVariableMetricRenames covers the small set of metric names referenced
-// directly by community-mixins' Thanos dashboard-level variables (job/
-// namespace/cluster/tenant), which aren't covered by the
-// ThanosCommonPanelQueries override in pkg/perses/dashboards/thanos since
-// they're not panel queries.
-var thanosVariableMetricRenames = strings.NewReplacer(
-	"thanos_build_info", "acm_thanos_build_info",
-	"thanos_status", "acm_thanos_status",
-	"prometheus_tsdb_head_max_time", "acm_prometheus_tsdb_head_max_time",
-)
-
-func buildThanosDashboards() []DashboardValue {
-	objs, err := thanos.BuildThanosDashboards(config.InstallNamespace, dsPlatformPrometheus, clusterLabelName)
-	if err != nil {
-		log.Printf("Failed to build Thanos dashboards: %v", err)
-		return nil
-	}
-
-	var dashboards []DashboardValue
-	for _, obj := range objs {
-		db, ok := obj.(*persesv1.PersesDashboard)
-		if !ok {
-			log.Printf("Failed to convert object to PersesDashboard: %v", obj)
-			continue
-		}
-		data, err := json.Marshal(db.Spec)
-		if err != nil {
-			log.Printf("Failed to marshal Thanos dashboard %s: %v", db.Name, err)
-			continue
-		}
-		dashboards = append(dashboards, DashboardValue{
-			Name: db.Name,
-			Data: thanosVariableMetricRenames.Replace(string(data)),
-		})
-	}
-	return dashboards
-}
-
-func buildCardinalityDashboards() []DashboardValue {
-	builders := []DashboardBuilder{
-		{acm.BuildACMMetricsCardinalityOverview, "ACMMetricsCardinalityOverview"},
-		{acm.BuildACMMetricsCardinalityCluster, "ACMMetricsCardinalityCluster"},
-		{acm.BuildACMMetricsCardinalityName, "ACMMetricsCardinalityName"},
-	}
-
-	return buildDashboards(builders, dsThanos, config.InstallNamespace)
-}
-
-func buildIncidentDetetctionDashboards() []DashboardValue {
-	builders := []DashboardBuilder{
-		{incident_management.BuildACMIncidentsOverview, "IncidentDetectionOverview"},
-	}
-
-	return buildDashboards(builders, dsThanos, config.AnalyticsNamespace)
-}
-
-func buildK8sDashboards() []DashboardValue {
-	type dashboardBuilder struct {
-		fn   func(string, string, string) ([]runtime.Object, error)
-		name string
-	}
-	builders := []dashboardBuilder{
-		{acm.BuildK8sDashboards, "Kubernetes"},
-		{acm.BuildETCDDashboards, "ETCD"},
-	}
-
-	var dashboards []DashboardValue
-	for _, builder := range builders {
-		objs, err := builder.fn(config.InstallNamespace, dsThanos, clusterLabelName)
-		if err != nil {
-			log.Printf("Failed to build %s dashboards: %v", builder.name, err)
-			continue
-		}
-		for _, obj := range objs {
-			db, ok := obj.(*persesv1.PersesDashboard)
-			if !ok {
-				log.Printf("Failed to convert object to PersesDashboard: %v", obj)
-				continue
-			}
-			data, err := json.Marshal(db.Spec)
-			if err != nil {
-				log.Printf("Failed to marshal %s dashboard: %v", builder.name, err)
-				continue
-			}
-			dashboards = append(dashboards, DashboardValue{
-				Name: db.Name,
-				Data: string(data),
-			})
-		}
-	}
-	return dashboards
-}
-
-func buildNamespaceRSDashboards() []DashboardValue {
-	builders := []DashboardBuilder{
-		{rsperses.BuildNamespaceRightSizing, "NamespaceRightSizing"},
-	}
-
-	return buildDashboards(builders, dsThanos, config.AnalyticsNamespace)
-}
-
-func buildVMRSDashboards() []DashboardValue {
-	builders := []DashboardBuilder{
-		{rsperses.BuildVMOverview, "VMRightSizingOverview"},
-		{rsperses.BuildVMOverestimation, "VMOverestimation"},
-		{rsperses.BuildVMUnderestimation, "VMUnderestimation"},
-	}
-
-	return buildDashboards(builders, dsThanos, config.AnalyticsNamespace)
 }
