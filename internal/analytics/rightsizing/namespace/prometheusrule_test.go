@@ -163,6 +163,7 @@ func TestProfileAggregationExpressions(t *testing.T) {
 		"P95":         "quantile_over_time(0.95,",
 	}
 
+	matched := map[string]bool{}
 	for _, group := range rule.Spec.Groups {
 		for _, r := range group.Rules {
 			if r.Record == "acm_rs:namespace:cpu_recommendation" {
@@ -170,10 +171,12 @@ func TestProfileAggregationExpressions(t *testing.T) {
 				if expectedPrefix, ok := profileExprs[profile]; ok {
 					assert.Contains(t, r.Expr.String(), expectedPrefix,
 						"profile %q should use %s", profile, expectedPrefix)
+					matched[profile] = true
 				}
 			}
 		}
 	}
+	require.Len(t, matched, len(profileExprs), "all profiles must be found in generated rules")
 }
 
 // TestCustomCpuAggregatorProfiles verifies that custom CPU aggregator profiles from ConfigMap
@@ -296,6 +299,7 @@ func TestDynamicPercentilePromQL(t *testing.T) {
 		"P75": "quantile_over_time(0.75,",
 	}
 
+	matched := map[string]bool{}
 	for _, group := range rule.Spec.Groups {
 		for _, r := range group.Rules {
 			if r.Record == "acm_rs:namespace:cpu_usage" {
@@ -303,10 +307,12 @@ func TestDynamicPercentilePromQL(t *testing.T) {
 				if expected, ok := expectedExprs[profile]; ok {
 					assert.Contains(t, r.Expr.String(), expected,
 						"profile %q should produce %s expression", profile, expected)
+					matched[profile] = true
 				}
 			}
 		}
 	}
+	require.Len(t, matched, len(expectedExprs), "all dynamic percentile profiles must be found")
 }
 
 // TestCustomRecommendationPercentageWithCustomProfiles verifies that a non-default
@@ -321,20 +327,25 @@ func TestCustomRecommendationPercentageWithCustomProfiles(t *testing.T) {
 	rule, err := GeneratePrometheusRule(configData)
 	require.NoError(t, err)
 
+	foundCpu, foundMem := false, false
 	for _, group := range rule.Spec.Groups {
 		for _, r := range group.Rules {
 			if r.Record == "acm_rs:namespace:cpu_recommendation" {
 				assert.Contains(t, r.Expr.String(), "130/100")
 				assert.Contains(t, r.Expr.String(), "quantile_over_time(0.9,")
 				assert.Equal(t, "P90", r.Labels["profile"])
+				foundCpu = true
 			}
 			if r.Record == "acm_rs:namespace:memory_recommendation" {
 				assert.Contains(t, r.Expr.String(), "130/100")
 				assert.Contains(t, r.Expr.String(), "quantile_over_time(0.75,")
 				assert.Equal(t, "P75", r.Labels["profile"])
+				foundMem = true
 			}
 		}
 	}
+	require.True(t, foundCpu, "CPU recommendation rule must be generated")
+	require.True(t, foundMem, "Memory recommendation rule must be generated")
 }
 
 // TestLabelFilterWithCustomProfiles verifies that label_env filters
@@ -396,6 +407,8 @@ func TestNamespaceRuleCountConsistency(t *testing.T) {
 		}
 	}
 
+	require.Len(t, cpuRecords, 2, "should have 2 CPU profiles")
+	require.Len(t, memRecords, 3, "should have 3 memory profiles")
 	for profile, count := range cpuRecords {
 		assert.Equal(t, 8, count, "CPU profile %q should have 8 rules (4 namespace + 4 cluster)", profile)
 	}
