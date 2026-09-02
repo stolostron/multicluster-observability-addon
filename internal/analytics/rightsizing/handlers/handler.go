@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"sync"
 
 	"github.com/go-logr/logr"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
@@ -21,6 +22,40 @@ import (
 	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+// lastValidAggregators caches the last known valid aggregator config per ConfigMap,
+// so that an edit containing any invalid entry can be rejected entirely and the
+// previous valid config restored. The cache is keyed by "configMapName:cpu" or
+// "configMapName:memory". On process restart with an invalid ConfigMap the cache
+// is empty and the resolver falls back to hardcoded defaults.
+var (
+	lastValidMu          sync.RWMutex
+	lastValidAggregators = make(map[string][]string)
+)
+
+func cacheKey(configMapName, field string) string {
+	return configMapName + ":" + field
+}
+
+func cacheValidAggregator(configMapName, field string, values []string) {
+	lastValidMu.Lock()
+	defer lastValidMu.Unlock()
+	dst := make([]string, len(values))
+	copy(dst, values)
+	lastValidAggregators[cacheKey(configMapName, field)] = dst
+}
+
+func getCachedAggregator(configMapName, field string) ([]string, bool) {
+	lastValidMu.RLock()
+	defer lastValidMu.RUnlock()
+	v, ok := lastValidAggregators[cacheKey(configMapName, field)]
+	if !ok {
+		return nil, false
+	}
+	dst := make([]string, len(v))
+	copy(dst, v)
+	return dst, true
+}
 
 // OptionsBuilder builds right-sizing options for the helm chart
 type OptionsBuilder struct {
@@ -70,6 +105,7 @@ func (o *OptionsBuilder) Build(ctx context.Context, cluster *clusterv1.ManagedCl
 				return ret, fmt.Errorf("failed to get namespace config: %w", err)
 			}
 		}
+		o.validateAndSanitizeConfig(&nsConfigData, rightsizing.NamespaceConfigMapName)
 
 		if clusterMatchesPlacement(cluster, nsConfigData.PlacementConfiguration) {
 			nsOpts, err := o.buildNamespaceOptionsFromConfig(nsConfigData)
@@ -100,6 +136,7 @@ func (o *OptionsBuilder) Build(ctx context.Context, cluster *clusterv1.ManagedCl
 				return ret, fmt.Errorf("failed to get virtualization config: %w", err)
 			}
 		}
+		o.validateAndSanitizeConfig(&virtConfigData, rightsizing.VirtualizationConfigMapName)
 
 		if clusterMatchesPlacement(cluster, virtConfigData.PlacementConfiguration) {
 			virtOpts, err := o.buildVirtualizationOptionsFromConfig(virtConfigData)
@@ -149,10 +186,46 @@ func (o *OptionsBuilder) getConfigData(ctx context.Context, configMapName string
 	return rightsizing.ParseConfigMapData(cm.Data)
 }
 
+// validateAndSanitizeConfig checks cpuAggregator and memoryAggregator for invalid
+// profile names. If ANY entry in a list is invalid, the entire edit is rejected
+// and the previous valid config (from cache) is restored. This prevents partial
+// application of a bad edit. When the cache is empty (e.g. after restart) and the
+// config is invalid, the list is set to nil so downstream resolvers fall back to
+// hardcoded defaults.
+func (o *OptionsBuilder) validateAndSanitizeConfig(configData *rightsizing.RSConfigMapData, configMapName string) {
+	if invalid := rightsizing.ValidateAggregatorNames(configData.PrometheusRuleConfig.CpuAggregator); len(invalid) > 0 {
+		if cached, ok := getCachedAggregator(configMapName, "cpu"); ok {
+			o.Logger.Info("Invalid cpuAggregator values in ConfigMap, rejecting edit and keeping previous valid config",
+				"configMap", configMapName, "invalidValues", invalid, "restoredConfig", cached)
+			configData.PrometheusRuleConfig.CpuAggregator = cached
+		} else {
+			o.Logger.Info("Invalid cpuAggregator values in ConfigMap, no previous config cached, falling back to defaults",
+				"configMap", configMapName, "invalidValues", invalid)
+			configData.PrometheusRuleConfig.CpuAggregator = nil
+		}
+	} else {
+		cacheValidAggregator(configMapName, "cpu", configData.PrometheusRuleConfig.CpuAggregator)
+	}
+
+	if invalid := rightsizing.ValidateAggregatorNames(configData.PrometheusRuleConfig.MemoryAggregator); len(invalid) > 0 {
+		if cached, ok := getCachedAggregator(configMapName, "memory"); ok {
+			o.Logger.Info("Invalid memoryAggregator values in ConfigMap, rejecting edit and keeping previous valid config",
+				"configMap", configMapName, "invalidValues", invalid, "restoredConfig", cached)
+			configData.PrometheusRuleConfig.MemoryAggregator = cached
+		} else {
+			o.Logger.Info("Invalid memoryAggregator values in ConfigMap, no previous config cached, falling back to defaults",
+				"configMap", configMapName, "invalidValues", invalid)
+			configData.PrometheusRuleConfig.MemoryAggregator = nil
+		}
+	} else {
+		cacheValidAggregator(configMapName, "memory", configData.PrometheusRuleConfig.MemoryAggregator)
+	}
+}
+
 //
 // Both MCO and MCOA use a "create if not exists" pattern for these ConfigMaps,
 // so user customizations (namespace filters, recommendation %, placement predicates)
-// are preserved across mode switches (MCO <=> MCOA).
+// are preserved across mode switches (MCO <=> MCOA). While upgrading from ACM 2.17 to ACM 5.0
 //
 
 // ensureNamespaceConfigMap ensures the namespace right-sizing ConfigMap exists on the hub.
