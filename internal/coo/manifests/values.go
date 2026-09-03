@@ -47,10 +47,12 @@ type COOValues struct {
 	// omitempty removed: when no regular dashboards are needed, the key must
 	// still appear in the serialized JSON so Helm uses the empty list instead
 	// of falling back to the default in values.yaml.
-	Dashboards          []DashboardValue                    `json:"dashboards"`
-	AnalyticsDashboards []DashboardValue                    `json:"analyticsDashboards,omitempty"`
-	Metrics             *UIValues                           `json:"metrics,omitempty"`
-	IncidentDetection   *imanifests.IncidentDetectionValues `json:"incidentDetection,omitempty"`
+	Dashboards             []DashboardValue                    `json:"dashboards"`
+	AnalyticsDashboards    []DashboardValue                    `json:"analyticsDashboards,omitempty"`
+	Metrics                *UIValues                           `json:"metrics,omitempty"`
+	IncidentDetection      *imanifests.IncidentDetectionValues `json:"incidentDetection,omitempty"`
+	CatalogSource          string                              `json:"catalogSource"`
+	CatalogSourceNamespace string                              `json:"catalogSourceNamespace"`
 }
 
 type UIValues struct {
@@ -108,15 +110,31 @@ func BuildValues(opts addon.Options, installCOOIsNeeded bool, isHubCluster bool,
 	}
 
 	return &COOValues{
-		Enabled:             len(dashboards) > 0 || len(analyticsDashboards) > 0 || incidentDetectionEnabled,
-		InstallCOO:          installCOO,
-		MonitoringUIPlugin:  len(dashboards) > 0 || len(analyticsDashboards) > 0 || incidentDetectionEnabled,
-		Perses:              len(dashboards) > 0 || len(analyticsDashboards) > 0,
-		Dashboards:          dashboards,
-		AnalyticsDashboards: analyticsDashboards,
-		Metrics:             metricsUI,
-		IncidentDetection:   incidentDetection,
+		Enabled:                len(dashboards) > 0 || len(analyticsDashboards) > 0 || incidentDetectionEnabled,
+		InstallCOO:             installCOO,
+		MonitoringUIPlugin:     len(dashboards) > 0 || len(analyticsDashboards) > 0 || incidentDetectionEnabled,
+		Perses:                 len(dashboards) > 0 || len(analyticsDashboards) > 0,
+		Dashboards:             dashboards,
+		AnalyticsDashboards:    analyticsDashboards,
+		Metrics:                metricsUI,
+		IncidentDetection:      incidentDetection,
+		CatalogSource:          catalogSourceOrDefault(opts.COO.CatalogSource),
+		CatalogSourceNamespace: catalogSourceNamespaceOrDefault(opts.COO.CatalogSourceNamespace),
 	}
+}
+
+func catalogSourceOrDefault(name string) string {
+	if name != "" {
+		return name
+	}
+	return config.DefaultCooCatalogSource
+}
+
+func catalogSourceNamespaceOrDefault(namespace string) string {
+	if namespace != "" {
+		return namespace
+	}
+	return config.DefaultCooCatalogSourceNamespace
 }
 
 func enableUI(opts addon.MetricsOptions, isHub bool) *UIValues {
