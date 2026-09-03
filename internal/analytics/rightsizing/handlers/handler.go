@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"slices"
+	"strings"
 	"sync"
 
 	"github.com/go-logr/logr"
@@ -344,7 +345,15 @@ func (o *OptionsBuilder) backfillAggregatorKeys(ctx context.Context, cm *corev1.
 		config["memoryAggregator"] = rightsizing.DefaultMemoryAggregator
 	}
 
-	updated, err := json.Marshal(config)
+	// Detect whether the original data was YAML (from MCO 2.17) or JSON (from MCOA)
+	// and preserve the format so users see the same style they wrote.
+	var updated []byte
+	var err error
+	if isYAML(raw) {
+		updated, err = sigYaml.Marshal(config)
+	} else {
+		updated, err = json.Marshal(config)
+	}
 	if err != nil {
 		return fmt.Errorf("failed to marshal backfilled config: %w", err)
 	}
@@ -357,6 +366,13 @@ func (o *OptionsBuilder) backfillAggregatorKeys(ctx context.Context, cm *corev1.
 	o.Logger.Info("Backfilled missing aggregator keys in ConfigMap",
 		"name", cm.Name, "addedCpu", !hasCpu, "addedMem", !hasMem)
 	return nil
+}
+
+// isYAML returns true if the raw string looks like YAML rather than JSON.
+// JSON ConfigMaps start with '{'; YAML uses key: value lines.
+func isYAML(raw string) bool {
+	trimmed := strings.TrimSpace(raw)
+	return len(trimmed) > 0 && trimmed[0] != '{'
 }
 
 // clusterMatchesPlacement evaluates placement predicates in-memory against
