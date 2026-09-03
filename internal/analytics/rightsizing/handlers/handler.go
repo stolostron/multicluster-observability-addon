@@ -22,6 +22,7 @@ import (
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	sigYaml "sigs.k8s.io/yaml"
 )
 
 // lastValidAggregators caches the last known valid aggregator config per ConfigMap,
@@ -287,8 +288,12 @@ func (o *OptionsBuilder) backfillAggregatorKeys(ctx context.Context, cm *corev1.
 		return nil
 	}
 
+	// Use sigs.k8s.io/yaml so both MCO 2.17 YAML and MCOA JSON ConfigMaps
+	// can be backfilled. encoding/json fails on YAML and previously left
+	// upgraded clusters without visible aggregator keys.
 	var config map[string]any
-	if err := json.Unmarshal([]byte(raw), &config); err != nil {
+	if err := sigYaml.Unmarshal([]byte(raw), &config); err != nil {
+		o.Logger.Error(err, "Cannot parse prometheusRuleConfig, skipping aggregator backfill", "name", cm.Name)
 		return nil
 	}
 
