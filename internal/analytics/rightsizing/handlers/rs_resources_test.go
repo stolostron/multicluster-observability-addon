@@ -448,6 +448,159 @@ func TestClusterMatchesPlacement_CombinedLabelAndClaim(t *testing.T) {
 	assert.False(t, clusterMatchesPlacement(cluster, placement), "label no longer matches")
 }
 
+func TestRevertConfigMap_WritesBackValidConfig(t *testing.T) {
+	// Simulate a ConfigMap with invalid memoryAggregator "M90".
+	// After validation + revert, the ConfigMap must reflect the cached (valid) values.
+	invalidConfig := `{"namespaceFilterCriteria":{"exclusionCriteria":["openshift.*"]},"recommendationPercentage":110,"cpuAggregator":["Max OverAll","P99","P95"],"memoryAggregator":["Max OverAll","P99","M90"]}`
+	cm := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      rightsizing.NamespaceConfigMapName,
+			Namespace: addoncfg.InstallNamespace,
+			Labels:    rightsizing.RSLabels(),
+		},
+		Data: map[string]string{
+			"prometheusRuleConfig": invalidConfig,
+		},
+	}
+	ob := newTestOptionsBuilder(t, cm)
+	ctx := t.Context()
+
+	// Seed the cache with a previous valid config
+	cacheValidAggregator(rightsizing.NamespaceConfigMapName, "cpu", []string{"Max OverAll", "P99", "P95"})
+	cacheValidAggregator(rightsizing.NamespaceConfigMapName, "memory", []string{"Max OverAll", "P99", "P95"})
+
+	// Parse, validate, and revert
+	configData, err := rightsizing.ParseConfigMapData(cm.Data)
+	require.NoError(t, err)
+
+	reverted := ob.validateAndSanitizeConfig(&configData, rightsizing.NamespaceConfigMapName)
+	assert.True(t, reverted, "should signal revert needed when invalid values present")
+
+	// The in-memory config should have the cached valid values, not the invalid ones
+	assert.Equal(t, []string{"Max OverAll", "P99", "P95"}, configData.PrometheusRuleConfig.MemoryAggregator)
+	assert.Equal(t, []string{"Max OverAll", "P99", "P95"}, configData.PrometheusRuleConfig.CpuAggregator)
+
+	// Now write-back
+	ob.revertConfigMap(ctx, rightsizing.NamespaceConfigMapName, configData)
+
+	// Verify the ConfigMap was updated
+	var updated corev1.ConfigMap
+	require.NoError(t, ob.Client.Get(ctx, types.NamespacedName{
+		Name: rightsizing.NamespaceConfigMapName, Namespace: addoncfg.InstallNamespace,
+	}, &updated))
+
+	assert.NotEqual(t, invalidConfig, updated.Data["prometheusRuleConfig"],
+		"ConfigMap should have been reverted (invalid M90 removed)")
+	assert.Contains(t, updated.Data["prometheusRuleConfig"], `"memoryAggregator":["Max OverAll","P99","P95"]`)
+	assert.NotContains(t, updated.Data["prometheusRuleConfig"], "M90",
+		"invalid value M90 should not be in reverted ConfigMap")
+}
+
+func TestRevertConfigMap_NoRevertWhenAllValid(t *testing.T) {
+	validConfig := `{"namespaceFilterCriteria":{"exclusionCriteria":["openshift.*"]},"recommendationPercentage":110,"cpuAggregator":["Max OverAll","P99","P95"],"memoryAggregator":["Max OverAll","P99"]}`
+	cm := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      rightsizing.NamespaceConfigMapName,
+			Namespace: addoncfg.InstallNamespace,
+			Labels:    rightsizing.RSLabels(),
+		},
+		Data: map[string]string{
+			"prometheusRuleConfig": validConfig,
+		},
+	}
+	ob := newTestOptionsBuilder(t, cm)
+
+	configData, err := rightsizing.ParseConfigMapData(cm.Data)
+	require.NoError(t, err)
+
+	reverted := ob.validateAndSanitizeConfig(&configData, rightsizing.NamespaceConfigMapName)
+	assert.False(t, reverted, "should not signal revert when all values are valid")
+}
+
+func TestRevertConfigMap_FallsBackToDefaultsWhenNoCachedConfig(t *testing.T) {
+	// Clear cache to simulate process restart
+	lastValidMu.Lock()
+	delete(lastValidAggregators, cacheKey(rightsizing.VirtualizationConfigMapName, "cpu"))
+	delete(lastValidAggregators, cacheKey(rightsizing.VirtualizationConfigMapName, "memory"))
+	lastValidMu.Unlock()
+
+	invalidConfig := `{"recommendationPercentage":110,"cpuAggregator":["foo"],"memoryAggregator":["bar"]}`
+	cm := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      rightsizing.VirtualizationConfigMapName,
+			Namespace: addoncfg.InstallNamespace,
+			Labels:    rightsizing.RSLabels(),
+		},
+		Data: map[string]string{
+			"prometheusRuleConfig": invalidConfig,
+		},
+	}
+	ob := newTestOptionsBuilder(t, cm)
+	ctx := t.Context()
+
+	configData, err := rightsizing.ParseConfigMapData(cm.Data)
+	require.NoError(t, err)
+
+	reverted := ob.validateAndSanitizeConfig(&configData, rightsizing.VirtualizationConfigMapName)
+	assert.True(t, reverted, "should signal revert when invalid values present")
+
+	// With no cache, aggregators are set to nil (downstream resolvers use defaults)
+	assert.Nil(t, configData.PrometheusRuleConfig.CpuAggregator)
+	assert.Nil(t, configData.PrometheusRuleConfig.MemoryAggregator)
+
+	// Write-back should store nil aggregators (defaults will be used)
+	ob.revertConfigMap(ctx, rightsizing.VirtualizationConfigMapName, configData)
+
+	var updated corev1.ConfigMap
+	require.NoError(t, ob.Client.Get(ctx, types.NamespacedName{
+		Name: rightsizing.VirtualizationConfigMapName, Namespace: addoncfg.InstallNamespace,
+	}, &updated))
+
+	assert.NotContains(t, updated.Data["prometheusRuleConfig"], "foo")
+	assert.NotContains(t, updated.Data["prometheusRuleConfig"], "bar")
+}
+
+func TestRevertConfigMap_InvalidCpuDoesNotAffectValidMemory(t *testing.T) {
+	// Pre-cache valid CPU
+	cacheValidAggregator("test-mixed-cm", "cpu", []string{"P90", "P80"})
+
+	invalidConfig := `{"recommendationPercentage":110,"cpuAggregator":["P90","M80"],"memoryAggregator":["Max OverAll","P99"]}`
+	cm := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-mixed-cm",
+			Namespace: addoncfg.InstallNamespace,
+			Labels:    rightsizing.RSLabels(),
+		},
+		Data: map[string]string{
+			"prometheusRuleConfig": invalidConfig,
+		},
+	}
+	ob := newTestOptionsBuilder(t, cm)
+	ctx := t.Context()
+
+	configData, err := rightsizing.ParseConfigMapData(cm.Data)
+	require.NoError(t, err)
+
+	reverted := ob.validateAndSanitizeConfig(&configData, "test-mixed-cm")
+	assert.True(t, reverted, "CPU has invalid entry so revert is needed")
+
+	// CPU should be reverted to cached; memory should keep the valid new values
+	assert.Equal(t, []string{"P90", "P80"}, configData.PrometheusRuleConfig.CpuAggregator)
+	assert.Equal(t, []string{"Max OverAll", "P99"}, configData.PrometheusRuleConfig.MemoryAggregator)
+
+	ob.revertConfigMap(ctx, "test-mixed-cm", configData)
+
+	var updated corev1.ConfigMap
+	require.NoError(t, ob.Client.Get(ctx, types.NamespacedName{
+		Name: "test-mixed-cm", Namespace: addoncfg.InstallNamespace,
+	}, &updated))
+
+	assert.NotContains(t, updated.Data["prometheusRuleConfig"], "M80")
+	assert.Contains(t, updated.Data["prometheusRuleConfig"], `"P90"`)
+	assert.Contains(t, updated.Data["prometheusRuleConfig"], `"P80"`)
+	assert.Contains(t, updated.Data["prometheusRuleConfig"], `"Max OverAll"`)
+}
+
 func TestBackfillAggregatorKeys_AddsMissingKeys(t *testing.T) {
 	cm := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
