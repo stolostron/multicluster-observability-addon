@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	lokiv1 "github.com/grafana/loki/operator/api/loki/v1"
@@ -16,6 +17,8 @@ import (
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+var errObjStorageSecretNotFound = errors.New("object storage secret referenced by LokiStack not found: create it before enabling the default logging stack")
 
 func BuildDefaultStackResources(ctx context.Context, k8s client.Client, cmao *addonv1beta1.ClusterManagementAddOn, platform, userWorkloads addon.LogsOptions, hubHostname string) ([]client.Object, []common.DefaultConfig, error) {
 	objects := []client.Object{}
@@ -78,9 +81,9 @@ func BuildDefaultStackResources(ctx context.Context, k8s client.Client, cmao *ad
 	}
 
 	objStorageSecretKey := client.ObjectKey{Namespace: ls.Namespace, Name: ls.Spec.Storage.Secret.Name}
-	if err := k8s.Get(ctx, objStorageSecretKey, &corev1.Secret{}); err != nil {
+	if err = k8s.Get(ctx, objStorageSecretKey, &corev1.Secret{}); err != nil {
 		if apierrors.IsNotFound(err) {
-			return nil, nil, fmt.Errorf("object storage secret %s/%s referenced by LokiStack %s/%s not found: create it before enabling the default logging stack",
+			return nil, nil, fmt.Errorf("%w: %s/%s referenced by LokiStack %s/%s", errObjStorageSecretNotFound,
 				objStorageSecretKey.Namespace, objStorageSecretKey.Name, ls.Namespace, resourceName)
 		}
 		return nil, nil, fmt.Errorf("failed to check object storage secret %s/%s: %w", objStorageSecretKey.Namespace, objStorageSecretKey.Name, err)
