@@ -732,11 +732,11 @@ recommendationPercentage: 110
 		Name: rightsizing.NamespaceConfigMapName, Namespace: addoncfg.InstallNamespace,
 	}, &updated))
 
-	assert.Contains(t, updated.Data["prometheusRuleConfig"], `"cpuAggregator"`)
-	assert.Contains(t, updated.Data["prometheusRuleConfig"], `"memoryAggregator"`)
-	assert.Contains(t, updated.Data["prometheusRuleConfig"], `"recommendationPercentage":110`)
+	assert.Contains(t, updated.Data["prometheusRuleConfig"], `cpuAggregator:`)
+	assert.Contains(t, updated.Data["prometheusRuleConfig"], `memoryAggregator:`)
+	assert.Contains(t, updated.Data["prometheusRuleConfig"], `recommendationPercentage: 110`)
 	assert.Contains(t, updated.Data["prometheusRuleConfig"], `openshift.*`,
-		"existing YAML fields should be preserved after JSON rewrite")
+		"existing YAML fields should be preserved after YAML rewrite")
 }
 
 func TestBackfillAggregatorKeys_YAMLPreservesExistingAggregators(t *testing.T) {
