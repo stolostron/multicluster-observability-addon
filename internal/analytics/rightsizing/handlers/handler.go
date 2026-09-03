@@ -107,7 +107,9 @@ func (o *OptionsBuilder) Build(ctx context.Context, cluster *clusterv1.ManagedCl
 				return ret, fmt.Errorf("failed to get namespace config: %w", err)
 			}
 		}
-		o.validateAndSanitizeConfig(&nsConfigData, rightsizing.NamespaceConfigMapName)
+		if reverted := o.validateAndSanitizeConfig(&nsConfigData, rightsizing.NamespaceConfigMapName); reverted {
+			o.revertConfigMap(ctx, rightsizing.NamespaceConfigMapName, nsConfigData)
+		}
 
 		if clusterMatchesPlacement(cluster, nsConfigData.PlacementConfiguration) {
 			nsOpts, err := o.buildNamespaceOptionsFromConfig(nsConfigData)
@@ -138,7 +140,9 @@ func (o *OptionsBuilder) Build(ctx context.Context, cluster *clusterv1.ManagedCl
 				return ret, fmt.Errorf("failed to get virtualization config: %w", err)
 			}
 		}
-		o.validateAndSanitizeConfig(&virtConfigData, rightsizing.VirtualizationConfigMapName)
+		if reverted := o.validateAndSanitizeConfig(&virtConfigData, rightsizing.VirtualizationConfigMapName); reverted {
+			o.revertConfigMap(ctx, rightsizing.VirtualizationConfigMapName, virtConfigData)
+		}
 
 		if clusterMatchesPlacement(cluster, virtConfigData.PlacementConfiguration) {
 			virtOpts, err := o.buildVirtualizationOptionsFromConfig(virtConfigData)
@@ -194,8 +198,12 @@ func (o *OptionsBuilder) getConfigData(ctx context.Context, configMapName string
 // application of a bad edit. When the cache is empty (e.g. after restart) and the
 // config is invalid, the list is set to nil so downstream resolvers fall back to
 // hardcoded defaults.
-func (o *OptionsBuilder) validateAndSanitizeConfig(configData *rightsizing.RSConfigMapData, configMapName string) {
+// Returns true if any field was reverted (caller should write-back the ConfigMap).
+func (o *OptionsBuilder) validateAndSanitizeConfig(configData *rightsizing.RSConfigMapData, configMapName string) bool {
+	reverted := false
+
 	if invalid := rightsizing.ValidateAggregatorNames(configData.PrometheusRuleConfig.CpuAggregator); len(invalid) > 0 {
+		reverted = true
 		if cached, ok := getCachedAggregator(configMapName, "cpu"); ok {
 			o.Logger.Info("Invalid cpuAggregator values in ConfigMap, rejecting edit and keeping previous valid config",
 				"configMap", configMapName, "invalidValues", invalid, "restoredConfig", cached)
@@ -210,6 +218,7 @@ func (o *OptionsBuilder) validateAndSanitizeConfig(configData *rightsizing.RSCon
 	}
 
 	if invalid := rightsizing.ValidateAggregatorNames(configData.PrometheusRuleConfig.MemoryAggregator); len(invalid) > 0 {
+		reverted = true
 		if cached, ok := getCachedAggregator(configMapName, "memory"); ok {
 			o.Logger.Info("Invalid memoryAggregator values in ConfigMap, rejecting edit and keeping previous valid config",
 				"configMap", configMapName, "invalidValues", invalid, "restoredConfig", cached)
@@ -222,6 +231,31 @@ func (o *OptionsBuilder) validateAndSanitizeConfig(configData *rightsizing.RSCon
 	} else {
 		cacheValidAggregator(configMapName, "memory", configData.PrometheusRuleConfig.MemoryAggregator)
 	}
+
+	return reverted
+}
+
+// revertConfigMap writes the sanitized (valid) config back to the ConfigMap,
+// effectively undoing the user's invalid edit. This ensures the ConfigMap
+// always reflects a valid configuration.
+func (o *OptionsBuilder) revertConfigMap(ctx context.Context, configMapName string, validConfig rightsizing.RSConfigMapData) {
+	cm, err := common.GetConfigMap(ctx, o.Client, addoncfg.InstallNamespace, configMapName)
+	if err != nil {
+		o.Logger.Error(err, "Failed to get ConfigMap for write-back after validation rejection", "configMap", configMapName)
+		return
+	}
+
+	cm.Data["prometheusRuleConfig"] = rightsizing.FormatJSON(validConfig.PrometheusRuleConfig)
+
+	if err := o.Client.Update(ctx, cm); err != nil {
+		o.Logger.Error(err, "Failed to revert ConfigMap to valid config", "configMap", configMapName)
+		return
+	}
+
+	o.Logger.Info("Reverted ConfigMap to previous valid configuration after detecting invalid aggregator values",
+		"configMap", configMapName,
+		"cpuAggregator", validConfig.PrometheusRuleConfig.CpuAggregator,
+		"memoryAggregator", validConfig.PrometheusRuleConfig.MemoryAggregator)
 }
 
 // ensureNamespaceConfigMap ensures the namespace right-sizing ConfigMap exists on the hub.
