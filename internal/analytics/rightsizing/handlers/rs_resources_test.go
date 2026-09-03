@@ -548,3 +548,74 @@ func TestBackfillAggregatorKeys_OnlyOneMissing(t *testing.T) {
 	assert.Contains(t, updated.Data["prometheusRuleConfig"], `"P90"`,
 		"existing cpuAggregator values should be preserved")
 }
+
+func TestBackfillAggregatorKeys_YAMLFromMCO217(t *testing.T) {
+	// MCO 2.17 writes prometheusRuleConfig as YAML via yaml.Marshal.
+	// On upgrade the ConfigMap is preserved; backfill must parse YAML so
+	// aggregator keys become visible (json.Unmarshal would silently no-op).
+	yamlConfig := `namespaceFilterCriteria:
+  inclusionCriteria: []
+  exclusionCriteria:
+  - openshift.*
+labelFilterCriteria: []
+recommendationPercentage: 110
+`
+	cm := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      rightsizing.NamespaceConfigMapName,
+			Namespace: addoncfg.InstallNamespace,
+		},
+		Data: map[string]string{
+			"prometheusRuleConfig": yamlConfig,
+		},
+	}
+	ob := newTestOptionsBuilder(t, cm)
+
+	err := ob.backfillAggregatorKeys(t.Context(), cm)
+	require.NoError(t, err)
+
+	var updated corev1.ConfigMap
+	require.NoError(t, ob.Client.Get(t.Context(), types.NamespacedName{
+		Name: rightsizing.NamespaceConfigMapName, Namespace: addoncfg.InstallNamespace,
+	}, &updated))
+
+	assert.Contains(t, updated.Data["prometheusRuleConfig"], `"cpuAggregator"`)
+	assert.Contains(t, updated.Data["prometheusRuleConfig"], `"memoryAggregator"`)
+	assert.Contains(t, updated.Data["prometheusRuleConfig"], `"recommendationPercentage":110`)
+	assert.Contains(t, updated.Data["prometheusRuleConfig"], `openshift.*`,
+		"existing YAML fields should be preserved after JSON rewrite")
+}
+
+func TestBackfillAggregatorKeys_YAMLPreservesExistingAggregators(t *testing.T) {
+	yamlConfig := `namespaceFilterCriteria:
+  exclusionCriteria:
+  - openshift.*
+recommendationPercentage: 110
+cpuAggregator:
+- P90
+memoryAggregator:
+- Max OverAll
+- P99
+`
+	cm := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      rightsizing.NamespaceConfigMapName,
+			Namespace: addoncfg.InstallNamespace,
+		},
+		Data: map[string]string{
+			"prometheusRuleConfig": yamlConfig,
+		},
+	}
+	ob := newTestOptionsBuilder(t, cm)
+
+	err := ob.backfillAggregatorKeys(t.Context(), cm)
+	require.NoError(t, err)
+
+	var updated corev1.ConfigMap
+	require.NoError(t, ob.Client.Get(t.Context(), types.NamespacedName{
+		Name: rightsizing.NamespaceConfigMapName, Namespace: addoncfg.InstallNamespace,
+	}, &updated))
+
+	assert.Equal(t, yamlConfig, updated.Data["prometheusRuleConfig"],
+		"should not modify YAML ConfigMap when both aggregator keys already exist")
+}
