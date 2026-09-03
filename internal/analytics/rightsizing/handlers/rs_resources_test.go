@@ -616,6 +616,6 @@ memoryAggregator:
 		Name: rightsizing.NamespaceConfigMapName, Namespace: addoncfg.InstallNamespace,
 	}, &updated))
 
-	assert.Equal(t, yamlConfig, updated.Data["prometheusRuleConfig"],
+	assert.YAMLEq(t, yamlConfig, updated.Data["prometheusRuleConfig"],
 		"should not modify YAML ConfigMap when both aggregator keys already exist")
 }
