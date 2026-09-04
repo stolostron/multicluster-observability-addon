@@ -26,6 +26,15 @@ func FormatJSON(data any) string {
 	return string(jsonData)
 }
 
+// FormatYAML marshals a Go data structure to a YAML string for ConfigMap storage.
+func FormatYAML(data any) string {
+	yamlData, err := sigYaml.Marshal(data)
+	if err != nil {
+		return ""
+	}
+	return string(yamlData)
+}
+
 // GetDefaultRSPlacement creates a default placement configuration for right-sizing.
 // Empty predicates = selects ALL clusters (evaluated in-memory during Build).
 // Tolerations are retained for backward compatibility with existing ConfigMaps.
@@ -146,8 +155,8 @@ func GetDefaultNamespaceConfigData() map[string]string {
 	ruleConfig := GetDefaultRSPrometheusRuleConfig()
 	placement := GetDefaultRSPlacement()
 	return map[string]string{
-		"prometheusRuleConfig":   FormatJSON(ruleConfig),
-		"placementConfiguration": FormatJSON(placement),
+		"prometheusRuleConfig":   FormatYAML(ruleConfig),
+		"placementConfiguration": FormatYAML(placement),
 	}
 }
 
@@ -156,7 +165,7 @@ func GetDefaultVirtualizationConfigData() map[string]string {
 	ruleConfig := GetDefaultRSPrometheusRuleConfig()
 	placement := GetDefaultRSPlacement()
 	return map[string]string{
-		"prometheusRuleConfig":   FormatJSON(ruleConfig),
-		"placementConfiguration": FormatJSON(placement),
+		"prometheusRuleConfig":   FormatYAML(ruleConfig),
+		"placementConfiguration": FormatYAML(placement),
 	}
 }

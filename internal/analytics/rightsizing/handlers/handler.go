@@ -246,7 +246,7 @@ func (o *OptionsBuilder) revertConfigMap(ctx context.Context, configMapName stri
 		return
 	}
 
-	cm.Data["prometheusRuleConfig"] = rightsizing.FormatJSON(validConfig.PrometheusRuleConfig)
+	cm.Data["prometheusRuleConfig"] = rightsizing.FormatYAML(validConfig.PrometheusRuleConfig)
 
 	if err := o.Client.Update(ctx, cm); err != nil {
 		o.Logger.Error(err, "Failed to revert ConfigMap to valid config", "configMap", configMapName)
