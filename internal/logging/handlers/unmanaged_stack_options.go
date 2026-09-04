@@ -54,7 +54,7 @@ func buildUnmanagedOptions(ctx context.Context, k8s client.Client, mcAddon *addo
 // getUnmanagedClusterLogForwarder returns the single admin-authored ClusterLogForwarder
 // referenced on the ManagedClusterAddOn for unmanaged log collection. ClusterLogForwarders
 // owned by this addon's ClusterManagementAddOn (i.e. MCOA's own managed/default-stack CLF,
-// see BuildCLFResources) are skipped: a real unmanaged CLF is authored directly by an admin
+// see BuildDefaultStackCollectionResources) are skipped: a real unmanaged CLF is authored directly by an admin
 // and should never carry that owner reference. Without this filter, enabling both
 // platformLogsCollection (unmanaged) and platformLogsDefault (managed) at once would cause
 // MCOA's own managed CLF to be mistaken for the unmanaged one and fail validation, since it
