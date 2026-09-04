@@ -92,7 +92,10 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, getter addonutils.Add
 
 		// WIP: Temporary solution to enable obs-api and will require to delete the mcoa pod to take effect.
 		obsAPIEnabled := aodc.Annotations["mcoa-obs-api"] == "true"
-		userValues.ObsAPI = omanifests.BuildValues(common.IsHubCluster(cluster), obsAPIEnabled)
+		// TODO(JoaoBraveCoding): Currently disabeling obs-api to make it easier to make progress on testing work
+		// We should remove this eventually.
+		// logsEnabled := opts.Platform.Logs.DefaultStack
+		userValues.ObsAPI = omanifests.BuildValues(common.IsHubCluster(cluster), obsAPIEnabled, false)
 
 		// WIP: Temporary solution to enable thanos-operator and will require to delete the mcoa pod to take effect.
 		if userValues.Metrics != nil {
@@ -123,7 +126,7 @@ func getMonitoringValues(ctx context.Context, k8s client.Client, logger logr.Log
 }
 
 func getLoggingValues(ctx context.Context, k8s client.Client, cluster *clusterv1.ManagedCluster, mcAddon *addonapiv1beta1.ManagedClusterAddOn, opts addon.Options) (*lmanifests.LoggingValues, error) {
-	if !opts.Platform.Logs.CollectionEnabled && !opts.UserWorkloads.Logs.CollectionEnabled {
+	if !opts.Platform.Logs.CollectionEnabled && !opts.UserWorkloads.Logs.CollectionEnabled && !opts.Platform.Logs.DefaultStack {
 		return nil, nil
 	}
 
@@ -131,7 +134,7 @@ func getLoggingValues(ctx context.Context, k8s client.Client, cluster *clusterv1
 		return nil, nil
 	}
 
-	loggingOpts, err := lhandlers.BuildOptions(ctx, k8s, mcAddon, opts.Platform.Logs, opts.UserWorkloads.Logs, common.IsHubCluster(cluster))
+	loggingOpts, err := lhandlers.BuildOptions(ctx, k8s, mcAddon, opts.Platform.Logs, opts.UserWorkloads.Logs, common.IsHubCluster(cluster), opts.HubHostname)
 	if err != nil {
 		return nil, err
 	}
