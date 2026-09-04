@@ -491,7 +491,9 @@ func TestRevertConfigMap_WritesBackValidConfig(t *testing.T) {
 
 	assert.NotEqual(t, invalidConfig, updated.Data["prometheusRuleConfig"],
 		"ConfigMap should have been reverted (invalid M90 removed)")
-	assert.Contains(t, updated.Data["prometheusRuleConfig"], `"memoryAggregator":["Max OverAll","P99","P95"]`)
+	assert.Contains(t, updated.Data["prometheusRuleConfig"], "- Max OverAll")
+	assert.Contains(t, updated.Data["prometheusRuleConfig"], "- P99")
+	assert.Contains(t, updated.Data["prometheusRuleConfig"], "- P95")
 	assert.NotContains(t, updated.Data["prometheusRuleConfig"], "M90",
 		"invalid value M90 should not be in reverted ConfigMap")
 }
@@ -596,9 +598,9 @@ func TestRevertConfigMap_InvalidCpuDoesNotAffectValidMemory(t *testing.T) {
 	}, &updated))
 
 	assert.NotContains(t, updated.Data["prometheusRuleConfig"], "M80")
-	assert.Contains(t, updated.Data["prometheusRuleConfig"], `"P90"`)
-	assert.Contains(t, updated.Data["prometheusRuleConfig"], `"P80"`)
-	assert.Contains(t, updated.Data["prometheusRuleConfig"], `"Max OverAll"`)
+	assert.Contains(t, updated.Data["prometheusRuleConfig"], "- P90")
+	assert.Contains(t, updated.Data["prometheusRuleConfig"], "- P80")
+	assert.Contains(t, updated.Data["prometheusRuleConfig"], "- Max OverAll")
 }
 
 func TestBackfillAggregatorKeys_AddsMissingKeys(t *testing.T) {
