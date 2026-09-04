@@ -546,11 +546,11 @@ func TestRevertConfigMap_FallsBackToDefaultsWhenNoCachedConfig(t *testing.T) {
 	reverted := ob.validateAndSanitizeConfig(&configData, rightsizing.VirtualizationConfigMapName)
 	assert.True(t, reverted, "should signal revert when invalid values present")
 
-	// With no cache, aggregators are set to nil (downstream resolvers use defaults)
-	assert.Nil(t, configData.PrometheusRuleConfig.CpuAggregator)
-	assert.Nil(t, configData.PrometheusRuleConfig.MemoryAggregator)
+	// With no cache, aggregators fall back to defaults
+	assert.Equal(t, rightsizing.DefaultCpuAggregator, configData.PrometheusRuleConfig.CpuAggregator)
+	assert.Equal(t, rightsizing.DefaultMemoryAggregator, configData.PrometheusRuleConfig.MemoryAggregator)
 
-	// Write-back should store nil aggregators (defaults will be used)
+	// Write-back should store default aggregators
 	ob.revertConfigMap(ctx, rightsizing.VirtualizationConfigMapName, configData)
 
 	var updated corev1.ConfigMap
