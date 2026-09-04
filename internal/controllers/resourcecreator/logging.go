@@ -30,7 +30,7 @@ func (r *ResourceCreatorReconciler) reconcileLoggingCollection(ctx context.Conte
 	if err != nil {
 		return nil, fmt.Errorf("failed to build default stack collection resources: %w", err)
 	}
-	if err := applyLoggingObjects(ctx, r.Client, objs, cmao); err != nil {
+	if err = applyLoggingObjects(ctx, r.Client, objs, cmao); err != nil {
 		return nil, err
 	}
 	return configs, nil
@@ -43,7 +43,7 @@ func (r *ResourceCreatorReconciler) reconcileLoggingStorage(ctx context.Context,
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to build default stack storage resources: %w", err)
 	}
-	if err := applyLoggingObjects(ctx, r.Client, objs, cmao); err != nil {
+	if err = applyLoggingObjects(ctx, r.Client, objs, cmao); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -57,7 +57,7 @@ func (r *ResourceCreatorReconciler) reconcileLoggingStorage(ctx context.Context,
 			desired = append(desired, cfg.Config)
 		}
 	}
-	if err := common.ApplyManagedClusterAddOnConfigs(ctx, r.Log, r.Client, hubName, desired, lokiv1.GroupVersion.Group, addoncfg.LokiStacksResource); err != nil {
+	if err = common.ApplyManagedClusterAddOnConfigs(ctx, r.Log, r.Client, hubName, desired, lokiv1.GroupVersion.Group, addoncfg.LokiStacksResource); err != nil {
 		if errors.IsNotFound(err) && len(desired) > 0 {
 			r.Log.Info("hub ManagedClusterAddOn not found, requeueing", "namespace", hubName)
 			return ctrl.Result{RequeueAfter: addoncfg.DefaultContextTimeout}, nil
