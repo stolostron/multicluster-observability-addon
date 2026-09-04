@@ -2,20 +2,24 @@ package resourcecreator
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/go-logr/logr"
+	lokiv1 "github.com/grafana/loki/operator/api/loki/v1"
+	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	rshandlers "github.com/stolostron/multicluster-observability-addon/internal/analytics/rightsizing/handlers"
+	lhandlers "github.com/stolostron/multicluster-observability-addon/internal/logging/handlers"
 	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	mresources "github.com/stolostron/multicluster-observability-addon/internal/metrics/resource"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -93,6 +97,9 @@ func SetupWithManager(mgr ctrl.Manager, logger logr.Logger) error {
 		Watches(&prometheusv1.PrometheusRule{}, r.enqueueForMCOControlledResources(), partOfMCOAPredicate).
 		// Trigger reconciliations if right-sizing ConfigMaps change
 		Watches(&corev1.ConfigMap{}, r.enqueueAODC(), rsConfigMapPredicate).
+		// Trigger reconciliations if logging resources change
+		Watches(&lokiv1.LokiStack{}, r.enqueueForMCOAOwnedResources()).
+		Watches(&loggingv1.ClusterLogForwarder{}, r.enqueueForMCOAOwnedResources()).
 		Complete(r)
 }
 
@@ -128,7 +135,7 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	// Reconcile metrics resources
 	objs := []common.DefaultConfig{}
 	images, err := mconfig.GetImageOverrides(ctx, r.Client, opts.Registries, r.Log)
-	if err != nil && !errors.IsNotFound(err) {
+	if err != nil && !apierrors.IsNotFound(err) {
 		return ctrl.Result{}, fmt.Errorf("failed to get image overrides: %w", err)
 	}
 
@@ -151,8 +158,41 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	// ConfigMap resources are created/updated/deleted here, not per-cluster in handler.go,
 	// to avoid race conditions from concurrent Build() calls.
 	rsBuilder := &rshandlers.OptionsBuilder{Client: r.Client, Logger: r.Log.WithName("rightsizing")}
-	if err := rsBuilder.ReconcileRSResources(ctx, opts); err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to reconcile right-sizing resources: %w", err)
+	if rsErr := rsBuilder.ReconcileRSResources(ctx, opts); rsErr != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to reconcile right-sizing resources: %w", rsErr)
+	}
+
+	// Reconcile logging CLFs and LokiStack separately so CLFs aren't blocking LokiStack install
+	lCLFObjs, lCLFDefaultConfig, clfErr := lhandlers.BuildCLFResources(ctx, r.Client, cmao, opts.Platform.Logs, opts.UserWorkloads.Logs, opts.HubHostname)
+	if clfErr != nil {
+		r.Log.Error(clfErr, "failed to build CLF resources, will requeue and continue to LokiStack")
+	} else {
+		var clfSSAErrs []error
+		for _, obj := range lCLFObjs {
+			if err := common.ServerSideApply(ctx, r.Client, obj, cmao); err != nil {
+				r.Log.V(1).Info("CLF SSA failed", "namespace", obj.GetNamespace(), "name", obj.GetName(), "err", err)
+				clfSSAErrs = append(clfSSAErrs, fmt.Errorf("%s/%s: %w", obj.GetNamespace(), obj.GetName(), err))
+			}
+		}
+		if len(clfSSAErrs) > 0 {
+			clfErr = errors.Join(clfSSAErrs...)
+		}
+		objs = append(objs, lCLFDefaultConfig...)
+	}
+
+	lsObjs, lsDefaultConfig, lsErr := lhandlers.BuildLokiStackResources(ctx, r.Client, opts.Platform.Logs, opts.UserWorkloads.Logs, opts.HubHostname)
+	if lsErr != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to build LokiStack resources: %w", lsErr)
+	}
+	for _, obj := range lsObjs {
+		if err := common.ServerSideApply(ctx, r.Client, obj, cmao); err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to apply LokiStack resource %s/%s: %w", obj.GetNamespace(), obj.GetName(), err)
+		}
+	}
+	objs = append(objs, lsDefaultConfig...)
+	// If CLF had errors, requeue after LokiStack is applied
+	if clfErr != nil {
+		return ctrl.Result{}, clfErr
 	}
 
 	if err := common.EnsureAddonConfig(ctx, r.Log, r.Client, objs); err != nil {
@@ -169,6 +209,12 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	// at least one of them still exists.
 	if err := common.DeleteOrphanResources(ctx, r.Log, r.Client, cmao, &cooprometheusv1alpha1.PrometheusAgentList{}); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to clean orphan resources: %w", err)
+	}
+	if err := common.DeleteOrphanResources(ctx, r.Log, r.Client, cmao, &lokiv1.LokiStackList{}); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to clean orphan logging storage resources: %w", err)
+	}
+	if err := common.DeleteOrphanResources(ctx, r.Log, r.Client, cmao, &loggingv1.ClusterLogForwarderList{}); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to clean orphan logging collection resources: %w", err)
 	}
 
 	return ctrl.Result{}, nil

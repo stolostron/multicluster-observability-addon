@@ -1,5 +1,5 @@
 apiVersion: v2
-description: A Helm chart for installing log collection and forwarding
+description: A Helm chart for installing logging related resources
 name: logging
 version: 1.0.0
 appVersion: "1.0.0"
