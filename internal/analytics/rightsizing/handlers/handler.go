@@ -212,7 +212,7 @@ func (o *OptionsBuilder) validateAndSanitizeConfig(configData *rightsizing.RSCon
 		} else {
 			o.Logger.Info("Invalid cpuAggregator values in ConfigMap, no previous config cached, falling back to defaults",
 				"configMap", configMapName, "invalidValues", invalid)
-			configData.PrometheusRuleConfig.CpuAggregator = nil
+			configData.PrometheusRuleConfig.CpuAggregator = rightsizing.DefaultCpuAggregator
 		}
 	} else {
 		cacheValidAggregator(configMapName, "cpu", configData.PrometheusRuleConfig.CpuAggregator)
@@ -227,7 +227,7 @@ func (o *OptionsBuilder) validateAndSanitizeConfig(configData *rightsizing.RSCon
 		} else {
 			o.Logger.Info("Invalid memoryAggregator values in ConfigMap, no previous config cached, falling back to defaults",
 				"configMap", configMapName, "invalidValues", invalid)
-			configData.PrometheusRuleConfig.MemoryAggregator = nil
+			configData.PrometheusRuleConfig.MemoryAggregator = rightsizing.DefaultMemoryAggregator
 		}
 	} else {
 		cacheValidAggregator(configMapName, "memory", configData.PrometheusRuleConfig.MemoryAggregator)
