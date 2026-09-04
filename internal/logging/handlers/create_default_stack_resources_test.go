@@ -9,7 +9,9 @@ import (
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
+	lmanifests "github.com/stolostron/multicluster-observability-addon/internal/logging/manifests"
 	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -27,6 +29,7 @@ func TestDefaultStackResourcesSurviveDeleteOrphan(t *testing.T) {
 	require.NoError(t, clusterv1.Install(scheme))
 	require.NoError(t, loggingv1.AddToScheme(scheme))
 	require.NoError(t, lokiv1.AddToScheme(scheme))
+	require.NoError(t, corev1.AddToScheme(scheme))
 
 	cmao := &addonapiv1beta1.ClusterManagementAddOn{
 		ObjectMeta: metav1.ObjectMeta{
@@ -44,7 +47,14 @@ func TestDefaultStackResourcesSurviveDeleteOrphan(t *testing.T) {
 		},
 	}
 
-	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cmao).Build()
+	objStorageSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      lmanifests.DefaultStorageObjStorageSecretName,
+			Namespace: addoncfg.InstallNamespace,
+		},
+	}
+
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cmao, objStorageSecret).Build()
 
 	objs, _, err := BuildDefaultStackResources(ctx, fakeClient, cmao, addon.LogsOptions{DefaultStack: true}, addon.LogsOptions{}, "hub.example.com")
 	require.NoError(t, err)
@@ -63,4 +73,37 @@ func TestDefaultStackResourcesSurviveDeleteOrphan(t *testing.T) {
 	}
 	require.NoError(t, fakeClient.Get(ctx, key, &loggingv1.ClusterLogForwarder{}), "CMAO-owned ClusterLogForwarder with a matching placement annotation must not be deleted")
 	require.NoError(t, fakeClient.Get(ctx, key, &lokiv1.LokiStack{}), "CMAO-owned LokiStack with a matching placement annotation must not be deleted")
+}
+
+func TestBuildDefaultStackResources_MissingObjStorageSecret(t *testing.T) {
+	ctx := t.Context()
+	scheme := runtime.NewScheme()
+	require.NoError(t, addonapiv1beta1.Install(scheme))
+	require.NoError(t, clusterv1.Install(scheme))
+	require.NoError(t, loggingv1.AddToScheme(scheme))
+	require.NoError(t, lokiv1.AddToScheme(scheme))
+	require.NoError(t, corev1.AddToScheme(scheme))
+
+	cmao := &addonapiv1beta1.ClusterManagementAddOn{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: addoncfg.Name,
+			UID:  "cmao-uid",
+		},
+		Spec: addonapiv1beta1.ClusterManagementAddOnSpec{
+			InstallStrategy: addonapiv1beta1.InstallStrategy{
+				Placements: []addonapiv1beta1.PlacementStrategy{
+					{
+						PlacementRef: addoncfg.GlobalPlacementRef,
+					},
+				},
+			},
+		},
+	}
+
+	// Deliberately no object storage secret seeded into the fake client.
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cmao).Build()
+
+	_, _, err := BuildDefaultStackResources(ctx, fakeClient, cmao, addon.LogsOptions{DefaultStack: true}, addon.LogsOptions{}, "hub.example.com")
+	require.Error(t, err)
+	require.ErrorIs(t, err, errObjStorageSecretNotFound)
 }
