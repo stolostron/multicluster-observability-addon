@@ -2,6 +2,7 @@ package resourcecreator
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/go-logr/logr"
@@ -18,7 +19,7 @@ import (
 	mresources "github.com/stolostron/multicluster-observability-addon/internal/metrics/resource"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -134,7 +135,7 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	// Reconcile metrics resources
 	objs := []common.DefaultConfig{}
 	images, err := mconfig.GetImageOverrides(ctx, r.Client, opts.Registries, r.Log)
-	if err != nil && !errors.IsNotFound(err) {
+	if err != nil && !apierrors.IsNotFound(err) {
 		return ctrl.Result{}, fmt.Errorf("failed to get image overrides: %w", err)
 	}
 
@@ -161,17 +162,38 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, fmt.Errorf("failed to reconcile right-sizing resources: %w", rsErr)
 	}
 
-	// Reconcile logging resources
-	lObjs, lDefaultConfig, err := lhandlers.BuildDefaultStackResources(ctx, r.Client, cmao, opts.Platform.Logs, opts.UserWorkloads.Logs, opts.HubHostname)
-	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to build default stack logging resources: %w", err)
+	// Reconcile logging CLFs and LokiStack separately so CLFs aren't blocking LokiStack install
+	lCLFObjs, lCLFDefaultConfig, clfErr := lhandlers.BuildCLFResources(ctx, r.Client, cmao, opts.Platform.Logs, opts.UserWorkloads.Logs, opts.HubHostname)
+	if clfErr != nil {
+		r.Log.Error(clfErr, "failed to build CLF resources, will requeue and continue to LokiStack")
+	} else {
+		var clfSSAErrs []error
+		for _, obj := range lCLFObjs {
+			if err := common.ServerSideApply(ctx, r.Client, obj, cmao); err != nil {
+				r.Log.V(1).Info("CLF SSA failed", "namespace", obj.GetNamespace(), "name", obj.GetName(), "err", err)
+				clfSSAErrs = append(clfSSAErrs, fmt.Errorf("%s/%s: %w", obj.GetNamespace(), obj.GetName(), err))
+			}
+		}
+		if len(clfSSAErrs) > 0 {
+			clfErr = errors.Join(clfSSAErrs...)
+		}
+		objs = append(objs, lCLFDefaultConfig...)
 	}
-	for _, obj := range lObjs {
+
+	lsObjs, lsDefaultConfig, lsErr := lhandlers.BuildLokiStackResources(ctx, r.Client, opts.Platform.Logs, opts.UserWorkloads.Logs, opts.HubHostname)
+	if lsErr != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to build LokiStack resources: %w", lsErr)
+	}
+	for _, obj := range lsObjs {
 		if err := common.ServerSideApply(ctx, r.Client, obj, cmao); err != nil {
-			return ctrl.Result{}, fmt.Errorf("failed to apply logging resource %s/%s: %w", obj.GetNamespace(), obj.GetName(), err)
+			return ctrl.Result{}, fmt.Errorf("failed to apply LokiStack resource %s/%s: %w", obj.GetNamespace(), obj.GetName(), err)
 		}
 	}
-	objs = append(objs, lDefaultConfig...)
+	objs = append(objs, lsDefaultConfig...)
+	// If CLF had errors, requeue after LokiStack is applied
+	if clfErr != nil {
+		return ctrl.Result{}, clfErr
+	}
 
 	if err := common.EnsureAddonConfig(ctx, r.Log, r.Client, objs); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to patch default configs of the clustermanageraddon: %w", err)
