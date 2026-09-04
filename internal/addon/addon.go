@@ -368,6 +368,32 @@ func ManifestConfigs() []workv1.ManifestConfigOption {
 				},
 			},
 		},
+		// Hub COO resources: HubResourceReconciler owns these via SSA.
+		// CreateOnly prevents the Work Agent from overwriting reconciler-managed fields.
+		// The templates render orphan-annotated stubs so the Work Agent doesn't
+		// delete these resources during upgrade from the pre-decoupled release.
+		workv1.ManifestConfigOption{
+			ResourceIdentifier: workv1.ResourceIdentifier{
+				Group:     "operators.coreos.com",
+				Resource:  "operatorgroups",
+				Name:      "openshift-cluster-observability-operator",
+				Namespace: "openshift-cluster-observability-operator",
+			},
+			UpdateStrategy: &workv1.UpdateStrategy{
+				Type: workv1.UpdateStrategyTypeCreateOnly,
+			},
+		},
+		workv1.ManifestConfigOption{
+			ResourceIdentifier: workv1.ResourceIdentifier{
+				Group:     "operators.coreos.com",
+				Resource:  "subscriptions",
+				Name:      "cluster-observability-operator",
+				Namespace: "openshift-cluster-observability-operator",
+			},
+			UpdateStrategy: &workv1.UpdateStrategy{
+				Type: workv1.UpdateStrategyTypeCreateOnly,
+			},
+		},
 	)
 	return manifestConfigs
 }

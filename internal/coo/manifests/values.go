@@ -11,6 +11,7 @@ import (
 type COOValues struct {
 	Enabled    bool `json:"enabled"`
 	InstallCOO bool `json:"installCOO"`
+	IsHub      bool `json:"isHub"`
 }
 
 type UIValues struct {
@@ -51,6 +52,7 @@ func BuildValues(opts addon.Options, installCOOIsNeeded bool, isHubCluster bool,
 	return &COOValues{
 		Enabled:    hasDashboards || incidentDetectionEnabled || rightSizingEnabled,
 		InstallCOO: installCOO,
+		IsHub:      isHubCluster,
 	}
 }
 

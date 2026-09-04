@@ -8,4 +8,11 @@ metadata:
     chart: {{ template "coohelm.chart" . }}
     release: {{ .Release.Name }}
     openshift.io/cluster-monitoring: "true"
+{{- else if and .Values.enabled .Values.isHub }}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: openshift-cluster-observability-operator
+  annotations:
+    addon.open-cluster-management.io/deletion-orphan: ""
 {{- end }}

@@ -4,3 +4,5 @@ nameOverride: null
 enabled: false
 
 installCOO: false
+
+isHub: false
