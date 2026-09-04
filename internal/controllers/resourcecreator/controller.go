@@ -13,7 +13,6 @@ import (
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	rshandlers "github.com/stolostron/multicluster-observability-addon/internal/analytics/rightsizing/handlers"
-	lhandlers "github.com/stolostron/multicluster-observability-addon/internal/logging/handlers"
 	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	mresources "github.com/stolostron/multicluster-observability-addon/internal/metrics/resource"
 	corev1 "k8s.io/api/core/v1"
@@ -64,6 +63,10 @@ var cmaoPredicate = builder.WithPredicates(predicate.Funcs{
 	GenericFunc: func(e event.GenericEvent) bool { return false },
 })
 
+var hubMCAOPredicate = builder.WithPredicates(predicate.NewPredicateFuncs(func(obj client.Object) bool {
+	return obj.GetName() == addoncfg.Name
+}))
+
 var rsConfigMapPredicate = builder.WithPredicates(rshandlers.RSConfigMapPredicate())
 
 var partOfMCOALabelSelector = labels.SelectorFromSet(labels.Set{
@@ -99,6 +102,8 @@ func SetupWithManager(mgr ctrl.Manager, logger logr.Logger) error {
 		// Trigger reconciliations if logging resources change
 		Watches(&lokiv1.LokiStack{}, r.enqueueForMCOAOwnedResources()).
 		Watches(&loggingv1.ClusterLogForwarder{}, r.enqueueForMCOAOwnedResources()).
+		// Trigger when the hub ManagedClusterAddOn is created so LokiStack can be attached to it
+		Watches(&addonv1beta1.ManagedClusterAddOn{}, r.enqueueAODC(), hubMCAOPredicate).
 		Complete(r)
 }
 
@@ -161,20 +166,20 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, fmt.Errorf("failed to reconcile right-sizing resources: %w", rsErr)
 	}
 
-	// Reconcile logging resources
-	lObjs, lDefaultConfig, err := lhandlers.BuildDefaultStackResources(ctx, r.Client, cmao, opts.Platform.Logs, opts.UserWorkloads.Logs, opts.HubHostname)
+	// Spoke collection: CLF templates on CMAO placements, fanned out via addon helm.
+	lDefaultConfig, err := r.reconcileLoggingCollection(ctx, cmao, opts)
 	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to build default stack logging resources: %w", err)
-	}
-	for _, obj := range lObjs {
-		if err := common.ServerSideApply(ctx, r.Client, obj, cmao); err != nil {
-			return ctrl.Result{}, fmt.Errorf("failed to apply logging resource %s/%s: %w", obj.GetNamespace(), obj.GetName(), err)
-		}
+		return ctrl.Result{}, err
 	}
 	objs = append(objs, lDefaultConfig...)
 
 	if err := common.EnsureAddonConfig(ctx, r.Log, r.Client, objs); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to patch default configs of the clustermanageraddon: %w", err)
+	}
+
+	// Hub storage component: LokiStack template + MCAO pointer (movable to another cluster later).
+	if result, err := r.reconcileLoggingStorage(ctx, cmao, opts); err != nil || !result.IsZero() {
+		return result, err
 	}
 
 	// Retrieve the updated ClusterManagementAddOn with current default configs

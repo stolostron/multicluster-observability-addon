@@ -6,8 +6,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func BuildSSAClusterCertificates(cluster string) ([]client.Object, error) {
-	objects := []client.Object{}
+func BuildSSACollectionCertificates(cluster string) ([]client.Object, error) {
 	certConfig := manifests.CertificateConfig{
 		CommonName: DefaultCollectionCertCommonName,
 		Subject: &certmanagerv1.X509Subject{
@@ -20,21 +19,21 @@ func BuildSSAClusterCertificates(cluster string) ([]client.Object, error) {
 	if err != nil {
 		return nil, err
 	}
-	objects = append(objects, cert)
+	return []client.Object{cert}, nil
+}
 
-	if cluster == "local-cluster" {
-		certConfig := manifests.CertificateConfig{
-			CommonName: DefaultStorageCertCommonName,
-			Subject:    &certmanagerv1.X509Subject{},
-			DNSNames:   []string{DefaultStorageCertCommonName},
-		}
-		key := client.ObjectKey{Name: DefaultStorageMTLSSecretName, Namespace: cluster}
-		cert, err := manifests.BuildServerCertificate(key, certConfig)
-		if err != nil {
-			return nil, err
-		}
-		objects = append(objects, cert)
+// BuildSSAStorageCertificate creates the storage mTLS certificate in the namespace
+// of the cluster whose ManagedClusterAddOn will deploy LokiStack (the hub today).
+func BuildSSAStorageCertificate(cluster string) ([]client.Object, error) {
+	certConfig := manifests.CertificateConfig{
+		CommonName: DefaultStorageCertCommonName,
+		Subject:    &certmanagerv1.X509Subject{},
+		DNSNames:   []string{DefaultStorageCertCommonName},
 	}
-
-	return objects, nil
+	key := client.ObjectKey{Name: DefaultStorageMTLSSecretName, Namespace: cluster}
+	cert, err := manifests.BuildServerCertificate(key, certConfig)
+	if err != nil {
+		return nil, err
+	}
+	return []client.Object{cert}, nil
 }

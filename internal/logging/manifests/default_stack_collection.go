@@ -58,7 +58,7 @@ func buildManagedCLFSpec(opts Options) (loggingv1.ClusterLogForwarderSpec, error
 
 // BuildSSAClusterLogForwarder builds a ClusterLogForwarder object for the SSA.
 // A key concept of this function is that uses the same function buildManagedCLFSpec to build
-// the ClusterLogForwarder spec as buildManagedValues does. This ensure that the version users configure (this template) ends
+// the ClusterLogForwarder spec as buildManagedCollectionValues does. This ensure that the version users configure (this template) ends
 // up being the same as the version MCOA generate but with the MCOA specific values.
 func BuildSSAClusterLogForwarder(opts Options, clfName, placementNamespace, placementName string) (*loggingv1.ClusterLogForwarder, error) {
 	clfSpec, err := buildManagedCLFSpec(opts)

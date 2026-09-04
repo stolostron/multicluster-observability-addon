@@ -148,60 +148,82 @@ func buildManagedValues(opts Options) (ManagedValues, error) {
 	if !opts.DefaultStackEnabled() {
 		return ManagedValues{}, nil
 	}
-	mValues := ManagedValues{}
 
-	mValues.Collection = CollectionValues{
+	collection, err := buildManagedCollectionValues(opts)
+	if err != nil {
+		return ManagedValues{}, err
+	}
+
+	storage, err := buildManagedStorageValues(opts)
+	if err != nil {
+		return ManagedValues{}, err
+	}
+
+	return ManagedValues{
+		Collection: collection,
+		Storage:    storage,
+	}, nil
+}
+
+func buildManagedCollectionValues(opts Options) (CollectionValues, error) {
+	cValues := CollectionValues{
 		Enabled: true,
 	}
 	configmaps, err := configMapsToResourceValues(opts.DefaultStack.Collection.ConfigMaps)
 	if err != nil {
-		return mValues, err
+		return cValues, err
 	}
-	mValues.Collection.ConfigMaps = configmaps
+	cValues.ConfigMaps = configmaps
 
 	secrets, err := secretsToResourceValues(opts.DefaultStack.Collection.Secrets)
 	if err != nil {
-		return mValues, err
+		return cValues, err
 	}
-	mValues.Collection.Secrets = secrets
+	cValues.Secrets = secrets
 
 	clfSpec, err := buildManagedCLFSpec(opts)
 	if err != nil {
-		return mValues, err
+		return cValues, err
 	}
 
 	clfMarshaled, err := json.Marshal(clfSpec)
 	if err != nil {
-		return mValues, err
+		return cValues, err
 	}
-	mValues.Collection.CLFSpec = string(clfMarshaled)
+	cValues.CLFSpec = string(clfMarshaled)
 
-	if opts.IsHub {
-		mValues.Storage = StorageValues{
-			Enabled: true,
-		}
-		secrets, err := secretsToResourceValues([]corev1.Secret{
-			opts.DefaultStack.Storage.ObjStorageSecret,
-			opts.DefaultStack.Storage.MTLSSecret,
-		})
-		if err != nil {
-			return mValues, err
-		}
-		mValues.Storage.Secrets = secrets
+	return cValues, nil
+}
 
-		lsSpec, err := buildManagedLokistackSpec(opts)
-		if err != nil {
-			return mValues, err
-		}
-
-		lsMarshaled, err := json.Marshal(lsSpec)
-		if err != nil {
-			return mValues, err
-		}
-		mValues.Storage.LSSpec = string(lsMarshaled)
+func buildManagedStorageValues(opts Options) (StorageValues, error) {
+	if opts.DefaultStack.Storage.LokiStack == nil {
+		return StorageValues{}, nil
 	}
 
-	return mValues, nil
+	sValues := StorageValues{
+		Enabled: true,
+	}
+	secrets, err := secretsToResourceValues([]corev1.Secret{
+		opts.DefaultStack.Storage.ObjStorageSecret,
+		opts.DefaultStack.Storage.MTLSSecret,
+	})
+	if err != nil {
+		return sValues, err
+	}
+	sValues.Secrets = secrets
+
+	lsSpec, err := buildManagedLokistackSpec(opts)
+	if err != nil {
+		return sValues, err
+	}
+
+	lsMarshaled, err := json.Marshal(lsSpec)
+	if err != nil {
+		return sValues, err
+	}
+	sValues.LSSpec = string(lsMarshaled)
+
+	return sValues, nil
 }
 
 func shouldInstallCLO(opts Options, channel string) (bool, error) {

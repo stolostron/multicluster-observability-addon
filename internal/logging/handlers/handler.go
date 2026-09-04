@@ -43,7 +43,11 @@ func BuildOptions(ctx context.Context, k8s client.Client, mcAddon *addonapiv1bet
 		return opts, err
 	}
 
-	if err := buildDefaultStackOptions(ctx, k8s, mcAddon, &opts); err != nil {
+	if err := buildDefaultStackCollectionOptions(ctx, k8s, mcAddon, &opts); err != nil {
+		return opts, err
+	}
+
+	if err := buildDefaultStackStorageOptions(ctx, k8s, mcAddon, &opts); err != nil {
 		return opts, err
 	}
 
