@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	lokiv1 "github.com/grafana/loki/operator/api/loki/v1"
 	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
@@ -14,7 +13,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func buildDefaultStackOptions(ctx context.Context, k8s client.Client, mcAddon *addonapiv1beta1.ManagedClusterAddOn, opts *manifests.Options) error {
+func buildDefaultStackCollectionOptions(ctx context.Context, k8s client.Client, mcAddon *addonapiv1beta1.ManagedClusterAddOn, opts *manifests.Options) error {
 	if !opts.DefaultStackEnabled() {
 		return nil
 	}
@@ -32,31 +31,6 @@ func buildDefaultStackOptions(ctx context.Context, k8s client.Client, mcAddon *a
 	opts.DefaultStack.Collection.Secrets = []corev1.Secret{*mTLSSecret}
 
 	opts.DefaultStack.LokiURL = fmt.Sprintf("https://mcoa-observability-observatorium-api.%s.svc:8080/api/logs/v1/%s/otlp/v1/logs", addoncfg.InstallNamespace, mcAddon.Namespace)
-
-	// Storage is enabled only on clusters whose ManagedClusterAddOn references a LokiStack
-	// (the hub today; another cluster later). Spokes without that ref skip storage.
-	if len(common.GetObjectKeys(mcAddon.Status.ConfigReferences, lokiv1.GroupVersion.Group, addoncfg.LokiStacksResource)) == 0 {
-		return nil
-	}
-
-	ls, err := common.GetResourceWithOwnerRef(ctx, k8s, mcAddon, lokiv1.GroupVersion.Group, addoncfg.LokiStacksResource, &lokiv1.LokiStack{})
-	if err != nil {
-		return err
-	}
-
-	opts.DefaultStack.Storage.LokiStack = ls
-
-	objStorageSecret, err := common.GetSecret(ctx, k8s, ls.Namespace, mcAddon.Namespace, ls.Spec.Storage.Secret.Name)
-	if err != nil {
-		return err
-	}
-	opts.DefaultStack.Storage.ObjStorageSecret = *objStorageSecret
-
-	mTLSSecret, err = common.GetSecret(ctx, k8s, ls.Namespace, mcAddon.Namespace, manifests.DefaultStorageMTLSSecretName)
-	if err != nil {
-		return err
-	}
-	opts.DefaultStack.Storage.MTLSSecret = *mTLSSecret
 
 	return nil
 }
