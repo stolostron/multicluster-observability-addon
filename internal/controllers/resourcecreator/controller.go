@@ -13,7 +13,6 @@ import (
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	rshandlers "github.com/stolostron/multicluster-observability-addon/internal/analytics/rightsizing/handlers"
-	lhandlers "github.com/stolostron/multicluster-observability-addon/internal/logging/handlers"
 	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	mresources "github.com/stolostron/multicluster-observability-addon/internal/metrics/resource"
 	corev1 "k8s.io/api/core/v1"
@@ -167,15 +166,10 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, fmt.Errorf("failed to reconcile right-sizing resources: %w", rsErr)
 	}
 
-	// Reconcile logging resources
-	lObjs, lDefaultConfig, lClusterConfig, err := lhandlers.BuildDefaultStackResources(ctx, r.Client, cmao, opts.Platform.Logs, opts.UserWorkloads.Logs, opts.HubHostname)
+	// Spoke collection: CLF templates on CMAO placements, fanned out via addon helm.
+	lDefaultConfig, err := r.reconcileLoggingCollection(ctx, cmao, opts)
 	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to build default stack logging resources: %w", err)
-	}
-	for _, obj := range lObjs {
-		if err := common.ServerSideApply(ctx, r.Client, obj, cmao); err != nil {
-			return ctrl.Result{}, fmt.Errorf("failed to apply logging resource %s/%s: %w", obj.GetNamespace(), obj.GetName(), err)
-		}
+		return ctrl.Result{}, err
 	}
 	objs = append(objs, lDefaultConfig...)
 
@@ -183,22 +177,9 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, fmt.Errorf("failed to patch default configs of the clustermanageraddon: %w", err)
 	}
 
-	hubName, err := common.LookupHubClusterName(ctx, r.Client)
-	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to look up hub cluster: %w", err)
-	}
-	desiredLokiStackConfigs := make([]addonv1beta1.AddOnConfig, 0, len(lClusterConfig))
-	for _, cfg := range lClusterConfig {
-		if cfg.ClusterNamespace == hubName {
-			desiredLokiStackConfigs = append(desiredLokiStackConfigs, cfg.Config)
-		}
-	}
-	if err := common.ApplyManagedClusterAddOnConfigs(ctx, r.Log, r.Client, hubName, desiredLokiStackConfigs, lokiv1.GroupVersion.Group, addoncfg.LokiStacksResource); err != nil {
-		if errors.IsNotFound(err) && len(desiredLokiStackConfigs) > 0 {
-			r.Log.Info("hub ManagedClusterAddOn not found, requeueing", "namespace", hubName)
-			return ctrl.Result{RequeueAfter: addoncfg.DefaultContextTimeout}, nil
-		}
-		return ctrl.Result{}, fmt.Errorf("failed to apply LokiStack config on ManagedClusterAddOn: %w", err)
+	// Hub storage component: LokiStack template + MCAO pointer (movable to another cluster later).
+	if result, err := r.reconcileLoggingStorage(ctx, cmao, opts); err != nil || !result.IsZero() {
+		return result, err
 	}
 
 	// Retrieve the updated ClusterManagementAddOn with current default configs
