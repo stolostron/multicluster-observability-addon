@@ -31,7 +31,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -452,40 +451,61 @@ func (r *HubResourceReconciler) reconcileDashboards(ctx context.Context, hasCard
 }
 
 func (r *HubResourceReconciler) cleanupOrphanDashboards(ctx context.Context, desiredNames map[string]struct{}) error {
-	// Match both new (managed-by label) and legacy Helm-managed dashboards
-	// (app.kubernetes.io/name + part-of labels from the old Helm templates).
-	selectors := []labels.Selector{
-		labels.SelectorFromSet(managedResourceLabels),
-		labels.SelectorFromSet(map[string]string{
-			"app.kubernetes.io/name":    "perses-dashboard",
-			"app.kubernetes.io/part-of": "perses-operator",
-		}),
-	}
+	knownNames := r.allPossibleDashboardNames()
 
 	for _, ns := range []string{addoncfg.InstallNamespace, addoncfg.AnalyticsNamespace} {
-		for _, selector := range selectors {
-			existingList := &persesv1.PersesDashboardList{}
-			if err := r.Client.List(ctx, existingList, client.InNamespace(ns), client.MatchingLabelsSelector{Selector: selector}); err != nil {
-				if errors.IsNotFound(err) {
-					continue
-				}
-				return fmt.Errorf("failed to list dashboards in %s: %w", ns, err)
+		existingList := &persesv1.PersesDashboardList{}
+		if err := r.Client.List(ctx, existingList, client.InNamespace(ns)); err != nil {
+			if errors.IsNotFound(err) {
+				continue
 			}
+			return fmt.Errorf("failed to list dashboards in %s: %w", ns, err)
+		}
 
-			for i := range existingList.Items {
-				db := &existingList.Items[i]
-				key := db.Namespace + "/" + db.Name
-				if _, ok := desiredNames[key]; !ok {
-					if err := r.Client.Delete(ctx, db); err != nil && !errors.IsNotFound(err) {
-						return fmt.Errorf("failed to delete orphan dashboard %s: %w", key, err)
-					}
-					r.Logger.Info("deleted orphan PersesDashboard", "namespace", db.Namespace, "name", db.Name)
-				}
+		for i := range existingList.Items {
+			db := &existingList.Items[i]
+			key := db.Namespace + "/" + db.Name
+			if _, isDesired := desiredNames[key]; isDesired {
+				continue
 			}
+			if _, isKnown := knownNames[db.Name]; !isKnown {
+				continue
+			}
+			if err := r.Client.Delete(ctx, db); err != nil && !errors.IsNotFound(err) {
+				return fmt.Errorf("failed to delete orphan dashboard %s: %w", key, err)
+			}
+			r.Logger.Info("deleted orphan PersesDashboard", "namespace", db.Namespace, "name", db.Name)
 		}
 	}
 
 	return nil
+}
+
+// allPossibleDashboardNames builds the complete set of dashboard names MCOA
+// can generate, regardless of feature flags. Only dashboards with these names
+// are candidates for orphan cleanup — user-created dashboards are never touched.
+func (r *HubResourceReconciler) allPossibleDashboardNames() map[string]struct{} {
+	allBuilders := []func() ([]persesv1.PersesDashboard, error){
+		buildACMPersesDashboards,
+		buildK8sPersesDashboards,
+		buildThanosPersesDashboards,
+		buildCardinalityPersesDashboards,
+		buildIncidentDetectionPersesDashboards,
+		buildNamespaceRSPersesDashboards,
+		buildVMRSPersesDashboards,
+	}
+
+	names := map[string]struct{}{}
+	for _, fn := range allBuilders {
+		dbs, err := fn()
+		if err != nil {
+			continue
+		}
+		for _, db := range dbs {
+			names[db.Name] = struct{}{}
+		}
+	}
+	return names
 }
 
 func (r *HubResourceReconciler) buildDesiredDashboards(hasCardinalityRules, incidentDetectionEnabled bool) []persesv1.PersesDashboard {
