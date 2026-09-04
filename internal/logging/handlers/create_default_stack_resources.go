@@ -20,7 +20,7 @@ import (
 
 var errObjStorageSecretNotFound = errors.New("object storage secret referenced by LokiStack not found: create it before enabling the default logging stack")
 
-func BuildDefaultStackResources(ctx context.Context, k8s client.Client, cmao *addonv1beta1.ClusterManagementAddOn, platform, userWorkloads addon.LogsOptions, hubHostname string) ([]client.Object, []common.DefaultConfig, error) {
+func BuildCLFResources(ctx context.Context, k8s client.Client, cmao *addonv1beta1.ClusterManagementAddOn, platform, userWorkloads addon.LogsOptions, hubHostname string) ([]client.Object, []common.DefaultConfig, error) {
 	objects := []client.Object{}
 	defaultConfig := []common.DefaultConfig{}
 
@@ -55,7 +55,15 @@ func BuildDefaultStackResources(ctx context.Context, k8s client.Client, cmao *ad
 			Config:       addonConfig,
 		})
 	}
+	return objects, defaultConfig, nil
+}
 
+// BuildLokiStackResources builds the hub-global LokiStack and per-tenant certificates.
+func BuildLokiStackResources(ctx context.Context, k8s client.Client, platform, userWorkloads addon.LogsOptions, hubHostname string) ([]client.Object, []common.DefaultConfig, error) {
+	if !platform.DefaultStack {
+		return nil, nil, nil
+	}
+	defaultOpts := manifests.BuildDefaultStackOptions(platform, userWorkloads, hubHostname)
 	managedClusters := &clusterv1.ManagedClusterList{}
 	if err := k8s.List(ctx, managedClusters, &client.ListOptions{}); err != nil {
 		return nil, nil, err
@@ -64,7 +72,6 @@ func BuildDefaultStackResources(ctx context.Context, k8s client.Client, cmao *ad
 	for _, cluster := range managedClusters.Items {
 		tenants = append(tenants, cluster.Name)
 	}
-
 	existingLS := &lokiv1.LokiStack{}
 	resourceName := fmt.Sprintf("%s-%s", addoncfg.DefaultStackPrefix, addoncfg.GlobalPlacementName)
 	key := client.ObjectKey{Namespace: addoncfg.InstallNamespace, Name: resourceName}
@@ -89,18 +96,15 @@ func BuildDefaultStackResources(ctx context.Context, k8s client.Client, cmao *ad
 		return nil, nil, fmt.Errorf("failed to check object storage secret %s/%s: %w", objStorageSecretKey.Namespace, objStorageSecretKey.Name, err)
 	}
 
-	objects = append(objects, ls)
-
 	addonConfig, err := common.ObjectToAddonConfig(ls)
 	if err != nil {
 		return nil, nil, err
 	}
-
-	defaultConfig = append(defaultConfig, common.DefaultConfig{
+	objects := []client.Object{ls}
+	defaultConfig := []common.DefaultConfig{{
 		PlacementRef: addoncfg.GlobalPlacementRef,
 		Config:       addonConfig,
-	})
-
+	}}
 	for _, tenant := range tenants {
 		certObjs, err := manifests.BuildSSAClusterCertificates(tenant)
 		if err != nil {
