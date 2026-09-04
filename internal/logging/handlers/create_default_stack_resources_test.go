@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 
@@ -234,6 +235,8 @@ func TestBuildLokiStackResources(t *testing.T) {
 }
 
 // CLF errors should not block LokiStack install
+var errSimulatedCLFGet = errors.New("simulated API server error on CLF Get")
+
 func TestBuildLokiStackResourcesWhenCLFFails(t *testing.T) {
 	ctx := t.Context()
 	scheme := buildTestScheme(t)
@@ -243,7 +246,7 @@ func TestBuildLokiStackResourcesWhenCLFFails(t *testing.T) {
 	clfGetFails := interceptor.Funcs{
 		Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
 			if _, ok := obj.(*loggingv1.ClusterLogForwarder); ok {
-				return fmt.Errorf("simulated API server error on CLF Get")
+				return errSimulatedCLFGet
 			}
 			return c.Get(ctx, key, obj, opts...)
 		},
@@ -260,7 +263,7 @@ func TestBuildLokiStackResourcesWhenCLFFails(t *testing.T) {
 	// CLF build fail
 	_, _, clfErr := BuildCLFResources(ctx, brokenClient, cmao, platform, addon.LogsOptions{}, "hub.example.com")
 	require.Error(t, clfErr, "BuildCLFResources must fail when CLF Get returns an API error")
-	assert.Contains(t, clfErr.Error(), "simulated API server error on CLF Get")
+	require.ErrorIs(t, clfErr, errSimulatedCLFGet)
 
 	lsObjs, lsDefaultConfig, err := BuildLokiStackResources(ctx, brokenClient, platform, addon.LogsOptions{}, "hub.example.com")
 	require.NoError(t, err, "BuildLokiStackResources must succeed even when CLF Get fails")
