@@ -1,0 +1,7 @@
+{{- if and (or .Values.platformEnabled .Values.userWorkloadsEnabled) (not .Values.deployNonOCPStack) (not .Values.isHub) }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: coo-status
+  namespace: {{ .Release.Namespace }}
+{{- end }}

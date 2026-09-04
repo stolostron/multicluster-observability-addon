@@ -368,6 +368,34 @@ func ManifestConfigs() []workv1.ManifestConfigOption {
 				},
 			},
 		},
+		// COO status ConfigMap: ReadOnly probe written by the endpoint-monitoring-operator
+		// on the spoke. Reports whether COO is pre-installed so MCOA can avoid conflicts.
+		workv1.ManifestConfigOption{
+			ResourceIdentifier: workv1.ResourceIdentifier{
+				Group:     "",
+				Resource:  "configmaps",
+				Name:      addoncfg.CooStatusConfigMapName,
+				Namespace: "*",
+			},
+			UpdateStrategy: &workv1.UpdateStrategy{
+				Type: workv1.UpdateStrategyTypeReadOnly,
+			},
+			FeedbackRules: []workv1.FeedbackRule{
+				{
+					Type: workv1.JSONPathsType,
+					JsonPaths: []workv1.JsonPath{
+						{
+							Name: addoncfg.CooStatusInstalledFeedbackName,
+							Path: addoncfg.CooStatusInstalledFeedbackPath,
+						},
+						{
+							Name: addoncfg.CooStatusManagedByFeedbackName,
+							Path: addoncfg.CooStatusManagedByFeedbackPath,
+						},
+					},
+				},
+			},
+		},
 	)
 	return manifestConfigs
 }

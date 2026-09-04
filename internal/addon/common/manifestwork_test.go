@@ -163,10 +163,10 @@ func TestGetFeedbackValuesForResources(t *testing.T) {
 }
 
 func TestIsCOOSubscribedOnSpoke(t *testing.T) {
-	crdID := workv1.ResourceIdentifier{
-		Group:    "apiextensions.k8s.io",
-		Resource: crdResourceName,
-		Name:     "alertmanagers.monitoring.rhobs",
+	cmID := workv1.ResourceIdentifier{
+		Group:    "",
+		Resource: "configmaps",
+		Name:     addoncfg.CooStatusConfigMapName,
 	}
 
 	newWork := func(manifests ...workv1.ManifestCondition) *workv1.ManifestWork {
@@ -202,7 +202,7 @@ func TestIsCOOSubscribedOnSpoke(t *testing.T) {
 			expectedFeedback: false,
 		},
 		{
-			name: "manifestwork exists but CRD not yet observed",
+			name: "ConfigMap not yet available (endpoint operator hasn't written it)",
 			works: []client.Object{
 				newWork(workv1.ManifestCondition{
 					ResourceMeta: workv1.ManifestResourceMeta{Group: "unrelated", Resource: "unrelated", Name: "unrelated"},
@@ -212,14 +212,14 @@ func TestIsCOOSubscribedOnSpoke(t *testing.T) {
 			expectedFeedback: false,
 		},
 		{
-			name: "CRD observed and OLM-managed",
+			name: "ConfigMap reports COO is installed",
 			works: []client.Object{
 				newWork(workv1.ManifestCondition{
-					ResourceMeta: workv1.ManifestResourceMeta{Group: crdID.Group, Resource: crdID.Resource, Name: crdID.Name},
+					ResourceMeta: workv1.ManifestResourceMeta{Group: cmID.Group, Resource: cmID.Resource, Name: cmID.Name},
 					Conditions:   []metav1.Condition{availableCondition},
 					StatusFeedbacks: workv1.StatusFeedbackResult{
 						Values: []workv1.FeedbackValue{
-							{Name: addoncfg.IsOLMManagedFeedbackName, Value: workv1.FieldValue{Type: workv1.String, String: ptr.To("True")}},
+							{Name: addoncfg.CooStatusInstalledFeedbackName, Value: workv1.FieldValue{Type: workv1.String, String: ptr.To("true")}},
 						},
 					},
 				}),
@@ -228,15 +228,16 @@ func TestIsCOOSubscribedOnSpoke(t *testing.T) {
 			expectedFeedback: true,
 		},
 		{
-			// Regression test: after a full COO CRD purge, the CRD may be re-created (e.g. by
-			// MCOA's own placeholder) without the "olm.managed" label at all, producing zero
-			// feedback values even though the resource itself was fully observed. This must be
-			// treated as a confirmed "not subscribed" rather than "unknown".
-			name: "CRD observed but olm.managed label absent entirely",
+			name: "ConfigMap reports COO is not installed",
 			works: []client.Object{
 				newWork(workv1.ManifestCondition{
-					ResourceMeta: workv1.ManifestResourceMeta{Group: crdID.Group, Resource: crdID.Resource, Name: crdID.Name},
+					ResourceMeta: workv1.ManifestResourceMeta{Group: cmID.Group, Resource: cmID.Resource, Name: cmID.Name},
 					Conditions:   []metav1.Condition{availableCondition},
+					StatusFeedbacks: workv1.StatusFeedbackResult{
+						Values: []workv1.FeedbackValue{
+							{Name: addoncfg.CooStatusInstalledFeedbackName, Value: workv1.FieldValue{Type: workv1.String, String: ptr.To("false")}},
+						},
+					},
 				}),
 			},
 			expectedSub:      false,

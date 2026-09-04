@@ -9,15 +9,10 @@ import (
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"github.com/stolostron/multicluster-observability-addon/internal/coo/manifests"
-	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/utils/ptr"
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	workv1 "open-cluster-management.io/api/work/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -206,22 +201,10 @@ func manifestWorkWithNoFeedback(name string) *workv1.ManifestWork {
 	}
 }
 
-// manifestWorkWithCRDFeedback builds a ManifestWork carrying status feedback for the
-// alertmanagers.monitoring.rhobs CRD, mimicking what the work agent reports back once it
-// has observed the CRD on the spoke. When olmManaged is nil, the CRD is reported as observed
-// (Available) but carries no "olm.managed" label value at all, e.g. because the label is
-// absent on the object (as opposed to present with value "false").
-func manifestWorkWithCRDFeedback(name string, olmManaged *string) *workv1.ManifestWork {
-	var values []workv1.FeedbackValue
-	if olmManaged != nil {
-		values = []workv1.FeedbackValue{
-			{
-				Name:  addoncfg.IsOLMManagedFeedbackName,
-				Value: workv1.FieldValue{Type: workv1.String, String: olmManaged},
-			},
-		}
-	}
-
+// manifestWorkWithCOOStatusFeedback builds a ManifestWork carrying status feedback for the
+// coo-status ConfigMap, mimicking what the work agent reports back once the endpoint-monitoring-operator
+// has written the COO detection result.
+func manifestWorkWithCOOStatusFeedback(name string, installed string) *workv1.ManifestWork {
 	return &workv1.ManifestWork{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -233,9 +216,9 @@ func manifestWorkWithCRDFeedback(name string, olmManaged *string) *workv1.Manife
 				Manifests: []workv1.ManifestCondition{
 					{
 						ResourceMeta: workv1.ManifestResourceMeta{
-							Group:    apiextensionsv1.GroupName,
-							Resource: "customresourcedefinitions",
-							Name:     mconfig.AlertmanagerCRDName,
+							Group:    "",
+							Resource: "configmaps",
+							Name:     addoncfg.CooStatusConfigMapName,
 						},
 						Conditions: []metav1.Condition{
 							{
@@ -246,7 +229,12 @@ func manifestWorkWithCRDFeedback(name string, olmManaged *string) *workv1.Manife
 							},
 						},
 						StatusFeedbacks: workv1.StatusFeedbackResult{
-							Values: values,
+							Values: []workv1.FeedbackValue{
+								{
+									Name:  addoncfg.CooStatusInstalledFeedbackName,
+									Value: workv1.FieldValue{Type: workv1.String, String: &installed},
+								},
+							},
 						},
 					},
 				},
@@ -256,35 +244,6 @@ func manifestWorkWithCRDFeedback(name string, olmManaged *string) *workv1.Manife
 }
 
 // manifestWorkWithCommittedSubscription builds a ManifestWork whose spec already renders
-// the COO Subscription manifest, mimicking a previous reconcile where MCOA committed to
-// installing COO on the spoke.
-func manifestWorkWithCommittedSubscription(name string) *workv1.ManifestWork {
-	sub := &unstructured.Unstructured{
-		Object: map[string]any{
-			"apiVersion": "operators.coreos.com/v1alpha1",
-			"kind":       "Subscription",
-			"metadata": map[string]any{
-				"name":      addoncfg.CooSubscriptionName,
-				"namespace": addoncfg.CooSubscriptionNamespace,
-			},
-		},
-	}
-
-	return &workv1.ManifestWork{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: testClusterName,
-			Labels:    map[string]string{addonapiv1beta1.AddonLabelKey: addoncfg.Name},
-		},
-		Spec: workv1.ManifestWorkSpec{
-			Workload: workv1.ManifestsTemplate{
-				Manifests: []workv1.Manifest{
-					{RawExtension: runtime.RawExtension{Object: sub}},
-				},
-			},
-		},
-	}
-}
 
 func TestInstallOfCOOOnSpokeIsNeeded(t *testing.T) {
 	tests := []struct {
@@ -293,33 +252,23 @@ func TestInstallOfCOOOnSpokeIsNeeded(t *testing.T) {
 		expectedInstall bool
 	}{
 		{
-			name:            "no manifestwork yet: bootstrap, defer decision",
+			name:            "no manifestwork yet: defer until endpoint operator reports",
 			objects:         nil,
 			expectedInstall: false,
 		},
 		{
-			name:            "manifestwork exists but no status feedback yet: defer decision",
+			name:            "manifestwork exists but no status feedback yet: defer until endpoint operator reports",
 			objects:         []client.Object{manifestWorkWithNoFeedback("addon-deploy-0")},
 			expectedInstall: false,
 		},
 		{
-			name:            "COO already OLM-managed on spoke: don't install our own",
-			objects:         []client.Object{manifestWorkWithCRDFeedback("addon-deploy-0", ptr.To("True"))},
+			name:            "COO status reports installed: don't install our own",
+			objects:         []client.Object{manifestWorkWithCOOStatusFeedback("addon-deploy-0", "true")},
 			expectedInstall: false,
 		},
 		{
-			name:            "COO CRD reported but not OLM-managed: safe to install",
-			objects:         []client.Object{manifestWorkWithCRDFeedback("addon-deploy-0", ptr.To("False"))},
-			expectedInstall: true,
-		},
-		{
-			name:            "COO CRD observed but olm.managed label absent entirely (e.g. after a full COO purge): safe to install",
-			objects:         []client.Object{manifestWorkWithCRDFeedback("addon-deploy-0", nil)},
-			expectedInstall: true,
-		},
-		{
-			name:            "previously committed to install: sticky, keep installing even though CRD now looks OLM-managed",
-			objects:         []client.Object{manifestWorkWithCommittedSubscription("addon-deploy-0")},
+			name:            "COO status reports not installed: safe to install",
+			objects:         []client.Object{manifestWorkWithCOOStatusFeedback("addon-deploy-0", "false")},
 			expectedInstall: true,
 		},
 	}

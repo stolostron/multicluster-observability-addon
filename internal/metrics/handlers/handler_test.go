@@ -19,8 +19,6 @@ import (
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/text/cases"
-	"golang.org/x/text/language"
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -915,9 +913,9 @@ func newManifestWork(name string, isOLMSubscrided bool) *workv1.ManifestWork {
 					},
 					{
 						ResourceMeta: workv1.ManifestResourceMeta{
-							Group:    apiextensionsv1.GroupName,
-							Resource: "customresourcedefinitions",
-							Name:     config.AlertmanagerCRDName,
+							Group:    "",
+							Resource: "configmaps",
+							Name:     addoncfg.CooStatusConfigMapName,
 						},
 						Conditions: []metav1.Condition{
 							{
@@ -930,10 +928,10 @@ func newManifestWork(name string, isOLMSubscrided bool) *workv1.ManifestWork {
 						StatusFeedbacks: workv1.StatusFeedbackResult{
 							Values: []workv1.FeedbackValue{
 								{
-									Name: addoncfg.IsOLMManagedFeedbackName,
+									Name: addoncfg.CooStatusInstalledFeedbackName,
 									Value: workv1.FieldValue{
 										Type:   workv1.String,
-										String: ptr.To(cases.Title(language.English).String(strconv.FormatBool(isOLMSubscrided))),
+										String: ptr.To(strconv.FormatBool(isOLMSubscrided)),
 									},
 								},
 							},

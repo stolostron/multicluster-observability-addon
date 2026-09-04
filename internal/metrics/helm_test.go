@@ -26,8 +26,6 @@ import (
 	internalres "github.com/stolostron/multicluster-observability-addon/internal/metrics/resource"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/text/cases"
-	"golang.org/x/text/language"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -289,7 +287,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				assert.Equal(t, "--cluster-name=cluster-1", jobClusterNameArg)
 				assert.Equal(t, "--hub-alertmanager-ca-secret=hub-mtls-ca-97e513873da14ae489e", jobHubCASecretArg)
 				// ensure that the number of objects is correct
-				expectedCount := 47
+				expectedCount := 48
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
@@ -314,7 +312,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 
 				// Ensure that the original resource annotation is set
 				for _, obj := range configmaps {
-					if obj.Name == config.PrometheusCAConfigMapName || obj.Name == addoncfg.TLSProfileConfigMapName {
+					if obj.Name == config.PrometheusCAConfigMapName || obj.Name == addoncfg.TLSProfileConfigMapName || obj.Name == addoncfg.CooStatusConfigMapName {
 						// ignore configmaps directly defined in helm charts
 						continue
 					}
@@ -385,7 +383,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				assert.Equal(t, "observability-operator", agent[0].Labels["app.kubernetes.io/managed-by"])
 				assert.Empty(t, agent[0].Annotations["operator.prometheus.io/controller-id"])
 				// ensure that the number of objects is correct
-				expectedCount := 39
+				expectedCount := 40
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
@@ -417,7 +415,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				cooRecordingRules := common.FilterResourcesByLabelSelector[*cooprometheusv1.PrometheusRule](objects, config.UserWorkloadPrometheusMatchLabels)
 				assert.Len(t, cooRecordingRules, 2)
 				assert.Empty(t, cooRecordingRules[0].Annotations["operator.prometheus.io/controller-id"])
-				expectedCount := 49
+				expectedCount := 50
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
@@ -442,7 +440,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				assert.Len(t, crds, 3) // alertmanagers + prometheusagents + scrapeconfigs (ReadOnly stubs, always present when metrics enabled)
 
 				// ensure that the number of objects is correct
-				expectedCount := 41
+				expectedCount := 42
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
@@ -1612,9 +1610,9 @@ func newManifestWork(name string, isOLMSubscrided bool) *workv1.ManifestWork {
 					},
 					{
 						ResourceMeta: workv1.ManifestResourceMeta{
-							Group:    apiextensionsv1.GroupName,
-							Resource: "customresourcedefinitions",
-							Name:     config.AlertmanagerCRDName,
+							Group:    "",
+							Resource: "configmaps",
+							Name:     addoncfg.CooStatusConfigMapName,
 						},
 						Conditions: []metav1.Condition{
 							{
@@ -1627,10 +1625,10 @@ func newManifestWork(name string, isOLMSubscrided bool) *workv1.ManifestWork {
 						StatusFeedbacks: workv1.StatusFeedbackResult{
 							Values: []workv1.FeedbackValue{
 								{
-									Name: addoncfg.IsOLMManagedFeedbackName,
+									Name: addoncfg.CooStatusInstalledFeedbackName,
 									Value: workv1.FieldValue{
 										Type:   workv1.String,
-										String: ptr.To(cases.Title(language.English).String(strconv.FormatBool(isOLMSubscrided))),
+										String: ptr.To(strconv.FormatBool(isOLMSubscrided)),
 									},
 								},
 							},

@@ -6,15 +6,11 @@ import (
 	"strings"
 
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
-	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	workv1 "open-cluster-management.io/api/work/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
-
-const crdResourceName = "customresourcedefinitions"
 
 // GetFeedbackValuesForResources finds all feedback values for a list of specific resources
 // across all ManifestWorks for the addon. It performs a single pass over the ManifestWorks
@@ -100,7 +96,7 @@ func GetManifestCondition(ctx context.Context, kubeClient client.Client, cluster
 				Name:      manifestStatus.ResourceMeta.Name,
 				Namespace: manifestStatus.ResourceMeta.Namespace,
 			}
-			if currentID == resourceID {
+			if matchesResourceIdentifier(currentID, resourceID) {
 				return &workList.Items[w].Status.ResourceStatus.Manifests[i], nil
 			}
 		}
@@ -110,42 +106,58 @@ func GetManifestCondition(ctx context.Context, kubeClient client.Client, cluster
 }
 
 // IsCOOSubscribedOnSpoke reports whether the Cluster Observability Operator is already
-// present on the given managed cluster. Since the hub has no direct API access to the
-// spoke, this relies on status feedback the work agent reports back for the
-// alertmanagers.monitoring.rhobs CRD (owned by COO), specifically the "olm.managed" label
-// that OLM stamps on CRDs it installed via a Subscription/CSV.
+// present on the given managed cluster AND was installed by someone other than MCOA.
+// This relies on a coo-status ConfigMap written by the endpoint-monitoring-operator on
+// the spoke, which reports both installed status and who manages the Subscription
+// (mcoa vs external).
 //
-// hasFeedback is false when the work agent hasn't reported anything for that CRD yet, e.g.
-// on the very first reconcile for a cluster before any ManifestWork exists or before it has
-// been picked up on the spoke. Callers should treat that as "unknown" rather than "not
-// installed", since the CRD may in fact already exist and simply hasn't been observed yet.
-//
-// Note this is deliberately based on whether the resource itself was observed (its Available
-// condition), not on whether the "olm.managed" JSONPath produced a value. A CRD that exists but
-// carries no "olm.managed" label (e.g. MCOA's own placeholder) yields zero feedback values, which
-// is a confirmed "not OLM-managed" signal, not an "unknown" one; conflating the two would leave a
-// cluster stuck deferring forever after COO is fully removed instead of self-healing.
+// Returns subscribed=true only when COO is installed by an external party (admin).
+// When COO is installed by MCOA itself, returns subscribed=false so MCOA keeps managing it.
+// hasFeedback is false when the endpoint-monitoring-operator hasn't written the ConfigMap yet.
 func IsCOOSubscribedOnSpoke(ctx context.Context, kubeClient client.Client, clusterName, addonName string) (subscribed bool, hasFeedback bool, err error) {
-	crdID := workv1.ResourceIdentifier{
-		Group:    apiextensionsv1.GroupName,
-		Resource: crdResourceName,
-		Name:     mconfig.AlertmanagerCRDName,
+	cmID := workv1.ResourceIdentifier{
+		Group:    "",
+		Resource: "configmaps",
+		Name:     addoncfg.CooStatusConfigMapName,
 	}
 
-	condition, err := GetManifestCondition(ctx, kubeClient, clusterName, addonName, crdID)
+	condition, err := GetManifestCondition(ctx, kubeClient, clusterName, addonName, cmID)
 	if err != nil {
-		return false, false, fmt.Errorf("failed to get manifest condition for %s: %w", crdID.Name, err)
+		return false, false, fmt.Errorf("failed to get manifest condition for %s: %w", cmID.Name, err)
 	}
 
 	if condition == nil || !meta.IsStatusConditionTrue(condition.Conditions, workv1.WorkAvailable) {
 		return false, false, nil
 	}
 
-	for _, v := range FilterFeedbackValuesByName(condition.StatusFeedbacks.Values, addoncfg.IsOLMManagedFeedbackName) {
+	var installed bool
+	var managedBy string
+	for _, v := range FilterFeedbackValuesByName(condition.StatusFeedbacks.Values, addoncfg.CooStatusInstalledFeedbackName) {
 		if v.Value.String != nil && strings.ToLower(*v.Value.String) == "true" {
-			return true, true, nil
+			installed = true
+		}
+	}
+	for _, v := range FilterFeedbackValuesByName(condition.StatusFeedbacks.Values, addoncfg.CooStatusManagedByFeedbackName) {
+		if v.Value.String != nil {
+			managedBy = *v.Value.String
 		}
 	}
 
+	if installed && managedBy != "mcoa" {
+		return true, true, nil
+	}
+
 	return false, true, nil
+}
+
+// matchesResourceIdentifier compares two ResourceIdentifiers. If the target
+// namespace is empty, namespace is ignored (wildcard match).
+func matchesResourceIdentifier(current, target workv1.ResourceIdentifier) bool {
+	if current.Group != target.Group || current.Resource != target.Resource || current.Name != target.Name {
+		return false
+	}
+	if target.Namespace != "" && current.Namespace != target.Namespace {
+		return false
+	}
+	return true
 }

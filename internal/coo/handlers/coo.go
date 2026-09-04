@@ -10,9 +10,6 @@ import (
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
-	workv1 "open-cluster-management.io/api/work/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
@@ -69,77 +66,20 @@ func InstallOfCOOOnTheHubIsNeeded(ctx context.Context, k8s client.Client, logger
 // installation. Once feedback arrives, the decision above is re-evaluated and, if COO isn't
 // present yet, MCOA commits to installing and managing it from then on.
 func InstallOfCOOOnSpokeIsNeeded(ctx context.Context, k8s client.Client, logger logr.Logger, clusterName string) (bool, error) {
-	committed, err := hasCommittedToInstallCOOSubscription(ctx, k8s, clusterName)
-	if err != nil {
-		return false, fmt.Errorf("failed to check previous COO install commitment for cluster %s: %w", clusterName, err)
-	}
-	if committed {
-		return true, nil
-	}
-
 	subscribed, hasFeedback, err := common.IsCOOSubscribedOnSpoke(ctx, k8s, clusterName, addoncfg.Name)
 	if err != nil {
 		return false, fmt.Errorf("failed to check if coo is subscribed on cluster %s: %w", clusterName, err)
 	}
 	if !hasFeedback {
-		logger.V(2).Info("no COO status feedback yet for cluster, deferring COO install decision", "clusterName", clusterName)
+		logger.V(2).Info("no COO status feedback yet for cluster, waiting for endpoint operator to report", "clusterName", clusterName)
 		return false, nil
 	}
 	if subscribed {
-		logger.V(2).Info("COO already present on cluster, MCOA will not install its own subscription", "clusterName", clusterName)
+		logger.V(2).Info("COO installed by external party on cluster, MCOA will not install its own subscription", "clusterName", clusterName)
 		return false, nil
 	}
 
 	return true, nil
-}
-
-// hasCommittedToInstallCOOSubscription checks whether the COO Subscription manifest is
-// already part of the ManifestWork(s) MCOA previously rendered for this cluster.
-func hasCommittedToInstallCOOSubscription(ctx context.Context, k8s client.Client, clusterName string) (bool, error) {
-	workList, err := common.ListAddonManifestWorks(ctx, k8s, clusterName, addoncfg.Name)
-	if err != nil {
-		return false, fmt.Errorf("failed to list manifestworks for cluster %s: %w", clusterName, err)
-	}
-
-	for _, work := range workList.Items {
-		for _, manifest := range work.Spec.Workload.Manifests {
-			u, err := manifestToUnstructured(manifest)
-			if err != nil || u == nil {
-				continue
-			}
-			if u.GetKind() == "Subscription" &&
-				u.GetName() == addoncfg.CooSubscriptionName &&
-				u.GetNamespace() == addoncfg.CooSubscriptionNamespace {
-				return true, nil
-			}
-		}
-	}
-
-	return false, nil
-}
-
-// manifestToUnstructured decodes a ManifestWork manifest entry, regardless of whether it
-// was populated as a typed/unstructured object (e.g. in unit tests building the object
-// in-memory) or as raw JSON bytes (as returned by a real API server).
-func manifestToUnstructured(m workv1.Manifest) (*unstructured.Unstructured, error) {
-	if u, ok := m.Object.(*unstructured.Unstructured); ok {
-		return u, nil
-	}
-	if m.Object != nil {
-		content, err := runtime.DefaultUnstructuredConverter.ToUnstructured(m.Object)
-		if err != nil {
-			return nil, fmt.Errorf("failed to convert manifest object to unstructured: %w", err)
-		}
-		return &unstructured.Unstructured{Object: content}, nil
-	}
-	if len(m.Raw) > 0 {
-		u := &unstructured.Unstructured{}
-		if _, _, err := unstructured.UnstructuredJSONScheme.Decode(m.Raw, nil, u); err != nil {
-			return nil, fmt.Errorf("failed to decode manifest raw bytes: %w", err)
-		}
-		return u, nil
-	}
-	return nil, nil
 }
 
 const thanosRulerCustomRulesName = "thanos-ruler-custom-rules"

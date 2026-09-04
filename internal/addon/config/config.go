@@ -25,6 +25,13 @@ const (
 	CooSubscriptionNamespace = "openshift-cluster-observability-operator"
 	CooSubscriptionChannel   = "stable"
 
+	CooStatusConfigMapName         = "coo-status"
+	CooStatusInstalledKey          = "installed"
+	CooStatusInstalledFeedbackName = "cooInstalled"
+	CooStatusInstalledFeedbackPath = ".data.installed"
+	CooStatusManagedByFeedbackName = "cooManagedBy"
+	CooStatusManagedByFeedbackPath = ".data.managedBy"
+
 	PaProbeKey  = "isAvailable"
 	PaProbePath = ".status.conditions[?(@.type==\"Available\")].status"
 
