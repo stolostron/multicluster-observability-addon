@@ -36,9 +36,8 @@ func configRef(group, resource, name, namespace string) addonapiv1beta1.ConfigRe
 	}
 }
 
-func TestBuildDefaultStackOptions(t *testing.T) {
+func TestBuildDefaultStackCollectionOptions(t *testing.T) {
 	scheme := runtime.NewScheme()
-	require.NoError(t, lokiv1.AddToScheme(scheme))
 	require.NoError(t, loggingv1.AddToScheme(scheme))
 	require.NoError(t, addonapiv1beta1.Install(scheme))
 	require.NoError(t, corev1.AddToScheme(scheme))
@@ -50,6 +49,41 @@ func TestBuildDefaultStackOptions(t *testing.T) {
 			OwnerReferences: []metav1.OwnerReference{cmaoOwnerRef()},
 		},
 	}
+	collectionSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      manifests.DefaultCollectionMTLSSecretName,
+			Namespace: addoncfg.InstallNamespace,
+		},
+	}
+	clfRef := configRef(loggingv1.GroupVersion.Group, addoncfg.ClusterLogForwardersResource, clf.Name, clf.Namespace)
+
+	t.Run("loads collection without touching storage", func(t *testing.T) {
+		k8s := fake.NewClientBuilder().WithScheme(scheme).WithObjects(clf, collectionSecret).Build()
+		mcAddon := &addonapiv1beta1.ManagedClusterAddOn{
+			ObjectMeta: metav1.ObjectMeta{Name: addoncfg.Name, Namespace: "spoke-1"},
+			Status:     addonapiv1beta1.ManagedClusterAddOnStatus{ConfigReferences: []addonapiv1beta1.ConfigReference{clfRef}},
+		}
+		opts := &manifests.Options{Platform: addon.LogsOptions{DefaultStack: true}}
+		require.NoError(t, buildDefaultStackCollectionOptions(t.Context(), k8s, mcAddon, opts))
+		assert.NotNil(t, opts.DefaultStack.Collection.ClusterLogForwarder)
+		assert.Nil(t, opts.DefaultStack.Storage.LokiStack)
+	})
+
+	t.Run("disabled default stack is a no-op", func(t *testing.T) {
+		k8s := fake.NewClientBuilder().WithScheme(scheme).Build()
+		mcAddon := &addonapiv1beta1.ManagedClusterAddOn{ObjectMeta: metav1.ObjectMeta{Name: addoncfg.Name, Namespace: "spoke-1"}}
+		opts := &manifests.Options{}
+		require.NoError(t, buildDefaultStackCollectionOptions(t.Context(), k8s, mcAddon, opts))
+		assert.Nil(t, opts.DefaultStack.Collection.ClusterLogForwarder)
+	})
+}
+
+func TestBuildDefaultStackStorageOptions(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, lokiv1.AddToScheme(scheme))
+	require.NoError(t, addonapiv1beta1.Install(scheme))
+	require.NoError(t, corev1.AddToScheme(scheme))
+
 	ls := &lokiv1.LokiStack{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "mcoa-default-global",
@@ -60,12 +94,6 @@ func TestBuildDefaultStackOptions(t *testing.T) {
 			Storage: lokiv1.ObjectStorageSpec{
 				Secret: lokiv1.ObjectStorageSecretSpec{Name: manifests.DefaultStorageObjStorageSecretName},
 			},
-		},
-	}
-	collectionSecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      manifests.DefaultCollectionMTLSSecretName,
-			Namespace: addoncfg.InstallNamespace,
 		},
 	}
 	objStorageSecret := &corev1.Secret{
@@ -80,35 +108,27 @@ func TestBuildDefaultStackOptions(t *testing.T) {
 			Namespace: addoncfg.InstallNamespace,
 		},
 	}
-
-	clfRef := configRef(loggingv1.GroupVersion.Group, addoncfg.ClusterLogForwardersResource, clf.Name, clf.Namespace)
 	lsRef := configRef(lokiv1.GroupVersion.Group, addoncfg.LokiStacksResource, ls.Name, ls.Namespace)
 
-	newOpts := func() *manifests.Options {
-		return &manifests.Options{Platform: addon.LogsOptions{DefaultStack: true}}
-	}
-
-	t.Run("spoke without LokiStack ref skips storage", func(t *testing.T) {
-		k8s := fake.NewClientBuilder().WithScheme(scheme).WithObjects(clf, collectionSecret).Build()
+	t.Run("no LokiStack ref skips storage", func(t *testing.T) {
+		k8s := fake.NewClientBuilder().WithScheme(scheme).WithObjects(ls).Build()
 		mcAddon := &addonapiv1beta1.ManagedClusterAddOn{
 			ObjectMeta: metav1.ObjectMeta{Name: addoncfg.Name, Namespace: "spoke-1"},
-			Status:     addonapiv1beta1.ManagedClusterAddOnStatus{ConfigReferences: []addonapiv1beta1.ConfigReference{clfRef}},
 		}
-		opts := newOpts()
-		require.NoError(t, buildDefaultStackOptions(t.Context(), k8s, mcAddon, opts))
-		assert.NotNil(t, opts.DefaultStack.Collection.ClusterLogForwarder)
+		opts := &manifests.Options{Platform: addon.LogsOptions{DefaultStack: true}}
+		require.NoError(t, buildDefaultStackStorageOptions(t.Context(), k8s, mcAddon, opts))
 		assert.Nil(t, opts.DefaultStack.Storage.LokiStack)
 	})
 
-	t.Run("hub with LokiStack ref loads storage regardless of IsHub", func(t *testing.T) {
-		k8s := fake.NewClientBuilder().WithScheme(scheme).WithObjects(clf, ls, collectionSecret, objStorageSecret, storageMTLSSecret).Build()
+	t.Run("MCAO LokiStack ref loads storage regardless of IsHub", func(t *testing.T) {
+		k8s := fake.NewClientBuilder().WithScheme(scheme).WithObjects(ls, objStorageSecret, storageMTLSSecret).Build()
 		mcAddon := &addonapiv1beta1.ManagedClusterAddOn{
 			ObjectMeta: metav1.ObjectMeta{Name: addoncfg.Name, Namespace: addoncfg.HubNamespace},
-			Status:     addonapiv1beta1.ManagedClusterAddOnStatus{ConfigReferences: []addonapiv1beta1.ConfigReference{clfRef, lsRef}},
+			Status:     addonapiv1beta1.ManagedClusterAddOnStatus{ConfigReferences: []addonapiv1beta1.ConfigReference{lsRef}},
 		}
-		opts := newOpts()
+		opts := &manifests.Options{Platform: addon.LogsOptions{DefaultStack: true}}
 		opts.IsHub = false
-		require.NoError(t, buildDefaultStackOptions(t.Context(), k8s, mcAddon, opts))
+		require.NoError(t, buildDefaultStackStorageOptions(t.Context(), k8s, mcAddon, opts))
 		require.NotNil(t, opts.DefaultStack.Storage.LokiStack)
 		assert.Equal(t, ls.Name, opts.DefaultStack.Storage.LokiStack.Name)
 		assert.Equal(t, manifests.DefaultStorageObjStorageSecretName, opts.DefaultStack.Storage.ObjStorageSecret.Name)
@@ -116,23 +136,12 @@ func TestBuildDefaultStackOptions(t *testing.T) {
 	})
 
 	t.Run("IsHub without LokiStack ref still skips storage", func(t *testing.T) {
-		k8s := fake.NewClientBuilder().WithScheme(scheme).WithObjects(clf, ls, collectionSecret).Build()
+		k8s := fake.NewClientBuilder().WithScheme(scheme).WithObjects(ls).Build()
 		mcAddon := &addonapiv1beta1.ManagedClusterAddOn{
 			ObjectMeta: metav1.ObjectMeta{Name: addoncfg.Name, Namespace: addoncfg.HubNamespace},
-			Status:     addonapiv1beta1.ManagedClusterAddOnStatus{ConfigReferences: []addonapiv1beta1.ConfigReference{clfRef}},
 		}
-		opts := newOpts()
-		opts.IsHub = true
-		require.NoError(t, buildDefaultStackOptions(t.Context(), k8s, mcAddon, opts))
-		assert.Nil(t, opts.DefaultStack.Storage.LokiStack)
-	})
-
-	t.Run("disabled default stack is a no-op", func(t *testing.T) {
-		k8s := fake.NewClientBuilder().WithScheme(scheme).Build()
-		mcAddon := &addonapiv1beta1.ManagedClusterAddOn{ObjectMeta: metav1.ObjectMeta{Name: addoncfg.Name, Namespace: "spoke-1"}}
-		opts := &manifests.Options{}
-		require.NoError(t, buildDefaultStackOptions(t.Context(), k8s, mcAddon, opts))
-		assert.Nil(t, opts.DefaultStack.Collection.ClusterLogForwarder)
+		opts := &manifests.Options{Platform: addon.LogsOptions{DefaultStack: true}, IsHub: true}
+		require.NoError(t, buildDefaultStackStorageOptions(t.Context(), k8s, mcAddon, opts))
 		assert.Nil(t, opts.DefaultStack.Storage.LokiStack)
 	})
 }
