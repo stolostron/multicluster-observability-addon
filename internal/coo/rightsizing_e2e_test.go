@@ -515,15 +515,6 @@ func findVariable(vars []any, name string) map[string]any {
 	return nil
 }
 
-func findDashboard(dbs []*persesv1.PersesDashboard, name string) *persesv1.PersesDashboard {
-	for _, db := range dbs {
-		if db.Name == name {
-			return db
-		}
-	}
-	return nil
-}
-
 func extractDashboardVarNames(vars []any) []string {
 	names := make([]string, 0, len(vars))
 	for _, v := range vars {
