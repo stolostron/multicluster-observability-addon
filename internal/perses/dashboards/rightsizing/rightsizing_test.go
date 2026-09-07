@@ -6,6 +6,7 @@ package rightsizing
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/perses/perses/go-sdk/dashboard"
@@ -127,6 +128,32 @@ func TestBuildVMOverview(t *testing.T) {
 		assert.Contains(t, specStr, "acm-rightsizing-vm-overestimation")
 		assert.Contains(t, specStr, "acm-rightsizing-vm-underestimation")
 		assert.Contains(t, specStr, "start=$__range", "drill-down links must pass the current time range")
+	})
+
+	// Perses runs StatChart queries as range queries (showing the last non-null point) but
+	// Table queries as instant queries at the range end. The stat queries are pinned with
+	// "@ end()" so a stopped VM disappears from the totals and the tables at the same time.
+	t.Run("stat panels are pinned to the range end, table panels stay instant", func(t *testing.T) {
+		statPanels := 0
+		for name, p := range spec.Panels {
+			for i, q := range p.Spec.Queries {
+				raw, err := json.Marshal(q.Spec.Plugin.Spec)
+				require.NoError(t, err)
+				var ps struct {
+					Query string `json:"query"`
+				}
+				require.NoError(t, json.Unmarshal(raw, &ps))
+				switch p.Spec.Plugin.Kind {
+				case "StatChart":
+					statPanels++
+					assert.Equal(t, 2, strings.Count(ps.Query, "[$days:] @ end()"), "panel %s query %d: both subqueries must be pinned to the range end", name, i)
+					assert.Contains(t, ps.Query, "} @ end() > 0) > 0)", "panel %s query %d: running VM filter must be pinned to the range end", name, i)
+				case "Table":
+					assert.NotContains(t, ps.Query, "@ end()", "panel %s query %d: table queries are already instant", name, i)
+				}
+			}
+		}
+		assert.Equal(t, 4, statPanels, "expected the four total stat panels")
 	})
 }
 
