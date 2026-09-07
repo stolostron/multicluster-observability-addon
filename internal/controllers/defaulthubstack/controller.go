@@ -13,6 +13,7 @@ import (
 	cooresource "github.com/stolostron/multicluster-observability-addon/internal/coo/resource"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -56,13 +57,27 @@ func SetupWithManager(mgr ctrl.Manager, logger logr.Logger) error {
 		}}
 	})
 
-	return ctrl.NewControllerManagedBy(mgr).
+	b := ctrl.NewControllerManagedBy(mgr).
 		Named("default-hub-stack").
-		For(&addonv1beta1.AddOnDeploymentConfig{}, builder.WithPredicates(mcoaAODCPredicate)).
-		Watches(&persesv1.PersesDashboard{}, enqueue, builder.WithPredicates(managedByPredicate)).
-		Watches(&persesv1.PersesDatasource{}, enqueue, builder.WithPredicates(managedByPredicate)).
-		Watches(&uiplugin.UIPlugin{}, enqueue, builder.WithPredicates(managedByPredicate)).
-		Complete(r)
+		For(&addonv1beta1.AddOnDeploymentConfig{}, builder.WithPredicates(mcoaAODCPredicate))
+
+	optionalWatches := []struct {
+		obj client.Object
+		gvk schema.GroupVersionKind
+	}{
+		{&persesv1.PersesDashboard{}, schema.GroupVersionKind{Group: "perses.dev", Version: "v1alpha1", Kind: "PersesDashboard"}},
+		{&persesv1.PersesDatasource{}, schema.GroupVersionKind{Group: "perses.dev", Version: "v1alpha1", Kind: "PersesDatasource"}},
+		{&uiplugin.UIPlugin{}, schema.GroupVersionKind{Group: "observability.openshift.io", Version: "v1alpha1", Kind: "UIPlugin"}},
+	}
+	for _, w := range optionalWatches {
+		if _, err := mgr.GetRESTMapper().RESTMapping(w.gvk.GroupKind(), w.gvk.Version); err != nil {
+			logger.Info("CRD not available, skipping watch", "kind", w.gvk.String())
+			continue
+		}
+		b = b.Watches(w.obj, enqueue, builder.WithPredicates(managedByPredicate))
+	}
+
+	return b.Complete(r)
 }
 
 func (r *DefaultHubStackReconciler) Reconcile(ctx context.Context, _ ctrl.Request) (ctrl.Result, error) {
