@@ -11,7 +11,6 @@ import (
 	otelv1alpha1 "github.com/open-telemetry/opentelemetry-operator/apis/v1alpha1"
 	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
 	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
-	uiplugin "github.com/rhobs/observability-operator/pkg/apis/uiplugin/v1alpha1"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
@@ -52,7 +51,6 @@ func HealthProber(getter addonutils.AddOnDeploymentConfigGetter, logger logr.Log
 	probeFields = append(probeFields, getMetricsProbeFields()...)
 	probeFields = append(probeFields, getLogsProbeFields()...)
 	probeFields = append(probeFields, getTracesProbeFields()...)
-	probeFields = append(probeFields, getAnalyticsProbeFields()...)
 	probeFields = append(probeFields, getTLSProfileProbeFields()...)
 	return &agent.HealthProber{
 		Type: agent.HealthProberTypeWork,
@@ -222,29 +220,6 @@ func getTracesProbeFields() []agent.ProbeField {
 						{
 							Name: addoncfg.OtelColProbeKey,
 							Path: addoncfg.OtelColProbePath,
-						},
-					},
-				},
-			},
-		},
-	}
-}
-
-func getAnalyticsProbeFields() []agent.ProbeField {
-	return []agent.ProbeField{
-		{
-			ResourceIdentifier: workv1.ResourceIdentifier{
-				Group:    uiplugin.GroupVersion.Group,
-				Resource: addoncfg.UiPluginsResource,
-				Name:     "monitoring",
-			},
-			ProbeRules: []workv1.FeedbackRule{
-				{
-					Type: workv1.JSONPathsType,
-					JsonPaths: []workv1.JsonPath{
-						{
-							Name: addoncfg.UipProbeKey,
-							Path: addoncfg.UipProbePath,
 						},
 					},
 				},
@@ -425,12 +400,6 @@ func healthChecker(getter addonutils.AddOnDeploymentConfigGetter, fields []agent
 	if err := checkTracing(fields, opts); err != nil {
 		return err
 	}
-	if common.IsHubCluster(mc) {
-		if err := checkMetricsUIPlugin(fields, opts); err != nil {
-			return err
-		}
-	}
-
 	return nil
 }
 
@@ -556,44 +525,6 @@ func checkTracing(fields []agent.FieldResult, opts Options) error {
 
 	if !foundOtelCol {
 		return fmt.Errorf("%w: %s", errMissingFields, addoncfg.OpenTelemetryCollectorsResource)
-	}
-
-	return nil
-}
-
-func checkMetricsUIPlugin(fields []agent.FieldResult, opts Options) error {
-	if !opts.Platform.Metrics.UI.Enabled {
-		return nil
-	}
-
-	foundUIPlugin := false
-	for _, field := range fields {
-		identifier := field.ResourceIdentifier
-		switch identifier.Resource {
-		case addoncfg.UiPluginsResource:
-			if len(field.FeedbackResult.Values) == 0 {
-				return fmt.Errorf("%w for %s with key %s/%s", errMissingFeedbackValues, identifier.Resource, identifier.Namespace, identifier.Name)
-			}
-			for _, value := range field.FeedbackResult.Values {
-				if value.Name != addoncfg.UipProbeKey {
-					return fmt.Errorf("%w: %s with key %s unknown probe keys %s", errUnknownProbeKey, identifier.Resource, identifier.Name, value.Name)
-				}
-
-				if value.Value.String == nil {
-					return fmt.Errorf("%w: %s with key %s", errProbeValueIsNil, identifier.Resource, identifier.Name)
-				}
-
-				if *value.Value.String != "True" {
-					return fmt.Errorf("%w: %s status condition type is %s for %s", errProbeConditionNotSatisfied, identifier.Resource, *value.Value.String, identifier.Name)
-				}
-				// uiplugin passes the health check
-			}
-			foundUIPlugin = true
-		}
-	}
-
-	if !foundUIPlugin {
-		return fmt.Errorf("%w: %s", errMissingFields, addoncfg.UiPluginsResource)
 	}
 
 	return nil
