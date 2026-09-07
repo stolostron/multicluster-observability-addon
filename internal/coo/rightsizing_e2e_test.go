@@ -276,7 +276,23 @@ func TestRightSizing_DashboardSpecStructure(t *testing.T) {
 			require.True(t, ok, "dashboard spec must have variables")
 			varSlice, ok := variables.([]any)
 			require.True(t, ok)
-			assert.GreaterOrEqual(t, len(varSlice), 3, "all RS dashboards have at least cluster, profile, days")
+			assert.GreaterOrEqual(t, len(varSlice), 4, "all RS dashboards have at least cluster, cpu_profile, memory_profile, days")
+
+			varNames := extractDashboardVarNames(varSlice)
+			assert.Contains(t, varNames, "cluster")
+			assert.Contains(t, varNames, "cpu_profile")
+			assert.Contains(t, varNames, "memory_profile")
+			assert.Contains(t, varNames, "days")
+			assert.NotContains(t, varNames, "profile", "shared profile variable should be split into cpu/memory profiles")
+		})
+
+		t.Run(db.Name+"/spec_uses_split_profile_vars", func(t *testing.T) {
+			raw, err := json.Marshal(db.Spec)
+			require.NoError(t, err)
+			specStr := string(raw)
+			assert.Contains(t, specStr, "$cpu_profile")
+			assert.Contains(t, specStr, "$memory_profile")
+			assert.NotContains(t, specStr, `profile="$profile"`)
 		})
 
 		t.Run(db.Name+"/spec_references_datasource", func(t *testing.T) {
@@ -287,6 +303,172 @@ func TestRightSizing_DashboardSpecStructure(t *testing.T) {
 	}
 }
 
+func TestRightSizing_CombinedWithIncidentDetection(t *testing.T) {
+	cv := []addonapiv1beta1.CustomizedVariable{
+		{Name: addon.KeyRightSizingDelegated, Value: "true"},
+		{Name: addon.KeyPlatformNamespaceRightSizing, Value: "enabled"},
+		{Name: addon.KeyPlatformVirtualizationRightSizing, Value: "enabled"},
+		{Name: addon.KeyPlatformIncidentDetection, Value: "uiplugins.v1alpha1.observability.openshift.io"},
+	}
+
+	k8s := reconcileHubResources(t, cv)
+	dashboards := listDashboards(t, k8s, addoncfg.AnalyticsNamespace)
+
+	t.Run("RS dashboards coexist with incident detection", func(t *testing.T) {
+		names := dashboardNames(dashboards)
+		for _, expected := range allRSDashboardIDs {
+			assert.Contains(t, names, expected, "RS dashboard %q present alongside incident detection", expected)
+		}
+	})
+
+	t.Run("RS dashboards are in analytics namespace", func(t *testing.T) {
+		for _, db := range dashboards {
+			if contains(allRSDashboardIDs, db.Name) {
+				assert.Equal(t, addoncfg.AnalyticsNamespace, db.Namespace,
+					"RS dashboard %q must be in analytics namespace", db.Name)
+			}
+		}
+	})
+
+	t.Run("analytics namespace exists", func(t *testing.T) {
+		ns := &corev1.Namespace{}
+		err := k8s.Get(t.Context(), client.ObjectKey{Name: addoncfg.AnalyticsNamespace}, ns)
+		require.NoError(t, err, "analytics namespace should exist")
+	})
+}
+
+func TestRightSizing_ProfileVariableMatchers(t *testing.T) {
+	cv := []addonapiv1beta1.CustomizedVariable{
+		{Name: addon.KeyRightSizingDelegated, Value: "true"},
+		{Name: addon.KeyPlatformNamespaceRightSizing, Value: "enabled"},
+		{Name: addon.KeyPlatformVirtualizationRightSizing, Value: "enabled"},
+	}
+
+	k8s := reconcileHubResources(t, cv)
+	dashboards := listDashboards(t, k8s, addoncfg.AnalyticsNamespace)
+
+	for _, db := range dashboards {
+		if !contains(allRSDashboardIDs, db.Name) {
+			continue
+		}
+
+		t.Run(db.Name+"/cpu_profile_queries_cpu_metric", func(t *testing.T) {
+			raw, err := json.Marshal(db.Spec)
+			require.NoError(t, err)
+
+			var spec map[string]any
+			require.NoError(t, json.Unmarshal(raw, &spec))
+
+			varSlice := extractVariableSlice(spec)
+			cpuProfileVar := findVariable(varSlice, "cpu_profile")
+			require.NotNil(t, cpuProfileVar, "cpu_profile variable must exist")
+
+			varJSON, _ := json.Marshal(cpuProfileVar)
+			varStr := string(varJSON)
+			assert.Contains(t, varStr, "cpu_usage",
+				"cpu_profile variable must query from a cpu_usage metric")
+			assert.NotContains(t, varStr, "memory_usage",
+				"cpu_profile variable must NOT query from a memory_usage metric")
+		})
+
+		t.Run(db.Name+"/memory_profile_queries_memory_metric", func(t *testing.T) {
+			raw, err := json.Marshal(db.Spec)
+			require.NoError(t, err)
+
+			var spec map[string]any
+			require.NoError(t, json.Unmarshal(raw, &spec))
+
+			varSlice := extractVariableSlice(spec)
+			memProfileVar := findVariable(varSlice, "memory_profile")
+			require.NotNil(t, memProfileVar, "memory_profile variable must exist")
+
+			varJSON, _ := json.Marshal(memProfileVar)
+			varStr := string(varJSON)
+			assert.Contains(t, varStr, "memory_usage",
+				"memory_profile variable must query from a memory_usage metric")
+			assert.NotContains(t, varStr, "cpu_usage",
+				"memory_profile variable must NOT query from a cpu_usage metric")
+		})
+	}
+}
+
+func TestRightSizing_NoCrossContamination(t *testing.T) {
+	cv := []addonapiv1beta1.CustomizedVariable{
+		{Name: addon.KeyRightSizingDelegated, Value: "true"},
+		{Name: addon.KeyPlatformNamespaceRightSizing, Value: "enabled"},
+		{Name: addon.KeyPlatformVirtualizationRightSizing, Value: "enabled"},
+	}
+
+	k8s := reconcileHubResources(t, cv)
+	dashboards := listDashboards(t, k8s, addoncfg.AnalyticsNamespace)
+
+	for _, db := range dashboards {
+		if !contains(allRSDashboardIDs, db.Name) {
+			continue
+		}
+
+		t.Run(db.Name+"/cpu_queries_do_not_use_memory_profile", func(t *testing.T) {
+			raw, err := json.Marshal(db.Spec)
+			require.NoError(t, err)
+			specStr := string(raw)
+
+			assert.NotContains(t, specStr, `cpu_recommendation{cluster=\"$cluster\", profile=\"$memory_profile\"`,
+				"CPU recommendation queries must not use $memory_profile")
+			assert.NotContains(t, specStr, `cpu_usage{cluster=\"$cluster\", profile=\"$memory_profile\"`,
+				"CPU usage queries must not use $memory_profile")
+		})
+
+		t.Run(db.Name+"/memory_queries_do_not_use_cpu_profile", func(t *testing.T) {
+			raw, err := json.Marshal(db.Spec)
+			require.NoError(t, err)
+			specStr := string(raw)
+
+			assert.NotContains(t, specStr, `memory_recommendation{cluster=\"$cluster\", profile=\"$cpu_profile\"`,
+				"Memory recommendation queries must not use $cpu_profile")
+			assert.NotContains(t, specStr, `memory_usage{cluster=\"$cluster\", profile=\"$cpu_profile\"`,
+				"Memory usage queries must not use $cpu_profile")
+		})
+	}
+}
+
+func TestRightSizing_DrillDownLinksPassBothProfiles(t *testing.T) {
+	cv := []addonapiv1beta1.CustomizedVariable{
+		{Name: addon.KeyRightSizingDelegated, Value: "true"},
+		{Name: addon.KeyPlatformNamespaceRightSizing, Value: "enabled"},
+		{Name: addon.KeyPlatformVirtualizationRightSizing, Value: "enabled"},
+	}
+
+	k8s := reconcileHubResources(t, cv)
+	dashboards := listDashboards(t, k8s, addoncfg.AnalyticsNamespace)
+
+	for _, db := range dashboards {
+		if !contains(allRSDashboardIDs, db.Name) {
+			continue
+		}
+		raw, err := json.Marshal(db.Spec)
+		require.NoError(t, err)
+		specStr := string(raw)
+
+		t.Run(db.Name+"/links_carry_cpu_profile", func(t *testing.T) {
+			if assert.Contains(t, specStr, "$cpu_profile") {
+				assert.NotContains(t, specStr, "var-profile=",
+					"drill-down URL must not use old 'profile' variable")
+			}
+		})
+
+		t.Run(db.Name+"/links_carry_memory_profile", func(t *testing.T) {
+			assert.Contains(t, specStr, "$memory_profile",
+				"dashboard must reference memory_profile variable")
+		})
+
+		t.Run(db.Name+"/no_stale_dollar_profile", func(t *testing.T) {
+			assert.NotContains(t, specStr, `profile="$profile"`,
+				"no panel should reference the removed $profile variable")
+		})
+	}
+}
+
+// TestRightSizing_MCOMode_NoDashboardsWhenNotDelegated verifies no RS dashboards render in MCO mode.
 func TestRightSizing_MCOMode_NoDashboardsWhenNotDelegated(t *testing.T) {
 	cv := []addonapiv1beta1.CustomizedVariable{
 		{Name: addon.KeyPlatformNamespaceRightSizing, Value: "enabled"},
@@ -302,4 +484,60 @@ func TestRightSizing_MCOMode_NoDashboardsWhenNotDelegated(t *testing.T) {
 				"RS dashboards must not render in MCO mode (rightSizingDelegated absent)")
 		}
 	})
+}
+
+func extractVariableSlice(spec map[string]any) []any {
+	variables, ok := spec["variables"]
+	if !ok {
+		return nil
+	}
+	varSlice, ok := variables.([]any)
+	if !ok {
+		return nil
+	}
+	return varSlice
+}
+
+func findVariable(vars []any, name string) map[string]any {
+	for _, v := range vars {
+		m, ok := v.(map[string]any)
+		if !ok {
+			continue
+		}
+		spec, ok := m["spec"].(map[string]any)
+		if !ok {
+			continue
+		}
+		if n, ok := spec["name"].(string); ok && n == name {
+			return m
+		}
+	}
+	return nil
+}
+
+func findDashboard(dbs []*persesv1.PersesDashboard, name string) *persesv1.PersesDashboard {
+	for _, db := range dbs {
+		if db.Name == name {
+			return db
+		}
+	}
+	return nil
+}
+
+func extractDashboardVarNames(vars []any) []string {
+	names := make([]string, 0, len(vars))
+	for _, v := range vars {
+		m, ok := v.(map[string]any)
+		if !ok {
+			continue
+		}
+		spec, ok := m["spec"].(map[string]any)
+		if !ok {
+			continue
+		}
+		if name, ok := spec["name"].(string); ok {
+			names = append(names, name)
+		}
+	}
+	return names
 }

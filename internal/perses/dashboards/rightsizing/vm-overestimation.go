@@ -40,17 +40,34 @@ func BuildVMOverestimation(project string, datasource string, clusterLabelName s
 			),
 		),
 
-		dashboard.AddVariable("profile",
+		dashboard.AddVariable("cpu_profile",
 			listVar.List(
 				labelValuesVar.PrometheusLabelValues("profile",
 					dashboards.AddVariableDatasource(datasource),
 					labelValuesVar.Matchers(
 						promql.SetLabelMatchers(
-							`{__name__=~"acm_rs_vm:namespace:(cpu_request|cpu_usage|memory_request|memory_usage)",cluster="$cluster"}`,
+							`acm_rs_vm:namespace:cpu_usage{cluster="$cluster"}`,
 							[]promql.LabelMatcher{},
 						)),
 				),
-				listVar.DisplayName("Profile"),
+				listVar.DisplayName("CPU Profile"),
+				listVar.DefaultValue("Max OverAll"),
+				listVar.AllowAllValue(false),
+				listVar.AllowMultiple(false),
+			),
+		),
+
+		dashboard.AddVariable("memory_profile",
+			listVar.List(
+				labelValuesVar.PrometheusLabelValues("profile",
+					dashboards.AddVariableDatasource(datasource),
+					labelValuesVar.Matchers(
+						promql.SetLabelMatchers(
+							`acm_rs_vm:namespace:memory_usage{cluster="$cluster"}`,
+							[]promql.LabelMatcher{},
+						)),
+				),
+				listVar.DisplayName("Memory Profile"),
 				listVar.DefaultValue("Max OverAll"),
 				listVar.AllowAllValue(false),
 				listVar.AllowMultiple(false),
@@ -75,7 +92,7 @@ func BuildVMOverestimation(project string, datasource string, clusterLabelName s
 					dashboards.AddVariableDatasource(datasource),
 					labelValuesVar.Matchers(
 						promql.SetLabelMatchers(
-							`{__name__=~"acm_rs_vm:namespace:(cpu_request|cpu_usage|memory_request|memory_usage)",cluster="$cluster",profile="$profile"}`,
+							`acm_rs_vm:namespace:cpu_usage{cluster="$cluster",profile="$cpu_profile"}`,
 							[]promql.LabelMatcher{},
 						)),
 				),
@@ -91,7 +108,7 @@ func BuildVMOverestimation(project string, datasource string, clusterLabelName s
 					dashboards.AddVariableDatasource(datasource),
 					labelValuesVar.Matchers(
 						promql.SetLabelMatchers(
-							`{__name__=~"acm_rs_vm:namespace:(cpu_request|cpu_usage|memory_request|memory_usage)",cluster="$cluster",profile="$profile",namespace="$namespace"}`,
+							`acm_rs_vm:namespace:cpu_usage{cluster="$cluster",profile="$cpu_profile",namespace="$namespace"}`,
 							[]promql.LabelMatcher{},
 						)),
 				),

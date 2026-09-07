@@ -49,7 +49,7 @@ func CPURecommendationPanel(datasourceName string) panelgroup.Option {
 	return BuildStatPanel(datasourceName, StatPanelConfig{
 		Title:       "CPU Recommendation",
 		Description: "CPU recommendation for the selected cluster",
-		Query:       `max_over_time(sum by (cluster)(acm_rs:cluster:cpu_recommendation{cluster="$cluster", profile="$profile"})[$days:])`,
+		Query:       `max_over_time(sum by (cluster)(acm_rs:cluster:cpu_recommendation{cluster="$cluster", profile="$cpu_profile"})[$days:])`,
 		Unit:        &dashboards.DecimalUnit,
 		Decimals:    2,
 		FontSize:    40,
@@ -61,7 +61,7 @@ func CPUUsagePanel(datasourceName string) panelgroup.Option {
 	return BuildStatPanel(datasourceName, StatPanelConfig{
 		Title:       "CPU Usage",
 		Description: "CPU usage for the selected cluster",
-		Query:       `max_over_time(sum by (cluster)(acm_rs:cluster:cpu_usage{cluster="$cluster", profile="$profile"})[$days:])`,
+		Query:       `max_over_time(sum by (cluster)(acm_rs:cluster:cpu_usage{cluster="$cluster", profile="$cpu_profile"})[$days:])`,
 		Unit:        &dashboards.DecimalUnit,
 		Decimals:    2,
 		FontSize:    40,
@@ -73,7 +73,7 @@ func CPURequestPanel(datasourceName string) panelgroup.Option {
 	return BuildStatPanel(datasourceName, StatPanelConfig{
 		Title:       "CPU Request",
 		Description: "CPU request for the selected cluster",
-		Query:       `max_over_time(sum by (cluster)(acm_rs:cluster:cpu_request{cluster="$cluster", profile="$profile"})[$days:])`,
+		Query:       `max_over_time(sum by (cluster)(acm_rs:cluster:cpu_request{cluster="$cluster", profile="$cpu_profile"})[$days:])`,
 		Unit:        &dashboards.DecimalUnit,
 		Decimals:    2,
 		FontSize:    40,
@@ -85,7 +85,7 @@ func CPUUtilizationPanel(datasourceName string) panelgroup.Option {
 	return BuildStatPanel(datasourceName, StatPanelConfig{
 		Title:       "CPU Utilization",
 		Description: "CPU utilization percentage for the selected cluster",
-		Query:       `max_over_time(sum by (cluster)(acm_rs:cluster:cpu_usage{cluster="$cluster", profile="$profile"})[$days:]) / max_over_time(sum by (cluster)(acm_rs:cluster:cpu_request{cluster="$cluster", profile="$profile"})[$days:])`,
+		Query:       `max_over_time(sum by (cluster)(acm_rs:cluster:cpu_usage{cluster="$cluster", profile="$cpu_profile"})[$days:]) / max_over_time(sum by (cluster)(acm_rs:cluster:cpu_request{cluster="$cluster", profile="$cpu_profile"})[$days:])`,
 		Unit:        &dashboards.PercentDecimalUnit,
 		Decimals:    1,
 		FontSize:    40,
@@ -97,7 +97,7 @@ func MemRecommendationPanel(datasourceName string) panelgroup.Option {
 	return BuildStatPanel(datasourceName, StatPanelConfig{
 		Title:       "Memory Recommendation",
 		Description: "Memory recommendation for the selected cluster",
-		Query:       `max_over_time(sum by (cluster)(acm_rs:cluster:memory_recommendation{cluster="$cluster", profile="$profile"})[$days:])`,
+		Query:       `max_over_time(sum by (cluster)(acm_rs:cluster:memory_recommendation{cluster="$cluster", profile="$memory_profile"})[$days:])`,
 		Unit:        &dashboards.BytesUnit,
 		Decimals:    1,
 		FontSize:    40,
@@ -109,7 +109,7 @@ func MemUsagePanel(datasourceName string) panelgroup.Option {
 	return BuildStatPanel(datasourceName, StatPanelConfig{
 		Title:       "Memory Usage",
 		Description: "Memory usage for the selected cluster",
-		Query:       `max_over_time(sum by (cluster)(acm_rs:cluster:memory_usage{cluster="$cluster", profile="$profile"})[$days:])`,
+		Query:       `max_over_time(sum by (cluster)(acm_rs:cluster:memory_usage{cluster="$cluster", profile="$memory_profile"})[$days:])`,
 		Unit:        &dashboards.BytesUnit,
 		Decimals:    1,
 		FontSize:    40,
@@ -121,7 +121,7 @@ func MemRequestPanel(datasourceName string) panelgroup.Option {
 	return BuildStatPanel(datasourceName, StatPanelConfig{
 		Title:       "Memory Request",
 		Description: "Memory request for the selected cluster",
-		Query:       `max_over_time(sum by (cluster)(acm_rs:cluster:memory_request{cluster="$cluster", profile="$profile"})[$days:])`,
+		Query:       `max_over_time(sum by (cluster)(acm_rs:cluster:memory_request{cluster="$cluster", profile="$memory_profile"})[$days:])`,
 		Unit:        &dashboards.BytesUnit,
 		Decimals:    1,
 		FontSize:    40,
@@ -133,7 +133,7 @@ func MemUtilizationPanel(datasourceName string) panelgroup.Option {
 	return BuildStatPanel(datasourceName, StatPanelConfig{
 		Title:       "Memory Utilization",
 		Description: "Memory utilization percentage for the selected cluster",
-		Query:       `max_over_time(sum by (cluster)(acm_rs:cluster:memory_usage{cluster="$cluster", profile="$profile"})[$days:]) / max_over_time(sum by (cluster)(acm_rs:cluster:memory_request{cluster="$cluster", profile="$profile"})[$days:])`,
+		Query:       `max_over_time(sum by (cluster)(acm_rs:cluster:memory_usage{cluster="$cluster", profile="$memory_profile"})[$days:]) / max_over_time(sum by (cluster)(acm_rs:cluster:memory_request{cluster="$cluster", profile="$memory_profile"})[$days:])`,
 		Unit:        &dashboards.PercentDecimalUnit,
 		Decimals:    1,
 		FontSize:    40,
@@ -165,7 +165,7 @@ func CPUTopNamespacesPanel(datasourceName string) panelgroup.Option {
 		),
 		panel.AddQuery(
 			query.PromQL(
-				`topk(20, sum by (namespace) (acm_rs:namespace:cpu_usage{cluster="$cluster", profile="$profile"}) / sum by (namespace) (acm_rs:namespace:cpu_request{cluster="$cluster", profile="$profile"}))`,
+				`topk(20, sum by (namespace) (acm_rs:namespace:cpu_usage{cluster="$cluster", profile="$cpu_profile"}) / sum by (namespace) (acm_rs:namespace:cpu_request{cluster="$cluster", profile="$cpu_profile"}))`,
 				dashboards.AddQueryDataSource(datasourceName),
 				query.SeriesNameFormat("{{namespace}}"),
 			),
@@ -197,7 +197,7 @@ func MemTopNamespacesPanel(datasourceName string) panelgroup.Option {
 		),
 		panel.AddQuery(
 			query.PromQL(
-				`topk(20, sum by (namespace) (acm_rs:namespace:memory_usage{cluster="$cluster", profile="$profile"}) / sum by (namespace) (acm_rs:namespace:memory_request{cluster="$cluster", profile="$profile"}))`,
+				`topk(20, sum by (namespace) (acm_rs:namespace:memory_usage{cluster="$cluster", profile="$memory_profile"}) / sum by (namespace) (acm_rs:namespace:memory_request{cluster="$cluster", profile="$memory_profile"}))`,
 				dashboards.AddQueryDataSource(datasourceName),
 				query.SeriesNameFormat("{{namespace}}"),
 			),
@@ -235,31 +235,31 @@ func CPUQuotaTablePanel(datasourceName string) panelgroup.Option {
 		}),
 		panel.AddQuery(
 			query.PromQL(
-				`max_over_time(sum by (namespace) (acm_rs:namespace:cpu_usage{cluster="$cluster", profile="$profile"})[$days:]) / max_over_time(sum by (namespace) (acm_rs:namespace:cpu_request{cluster="$cluster", profile="$profile"})[$days:])`,
+				`max_over_time(sum by (namespace) (acm_rs:namespace:cpu_usage{cluster="$cluster", profile="$cpu_profile"})[$days:]) / max_over_time(sum by (namespace) (acm_rs:namespace:cpu_request{cluster="$cluster", profile="$cpu_profile"})[$days:])`,
 				dashboards.AddQueryDataSource(datasourceName),
 			),
 		),
 		panel.AddQuery(
 			query.PromQL(
-				`max_over_time(sum by (namespace) (acm_rs:namespace:cpu_usage{cluster="$cluster", profile="$profile"})[$days:])`,
+				`max_over_time(sum by (namespace) (acm_rs:namespace:cpu_usage{cluster="$cluster", profile="$cpu_profile"})[$days:])`,
 				dashboards.AddQueryDataSource(datasourceName),
 			),
 		),
 		panel.AddQuery(
 			query.PromQL(
-				`max_over_time(sum by (namespace) (acm_rs:namespace:cpu_request{cluster="$cluster", profile="$profile"})[$days:])`,
+				`max_over_time(sum by (namespace) (acm_rs:namespace:cpu_request{cluster="$cluster", profile="$cpu_profile"})[$days:])`,
 				dashboards.AddQueryDataSource(datasourceName),
 			),
 		),
 		panel.AddQuery(
 			query.PromQL(
-				`max_over_time(sum by (namespace) (acm_rs:namespace:cpu_recommendation{cluster="$cluster", profile="$profile"})[$days:])`,
+				`max_over_time(sum by (namespace) (acm_rs:namespace:cpu_recommendation{cluster="$cluster", profile="$cpu_profile"})[$days:])`,
 				dashboards.AddQueryDataSource(datasourceName),
 			),
 		),
 		panel.AddQuery(
 			query.PromQL(
-				`max_over_time(sum by (namespace) (acm_rs:namespace:cpu_request_hard{cluster="$cluster", profile="$profile"})[$days:])`,
+				`max_over_time(sum by (namespace) (acm_rs:namespace:cpu_request_hard{cluster="$cluster", profile="$cpu_profile"})[$days:])`,
 				dashboards.AddQueryDataSource(datasourceName),
 			),
 		),
@@ -296,31 +296,31 @@ func MemQuotaTablePanel(datasourceName string) panelgroup.Option {
 		}),
 		panel.AddQuery(
 			query.PromQL(
-				`max_over_time(sum by (namespace) (acm_rs:namespace:memory_usage{cluster="$cluster", profile="$profile"})[$days:]) / max_over_time(sum by (namespace) (acm_rs:namespace:memory_request{cluster="$cluster", profile="$profile"})[$days:])`,
+				`max_over_time(sum by (namespace) (acm_rs:namespace:memory_usage{cluster="$cluster", profile="$memory_profile"})[$days:]) / max_over_time(sum by (namespace) (acm_rs:namespace:memory_request{cluster="$cluster", profile="$memory_profile"})[$days:])`,
 				dashboards.AddQueryDataSource(datasourceName),
 			),
 		),
 		panel.AddQuery(
 			query.PromQL(
-				`max_over_time(sum by (namespace) (acm_rs:namespace:memory_usage{cluster="$cluster", profile="$profile"})[$days:])`,
+				`max_over_time(sum by (namespace) (acm_rs:namespace:memory_usage{cluster="$cluster", profile="$memory_profile"})[$days:])`,
 				dashboards.AddQueryDataSource(datasourceName),
 			),
 		),
 		panel.AddQuery(
 			query.PromQL(
-				`max_over_time(sum by (namespace) (acm_rs:namespace:memory_request{cluster="$cluster", profile="$profile"})[$days:])`,
+				`max_over_time(sum by (namespace) (acm_rs:namespace:memory_request{cluster="$cluster", profile="$memory_profile"})[$days:])`,
 				dashboards.AddQueryDataSource(datasourceName),
 			),
 		),
 		panel.AddQuery(
 			query.PromQL(
-				`max_over_time(sum by (namespace) (acm_rs:namespace:memory_recommendation{cluster="$cluster", profile="$profile"})[$days:])`,
+				`max_over_time(sum by (namespace) (acm_rs:namespace:memory_recommendation{cluster="$cluster", profile="$memory_profile"})[$days:])`,
 				dashboards.AddQueryDataSource(datasourceName),
 			),
 		),
 		panel.AddQuery(
 			query.PromQL(
-				`max_over_time(sum by (namespace) (acm_rs:namespace:memory_request_hard{cluster="$cluster", profile="$profile"})[$days:])`,
+				`max_over_time(sum by (namespace) (acm_rs:namespace:memory_request_hard{cluster="$cluster", profile="$memory_profile"})[$days:])`,
 				dashboards.AddQueryDataSource(datasourceName),
 			),
 		),

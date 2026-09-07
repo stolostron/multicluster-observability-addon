@@ -30,10 +30,11 @@ func TestBuildNamespaceRightSizing(t *testing.T) {
 	assert.Equal(t, "ACM Right-Sizing Namespace", spec.Display.Name)
 
 	t.Run("has expected variables", func(t *testing.T) {
-		require.Len(t, spec.Variables, 3, "expected cluster, profile, days")
+		require.Len(t, spec.Variables, 4, "expected cluster, cpu_profile, memory_profile, days")
 		varNames := extractVarNames(spec.Variables)
 		assert.Contains(t, varNames, "cluster")
-		assert.Contains(t, varNames, "profile")
+		assert.Contains(t, varNames, "cpu_profile")
+		assert.Contains(t, varNames, "memory_profile")
 		assert.Contains(t, varNames, "days")
 	})
 
@@ -55,6 +56,9 @@ func TestBuildNamespaceRightSizing(t *testing.T) {
 		assert.Contains(t, specStr, "acm_rs:cluster:cpu_usage")
 		assert.Contains(t, specStr, "acm_rs:namespace:cpu_usage")
 		assert.Contains(t, specStr, "acm_rs:namespace:memory_usage")
+		assert.Contains(t, specStr, "$cpu_profile")
+		assert.Contains(t, specStr, "$memory_profile")
+		assert.NotContains(t, specStr, `profile="$profile"`)
 	})
 
 	t.Run("spec serializes to valid JSON", func(t *testing.T) {
@@ -90,10 +94,11 @@ func TestBuildVMOverview(t *testing.T) {
 	assert.Equal(t, "ACM Right-Sizing OpenShift Virtualization", spec.Display.Name)
 
 	t.Run("has expected variables", func(t *testing.T) {
-		require.Len(t, spec.Variables, 4, "expected cluster, profile, days, namespace")
+		require.Len(t, spec.Variables, 5, "expected cluster, cpu_profile, memory_profile, days, namespace")
 		varNames := extractVarNames(spec.Variables)
 		assert.Contains(t, varNames, "cluster")
-		assert.Contains(t, varNames, "profile")
+		assert.Contains(t, varNames, "cpu_profile")
+		assert.Contains(t, varNames, "memory_profile")
 		assert.Contains(t, varNames, "days")
 		assert.Contains(t, varNames, "namespace")
 	})
@@ -110,6 +115,9 @@ func TestBuildVMOverview(t *testing.T) {
 		assert.Contains(t, specStr, "acm_rs_vm:namespace:cpu_usage")
 		assert.Contains(t, specStr, "acm_rs_vm:namespace:memory_request")
 		assert.Contains(t, specStr, "acm_rs_vm:namespace:memory_usage")
+		assert.Contains(t, specStr, "$cpu_profile")
+		assert.Contains(t, specStr, "$memory_profile")
+		assert.NotContains(t, specStr, `profile="$profile"`)
 	})
 
 	t.Run("table panels contain drill-down links", func(t *testing.T) {
@@ -145,10 +153,11 @@ func TestBuildVMOverestimation(t *testing.T) {
 	assert.Equal(t, "ACM Right-Sizing OpenShift Virtualization VM Overestimation", spec.Display.Name)
 
 	t.Run("has expected variables", func(t *testing.T) {
-		require.Len(t, spec.Variables, 5, "expected cluster, profile, days, namespace, vm")
+		require.Len(t, spec.Variables, 6, "expected cluster, cpu_profile, memory_profile, days, namespace, vm")
 		varNames := extractVarNames(spec.Variables)
 		assert.Contains(t, varNames, "cluster")
-		assert.Contains(t, varNames, "profile")
+		assert.Contains(t, varNames, "cpu_profile")
+		assert.Contains(t, varNames, "memory_profile")
 		assert.Contains(t, varNames, "days")
 		assert.Contains(t, varNames, "namespace")
 		assert.Contains(t, varNames, "vm")
@@ -174,6 +183,8 @@ func TestBuildVMOverestimation(t *testing.T) {
 		assert.Contains(t, specStr, "acm_rs_vm:namespace:cpu_recommendation")
 		assert.Contains(t, specStr, "acm_rs_vm:namespace:memory_request")
 		assert.Contains(t, specStr, "acm_rs_vm:namespace:memory_recommendation")
+		assert.Contains(t, specStr, "$cpu_profile")
+		assert.Contains(t, specStr, "$memory_profile")
 	})
 }
 
@@ -200,10 +211,11 @@ func TestBuildVMUnderestimation(t *testing.T) {
 	assert.Equal(t, "ACM Right-Sizing OpenShift Virtualization VM Underestimation", spec.Display.Name)
 
 	t.Run("has expected variables", func(t *testing.T) {
-		require.Len(t, spec.Variables, 5, "expected cluster, profile, days, namespace, vm")
+		require.Len(t, spec.Variables, 6, "expected cluster, cpu_profile, memory_profile, days, namespace, vm")
 		varNames := extractVarNames(spec.Variables)
 		assert.Contains(t, varNames, "cluster")
-		assert.Contains(t, varNames, "profile")
+		assert.Contains(t, varNames, "cpu_profile")
+		assert.Contains(t, varNames, "memory_profile")
 		assert.Contains(t, varNames, "days")
 		assert.Contains(t, varNames, "namespace")
 		assert.Contains(t, varNames, "vm")
@@ -229,6 +241,8 @@ func TestBuildVMUnderestimation(t *testing.T) {
 		assert.Contains(t, specStr, "acm_rs_vm:namespace:cpu_recommendation")
 		assert.Contains(t, specStr, "acm_rs_vm:namespace:memory_request")
 		assert.Contains(t, specStr, "acm_rs_vm:namespace:memory_recommendation")
+		assert.Contains(t, specStr, "$cpu_profile")
+		assert.Contains(t, specStr, "$memory_profile")
 	})
 }
 

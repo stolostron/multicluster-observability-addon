@@ -70,6 +70,17 @@ const (
 	// TODO: replace with image from ACM image overrides ConfigMap once available.
 	ThanosOperatorImage = "quay.io/thanos/thanos-operator:main-2026-04-09-a4dc024"
 
+	// Thanos Store defaults
+	DefaultStoreShards      = 3
+	DefaultStoreStorageSize = "10Gi"
+	DefaultStoreCPURequest  = "100m"
+	DefaultStoreMemRequest  = "1Gi"
+	ThanosStoreContainerID  = "statefulsets:mcoa:thanos"
+
+	// Thanos object storage configuration
+	ObjectStorageSecretName = "thanos-object-storage"
+	ObjectStorageSecretKey  = "thanos.yaml"
+
 	AlertmanagerAccessorSecretName = "observability-alertmanager-accessor"
 	AlertmanagerRouterCASecretName = "hub-alertmanager-router-ca"
 	AlertmanagerRouteBYOCAName     = "alertmanager-byo-ca"
@@ -116,6 +127,7 @@ type ImageOverrides struct {
 	Prometheus                 string `json:"prometheus"`
 	EndpointMonitoringOperator string `json:"endpoint_monitoring_operator"`
 	ThanosOperator             string `json:"thanos_operator"`
+	ThanosStore                string `json:"thanos_store"`
 }
 
 func GetImageOverrides(ctx context.Context, c client.Client, registries []addonapiv1beta1.ImageMirror, logger logr.Logger) (ImageOverrides, error) {
@@ -156,6 +168,9 @@ func GetImageOverrides(ctx context.Context, c client.Client, registries []addona
 		ret.EndpointMonitoringOperator = overrideImage(ret.EndpointMonitoringOperator, registries, logger)
 		if ret.ThanosOperator != "" {
 			ret.ThanosOperator = overrideImage(ret.ThanosOperator, registries, logger)
+		}
+		if ret.ThanosStore != "" {
+			ret.ThanosStore = overrideImage(ret.ThanosStore, registries, logger)
 		}
 	}
 

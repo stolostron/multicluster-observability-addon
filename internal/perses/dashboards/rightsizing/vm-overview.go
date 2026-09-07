@@ -83,7 +83,7 @@ func BuildVMOverview(project string, datasource string, clusterLabelName string)
 			),
 		),
 
-		dashboard.AddVariable("profile",
+		dashboard.AddVariable("cpu_profile",
 			listVar.List(
 				labelValuesVar.PrometheusLabelValues("profile",
 					dashboards.AddVariableDatasource(datasource),
@@ -93,7 +93,24 @@ func BuildVMOverview(project string, datasource string, clusterLabelName string)
 							[]promql.LabelMatcher{},
 						)),
 				),
-				listVar.DisplayName("Profile"),
+				listVar.DisplayName("CPU Profile"),
+				listVar.DefaultValue("Max OverAll"),
+				listVar.AllowAllValue(false),
+				listVar.AllowMultiple(false),
+			),
+		),
+
+		dashboard.AddVariable("memory_profile",
+			listVar.List(
+				labelValuesVar.PrometheusLabelValues("profile",
+					dashboards.AddVariableDatasource(datasource),
+					labelValuesVar.Matchers(
+						promql.SetLabelMatchers(
+							`acm_rs_vm:namespace:memory_usage{cluster="$cluster"}`,
+							[]promql.LabelMatcher{},
+						)),
+				),
+				listVar.DisplayName("Memory Profile"),
 				listVar.DefaultValue("Max OverAll"),
 				listVar.AllowAllValue(false),
 				listVar.AllowMultiple(false),
@@ -118,7 +135,7 @@ func BuildVMOverview(project string, datasource string, clusterLabelName string)
 					dashboards.AddVariableDatasource(datasource),
 					labelValuesVar.Matchers(
 						promql.SetLabelMatchers(
-							`acm_rs_vm:namespace:cpu_usage{cluster="$cluster",profile="$profile"}`,
+							`acm_rs_vm:namespace:cpu_usage{cluster="$cluster",profile="$cpu_profile"}`,
 							[]promql.LabelMatcher{},
 						)),
 				),

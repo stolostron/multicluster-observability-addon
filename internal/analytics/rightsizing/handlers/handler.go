@@ -2,8 +2,10 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"slices"
+	"sync"
 
 	"github.com/go-logr/logr"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
@@ -20,7 +22,42 @@ import (
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	sigYaml "sigs.k8s.io/yaml"
 )
+
+// lastValidAggregators caches the last known valid aggregator config per ConfigMap,
+// so that an edit containing any invalid entry can be rejected entirely and the
+// previous valid config restored. The cache is keyed by "configMapName:cpu" or
+// "configMapName:memory". On process restart with an invalid ConfigMap the cache
+// is empty and the resolver falls back to hardcoded defaults.
+var (
+	lastValidMu          sync.RWMutex
+	lastValidAggregators = make(map[string][]string)
+)
+
+func cacheKey(configMapName, field string) string {
+	return configMapName + ":" + field
+}
+
+func cacheValidAggregator(configMapName, field string, values []string) {
+	lastValidMu.Lock()
+	defer lastValidMu.Unlock()
+	dst := make([]string, len(values))
+	copy(dst, values)
+	lastValidAggregators[cacheKey(configMapName, field)] = dst
+}
+
+func getCachedAggregator(configMapName, field string) ([]string, bool) {
+	lastValidMu.RLock()
+	defer lastValidMu.RUnlock()
+	v, ok := lastValidAggregators[cacheKey(configMapName, field)]
+	if !ok {
+		return nil, false
+	}
+	dst := make([]string, len(v))
+	copy(dst, v)
+	return dst, true
+}
 
 // OptionsBuilder builds right-sizing options for the helm chart
 type OptionsBuilder struct {
@@ -70,6 +107,7 @@ func (o *OptionsBuilder) Build(ctx context.Context, cluster *clusterv1.ManagedCl
 				return ret, fmt.Errorf("failed to get namespace config: %w", err)
 			}
 		}
+		o.validateAndSanitizeConfig(&nsConfigData, rightsizing.NamespaceConfigMapName)
 
 		if clusterMatchesPlacement(cluster, nsConfigData.PlacementConfiguration) {
 			nsOpts, err := o.buildNamespaceOptionsFromConfig(nsConfigData)
@@ -100,6 +138,7 @@ func (o *OptionsBuilder) Build(ctx context.Context, cluster *clusterv1.ManagedCl
 				return ret, fmt.Errorf("failed to get virtualization config: %w", err)
 			}
 		}
+		o.validateAndSanitizeConfig(&virtConfigData, rightsizing.VirtualizationConfigMapName)
 
 		if clusterMatchesPlacement(cluster, virtConfigData.PlacementConfiguration) {
 			virtOpts, err := o.buildVirtualizationOptionsFromConfig(virtConfigData)
@@ -149,10 +188,48 @@ func (o *OptionsBuilder) getConfigData(ctx context.Context, configMapName string
 	return rightsizing.ParseConfigMapData(cm.Data)
 }
 
+// validateAndSanitizeConfig checks cpuAggregator and memoryAggregator for invalid
+// profile names. If ANY entry in a list is invalid, the entire edit is rejected
+// and the previous valid config (from cache) is restored. This prevents partial
+// application of a bad edit. When the cache is empty (e.g. after restart) and the
+// config is invalid, the list is set to nil so downstream resolvers fall back to
+// hardcoded defaults.
+func (o *OptionsBuilder) validateAndSanitizeConfig(configData *rightsizing.RSConfigMapData, configMapName string) {
+	if invalid := rightsizing.ValidateAggregatorNames(configData.PrometheusRuleConfig.CpuAggregator); len(invalid) > 0 {
+		if cached, ok := getCachedAggregator(configMapName, "cpu"); ok {
+			o.Logger.Info("Invalid cpuAggregator values in ConfigMap, rejecting edit and keeping previous valid config",
+				"configMap", configMapName, "invalidValues", invalid, "restoredConfig", cached)
+			configData.PrometheusRuleConfig.CpuAggregator = cached
+		} else {
+			o.Logger.Info("Invalid cpuAggregator values in ConfigMap, no previous config cached, falling back to defaults",
+				"configMap", configMapName, "invalidValues", invalid)
+			configData.PrometheusRuleConfig.CpuAggregator = nil
+		}
+	} else {
+		cacheValidAggregator(configMapName, "cpu", configData.PrometheusRuleConfig.CpuAggregator)
+	}
+
+	if invalid := rightsizing.ValidateAggregatorNames(configData.PrometheusRuleConfig.MemoryAggregator); len(invalid) > 0 {
+		if cached, ok := getCachedAggregator(configMapName, "memory"); ok {
+			o.Logger.Info("Invalid memoryAggregator values in ConfigMap, rejecting edit and keeping previous valid config",
+				"configMap", configMapName, "invalidValues", invalid, "restoredConfig", cached)
+			configData.PrometheusRuleConfig.MemoryAggregator = cached
+		} else {
+			o.Logger.Info("Invalid memoryAggregator values in ConfigMap, no previous config cached, falling back to defaults",
+				"configMap", configMapName, "invalidValues", invalid)
+			configData.PrometheusRuleConfig.MemoryAggregator = nil
+		}
+	} else {
+		cacheValidAggregator(configMapName, "memory", configData.PrometheusRuleConfig.MemoryAggregator)
+	}
+}
+
 // ensureNamespaceConfigMap ensures the namespace right-sizing ConfigMap exists on the hub.
-// MCOA owns all right-sizing resources including ConfigMaps for cleaner architecture.
+// Uses a "create if not exists" pattern so that user customizations (namespace filters,
+// recommendation %, placement predicates) are preserved across upgrades (ACM 2.17 -> ACM 5.0).
+// In ACM 5.0 only MCOA mode is supported; the MCO/MCOA mode switch no longer applies.
 func (o *OptionsBuilder) ensureNamespaceConfigMap(ctx context.Context) error {
-	_, err := common.GetConfigMap(ctx, o.Client, addoncfg.InstallNamespace, rightsizing.NamespaceConfigMapName)
+	cm, err := common.GetConfigMap(ctx, o.Client, addoncfg.InstallNamespace, rightsizing.NamespaceConfigMapName)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			o.Logger.Info("Creating namespace right-sizing ConfigMap with defaults",
@@ -162,14 +239,13 @@ func (o *OptionsBuilder) ensureNamespaceConfigMap(ctx context.Context) error {
 		}
 		return err
 	}
-	// ConfigMap already exists
-	return nil
+	return o.backfillAggregatorKeys(ctx, cm)
 }
 
 // ensureVirtualizationConfigMap ensures the virtualization right-sizing ConfigMap exists on the hub.
-// MCOA owns all right-sizing resources including ConfigMaps for cleaner architecture.
+// Same "create if not exists" pattern as ensureNamespaceConfigMap.
 func (o *OptionsBuilder) ensureVirtualizationConfigMap(ctx context.Context) error {
-	_, err := common.GetConfigMap(ctx, o.Client, addoncfg.InstallNamespace, rightsizing.VirtualizationConfigMapName)
+	cm, err := common.GetConfigMap(ctx, o.Client, addoncfg.InstallNamespace, rightsizing.VirtualizationConfigMapName)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			o.Logger.Info("Creating virtualization right-sizing ConfigMap with defaults",
@@ -179,16 +255,11 @@ func (o *OptionsBuilder) ensureVirtualizationConfigMap(ctx context.Context) erro
 		}
 		return err
 	}
-	// ConfigMap already exists
-	return nil
+	return o.backfillAggregatorKeys(ctx, cm)
 }
 
 // createDefaultConfigMap creates a ConfigMap with the provided data.
 // The ConfigMap is labeled to indicate it's managed for right-sizing.
-//
-// Both MCO and MCOA use a "create if not exists" pattern for these ConfigMaps,
-// so user customizations (namespace filters, recommendation %, placement predicates)
-// are preserved across mode switches (MCO <=> MCOA).
 func (o *OptionsBuilder) createDefaultConfigMap(ctx context.Context, name string, data map[string]string) error {
 	cm := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
@@ -204,6 +275,53 @@ func (o *OptionsBuilder) createDefaultConfigMap(ctx context.Context, name string
 	}
 
 	o.Logger.V(1).Info("Created right-sizing ConfigMap", "name", name, "namespace", addoncfg.InstallNamespace)
+	return nil
+}
+
+// backfillAggregatorKeys patches an existing ConfigMap to add cpuAggregator and
+// memoryAggregator with default values when they are absent. This covers upgraded
+// clusters where the ConfigMap was created before these keys existed.
+// Only missing keys are added — existing user customizations are never overwritten.
+func (o *OptionsBuilder) backfillAggregatorKeys(ctx context.Context, cm *corev1.ConfigMap) error {
+	raw, ok := cm.Data["prometheusRuleConfig"]
+	if !ok {
+		return nil
+	}
+
+	// Use sigs.k8s.io/yaml so both MCO 2.17 YAML and MCOA JSON ConfigMaps
+	// can be backfilled. encoding/json fails on YAML and previously left
+	// upgraded clusters without visible aggregator keys.
+	var config map[string]any
+	if err := sigYaml.Unmarshal([]byte(raw), &config); err != nil {
+		o.Logger.Error(err, "Cannot parse prometheusRuleConfig, skipping aggregator backfill", "name", cm.Name)
+		return nil
+	}
+
+	_, hasCpu := config["cpuAggregator"]
+	_, hasMem := config["memoryAggregator"]
+	if hasCpu && hasMem {
+		return nil
+	}
+
+	if !hasCpu {
+		config["cpuAggregator"] = rightsizing.DefaultCpuAggregator
+	}
+	if !hasMem {
+		config["memoryAggregator"] = rightsizing.DefaultMemoryAggregator
+	}
+
+	updated, err := json.Marshal(config)
+	if err != nil {
+		return fmt.Errorf("failed to marshal backfilled config: %w", err)
+	}
+
+	cm.Data["prometheusRuleConfig"] = string(updated)
+	if err := o.Client.Update(ctx, cm); err != nil {
+		return fmt.Errorf("failed to backfill aggregator keys in ConfigMap %s: %w", cm.Name, err)
+	}
+
+	o.Logger.Info("Backfilled missing aggregator keys in ConfigMap",
+		"name", cm.Name, "addedCpu", !hasCpu, "addedMem", !hasMem)
 	return nil
 }
 

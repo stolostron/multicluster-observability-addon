@@ -79,7 +79,7 @@ func BuildNamespaceRightSizing(project string, datasource string, clusterLabelNa
 			),
 		),
 
-		dashboard.AddVariable("profile",
+		dashboard.AddVariable("cpu_profile",
 			listVar.List(
 				labelValuesVar.PrometheusLabelValues("profile",
 					dashboards.AddVariableDatasource(datasource),
@@ -89,7 +89,24 @@ func BuildNamespaceRightSizing(project string, datasource string, clusterLabelNa
 							[]promql.LabelMatcher{},
 						)),
 				),
-				listVar.DisplayName("Profile"),
+				listVar.DisplayName("CPU Profile"),
+				listVar.DefaultValue("Max OverAll"),
+				listVar.AllowAllValue(false),
+				listVar.AllowMultiple(false),
+			),
+		),
+
+		dashboard.AddVariable("memory_profile",
+			listVar.List(
+				labelValuesVar.PrometheusLabelValues("profile",
+					dashboards.AddVariableDatasource(datasource),
+					labelValuesVar.Matchers(
+						promql.SetLabelMatchers(
+							`acm_rs:namespace:memory_usage{cluster="$cluster"}`,
+							[]promql.LabelMatcher{},
+						)),
+				),
+				listVar.DisplayName("Memory Profile"),
 				listVar.DefaultValue("Max OverAll"),
 				listVar.AllowAllValue(false),
 				listVar.AllowMultiple(false),

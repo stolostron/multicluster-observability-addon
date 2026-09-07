@@ -17,8 +17,10 @@ import (
 	coomonitoringv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	monitoringv1alpha1 "github.com/rhobs/observability-operator/pkg/apis/monitoring/v1alpha1"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
+	addoncommon "github.com/stolostron/multicluster-observability-addon/internal/addon/common"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	addonhelm "github.com/stolostron/multicluster-observability-addon/internal/addon/helm"
+	thanosbuilder "github.com/stolostron/multicluster-observability-addon/internal/metrics/thanos"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -111,10 +113,17 @@ func NewAddonManager(ctx context.Context, kubeConfig *rest.Config, scheme *runti
 		return nil, fmt.Errorf("failed to build helm agent addon: %w", err)
 	}
 
+	thanosObjBuilder := &thanosbuilder.ObjectBuilder{
+		Client: k8sClient,
+		Logger: agentLogger.WithName("thanos"),
+	}
+
 	err = mgr.AddAgent(&AgentAddonWithSortedManifests{
-		agent:  mcoaAgentAddon,
-		logger: agentLogger,
-		client: k8sClient,
+		agent:          mcoaAgentAddon,
+		logger:         agentLogger,
+		client:         k8sClient,
+		getter:         getter,
+		objectBuilders: []ObjectBuilder{thanosObjBuilder},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to add mcoa agent to manager: %w", err)
@@ -123,14 +132,20 @@ func NewAddonManager(ctx context.Context, kubeConfig *rest.Config, scheme *runti
 	return mgr, nil
 }
 
-type AgentAddonWithSortedManifests struct {
-	agent  agent.AgentAddon
-	logger logr.Logger
-	client client.Client
+type ObjectBuilder interface {
+	Build(ctx context.Context, cluster *clusterv1.ManagedCluster, opts addon.Options) ([]runtime.Object, error)
 }
 
-func (a *AgentAddonWithSortedManifests) Manifests(ctx context.Context, cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) ([]runtime.Object, error) {
-	objects, err := a.agent.Manifests(ctx, cluster, addon)
+type AgentAddonWithSortedManifests struct {
+	agent          agent.AgentAddon
+	logger         logr.Logger
+	client         client.Client
+	getter         utils.AddOnDeploymentConfigGetter
+	objectBuilders []ObjectBuilder
+}
+
+func (a *AgentAddonWithSortedManifests) Manifests(ctx context.Context, cluster *clusterv1.ManagedCluster, mcAddon *addonapiv1beta1.ManagedClusterAddOn) ([]runtime.Object, error) {
+	objects, err := a.agent.Manifests(ctx, cluster, mcAddon)
 	if err != nil {
 		return nil, err
 	}
@@ -138,6 +153,25 @@ func (a *AgentAddonWithSortedManifests) Manifests(ctx context.Context, cluster *
 	for i, obj := range objects {
 		if ms, ok := obj.(*monitoringv1alpha1.MonitoringStack); ok {
 			objects[i] = a.toUnstructuredMonitoringStack(ms)
+		}
+	}
+
+	if len(a.objectBuilders) > 0 {
+		aodc, err := addoncommon.GetAddOnDeploymentConfig(ctx, a.getter, mcAddon)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get AddOnDeploymentConfig: %w", err)
+		}
+		opts, err := addon.BuildOptions(aodc)
+		if err != nil {
+			return nil, fmt.Errorf("failed to build addon options: %w", err)
+		}
+
+		for _, builder := range a.objectBuilders {
+			objs, buildErr := builder.Build(ctx, cluster, opts)
+			if buildErr != nil {
+				return nil, fmt.Errorf("failed to build programmatic objects: %w", buildErr)
+			}
+			objects = append(objects, objs...)
 		}
 	}
 

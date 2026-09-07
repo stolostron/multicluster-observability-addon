@@ -5,13 +5,17 @@ import (
 	"testing"
 
 	monitoringv1alpha1 "github.com/rhobs/observability-operator/pkg/apis/monitoring/v1alpha1"
+	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
+	thanosbuilder "github.com/stolostron/multicluster-observability-addon/internal/metrics/thanos"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	thanosv1alpha1 "github.com/thanos-community/thanos-operator/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/klog/v2"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
@@ -150,4 +154,124 @@ func TestToUnstructuredMonitoringStackPreservesNonEmptyFields(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, found, "non-empty spec.resources should be preserved")
 	assert.NotEmpty(t, resources)
+}
+
+type mockAODCGetter struct {
+	aodc *addonapiv1beta1.AddOnDeploymentConfig
+}
+
+func (m *mockAODCGetter) Get(_ context.Context, _, _ string) (*addonapiv1beta1.AddOnDeploymentConfig, error) {
+	return m.aodc, nil
+}
+
+func TestManifestsWithObjectBuilders(t *testing.T) {
+	hubCluster := &clusterv1.ManagedCluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   "local-cluster",
+			Labels: map[string]string{"local-cluster": "true"},
+		},
+	}
+
+	aodc := &addonapiv1beta1.AddOnDeploymentConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        addoncfg.Name,
+			Namespace:   addoncfg.InstallNamespace,
+			Annotations: map[string]string{"mcoa-thanos-operator": "true"},
+		},
+	}
+
+	mcAddon := &addonapiv1beta1.ManagedClusterAddOn{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      addoncfg.Name,
+			Namespace: "local-cluster",
+		},
+		Status: addonapiv1beta1.ManagedClusterAddOnStatus{
+			ConfigReferences: []addonapiv1beta1.ConfigReference{
+				{
+					ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
+						Group:    "addon.open-cluster-management.io",
+						Resource: addoncfg.AddonDeploymentConfigResource,
+					},
+					DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+						ConfigReferent: addonapiv1beta1.ConfigReferent{
+							Namespace: addoncfg.InstallNamespace,
+							Name:      addoncfg.Name,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	getter := &mockAODCGetter{aodc: aodc}
+	thanosBuilder := &thanosbuilder.ObjectBuilder{
+		Logger: klog.Background(),
+	}
+
+	wrapper := &AgentAddonWithSortedManifests{
+		agent:          &mockAgent{manifests: []runtime.Object{}},
+		getter:         getter,
+		objectBuilders: []ObjectBuilder{thanosBuilder},
+	}
+
+	objects, err := wrapper.Manifests(t.Context(), hubCluster, mcAddon)
+	require.NoError(t, err)
+	require.Len(t, objects, 1, "expected 1 ThanosStore object")
+
+	store, ok := objects[0].(*thanosv1alpha1.ThanosStore)
+	require.True(t, ok, "expected *ThanosStore, got %T", objects[0])
+	assert.Equal(t, "mcoa", store.Name)
+	assert.Equal(t, addoncfg.InstallNamespace, store.Namespace)
+}
+
+func TestManifestsObjectBuildersSkippedForNonHub(t *testing.T) {
+	spokeCluster := &clusterv1.ManagedCluster{
+		ObjectMeta: metav1.ObjectMeta{Name: "spoke-1"},
+	}
+
+	aodc := &addonapiv1beta1.AddOnDeploymentConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        addoncfg.Name,
+			Namespace:   addoncfg.InstallNamespace,
+			Annotations: map[string]string{"mcoa-thanos-operator": "true"},
+		},
+	}
+
+	mcAddon := &addonapiv1beta1.ManagedClusterAddOn{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      addoncfg.Name,
+			Namespace: "spoke-1",
+		},
+		Status: addonapiv1beta1.ManagedClusterAddOnStatus{
+			ConfigReferences: []addonapiv1beta1.ConfigReference{
+				{
+					ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
+						Group:    "addon.open-cluster-management.io",
+						Resource: addoncfg.AddonDeploymentConfigResource,
+					},
+					DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+						ConfigReferent: addonapiv1beta1.ConfigReferent{
+							Namespace: addoncfg.InstallNamespace,
+							Name:      addoncfg.Name,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	getter := &mockAODCGetter{aodc: aodc}
+	thanosBuilder := &thanosbuilder.ObjectBuilder{
+		Logger: klog.Background(),
+	}
+
+	wrapper := &AgentAddonWithSortedManifests{
+		agent:          &mockAgent{manifests: []runtime.Object{}},
+		getter:         getter,
+		objectBuilders: []ObjectBuilder{thanosBuilder},
+	}
+
+	objects, err := wrapper.Manifests(t.Context(), spokeCluster, mcAddon)
+	require.NoError(t, err)
+	assert.Empty(t, objects, "no Thanos objects should be built for non-hub clusters")
 }

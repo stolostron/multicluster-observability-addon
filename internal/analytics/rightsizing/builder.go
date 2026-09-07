@@ -52,6 +52,8 @@ func GetDefaultRSPrometheusRuleConfig() RSPrometheusRuleConfig {
 	var ruleConfig RSPrometheusRuleConfig
 	ruleConfig.NamespaceFilterCriteria.ExclusionCriteria = []string{"openshift.*"}
 	ruleConfig.RecommendationPercentage = DefaultRecommendationPercentage
+	ruleConfig.CpuAggregator = DefaultCpuAggregator
+	ruleConfig.MemoryAggregator = DefaultMemoryAggregator
 	return ruleConfig
 }
 
