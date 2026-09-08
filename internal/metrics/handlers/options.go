@@ -20,6 +20,7 @@ type Options struct {
 	ConfigMaps                []*corev1.ConfigMap
 	HubEndpoint               string
 	ClusterName               string
+	HubClusterName            string
 	HubClusterID              string
 	ClusterID                 string
 	IsOpenShiftVendor         bool
