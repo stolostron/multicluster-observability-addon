@@ -48,8 +48,9 @@ func (b *ObjectBuilder) Build(ctx context.Context, cluster *clusterv1.ManagedClu
 
 	store := b.buildStore(opts, storeImage)
 	receive := b.buildReceive(opts)
+	query := b.buildQuery(opts)
 
-	return []runtime.Object{store, receive}, nil
+	return []runtime.Object{store, receive, query}, nil
 }
 
 func (b *ObjectBuilder) buildStore(opts addon.Options, storeImage string) *thanosv1alpha1.ThanosStore {
@@ -142,6 +143,43 @@ func (b *ObjectBuilder) buildReceive(opts addon.Options) *thanosv1alpha1.ThanosR
 	return receive
 }
 
+func (b *ObjectBuilder) buildQuery(opts addon.Options) *thanosv1alpha1.ThanosQuery {
+	query := &thanosv1alpha1.ThanosQuery{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: thanosv1alpha1.GroupVersion.String(),
+			Kind:       "ThanosQuery",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "mcoa",
+			Namespace: config.HubInstallNamespace,
+			Labels:    queryLabels(),
+		},
+		Spec: thanosv1alpha1.ThanosQuerySpec{
+			Replicas:      config.DefaultQueryReplicas,
+			ReplicaLabels: []string{"replica"},
+			QueryFrontend: &thanosv1alpha1.QueryFrontendSpec{
+				Replicas:          config.DefaultQueryFrontendReplicas,
+				CompressResponses: true,
+			},
+		},
+	}
+
+	ApplyCommonThanosFields(&query.Spec.CommonFields, opts, config.ThanosQueryContainerID)
+	if query.Spec.QueryFrontend != nil {
+		ApplyCommonThanosFields(&query.Spec.QueryFrontend.CommonFields, opts, config.ThanosQueryFrontendContainerID)
+	}
+
+	return query
+}
+
+func queryLabels() map[string]string {
+	labels := make(map[string]string, len(mcoaLabels)+2)
+	maps.Copy(labels, mcoaLabels)
+	labels["app.kubernetes.io/component"] = "query"
+	labels["app.kubernetes.io/name"] = config.ThanosOperatorAppName
+	return labels
+}
+
 func receiveLabels() map[string]string {
 	labels := make(map[string]string, len(mcoaLabels)+2)
 	maps.Copy(labels, mcoaLabels)
@@ -199,6 +237,20 @@ func defaultResources(containerID string) *corev1.ResourceRequirements {
 			Requests: corev1.ResourceList{
 				corev1.ResourceCPU:    resource.MustParse(config.DefaultReceiveIngesterCPURequest),
 				corev1.ResourceMemory: resource.MustParse(config.DefaultReceiveIngesterMemRequest),
+			},
+		}
+	case config.ThanosQueryContainerID:
+		return &corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse(config.DefaultQueryCPURequest),
+				corev1.ResourceMemory: resource.MustParse(config.DefaultQueryMemRequest),
+			},
+		}
+	case config.ThanosQueryFrontendContainerID:
+		return &corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse(config.DefaultQueryFrontendCPURequest),
+				corev1.ResourceMemory: resource.MustParse(config.DefaultQueryFrontendMemRequest),
 			},
 		}
 	default:

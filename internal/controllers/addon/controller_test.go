@@ -216,16 +216,19 @@ func TestManifestsWithObjectBuilders(t *testing.T) {
 
 	objects, err := wrapper.Manifests(t.Context(), hubCluster, mcAddon)
 	require.NoError(t, err)
-	require.Len(t, objects, 2, "expected ThanosReceive and ThanosStore objects")
+	require.Len(t, objects, 3, "expected ThanosStore, ThanosReceive, and ThanosQuery objects")
 
 	var store *thanosv1alpha1.ThanosStore
 	var receive *thanosv1alpha1.ThanosReceive
+	var query *thanosv1alpha1.ThanosQuery
 	for _, obj := range objects {
 		switch o := obj.(type) {
 		case *thanosv1alpha1.ThanosStore:
 			store = o
 		case *thanosv1alpha1.ThanosReceive:
 			receive = o
+		case *thanosv1alpha1.ThanosQuery:
+			query = o
 		}
 	}
 
@@ -238,6 +241,13 @@ func TestManifestsWithObjectBuilders(t *testing.T) {
 	assert.Equal(t, addoncfg.InstallNamespace, receive.Namespace)
 	require.Len(t, receive.Spec.Ingester.Hashrings, 1)
 	assert.Equal(t, "default", receive.Spec.Ingester.Hashrings[0].Name)
+
+	require.NotNil(t, query, "expected ThanosQuery object")
+	assert.Equal(t, "mcoa", query.Name)
+	assert.Equal(t, addoncfg.InstallNamespace, query.Namespace)
+	assert.Equal(t, int32(2), query.Spec.Replicas)
+	require.NotNil(t, query.Spec.QueryFrontend)
+	assert.Equal(t, int32(2), query.Spec.QueryFrontend.Replicas)
 }
 
 func TestManifestsObjectBuildersSkippedForNonHub(t *testing.T) {
