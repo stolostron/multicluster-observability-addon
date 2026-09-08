@@ -50,8 +50,9 @@ func (b *ObjectBuilder) Build(ctx context.Context, cluster *clusterv1.ManagedClu
 	receive := b.buildReceive(opts)
 	query := b.buildQuery(opts)
 	ruler := b.buildRuler(opts)
+	compact := b.buildCompact(opts)
 
-	return []runtime.Object{store, receive, query, ruler}, nil
+	return []runtime.Object{store, receive, query, ruler, compact}, nil
 }
 
 func (b *ObjectBuilder) buildStore(opts addon.Options, storeImage string) *thanosv1alpha1.ThanosStore {
@@ -215,10 +216,50 @@ func (b *ObjectBuilder) buildRuler(opts addon.Options) *thanosv1alpha1.ThanosRul
 	return ruler
 }
 
+func (b *ObjectBuilder) buildCompact(opts addon.Options) *thanosv1alpha1.ThanosCompact {
+	compact := &thanosv1alpha1.ThanosCompact{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: thanosv1alpha1.GroupVersion.String(),
+			Kind:       "ThanosCompact",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "mcoa",
+			Namespace: config.HubInstallNamespace,
+			Labels:    compactLabels(),
+		},
+		Spec: thanosv1alpha1.ThanosCompactSpec{
+			ObjectStorageConfig: thanosv1alpha1.ObjectStorageConfig{
+				LocalObjectReference: corev1.LocalObjectReference{Name: config.ObjectStorageSecretName},
+				Key:                  config.ObjectStorageSecretKey,
+			},
+			StorageConfiguration: thanosv1alpha1.StorageConfiguration{
+				Size: thanosv1alpha1.StorageSize(config.DefaultCompactStorageSize),
+			},
+			RetentionConfig: thanosv1alpha1.RetentionResolutionConfig{
+				Raw:         "0d",
+				FiveMinutes: "0d",
+				OneHour:     "0d",
+			},
+		},
+	}
+
+	ApplyCommonThanosFields(&compact.Spec.CommonFields, opts, config.ThanosCompactContainerID)
+
+	return compact
+}
+
 func rulerLabels() map[string]string {
 	labels := make(map[string]string, len(mcoaLabels)+2)
 	maps.Copy(labels, mcoaLabels)
 	labels["app.kubernetes.io/component"] = "ruler"
+	labels["app.kubernetes.io/name"] = config.ThanosOperatorAppName
+	return labels
+}
+
+func compactLabels() map[string]string {
+	labels := make(map[string]string, len(mcoaLabels)+2)
+	maps.Copy(labels, mcoaLabels)
+	labels["app.kubernetes.io/component"] = "compact"
 	labels["app.kubernetes.io/name"] = config.ThanosOperatorAppName
 	return labels
 }
@@ -309,6 +350,13 @@ func defaultResources(containerID string) *corev1.ResourceRequirements {
 			Requests: corev1.ResourceList{
 				corev1.ResourceCPU:    resource.MustParse(config.DefaultRulerCPURequest),
 				corev1.ResourceMemory: resource.MustParse(config.DefaultRulerMemRequest),
+			},
+		}
+	case config.ThanosCompactContainerID:
+		return &corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse(config.DefaultCompactCPURequest),
+				corev1.ResourceMemory: resource.MustParse(config.DefaultCompactMemRequest),
 			},
 		}
 	default:

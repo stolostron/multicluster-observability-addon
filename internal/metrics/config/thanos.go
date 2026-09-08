@@ -48,6 +48,12 @@ const (
 	DefaultRulerAlertmanagerURL = "http://alertmanager.open-cluster-management-observability.svc:9093"
 	ThanosRulerContainerID      = "statefulsets:mcoa:thanos-ruler"
 
+	// Thanos Compact defaults
+	DefaultCompactStorageSize = "10Gi"
+	DefaultCompactCPURequest  = "100m"
+	DefaultCompactMemRequest  = "512Mi"
+	ThanosCompactContainerID  = "statefulsets:mcoa:thanos-compact"
+
 	// Thanos object storage configuration
 	ObjectStorageSecretName = "thanos-object-storage"
 	ObjectStorageSecretKey  = "thanos.yaml"
