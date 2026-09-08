@@ -216,11 +216,12 @@ func TestManifestsWithObjectBuilders(t *testing.T) {
 
 	objects, err := wrapper.Manifests(t.Context(), hubCluster, mcAddon)
 	require.NoError(t, err)
-	require.Len(t, objects, 3, "expected ThanosStore, ThanosReceive, and ThanosQuery objects")
+	require.Len(t, objects, 4, "expected ThanosStore, ThanosReceive, ThanosQuery, and ThanosCompact objects")
 
 	var store *thanosv1alpha1.ThanosStore
 	var receive *thanosv1alpha1.ThanosReceive
 	var query *thanosv1alpha1.ThanosQuery
+	var compact *thanosv1alpha1.ThanosCompact
 	for _, obj := range objects {
 		switch o := obj.(type) {
 		case *thanosv1alpha1.ThanosStore:
@@ -229,6 +230,8 @@ func TestManifestsWithObjectBuilders(t *testing.T) {
 			receive = o
 		case *thanosv1alpha1.ThanosQuery:
 			query = o
+		case *thanosv1alpha1.ThanosCompact:
+			compact = o
 		}
 	}
 
@@ -248,6 +251,10 @@ func TestManifestsWithObjectBuilders(t *testing.T) {
 	assert.Equal(t, int32(2), query.Spec.Replicas)
 	require.NotNil(t, query.Spec.QueryFrontend)
 	assert.Equal(t, int32(2), query.Spec.QueryFrontend.Replicas)
+
+	require.NotNil(t, compact, "expected ThanosCompact object")
+	assert.Equal(t, "mcoa", compact.Name)
+	assert.Equal(t, addoncfg.InstallNamespace, compact.Namespace)
 }
 
 func TestManifestsObjectBuildersSkippedForNonHub(t *testing.T) {
