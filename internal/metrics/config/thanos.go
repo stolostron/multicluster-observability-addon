@@ -38,6 +38,16 @@ const (
 	ThanosQueryContainerID         = "deployments:mcoa:thanos-query"
 	ThanosQueryFrontendContainerID = "deployments:mcoa:thanos-query-frontend"
 
+	// Thanos Ruler defaults
+	DefaultRulerReplicas        = 3
+	DefaultRulerRetention       = "2h"
+	DefaultRulerEvalInterval    = "1m"
+	DefaultRulerStorageSize     = "1Gi"
+	DefaultRulerCPURequest      = "100m"
+	DefaultRulerMemRequest      = "256Mi"
+	DefaultRulerAlertmanagerURL = "http://alertmanager.open-cluster-management-observability.svc:9093"
+	ThanosRulerContainerID      = "statefulsets:mcoa:thanos-ruler"
+
 	// Thanos object storage configuration
 	ObjectStorageSecretName = "thanos-object-storage"
 	ObjectStorageSecretKey  = "thanos.yaml"
