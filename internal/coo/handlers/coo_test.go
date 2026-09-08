@@ -295,14 +295,14 @@ func TestInstallOfCOOOnSpokeIsNeeded(t *testing.T) {
 		expectedInstall bool
 	}{
 		{
-			name:            "no manifestwork yet: bootstrap, defer decision",
+			name:            "no manifestwork yet: bootstrap, install COO",
 			objects:         nil,
-			expectedInstall: false,
+			expectedInstall: true,
 		},
 		{
-			name:            "manifestwork exists but no status feedback yet: defer decision",
+			name:            "manifestwork exists but no status feedback yet: install COO",
 			objects:         []client.Object{manifestWorkWithNoFeedback("addon-deploy-0")},
-			expectedInstall: false,
+			expectedInstall: true,
 		},
 		{
 			name:            "COO already OLM-managed on spoke: don't install our own",

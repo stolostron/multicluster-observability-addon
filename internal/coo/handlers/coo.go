@@ -82,8 +82,8 @@ func InstallOfCOOOnSpokeIsNeeded(ctx context.Context, k8s client.Client, logger 
 		return false, fmt.Errorf("failed to check if coo is subscribed on cluster %s: %w", clusterName, err)
 	}
 	if !hasFeedback {
-		logger.V(2).Info("no COO status feedback yet for cluster, deferring COO install decision", "clusterName", clusterName)
-		return false, nil
+		logger.V(2).Info("no COO status feedback yet for cluster, defaulting to install COO", "clusterName", clusterName)
+		return true, nil
 	}
 	if subscribed {
 		logger.V(2).Info("COO already present on cluster, MCOA will not install its own subscription", "clusterName", clusterName)
