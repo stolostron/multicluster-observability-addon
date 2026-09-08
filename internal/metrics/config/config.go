@@ -92,6 +92,16 @@ const (
 	ThanosReceiveIngesterContainerID  = "statefulsets:mcoa:thanos-receive-ingester"
 	DefaultReceiveHashringName        = "default"
 
+	// Thanos Query defaults
+	DefaultQueryReplicas           = 2
+	DefaultQueryCPURequest         = "300m"
+	DefaultQueryMemRequest         = "1Gi"
+	DefaultQueryFrontendReplicas   = 2
+	DefaultQueryFrontendCPURequest = "100m"
+	DefaultQueryFrontendMemRequest = "256Mi"
+	ThanosQueryContainerID         = "deployments:mcoa:thanos-query"
+	ThanosQueryFrontendContainerID = "deployments:mcoa:thanos-query-frontend"
+
 	// Thanos object storage configuration
 	ObjectStorageSecretName = "thanos-object-storage"
 	ObjectStorageSecretKey  = "thanos.yaml"
