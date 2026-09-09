@@ -19,6 +19,27 @@ var (
 	errMissingOwnerRef     = errors.New("no resource owned by MCOA found in references")
 )
 
+// cmaoOwnerStub returns a minimal ClusterManagementAddOn object suitable for owner
+// reference comparisons via controllerutil.HasOwnerReference.
+func cmaoOwnerStub() *addonv1beta1.ClusterManagementAddOn {
+	return &addonv1beta1.ClusterManagementAddOn{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "ClusterManagementAddOn",
+			APIVersion: addonv1beta1.GroupVersion.String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: addoncfg.Name,
+		},
+	}
+}
+
+// IsOwnedByCMAO reports whether obj carries a controller reference back to this
+// addon's ClusterManagementAddOn, i.e. whether MCOA itself created/owns obj (as
+// opposed to a resource an admin authored directly, such as an unmanaged CLF).
+func IsOwnedByCMAO(k8s client.Client, obj client.Object) (bool, error) {
+	return controllerutil.HasOwnerReference(obj.GetOwnerReferences(), cmaoOwnerStub(), k8s.Scheme())
+}
+
 func GetResourceWithOwnerRef[T client.Object](
 	ctx context.Context,
 	k8s client.Client,
@@ -31,15 +52,7 @@ func GetResourceWithOwnerRef[T client.Object](
 		return obj, fmt.Errorf("%w: %s/%s", errMissingResourceRefs, group, resource)
 	}
 
-	cmao := &addonv1beta1.ClusterManagementAddOn{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "ClusterManagementAddOn",
-			APIVersion: addonv1beta1.GroupVersion.String(),
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: addoncfg.Name,
-		},
-	}
+	cmao := cmaoOwnerStub()
 
 	for _, key := range keys {
 		tempObj := obj.DeepCopyObject().(T)
