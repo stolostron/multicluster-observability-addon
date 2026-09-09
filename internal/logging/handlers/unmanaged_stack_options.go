@@ -18,15 +18,8 @@ func buildUnmanagedOptions(ctx context.Context, k8s client.Client, mcAddon *addo
 		return nil
 	}
 
-	keys := common.GetObjectKeys(mcAddon.Status.ConfigReferences, loggingv1.GroupVersion.Group, addoncfg.ClusterLogForwardersResource)
-	switch {
-	case len(keys) == 0:
-		return errMissingCLFRef
-	case len(keys) > 1:
-		return errMultipleCLFRef
-	}
-	clf := &loggingv1.ClusterLogForwarder{}
-	if err := k8s.Get(ctx, keys[0], clf, &client.GetOptions{}); err != nil {
+	clf, err := getUnmanagedClusterLogForwarder(ctx, k8s, mcAddon)
+	if err != nil {
 		return err
 	}
 	opts.Unmanaged.Collection.ClusterLogForwarder = clf
@@ -34,7 +27,8 @@ func buildUnmanagedOptions(ctx context.Context, k8s client.Client, mcAddon *addo
 	secretNames := []string{}
 	configmapNames := []string{}
 	for _, output := range clf.Spec.Outputs {
-		extractedSecretsNames, extracedConfigmapNames, err := getOutputResourcesNames(output)
+		var extractedSecretsNames, extracedConfigmapNames []string
+		extractedSecretsNames, extracedConfigmapNames, err = getOutputResourcesNames(output)
 		if err != nil {
 			return err
 		}
@@ -55,6 +49,44 @@ func buildUnmanagedOptions(ctx context.Context, k8s client.Client, mcAddon *addo
 	opts.Unmanaged.Collection.ConfigMaps = configMaps
 
 	return nil
+}
+
+// getUnmanagedClusterLogForwarder returns the single admin-authored ClusterLogForwarder
+// referenced on the ManagedClusterAddOn for unmanaged log collection. ClusterLogForwarders
+// owned by this addon's ClusterManagementAddOn (i.e. MCOA's own managed/default-stack CLF,
+// see BuildCLFResources) are skipped: a real unmanaged CLF is authored directly by an admin
+// and should never carry that owner reference. Without this filter, enabling both
+// platformLogsCollection (unmanaged) and platformLogsDefault (managed) at once would cause
+// MCOA's own managed CLF to be mistaken for the unmanaged one and fail validation, since it
+// authenticates via mTLS rather than the per-output Authentication field this unmanaged path
+// requires.
+func getUnmanagedClusterLogForwarder(ctx context.Context, k8s client.Client, mcAddon *addonapiv1beta1.ManagedClusterAddOn) (*loggingv1.ClusterLogForwarder, error) {
+	keys := common.GetObjectKeys(mcAddon.Status.ConfigReferences, loggingv1.GroupVersion.Group, addoncfg.ClusterLogForwardersResource)
+
+	candidates := make([]*loggingv1.ClusterLogForwarder, 0, len(keys))
+	for _, key := range keys {
+		clf := &loggingv1.ClusterLogForwarder{}
+		if err := k8s.Get(ctx, key, clf, &client.GetOptions{}); err != nil {
+			return nil, err
+		}
+
+		ownedByMCOA, err := common.IsOwnedByCMAO(k8s, clf)
+		if err != nil {
+			return nil, err
+		}
+		if ownedByMCOA {
+			continue
+		}
+		candidates = append(candidates, clf)
+	}
+
+	switch {
+	case len(candidates) == 0:
+		return nil, errMissingCLFRef
+	case len(candidates) > 1:
+		return nil, errMultipleCLFRef
+	}
+	return candidates[0], nil
 }
 
 func getOutputResourcesNames(output loggingv1.OutputSpec) ([]string, []string, error) {
