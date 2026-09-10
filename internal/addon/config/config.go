@@ -25,6 +25,9 @@ const (
 	CooSubscriptionNamespace = "openshift-cluster-observability-operator"
 	CooSubscriptionChannel   = "stable"
 
+	DefaultCooCatalogSource          = "redhat-operators"
+	DefaultCooCatalogSourceNamespace = "openshift-marketplace"
+
 	PaProbeKey  = "isAvailable"
 	PaProbePath = ".status.conditions[?(@.type==\"Available\")].status"
 

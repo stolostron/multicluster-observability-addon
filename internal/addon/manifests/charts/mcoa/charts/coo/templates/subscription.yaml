@@ -13,6 +13,6 @@ spec:
   channel: stable
   installPlanApproval: Automatic
   name: cluster-observability-operator
-  source: redhat-operators
-  sourceNamespace: openshift-marketplace
+  source: {{ .Values.catalogSource | default "redhat-operators" }}
+  sourceNamespace: {{ .Values.catalogSourceNamespace | default "openshift-marketplace" }}
 {{- end }}
