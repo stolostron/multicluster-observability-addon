@@ -13,6 +13,7 @@ import (
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	coomonitoringv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
+	addoncommon "github.com/stolostron/multicluster-observability-addon/internal/addon/common"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	addonhelm "github.com/stolostron/multicluster-observability-addon/internal/addon/helm"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -118,8 +119,12 @@ type AgentAddonWithSortedManifests struct {
 	client client.Client
 }
 
-func (a *AgentAddonWithSortedManifests) Manifests(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) ([]runtime.Object, error) {
-	objects, err := a.agent.Manifests(cluster, addon)
+func (a *AgentAddonWithSortedManifests) Manifests(cluster *clusterv1.ManagedCluster, mcAddon *addonapiv1alpha1.ManagedClusterAddOn) ([]runtime.Object, error) {
+	// The framework fetches configuration before invoking MCOA's values functions.
+	if err := addoncommon.ValidateConfigNamespaces(mcAddon); err != nil {
+		return nil, err
+	}
+	objects, err := a.agent.Manifests(cluster, mcAddon)
 	if err != nil {
 		return nil, err
 	}
@@ -161,5 +166,17 @@ func (a *AgentAddonWithSortedManifests) Manifests(cluster *clusterv1.ManagedClus
 }
 
 func (a *AgentAddonWithSortedManifests) GetAgentAddonOptions() agent.AgentAddonOptions {
-	return a.agent.GetAgentAddonOptions()
+	options := a.agent.GetAgentAddonOptions()
+	if options.Registration != nil {
+		if installNamespace := options.Registration.AgentInstallNamespace; installNamespace != nil {
+			// Registration invokes this callback independently of manifest generation.
+			options.Registration.AgentInstallNamespace = func(mcAddon *addonapiv1alpha1.ManagedClusterAddOn) (string, error) {
+				if err := addoncommon.ValidateConfigNamespaces(mcAddon); err != nil {
+					return "", err
+				}
+				return installNamespace(mcAddon)
+			}
+		}
+	}
+	return options
 }

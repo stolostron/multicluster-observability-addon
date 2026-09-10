@@ -3,6 +3,7 @@ package common
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	addonutils "open-cluster-management.io/addon-framework/pkg/utils"
@@ -11,9 +12,34 @@ import (
 )
 
 var (
-	ErrMissingAODCRef  = errors.New("missing required AddOnDeploymentConfig reference in addon configuration")
-	ErrMultipleAODCRef = errors.New("addonmultiple AddOnDeploymentConfig references found - only one is supported")
+	ErrMissingAODCRef         = errors.New("missing required AddOnDeploymentConfig reference in addon configuration")
+	ErrMultipleAODCRef        = errors.New("addonmultiple AddOnDeploymentConfig references found - only one is supported")
+	ErrInvalidConfigNamespace = errors.New("config reference namespace is not allowed")
 )
+
+// ValidateConfigNamespaces restricts desired configs to shared templates or the managed cluster's namespace.
+// Validate the entire list before fetching any config, since MCA writers can override these references.
+func ValidateConfigNamespaces(mcAddon *addonapiv1alpha1.ManagedClusterAddOn) error {
+	for _, config := range mcAddon.Status.ConfigReferences {
+		namespace := config.Namespace // Deprecated fallback, overridden below when DesiredConfig is set.
+		name := config.Name
+		switch {
+		case config.DesiredConfig != nil:
+			namespace = config.DesiredConfig.Namespace
+			name = config.DesiredConfig.Name
+		case name == "":
+			// No DesiredConfig and no deprecated reference set: nothing is configured yet.
+			continue
+		}
+		if namespace == addoncfg.InstallNamespace || (namespace != "" && namespace == mcAddon.Namespace) {
+			continue
+		}
+		return fmt.Errorf("%w: %s/%s %q in namespace %q for ManagedClusterAddOn %s/%s; expected %q or %q",
+			ErrInvalidConfigNamespace, config.Group, config.Resource, name, namespace,
+			mcAddon.Namespace, mcAddon.Name, addoncfg.InstallNamespace, mcAddon.Namespace)
+	}
+	return nil
+}
 
 func GetObjectKeys(configRef []addonapiv1alpha1.ConfigReference, group, resource string) []client.ObjectKey {
 	var keys []client.ObjectKey
@@ -43,6 +69,9 @@ func GetObjectKeys(configRef []addonapiv1alpha1.ConfigReference, group, resource
 }
 
 func GetAddOnDeploymentConfig(ctx context.Context, k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAddOn) (*addonapiv1alpha1.AddOnDeploymentConfig, error) {
+	if err := ValidateConfigNamespaces(mcAddon); err != nil {
+		return nil, err
+	}
 	aodc := &addonapiv1alpha1.AddOnDeploymentConfig{}
 	keys := GetObjectKeys(mcAddon.Status.ConfigReferences, addonutils.AddOnDeploymentConfigGVR.Group, addoncfg.AddonDeploymentConfigResource)
 	switch {
