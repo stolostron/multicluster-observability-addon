@@ -30,6 +30,19 @@ rules:
 - apiGroups: ["monitoring.rhobs"]
   resources: ["scrapeconfigs", "prometheusagents"]
   verbs: ["get", "list", "watch"]
+# COO detection: endpoint operator creates and updates two ClusterClaims.
+# list/watch are needed for the controller-runtime cache informer.
+- apiGroups: ["cluster.open-cluster-management.io"]
+  resources: ["clusterclaims"]
+  verbs: ["create", "list", "watch"]
+- apiGroups: ["cluster.open-cluster-management.io"]
+  resources: ["clusterclaims"]
+  verbs: ["get", "update"]
+  resourceNames: ["coo-installed.observability.open-cluster-management.io", "coo-managed-by.observability.open-cluster-management.io"]
+# OLM Subscription detection for COO status reporting
+- apiGroups: ["operators.coreos.com"]
+  resources: ["subscriptions"]
+  verbs: ["list", "watch"]
 # CRD management (applied directly on spoke, not via ManifestWork) and TLS profile management
 - apiGroups: ["apiextensions.k8s.io"]
   resources: ["customresourcedefinitions"]

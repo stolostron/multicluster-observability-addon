@@ -55,22 +55,16 @@ func fakeGetValues(ctx context.Context, k8s client.Client) addonfactory.GetValue
 			return nil, err
 		}
 
-		// Check if this is a hub cluster by looking for the local-cluster label
-		isHub := false
-		if cluster != nil {
-			if val, ok := cluster.Labels["local-cluster"]; ok {
-				isHub = val == "true"
-			}
-		}
+		isHub := common.IsHubCluster(cluster)
 
 		var installCOO bool
 		if isHub {
 			installCOO, err = handlers.InstallOfCOOOnTheHubIsNeeded(ctx, k8s, logr.Discard())
+			if err != nil {
+				return nil, err
+			}
 		} else {
-			installCOO, err = handlers.InstallOfCOOOnSpokeIsNeeded(ctx, k8s, logr.Discard(), cluster.Name)
-		}
-		if err != nil {
-			return nil, err
+			installCOO = handlers.InstallOfCOOOnSpokeIsNeeded(cluster, logr.Discard())
 		}
 
 		cooValues := manifests.BuildValues(addonOpts, installCOO, isHub, false)
