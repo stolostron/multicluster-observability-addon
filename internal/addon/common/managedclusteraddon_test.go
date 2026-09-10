@@ -33,6 +33,7 @@ func TestGetAddOnDeploymentConfig(t *testing.T) {
 		{
 			name: "Multiple AODC references",
 			mcAddon: &addonapiv1alpha1.ManagedClusterAddOn{
+				ObjectMeta: metav1.ObjectMeta{Namespace: "foo"},
 				Status: addonapiv1alpha1.ManagedClusterAddOnStatus{
 					ConfigReferences: []addonapiv1alpha1.ConfigReference{
 						{
@@ -52,7 +53,7 @@ func TestGetAddOnDeploymentConfig(t *testing.T) {
 							},
 							ConfigReferent: addonapiv1alpha1.ConfigReferent{
 								Name:      "bar",
-								Namespace: "bar",
+								Namespace: "foo",
 							},
 						},
 					},
@@ -63,6 +64,7 @@ func TestGetAddOnDeploymentConfig(t *testing.T) {
 		{
 			name: "AODC reference found",
 			mcAddon: &addonapiv1alpha1.ManagedClusterAddOn{
+				ObjectMeta: metav1.ObjectMeta{Namespace: "foo"},
 				Status: addonapiv1alpha1.ManagedClusterAddOnStatus{
 					ConfigReferences: []addonapiv1alpha1.ConfigReference{
 						{
@@ -112,4 +114,99 @@ func TestGetAddOnDeploymentConfig(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestValidateConfigNamespaces(t *testing.T) {
+	for _, tt := range []struct {
+		name            string
+		addonNamespace  string
+		configNamespace string
+		wantErr         bool
+	}{
+		{name: "shared config", addonNamespace: "cluster-a", configNamespace: addoncfg.InstallNamespace},
+		{name: "per-cluster config", addonNamespace: "cluster-a", configNamespace: "cluster-a"},
+		{name: "hub logging config", addonNamespace: "cluster-a", configNamespace: "openshift-logging", wantErr: true},
+		{name: "other cluster config", addonNamespace: "cluster-a", configNamespace: "cluster-b", wantErr: true},
+		{name: "empty config namespace", addonNamespace: "cluster-a", wantErr: true},
+		{name: "both namespaces empty", wantErr: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			mcAddon := &addonapiv1alpha1.ManagedClusterAddOn{
+				ObjectMeta: metav1.ObjectMeta{Name: addoncfg.Name, Namespace: tt.addonNamespace},
+				Status: addonapiv1alpha1.ManagedClusterAddOnStatus{
+					ConfigReferences: []addonapiv1alpha1.ConfigReference{
+						{},
+						{
+							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+								Group: "observability.openshift.io", Resource: addoncfg.ClusterLogForwardersResource,
+							},
+							DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
+								ConfigReferent: addonapiv1alpha1.ConfigReferent{Name: "instance", Namespace: tt.configNamespace},
+							},
+						},
+					},
+				},
+			}
+			err := common.ValidateConfigNamespaces(mcAddon)
+			if tt.wantErr {
+				require.ErrorIs(t, err, common.ErrInvalidConfigNamespace)
+				require.Contains(t, err.Error(), "clusterlogforwarders")
+				require.Contains(t, err.Error(), "instance")
+				return
+			}
+			require.NoError(t, err)
+		})
+	}
+
+	require.NoError(t, common.ValidateConfigNamespaces(&addonapiv1alpha1.ManagedClusterAddOn{}))
+	require.NoError(t, common.ValidateConfigNamespaces(&addonapiv1alpha1.ManagedClusterAddOn{
+		Status: addonapiv1alpha1.ManagedClusterAddOnStatus{
+			ConfigReferences: []addonapiv1alpha1.ConfigReference{{}},
+		},
+	}))
+}
+
+func TestValidateConfigNamespacesUsesDeprecatedFields(t *testing.T) {
+	mcAddon := &addonapiv1alpha1.ManagedClusterAddOn{
+		ObjectMeta: metav1.ObjectMeta{Name: addoncfg.Name, Namespace: "cluster-a"},
+		Status: addonapiv1alpha1.ManagedClusterAddOnStatus{
+			ConfigReferences: []addonapiv1alpha1.ConfigReference{
+				{
+					ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+						Group: "observability.openshift.io", Resource: addoncfg.ClusterLogForwardersResource,
+					},
+					ConfigReferent: addonapiv1alpha1.ConfigReferent{Name: "instance", Namespace: "openshift-logging"},
+				},
+			},
+		},
+	}
+	err := common.ValidateConfigNamespaces(mcAddon)
+	require.ErrorIs(t, err, common.ErrInvalidConfigNamespace)
+	require.Contains(t, err.Error(), "instance")
+}
+
+func TestGetAddOnDeploymentConfigRejectsNamespaceBeforeFetching(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, addonapiv1alpha1.AddToScheme(scheme))
+	existingAODC := &addonapiv1alpha1.AddOnDeploymentConfig{
+		ObjectMeta: metav1.ObjectMeta{Name: "instance", Namespace: "cluster-b"},
+	}
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(existingAODC).Build()
+
+	mcAddon := &addonapiv1alpha1.ManagedClusterAddOn{
+		ObjectMeta: metav1.ObjectMeta{Name: addoncfg.Name, Namespace: "cluster-a"},
+		Status: addonapiv1alpha1.ManagedClusterAddOnStatus{
+			ConfigReferences: []addonapiv1alpha1.ConfigReference{{
+				ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+					Group: addonutils.AddOnDeploymentConfigGVR.Group, Resource: addoncfg.AddonDeploymentConfigResource,
+				},
+				DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
+					ConfigReferent: addonapiv1alpha1.ConfigReferent{Name: "instance", Namespace: "cluster-b"},
+				},
+			}},
+		},
+	}
+	config, err := common.GetAddOnDeploymentConfig(t.Context(), fakeClient, mcAddon)
+	require.ErrorIs(t, err, common.ErrInvalidConfigNamespace)
+	require.Nil(t, config)
 }

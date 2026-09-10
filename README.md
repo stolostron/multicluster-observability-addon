@@ -91,6 +91,13 @@ In 2.12, multicluster-observability-operator has the ability to install MCOA usi
 
 #### Default configurations references
 
+Effective configuration references in `ManagedClusterAddOn.status.configReferences` must point to
+`open-cluster-management-observability` (trusted shared configurations) or the namespace of that
+`ManagedClusterAddOn` (per-cluster configurations). Empty namespaces and references to any other
+namespace are rejected before manifest generation, including overrides supplied through `spec.configs`.
+Treat configurations and their referenced Secrets in the shared namespace as available for distribution
+to managed clusters; keep unrelated hub credentials outside that namespace.
+
 ```yaml
 apiVersion: addon.open-cluster-management.io/v1alpha1
 kind: ClusterManagementAddOn
