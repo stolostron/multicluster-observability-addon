@@ -12,9 +12,28 @@ import (
 )
 
 var (
-	ErrMissingAODCRef  = errors.New("missing required AddOnDeploymentConfig reference in addon configuration")
-	ErrMultipleAODCRef = errors.New("multiple AddOnDeploymentConfig references found - only one is supported")
+	ErrMissingAODCRef         = errors.New("missing required AddOnDeploymentConfig reference in addon configuration")
+	ErrMultipleAODCRef        = errors.New("multiple AddOnDeploymentConfig references found - only one is supported")
+	ErrInvalidConfigNamespace = errors.New("config reference namespace is not allowed")
 )
+
+// ValidateConfigNamespaces restricts desired configs to shared templates or the managed cluster's namespace.
+// Validate the entire list before fetching any config, since MCA writers can override these references.
+func ValidateConfigNamespaces(mcAddon *addonapiv1beta1.ManagedClusterAddOn) error {
+	for _, config := range mcAddon.Status.ConfigReferences {
+		if config.DesiredConfig == nil {
+			continue
+		}
+		namespace := config.DesiredConfig.Namespace
+		if namespace == addoncfg.InstallNamespace || (namespace != "" && namespace == mcAddon.Namespace) {
+			continue
+		}
+		return fmt.Errorf("%w: %s/%s %q in namespace %q for ManagedClusterAddOn %s/%s; expected %q or %q",
+			ErrInvalidConfigNamespace, config.Group, config.Resource, config.DesiredConfig.Name, namespace,
+			mcAddon.Namespace, mcAddon.Name, addoncfg.InstallNamespace, mcAddon.Namespace)
+	}
+	return nil
+}
 
 func GetObjectKeys(configRef []addonapiv1beta1.ConfigReference, group, resource string) []client.ObjectKey {
 	var keys []client.ObjectKey
@@ -39,6 +58,9 @@ func GetObjectKeys(configRef []addonapiv1beta1.ConfigReference, group, resource 
 }
 
 func GetAddOnDeploymentConfig(ctx context.Context, getter addonutils.AddOnDeploymentConfigGetter, mcAddon *addonapiv1beta1.ManagedClusterAddOn) (*addonapiv1beta1.AddOnDeploymentConfig, error) {
+	if err := ValidateConfigNamespaces(mcAddon); err != nil {
+		return nil, err
+	}
 	keys := GetObjectKeys(mcAddon.Status.ConfigReferences, addonutils.AddOnDeploymentConfigGVR.Group, addoncfg.AddonDeploymentConfigResource)
 	switch {
 	case len(keys) == 0:
