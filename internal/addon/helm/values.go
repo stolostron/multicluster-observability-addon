@@ -160,6 +160,11 @@ func getCOOValues(ctx context.Context, k8s client.Client, logger logr.Logger, cl
 }
 
 func getAddOnDeploymentConfig(ctx context.Context, k8s client.Client, mcAddon *addonapiv1alpha1.ManagedClusterAddOn) (*addonapiv1alpha1.AddOnDeploymentConfig, error) {
+	// Validate the entire reference list before fetching any config, since this is the gate for the
+	// whole rendering pipeline (logging/tracing/metrics config resolution all happen after this call).
+	if err := common.ValidateConfigNamespaces(mcAddon); err != nil {
+		return nil, err
+	}
 	aodc := &addonapiv1alpha1.AddOnDeploymentConfig{}
 	keys := common.GetObjectKeys(mcAddon.Status.ConfigReferences, addonutils.AddOnDeploymentConfigGVR.Group, addoncfg.AddonDeploymentConfigResource)
 	switch {

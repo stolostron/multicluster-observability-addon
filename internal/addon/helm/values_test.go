@@ -10,6 +10,7 @@ import (
 	operatorsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	uiplugin "github.com/rhobs/observability-operator/pkg/apis/uiplugin/v1alpha1"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
+	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -220,6 +221,7 @@ func TestGetAddOnDeploymentConfig(t *testing.T) {
 		{
 			name: "Multiple AODC references",
 			mcAddon: &addonapiv1alpha1.ManagedClusterAddOn{
+				ObjectMeta: metav1.ObjectMeta{Namespace: "foo"},
 				Status: addonapiv1alpha1.ManagedClusterAddOnStatus{
 					ConfigReferences: []addonapiv1alpha1.ConfigReference{
 						{
@@ -239,7 +241,7 @@ func TestGetAddOnDeploymentConfig(t *testing.T) {
 							},
 							ConfigReferent: addonapiv1alpha1.ConfigReferent{
 								Name:      "bar",
-								Namespace: "bar",
+								Namespace: "foo",
 							},
 						},
 					},
@@ -250,6 +252,7 @@ func TestGetAddOnDeploymentConfig(t *testing.T) {
 		{
 			name: "AODC reference found",
 			mcAddon: &addonapiv1alpha1.ManagedClusterAddOn{
+				ObjectMeta: metav1.ObjectMeta{Namespace: "foo"},
 				Status: addonapiv1alpha1.ManagedClusterAddOnStatus{
 					ConfigReferences: []addonapiv1alpha1.ConfigReference{
 						{
@@ -297,4 +300,26 @@ func TestGetAddOnDeploymentConfig(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestGetAddOnDeploymentConfigRejectsNamespaceBeforeFetching(t *testing.T) {
+	existingAODC := &addonapiv1alpha1.AddOnDeploymentConfig{
+		ObjectMeta: metav1.ObjectMeta{Name: "instance", Namespace: "cluster-b"},
+	}
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme.Scheme).WithObjects(existingAODC).Build()
+
+	mcAddon := &addonapiv1alpha1.ManagedClusterAddOn{
+		ObjectMeta: metav1.ObjectMeta{Name: addoncfg.Name, Namespace: "cluster-a"},
+		Status: addonapiv1alpha1.ManagedClusterAddOnStatus{
+			ConfigReferences: []addonapiv1alpha1.ConfigReference{{
+				ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+					Group: addonutils.AddOnDeploymentConfigGVR.Group, Resource: addoncfg.AddonDeploymentConfigResource,
+				},
+				ConfigReferent: addonapiv1alpha1.ConfigReferent{Name: "instance", Namespace: "cluster-b"},
+			}},
+		},
+	}
+	config, err := getAddOnDeploymentConfig(context.TODO(), fakeClient, mcAddon)
+	require.ErrorIs(t, err, common.ErrInvalidConfigNamespace)
+	require.Nil(t, config)
 }
