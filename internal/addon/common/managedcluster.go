@@ -55,6 +55,33 @@ func IsOpenShiftVendor(cluster *clusterv1.ManagedCluster) bool {
 	return idx != -1
 }
 
+// IsCOOExternallyInstalledOnSpoke reports whether the Cluster Observability Operator was
+// installed on a spoke by someone other than MCOA, based on ClusterClaims set by the
+// endpoint-monitoring-operator. Returns (true, true) when COO is externally installed,
+// (false, true) when not installed or installed by MCOA, and (false, false) when the
+// endpoint operator hasn't reported yet.
+func IsCOOExternallyInstalledOnSpoke(cluster *clusterv1.ManagedCluster) (externallyInstalled bool, hasReport bool) {
+	installed := getClusterClaim(cluster, addoncfg.CooInstalledClaimName)
+	if installed == "" {
+		return false, false
+	}
+	if installed != "true" {
+		return false, true
+	}
+	managedBy := getClusterClaim(cluster, addoncfg.CooManagedByClaimName)
+	return managedBy != "mcoa", true
+}
+
+func getClusterClaim(cluster *clusterv1.ManagedCluster, name string) string {
+	idx := slices.IndexFunc(cluster.Status.ClusterClaims, func(c clusterv1.ManagedClusterClaim) bool {
+		return c.Name == name
+	})
+	if idx == -1 {
+		return ""
+	}
+	return cluster.Status.ClusterClaims[idx].Value
+}
+
 func VendorIsOverridden(cluster *clusterv1.ManagedCluster) string {
 	vendorOverride := cluster.Annotations[addoncfg.VendorOverrideAnnotationKey]
 	if vendorOverride != "" {

@@ -175,7 +175,7 @@ func getCOOValues(ctx context.Context, k8s client.Client, logger logr.Logger, cl
 		installCOO, err = chandlers.InstallOfCOOOnTheHubIsNeeded(ctx, k8s, logger)
 		hasCardinalityRules = chandlers.HasCardinalityRules(ctx, k8s)
 	} else {
-		installCOO, err = chandlers.InstallOfCOOOnSpokeIsNeeded(ctx, k8s, logger, cluster.Name)
+		installCOO = chandlers.InstallOfCOOOnSpokeIsNeeded(cluster, logger)
 	}
 	if err != nil {
 		return nil, err
