@@ -17,6 +17,7 @@ import (
 	coomonitoringv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	monitoringv1alpha1 "github.com/rhobs/observability-operator/pkg/apis/monitoring/v1alpha1"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
+	addoncommon "github.com/stolostron/multicluster-observability-addon/internal/addon/common"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	addonhelm "github.com/stolostron/multicluster-observability-addon/internal/addon/helm"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -129,8 +130,12 @@ type AgentAddonWithSortedManifests struct {
 	client client.Client
 }
 
-func (a *AgentAddonWithSortedManifests) Manifests(ctx context.Context, cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) ([]runtime.Object, error) {
-	objects, err := a.agent.Manifests(ctx, cluster, addon)
+func (a *AgentAddonWithSortedManifests) Manifests(ctx context.Context, cluster *clusterv1.ManagedCluster, mcAddon *addonapiv1beta1.ManagedClusterAddOn) ([]runtime.Object, error) {
+	// The framework fetches configuration before invoking MCOA's values functions.
+	if err := addoncommon.ValidateConfigNamespaces(mcAddon); err != nil {
+		return nil, err
+	}
+	objects, err := a.agent.Manifests(ctx, cluster, mcAddon)
 	if err != nil {
 		return nil, err
 	}
@@ -180,6 +185,15 @@ func (a *AgentAddonWithSortedManifests) Manifests(ctx context.Context, cluster *
 func (a *AgentAddonWithSortedManifests) GetAgentAddonOptions() agent.AgentAddonOptions {
 	options := a.agent.GetAgentAddonOptions()
 	options.ManifestConfigs = addon.ManifestConfigs()
+	if installNamespace := options.AgentInstallNamespace; installNamespace != nil {
+		// Registration also invokes this callback independently of manifest generation.
+		options.AgentInstallNamespace = func(ctx context.Context, mcAddon *addonapiv1beta1.ManagedClusterAddOn) (string, error) {
+			if err := addoncommon.ValidateConfigNamespaces(mcAddon); err != nil {
+				return "", err
+			}
+			return installNamespace(ctx, mcAddon)
+		}
+	}
 	return options
 }
 
