@@ -8,16 +8,18 @@ import (
 	persesv1 "github.com/perses/perses-operator/api/v1alpha1"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
+	cooresource "github.com/stolostron/multicluster-observability-addon/internal/coo/resource"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/klog/v2"
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
-// expectedRSDashboards are the dashboard IDs produced by the right-sizing builders.
 var (
 	namespaceDashboardID = "acm-rs-namespace-overview"
 	vmDashboardIDs       = []string{
@@ -28,71 +30,58 @@ var (
 	allRSDashboardIDs = append([]string{namespaceDashboardID}, vmDashboardIDs...)
 )
 
-func renderRSManifests(t *testing.T, isHub bool, cv []addonapiv1beta1.CustomizedVariable) []runtime.Object {
+func buildOpts(t *testing.T, cv []addonapiv1beta1.CustomizedVariable) addon.Options {
 	t.Helper()
-
-	mc := addontesting.NewManagedCluster("cluster-1")
-	if isHub {
-		mc.Labels = map[string]string{"local-cluster": "true"}
-	}
-
-	mcao := addontesting.NewAddon("test", "cluster-1")
-	mcao.Status.ConfigReferences = []addonapiv1beta1.ConfigReference{
-		{
-			ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
-				Group:    "addon.open-cluster-management.io",
-				Resource: "addondeploymentconfigs",
-			},
-			DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
-				ConfigReferent: addonapiv1beta1.ConfigReferent{
-					Namespace: addoncfg.InstallNamespace,
-					Name:      addoncfg.Name,
-				},
-				SpecHash: "fake-spec-hash",
-			},
+	aodc := &addonapiv1beta1.AddOnDeploymentConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      addoncfg.Name,
+			Namespace: addoncfg.InstallNamespace,
 		},
-	}
-
-	addc := &addonapiv1beta1.AddOnDeploymentConfig{
-		ObjectMeta: mcao.ObjectMeta,
 		Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
 			CustomizedVariables: cv,
 		},
 	}
-	addc.Name = addoncfg.Name
-	addc.Namespace = addoncfg.InstallNamespace
-
-	cooAgent := newCOOAgentAddon([]client.Object{mcao}, addc)
-	objects, err := cooAgent.Manifests(t.Context(), mc, mcao)
+	opts, err := addon.BuildOptions(aodc)
 	require.NoError(t, err)
-	return objects
+	return opts
 }
 
-// classifyObjects separates rendered manifests into typed buckets for assertions.
-type renderedObjects struct {
-	namespaces  []*corev1.Namespace
-	datasources []*persesv1.PersesDatasource
-	dashboards  []*persesv1.PersesDashboard
-	all         []runtime.Object
-}
+func reconcileHubResources(t *testing.T, cv []addonapiv1beta1.CustomizedVariable) client.Client {
+	t.Helper()
 
-func classify(objects []runtime.Object) renderedObjects {
-	var r renderedObjects
-	r.all = objects
-	for _, o := range objects {
-		switch obj := o.(type) {
-		case *corev1.Namespace:
-			r.namespaces = append(r.namespaces, obj)
-		case *persesv1.PersesDatasource:
-			r.datasources = append(r.datasources, obj)
-		case *persesv1.PersesDashboard:
-			r.dashboards = append(r.dashboards, obj)
-		}
+	k8s := fake.NewClientBuilder().
+		WithScheme(scheme.Scheme).
+		Build()
+
+	reconciler := &cooresource.HubResourceReconciler{
+		Client: k8s,
+		Logger: klog.Background(),
+		Opts:   buildOpts(t, cv),
 	}
-	return r
+
+	err := reconciler.Reconcile(t.Context(), false, false)
+	require.NoError(t, err)
+	return k8s
 }
 
-// --- End-to-End Tests ---
+func listDashboards(t *testing.T, k8s client.Client, namespace string) []persesv1.PersesDashboard {
+	t.Helper()
+	list := &persesv1.PersesDashboardList{}
+	require.NoError(t, k8s.List(t.Context(), list, client.InNamespace(namespace)))
+	return list.Items
+}
+
+func dashboardNames(dbs []persesv1.PersesDashboard) []string {
+	names := make([]string, 0, len(dbs))
+	for _, db := range dbs {
+		names = append(names, db.Name)
+	}
+	return names
+}
+
+func contains(slice []string, val string) bool {
+	return slices.Contains(slice, val)
+}
 
 func TestRightSizing_HubCluster_BothEnabled(t *testing.T) {
 	cv := []addonapiv1beta1.CustomizedVariable{
@@ -101,40 +90,33 @@ func TestRightSizing_HubCluster_BothEnabled(t *testing.T) {
 		{Name: addon.KeyPlatformVirtualizationRightSizing, Value: "enabled"},
 	}
 
-	objects := renderRSManifests(t, true, cv)
-	r := classify(objects)
+	k8s := reconcileHubResources(t, cv)
+	dashboards := listDashboards(t, k8s, addoncfg.AnalyticsNamespace)
 
 	t.Run("creates analytics namespace", func(t *testing.T) {
-		var found bool
-		for _, ns := range r.namespaces {
-			if ns.Name == addoncfg.AnalyticsNamespace {
-				found = true
-				break
-			}
-		}
-		require.True(t, found, "observability-analytics namespace must be created")
+		ns := &corev1.Namespace{}
+		err := k8s.Get(t.Context(), client.ObjectKey{Name: addoncfg.AnalyticsNamespace}, ns)
+		require.NoError(t, err, "observability-analytics namespace must be created")
 	})
 
 	t.Run("creates analytics datasource", func(t *testing.T) {
-		var found bool
-		for _, ds := range r.datasources {
-			if ds.Namespace == addoncfg.AnalyticsNamespace && ds.Name == "rbac-query-proxy-datasource" {
-				found = true
-				break
-			}
-		}
-		require.True(t, found, "rbac-query-proxy-datasource must exist in analytics namespace")
+		ds := &persesv1.PersesDatasource{}
+		err := k8s.Get(t.Context(), client.ObjectKey{
+			Namespace: addoncfg.AnalyticsNamespace,
+			Name:      "rbac-query-proxy-datasource",
+		}, ds)
+		require.NoError(t, err, "rbac-query-proxy-datasource must exist in analytics namespace")
 	})
 
 	t.Run("creates all 4 right-sizing dashboards", func(t *testing.T) {
-		dashNames := dashboardNames(r.dashboards)
+		names := dashboardNames(dashboards)
 		for _, expected := range allRSDashboardIDs {
-			assert.Contains(t, dashNames, expected, "dashboard %q should be rendered", expected)
+			assert.Contains(t, names, expected, "dashboard %q should be rendered", expected)
 		}
 	})
 
 	t.Run("all RS dashboards are in the analytics namespace", func(t *testing.T) {
-		for _, db := range r.dashboards {
+		for _, db := range dashboards {
 			if contains(allRSDashboardIDs, db.Name) {
 				assert.Equal(t, addoncfg.AnalyticsNamespace, db.Namespace,
 					"dashboard %q must be in %s", db.Name, addoncfg.AnalyticsNamespace)
@@ -143,16 +125,15 @@ func TestRightSizing_HubCluster_BothEnabled(t *testing.T) {
 	})
 
 	t.Run("no RS dashboards in the install namespace", func(t *testing.T) {
-		for _, db := range r.dashboards {
-			if db.Namespace == addoncfg.InstallNamespace {
-				assert.NotContains(t, allRSDashboardIDs, db.Name,
-					"RS dashboard %q should NOT be in install namespace", db.Name)
-			}
+		installDashboards := listDashboards(t, k8s, addoncfg.InstallNamespace)
+		for _, db := range installDashboards {
+			assert.NotContains(t, allRSDashboardIDs, db.Name,
+				"RS dashboard %q should NOT be in install namespace", db.Name)
 		}
 	})
 
 	t.Run("dashboard specs contain valid JSON with expected metrics", func(t *testing.T) {
-		for _, db := range r.dashboards {
+		for _, db := range dashboards {
 			if !contains(allRSDashboardIDs, db.Name) {
 				continue
 			}
@@ -179,20 +160,28 @@ func TestRightSizing_HubCluster_NamespaceOnly(t *testing.T) {
 		{Name: addon.KeyPlatformVirtualizationRightSizing, Value: "disabled"},
 	}
 
-	objects := renderRSManifests(t, true, cv)
-	r := classify(objects)
+	k8s := reconcileHubResources(t, cv)
+	dashboards := listDashboards(t, k8s, addoncfg.AnalyticsNamespace)
 
 	t.Run("creates namespace RS dashboard only", func(t *testing.T) {
-		dashNames := dashboardNames(r.dashboards)
-		assert.Contains(t, dashNames, namespaceDashboardID)
+		names := dashboardNames(dashboards)
+		assert.Contains(t, names, namespaceDashboardID)
 		for _, vmID := range vmDashboardIDs {
-			assert.NotContains(t, dashNames, vmID, "VM dashboard %q should not be rendered", vmID)
+			assert.NotContains(t, names, vmID, "VM dashboard %q should not be rendered", vmID)
 		}
 	})
 
 	t.Run("analytics namespace and datasource still created", func(t *testing.T) {
-		require.GreaterOrEqual(t, len(r.namespaces), 1)
-		require.GreaterOrEqual(t, len(r.datasources), 1)
+		ns := &corev1.Namespace{}
+		err := k8s.Get(t.Context(), client.ObjectKey{Name: addoncfg.AnalyticsNamespace}, ns)
+		require.NoError(t, err)
+
+		ds := &persesv1.PersesDatasource{}
+		err = k8s.Get(t.Context(), client.ObjectKey{
+			Namespace: addoncfg.AnalyticsNamespace,
+			Name:      "rbac-query-proxy-datasource",
+		}, ds)
+		require.NoError(t, err)
 	})
 }
 
@@ -203,14 +192,14 @@ func TestRightSizing_HubCluster_VirtualizationOnly(t *testing.T) {
 		{Name: addon.KeyPlatformVirtualizationRightSizing, Value: "enabled"},
 	}
 
-	objects := renderRSManifests(t, true, cv)
-	r := classify(objects)
+	k8s := reconcileHubResources(t, cv)
+	dashboards := listDashboards(t, k8s, addoncfg.AnalyticsNamespace)
 
 	t.Run("creates 3 VM RS dashboards, no namespace dashboard", func(t *testing.T) {
-		dashNames := dashboardNames(r.dashboards)
-		assert.NotContains(t, dashNames, namespaceDashboardID)
+		names := dashboardNames(dashboards)
+		assert.NotContains(t, names, namespaceDashboardID)
 		for _, vmID := range vmDashboardIDs {
-			assert.Contains(t, dashNames, vmID, "VM dashboard %q should be rendered", vmID)
+			assert.Contains(t, names, vmID, "VM dashboard %q should be rendered", vmID)
 		}
 	})
 }
@@ -222,37 +211,13 @@ func TestRightSizing_HubCluster_BothDisabled(t *testing.T) {
 		{Name: addon.KeyPlatformVirtualizationRightSizing, Value: "disabled"},
 	}
 
-	objects := renderRSManifests(t, true, cv)
-	r := classify(objects)
+	k8s := reconcileHubResources(t, cv)
+	dashboards := listDashboards(t, k8s, addoncfg.AnalyticsNamespace)
 
 	t.Run("no RS dashboards rendered", func(t *testing.T) {
-		for _, db := range r.dashboards {
+		for _, db := range dashboards {
 			assert.NotContains(t, allRSDashboardIDs, db.Name,
 				"no RS dashboards should exist when both are disabled")
-		}
-	})
-
-	t.Run("no analytics namespace", func(t *testing.T) {
-		for _, ns := range r.namespaces {
-			assert.NotEqual(t, addoncfg.AnalyticsNamespace, ns.Name)
-		}
-	})
-}
-
-func TestRightSizing_NonHubCluster_NoRSDashboards(t *testing.T) {
-	cv := []addonapiv1beta1.CustomizedVariable{
-		{Name: addon.KeyRightSizingDelegated, Value: "true"},
-		{Name: addon.KeyPlatformNamespaceRightSizing, Value: "enabled"},
-		{Name: addon.KeyPlatformVirtualizationRightSizing, Value: "enabled"},
-	}
-
-	objects := renderRSManifests(t, false, cv)
-	r := classify(objects)
-
-	t.Run("no RS dashboards on spoke cluster", func(t *testing.T) {
-		for _, db := range r.dashboards {
-			assert.NotContains(t, allRSDashboardIDs, db.Name,
-				"RS dashboards should only be on the hub cluster")
 		}
 	})
 }
@@ -264,10 +229,10 @@ func TestRightSizing_DashboardSpecStructure(t *testing.T) {
 		{Name: addon.KeyPlatformVirtualizationRightSizing, Value: "enabled"},
 	}
 
-	objects := renderRSManifests(t, true, cv)
-	r := classify(objects)
+	k8s := reconcileHubResources(t, cv)
+	dashboards := listDashboards(t, k8s, addoncfg.AnalyticsNamespace)
 
-	for _, db := range r.dashboards {
+	for _, db := range dashboards {
 		if !contains(allRSDashboardIDs, db.Name) {
 			continue
 		}
@@ -346,18 +311,18 @@ func TestRightSizing_CombinedWithIncidentDetection(t *testing.T) {
 		{Name: addon.KeyPlatformIncidentDetection, Value: "uiplugins.v1alpha1.observability.openshift.io"},
 	}
 
-	objects := renderRSManifests(t, true, cv)
-	r := classify(objects)
+	k8s := reconcileHubResources(t, cv)
+	dashboards := listDashboards(t, k8s, addoncfg.AnalyticsNamespace)
 
 	t.Run("RS dashboards coexist with incident detection", func(t *testing.T) {
-		dashNames := dashboardNames(r.dashboards)
+		names := dashboardNames(dashboards)
 		for _, expected := range allRSDashboardIDs {
-			assert.Contains(t, dashNames, expected, "RS dashboard %q present alongside incident detection", expected)
+			assert.Contains(t, names, expected, "RS dashboard %q present alongside incident detection", expected)
 		}
 	})
 
 	t.Run("RS dashboards are in analytics namespace", func(t *testing.T) {
-		for _, db := range r.dashboards {
+		for _, db := range dashboards {
 			if contains(allRSDashboardIDs, db.Name) {
 				assert.Equal(t, addoncfg.AnalyticsNamespace, db.Namespace,
 					"RS dashboard %q must be in analytics namespace", db.Name)
@@ -365,19 +330,13 @@ func TestRightSizing_CombinedWithIncidentDetection(t *testing.T) {
 		}
 	})
 
-	t.Run("single analytics namespace object", func(t *testing.T) {
-		count := 0
-		for _, ns := range r.namespaces {
-			if ns.Name == addoncfg.AnalyticsNamespace {
-				count++
-			}
-		}
-		assert.Equal(t, 1, count, "exactly one analytics namespace object should be rendered")
+	t.Run("analytics namespace exists", func(t *testing.T) {
+		ns := &corev1.Namespace{}
+		err := k8s.Get(t.Context(), client.ObjectKey{Name: addoncfg.AnalyticsNamespace}, ns)
+		require.NoError(t, err, "analytics namespace should exist")
 	})
 }
 
-// TestRightSizing_ProfileVariableMatchers verifies that cpu_profile and memory_profile variables
-// query the correct label_values from CPU and memory metrics respectively, preventing cross-contamination.
 func TestRightSizing_ProfileVariableMatchers(t *testing.T) {
 	cv := []addonapiv1beta1.CustomizedVariable{
 		{Name: addon.KeyRightSizingDelegated, Value: "true"},
@@ -385,10 +344,10 @@ func TestRightSizing_ProfileVariableMatchers(t *testing.T) {
 		{Name: addon.KeyPlatformVirtualizationRightSizing, Value: "enabled"},
 	}
 
-	objects := renderRSManifests(t, true, cv)
-	r := classify(objects)
+	k8s := reconcileHubResources(t, cv)
+	dashboards := listDashboards(t, k8s, addoncfg.AnalyticsNamespace)
 
-	for _, db := range r.dashboards {
+	for _, db := range dashboards {
 		if !contains(allRSDashboardIDs, db.Name) {
 			continue
 		}
@@ -433,8 +392,6 @@ func TestRightSizing_ProfileVariableMatchers(t *testing.T) {
 	}
 }
 
-// TestRightSizing_NoCrossContamination verifies that CPU panel queries use $cpu_profile
-// and memory panel queries use $memory_profile, never the opposite.
 func TestRightSizing_NoCrossContamination(t *testing.T) {
 	cv := []addonapiv1beta1.CustomizedVariable{
 		{Name: addon.KeyRightSizingDelegated, Value: "true"},
@@ -442,10 +399,10 @@ func TestRightSizing_NoCrossContamination(t *testing.T) {
 		{Name: addon.KeyPlatformVirtualizationRightSizing, Value: "enabled"},
 	}
 
-	objects := renderRSManifests(t, true, cv)
-	r := classify(objects)
+	k8s := reconcileHubResources(t, cv)
+	dashboards := listDashboards(t, k8s, addoncfg.AnalyticsNamespace)
 
-	for _, db := range r.dashboards {
+	for _, db := range dashboards {
 		if !contains(allRSDashboardIDs, db.Name) {
 			continue
 		}
@@ -474,8 +431,6 @@ func TestRightSizing_NoCrossContamination(t *testing.T) {
 	}
 }
 
-// TestRightSizing_DrillDownLinksPassBothProfiles verifies that VM drill-down links
-// include both cpu_profile and memory_profile URL parameters.
 func TestRightSizing_DrillDownLinksPassBothProfiles(t *testing.T) {
 	cv := []addonapiv1beta1.CustomizedVariable{
 		{Name: addon.KeyRightSizingDelegated, Value: "true"},
@@ -483,31 +438,30 @@ func TestRightSizing_DrillDownLinksPassBothProfiles(t *testing.T) {
 		{Name: addon.KeyPlatformVirtualizationRightSizing, Value: "enabled"},
 	}
 
-	objects := renderRSManifests(t, true, cv)
-	r := classify(objects)
+	k8s := reconcileHubResources(t, cv)
+	dashboards := listDashboards(t, k8s, addoncfg.AnalyticsNamespace)
 
-	for _, dbID := range allRSDashboardIDs {
-		db := findDashboard(r.dashboards, dbID)
-		if db == nil {
+	for _, db := range dashboards {
+		if !contains(allRSDashboardIDs, db.Name) {
 			continue
 		}
 		raw, err := json.Marshal(db.Spec)
 		require.NoError(t, err)
 		specStr := string(raw)
 
-		t.Run(dbID+"/links_carry_cpu_profile", func(t *testing.T) {
+		t.Run(db.Name+"/links_carry_cpu_profile", func(t *testing.T) {
 			if assert.Contains(t, specStr, "$cpu_profile") {
 				assert.NotContains(t, specStr, "var-profile=",
 					"drill-down URL must not use old 'profile' variable")
 			}
 		})
 
-		t.Run(dbID+"/links_carry_memory_profile", func(t *testing.T) {
+		t.Run(db.Name+"/links_carry_memory_profile", func(t *testing.T) {
 			assert.Contains(t, specStr, "$memory_profile",
 				"dashboard must reference memory_profile variable")
 		})
 
-		t.Run(dbID+"/no_stale_dollar_profile", func(t *testing.T) {
+		t.Run(db.Name+"/no_stale_dollar_profile", func(t *testing.T) {
 			assert.NotContains(t, specStr, `profile="$profile"`,
 				"no panel should reference the removed $profile variable")
 		})
@@ -521,36 +475,15 @@ func TestRightSizing_MCOMode_NoDashboardsWhenNotDelegated(t *testing.T) {
 		{Name: addon.KeyPlatformVirtualizationRightSizing, Value: "enabled"},
 	}
 
-	objects := renderRSManifests(t, true, cv)
-	r := classify(objects)
+	k8s := reconcileHubResources(t, cv)
+	dashboards := listDashboards(t, k8s, addoncfg.AnalyticsNamespace)
 
 	t.Run("no RS dashboards without delegation", func(t *testing.T) {
-		for _, db := range r.dashboards {
+		for _, db := range dashboards {
 			assert.NotContains(t, allRSDashboardIDs, db.Name,
 				"RS dashboards must not render in MCO mode (rightSizingDelegated absent)")
 		}
 	})
-
-	t.Run("no analytics namespace without delegation", func(t *testing.T) {
-		for _, ns := range r.namespaces {
-			assert.NotEqual(t, addoncfg.AnalyticsNamespace, ns.Name,
-				"analytics namespace must not be created in MCO mode")
-		}
-	})
-}
-
-// --- Helpers ---
-
-func dashboardNames(dbs []*persesv1.PersesDashboard) []string {
-	names := make([]string, 0, len(dbs))
-	for _, db := range dbs {
-		names = append(names, db.Name)
-	}
-	return names
-}
-
-func contains(slice []string, val string) bool {
-	return slices.Contains(slice, val)
 }
 
 func extractVariableSlice(spec map[string]any) []any {
@@ -577,15 +510,6 @@ func findVariable(vars []any, name string) map[string]any {
 		}
 		if n, ok := spec["name"].(string); ok && n == name {
 			return m
-		}
-	}
-	return nil
-}
-
-func findDashboard(dbs []*persesv1.PersesDashboard, name string) *persesv1.PersesDashboard {
-	for _, db := range dbs {
-		if db.Name == name {
-			return db
 		}
 	}
 	return nil

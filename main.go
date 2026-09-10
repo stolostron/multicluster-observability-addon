@@ -31,6 +31,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	addonctrl "github.com/stolostron/multicluster-observability-addon/internal/controllers/addon"
+	"github.com/stolostron/multicluster-observability-addon/internal/controllers/defaulthubstack"
 	"github.com/stolostron/multicluster-observability-addon/internal/controllers/resourcecreator"
 	"github.com/stolostron/multicluster-observability-addon/internal/controllers/watcher"
 	tlshelper "github.com/stolostron/multicluster-observability-addon/pkg/util"
@@ -239,6 +240,10 @@ func runControllers(ctx context.Context, kubeConfig *rest.Config) error {
 
 	if err = resourcecreator.SetupWithManager(sharedMgr, logger); err != nil {
 		return fmt.Errorf("unable to create resource creator controller: %w", err)
+	}
+
+	if err = defaulthubstack.SetupWithManager(sharedMgr, logger); err != nil {
+		return fmt.Errorf("unable to create COO hub resource controller: %w", err)
 	}
 
 	go func() {

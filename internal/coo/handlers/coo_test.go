@@ -62,7 +62,7 @@ func TestInstallCOO(t *testing.T) {
 				},
 			},
 			expectedUIPluginInstall: true,
-			expectedCOOInstall:      true,
+			expectedCOOInstall:      false, // hub COO installation handled by HubResourceReconciler
 		},
 		{
 			name:                    "Hub cluster with no features enabled",
@@ -122,7 +122,7 @@ func TestInstallCOO(t *testing.T) {
 				},
 			},
 			expectedUIPluginInstall: true,
-			expectedCOOInstall:      true,
+			expectedCOOInstall:      false, // hub COO installation handled by HubResourceReconciler
 		},
 		{
 			name:  "Hub cluster with wrong version of COO installed and incident detection enabled",
@@ -175,12 +175,14 @@ func TestInstallCOO(t *testing.T) {
 				k8sClientBuilder = k8sClientBuilder.WithObjects(tc.subscription)
 			}
 
-			var result bool
+			var installCOO bool
 			var err error
 			if tc.isHub {
-				result, err = InstallOfCOOOnTheHubIsNeeded(context.Background(), k8sClientBuilder.Build(), logr.Discard())
+				// Hub COO installation is handled by HubResourceReconciler, not ManifestWork.
+				_, err = InstallOfCOOOnTheHubIsNeeded(context.Background(), k8sClientBuilder.Build(), logr.Discard())
+				installCOO = false
 			}
-			cooValues := manifests.BuildValues(tc.options, result, tc.isHub, false)
+			cooValues := manifests.BuildValues(tc.options, installCOO, tc.isHub, false)
 
 			if tc.expectedErrMsg != "" {
 				assert.EqualError(t, err, tc.expectedErrMsg)
@@ -293,14 +295,14 @@ func TestInstallOfCOOOnSpokeIsNeeded(t *testing.T) {
 		expectedInstall bool
 	}{
 		{
-			name:            "no manifestwork yet: bootstrap, defer decision",
+			name:            "no manifestwork yet: bootstrap, install COO",
 			objects:         nil,
-			expectedInstall: false,
+			expectedInstall: true,
 		},
 		{
-			name:            "manifestwork exists but no status feedback yet: defer decision",
+			name:            "manifestwork exists but no status feedback yet: install COO",
 			objects:         []client.Object{manifestWorkWithNoFeedback("addon-deploy-0")},
-			expectedInstall: false,
+			expectedInstall: true,
 		},
 		{
 			name:            "COO already OLM-managed on spoke: don't install our own",

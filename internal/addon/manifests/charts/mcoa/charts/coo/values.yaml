@@ -5,14 +5,4 @@ enabled: false
 
 installCOO: false
 
-metrics:
-    enabled: false
-
-dashboards: []
-
-analyticsDashboards: []
-
-incidentDetection:
-  enabled: false
-
-monitoringUIPlugin: false
+isHub: false
