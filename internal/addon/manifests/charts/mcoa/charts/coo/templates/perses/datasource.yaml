@@ -1,4 +1,4 @@
-{{- if and .Values.enabled .Values.monitoringUIPlugin }}
+{{- if and .Values.enabled .Values.dashboards }}
 apiVersion: perses.dev/v1alpha1
 kind: PersesDatasource
 metadata:
