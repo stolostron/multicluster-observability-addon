@@ -265,6 +265,8 @@ github.com/jpillora/backoff v1.0.0 h1:uvFg412JmmHBHw7iwprIxkPMI+sGQ4kzOWsMeHnm2E
 github.com/jpillora/backoff v1.0.0/go.mod h1:J/6gKK9jxlEcS3zixgDgUAsiuZ7yrSoa/FX5e0EB2j4=
 github.com/json-iterator/go v1.1.12 h1:PV8peI4a0ysnczrg+LtxykD8LfKY9ML6u2jnxaEnrnM=
 github.com/json-iterator/go v1.1.12/go.mod h1:e30LSqwooZae/UwlEbR2852Gd8hjQvJoHmT4TnhNGBo=
+github.com/katekeiroz-dev/prometheus v0.0.0-20260805152148-3e63de110bdd h1:lK/QI9GjAtyCfgWW633sXTRvFSiKp2pNCTBpI1xgQ4k=
+github.com/katekeiroz-dev/prometheus v0.0.0-20260805152148-3e63de110bdd/go.mod h1:UeEsqN3iSmAASRE3qkAm3b/3ofdiTAqGdsz+Sj3F0KA=
 github.com/kisielk/errcheck v1.5.0/go.mod h1:pFxgyoBC7bSaBwPgfKdkLd5X25qrDl4LWUI2bnpBCr8=
 github.com/kisielk/gotool v1.0.0/go.mod h1:XhKaO+MFFWcvkIS/tQcRk01m1F5IRFswLeQ+oQHNcck=
 github.com/klauspost/compress v1.18.0 h1:c/Cqfb0r+Yi+JtIEq73FWXVkRonBlf0CRNYc8Zttxdo=
@@ -387,8 +389,6 @@ github.com/prometheus/otlptranslator v1.0.0 h1:s0LJW/iN9dkIH+EnhiD3BlkkP5QVIUVEo
 github.com/prometheus/otlptranslator v1.0.0/go.mod h1:vRYWnXvI6aWGpsdY/mOT/cbeVRBlPWtBNDb7kGR3uKM=
 github.com/prometheus/procfs v0.17.0 h1:FuLQ+05u4ZI+SS/w9+BWEM2TXiHKsUQ9TADiRH7DuK0=
 github.com/prometheus/procfs v0.17.0/go.mod h1:oPQLaDAMRbA+u8H5Pbfq+dl3VDAvHxMUOVhe0wYB2zw=
-github.com/prometheus/prometheus v0.307.2 h1:oA6J+sgS1iTEpsRjyKUYAe+3BzwpsYBqzeRchPOUZ/M=
-github.com/prometheus/prometheus v0.307.2/go.mod h1:UeEsqN3iSmAASRE3qkAm3b/3ofdiTAqGdsz+Sj3F0KA=
 github.com/prometheus/sigv4 v0.2.1 h1:hl8D3+QEzU9rRmbKIRwMKRwaFGyLkbPdH5ZerglRHY0=
 github.com/prometheus/sigv4 v0.2.1/go.mod h1:ySk6TahIlsR2sxADuHy4IBFhwEjRGGsfbbLGhFYFj6Q=
 github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring v0.83.0-rhobs1 h1:tnuw3oTPuZN/srWcVXU6+BqtXJTxOQebsI+MYMKdE08=
