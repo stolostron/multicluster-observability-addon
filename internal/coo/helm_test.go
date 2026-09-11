@@ -162,6 +162,41 @@ func Test_IncidentDetection_AllConfigsTogether_AllResources(t *testing.T) {
 			},
 		},
 		{
+			name:  "spoke with incident detection renders UIPlugin but no datasources",
+			isHub: false,
+			cv: []addonapiv1beta1.CustomizedVariable{
+				{
+					Name:  "platformIncidentDetection",
+					Value: "uiplugins.v1alpha1.observability.openshift.io",
+				},
+			},
+			expectedFunc: func(t *testing.T, objects []runtime.Object) {
+				var uiPluginCount int
+				var datasourceCount int
+				var dashboardCount int
+
+				for _, o := range objects {
+					switch obj := o.(type) {
+					case *uiplugin.UIPlugin:
+						uiPluginCount++
+						require.Equal(t, "monitoring", obj.Name)
+						require.NotNil(t, obj.Spec.Monitoring.Incidents)
+						require.True(t, obj.Spec.Monitoring.Incidents.Enabled)
+					case *persesv1.PersesDatasource:
+						datasourceCount++
+						t.Errorf("unexpected PersesDatasource %s/%s on spoke", obj.Namespace, obj.Name)
+					case *persesv1.PersesDashboard:
+						dashboardCount++
+						t.Errorf("unexpected PersesDashboard %s/%s on spoke", obj.Namespace, obj.Name)
+					}
+				}
+
+				require.Equal(t, 1, uiPluginCount, "UIPlugin should render on spoke for incident detection")
+				require.Equal(t, 0, datasourceCount, "no datasources should render on spoke")
+				require.Equal(t, 0, dashboardCount, "no dashboards should render on spoke")
+			},
+		},
+		{
 			name: "incident detection dashboards in observability-analytics namespace",
 			cv: []addonapiv1beta1.CustomizedVariable{
 				{
