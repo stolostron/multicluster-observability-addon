@@ -195,24 +195,28 @@ func TestInstallOfCOOOnSpokeIsNeeded(t *testing.T) {
 		{
 			name: "COO not installed: safe to install",
 			claims: []clusterv1.ManagedClusterClaim{
-				{Name: addoncfg.CooInstalledClaimName, Value: "false"},
-				{Name: addoncfg.CooManagedByClaimName, Value: ""},
+				{Name: addoncfg.CooStatusClaimName, Value: "not-installed"},
 			},
 			expectedInstall: true,
 		},
 		{
 			name: "COO installed by MCOA: keep managing",
 			claims: []clusterv1.ManagedClusterClaim{
-				{Name: addoncfg.CooInstalledClaimName, Value: "true"},
-				{Name: addoncfg.CooManagedByClaimName, Value: "mcoa"},
+				{Name: addoncfg.CooStatusClaimName, Value: "mcoa"},
 			},
 			expectedInstall: true,
 		},
 		{
 			name: "COO installed by external party: don't install",
 			claims: []clusterv1.ManagedClusterClaim{
-				{Name: addoncfg.CooInstalledClaimName, Value: "true"},
-				{Name: addoncfg.CooManagedByClaimName, Value: "external"},
+				{Name: addoncfg.CooStatusClaimName, Value: "external"},
+			},
+			expectedInstall: false,
+		},
+		{
+			name: "unknown status value: defer",
+			claims: []clusterv1.ManagedClusterClaim{
+				{Name: addoncfg.CooStatusClaimName, Value: "something-unexpected"},
 			},
 			expectedInstall: false,
 		},
