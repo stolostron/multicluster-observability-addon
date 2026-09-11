@@ -213,6 +213,13 @@ func TestInstallOfCOOOnSpokeIsNeeded(t *testing.T) {
 			},
 			expectedInstall: false,
 		},
+		{
+			name: "unknown status value: defer",
+			claims: []clusterv1.ManagedClusterClaim{
+				{Name: addoncfg.CooStatusClaimName, Value: "something-unexpected"},
+			},
+			expectedInstall: false,
+		},
 	}
 
 	for _, tc := range tests {
