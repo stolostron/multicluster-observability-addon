@@ -25,8 +25,7 @@ const (
 	CooSubscriptionNamespace = "openshift-cluster-observability-operator"
 	CooSubscriptionChannel   = "stable"
 
-	CooInstalledClaimName = "coo-installed.observability.open-cluster-management.io"
-	CooManagedByClaimName = "coo-managed-by.observability.open-cluster-management.io"
+	CooStatusClaimName = "coo.observability.open-cluster-management.io"
 
 	PaProbeKey  = "isAvailable"
 	PaProbePath = ".status.conditions[?(@.type==\"Available\")].status"
