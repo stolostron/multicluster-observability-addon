@@ -49,8 +49,9 @@ func (b *ObjectBuilder) Build(ctx context.Context, cluster *clusterv1.ManagedClu
 	store := b.buildStore(opts, storeImage)
 	receive := b.buildReceive(opts)
 	query := b.buildQuery(opts)
+	ruler := b.buildRuler(opts)
 
-	return []runtime.Object{store, receive, query}, nil
+	return []runtime.Object{store, receive, query, ruler}, nil
 }
 
 func (b *ObjectBuilder) buildStore(opts addon.Options, storeImage string) *thanosv1alpha1.ThanosStore {
@@ -172,6 +173,51 @@ func (b *ObjectBuilder) buildQuery(opts addon.Options) *thanosv1alpha1.ThanosQue
 	return query
 }
 
+func (b *ObjectBuilder) buildRuler(opts addon.Options) *thanosv1alpha1.ThanosRuler {
+	retention := thanosv1alpha1.Duration(config.DefaultRulerRetention)
+	evalInterval := thanosv1alpha1.Duration(config.DefaultRulerEvalInterval)
+
+	ruler := &thanosv1alpha1.ThanosRuler{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: thanosv1alpha1.GroupVersion.String(),
+			Kind:       "ThanosRuler",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "mcoa",
+			Namespace: config.HubInstallNamespace,
+			Labels:    rulerLabels(),
+		},
+		Spec: thanosv1alpha1.ThanosRulerSpec{
+			Replicas: config.DefaultRulerReplicas,
+			ObjectStorageConfig: thanosv1alpha1.ObjectStorageConfig{
+				LocalObjectReference: corev1.LocalObjectReference{Name: config.ObjectStorageSecretName},
+				Key:                  config.ObjectStorageSecretKey,
+			},
+			StorageConfiguration: thanosv1alpha1.StorageConfiguration{
+				Size: thanosv1alpha1.StorageSize(config.DefaultRulerStorageSize),
+			},
+			AlertmanagerURL:    config.DefaultRulerAlertmanagerURL,
+			Retention:          retention,
+			EvaluationInterval: evalInterval,
+			ExternalLabels: thanosv1alpha1.ExternalLabels{
+				"rule_replica": "$(NAME)",
+			},
+		},
+	}
+
+	ApplyCommonThanosFields(&ruler.Spec.CommonFields, opts, config.ThanosRulerContainerID)
+
+	return ruler
+}
+
+func rulerLabels() map[string]string {
+	labels := make(map[string]string, len(mcoaLabels)+2)
+	maps.Copy(labels, mcoaLabels)
+	labels["app.kubernetes.io/component"] = "ruler"
+	labels["app.kubernetes.io/name"] = config.ThanosOperatorAppName
+	return labels
+}
+
 func queryLabels() map[string]string {
 	labels := make(map[string]string, len(mcoaLabels)+2)
 	maps.Copy(labels, mcoaLabels)
@@ -251,6 +297,13 @@ func defaultResources(containerID string) *corev1.ResourceRequirements {
 			Requests: corev1.ResourceList{
 				corev1.ResourceCPU:    resource.MustParse(config.DefaultQueryFrontendCPURequest),
 				corev1.ResourceMemory: resource.MustParse(config.DefaultQueryFrontendMemRequest),
+			},
+		}
+	case config.ThanosRulerContainerID:
+		return &corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse(config.DefaultRulerCPURequest),
+				corev1.ResourceMemory: resource.MustParse(config.DefaultRulerMemRequest),
 			},
 		}
 	default:
