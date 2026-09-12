@@ -7,6 +7,10 @@ kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: open-cluster-management:multicluster-observability-addon:klusterlet-work:agent
+  annotations:
+    # Retain the ClusterRole during ManifestWork teardown so klusterlet-work-sa
+    # doesn't lose permissions while deleting the remaining applied resources.
+    addon.open-cluster-management.io/deletion-orphan: ""
   labels:
     app: {{ template "mcoahelm.name" . }}
     chart: {{ template "mcoahelm.chart" . }}
@@ -24,5 +28,8 @@ rules:
     verbs: ["get", "list", "watch", "create", "update", "delete", "patch"]
   - apiGroups: ["apiextensions.k8s.io"]
     resources: ["customresourcedefinitions"]
+    verbs: ["get", "list", "watch", "create", "update", "delete", "patch"]
+  - apiGroups: [""]
+    resources: ["namespaces"]
     verbs: ["get", "list", "watch", "create", "update", "delete", "patch"]
 {{- end }}
