@@ -145,12 +145,48 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 
 				sa := common.FilterResourcesByLabelSelector[*corev1.ServiceAccount](objects, nil)
 				assert.Len(t, sa, 2)
+				var cleanupSA *corev1.ServiceAccount
+				for _, s := range sa {
+					if s.GetName() == "observability-pre-delete-sa" {
+						cleanupSA = s
+						break
+					}
+				}
+				require.NotNil(t, cleanupSA)
+				assert.Contains(t, cleanupSA.Annotations, "addon.open-cluster-management.io/addon-pre-delete")
+				assert.Contains(t, cleanupSA.Annotations, "addon.open-cluster-management.io/deletion-orphan")
+				assert.Empty(t, cleanupSA.Annotations["addon.open-cluster-management.io/addon-pre-delete"])
+				assert.Empty(t, cleanupSA.Annotations["addon.open-cluster-management.io/deletion-orphan"])
 
 				cr := common.FilterResourcesByLabelSelector[*rbacv1.ClusterRole](objects, nil)
 				assert.Len(t, cr, 3)
+				var cleanupCR *rbacv1.ClusterRole
+				for _, c := range cr {
+					if strings.Contains(c.GetName(), "observability-addon-cleanup") {
+						cleanupCR = c
+						break
+					}
+				}
+				require.NotNil(t, cleanupCR)
+				assert.Contains(t, cleanupCR.Annotations, "addon.open-cluster-management.io/addon-pre-delete")
+				assert.Contains(t, cleanupCR.Annotations, "addon.open-cluster-management.io/deletion-orphan")
+				assert.Empty(t, cleanupCR.Annotations["addon.open-cluster-management.io/addon-pre-delete"])
+				assert.Empty(t, cleanupCR.Annotations["addon.open-cluster-management.io/deletion-orphan"])
 
 				crb := common.FilterResourcesByLabelSelector[*rbacv1.ClusterRoleBinding](objects, nil)
 				assert.Len(t, crb, 3)
+				var cleanupCRB *rbacv1.ClusterRoleBinding
+				for _, b := range crb {
+					if strings.Contains(b.GetName(), "observability-addon-cleanup") {
+						cleanupCRB = b
+						break
+					}
+				}
+				require.NotNil(t, cleanupCRB)
+				assert.Contains(t, cleanupCRB.Annotations, "addon.open-cluster-management.io/addon-pre-delete")
+				assert.Contains(t, cleanupCRB.Annotations, "addon.open-cluster-management.io/deletion-orphan")
+				assert.Empty(t, cleanupCRB.Annotations["addon.open-cluster-management.io/addon-pre-delete"])
+				assert.Empty(t, cleanupCRB.Annotations["addon.open-cluster-management.io/deletion-orphan"])
 
 				svc := common.FilterResourcesByLabelSelector[*corev1.Service](objects, nil)
 				assert.Len(t, svc, 1)
@@ -161,8 +197,13 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				assert.Equal(t, "endpoint-monitoring-operator-metrics", sm[0].GetName())
 
 				job := common.FilterResourcesByLabelSelector[*batchv1.Job](objects, nil)
-				assert.Len(t, job, 1)
+				require.Len(t, job, 1)
 				assert.Equal(t, "observability-monitoring-cleanup", job[0].GetName())
+				require.NotNil(t, job[0].Spec.TTLSecondsAfterFinished)
+				assert.Equal(t, int32(180), *job[0].Spec.TTLSecondsAfterFinished)
+				require.NotNil(t, job[0].Spec.ActiveDeadlineSeconds)
+				assert.Equal(t, int64(300), *job[0].Spec.ActiveDeadlineSeconds)
+				assert.Contains(t, job[0].Spec.Template.Spec.Tolerations, corev1.Toleration{Operator: corev1.TolerationOpExists})
 			},
 		},
 		"platform metrics enabled but agent missing": {
@@ -179,8 +220,13 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				sa := common.FilterResourcesByLabelSelector[*corev1.ServiceAccount](objects, nil)
 				assert.Len(t, sa, 2)
 				job := common.FilterResourcesByLabelSelector[*batchv1.Job](objects, nil)
-				assert.Len(t, job, 1)
+				require.Len(t, job, 1)
 				assert.Equal(t, "observability-monitoring-cleanup", job[0].GetName())
+				require.NotNil(t, job[0].Spec.TTLSecondsAfterFinished)
+				assert.Equal(t, int32(180), *job[0].Spec.TTLSecondsAfterFinished)
+				require.NotNil(t, job[0].Spec.ActiveDeadlineSeconds)
+				assert.Equal(t, int64(300), *job[0].Spec.ActiveDeadlineSeconds)
+				assert.Contains(t, job[0].Spec.Template.Spec.Tolerations, corev1.Toleration{Operator: corev1.TolerationOpExists})
 				secrets := common.FilterResourcesByLabelSelector[*corev1.Secret](objects, nil)
 				assert.Len(t, secrets, 3)
 			},
@@ -288,6 +334,11 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				}
 				assert.Equal(t, "--cluster-name=cluster-1", jobClusterNameArg)
 				assert.Equal(t, "--hub-alertmanager-ca-secret=hub-mtls-ca-97e513873da14ae489e", jobHubCASecretArg)
+				require.NotNil(t, cleanupJob.Spec.TTLSecondsAfterFinished)
+				assert.Equal(t, int32(180), *cleanupJob.Spec.TTLSecondsAfterFinished)
+				require.NotNil(t, cleanupJob.Spec.ActiveDeadlineSeconds)
+				assert.Equal(t, int64(300), *cleanupJob.Spec.ActiveDeadlineSeconds)
+				assert.Contains(t, cleanupJob.Spec.Template.Spec.Tolerations, corev1.Toleration{Operator: corev1.TolerationOpExists})
 				// ensure that the number of objects is correct
 				expectedCount := 47
 				if len(objects) != expectedCount {
