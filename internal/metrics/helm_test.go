@@ -161,8 +161,12 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				assert.Equal(t, "endpoint-monitoring-operator-metrics", sm[0].GetName())
 
 				job := common.FilterResourcesByLabelSelector[*batchv1.Job](objects, nil)
-				assert.Len(t, job, 1)
+				require.Len(t, job, 1)
 				assert.Equal(t, "observability-monitoring-cleanup", job[0].GetName())
+				require.NotNil(t, job[0].Spec.TTLSecondsAfterFinished)
+				assert.Equal(t, int32(180), *job[0].Spec.TTLSecondsAfterFinished)
+				assert.Nil(t, job[0].Spec.ActiveDeadlineSeconds)
+				assert.Contains(t, job[0].Spec.Template.Spec.Tolerations, corev1.Toleration{Operator: corev1.TolerationOpExists})
 			},
 		},
 		"platform metrics enabled but agent missing": {
@@ -179,8 +183,12 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				sa := common.FilterResourcesByLabelSelector[*corev1.ServiceAccount](objects, nil)
 				assert.Len(t, sa, 2)
 				job := common.FilterResourcesByLabelSelector[*batchv1.Job](objects, nil)
-				assert.Len(t, job, 1)
+				require.Len(t, job, 1)
 				assert.Equal(t, "observability-monitoring-cleanup", job[0].GetName())
+				require.NotNil(t, job[0].Spec.TTLSecondsAfterFinished)
+				assert.Equal(t, int32(180), *job[0].Spec.TTLSecondsAfterFinished)
+				assert.Nil(t, job[0].Spec.ActiveDeadlineSeconds)
+				assert.Contains(t, job[0].Spec.Template.Spec.Tolerations, corev1.Toleration{Operator: corev1.TolerationOpExists})
 				secrets := common.FilterResourcesByLabelSelector[*corev1.Secret](objects, nil)
 				assert.Len(t, secrets, 3)
 			},
@@ -288,6 +296,10 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				}
 				assert.Equal(t, "--cluster-name=cluster-1", jobClusterNameArg)
 				assert.Equal(t, "--hub-alertmanager-ca-secret=hub-mtls-ca-97e513873da14ae489e", jobHubCASecretArg)
+				require.NotNil(t, cleanupJob.Spec.TTLSecondsAfterFinished)
+				assert.Equal(t, int32(180), *cleanupJob.Spec.TTLSecondsAfterFinished)
+				assert.Nil(t, cleanupJob.Spec.ActiveDeadlineSeconds)
+				assert.Contains(t, cleanupJob.Spec.Template.Spec.Tolerations, corev1.Toleration{Operator: corev1.TolerationOpExists})
 				// ensure that the number of objects is correct
 				expectedCount := 47
 				if len(objects) != expectedCount {
