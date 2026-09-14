@@ -49,10 +49,15 @@ const (
 	ThanosRulerContainerID      = "statefulsets:mcoa:thanos-ruler"
 
 	// Thanos Compact defaults
-	DefaultCompactStorageSize = "10Gi"
-	DefaultCompactCPURequest  = "100m"
-	DefaultCompactMemRequest  = "512Mi"
-	ThanosCompactContainerID  = "statefulsets:mcoa:thanos-compact"
+	DefaultCompactStorageSize    = "10Gi"
+	DefaultCompactCPURequest     = "100m"
+	DefaultCompactMemRequest     = "512Mi"
+	DefaultCompactRetentionRaw   = "365d"
+	DefaultCompactRetention5m    = "365d"
+	DefaultCompactRetention1h    = "365d"
+	DefaultCompactConcurrency    = int32(4)
+	DefaultCompactDownsampleConc = int32(4)
+	ThanosCompactContainerID     = "statefulsets:mcoa:thanos-compact"
 
 	// Thanos object storage configuration
 	ObjectStorageSecretName = "thanos-object-storage"

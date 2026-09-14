@@ -217,6 +217,10 @@ func (b *ObjectBuilder) buildRuler(opts addon.Options) *thanosv1alpha1.ThanosRul
 }
 
 func (b *ObjectBuilder) buildCompact(opts addon.Options) *thanosv1alpha1.ThanosCompact {
+	acceptMalformedIndex := true
+	compactConc := config.DefaultCompactConcurrency
+	downsampleConc := config.DefaultCompactDownsampleConc
+
 	compact := &thanosv1alpha1.ThanosCompact{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: thanosv1alpha1.GroupVersion.String(),
@@ -236,9 +240,24 @@ func (b *ObjectBuilder) buildCompact(opts addon.Options) *thanosv1alpha1.ThanosC
 				Size: thanosv1alpha1.StorageSize(config.DefaultCompactStorageSize),
 			},
 			RetentionConfig: thanosv1alpha1.RetentionResolutionConfig{
-				Raw:         "0d",
-				FiveMinutes: "0d",
-				OneHour:     "0d",
+				Raw:         thanosv1alpha1.Duration(config.DefaultCompactRetentionRaw),
+				FiveMinutes: thanosv1alpha1.Duration(config.DefaultCompactRetention5m),
+				OneHour:     thanosv1alpha1.Duration(config.DefaultCompactRetention1h),
+			},
+			BlockConfig: &thanosv1alpha1.BlockConfig{
+				BlockDiscoveryStrategy: thanosv1alpha1.BlockDiscoveryStrategyRecursive,
+			},
+			CompactConfig: &thanosv1alpha1.CompactConfig{
+				CompactConcurrency: &compactConc,
+			},
+			DownsamplingConfig: &thanosv1alpha1.DownsamplingConfig{
+				Concurrency: &downsampleConc,
+			},
+			VerticalCompactionConfig: &thanosv1alpha1.VerticalCompactionConfig{
+				ReplicaLabels: []string{"replica"},
+			},
+			DebugConfig: &thanosv1alpha1.DebugConfig{
+				AcceptMalformedIndex: &acceptMalformedIndex,
 			},
 		},
 	}
