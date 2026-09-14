@@ -199,6 +199,11 @@ func (b *ObjectBuilder) buildRuler(opts addon.Options) *thanosv1alpha1.ThanosRul
 			AlertmanagerURL:    config.DefaultRulerAlertmanagerURL,
 			Retention:          retention,
 			EvaluationInterval: evalInterval,
+			RuleConfigSelector: metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"app.kubernetes.io/part-of": "multicluster-observability-addon",
+				},
+			},
 			ExternalLabels: thanosv1alpha1.ExternalLabels{
 				"rule_replica": "$(NAME)",
 			},
