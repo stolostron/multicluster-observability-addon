@@ -7,7 +7,7 @@ metadata:
   namespace: openshift-monitoring
   labels:
     {{- $mcoaHelmLabels := fromYaml (include "mcoahelm.labels" $) }}
-    {{- $customLabel := dict "app.kubernetes.io/component" "right-sizing-virtualization" "operator.thanos.io/prometheus-rule" "true" }}
+    {{- $customLabel := dict "app.kubernetes.io/component" "right-sizing-virtualization" }}
     {{- $mergedLabels := mergeOverwrite $mcoaHelmLabels $customLabel }}
     {{- toYaml $mergedLabels | nindent 4 }}
   annotations:
