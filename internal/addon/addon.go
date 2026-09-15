@@ -274,6 +274,36 @@ func ManifestConfigs() []workv1.ManifestConfigOption {
 	manifestConfigs = append(manifestConfigs,
 		workv1.ManifestConfigOption{
 			ResourceIdentifier: workv1.ResourceIdentifier{
+				Group:     "",
+				Resource:  "configmaps",
+				Name:      addoncfg.TLSProfileConfigMapName,
+				Namespace: addoncfg.TLSProfileConfigMapNamespace,
+			},
+			UpdateStrategy: &workv1.UpdateStrategy{
+				Type: workv1.UpdateStrategyTypeReadOnly,
+			},
+			FeedbackRules: []workv1.FeedbackRule{
+				{
+					Type: workv1.JSONPathsType,
+					JsonPaths: []workv1.JsonPath{
+						{
+							Name: addoncfg.TLSProfileTypeFeedbackName,
+							Path: addoncfg.TLSProfileTypeFeedbackPath,
+						},
+						{
+							Name: addoncfg.TLSMinVersionFeedbackName,
+							Path: addoncfg.TLSMinVersionFeedbackPath,
+						},
+						{
+							Name: addoncfg.TLSCipherSuitesFeedbackName,
+							Path: addoncfg.TLSCipherSuitesFeedbackPath,
+						},
+					},
+				},
+			},
+		},
+		workv1.ManifestConfigOption{
+			ResourceIdentifier: workv1.ResourceIdentifier{
 				Group:    "",
 				Resource: "configmaps",
 				Name:     mconfig.PrometheusCAConfigMapName,
