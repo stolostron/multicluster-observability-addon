@@ -38,6 +38,7 @@ type Options struct {
 	ProxyConfig              addon.ProxyConfig
 	TLSMinVersion            string
 	TLSCipherSuites          string
+	TLSProfileEnabled        bool
 
 	ThanosOperatorEnabled bool
 

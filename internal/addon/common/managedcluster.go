@@ -82,6 +82,14 @@ func getClusterClaim(cluster *clusterv1.ManagedCluster, name string) string {
 	return cluster.Status.ClusterClaims[idx].Value
 }
 
+func HasTLSProfileSupport(cluster *clusterv1.ManagedCluster) bool {
+	version := getClusterClaim(cluster, "version.openshift.io")
+	if version == "" {
+		return false
+	}
+	return version >= "5.0"
+}
+
 func VendorIsOverridden(cluster *clusterv1.ManagedCluster) string {
 	vendorOverride := cluster.Annotations[addoncfg.VendorOverrideAnnotationKey]
 	if vendorOverride != "" {
