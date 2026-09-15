@@ -57,24 +57,17 @@ func TestBuildDefaultStackStorageResources(t *testing.T) {
 
 	t.Run("disabled default stack returns nothing", func(t *testing.T) {
 		k8s := fake.NewClientBuilder().WithScheme(scheme).Build()
-		objects, clusterConfigs, err := BuildDefaultStackStorageResources(t.Context(), k8s, addon.LogsOptions{}, addon.LogsOptions{}, "")
+		objects, err := BuildDefaultStackStorageResources(t.Context(), k8s, addon.LogsOptions{}, addon.LogsOptions{}, "")
 		require.NoError(t, err)
 		assert.Empty(t, objects)
-		assert.Empty(t, clusterConfigs)
 	})
 
-	t.Run("LokiStack is an MCAO cluster config, not a placement config", func(t *testing.T) {
+	t.Run("creates LokiStack template and storage cert on the hub cluster", func(t *testing.T) {
 		k8s := fake.NewClientBuilder().WithScheme(scheme).WithObjects(hub, spoke, buildObjStorageSecret()).Build()
 		platform := addon.LogsOptions{DefaultStack: true}
 
-		objects, clusterConfigs, err := BuildDefaultStackStorageResources(t.Context(), k8s, platform, addon.LogsOptions{}, "")
+		objects, err := BuildDefaultStackStorageResources(t.Context(), k8s, platform, addon.LogsOptions{}, "")
 		require.NoError(t, err)
-
-		require.Len(t, clusterConfigs, 1)
-		assert.Equal(t, "local-cluster", clusterConfigs[0].ClusterNamespace)
-		assert.Equal(t, addoncfg.LokiStacksResource, clusterConfigs[0].Config.Resource)
-		assert.Equal(t, "loki.grafana.com", clusterConfigs[0].Config.Group)
-		assert.Equal(t, "mcoa-default-global", clusterConfigs[0].Config.Name)
 
 		var foundLS bool
 		var storageCertNS string
@@ -95,7 +88,7 @@ func TestBuildDefaultStackStorageResources(t *testing.T) {
 		assert.Equal(t, "local-cluster", storageCertNS)
 	})
 
-	t.Run("uses labeled hub cluster name as MCAO namespace", func(t *testing.T) {
+	t.Run("uses labeled hub cluster name for the storage cert namespace", func(t *testing.T) {
 		customHub := &clusterv1.ManagedCluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   "my-hub",
@@ -105,10 +98,8 @@ func TestBuildDefaultStackStorageResources(t *testing.T) {
 		k8s := fake.NewClientBuilder().WithScheme(scheme).WithObjects(customHub, buildObjStorageSecret()).Build()
 		platform := addon.LogsOptions{DefaultStack: true}
 
-		objects, clusterConfigs, err := BuildDefaultStackStorageResources(t.Context(), k8s, platform, addon.LogsOptions{}, "")
+		objects, err := BuildDefaultStackStorageResources(t.Context(), k8s, platform, addon.LogsOptions{}, "")
 		require.NoError(t, err)
-		require.Len(t, clusterConfigs, 1)
-		assert.Equal(t, "my-hub", clusterConfigs[0].ClusterNamespace)
 
 		var storageCertNS string
 		for _, obj := range objects {
@@ -117,6 +108,56 @@ func TestBuildDefaultStackStorageResources(t *testing.T) {
 			}
 		}
 		assert.Equal(t, "my-hub", storageCertNS)
+	})
+}
+
+func TestBuildDefaultStackStorageClusterConfig(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, addonv1beta1.Install(scheme))
+	require.NoError(t, clusterv1.Install(scheme))
+
+	hub := &clusterv1.ManagedCluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   "local-cluster",
+			Labels: map[string]string{constants.SelfManagedClusterLabelKey: "true"},
+		},
+	}
+	spoke := &clusterv1.ManagedCluster{
+		ObjectMeta: metav1.ObjectMeta{Name: "spoke-1"},
+	}
+
+	t.Run("disabled default stack returns nothing", func(t *testing.T) {
+		k8s := fake.NewClientBuilder().WithScheme(scheme).Build()
+		clusterConfigs, err := BuildDefaultStackStorageClusterConfig(t.Context(), k8s, addon.LogsOptions{})
+		require.NoError(t, err)
+		assert.Empty(t, clusterConfigs)
+	})
+
+	t.Run("LokiStack is an MCAO cluster config on the hub", func(t *testing.T) {
+		k8s := fake.NewClientBuilder().WithScheme(scheme).WithObjects(hub, spoke).Build()
+		clusterConfigs, err := BuildDefaultStackStorageClusterConfig(t.Context(), k8s, addon.LogsOptions{DefaultStack: true})
+		require.NoError(t, err)
+
+		require.Len(t, clusterConfigs, 1)
+		assert.Equal(t, "local-cluster", clusterConfigs[0].ClusterNamespace)
+		assert.Equal(t, addoncfg.LokiStacksResource, clusterConfigs[0].Config.Resource)
+		assert.Equal(t, "loki.grafana.com", clusterConfigs[0].Config.Group)
+		assert.Equal(t, "mcoa-default-global", clusterConfigs[0].Config.Name)
+		assert.Equal(t, addoncfg.InstallNamespace, clusterConfigs[0].Config.Namespace)
+	})
+
+	t.Run("uses labeled hub cluster name as MCAO namespace", func(t *testing.T) {
+		customHub := &clusterv1.ManagedCluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   "my-hub",
+				Labels: map[string]string{constants.SelfManagedClusterLabelKey: "true"},
+			},
+		}
+		k8s := fake.NewClientBuilder().WithScheme(scheme).WithObjects(customHub).Build()
+		clusterConfigs, err := BuildDefaultStackStorageClusterConfig(t.Context(), k8s, addon.LogsOptions{DefaultStack: true})
+		require.NoError(t, err)
+		require.Len(t, clusterConfigs, 1)
+		assert.Equal(t, "my-hub", clusterConfigs[0].ClusterNamespace)
 	})
 }
 
@@ -142,7 +183,7 @@ func TestDefaultStackStorageResourcesSurviveDeleteOrphan(t *testing.T) {
 
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cmao, buildObjStorageSecret()).Build()
 
-	objs, _, err := BuildDefaultStackStorageResources(ctx, fakeClient, addon.LogsOptions{DefaultStack: true}, addon.LogsOptions{}, "hub.example.com")
+	objs, err := BuildDefaultStackStorageResources(ctx, fakeClient, addon.LogsOptions{DefaultStack: true}, addon.LogsOptions{}, "hub.example.com")
 	require.NoError(t, err)
 
 	for _, obj := range objs {
@@ -167,7 +208,7 @@ func TestBuildDefaultStackStorageResources_MissingObjStorageSecret(t *testing.T)
 	scheme := buildStorageTestScheme(t)
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
 
-	_, _, err := BuildDefaultStackStorageResources(ctx, fakeClient, addon.LogsOptions{DefaultStack: true}, addon.LogsOptions{}, "hub.example.com")
+	_, err := BuildDefaultStackStorageResources(ctx, fakeClient, addon.LogsOptions{DefaultStack: true}, addon.LogsOptions{}, "hub.example.com")
 	require.Error(t, err)
 	require.ErrorIs(t, err, errObjStorageSecretNotFound)
 }
