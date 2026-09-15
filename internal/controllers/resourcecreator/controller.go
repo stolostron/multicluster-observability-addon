@@ -63,11 +63,25 @@ var cmaoPredicate = builder.WithPredicates(predicate.Funcs{
 	GenericFunc: func(e event.GenericEvent) bool { return false },
 })
 
-var hubMCAOPredicate = builder.WithPredicates(predicate.NewPredicateFuncs(func(obj client.Object) bool {
-	// Every cluster's ManagedClusterAddOn is named after the addon. Only the hub
-	// cluster namespace (conventionally local-cluster) should trigger LokiStack attach.
-	return obj.GetName() == addoncfg.Name && obj.GetNamespace() == addoncfg.HubNamespace
-}))
+func isHubManagedClusterAddOn(ctx context.Context, k8s client.Client, obj client.Object) bool {
+	// Every cluster's ManagedClusterAddOn is named after the addon. Match the
+	// same hub name used when attaching LokiStack (labeled self-managed cluster,
+	// or local-cluster when none is labeled).
+	if obj.GetName() != addoncfg.Name {
+		return false
+	}
+	hubName, err := common.LookupHubClusterName(ctx, k8s)
+	if err != nil {
+		return obj.GetNamespace() == addoncfg.HubNamespace
+	}
+	return obj.GetNamespace() == hubName
+}
+
+func hubMCAOPredicate(k8s client.Client) builder.Predicates {
+	return builder.WithPredicates(predicate.NewPredicateFuncs(func(obj client.Object) bool {
+		return isHubManagedClusterAddOn(context.TODO(), k8s, obj)
+	}))
+}
 
 var rsConfigMapPredicate = builder.WithPredicates(rshandlers.RSConfigMapPredicate())
 
@@ -100,8 +114,9 @@ func SetupWithManager(mgr ctrl.Manager, logger logr.Logger) error {
 		// Trigger reconciliations if logging resources change
 		Watches(&lokiv1.LokiStack{}, r.enqueueForMCOAOwnedResources()).
 		Watches(&loggingv1.ClusterLogForwarder{}, r.enqueueForMCOAOwnedResources()).
-		// Trigger when the hub ManagedClusterAddOn is created so LokiStack can be attached to it
-		Watches(&addonv1beta1.ManagedClusterAddOn{}, r.enqueueAODC(), hubMCAOPredicate).
+		// Trigger when the hub ManagedClusterAddOn is created so LokiStack can be attached to it.
+		// Hub namespace is resolved the same way as storage attach (not hardcoded to local-cluster).
+		Watches(&addonv1beta1.ManagedClusterAddOn{}, r.enqueueAODC(), hubMCAOPredicate(r.Client)).
 		Complete(r)
 }
 
@@ -164,27 +179,36 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, fmt.Errorf("failed to reconcile right-sizing resources: %w", rsErr)
 	}
 
-	// Spoke collection: CLF templates on CMAO placements, fanned out via addon helm.
-	// Collection errors must not block LokiStack install.
+	// Spoke collection: CLF templates are applied here. Placement configs are
+	// appended only after LokiStack is requested on the hub MCAO so spokes do
+	// not start forwarding before storage is requested. Metrics configs stay
+	// on objs regardless of that wait.
 	lDefaultConfig, clfErr := r.reconcileLoggingCollection(ctx, cmao, opts)
 	if clfErr != nil {
 		r.Log.Error(clfErr, "failed to build CLF resources, will requeue and continue to LokiStack")
-	} else {
-		objs = append(objs, lDefaultConfig...)
 	}
 
 	// Hub storage component: LokiStack template + MCAO pointer (movable to another cluster later).
-	if result, err := r.reconcileLoggingStorage(ctx, cmao, opts); err != nil || !result.IsZero() {
-		return result, err
+	storageResult, storageErr := r.reconcileLoggingStorage(ctx, cmao, opts)
+	if storageErr != nil {
+		return ctrl.Result{}, storageErr
 	}
 
-	// If CLF had errors, requeue after LokiStack is applied
-	if clfErr != nil {
-		return ctrl.Result{}, clfErr
+	if storageResult.IsZero() && clfErr == nil {
+		objs = append(objs, lDefaultConfig...)
 	}
 
 	if err := common.EnsureAddonConfig(ctx, r.Log, r.Client, objs); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to patch default configs of the clustermanageraddon: %w", err)
+	}
+
+	if !storageResult.IsZero() {
+		return storageResult, nil
+	}
+
+	// If CLF had errors, requeue after LokiStack is applied and metrics configs are patched.
+	if clfErr != nil {
+		return ctrl.Result{}, clfErr
 	}
 
 	// Retrieve the updated ClusterManagementAddOn with current default configs

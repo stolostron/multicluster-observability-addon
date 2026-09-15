@@ -39,6 +39,23 @@ func (r *ResourceCreatorReconciler) reconcileLoggingCollection(ctx context.Conte
 // reconcileLoggingStorage applies the hub storage component (LokiStack template +
 // storage cert) and attaches the LokiStack config to the target ManagedClusterAddOn.
 func (r *ResourceCreatorReconciler) reconcileLoggingStorage(ctx context.Context, cmao *addonv1beta1.ClusterManagementAddOn, opts addon.Options) (ctrl.Result, error) {
+	// Drop leftover LokiStack placement configs before anything else so addon-manager
+	// stops fanning storage to spokes, even if object-storage setup later fails.
+	if err := common.StripPlacementConfigs(ctx, r.Log, r.Client, lokiv1.GroupVersion.Group, addoncfg.LokiStacksResource); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to strip LokiStack configs from ClusterManagementAddOn: %w", err)
+	}
+
+	clusterConfig, err := lhandlers.BuildDefaultStackStorageClusterConfig(ctx, r.Client, opts.Platform.Logs)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to build default stack storage addon config: %w", err)
+	}
+
+	// Strip LokiStack from every MCAO that should not run storage (upgrade leftovers
+	// copied onto spec.configs). Leave the target untouched until hub objects exist.
+	if _, err = r.applyStorageAddonConfigs(ctx, clusterConfig, false); err != nil {
+		return ctrl.Result{}, err
+	}
+
 	objs, err := lhandlers.BuildDefaultStackStorageResources(ctx, r.Client, opts.Platform.Logs, opts.UserWorkloads.Logs, opts.HubHostname)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to build default stack storage resources: %w", err)
@@ -47,28 +64,58 @@ func (r *ResourceCreatorReconciler) reconcileLoggingStorage(ctx context.Context,
 		return ctrl.Result{}, err
 	}
 
-	clusterConfig, err := lhandlers.BuildDefaultStackStorageClusterConfig(ctx, r.Client, opts.Platform.Logs)
-	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to build default stack storage addon config: %w", err)
+	return r.applyStorageAddonConfigs(ctx, clusterConfig, true)
+}
+
+// applyStorageAddonConfigs writes LokiStack configs onto ManagedClusterAddOns.
+// When attachDesired is false, target clusters are left untouched and leftover
+// LokiStack configs are removed from every other MCAO. When true, desired configs
+// are applied to their target namespaces (empty desired strips all) and missing
+// targets requeue.
+func (r *ResourceCreatorReconciler) applyStorageAddonConfigs(ctx context.Context, desired []common.ClusterAddonConfig, attachDesired bool) (ctrl.Result, error) {
+	desiredByNS := make(map[string][]addonv1beta1.AddOnConfig, len(desired))
+	for _, cfg := range desired {
+		desiredByNS[cfg.ClusterNamespace] = append(desiredByNS[cfg.ClusterNamespace], cfg.Config)
 	}
 
-	if len(clusterConfig) == 0 {
-		// Default stack is off: drop our LokiStack config from the hub MCAO.
-		// opts.HubHostname is the observability API DNS name from the AODC, not
-		// the ManagedCluster name used as the MCAO namespace.
-		hubName, lookupErr := common.LookupHubClusterName(ctx, r.Client)
-		if lookupErr != nil {
-			return ctrl.Result{}, fmt.Errorf("failed to look up hub cluster: %w", lookupErr)
+	list := &addonv1beta1.ManagedClusterAddOnList{}
+	if err := r.List(ctx, list); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to list ManagedClusterAddOns: %w", err)
+	}
+
+	foundDesired := make(map[string]struct{}, len(desiredByNS))
+	for i := range list.Items {
+		mcAddon := &list.Items[i]
+		if mcAddon.Name != addoncfg.Name {
+			continue
 		}
-		return r.applyStorageAddonConfig(ctx, hubName, nil)
-	}
 
-	var result ctrl.Result
-	for _, cfg := range clusterConfig {
-		result, err = r.applyStorageAddonConfig(ctx, cfg.ClusterNamespace, []addonv1beta1.AddOnConfig{cfg.Config})
+		configs, isTarget := desiredByNS[mcAddon.Namespace]
+		if isTarget && !attachDesired {
+			continue
+		}
+		if !isTarget {
+			configs = nil
+		}
+
+		result, err := r.applyStorageAddonConfig(ctx, mcAddon.Namespace, configs)
 		if err != nil || !result.IsZero() {
 			return result, err
 		}
+		if isTarget {
+			foundDesired[mcAddon.Namespace] = struct{}{}
+		}
+	}
+
+	if !attachDesired {
+		return ctrl.Result{}, nil
+	}
+	for ns := range desiredByNS {
+		if _, ok := foundDesired[ns]; ok {
+			continue
+		}
+		r.Log.Info("hub ManagedClusterAddOn not found, requeueing", "namespace", ns)
+		return ctrl.Result{RequeueAfter: addoncfg.DefaultContextTimeout}, nil
 	}
 	return ctrl.Result{}, nil
 }

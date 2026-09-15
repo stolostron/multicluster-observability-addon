@@ -93,6 +93,33 @@ func EnsureAddonConfig(ctx context.Context, logger logr.Logger, k8s client.Clien
 	return nil
 }
 
+// StripPlacementConfigs removes configs of the given group/resource from every
+// CMAO placement. Used when a config must live on a single ManagedClusterAddOn
+// (LokiStack) after it was previously fanned out through placements.
+func StripPlacementConfigs(ctx context.Context, logger logr.Logger, k8s client.Client, group, resource string) error {
+	cmao := &addonv1beta1.ClusterManagementAddOn{}
+	if err := k8s.Get(ctx, types.NamespacedName{Name: addoncfg.Name}, cmao); err != nil {
+		return fmt.Errorf("failed to get ClusterManagementAddOn: %w", err)
+	}
+
+	desiredCmao := cmao.DeepCopy()
+	desiredCmao.ManagedFields = nil // required for patching with ssa
+	if !removePlacementConfigs(desiredCmao, group, resource) {
+		return nil
+	}
+
+	if err := ServerSideApply(ctx, k8s, desiredCmao, nil); err != nil {
+		return fmt.Errorf("failed to strip %s/%s configs from ClusterManagementAddOn: %w", group, resource, err)
+	}
+
+	logger.Info("ClusterManagementAddOn placement configs stripped",
+		"name", desiredCmao.Name,
+		"group", group,
+		"resource", resource)
+
+	return nil
+}
+
 func containsAddOnConfig(configs []addonv1beta1.AddOnConfig, cfg addonv1beta1.AddOnConfig) bool {
 	return slices.ContainsFunc(configs, func(e addonv1beta1.AddOnConfig) bool {
 		return e == cfg
@@ -123,6 +150,24 @@ func ensureConfigsInAddon(cmao *addonv1beta1.ClusterManagementAddOn, configs []D
 		}
 		cmao.Spec.InstallStrategy.Placements[i].Configs = append(cmao.Spec.InstallStrategy.Placements[i].Configs, dedupConfigs...)
 	}
+}
+
+// removePlacementConfigs drops configs matching group/resource from every CMAO
+// placement. Returns true if any config was removed.
+func removePlacementConfigs(cmao *addonv1beta1.ClusterManagementAddOn, group, resource string) bool {
+	changed := false
+	for i, placement := range cmao.Spec.InstallStrategy.Placements {
+		filtered := make([]addonv1beta1.AddOnConfig, 0, len(placement.Configs))
+		for _, cfg := range placement.Configs {
+			if cfg.Group == group && cfg.Resource == resource {
+				changed = true
+				continue
+			}
+			filtered = append(filtered, cfg)
+		}
+		cmao.Spec.InstallStrategy.Placements[i].Configs = filtered
+	}
+	return changed
 }
 
 // removeStaleConfigs removes any user-defined PrometheusRule or ScrapeConfig, along with any PrometheusAgent
