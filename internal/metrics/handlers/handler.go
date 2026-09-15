@@ -93,6 +93,12 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1beta1.Man
 	}
 	ret.HubClusterID = hubId
 
+	hubName, err := common.GetLocalClusterName(ctx, o.Client)
+	if err != nil {
+		o.Logger.Error(err, "failed to get hub cluster name, defaulting to local-cluster")
+	}
+	ret.HubClusterName = hubName
+
 	if err = o.addAlertmanagerMtlsSecrets(ctx, &ret.Secrets, config.GetTrimmedClusterID(hubId), opts, isOpenShiftVendor); err != nil {
 		return ret, fmt.Errorf("failed to add alertmanager secrets: %w", err)
 	}
@@ -331,7 +337,7 @@ func (o *OptionsBuilder) buildPrometheusAgent(ctx context.Context, opts *Options
 	// add the relabel cfg to all remote write configs
 	for i := range agent.Spec.RemoteWrite {
 		agent.Spec.RemoteWrite[i].WriteRelabelConfigs = append(agent.Spec.RemoteWrite[i].WriteRelabelConfigs,
-			createWriteRelabelConfigs(opts.ClusterName, opts.ClusterID, isHypershift)...)
+			createWriteRelabelConfigs(opts.ClusterName, opts.ClusterID, opts.HubClusterName, isHypershift)...)
 	}
 
 	// Add proxy configuration to all remoteWrite configurations
@@ -572,7 +578,7 @@ func (o *OptionsBuilder) cooIsSubscribed(ctx context.Context, managedCluster *cl
 	return false, nil
 }
 
-func createWriteRelabelConfigs(clusterName, clusterID string, isHypershiftLocalCluster bool) []cooprometheusv1.RelabelConfig {
+func createWriteRelabelConfigs(clusterName, clusterID, hubClusterName string, isHypershiftLocalCluster bool) []cooprometheusv1.RelabelConfig {
 	ret := []cooprometheusv1.RelabelConfig{}
 	if isHypershiftLocalCluster {
 		// Don't overwrite the clusterID label as some are set to the hosted cluster ID (for hosted etcd and apiserver)
@@ -632,6 +638,11 @@ func createWriteRelabelConfigs(clusterName, clusterID string, isHypershiftLocalC
 	}
 
 	return append(ret,
+		cooprometheusv1.RelabelConfig{
+			Replacement: &hubClusterName,
+			TargetLabel: "managed_by",
+			Action:      "replace",
+		},
 		cooprometheusv1.RelabelConfig{
 			SourceLabels: []cooprometheusv1.LabelName{"exported_job"},
 			TargetLabel:  "job",
