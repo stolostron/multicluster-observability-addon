@@ -12,4 +12,14 @@ metadata:
     release: {{ .Release.Name }}
 spec:
   upgradeStrategy: Default
+{{- else if and .Values.enabled .Values.isHub }}
+apiVersion: operators.coreos.com/v1
+kind: OperatorGroup
+metadata:
+  name: openshift-cluster-observability-operator
+  namespace: openshift-cluster-observability-operator
+  annotations:
+    addon.open-cluster-management.io/deletion-orphan: ""
+spec:
+  upgradeStrategy: Default
 {{- end }}
