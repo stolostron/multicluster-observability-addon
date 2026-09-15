@@ -59,6 +59,24 @@ const (
 	DefaultCompactDownsampleConc = int32(4)
 	ThanosCompactContainerID     = "statefulsets:mcoa:thanos-compact"
 
+	// Memcached defaults
+	DefaultMemcachedImage              = "quay.io/ocm-observability/memcached:1.6.3-alpine"
+	DefaultMemcachedExporterImage      = "quay.io/prometheus/memcached-exporter:v0.9.0"
+	DefaultMemcachedReplicas           = int32(3)
+	DefaultMemcachedMemoryLimitMB      = int32(1024)
+	DefaultMemcachedConnectionLimit    = int32(1024)
+	DefaultMemcachedMaxItemSize        = "1m"
+	DefaultMemcachedCPURequest         = "45m"
+	DefaultMemcachedMemRequest         = "128Mi"
+	DefaultMemcachedExporterCPURequest = "5m"
+	DefaultMemcachedExporterMemRequest = "50Mi"
+	MemcachedStoreName                 = "memcached-store"
+	MemcachedQueryFrontendName         = "memcached-query-frontend"
+	StoreCacheConfigSecretName         = "thanos-store-index-cache-config"
+	StoreCacheConfigSecretKey          = "config.yaml"
+	QueryFECacheConfigSecretName       = "thanos-query-frontend-cache-config"
+	QueryFECacheConfigSecretKey        = "config.yaml"
+
 	// Thanos object storage configuration
 	ObjectStorageSecretName = "thanos-object-storage"
 	ObjectStorageSecretKey  = "thanos.yaml"

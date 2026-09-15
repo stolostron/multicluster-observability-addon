@@ -112,6 +112,8 @@ type ImageOverrides struct {
 	EndpointMonitoringOperator string `json:"endpoint_monitoring_operator"`
 	ThanosOperator             string `json:"thanos_operator"`
 	ThanosStore                string `json:"thanos_store"`
+	Memcached                  string `json:"memcached"`
+	MemcachedExporter          string `json:"memcached_exporter"`
 }
 
 func GetImageOverrides(ctx context.Context, c client.Client, registries []addonapiv1beta1.ImageMirror, logger logr.Logger) (ImageOverrides, error) {
@@ -155,6 +157,12 @@ func GetImageOverrides(ctx context.Context, c client.Client, registries []addona
 		}
 		if ret.ThanosStore != "" {
 			ret.ThanosStore = overrideImage(ret.ThanosStore, registries, logger)
+		}
+		if ret.Memcached != "" {
+			ret.Memcached = overrideImage(ret.Memcached, registries, logger)
+		}
+		if ret.MemcachedExporter != "" {
+			ret.MemcachedExporter = overrideImage(ret.MemcachedExporter, registries, logger)
 		}
 	}
 
