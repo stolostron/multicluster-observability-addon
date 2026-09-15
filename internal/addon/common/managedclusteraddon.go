@@ -64,6 +64,12 @@ func GetAddOnDeploymentConfig(ctx context.Context, getter addonutils.AddOnDeploy
 //
 // If the ManagedClusterAddOn does not exist and desired is empty, this is a no-op. If desired is
 // non-empty, the NotFound error is returned so the caller can requeue.
+//
+// This writes ManagedClusterAddOn spec.configs. The addon-manager also copies
+// ClusterManagementAddOn placement configs onto matching ManagedClusterAddOns. If a customer
+// puts the same group/resource on a CMAO placement (for LokiStack, that is a misconfiguration),
+// the two writers can fight. We do not error on that here; LokiStack must stay off CMAO
+// placements.
 func ApplyManagedClusterAddOnConfigs(ctx context.Context, logger logr.Logger, k8s client.Client, clusterNamespace string, desired []addonapiv1beta1.AddOnConfig, group, resource string) error {
 	mcAddon := &addonapiv1beta1.ManagedClusterAddOn{}
 	key := types.NamespacedName{Name: addoncfg.Name, Namespace: clusterNamespace}

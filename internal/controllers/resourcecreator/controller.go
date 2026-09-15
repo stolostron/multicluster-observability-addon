@@ -64,7 +64,9 @@ var cmaoPredicate = builder.WithPredicates(predicate.Funcs{
 })
 
 var hubMCAOPredicate = builder.WithPredicates(predicate.NewPredicateFuncs(func(obj client.Object) bool {
-	return obj.GetName() == addoncfg.Name
+	// Every cluster's ManagedClusterAddOn is named after the addon. Only the hub
+	// cluster namespace (conventionally local-cluster) should trigger LokiStack attach.
+	return obj.GetName() == addoncfg.Name && obj.GetNamespace() == addoncfg.HubNamespace
 }))
 
 var rsConfigMapPredicate = builder.WithPredicates(rshandlers.RSConfigMapPredicate())

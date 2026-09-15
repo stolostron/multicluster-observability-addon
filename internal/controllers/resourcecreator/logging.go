@@ -37,9 +37,9 @@ func (r *ResourceCreatorReconciler) reconcileLoggingCollection(ctx context.Conte
 }
 
 // reconcileLoggingStorage applies the hub storage component (LokiStack template +
-// storage cert) and attaches the LokiStack config to the hub ManagedClusterAddOn.
+// storage cert) and attaches the LokiStack config to the target ManagedClusterAddOn.
 func (r *ResourceCreatorReconciler) reconcileLoggingStorage(ctx context.Context, cmao *addonv1beta1.ClusterManagementAddOn, opts addon.Options) (ctrl.Result, error) {
-	objs, clusterConfig, err := lhandlers.BuildDefaultStackStorageResources(ctx, r.Client, opts.Platform.Logs, opts.UserWorkloads.Logs, opts.HubHostname)
+	objs, err := lhandlers.BuildDefaultStackStorageResources(ctx, r.Client, opts.Platform.Logs, opts.UserWorkloads.Logs, opts.HubHostname)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to build default stack storage resources: %w", err)
 	}
@@ -47,19 +47,36 @@ func (r *ResourceCreatorReconciler) reconcileLoggingStorage(ctx context.Context,
 		return ctrl.Result{}, err
 	}
 
-	hubName, err := common.LookupHubClusterName(ctx, r.Client)
+	clusterConfig, err := lhandlers.BuildDefaultStackStorageClusterConfig(ctx, r.Client, opts.Platform.Logs)
 	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to look up hub cluster: %w", err)
+		return ctrl.Result{}, fmt.Errorf("failed to build default stack storage addon config: %w", err)
 	}
-	desired := make([]addonv1beta1.AddOnConfig, 0, len(clusterConfig))
+
+	if len(clusterConfig) == 0 {
+		// Default stack is off: drop our LokiStack config from the hub MCAO.
+		// opts.HubHostname is the observability API DNS name from the AODC, not
+		// the ManagedCluster name used as the MCAO namespace.
+		hubName, lookupErr := common.LookupHubClusterName(ctx, r.Client)
+		if lookupErr != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to look up hub cluster: %w", lookupErr)
+		}
+		return r.applyStorageAddonConfig(ctx, hubName, nil)
+	}
+
+	var result ctrl.Result
 	for _, cfg := range clusterConfig {
-		if cfg.ClusterNamespace == hubName {
-			desired = append(desired, cfg.Config)
+		result, err = r.applyStorageAddonConfig(ctx, cfg.ClusterNamespace, []addonv1beta1.AddOnConfig{cfg.Config})
+		if err != nil || !result.IsZero() {
+			return result, err
 		}
 	}
-	if err = common.ApplyManagedClusterAddOnConfigs(ctx, r.Log, r.Client, hubName, desired, lokiv1.GroupVersion.Group, addoncfg.LokiStacksResource); err != nil {
+	return ctrl.Result{}, nil
+}
+
+func (r *ResourceCreatorReconciler) applyStorageAddonConfig(ctx context.Context, clusterNamespace string, desired []addonv1beta1.AddOnConfig) (ctrl.Result, error) {
+	if err := common.ApplyManagedClusterAddOnConfigs(ctx, r.Log, r.Client, clusterNamespace, desired, lokiv1.GroupVersion.Group, addoncfg.LokiStacksResource); err != nil {
 		if errors.IsNotFound(err) && len(desired) > 0 {
-			r.Log.Info("hub ManagedClusterAddOn not found, requeueing", "namespace", hubName)
+			r.Log.Info("hub ManagedClusterAddOn not found, requeueing", "namespace", clusterNamespace)
 			return ctrl.Result{RequeueAfter: addoncfg.DefaultContextTimeout}, nil
 		}
 		return ctrl.Result{}, fmt.Errorf("failed to apply LokiStack config on ManagedClusterAddOn: %w", err)
