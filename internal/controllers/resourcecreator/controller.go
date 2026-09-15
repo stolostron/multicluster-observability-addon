@@ -67,10 +67,6 @@ var partOfMCOALabelSelector = labels.SelectorFromSet(labels.Set{
 	addoncfg.PartOfK8sLabelKey: addoncfg.Name,
 })
 
-var partOfMCOAPredicate = builder.WithPredicates(predicate.NewPredicateFuncs(func(obj client.Object) bool {
-	return partOfMCOALabelSelector.Matches(labels.Set(obj.GetLabels()))
-}))
-
 // SetupWithManager sets up the controller with the Manager.
 func SetupWithManager(mgr ctrl.Manager, logger logr.Logger) error {
 	l := logger.WithName("resourcecreator")
@@ -89,8 +85,8 @@ func SetupWithManager(mgr ctrl.Manager, logger logr.Logger) error {
 		Watches(&clusterv1.ManagedCluster{}, r.enqueueAODC(), builder.OnlyMetadata).
 		// Trigger reconciliations if the metrics configuration resources change
 		Watches(&cooprometheusv1alpha1.PrometheusAgent{}, r.enqueueForMCOAOwnedResources()).
-		Watches(&cooprometheusv1alpha1.ScrapeConfig{}, r.enqueueForMCOControlledResources(), partOfMCOAPredicate).
-		Watches(&prometheusv1.PrometheusRule{}, r.enqueueForMCOControlledResources(), partOfMCOAPredicate).
+		Watches(&cooprometheusv1alpha1.ScrapeConfig{}, r.enqueueForMCOControlledResources()).
+		Watches(&prometheusv1.PrometheusRule{}, r.enqueueForMCOControlledResources()).
 		// Trigger reconciliations if right-sizing ConfigMaps change
 		Watches(&corev1.ConfigMap{}, r.enqueueAODC(), rsConfigMapPredicate).
 		Complete(r)
@@ -193,6 +189,14 @@ func (r *ResourceCreatorReconciler) enqueueAODC() handler.EventHandler {
 
 func (r *ResourceCreatorReconciler) enqueueForMCOAOwnedResources() handler.EventHandler {
 	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
+		if obj == nil {
+			return []reconcile.Request{}
+		}
+
+		if partOfMCOALabelSelector.Matches(labels.Set(obj.GetLabels())) {
+			return mcoaAODCRequest()
+		}
+
 		hasOwnerRef, err := controllerutil.HasOwnerReference(obj.GetOwnerReferences(), common.NewMCOAClusterManagementAddOn(), r.Client.Scheme())
 		if err != nil {
 			r.Log.Error(err, "failed to check owner reference")
@@ -209,6 +213,14 @@ func (r *ResourceCreatorReconciler) enqueueForMCOAOwnedResources() handler.Event
 
 func (r *ResourceCreatorReconciler) enqueueForMCOControlledResources() handler.EventHandler {
 	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
+		if obj == nil {
+			return []reconcile.Request{}
+		}
+
+		if partOfMCOALabelSelector.Matches(labels.Set(obj.GetLabels())) {
+			return mcoaAODCRequest()
+		}
+
 		var isControlledByMCO bool
 		for _, owner := range obj.GetOwnerReferences() {
 			if owner.Controller == nil || !*owner.Controller {
@@ -216,7 +228,7 @@ func (r *ResourceCreatorReconciler) enqueueForMCOControlledResources() handler.E
 			}
 			gv, err := schema.ParseGroupVersion(owner.APIVersion)
 			if err != nil {
-				r.Log.V(1).Info("failed to parse groupd version: %s", err.Error())
+				r.Log.V(1).Info("failed to parse group version", "err", err)
 				continue
 			}
 			if owner.Kind != "MultiClusterObservability" || gv.Group != "observability.open-cluster-management.io" {
