@@ -51,11 +51,8 @@ func (b *ObjectBuilder) Build(ctx context.Context, cluster *clusterv1.ManagedClu
 	query := b.buildQuery(opts)
 	ruler := b.buildRuler(opts)
 	compact := b.buildCompact(opts)
-	memcachedObjects := b.buildMemcachedObjects()
 
-	objects := []runtime.Object{store, receive, query, ruler, compact}
-	objects = append(objects, memcachedObjects...)
-	return objects, nil
+	return []runtime.Object{store, receive, query, ruler, compact}, nil
 }
 
 func (b *ObjectBuilder) buildStore(opts addon.Options, storeImage string) *thanosv1alpha1.ThanosStore {
@@ -83,12 +80,6 @@ func (b *ObjectBuilder) buildStore(opts addon.Options, storeImage string) *thano
 			ShardingStrategy: thanosv1alpha1.ShardingStrategy{
 				Type:   thanosv1alpha1.Block,
 				Shards: shards,
-			},
-			IndexCacheConfig: &thanosv1alpha1.CacheConfig{
-				ExternalCacheConfig: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{Name: config.StoreCacheConfigSecretName},
-					Key:                  config.StoreCacheConfigSecretKey,
-				},
 			},
 		},
 	}
@@ -171,12 +162,6 @@ func (b *ObjectBuilder) buildQuery(opts addon.Options) *thanosv1alpha1.ThanosQue
 			QueryFrontend: &thanosv1alpha1.QueryFrontendSpec{
 				Replicas:          config.DefaultQueryFrontendReplicas,
 				CompressResponses: true,
-				QueryRangeResponseCacheConfig: &thanosv1alpha1.CacheConfig{
-					ExternalCacheConfig: &corev1.SecretKeySelector{
-						LocalObjectReference: corev1.LocalObjectReference{Name: config.QueryFECacheConfigSecretName},
-						Key:                  config.QueryFECacheConfigSecretKey,
-					},
-				},
 			},
 		},
 	}
