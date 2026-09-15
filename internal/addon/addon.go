@@ -53,7 +53,6 @@ func HealthProber(getter addonutils.AddOnDeploymentConfigGetter, logger logr.Log
 	probeFields = append(probeFields, getLogsProbeFields()...)
 	probeFields = append(probeFields, getTracesProbeFields()...)
 	probeFields = append(probeFields, getAnalyticsProbeFields()...)
-	probeFields = append(probeFields, getTLSProfileProbeFields()...)
 	return &agent.HealthProber{
 		Type: agent.HealthProberTypeWork,
 		WorkProber: &agent.WorkHealthProber{
@@ -253,38 +252,6 @@ func getAnalyticsProbeFields() []agent.ProbeField {
 	}
 }
 
-func getTLSProfileProbeFields() []agent.ProbeField {
-	return []agent.ProbeField{
-		{
-			ResourceIdentifier: workv1.ResourceIdentifier{
-				Group:     "",
-				Resource:  "configmaps",
-				Name:      addoncfg.TLSProfileConfigMapName,
-				Namespace: "*",
-			},
-			ProbeRules: []workv1.FeedbackRule{
-				{
-					Type: workv1.JSONPathsType,
-					JsonPaths: []workv1.JsonPath{
-						{
-							Name: addoncfg.TLSProfileTypeFeedbackName,
-							Path: addoncfg.TLSProfileTypeFeedbackPath,
-						},
-						{
-							Name: addoncfg.TLSMinVersionFeedbackName,
-							Path: addoncfg.TLSMinVersionFeedbackPath,
-						},
-						{
-							Name: addoncfg.TLSCipherSuitesFeedbackName,
-							Path: addoncfg.TLSCipherSuitesFeedbackPath,
-						},
-					},
-				},
-			},
-		},
-	}
-}
-
 func ManifestConfigs() []workv1.ManifestConfigOption {
 	// prometheusagents and scrapeconfigs CRDs use ReadOnly: the Work Agent never creates or
 	// updates them (the endpoint operator owns them), but still reports isEstablished and
@@ -305,17 +272,6 @@ func ManifestConfigs() []workv1.ManifestConfigOption {
 	}
 
 	manifestConfigs = append(manifestConfigs,
-		workv1.ManifestConfigOption{
-			ResourceIdentifier: workv1.ResourceIdentifier{
-				Group:     "",
-				Resource:  "configmaps",
-				Name:      addoncfg.TLSProfileConfigMapName,
-				Namespace: addoncfg.TLSProfileConfigMapNamespace,
-			},
-			UpdateStrategy: &workv1.UpdateStrategy{
-				Type: workv1.UpdateStrategyTypeReadOnly,
-			},
-		},
 		workv1.ManifestConfigOption{
 			ResourceIdentifier: workv1.ResourceIdentifier{
 				Group:    "",
