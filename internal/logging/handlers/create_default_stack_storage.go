@@ -55,7 +55,7 @@ func BuildDefaultStackStorageResources(ctx context.Context, k8s client.Client, p
 	existingLS := &lokiv1.LokiStack{}
 	resourceName := defaultStackLokiStackName()
 	key := client.ObjectKey{Namespace: addoncfg.InstallNamespace, Name: resourceName}
-	if err := k8s.Get(ctx, key, existingLS); err != nil && !apierrors.IsNotFound(err) {
+	if err = k8s.Get(ctx, key, existingLS); err != nil && !apierrors.IsNotFound(err) {
 		return nil, err
 	}
 
