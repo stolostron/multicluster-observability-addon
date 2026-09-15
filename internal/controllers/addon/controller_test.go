@@ -292,7 +292,7 @@ func TestManifestsWithObjectBuilders(t *testing.T) {
 
 	objects, err := wrapper.Manifests(t.Context(), hubCluster, mcAddon)
 	require.NoError(t, err)
-	require.Len(t, objects, 11, "expected 5 Thanos CRs + 6 memcached objects (2 deployments, 2 services, 2 secrets)")
+	require.Len(t, objects, 5, "expected ThanosStore, ThanosReceive, ThanosQuery, ThanosRuler, and ThanosCompact objects")
 
 	var store *thanosv1alpha1.ThanosStore
 	var receive *thanosv1alpha1.ThanosReceive
