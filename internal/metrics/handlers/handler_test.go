@@ -417,7 +417,7 @@ func TestBuildOptions(t *testing.T) {
 				// Check that relabelling is added to the remote write config
 				assert.Equal(t, spokeName, *opts.Platform.PrometheusAgent.Spec.CommonPrometheusFields.RemoteWrite[0].WriteRelabelConfigs[0].Replacement)
 				assert.Equal(t, config.ClusterNameMetricLabel, opts.Platform.PrometheusAgent.Spec.CommonPrometheusFields.RemoteWrite[0].WriteRelabelConfigs[0].TargetLabel)
-				assert.Len(t, opts.Platform.PrometheusAgent.Spec.CommonPrometheusFields.RemoteWrite[0].WriteRelabelConfigs, 5)
+				assert.Len(t, opts.Platform.PrometheusAgent.Spec.CommonPrometheusFields.RemoteWrite[0].WriteRelabelConfigs, 6)
 				// Check that the secrets are set
 				assert.Len(t, opts.Secrets, 5)
 				// Check that user workloads are not enabled
@@ -505,7 +505,7 @@ func TestBuildOptions(t *testing.T) {
 				// Check that relabelling is added to the remote write config
 				assert.Equal(t, spokeName, *opts.UserWorkloads.PrometheusAgent.Spec.CommonPrometheusFields.RemoteWrite[0].WriteRelabelConfigs[0].Replacement)
 				assert.Equal(t, config.ClusterNameMetricLabel, opts.UserWorkloads.PrometheusAgent.Spec.CommonPrometheusFields.RemoteWrite[0].WriteRelabelConfigs[0].TargetLabel)
-				assert.Len(t, opts.UserWorkloads.PrometheusAgent.Spec.CommonPrometheusFields.RemoteWrite[0].WriteRelabelConfigs, 5)
+				assert.Len(t, opts.UserWorkloads.PrometheusAgent.Spec.CommonPrometheusFields.RemoteWrite[0].WriteRelabelConfigs, 6)
 				assert.False(t, opts.COOIsSubscribed)
 			},
 		},
@@ -693,7 +693,7 @@ func TestBuildOptions(t *testing.T) {
 				assert.Equal(t, []string{"etcd_metric", "etcd_rule_dependent_metric"}, etcdMetrics)
 				assert.Equal(t, []string{"apiserver_metric", "apiserver_rule_dependent_metric"}, apiserverMetrics)
 
-				assert.Len(t, opts.UserWorkloads.PrometheusAgent.Spec.CommonPrometheusFields.RemoteWrite[0].WriteRelabelConfigs, 8)
+				assert.Len(t, opts.UserWorkloads.PrometheusAgent.Spec.CommonPrometheusFields.RemoteWrite[0].WriteRelabelConfigs, 9)
 			},
 		},
 		"proxy configuration is enabled": {
@@ -781,8 +781,8 @@ func TestBuildOptions(t *testing.T) {
 				require.NotNil(t, opts.Platform.PrometheusAgent)
 				require.Len(t, opts.Platform.PrometheusAgent.Spec.RemoteWrite, 2)
 				for _, rw := range opts.Platform.PrometheusAgent.Spec.RemoteWrite {
-					// There are 5 generated rules + 1 existing
-					assert.Len(t, rw.WriteRelabelConfigs, 6)
+					// There are 6 generated rules + 1 existing
+					assert.Len(t, rw.WriteRelabelConfigs, 7)
 					if *rw.Name == config.RemoteWriteCfgName {
 						// Check that the existing rule is still there
 						existingRuleFound := false

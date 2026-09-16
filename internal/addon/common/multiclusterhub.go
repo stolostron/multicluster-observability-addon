@@ -2,6 +2,7 @@ package common
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -15,6 +16,8 @@ const (
 	mchVersion = "v1"
 	mchKind    = "MultiClusterHub"
 )
+
+var errMCHNotFound = errors.New("no MultiClusterHub found")
 
 var MchGVK = schema.GroupVersionKind{
 	Group:   mchGroup,
@@ -41,7 +44,28 @@ func IsNetworkPoliciesEnabled(u *unstructured.Unstructured) bool {
 	return enabled
 }
 
-// lists MultiClusterHub and returns whether network policies are enabled.
+// GetLocalClusterName returns the hub's local cluster name from MCH spec.localClusterName.
+func GetLocalClusterName(ctx context.Context, c client.Client) (string, error) {
+	mchList := &unstructured.UnstructuredList{}
+	mchList.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   mchGroup,
+		Version: mchVersion,
+		Kind:    mchKind,
+	})
+	if err := c.List(ctx, mchList); err != nil {
+		return "local-cluster", fmt.Errorf("failed to list MultiClusterHub: %w", err)
+	}
+	if len(mchList.Items) == 0 {
+		return "", errMCHNotFound
+	}
+	name, found, err := unstructured.NestedString(mchList.Items[0].Object, "spec", "localClusterName")
+	if err != nil || !found || name == "" {
+		return "local-cluster", nil
+	}
+	return name, nil
+}
+
+// GetNetworkPoliciesEnabled lists MultiClusterHub and returns whether network policies are enabled.
 func GetNetworkPoliciesEnabled(ctx context.Context, c client.Client) (bool, error) {
 	mchList := &unstructured.UnstructuredList{}
 	mchList.SetGroupVersionKind(schema.GroupVersionKind{
