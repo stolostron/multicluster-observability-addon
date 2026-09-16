@@ -9,8 +9,6 @@ metadata:
     release: {{ .Release.Name }}
 spec:
   monitoring:
-    perses:
-      enabled: {{ .Values.perses }}
 {{- if and .Values.incidentDetection .Values.incidentDetection.enabled }}
     incidents:
       enabled: true
