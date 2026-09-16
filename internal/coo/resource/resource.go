@@ -241,8 +241,6 @@ func (r *HubResourceReconciler) ensureAnalyticsNamespace(ctx context.Context) er
 
 func (r *HubResourceReconciler) reconcileUIPlugin(ctx context.Context, persesEnabled, incidentDetectionEnabled bool) error {
 	monitoringUINeeded := persesEnabled || incidentDetectionEnabled
-	metricsUI := cmanifests.EnableUI(r.Opts.Platform.Metrics, true)
-	metricsEnabled := metricsUI != nil && metricsUI.Enabled
 
 	if !monitoringUINeeded {
 		return r.deleteIfManaged(ctx, &uiplugin.UIPlugin{
@@ -267,7 +265,7 @@ func (r *HubResourceReconciler) reconcileUIPlugin(ctx context.Context, persesEna
 		},
 	}
 
-	if metricsEnabled {
+	if persesEnabled {
 		desired.Spec.Monitoring.ACM = &uiplugin.AdvancedClusterManagementReference{
 			Enabled: true,
 			Alertmanager: uiplugin.AlertmanagerReference{
