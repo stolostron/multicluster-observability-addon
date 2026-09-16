@@ -9,9 +9,13 @@ import (
 // subscription/operatorgroup) still need. Hub-only Perses resources are
 // now reconciled directly by HubResourceReconciler.
 type COOValues struct {
-	Enabled    bool `json:"enabled"`
-	InstallCOO bool `json:"installCOO"`
-	IsHub      bool `json:"isHub"`
+	Enabled            bool                                `json:"enabled"`
+	InstallCOO         bool                                `json:"installCOO"`
+	IsHub              bool                                `json:"isHub"`
+	MonitoringUIPlugin bool                                `json:"monitoringUIPlugin"`
+	Perses             bool                                `json:"perses"`
+	Metrics            *UIValues                           `json:"metrics,omitempty"`
+	IncidentDetection  *imanifests.IncidentDetectionValues `json:"incidentDetection,omitempty"`
 }
 
 type UIValues struct {
@@ -53,10 +57,19 @@ func BuildValues(opts addon.Options, isHubCluster bool) *COOValues {
 		}
 	}
 
-	return &COOValues{
-		Enabled:    hasDashboards || incidentDetectionEnabled || rightSizingEnabled,
-		InstallCOO: installCOO,
+	needsUIPlugin := incidentDetectionEnabled || hasDashboards
+
+	values := &COOValues{
+		Enabled:            hasDashboards || incidentDetectionEnabled || rightSizingEnabled,
+		InstallCOO:         installCOO,
+		IsHub:              isHubCluster,
+		MonitoringUIPlugin: needsUIPlugin,
+		Perses:             hasDashboards,
+		Metrics:            metricsUI,
+		IncidentDetection:  incidentDetection,
 	}
+
+	return values
 }
 
 func EnableUI(opts addon.MetricsOptions, isHub bool) *UIValues {
