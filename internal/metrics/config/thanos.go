@@ -66,8 +66,10 @@ const (
 	DefaultMemcachedMemoryLimitMB      = int32(1024)
 	DefaultMemcachedConnectionLimit    = int32(1024)
 	DefaultMemcachedMaxItemSize        = "1m"
+	DefaultMemcachedMaxItemSizeCache   = "1MiB"
 	DefaultMemcachedCPURequest         = "45m"
-	DefaultMemcachedMemRequest         = "128Mi"
+	DefaultMemcachedMemRequest         = "1124Mi"
+	DefaultMemcachedMemLimit           = "1224Mi"
 	DefaultMemcachedExporterCPURequest = "5m"
 	DefaultMemcachedExporterMemRequest = "50Mi"
 	MemcachedStoreName                 = "memcached-store"

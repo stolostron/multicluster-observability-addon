@@ -97,6 +97,9 @@ func buildMemcachedDeployment(name string, labels map[string]string, memcachedIm
 									corev1.ResourceCPU:    resource.MustParse(config.DefaultMemcachedCPURequest),
 									corev1.ResourceMemory: resource.MustParse(config.DefaultMemcachedMemRequest),
 								},
+								Limits: corev1.ResourceList{
+									corev1.ResourceMemory: resource.MustParse(config.DefaultMemcachedMemLimit),
+								},
 							},
 							SecurityContext: &corev1.SecurityContext{
 								AllowPrivilegeEscalation: boolPtr(false),
@@ -185,7 +188,7 @@ config:
   max_get_multi_concurrency: 100
   max_item_size: %s
   dns_provider_update_interval: 10s
-`, serviceName, config.HubInstallNamespace, config.DefaultMemcachedMaxItemSize)
+`, serviceName, config.HubInstallNamespace, config.DefaultMemcachedMaxItemSizeCache)
 
 	return &corev1.Secret{
 		TypeMeta: metav1.TypeMeta{
