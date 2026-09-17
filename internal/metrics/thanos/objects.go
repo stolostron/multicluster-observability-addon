@@ -42,6 +42,7 @@ func (b *ObjectBuilder) Build(ctx context.Context, cluster *clusterv1.ManagedClu
 		images, err = config.GetImageOverrides(ctx, b.Client, opts.Registries, b.Logger)
 		if err != nil {
 			b.Logger.Error(err, "failed to get image overrides, will use default images")
+			images = config.ImageOverrides{}
 		}
 	}
 
