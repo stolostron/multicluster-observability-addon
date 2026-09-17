@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
@@ -36,7 +37,7 @@ func newAPIServerWithProfile(profile *configv1.TLSSecurityProfile, adherence con
 
 func setFakeClient(objs ...client.Object) {
 	c := fake.NewClientBuilder().WithScheme(newTestScheme()).WithObjects(objs...).Build()
-	tlsClientFunc = func() (client.Client, error) {
+	tlsClientFunc = func(_ *rest.Config) (client.Client, error) {
 		return c, nil
 	}
 }
@@ -104,7 +105,7 @@ func TestGetOrCreateTLSProfileSpec(t *testing.T) {
 			defer resetTLSState()
 			setFakeClient(newAPIServerWithProfile(tt.profile, tt.adherence))
 
-			spec, err := GetOrCreateTLSProfileSpec(context.Background())
+			spec, err := GetOrCreateTLSProfileSpec(context.Background(), nil)
 			require.NoError(t, err)
 			assert.Equal(t, tt.wantedSpec.MinTLSVersion, spec.MinTLSVersion)
 		})
@@ -116,7 +117,7 @@ func TestGetOrCreateTLSProfileSpec_NotFound(t *testing.T) {
 	// No APIServer object
 	setFakeClient()
 
-	spec, err := GetOrCreateTLSProfileSpec(context.Background())
+	spec, err := GetOrCreateTLSProfileSpec(context.Background(), nil)
 	require.NoError(t, err)
 
 	intermediateSpec := configv1.TLSProfiles[configv1.TLSProfileIntermediateType]
@@ -130,17 +131,37 @@ func TestGetOrCreateTLSProfileSpec_Caching(t *testing.T) {
 		Type: configv1.TLSProfileModernType,
 	}, configv1.TLSAdherencePolicyStrictAllComponents))
 
-	spec1, err := GetOrCreateTLSProfileSpec(context.Background())
+	spec1, err := GetOrCreateTLSProfileSpec(context.Background(), nil)
 	require.NoError(t, err)
 
 	// Break the client and verify the second still returns cached value
-	tlsClientFunc = func() (client.Client, error) {
+	tlsClientFunc = func(_ *rest.Config) (client.Client, error) {
 		return nil, assert.AnError
 	}
 
-	spec2, err := GetOrCreateTLSProfileSpec(context.Background())
+	spec2, err := GetOrCreateTLSProfileSpec(context.Background(), nil)
 	require.NoError(t, err)
 	assert.Equal(t, spec1, spec2)
+}
+
+func TestGetOrCreateTLSProfileSpec_ExplicitKubeConfig(t *testing.T) {
+	defer resetTLSState()
+	config := &rest.Config{Host: "https://selected-cluster.example"}
+	c := fake.NewClientBuilder().WithScheme(newTestScheme()).Build()
+	tlsClientFunc = func(received *rest.Config) (client.Client, error) {
+		require.Same(t, config, received)
+		return c, nil
+	}
+	_, err := GetOrCreateTLSProfileSpec(t.Context(), config)
+	require.NoError(t, err)
+}
+
+func TestGetOrCreateOCPConfigCRClient_ExplicitKubeConfig(t *testing.T) {
+	defer resetTLSState()
+	t.Setenv("KUBECONFIG", "does-not-exist")
+	c, err := getOrCreateOCPConfigCRClient(&rest.Config{Host: "https://selected-cluster.example"})
+	require.NoError(t, err)
+	require.NotNil(t, c)
 }
 
 func TestGetOrCreateTLSConfig(t *testing.T) {
@@ -250,7 +271,5 @@ func resetTLSState() {
 	tlsProfileSpec = nil
 	tlsConfig = nil
 	ocpConfigClient = nil
-	tlsClientFunc = func() (client.Client, error) {
-		return getOrCreateOCPConfigCRClient()
-	}
+	tlsClientFunc = getOrCreateOCPConfigCRClient
 }
