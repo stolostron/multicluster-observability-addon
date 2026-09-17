@@ -37,6 +37,39 @@ func TestInstallCOO(t *testing.T) {
 			expectedCOOInstall:      false,
 		},
 		{
+			name:  "Non-hub cluster with incident detection enabled installs COO",
+			isHub: false,
+			options: addon.Options{
+				Platform: addon.PlatformOptions{
+					Enabled: true,
+					AnalyticsOptions: addon.AnalyticsOptions{
+						IncidentDetection: addon.IncidentDetection{
+							Enabled: true,
+						},
+					},
+				},
+			},
+			expectedUIPluginInstall: true,
+			expectedCOOInstall:      true,
+		},
+		{
+			name:  "Non-hub cluster with right-sizing does not install COO",
+			isHub: false,
+			options: addon.Options{
+				Platform: addon.PlatformOptions{
+					Enabled: true,
+					AnalyticsOptions: addon.AnalyticsOptions{
+						RightSizing: addon.RightSizingOptions{
+							Delegated:        true,
+							NamespaceEnabled: true,
+						},
+					},
+				},
+			},
+			expectedUIPluginInstall: false,
+			expectedCOOInstall:      false,
+		},
+		{
 			name:  "Hub cluster with incident detection enabled but no COO installed",
 			isHub: true,
 			options: addon.Options{
@@ -137,6 +170,24 @@ func TestInstallCOO(t *testing.T) {
 			expectedUIPluginInstall: false,
 			expectedCOOInstall:      false,
 			expectedErrMsg:          addoncfg.ErrInvalidSubscriptionChannel.Error(),
+		},
+		{
+			name:  "Hub cluster with right-sizing enabled",
+			isHub: true,
+			options: addon.Options{
+				Platform: addon.PlatformOptions{
+					Enabled: true,
+					AnalyticsOptions: addon.AnalyticsOptions{
+						RightSizing: addon.RightSizingOptions{
+							Delegated:             true,
+							NamespaceEnabled:      true,
+							VirtualizationEnabled: true,
+						},
+					},
+				},
+			},
+			expectedUIPluginInstall: true,
+			expectedCOOInstall:      false,
 		},
 		{
 			name:  "Hub cluster with metrics enabled but not incident detection",
