@@ -135,7 +135,7 @@ func TestReconcile_EmptyOptions(t *testing.T) {
 
 	uip := &uiplugin.UIPlugin{}
 	err = fakeClient.Get(t.Context(), client.ObjectKey{Name: "monitoring"}, uip)
-	assert.True(t, err != nil, "UIPlugin should not exist with empty options")
+	assert.Error(t, err, "UIPlugin should not exist with empty options")
 }
 
 func TestReconcile_COOSubscriptionWrongChannel(t *testing.T) {
