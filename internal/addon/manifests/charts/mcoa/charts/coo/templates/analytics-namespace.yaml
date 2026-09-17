@@ -1,0 +1,8 @@
+{{- if and .Values.enabled .Values.isHub }}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: observability-analytics
+  annotations:
+    addon.open-cluster-management.io/deletion-orphan: ""
+{{- end }}
