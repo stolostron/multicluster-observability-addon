@@ -10,9 +10,11 @@ import (
 	"github.com/go-logr/logr"
 	otelv1alpha1 "github.com/open-telemetry/opentelemetry-operator/apis/v1alpha1"
 	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
+	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
+	"github.com/stolostron/multicluster-observability-addon/internal/analytics/rightsizing"
 	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"open-cluster-management.io/addon-framework/pkg/agent"
@@ -51,6 +53,7 @@ func HealthProber(getter addonutils.AddOnDeploymentConfigGetter, logger logr.Log
 	probeFields = append(probeFields, getMetricsProbeFields()...)
 	probeFields = append(probeFields, getLogsProbeFields()...)
 	probeFields = append(probeFields, getTracesProbeFields()...)
+	probeFields = append(probeFields, getRightSizingProbeFields()...)
 	probeFields = append(probeFields, getTLSProfileProbeFields()...)
 	return &agent.HealthProber{
 		Type: agent.HealthProberTypeWork,
@@ -228,6 +231,29 @@ func getTracesProbeFields() []agent.ProbeField {
 	}
 }
 
+func getRightSizingProbeFields() []agent.ProbeField {
+	names := []string{rightsizing.NamespacePrometheusRuleName, rightsizing.VirtualizationPrometheusRuleName}
+	fields := make([]agent.ProbeField, 0, len(names))
+	for _, name := range names {
+		fields = append(fields, agent.ProbeField{
+			ResourceIdentifier: workv1.ResourceIdentifier{
+				Group:     monitoringv1.SchemeGroupVersion.Group,
+				Resource:  addoncfg.PrometheusRulesResource,
+				Name:      name,
+				Namespace: rightsizing.MonitoringNamespace,
+			},
+			ProbeRules: []workv1.FeedbackRule{{
+				Type: workv1.JSONPathsType,
+				JsonPaths: []workv1.JsonPath{{
+					Name: addoncfg.RsProbeKey,
+					Path: addoncfg.RsProbePath,
+				}},
+			}},
+		})
+	}
+	return fields
+}
+
 func getTLSProfileProbeFields() []agent.ProbeField {
 	return []agent.ProbeField{
 		{
@@ -400,6 +426,9 @@ func healthChecker(getter addonutils.AddOnDeploymentConfigGetter, fields []agent
 	if err := checkTracing(fields, opts); err != nil {
 		return err
 	}
+	if err := checkRightSizing(fields, opts); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -525,6 +554,54 @@ func checkTracing(fields []agent.FieldResult, opts Options) error {
 
 	if !foundOtelCol {
 		return fmt.Errorf("%w: %s", errMissingFields, addoncfg.OpenTelemetryCollectorsResource)
+	}
+
+	return nil
+}
+
+func checkRightSizing(fields []agent.FieldResult, opts Options) error {
+	rs := opts.Platform.AnalyticsOptions.RightSizing
+	if !rs.Delegated {
+		return nil
+	}
+
+	expectedNames := map[string]bool{}
+	if rs.NamespaceEnabled {
+		expectedNames[rightsizing.NamespacePrometheusRuleName] = false
+	}
+	if rs.VirtualizationEnabled {
+		expectedNames[rightsizing.VirtualizationPrometheusRuleName] = false
+	}
+	if len(expectedNames) == 0 {
+		return nil
+	}
+
+	for _, field := range fields {
+		id := field.ResourceIdentifier
+		if id.Resource != addoncfg.PrometheusRulesResource {
+			continue
+		}
+		if _, ok := expectedNames[id.Name]; !ok {
+			continue
+		}
+		if len(field.FeedbackResult.Values) == 0 {
+			return fmt.Errorf("%w for %s with key %s/%s", errMissingFeedbackValues, id.Resource, id.Namespace, id.Name)
+		}
+		for _, value := range field.FeedbackResult.Values {
+			if value.Name != addoncfg.RsProbeKey {
+				return fmt.Errorf("%w: %s with key %s/%s unknown probe key %s", errUnknownProbeKey, id.Resource, id.Namespace, id.Name, value.Name)
+			}
+			if value.Value.String == nil {
+				return fmt.Errorf("%w: %s with key %s/%s", errProbeValueIsNil, id.Resource, id.Namespace, id.Name)
+			}
+		}
+		expectedNames[id.Name] = true
+	}
+
+	for name, found := range expectedNames {
+		if !found {
+			return fmt.Errorf("%w: %s with name %s", errMissingFields, addoncfg.PrometheusRulesResource, name)
+		}
 	}
 
 	return nil

@@ -89,6 +89,10 @@ const (
 	TLSCipherSuitesFeedbackPath  = ".data.cipherSuites"
 	TLSDefaultMinVersion         = "VersionTLS12"
 
+	PrometheusRulesResource = "prometheusrules"
+	RsProbeKey              = "ruleName"
+	RsProbePath             = ".metadata.name"
+
 	VendorOverrideAnnotationKey = "mcoa-override-vendor"
 	AnnotationOriginalResource  = "mcoa.openshift.io/original-resource"
 )

@@ -6,8 +6,10 @@ import (
 	"github.com/go-logr/logr"
 	otelv1alpha1 "github.com/open-telemetry/opentelemetry-operator/apis/v1alpha1"
 	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
+	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
+	"github.com/stolostron/multicluster-observability-addon/internal/analytics/rightsizing"
 	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -318,6 +320,68 @@ func Test_AgentHealthProber_MissingResources(t *testing.T) {
 			managedCluster, managedClusterAddOn)
 		require.ErrorIs(t, err, errMissingFields)
 	})
+
+	t.Run("right-sizing enabled but missing prometheus rules", func(t *testing.T) {
+		aodc := newAddonDeploymentConfig()
+		addRightSizingCustomizedVariables(aodc)
+		addAODCConfigReference(managedClusterAddOn, aodc)
+
+		healthProber := HealthProber(newTestGetter(aodc), logr.Discard())
+		err := healthProber.WorkProber.HealthChecker(
+			[]agent.FieldResult{scrapeConfigFieldResult()},
+			managedCluster, managedClusterAddOn)
+		require.ErrorIs(t, err, errMissingFields)
+	})
+}
+
+func Test_AgentHealthProber_RightSizing(t *testing.T) {
+	managedCluster := addontesting.NewManagedCluster("cluster-1")
+	managedClusterAddOn := addontesting.NewAddon("test", "cluster-1")
+	aodc := newAddonDeploymentConfig()
+	addRightSizingCustomizedVariables(aodc)
+	addAODCConfigReference(managedClusterAddOn, aodc)
+	scheme := runtime.NewScheme()
+	require.NoError(t, addonapiv1beta1.Install(scheme))
+
+	nsRuleName := rightsizing.NamespacePrometheusRuleName
+	virtRuleName := rightsizing.VirtualizationPrometheusRuleName
+
+	t.Run("healthy", func(t *testing.T) {
+		healthProber := HealthProber(newTestGetter(aodc), logr.Discard())
+		err := healthProber.WorkProber.HealthChecker(
+			[]agent.FieldResult{
+				rsFieldResult(nsRuleName),
+				rsFieldResult(virtRuleName),
+			}, managedCluster, managedClusterAddOn)
+		require.NoError(t, err)
+	})
+
+	t.Run("missing namespace rule", func(t *testing.T) {
+		healthProber := HealthProber(newTestGetter(aodc), logr.Discard())
+		err := healthProber.WorkProber.HealthChecker(
+			[]agent.FieldResult{
+				rsFieldResult(virtRuleName),
+			}, managedCluster, managedClusterAddOn)
+		require.ErrorIs(t, err, errMissingFields)
+	})
+
+	t.Run("missing feedback values", func(t *testing.T) {
+		healthProber := HealthProber(newTestGetter(aodc), logr.Discard())
+		err := healthProber.WorkProber.HealthChecker(
+			[]agent.FieldResult{
+				{
+					ResourceIdentifier: workv1.ResourceIdentifier{
+						Group:     monitoringv1.SchemeGroupVersion.Group,
+						Resource:  addoncfg.PrometheusRulesResource,
+						Name:      nsRuleName,
+						Namespace: rightsizing.MonitoringNamespace,
+					},
+					FeedbackResult: workv1.StatusFeedbackResult{},
+				},
+				rsFieldResult(virtRuleName),
+			}, managedCluster, managedClusterAddOn)
+		require.ErrorIs(t, err, errMissingFeedbackValues)
+	})
 }
 
 func scrapeConfigFieldResult() agent.FieldResult {
@@ -505,6 +569,45 @@ func addAODCConfigReference(managedClusterAddOn *addonapiv1beta1.ManagedClusterA
 				ConfigReferent: addonapiv1beta1.ConfigReferent{
 					Namespace: aodc.Namespace,
 					Name:      aodc.Name,
+				},
+			},
+		},
+	}
+}
+
+func addRightSizingCustomizedVariables(aodc *addonapiv1beta1.AddOnDeploymentConfig) {
+	aodc.Spec.CustomizedVariables = append(aodc.Spec.CustomizedVariables, []addonapiv1beta1.CustomizedVariable{
+		{
+			Name:  KeyRightSizingDelegated,
+			Value: "true",
+		},
+		{
+			Name:  KeyPlatformNamespaceRightSizing,
+			Value: "enabled",
+		},
+		{
+			Name:  KeyPlatformVirtualizationRightSizing,
+			Value: "enabled",
+		},
+	}...)
+}
+
+func rsFieldResult(name string) agent.FieldResult {
+	return agent.FieldResult{
+		ResourceIdentifier: workv1.ResourceIdentifier{
+			Group:     monitoringv1.SchemeGroupVersion.Group,
+			Resource:  addoncfg.PrometheusRulesResource,
+			Name:      name,
+			Namespace: rightsizing.MonitoringNamespace,
+		},
+		FeedbackResult: workv1.StatusFeedbackResult{
+			Values: []workv1.FeedbackValue{
+				{
+					Name: addoncfg.RsProbeKey,
+					Value: workv1.FieldValue{
+						Type:   workv1.String,
+						String: &name,
+					},
 				},
 			},
 		},
