@@ -213,7 +213,7 @@ func BuildOptions(addOnDeployment *addonapiv1beta1.AddOnDeploymentConfig) (Optio
 			if err != nil {
 				return opts, fmt.Errorf("%w: %s", addoncfg.ErrInvalidMetricsHubHostname, err.Error())
 			}
-			url = url.JoinPath("/api/metrics/v1/default/api/v1/receive")
+			url = url.JoinPath("/api/metrics/v1/api/v1/receive")
 
 			// Hostname validation:
 			// - Check if host is empty
