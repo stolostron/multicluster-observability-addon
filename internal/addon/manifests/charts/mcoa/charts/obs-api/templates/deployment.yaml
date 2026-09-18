@@ -129,7 +129,6 @@ spec:
             - '--metrics.read.endpoint={{ .Values.metricsReadEndpoint }}'
             - '--metrics.write.endpoint={{ .Values.metricsWriteEndpoint }}'
             - '--log.level=warn'
-            - '--rbac.config=/etc/observatorium/rbac.yaml'
             - '--tenants.config=/etc/observatorium/tenants.yaml'
             - '--web.healthchecks.url=https://127.0.0.1:8080'
             - '--tls.server.cert-file=/var/run/tls/tls.crt'
