@@ -2,7 +2,6 @@ package resourcecreator
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/go-logr/logr"
@@ -14,7 +13,6 @@ import (
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	rshandlers "github.com/stolostron/multicluster-observability-addon/internal/analytics/rightsizing/handlers"
-	lhandlers "github.com/stolostron/multicluster-observability-addon/internal/logging/handlers"
 	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	mresources "github.com/stolostron/multicluster-observability-addon/internal/metrics/resource"
 	corev1 "k8s.io/api/core/v1"
@@ -65,6 +63,12 @@ var cmaoPredicate = builder.WithPredicates(predicate.Funcs{
 	GenericFunc: func(e event.GenericEvent) bool { return false },
 })
 
+var hubMCAOPredicate = builder.WithPredicates(predicate.NewPredicateFuncs(func(obj client.Object) bool {
+	// Every cluster's ManagedClusterAddOn is named after the addon. Only the hub
+	// cluster namespace (conventionally local-cluster) should trigger LokiStack attach.
+	return obj.GetName() == addoncfg.Name && obj.GetNamespace() == addoncfg.HubNamespace
+}))
+
 var rsConfigMapPredicate = builder.WithPredicates(rshandlers.RSConfigMapPredicate())
 
 var partOfMCOALabelSelector = labels.SelectorFromSet(labels.Set{
@@ -100,6 +104,8 @@ func SetupWithManager(mgr ctrl.Manager, logger logr.Logger) error {
 		// Trigger reconciliations if logging resources change
 		Watches(&lokiv1.LokiStack{}, r.enqueueForMCOAOwnedResources()).
 		Watches(&loggingv1.ClusterLogForwarder{}, r.enqueueForMCOAOwnedResources()).
+		// Trigger when the hub ManagedClusterAddOn is created so LokiStack can be attached to it
+		Watches(&addonv1beta1.ManagedClusterAddOn{}, r.enqueueAODC(), hubMCAOPredicate).
 		Complete(r)
 }
 
@@ -162,34 +168,20 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, fmt.Errorf("failed to reconcile right-sizing resources: %w", rsErr)
 	}
 
-	// Reconcile logging CLFs and LokiStack separately so CLFs aren't blocking LokiStack install
-	lCLFObjs, lCLFDefaultConfig, clfErr := lhandlers.BuildCLFResources(ctx, r.Client, cmao, opts.Platform.Logs, opts.UserWorkloads.Logs, opts.HubHostname)
+	// Spoke collection: CLF templates on CMAO placements, fanned out via addon helm.
+	// Collection errors must not block LokiStack install.
+	lDefaultConfig, clfErr := r.reconcileLoggingCollection(ctx, cmao, opts)
 	if clfErr != nil {
 		r.Log.Error(clfErr, "failed to build CLF resources, will requeue and continue to LokiStack")
 	} else {
-		var clfSSAErrs []error
-		for _, obj := range lCLFObjs {
-			if err := common.ServerSideApply(ctx, r.Client, obj, cmao); err != nil {
-				r.Log.V(1).Info("CLF SSA failed", "namespace", obj.GetNamespace(), "name", obj.GetName(), "err", err)
-				clfSSAErrs = append(clfSSAErrs, fmt.Errorf("%s/%s: %w", obj.GetNamespace(), obj.GetName(), err))
-			}
-		}
-		if len(clfSSAErrs) > 0 {
-			clfErr = errors.Join(clfSSAErrs...)
-		}
-		objs = append(objs, lCLFDefaultConfig...)
+		objs = append(objs, lDefaultConfig...)
 	}
 
-	lsObjs, lsDefaultConfig, lsErr := lhandlers.BuildLokiStackResources(ctx, r.Client, opts.Platform.Logs, opts.UserWorkloads.Logs, opts.HubHostname)
-	if lsErr != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to build LokiStack resources: %w", lsErr)
+	// Hub storage component: LokiStack template + MCAO pointer (movable to another cluster later).
+	if result, err := r.reconcileLoggingStorage(ctx, cmao, opts); err != nil || !result.IsZero() {
+		return result, err
 	}
-	for _, obj := range lsObjs {
-		if err := common.ServerSideApply(ctx, r.Client, obj, cmao); err != nil {
-			return ctrl.Result{}, fmt.Errorf("failed to apply LokiStack resource %s/%s: %w", obj.GetNamespace(), obj.GetName(), err)
-		}
-	}
-	objs = append(objs, lsDefaultConfig...)
+
 	// If CLF had errors, requeue after LokiStack is applied
 	if clfErr != nil {
 		return ctrl.Result{}, clfErr
