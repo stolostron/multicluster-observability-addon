@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"maps"
 
+	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -35,6 +36,7 @@ func (b *ObjectBuilder) buildMemcachedObjects(images config.ImageOverrides) []ru
 		config.StoreCacheConfigSecretKey,
 		config.MemcachedStoreName,
 	)
+	storeServiceMonitor := buildMemcachedServiceMonitor(config.MemcachedStoreName, memcachedStoreLabels())
 
 	qfeDeployment := buildMemcachedDeployment(config.MemcachedQueryFrontendName, memcachedQueryFrontendLabels(), memcachedImage, exporterImage)
 	qfeService := buildMemcachedService(config.MemcachedQueryFrontendName, memcachedQueryFrontendLabels())
@@ -43,10 +45,11 @@ func (b *ObjectBuilder) buildMemcachedObjects(images config.ImageOverrides) []ru
 		config.QueryFECacheConfigSecretKey,
 		config.MemcachedQueryFrontendName,
 	)
+	qfeServiceMonitor := buildMemcachedServiceMonitor(config.MemcachedQueryFrontendName, memcachedQueryFrontendLabels())
 
 	return []runtime.Object{
-		storeDeployment, storeService, storeCacheSecret,
-		qfeDeployment, qfeService, qfeCacheSecret,
+		storeDeployment, storeService, storeCacheSecret, storeServiceMonitor,
+		qfeDeployment, qfeService, qfeCacheSecret, qfeServiceMonitor,
 	}
 }
 
@@ -202,6 +205,43 @@ config:
 		},
 		StringData: map[string]string{
 			secretKey: cacheConfigYAML,
+		},
+	}
+}
+
+func buildMemcachedServiceMonitor(name string, labels map[string]string) *prometheusv1.ServiceMonitor {
+	acmPrefix := "acm_${1}"
+	return &prometheusv1.ServiceMonitor{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "monitoring.coreos.com/v1",
+			Kind:       "ServiceMonitor",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: config.HubInstallNamespace,
+			Labels:    labels,
+		},
+		Spec: prometheusv1.ServiceMonitorSpec{
+			Selector: metav1.LabelSelector{
+				MatchLabels: labels,
+			},
+			NamespaceSelector: prometheusv1.NamespaceSelector{
+				MatchNames: []string{config.HubInstallNamespace},
+			},
+			Endpoints: []prometheusv1.Endpoint{
+				{
+					Port: "metrics",
+					MetricRelabelConfigs: []prometheusv1.RelabelConfig{
+						{
+							SourceLabels: []prometheusv1.LabelName{"__name__"},
+							Regex:        "(.+)",
+							TargetLabel:  "__name__",
+							Replacement:  &acmPrefix,
+							Action:       "replace",
+						},
+					},
+				},
+			},
 		},
 	}
 }
