@@ -37,7 +37,7 @@ require (
 	github.com/perses/plugins/timeserieschart v0.11.1
 	github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring v0.83.0-rhobs1
 	github.com/rhobs/observability-operator/pkg/apis v0.0.0-20250902133632-f98bd8a20a80
-	golang.org/x/text v0.36.0
+	golang.org/x/text v0.37.0
 )
 
 require (
@@ -158,13 +158,13 @@ require (
 	go.uber.org/zap v1.27.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.3 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
-	golang.org/x/crypto v0.50.0 // indirect
+	golang.org/x/crypto v0.52.0 // indirect
 	golang.org/x/exp v0.0.0-20250911091902-df9299821621 // indirect
-	golang.org/x/net v0.53.0 // indirect
+	golang.org/x/net v0.55.0 // indirect
 	golang.org/x/oauth2 v0.34.0 // indirect
 	golang.org/x/sync v0.20.0 // indirect
-	golang.org/x/sys v0.43.0 // indirect
-	golang.org/x/term v0.42.0 // indirect
+	golang.org/x/sys v0.45.0 // indirect
+	golang.org/x/term v0.43.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.4.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20251202230838-ff82c1b0f217 // indirect
@@ -196,4 +196,4 @@ replace github.com/perses/plugins/table => github.com/perses/plugins/table v0.0.
 // CVE-2026-42151: Azure AD OAuth client_secret exposed via config API.
 // Upstream fix is in v0.311.3 but requires incompatible API changes (parser.ParseExpr removal).
 // This replace points to katekeiroz-dev/prometheus with the fix cherry-picked onto v0.307.2.
-replace github.com/prometheus/prometheus => github.com/katekeiroz-dev/prometheus v0.0.0-20260805152148-3e63de110bdd
+replace github.com/prometheus/prometheus => github.com/stolostron/prometheus v1.8.2-0.20260921150540-e2d348f3103b
