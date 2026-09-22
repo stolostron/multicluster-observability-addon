@@ -195,5 +195,6 @@ replace github.com/perses/plugins/table => github.com/perses/plugins/table v0.0.
 
 // CVE-2026-42151: Azure AD OAuth client_secret exposed via config API.
 // Upstream fix is in v0.311.3 but requires incompatible API changes (parser.ParseExpr removal).
-// This replace points to katekeiroz-dev/prometheus with the fix cherry-picked onto v0.307.2.
+// Use stolostron/prometheus release-2.16 (Prometheus 3.5.0), which already
+// carries the config_util.Secret fix.
 replace github.com/prometheus/prometheus => github.com/stolostron/prometheus v1.8.2-0.20260921150540-e2d348f3103b
