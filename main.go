@@ -11,7 +11,9 @@ import (
 	"os"
 
 	"github.com/ViaQ/logerr/v2/log"
+	certmanagerv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	"github.com/go-logr/logr"
+	lokiv1 "github.com/grafana/loki/operator/api/loki/v1"
 	otelv1alpha1 "github.com/open-telemetry/opentelemetry-operator/apis/v1alpha1"
 	otelv1beta1 "github.com/open-telemetry/opentelemetry-operator/apis/v1beta1"
 	configv1 "github.com/openshift/api/config/v1"
@@ -81,6 +83,8 @@ func init() {
 	utilruntime.Must(addonv1beta1.Install(scheme))
 	utilruntime.Must(thanosv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(configv1.AddToScheme(scheme))
+	utilruntime.Must(certmanagerv1.AddToScheme(scheme))
+	utilruntime.Must(lokiv1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 }
 
