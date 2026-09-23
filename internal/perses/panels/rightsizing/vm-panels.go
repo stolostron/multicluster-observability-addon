@@ -52,10 +52,21 @@ const runningVMFilter = `(max by (name, namespace) (kubevirt_vm_running_status_l
 // Perses evaluates StatChart queries as range queries and displays the last non-null
 // point ("last-number"), whereas Table panels run instant queries at the range end. Without
 // "@ end()" a stopped VM keeps contributing to the stat totals until its last running point
-// leaves the selected time range, while it disappears from the tables immediately.
-// Pinning every selector of the stat queries with "@ end()" makes each step evaluate at the
-// range end, so stat totals and table rows always agree. Replace with the per-query
-// "instant" option once the shipped Perses Prometheus plugin (>= 0.59) supports it.
+// leaves the selected time range (up to a week on the default range), while it disappears
+// from the tables within one collector cycle.
+//
+// Pinning the two [$days:] subqueries and the running-VM selector with "@ end()" makes every
+// step evaluate at the range end, so the totals follow the tables. Selectors *inside* the
+// subqueries must stay unpinned: pinning them collapses max_over_time to the range-end value.
+//
+// Known residual: Perses rounds the query end down to each panel's own step, and the step is
+// derived from the panel width (roundStepInterval(range / width)), so the narrow stat cards
+// use a coarser step than the full-width tables. After a VM stops, the totals therefore trail
+// the tables by up to one stat-panel step (~1 min on a 1h range, ~5 min on 24h, 30-60 min on
+// the default 1w range) and catch up at the next step boundary. Perses also re-resolves a
+// relative range only on refresh, so changing a variable alone keeps the old end time.
+// The per-query "instant" option removes the residual, once the shipped Perses Prometheus
+// plugin (>= 0.59, plus perses/plugins#803 for the unaligned end) supports it.
 const runningVMFilterAtEnd = `(max by (name, namespace) (kubevirt_vm_running_status_last_transition_timestamp_seconds{cluster="$cluster", namespace=~"$namespace"} @ end() > 0) > 0)`
 
 var overestRedThreshold = &commonSdk.Thresholds{

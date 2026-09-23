@@ -132,7 +132,8 @@ func TestBuildVMOverview(t *testing.T) {
 
 	// Perses runs StatChart queries as range queries (showing the last non-null point) but
 	// Table queries as instant queries at the range end. The stat queries are pinned with
-	// "@ end()" so a stopped VM disappears from the totals and the tables at the same time.
+	// "@ end()" so a stopped VM leaves the totals as it leaves the tables, within one
+	// stat-panel step (see runningVMFilterAtEnd for the residual and the "instant" follow-up).
 	t.Run("stat panels are pinned to the range end, table panels stay instant", func(t *testing.T) {
 		statPanels := 0
 		for name, p := range spec.Panels {
