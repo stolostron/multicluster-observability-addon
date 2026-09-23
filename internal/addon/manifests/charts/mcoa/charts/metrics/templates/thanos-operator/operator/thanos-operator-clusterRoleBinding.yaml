@@ -14,5 +14,5 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: {{ .Values.thanosOperator.appName }}-controller-manager
-  namespace: {{ .Release.Namespace }}
+  namespace: open-cluster-management-observability
 {{- end }}
