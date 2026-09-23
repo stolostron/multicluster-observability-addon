@@ -6,6 +6,7 @@ import (
 	stderrors "errors"
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/go-logr/logr"
 	operatorsv1 "github.com/operator-framework/api/pkg/operators/v1"
@@ -449,7 +450,7 @@ func (r *HubResourceReconciler) reconcileDashboards(ctx context.Context, hasCard
 }
 
 func (r *HubResourceReconciler) cleanupOrphanDashboards(ctx context.Context, desiredNames map[string]struct{}) error {
-	knownNames := r.allPossibleDashboardNames()
+	knownNames := allPossibleDashboardNames()
 
 	for _, ns := range []string{addoncfg.InstallNamespace, addoncfg.AnalyticsNamespace} {
 		existingList := &persesv1.PersesDashboardList{}
@@ -479,31 +480,35 @@ func (r *HubResourceReconciler) cleanupOrphanDashboards(ctx context.Context, des
 	return nil
 }
 
-// allPossibleDashboardNames builds the complete set of dashboard names MCOA
-// can generate, regardless of feature flags. Only dashboards with these names
-// are candidates for orphan cleanup — user-created dashboards are never touched.
-func (r *HubResourceReconciler) allPossibleDashboardNames() map[string]struct{} {
-	allBuilders := []func() ([]persesv1.PersesDashboard, error){
-		buildACMPersesDashboards,
-		buildK8sPersesDashboards,
-		buildThanosPersesDashboards,
-		buildCardinalityPersesDashboards,
-		buildIncidentDetectionPersesDashboards,
-		buildNamespaceRSPersesDashboards,
-		buildVMRSPersesDashboards,
-	}
+var (
+	knownDashboardNames     map[string]struct{}
+	knownDashboardNamesOnce sync.Once
+)
 
-	names := map[string]struct{}{}
-	for _, fn := range allBuilders {
-		dbs, err := fn()
-		if err != nil {
-			continue
+func allPossibleDashboardNames() map[string]struct{} {
+	knownDashboardNamesOnce.Do(func() {
+		allBuilders := []func() ([]persesv1.PersesDashboard, error){
+			buildACMPersesDashboards,
+			buildK8sPersesDashboards,
+			buildThanosPersesDashboards,
+			buildCardinalityPersesDashboards,
+			buildIncidentDetectionPersesDashboards,
+			buildNamespaceRSPersesDashboards,
+			buildVMRSPersesDashboards,
 		}
-		for _, db := range dbs {
-			names[db.Name] = struct{}{}
+
+		knownDashboardNames = map[string]struct{}{}
+		for _, fn := range allBuilders {
+			dbs, err := fn()
+			if err != nil {
+				continue
+			}
+			for _, db := range dbs {
+				knownDashboardNames[db.Name] = struct{}{}
+			}
 		}
-	}
-	return names
+	})
+	return knownDashboardNames
 }
 
 func (r *HubResourceReconciler) buildDesiredDashboards(hasCardinalityRules, incidentDetectionEnabled bool) []persesv1.PersesDashboard {
