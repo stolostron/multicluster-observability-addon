@@ -53,6 +53,7 @@ func HealthProber(getter addonutils.AddOnDeploymentConfigGetter, logger logr.Log
 	probeFields = append(probeFields, getLogsProbeFields()...)
 	probeFields = append(probeFields, getTracesProbeFields()...)
 	probeFields = append(probeFields, getAnalyticsProbeFields()...)
+	probeFields = append(probeFields, getThanosProbeFields()...)
 	probeFields = append(probeFields, getTLSProfileProbeFields()...)
 	return &agent.HealthProber{
 		Type: agent.HealthProberTypeWork,
@@ -253,6 +254,40 @@ func getAnalyticsProbeFields() []agent.ProbeField {
 	}
 }
 
+func getThanosProbeFields() []agent.ProbeField {
+	thanosResources := []string{
+		mconfig.ThanosStoreResource,
+		mconfig.ThanosReceiveResource,
+		mconfig.ThanosQueryResource,
+		mconfig.ThanosRulerResource,
+		mconfig.ThanosCompactResource,
+	}
+
+	fields := make([]agent.ProbeField, 0, len(thanosResources))
+	for _, resource := range thanosResources {
+		fields = append(fields, agent.ProbeField{
+			ResourceIdentifier: workv1.ResourceIdentifier{
+				Group:     mconfig.ThanosAPIGroup,
+				Resource:  resource,
+				Name:      mconfig.ThanosCRName,
+				Namespace: mconfig.HubInstallNamespace,
+			},
+			ProbeRules: []workv1.FeedbackRule{
+				{
+					Type: workv1.JSONPathsType,
+					JsonPaths: []workv1.JsonPath{
+						{
+							Name: addoncfg.ThanosProbeKey,
+							Path: addoncfg.ThanosProbePath,
+						},
+					},
+				},
+			},
+		})
+	}
+	return fields
+}
+
 func getTLSProfileProbeFields() []agent.ProbeField {
 	return []agent.ProbeField{
 		{
@@ -433,6 +468,9 @@ func healthChecker(getter addonutils.AddOnDeploymentConfigGetter, fields []agent
 		if err := checkMetricsUIPlugin(fields, opts); err != nil {
 			return err
 		}
+		if err := checkThanos(fields, opts); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -598,6 +636,77 @@ func checkMetricsUIPlugin(fields []agent.FieldResult, opts Options) error {
 
 	if !foundUIPlugin {
 		return fmt.Errorf("%w: %s", errMissingFields, addoncfg.UiPluginsResource)
+	}
+
+	return nil
+}
+
+func checkThanos(fields []agent.FieldResult, opts Options) error {
+	if !opts.ThanosOperatorEnabled {
+		return nil
+	}
+
+	foundStore := false
+	foundReceive := false
+	foundQuery := false
+	foundRuler := false
+	foundCompact := false
+
+	for _, field := range fields {
+		identifier := field.ResourceIdentifier
+		switch identifier.Resource {
+		case mconfig.ThanosStoreResource,
+			mconfig.ThanosReceiveResource,
+			mconfig.ThanosQueryResource,
+			mconfig.ThanosRulerResource,
+			mconfig.ThanosCompactResource:
+
+			if len(field.FeedbackResult.Values) == 0 {
+				return fmt.Errorf("%w for %s with key %s/%s", errMissingFeedbackValues, identifier.Resource, identifier.Namespace, identifier.Name)
+			}
+			for _, value := range field.FeedbackResult.Values {
+				if value.Name != addoncfg.ThanosProbeKey {
+					return fmt.Errorf("%w: %s with key %s/%s unknown probe keys %s", errUnknownProbeKey, identifier.Resource, identifier.Namespace, identifier.Name, value.Name)
+				}
+
+				if value.Value.String == nil {
+					return fmt.Errorf("%w: %s with key %s/%s", errProbeValueIsNil, identifier.Resource, identifier.Namespace, identifier.Name)
+				}
+
+				if *value.Value.String != "True" {
+					return fmt.Errorf("%w: %s status condition type is %s for %s/%s", errProbeConditionNotSatisfied, identifier.Resource, *value.Value.String, identifier.Namespace, identifier.Name)
+				}
+			}
+
+			switch identifier.Resource {
+			case mconfig.ThanosStoreResource:
+				foundStore = true
+			case mconfig.ThanosReceiveResource:
+				foundReceive = true
+			case mconfig.ThanosQueryResource:
+				foundQuery = true
+			case mconfig.ThanosRulerResource:
+				foundRuler = true
+			case mconfig.ThanosCompactResource:
+				foundCompact = true
+			}
+		}
+	}
+
+	if !foundStore {
+		return fmt.Errorf("%w: %s", errMissingFields, mconfig.ThanosStoreResource)
+	}
+	if !foundReceive {
+		return fmt.Errorf("%w: %s", errMissingFields, mconfig.ThanosReceiveResource)
+	}
+	if !foundQuery {
+		return fmt.Errorf("%w: %s", errMissingFields, mconfig.ThanosQueryResource)
+	}
+	if !foundRuler {
+		return fmt.Errorf("%w: %s", errMissingFields, mconfig.ThanosRulerResource)
+	}
+	if !foundCompact {
+		return fmt.Errorf("%w: %s", errMissingFields, mconfig.ThanosCompactResource)
 	}
 
 	return nil

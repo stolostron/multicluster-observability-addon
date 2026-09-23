@@ -49,6 +49,9 @@ const (
 	UipProbeKey       = "isAvailable"
 	UipProbePath      = ".status.conditions[?(@.type==\"Available\")].status"
 
+	ThanosProbeKey  = "isReconciled"
+	ThanosProbePath = ".status.conditions[?(@.type==\"ReconcileSuccess\")].status"
+
 	DefaultStackPrefix = "mcoa-default"
 
 	// Label keys
