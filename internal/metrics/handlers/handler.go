@@ -33,7 +33,7 @@ import (
 const (
 	crdResourceName       = "customresourcedefinitions"
 	mcoaObsAPIRouteName   = "mcoa-observatorium-api"
-	remoteWritePathSuffix = "/api/metrics/v1/default/api/v1/receive"
+	remoteWritePathSuffix = "/api/metrics/v1/api/v1/receive"
 )
 
 var (

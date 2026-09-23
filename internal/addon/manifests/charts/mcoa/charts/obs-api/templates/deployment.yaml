@@ -122,7 +122,7 @@ spec:
               mountPath: /var/run/tls/ca.crt
               subPath: ca.crt
           terminationMessagePolicy: File
-          image: 'registry.redhat.io/rhacm2/observatorium-rhel9@sha256:039a55acb60e43d47c80a682167c8563ee45e7a5bb8b71d60ff6346542caadfd'
+          image: 'quay.io/rh-ee-gaeillo/observatorium:metrics-recieve-prefix-fix-amd64' # TODO replace stolostron image when we get one
           args:
             - '--web.listen=0.0.0.0:8080'
             - '--web.internal.listen=0.0.0.0:8081'
