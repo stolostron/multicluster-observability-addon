@@ -16,6 +16,7 @@ import (
 	tlsutil "github.com/openshift/controller-runtime-common/pkg/tls"
 	libgocrypto "github.com/openshift/library-go/pkg/crypto"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -29,20 +30,19 @@ var (
 	ocpConfigClient client.Client
 
 	// Override in tests to inject a fake client.
-	tlsClientFunc = func() (client.Client, error) {
-		return getOrCreateOCPConfigCRClient()
-	}
+	tlsClientFunc = getOrCreateOCPConfigCRClient
 )
 
 // GetOrCreateTLSProfileSpec retrieves spec.tlsSecurityProfile
 // from a OCP Cluster API server: apiservers.config.openshift.io/cluster resource
 // and applies it based on the adherence policy.
-func GetOrCreateTLSProfileSpec(ctx context.Context) (*ocinfrav1.TLSProfileSpec, error) {
+// kubeConfig is used when initializing the client; nil uses the default kubeconfig.
+func GetOrCreateTLSProfileSpec(ctx context.Context, kubeConfig *rest.Config) (*ocinfrav1.TLSProfileSpec, error) {
 	if tlsProfileSpec != nil {
 		return tlsProfileSpec, nil
 	}
 
-	c, err := tlsClientFunc()
+	c, err := tlsClientFunc(kubeConfig)
 	if err != nil {
 		log.Error(err, "unable to create client for API server")
 		return nil, err
@@ -78,7 +78,7 @@ func GetOrCreateTLSConfig(ctx context.Context) (func(*tls.Config), error) {
 		return tlsConfig, nil
 	}
 
-	profileSpec, err := GetOrCreateTLSProfileSpec(ctx)
+	profileSpec, err := GetOrCreateTLSProfileSpec(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -95,7 +95,7 @@ func GetOrCreateTLSConfig(ctx context.Context) (func(*tls.Config), error) {
 // GetTLSVersionAndCiphers returns the TLS min version
 // and comma-separated IANA cipher suites from the cluster TLS profile.
 func GetTLSVersionAndCiphers(ctx context.Context) (minVersion string, cipherSuites string, err error) {
-	profileSpec, err := GetOrCreateTLSProfileSpec(ctx)
+	profileSpec, err := GetOrCreateTLSProfileSpec(ctx, nil)
 	if err != nil {
 		if isTest, parseErr := strconv.ParseBool(os.Getenv("UNIT_TEST")); parseErr == nil && isTest {
 			log.Info("running unit test, skipping TLS profile adherence")
@@ -112,7 +112,7 @@ func GetTLSVersionAndCiphers(ctx context.Context) (minVersion string, cipherSuit
 // SetTLSSecurityConfiguration appends or overwrites --tls-cipher-suites and --tls-min-version
 // flags on a container args slice based on the cluster TLS profile.
 func SetTLSSecurityConfiguration(ctx context.Context, args []string, tlsCipherSuitesArg string, minTLSversionArg string) ([]string, error) {
-	profileSpec, err := GetOrCreateTLSProfileSpec(ctx)
+	profileSpec, err := GetOrCreateTLSProfileSpec(ctx, nil)
 	if err != nil {
 		if isTest, parseErr := strconv.ParseBool(os.Getenv("UNIT_TEST")); parseErr == nil && isTest {
 			log.Info("running unit test, skipping TLS profile adherence")
@@ -142,14 +142,17 @@ func setArg(args []string, argName string, argValue string) []string {
 	return args
 }
 
-func getOrCreateOCPConfigCRClient() (client.Client, error) {
+func getOrCreateOCPConfigCRClient(config *rest.Config) (client.Client, error) {
 	if ocpConfigClient != nil {
 		return ocpConfigClient, nil
 	}
 
-	config, err := clientcmd.BuildConfigFromFlags("", "")
-	if err != nil {
-		return nil, fmt.Errorf("failed to create in-cluster config: %w", err)
+	var err error
+	if config == nil {
+		config, err = clientcmd.BuildConfigFromFlags("", "")
+		if err != nil {
+			return nil, fmt.Errorf("failed to create in-cluster config: %w", err)
+		}
 	}
 
 	scheme := runtime.NewScheme()
