@@ -369,6 +369,36 @@ func ManifestConfigs() []workv1.ManifestConfigOption {
 			},
 		},
 	)
+
+	thanosResources := []string{
+		mconfig.ThanosStoreResource,
+		mconfig.ThanosReceiveResource,
+		mconfig.ThanosQueryResource,
+		mconfig.ThanosRulerResource,
+		mconfig.ThanosCompactResource,
+	}
+	for _, resource := range thanosResources {
+		manifestConfigs = append(manifestConfigs, workv1.ManifestConfigOption{
+			ResourceIdentifier: workv1.ResourceIdentifier{
+				Group:     mconfig.ThanosAPIGroup,
+				Resource:  resource,
+				Name:      mconfig.ThanosCRName,
+				Namespace: mconfig.HubInstallNamespace,
+			},
+			UpdateStrategy: &workv1.UpdateStrategy{
+				Type: workv1.UpdateStrategyTypeServerSideApply,
+				ServerSideApply: &workv1.ServerSideApplyConfig{
+					IgnoreFields: []workv1.IgnoreField{
+						{
+							Condition: "OnSpokeChange",
+							JSONPaths: []string{".spec"},
+						},
+					},
+				},
+			},
+		})
+	}
+
 	return manifestConfigs
 }
 
