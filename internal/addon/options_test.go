@@ -80,7 +80,7 @@ func TestBuildOptions(t *testing.T) {
 						HubEndpoint: url.URL{
 							Scheme: "https",
 							Host:   "metrics.example.com",
-							Path:   "api/metrics/v1/default/api/v1/receive",
+							Path:   "api/metrics/v1/api/v1/receive",
 						},
 					},
 					AnalyticsOptions: AnalyticsOptions{
@@ -117,7 +117,7 @@ func TestBuildOptions(t *testing.T) {
 						HubEndpoint: url.URL{
 							Scheme: "https",
 							Host:   "metrics.example.com",
-							Path:   "api/metrics/v1/default/api/v1/receive",
+							Path:   "api/metrics/v1/api/v1/receive",
 						},
 					},
 					AnalyticsOptions: AnalyticsOptions{
