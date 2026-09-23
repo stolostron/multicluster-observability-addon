@@ -16,6 +16,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -23,6 +24,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
+
+func allGVKsRegistered() map[schema.GroupVersionKind]bool {
+	return map[schema.GroupVersionKind]bool{
+		{Group: "perses.dev", Version: "v1alpha1", Kind: "PersesDashboard"}:          true,
+		{Group: "perses.dev", Version: "v1alpha1", Kind: "PersesDatasource"}:         true,
+		{Group: "observability.openshift.io", Version: "v1alpha1", Kind: "UIPlugin"}: true,
+	}
+}
 
 func newTestScheme() *runtime.Scheme {
 	scheme := runtime.NewScheme()
@@ -101,10 +110,10 @@ func TestReconcile_AODCNotFound(t *testing.T) {
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
 
 	r := &DefaultHubStackReconciler{
-		Client:            fakeClient,
-		Log:               logr.Discard(),
-		Scheme:            scheme,
-		watchesRegistered: true,
+		Client:      fakeClient,
+		Log:         logr.Discard(),
+		Scheme:      scheme,
+		watchedGVKs: allGVKsRegistered(),
 	}
 
 	result, err := r.Reconcile(t.Context(), reconcile.Request{})
@@ -123,10 +132,10 @@ func TestReconcile_EmptyOptions(t *testing.T) {
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(aodc).Build()
 
 	r := &DefaultHubStackReconciler{
-		Client:            fakeClient,
-		Log:               logr.Discard(),
-		Scheme:            scheme,
-		watchesRegistered: true,
+		Client:      fakeClient,
+		Log:         logr.Discard(),
+		Scheme:      scheme,
+		watchedGVKs: allGVKsRegistered(),
 	}
 
 	result, err := r.Reconcile(t.Context(), reconcile.Request{})
@@ -164,10 +173,10 @@ func TestReconcile_COOSubscriptionWrongChannel(t *testing.T) {
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(aodc, sub).Build()
 
 	r := &DefaultHubStackReconciler{
-		Client:            fakeClient,
-		Log:               logr.Discard(),
-		Scheme:            scheme,
-		watchesRegistered: true,
+		Client:      fakeClient,
+		Log:         logr.Discard(),
+		Scheme:      scheme,
+		watchedGVKs: allGVKsRegistered(),
 	}
 
 	_, err := r.Reconcile(t.Context(), reconcile.Request{})
@@ -191,10 +200,10 @@ func TestReconcile_RightSizingInstallsCOOOnHub(t *testing.T) {
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(aodc).Build()
 
 	r := &DefaultHubStackReconciler{
-		Client:            fakeClient,
-		Log:               logr.Discard(),
-		Scheme:            scheme,
-		watchesRegistered: true,
+		Client:      fakeClient,
+		Log:         logr.Discard(),
+		Scheme:      scheme,
+		watchedGVKs: allGVKsRegistered(),
 	}
 
 	result, err := r.Reconcile(t.Context(), reconcile.Request{})
@@ -249,10 +258,10 @@ func TestReconcile_IncidentDetectionInstallsCOOOnHub(t *testing.T) {
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(aodc).Build()
 
 	r := &DefaultHubStackReconciler{
-		Client:            fakeClient,
-		Log:               logr.Discard(),
-		Scheme:            scheme,
-		watchesRegistered: true,
+		Client:      fakeClient,
+		Log:         logr.Discard(),
+		Scheme:      scheme,
+		watchedGVKs: allGVKsRegistered(),
 	}
 
 	result, err := r.Reconcile(t.Context(), reconcile.Request{})

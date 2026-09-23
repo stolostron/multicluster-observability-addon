@@ -29,9 +29,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-var managedByPredicate = predicate.NewPredicateFuncs(func(obj client.Object) bool {
-	return obj.GetLabels()[addoncfg.ManagedByK8sLabelKey] == cooresource.ManagedByLabelValue
-})
+var managedByPredicate = predicate.And(
+	predicate.GenerationChangedPredicate{},
+	predicate.NewPredicateFuncs(func(obj client.Object) bool {
+		return obj.GetLabels()[addoncfg.ManagedByK8sLabelKey] == cooresource.ManagedByLabelValue
+	}),
+)
 
 var mcoaAODCPredicate = predicate.NewPredicateFuncs(func(obj client.Object) bool {
 	return obj.GetNamespace() == addoncfg.InstallNamespace && obj.GetName() == addoncfg.Name
@@ -42,12 +45,12 @@ var mcoaAODCPredicate = predicate.NewPredicateFuncs(func(obj client.Object) bool
 // for all managed clusters.
 type DefaultHubStackReconciler struct {
 	client.Client
-	Log               logr.Logger
-	Scheme            *runtime.Scheme
-	ctrl              controller.Controller
-	cache             cache.Cache
-	mapper            meta.RESTMapper
-	watchesRegistered bool
+	Log         logr.Logger
+	Scheme      *runtime.Scheme
+	ctrl        controller.Controller
+	cache       cache.Cache
+	mapper      meta.RESTMapper
+	watchedGVKs map[schema.GroupVersionKind]bool
 }
 
 func SetupWithManager(mgr ctrl.Manager, logger logr.Logger) error {
@@ -111,8 +114,8 @@ func (r *DefaultHubStackReconciler) Reconcile(ctx context.Context, _ ctrl.Reques
 }
 
 func (r *DefaultHubStackReconciler) registerDynamicWatches() {
-	if r.watchesRegistered {
-		return
+	if r.watchedGVKs == nil {
+		r.watchedGVKs = make(map[schema.GroupVersionKind]bool)
 	}
 
 	enqueue := handler.EnqueueRequestsFromMapFunc(func(_ context.Context, _ client.Object) []reconcile.Request {
@@ -134,19 +137,21 @@ func (r *DefaultHubStackReconciler) registerDynamicWatches() {
 	}
 
 	for _, w := range watchTargets {
+		if r.watchedGVKs[w.gvk] {
+			continue
+		}
+
 		if _, err := r.mapper.RESTMapping(w.gvk.GroupKind(), w.gvk.Version); err != nil {
 			r.Log.V(2).Info("CRD not yet available, will retry on next reconcile", "kind", w.gvk.Kind)
-			return
+			continue
 		}
-	}
 
-	for _, w := range watchTargets {
 		if err := r.ctrl.Watch(source.Kind(r.cache, w.obj, enqueue, managedByPredicate)); err != nil {
 			r.Log.Error(err, "failed to register dynamic watch", "kind", w.gvk.Kind)
-			return
+			continue
 		}
+
+		r.watchedGVKs[w.gvk] = true
 		r.Log.Info("registered dynamic watch", "kind", w.gvk.Kind)
 	}
-
-	r.watchesRegistered = true
 }
