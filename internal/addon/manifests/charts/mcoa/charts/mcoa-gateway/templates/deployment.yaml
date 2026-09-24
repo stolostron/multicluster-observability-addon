@@ -97,18 +97,10 @@ spec:
               protocol: TCP
           imagePullPolicy: IfNotPresent
           volumeMounts:
-            - name: rbac
-              readOnly: true
-              mountPath: /etc/observatorium/rbac.yaml
-              subPath: rbac.yaml
             - name: tenants
               readOnly: true
               mountPath: /etc/observatorium/tenants.yaml
               subPath: tenants.yaml
-            - name: default-mtls-secret
-              readOnly: true
-              mountPath: /var/run/mtls/default/tls.crt
-              subPath: tls.crt
             - name: tls-secret
               readOnly: true
               mountPath: /var/run/tls/tls.crt
@@ -121,45 +113,67 @@ spec:
               readOnly: true
               mountPath: /var/run/tls/ca.crt
               subPath: ca.crt
+            {{- if .Values.logsEnabled }}
+            - name: loki-client-tls
+              readOnly: true
+              mountPath: /var/run/loki-client-tls/tls.crt
+              subPath: tls.crt
+            - name: loki-client-tls
+              readOnly: true
+              mountPath: /var/run/loki-client-tls/tls.key
+              subPath: tls.key
+            - name: openshift-service-ca
+              readOnly: true
+              mountPath: /var/run/loki-client-tls/service-ca.crt
+              subPath: service-ca.crt
+            {{- end }}
           terminationMessagePolicy: File
-          image: 'quay.io/rh-ee-gaeillo/observatorium:metrics-recieve-prefix-fix-amd64' # TODO replace stolostron image when we get one
+          image: 'quay.io/rh-ee-gaeillo/mcoa-gateway:mtlshealthcheck' # TODO replace stolostron image when we get one
           args:
             - '--web.listen=0.0.0.0:8080'
             - '--web.internal.listen=0.0.0.0:8081'
             - '--metrics.read.endpoint={{ .Values.metricsReadEndpoint }}'
             - '--metrics.write.endpoint={{ .Values.metricsWriteEndpoint }}'
-            - '--log.level=warn'
+            - '--log.level=debug'
             - '--tenants.config=/etc/observatorium/tenants.yaml'
             - '--web.healthchecks.url=https://127.0.0.1:8080'
+            - '--tls.client-auth-type=RequireAndVerifyClientCert'
             - '--tls.server.cert-file=/var/run/tls/tls.crt'
             - '--tls.server.key-file=/var/run/tls/tls.key'
+            - '--tls.client-ca-file=/var/run/tls/ca.crt'
             - '--tls.healthchecks.server-ca-file=/var/run/tls/ca.crt'
-            - '--tls.healthchecks.server-name=observability-server-certificate'
+            - '--tls.healthchecks.server-name=mcoa-observability-observatorium-api.open-cluster-management-observability.svc'
+            - '--tls.healthchecks.client-cert-file=/var/run/tls/tls.crt'
+            - '--tls.healthchecks.client-key-file=/var/run/tls/tls.key'
             - '--metrics.write-timeout=5m'
             - '--server.read-header-timeout=10s'
             {{- if .Values.logsEnabled }}
             - '--logs.write.endpoint={{ .Values.logsWriteEndpoint }}'
             - '--logs.read.endpoint={{ .Values.logsReadEndpoint }}'
-            # TODO(JoaoBraveCoding): Here we should set need to mount the openshift-service-ca to validate the TLS Connection from LokiStack
+            - '--logs.tls.cert-file=/var/run/loki-client-tls/tls.crt'
+            - '--logs.tls.key-file=/var/run/loki-client-tls/tls.key'
+            - '--logs.tls.ca-file=/var/run/loki-client-tls/service-ca.crt'
             {{- end }}
       serviceAccount: observability-observatorium-api
       volumes:
-        - name: rbac
-          configMap:
-            name: observability-observatorium-api
-            defaultMode: 420
         - name: tenants
           secret:
             secretName: observability-observatorium-api
             defaultMode: 420
-        - name: default-mtls-secret
-          secret:
-            secretName: observability-client-ca-certs
-            defaultMode: 420
         - name: tls-secret
           secret:
-            secretName: observability-server-certs
+            secretName: mcoa-gateway-server-tls
             defaultMode: 420
+        {{- if .Values.logsEnabled }}
+        - name: loki-client-tls
+          secret:
+            secretName: mcoa-gateway-loki-client-tls
+            defaultMode: 420
+        - name: openshift-service-ca
+          configMap:
+            name: openshift-service-ca.crt
+            defaultMode: 420
+        {{- end }}
       dnsPolicy: ClusterFirst
   strategy:
     type: RollingUpdate
