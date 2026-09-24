@@ -11,7 +11,7 @@ func buildManagedLokistackSpec(opts Options) (lokiv1.LokiStackSpec, error) {
 		Mode: lokiv1.Passthrough,
 		Passthrough: &lokiv1.PassthroughTenantSpec{
 			CA: &lokiv1.ValueReference{
-				SecretName: DefaultStorageMTLSSecretName, // TODO(JoaoBraveCoding): Needs to be CA used by OBS-API
+				SecretName: DefaultStorageMTLSSecretName, // TODO(JoaoBraveCoding): Needs to be CA used by MCOA Gateway
 				Key:        "ca.crt",
 			},
 			// TODO(JoaoBraveCoding): For now we're gonna put everything in the infrastructure tenant, obs/api should

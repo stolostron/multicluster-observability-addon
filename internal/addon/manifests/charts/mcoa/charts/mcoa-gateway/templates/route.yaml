@@ -5,8 +5,8 @@ metadata:
   name: mcoa-observatorium-api
   namespace: open-cluster-management-observability
   labels:
-    app: {{ template "obsapihelm.name" . }}
-    chart: {{ template "obsapihelm.chart" . }}
+    app: {{ template "mcoagatewayhelm.name" . }}
+    chart: {{ template "mcoagatewayhelm.chart" . }}
     release: {{ .Release.Name }}
 spec:
   to:

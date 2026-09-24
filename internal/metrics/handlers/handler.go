@@ -32,7 +32,7 @@ import (
 
 const (
 	crdResourceName       = "customresourcedefinitions"
-	mcoaObsAPIRouteName   = "mcoa-observatorium-api"
+	mcoagatewayRouteName  = "mcoa-observatorium-api"
 	remoteWritePathSuffix = "/api/metrics/v1/api/v1/receive"
 )
 
@@ -42,7 +42,7 @@ var (
 	errMissingDesiredConfig        = errors.New("missing desiredConfig in managedClusterAddon.Status.ConfigReferences")
 	errMissingRemoteWriteConfig    = errors.New("missing expected remote write spec in the prometheusAgent")
 	errMissingCMAOOwnership        = errors.New("object is not owned by the ClusterManagementAddOn")
-	errMissingRouteHost            = errors.New("MCOA obs-api route has no host")
+	errMissingRouteHost            = errors.New("MCOA gateway route has no host")
 )
 
 type OptionsBuilder struct {
@@ -280,7 +280,7 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1beta1.Man
 		}
 	}
 
-	// Override remote write URL to point to MCOA obs-api when thanos-operator is enabled
+	// Override remote write URL to point to MCOA gateway when thanos-operator is enabled
 	if opts.ThanosOperatorEnabled {
 		if err = o.overrideRemoteWriteEndpoint(ctx, &ret); err != nil {
 			o.Logger.Error(err, "failed to override remote write endpoint, keeping original")
@@ -964,14 +964,14 @@ func (o *OptionsBuilder) buildThanosComponents(ctx context.Context, opts *Option
 func (o *OptionsBuilder) overrideRemoteWriteEndpoint(ctx context.Context, opts *Options) error {
 	route := &routev1.Route{}
 	if err := o.Client.Get(ctx, types.NamespacedName{
-		Name:      mcoaObsAPIRouteName,
+		Name:      mcoagatewayRouteName,
 		Namespace: config.HubInstallNamespace,
 	}, route); err != nil {
-		return fmt.Errorf("failed to get MCOA obs-api route: %w", err)
+		return fmt.Errorf("failed to get MCOA gateway route: %w", err)
 	}
 
 	if route.Spec.Host == "" {
-		return fmt.Errorf("%w: %s", errMissingRouteHost, mcoaObsAPIRouteName)
+		return fmt.Errorf("%w: %s", errMissingRouteHost, mcoagatewayRouteName)
 	}
 
 	endpoint := "https://" + route.Spec.Host + remoteWritePathSuffix
