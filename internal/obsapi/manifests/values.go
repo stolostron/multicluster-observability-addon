@@ -12,9 +12,10 @@ type ObsAPIValues struct {
 	Enabled              bool   `json:"enabled"`
 	MetricsWriteEndpoint string `json:"metricsWriteEndpoint"`
 	MetricsReadEndpoint  string `json:"metricsReadEndpoint"`
+	LogsEnabled          bool   `json:"logsEnabled"`
 }
 
-func BuildValues(isHubCluster, obsAPIEnabled, thanosOperatorEnabled bool) *ObsAPIValues {
+func BuildValues(isHubCluster, obsAPIEnabled, thanosOperatorEnabled bool, logsEnabled bool) *ObsAPIValues {
 	if !isHubCluster || !obsAPIEnabled {
 		return nil
 	}
@@ -30,5 +31,6 @@ func BuildValues(isHubCluster, obsAPIEnabled, thanosOperatorEnabled bool) *ObsAP
 		Enabled:              true,
 		MetricsWriteEndpoint: writeEndpoint,
 		MetricsReadEndpoint:  readEndpoint,
+		LogsEnabled:          logsEnabled,
 	}
 }
