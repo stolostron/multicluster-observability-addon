@@ -9,13 +9,9 @@ const (
 	CloSubscriptionInstallNamespace = "openshift-logging"
 	LoggingNamespace                = "openshift-logging"
 
-	DefaultCollectionCLFName        = "mcoa-logging-managed-collection"
-	DefaultCollectionCertCommonName = "mcoa-logging-managed-collection"
-	DefaultCollectionMTLSSecretName = "mcoa-logging-managed-collection-tls"
+	DefaultCollectionCLFName = "mcoa-logging-managed-collection"
 
 	DefaultStorageLSName               = "mcoa-logging-managed-storage"
-	DefaultStorageCertCommonName       = "mcoa-logging-managed-storage"
-	DefaultStorageMTLSSecretName       = "mcoa-logging-managed-storage-tls"
 	DefaultStorageObjStorageSecretName = "mcoa-logging-managed-storage-objstorage"
 )
 

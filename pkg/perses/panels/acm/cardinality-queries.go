@@ -77,15 +77,15 @@ var CardinalityQueries = map[string]parser.Expr{
 
 	// Overview - Cluster Cardinality
 	"ClusterCardinalityOverTime": promqlbuilder.TopK(clusterCardinalityVector(), 8),
-	"ClusterCardinalityNow":     lastOverTime35m(clusterCardinalityVector()),
-	"ClusterCardinality7dAgo":   lastOverTime35m(clusterCardinalityVector(vector.WithOffsetAsString("7d"))),
-	"ClusterCardinality30dAgo":  lastOverTime35m(clusterCardinalityVector(vector.WithOffsetAsString("30d"))),
+	"ClusterCardinalityNow":      lastOverTime35m(clusterCardinalityVector()),
+	"ClusterCardinality7dAgo":    lastOverTime35m(clusterCardinalityVector(vector.WithOffsetAsString("7d"))),
+	"ClusterCardinality30dAgo":   lastOverTime35m(clusterCardinalityVector(vector.WithOffsetAsString("30d"))),
 
 	// Overview - Metric Cardinality
 	"MetricCardinalityOverTime": promqlbuilder.TopK(nameCardinalityVector(), 8),
-	"MetricCardinalityNow":     lastOverTime35m(nameCardinalityVector()),
-	"MetricCardinality7dAgo":   lastOverTime35m(nameCardinalityVector(vector.WithOffsetAsString("7d"))),
-	"MetricCardinality30dAgo":  lastOverTime35m(nameCardinalityVector(vector.WithOffsetAsString("30d"))),
+	"MetricCardinalityNow":      lastOverTime35m(nameCardinalityVector()),
+	"MetricCardinality7dAgo":    lastOverTime35m(nameCardinalityVector(vector.WithOffsetAsString("7d"))),
+	"MetricCardinality30dAgo":   lastOverTime35m(nameCardinalityVector(vector.WithOffsetAsString("30d"))),
 
 	// Overview - Global Recording Rules
 	"GlobalRulesOverTime": promqlbuilder.TopK(globalRulesVector(), 8),

@@ -71,6 +71,8 @@ func BuildServerCertificate(key client.ObjectKey, mTLSConfig CertificateConfig) 
 			},
 			Usages: []certmanagerv1.KeyUsage{
 				certmanagerv1.UsageServerAuth,
+				// for --tls.healthchecks.client-cert-file
+				certmanagerv1.UsageClientAuth,
 				certmanagerv1.UsageKeyEncipherment,
 				certmanagerv1.UsageDigitalSignature,
 			},
