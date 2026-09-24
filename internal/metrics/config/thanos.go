@@ -13,7 +13,7 @@ const (
 	ThanosRulerResource   = "thanosrulers"
 	ThanosCompactResource = "thanoscompacts"
 	// TODO: replace with image from ACM image overrides ConfigMap once available.
-	ThanosOperatorImage = "quay.io/thanos/thanos-operator:main-2026-04-09-a4dc024"
+	ThanosOperatorImage = "quay.io/thanos/thanos-operator:main-2026-09-15-83900c49"
 
 	// Thanos Store defaults
 	DefaultStoreShards      = 3
