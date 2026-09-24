@@ -28,6 +28,9 @@ spec:
     # Resources for configuring the deployment of the Log collection
     - group: observability.openshift.io
       resource: clusterlogforwarders
+    # Resources for configuring managed logging
+    - group: loki.grafana.com
+      resource: lokistacks
     # Resources for configuring the deployment of OpenTelemetry collection
     - group: opentelemetry.io
       resource: opentelemetrycollectors
@@ -51,4 +54,12 @@ spec:
           - group: opentelemetry.io
             resource: instrumentations
             name: instance
+            namespace: open-cluster-management-observability
+          - group: observability.openshift.io
+            resource: clusterlogforwarders
+            name: default-stack-instance-global
+            namespace: open-cluster-management-observability
+          - group: loki.grafana.com
+            resource: lokistacks
+            name: default-stack-instance-global
             namespace: open-cluster-management-observability
