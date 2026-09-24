@@ -31,6 +31,7 @@ import (
 	"github.com/stolostron/multicluster-observability-addon/pkg/perses/dashboards/thanos"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -412,7 +413,7 @@ func (r *HubResourceReconciler) applyResource(ctx context.Context, obj client.Ob
 func (r *HubResourceReconciler) deleteIfManaged(ctx context.Context, obj client.Object) error {
 	existing := obj.DeepCopyObject().(client.Object)
 	if err := r.Client.Get(ctx, client.ObjectKeyFromObject(obj), existing); err != nil {
-		if errors.IsNotFound(err) {
+		if errors.IsNotFound(err) || meta.IsNoMatchError(err) {
 			return nil
 		}
 		return fmt.Errorf("failed to get %T %s/%s: %w",
@@ -455,7 +456,7 @@ func (r *HubResourceReconciler) cleanupOrphanDashboards(ctx context.Context, des
 	for _, ns := range []string{addoncfg.InstallNamespace, addoncfg.AnalyticsNamespace} {
 		existingList := &persesv1.PersesDashboardList{}
 		if err := r.Client.List(ctx, existingList, client.InNamespace(ns)); err != nil {
-			if errors.IsNotFound(err) {
+			if errors.IsNotFound(err) || meta.IsNoMatchError(err) {
 				continue
 			}
 			return fmt.Errorf("failed to list dashboards in %s: %w", ns, err)
