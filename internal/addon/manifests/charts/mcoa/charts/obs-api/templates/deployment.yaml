@@ -138,6 +138,11 @@ spec:
             - '--tls.healthchecks.server-name=observability-server-certificate'
             - '--metrics.write-timeout=5m'
             - '--server.read-header-timeout=10s'
+            {{- if .Values.logsEnabled }}
+            - '--logs.write.endpoint=https://mcoa-default-global-gateway-http.open-cluster-management-observability.svc:8080'
+            - '--logs.read.endpoint=https://mcoa-default-global-gateway-http.open-cluster-management-observability.svc:8080'
+            # TODO(JoaoBraveCoding): Here we should set need to mount the openshift-service-ca to validate the TLS Connection from LokiStack
+            {{- end }}
       serviceAccount: observability-observatorium-api
       volumes:
         - name: rbac

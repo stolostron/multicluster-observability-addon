@@ -45,6 +45,8 @@ const (
 	ClusterLogForwardersResource = "clusterlogforwarders"
 	SpokeCLFName                 = "mcoa-instance"
 	SpokeCLFNamespace            = "openshift-logging"
+	LokiStacksResource           = "lokistacks"
+	HubNamespace                 = "local-cluster"
 	ClfProbeKey                  = "isReady"
 	ClfProbePath                 = ".status.conditions[?(@.type==\"Ready\")].status"
 
@@ -108,7 +110,15 @@ const (
 
 	VendorOverrideAnnotationKey = "mcoa-override-vendor"
 	AnnotationOriginalResource  = "mcoa.openshift.io/original-resource"
+
+	GlobalPlacementName      = "global"
+	GlobalPlacementNamespace = "open-cluster-management-global-set"
 )
+
+var GlobalPlacementRef = addonv1beta1.PlacementRef{
+	Name:      GlobalPlacementName,
+	Namespace: GlobalPlacementNamespace,
+}
 
 var (
 	ErrInvalidMetricsHubHostname  = errors.New("invalid metrics hub hostname")

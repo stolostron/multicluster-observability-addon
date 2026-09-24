@@ -19,6 +19,7 @@ type ObsAPIValues struct {
 	MetricsReadEndpoint  string          `json:"metricsReadEndpoint"`
 	Replicas             int32           `json:"replicas"`
 	Resources            ObsAPIResources `json:"resources"`
+	LogsEnabled          bool            `json:"logsEnabled"`
 }
 
 var obsAPICPURequest = map[string]string{
@@ -51,7 +52,7 @@ var obsAPIReplicas = map[string]int32{
 	"4xlarge": 12,
 }
 
-func BuildValues(isHubCluster, obsAPIEnabled, thanosOperatorEnabled bool, instanceSize string) *ObsAPIValues {
+func BuildValues(isHubCluster, obsAPIEnabled, thanosOperatorEnabled bool, instanceSize string, logsEnabled bool) *ObsAPIValues {
 	if !isHubCluster || !obsAPIEnabled {
 		return nil
 	}
@@ -89,5 +90,6 @@ func BuildValues(isHubCluster, obsAPIEnabled, thanosOperatorEnabled bool, instan
 			CPURequest:    cpu,
 			MemoryRequest: mem,
 		},
+		LogsEnabled: logsEnabled,
 	}
 }
