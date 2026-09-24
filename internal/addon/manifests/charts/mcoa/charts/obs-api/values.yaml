@@ -3,3 +3,6 @@ nameOverride: null
 enabled: false
 metricsWriteEndpoint: "http://observability-thanos-receive.open-cluster-management-observability.svc.cluster.local:19291"
 metricsReadEndpoint: "http://observability-thanos-query-frontend.open-cluster-management-observability.svc.cluster.local:9090"
+logsEnabled: false
+logsWriteEndpoint: "https://mcoa-logging-managed-storage-gateway-http.openshift-logging.svc:8080"
+logsReadEndpoint: "https://mcoa-logging-managed-storage-gateway-http.openshift-logging.svc:8080"

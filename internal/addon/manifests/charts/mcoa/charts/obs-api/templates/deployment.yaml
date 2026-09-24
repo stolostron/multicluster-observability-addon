@@ -122,14 +122,13 @@ spec:
               mountPath: /var/run/tls/ca.crt
               subPath: ca.crt
           terminationMessagePolicy: File
-          image: 'registry.redhat.io/rhacm2/observatorium-rhel9@sha256:039a55acb60e43d47c80a682167c8563ee45e7a5bb8b71d60ff6346542caadfd'
+          image: 'quay.io/rh-ee-gaeillo/observatorium:metrics-recieve-prefix-fix-amd64' # TODO replace stolostron image when we get one
           args:
             - '--web.listen=0.0.0.0:8080'
             - '--web.internal.listen=0.0.0.0:8081'
             - '--metrics.read.endpoint={{ .Values.metricsReadEndpoint }}'
             - '--metrics.write.endpoint={{ .Values.metricsWriteEndpoint }}'
             - '--log.level=warn'
-            - '--rbac.config=/etc/observatorium/rbac.yaml'
             - '--tenants.config=/etc/observatorium/tenants.yaml'
             - '--web.healthchecks.url=https://127.0.0.1:8080'
             - '--tls.server.cert-file=/var/run/tls/tls.crt'
@@ -138,6 +137,11 @@ spec:
             - '--tls.healthchecks.server-name=observability-server-certificate'
             - '--metrics.write-timeout=5m'
             - '--server.read-header-timeout=10s'
+            {{- if .Values.logsEnabled }}
+            - '--logs.write.endpoint={{ .Values.logsWriteEndpoint }}'
+            - '--logs.read.endpoint={{ .Values.logsReadEndpoint }}'
+            # TODO(JoaoBraveCoding): Here we should set need to mount the openshift-service-ca to validate the TLS Connection from LokiStack
+            {{- end }}
       serviceAccount: observability-observatorium-api
       volumes:
         - name: rbac

@@ -35,6 +35,9 @@ const (
 	KeyUserWorkloadMetricsAlerts     = "userWorkloadMetricsAlerts"
 
 	KeyPlatformMetricsUI = "platformMetricsUI"
+
+	KeyPlatformLogsDefault = "platformLogsDefault"
+	KeyHubHostname         = "hubHostname"
 )
 
 type CollectionKind string
@@ -77,6 +80,7 @@ type IncidentDetection struct {
 type LogsOptions struct {
 	CollectionEnabled   bool
 	SubscriptionChannel string
+	DefaultStack        bool
 }
 
 type TracesOptions struct {
@@ -129,6 +133,7 @@ type Options struct {
 	ProxyConfig           ProxyConfig
 	Registries            []addonapiv1beta1.ImageMirror
 	ThanosOperatorEnabled bool
+	HubHostname           string
 }
 
 func (o Options) validate() error {
@@ -208,7 +213,7 @@ func BuildOptions(addOnDeployment *addonapiv1beta1.AddOnDeploymentConfig) (Optio
 			if err != nil {
 				return opts, fmt.Errorf("%w: %s", addoncfg.ErrInvalidMetricsHubHostname, err.Error())
 			}
-			url = url.JoinPath("/api/metrics/v1/default/api/v1/receive")
+			url = url.JoinPath("/api/metrics/v1/api/v1/receive")
 
 			// Hostname validation:
 			// - Check if host is empty
@@ -298,6 +303,13 @@ func BuildOptions(addOnDeployment *addonapiv1beta1.AddOnDeploymentConfig) (Optio
 			if keyvalue.Value == string(UIPluginV1alpha1) {
 				opts.Platform.Metrics.UI.Enabled = true
 			}
+		case KeyPlatformLogsDefault:
+			if keyvalue.Value == "true" {
+				opts.Platform.Enabled = true
+				opts.Platform.Logs.DefaultStack = true
+			}
+		case KeyHubHostname:
+			opts.HubHostname = keyvalue.Value
 		}
 	}
 
