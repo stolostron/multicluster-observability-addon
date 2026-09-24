@@ -114,5 +114,8 @@
     - apiGroups: ["cert-manager.io"]
       resources: ["certificates/status"]
       verbs: ["get", "update"]
+    - apiGroups: ["route.openshift.io"]
+      resources: ["routes"]
+      verbs: ["get", "list", "watch"]
 
 

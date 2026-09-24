@@ -183,6 +183,7 @@ func buildManagedValues(opts Options) (ManagedValues, error) {
 		secrets, err := secretsToResourceValues([]corev1.Secret{
 			opts.DefaultStack.Storage.ObjStorageSecret,
 			opts.DefaultStack.Storage.MTLSSecret,
+			opts.DefaultStack.Storage.LokiClientCASecret,
 		})
 		if err != nil {
 			return mValues, err
