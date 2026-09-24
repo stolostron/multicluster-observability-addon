@@ -62,7 +62,9 @@ func BuildDefaultStackOptions(platform, userWorkloads addon.LogsOptions, hubHost
 		HubHostname:   hubHostname,
 		DefaultStack: DefaultStack{
 			// Template value as CLF requires a LokiURL in its CEL expression.
-			LokiURL: fmt.Sprintf("https://mcoa-observability-observatorium-api.%s.svc:8080/api/logs/v1/%s/otlp/v1/logs", addoncfg.InstallNamespace, "tenant"),
+			// mcoa-gateway mounts logs at /api/logs/v1 with no tenant path segment;
+			// tenant comes from the client mTLS certificate's OU field instead.
+			LokiURL: fmt.Sprintf("https://mcoa-observability-observatorium-api.%s.svc:8080/api/logs/v1/otlp/v1/logs", addoncfg.InstallNamespace),
 			Collection: Collection{
 				Secrets: []corev1.Secret{
 					{
