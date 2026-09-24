@@ -3,6 +3,7 @@ package manifests
 import (
 	lokiv1 "github.com/grafana/loki/operator/api/loki/v1"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
+	mcoagateway "github.com/stolostron/multicluster-observability-addon/internal/mcoagateway"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -11,7 +12,7 @@ func buildManagedLokistackSpec(opts Options) (lokiv1.LokiStackSpec, error) {
 		Mode: lokiv1.Passthrough,
 		Passthrough: &lokiv1.PassthroughTenantSpec{
 			CA: &lokiv1.ValueReference{
-				SecretName: DefaultStorageMTLSSecretName, // TODO(JoaoBraveCoding): Needs to be CA used by MCOA Gateway
+				SecretName: mcoagateway.DefaultLokiClientMTLSSecretName, // specifies CA of client
 				Key:        "ca.crt",
 			},
 			// TODO(JoaoBraveCoding): For now we're gonna put everything in the infrastructure tenant, obs/api should
