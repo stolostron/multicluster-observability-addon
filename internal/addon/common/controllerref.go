@@ -54,14 +54,18 @@ func GetResourceWithOwnerRef[T client.Object](
 
 	cmao := cmaoOwnerStub()
 
+	// A missing object is skipped so one stale config reference (for example a
+	// renamed template) does not hide another reference that is present and owned.
+	sawObject := false
 	for _, key := range keys {
 		tempObj := obj.DeepCopyObject().(T)
 		if err := k8s.Get(ctx, key, tempObj, &client.GetOptions{}); err != nil {
 			if k8serrors.IsNotFound(err) {
-				return obj, fmt.Errorf("%w: %s/%s %s/%s", errMissingResource, group, resource, key.Namespace, key.Name)
+				continue
 			}
 			return obj, err
 		}
+		sawObject = true
 
 		hasOwnerRef, err := controllerutil.HasOwnerReference(tempObj.GetOwnerReferences(), cmao, k8s.Scheme())
 		if err != nil {
@@ -75,6 +79,9 @@ func GetResourceWithOwnerRef[T client.Object](
 	}
 
 	if obj.GetName() == "" {
+		if !sawObject {
+			return obj, fmt.Errorf("%w: %s/%s", errMissingResource, group, resource)
+		}
 		return obj, fmt.Errorf("%w: group=%s, resource=%s", errMissingOwnerRef, group, resource)
 	}
 

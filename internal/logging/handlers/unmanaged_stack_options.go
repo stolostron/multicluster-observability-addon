@@ -9,6 +9,7 @@ import (
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"github.com/stolostron/multicluster-observability-addon/internal/logging/manifests"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -54,7 +55,7 @@ func buildUnmanagedOptions(ctx context.Context, k8s client.Client, mcAddon *addo
 // getUnmanagedClusterLogForwarder returns the single admin-authored ClusterLogForwarder
 // referenced on the ManagedClusterAddOn for unmanaged log collection. ClusterLogForwarders
 // owned by this addon's ClusterManagementAddOn (i.e. MCOA's own managed/default-stack CLF,
-// see BuildCLFResources) are skipped: a real unmanaged CLF is authored directly by an admin
+// see BuildDefaultStackCollectionResources) are skipped: a real unmanaged CLF is authored directly by an admin
 // and should never carry that owner reference. Without this filter, enabling both
 // platformLogsCollection (unmanaged) and platformLogsDefault (managed) at once would cause
 // MCOA's own managed CLF to be mistaken for the unmanaged one and fail validation, since it
@@ -67,6 +68,9 @@ func getUnmanagedClusterLogForwarder(ctx context.Context, k8s client.Client, mcA
 	for _, key := range keys {
 		clf := &loggingv1.ClusterLogForwarder{}
 		if err := k8s.Get(ctx, key, clf, &client.GetOptions{}); err != nil {
+			if apierrors.IsNotFound(err) {
+				continue
+			}
 			return nil, err
 		}
 

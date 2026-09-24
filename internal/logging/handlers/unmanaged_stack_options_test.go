@@ -122,6 +122,43 @@ func TestGetUnmanagedClusterLogForwarder(t *testing.T) {
 		require.ErrorIs(t, err, errMultipleCLFRef)
 	})
 
+	t.Run("ignores a missing reference when another unmanaged CLF exists", func(t *testing.T) {
+		scheme := buildTestScheme(t)
+		userCLF := &loggingv1.ClusterLogForwarder{
+			ObjectMeta: metav1.ObjectMeta{Name: "user-clf", Namespace: "user-ns"},
+		}
+		fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(userCLF).Build()
+
+		mcAddon := &addonapiv1beta1.ManagedClusterAddOn{
+			Status: addonapiv1beta1.ManagedClusterAddOnStatus{
+				ConfigReferences: []addonapiv1beta1.ConfigReference{
+					buildCLFConfigReference(addoncfg.InstallNamespace, "default-stack-instance-global"),
+					buildCLFConfigReference("user-ns", "user-clf"),
+				},
+			},
+		}
+
+		got, err := getUnmanagedClusterLogForwarder(ctx, fakeClient, mcAddon)
+		require.NoError(t, err)
+		assert.Equal(t, "user-clf", got.Name)
+	})
+
+	t.Run("missing-only reference is treated as no unmanaged CLF", func(t *testing.T) {
+		scheme := buildTestScheme(t)
+		fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
+		mcAddon := &addonapiv1beta1.ManagedClusterAddOn{
+			Status: addonapiv1beta1.ManagedClusterAddOnStatus{
+				ConfigReferences: []addonapiv1beta1.ConfigReference{
+					buildCLFConfigReference(addoncfg.InstallNamespace, "default-stack-instance-global"),
+				},
+			},
+		}
+
+		_, err := getUnmanagedClusterLogForwarder(ctx, fakeClient, mcAddon)
+		require.Error(t, err)
+		require.ErrorIs(t, err, errMissingCLFRef)
+	})
+
 	t.Run("errors when no CLF is referenced", func(t *testing.T) {
 		scheme := buildTestScheme(t)
 		fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()

@@ -17,6 +17,13 @@ const (
 	DefaultStorageCertCommonName       = "mcoa-logging-managed-storage"
 	DefaultStorageMTLSSecretName       = "mcoa-logging-managed-storage-tls"
 	DefaultStorageObjStorageSecretName = "mcoa-logging-managed-storage-objstorage"
+
+	// ObsAPIServerMTLSSecretName is the cert-manager secret obs-api serves with
+	// when managed logging is on. The deployment healthcheck flag
+	// --tls.healthchecks.server-name must stay equal to ObsAPIServerCertCommonName.
+	ObsAPIServerMTLSSecretName = "mcoa-observatorium-api-tls"
+	ObsAPIServerCertCommonName = "observability-server-certificate"
+	ObsAPIServiceName          = "mcoa-observability-observatorium-api"
 )
 
 var errInvalidSubscriptionChannel = errors.New("current version of the cluster-logging installed doesn't match the supported MCOA version")

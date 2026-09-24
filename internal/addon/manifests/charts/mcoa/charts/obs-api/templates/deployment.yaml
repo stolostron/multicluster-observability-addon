@@ -108,7 +108,11 @@ spec:
             - name: default-mtls-secret
               readOnly: true
               mountPath: /var/run/mtls/default/tls.crt
+              {{- if .Values.logsEnabled }}
+              subPath: ca.crt
+              {{- else }}
               subPath: tls.crt
+              {{- end }}
             - name: tls-secret
               readOnly: true
               mountPath: /var/run/tls/tls.crt
@@ -154,11 +158,19 @@ spec:
             defaultMode: 420
         - name: default-mtls-secret
           secret:
+            {{- if .Values.logsEnabled }}
+            secretName: mcoa-observatorium-api-tls
+            {{- else }}
             secretName: observability-client-ca-certs
+            {{- end }}
             defaultMode: 420
         - name: tls-secret
           secret:
+            {{- if .Values.logsEnabled }}
+            secretName: mcoa-observatorium-api-tls
+            {{- else }}
             secretName: observability-server-certs
+            {{- end }}
             defaultMode: 420
       dnsPolicy: ClusterFirst
   strategy:

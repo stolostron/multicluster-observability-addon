@@ -55,11 +55,3 @@ spec:
             resource: instrumentations
             name: instance
             namespace: open-cluster-management-observability
-          - group: observability.openshift.io
-            resource: clusterlogforwarders
-            name: default-stack-instance-global
-            namespace: open-cluster-management-observability
-          - group: loki.grafana.com
-            resource: lokistacks
-            name: default-stack-instance-global
-            namespace: open-cluster-management-observability

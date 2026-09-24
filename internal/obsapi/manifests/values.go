@@ -24,7 +24,10 @@ type ObsAPIValues struct {
 }
 
 func BuildValues(isHubCluster, obsAPIEnabled, thanosOperatorEnabled bool, logsEnabled bool) *ObsAPIValues {
-	if !isHubCluster || !obsAPIEnabled {
+	// Default logging needs obs-api on the hub: spoke ClusterLogForwarders write
+	// OTLP to it, and it forwards to the Loki gateway. The annotation remains
+	// the switch for metrics-only use.
+	if !isHubCluster || (!obsAPIEnabled && !logsEnabled) {
 		return nil
 	}
 
