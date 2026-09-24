@@ -4,7 +4,9 @@ import (
 	"context"
 	"crypto/x509"
 	"encoding/pem"
+	"errors"
 	"fmt"
+	"slices"
 
 	routev1 "github.com/openshift/api/route/v1"
 	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
@@ -19,6 +21,12 @@ import (
 )
 
 const obsAPIRouteName = "mcoa-observatorium-api"
+
+var (
+	errObsAPIRouteHostMissing     = errors.New("obs-api route has no host yet")
+	errObsAPIServerCertIncomplete = errors.New("obs-api server certificate secret has no tls.crt yet")
+	errObsAPIServerCertHost       = errors.New("obs-api server certificate does not include route host yet")
+)
 
 func buildDefaultStackCollectionOptions(ctx context.Context, k8s client.Client, mcAddon *addonapiv1beta1.ManagedClusterAddOn, opts *manifests.Options) error {
 	if !opts.DefaultStackEnabled() {
@@ -76,7 +84,7 @@ func obsAPILogsURL(ctx context.Context, k8s client.Client) (string, error) {
 		return "", err
 	}
 	if host == "" {
-		return "", fmt.Errorf("obs-api route %s/%s has no host yet", addoncfg.InstallNamespace, obsAPIRouteName)
+		return "", fmt.Errorf("%w: %s/%s", errObsAPIRouteHostMissing, addoncfg.InstallNamespace, obsAPIRouteName)
 	}
 	if err := obsAPIServerCertIncludesHost(ctx, k8s, host); err != nil {
 		return "", err
@@ -104,16 +112,14 @@ func obsAPIServerCertIncludesHost(ctx context.Context, k8s client.Client, host s
 	}
 	block, _ := pem.Decode(secret.Data[corev1.TLSCertKey])
 	if block == nil {
-		return fmt.Errorf("obs-api server certificate secret %s/%s has no tls.crt yet", key.Namespace, key.Name)
+		return fmt.Errorf("%w: %s/%s", errObsAPIServerCertIncomplete, key.Namespace, key.Name)
 	}
 	cert, err := x509.ParseCertificate(block.Bytes)
 	if err != nil {
 		return fmt.Errorf("failed to parse obs-api server certificate %s/%s: %w", key.Namespace, key.Name, err)
 	}
-	for _, name := range cert.DNSNames {
-		if name == host {
-			return nil
-		}
+	if slices.Contains(cert.DNSNames, host) {
+		return nil
 	}
-	return fmt.Errorf("obs-api server certificate %s/%s does not include host %s yet", key.Namespace, key.Name, host)
+	return fmt.Errorf("%w: %s/%s host %s", errObsAPIServerCertHost, key.Namespace, key.Name, host)
 }

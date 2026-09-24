@@ -2,7 +2,7 @@ package resourcecreator
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"testing"
 
 	certmanagerv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
@@ -26,6 +26,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 )
+
+var errListFailed = errors.New("list failed")
 
 func loggingReconcileScheme(t *testing.T) *runtime.Scheme {
 	t.Helper()
@@ -197,7 +199,7 @@ func TestIsHubManagedClusterAddOn(t *testing.T) {
 	t.Run("falls back to local-cluster when listing clusters fails", func(t *testing.T) {
 		k8s := fake.NewClientBuilder().WithScheme(scheme).WithInterceptorFuncs(interceptor.Funcs{
 			List: func(ctx context.Context, c client.WithWatch, list client.ObjectList, opts ...client.ListOption) error {
-				return fmt.Errorf("list failed")
+				return errListFailed
 			},
 		}).Build()
 		assert.True(t, isHubManagedClusterAddOn(t.Context(), k8s, testHubMCAO()))
