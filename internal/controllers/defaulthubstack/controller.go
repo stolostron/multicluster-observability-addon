@@ -23,18 +23,21 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-var managedByPredicate = predicate.And(
-	predicate.GenerationChangedPredicate{},
-	predicate.NewPredicateFuncs(func(obj client.Object) bool {
-		return obj.GetLabels()[addoncfg.ManagedByK8sLabelKey] == cooresource.ManagedByLabelValue
-	}),
-)
+var managedByPredicate = predicate.Funcs{
+	CreateFunc:  func(event.CreateEvent) bool { return false },
+	UpdateFunc:  func(event.UpdateEvent) bool { return false },
+	GenericFunc: func(event.GenericEvent) bool { return false },
+	DeleteFunc: func(e event.DeleteEvent) bool {
+		return e.Object.GetLabels()[addoncfg.ManagedByK8sLabelKey] == cooresource.ManagedByLabelValue
+	},
+}
 
 var mcoaAODCPredicate = predicate.NewPredicateFuncs(func(obj client.Object) bool {
 	return obj.GetNamespace() == addoncfg.InstallNamespace && obj.GetName() == addoncfg.Name
