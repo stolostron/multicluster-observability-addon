@@ -1,5 +1,5 @@
 {{- if  .Values.deployCOOResources }}
-apiVersion: monitoring.coreos.com/v1
+apiVersion: {{ if .Values.deployNonOCPStack }}monitoring.rhobs/v1{{ else }}monitoring.coreos.com/v1{{ end }}
 kind: ServiceMonitor
 metadata:
   name: {{ .Values.prometheusOperator.appName }}
