@@ -8,6 +8,7 @@ import (
 	operatorv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
+	"github.com/stolostron/multicluster-observability-addon/internal/mcoagateway"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -40,10 +41,11 @@ type Collection struct {
 }
 
 type Storage struct {
-	Tenants          []string
-	ObjStorageSecret corev1.Secret
-	MTLSSecret       corev1.Secret
-	LokiStack        *lokiv1.LokiStack
+	Tenants            []string
+	ObjStorageSecret   corev1.Secret
+	MTLSSecret         corev1.Secret
+	LokiClientCASecret corev1.Secret
+	LokiStack          *lokiv1.LokiStack
 }
 
 func (opts Options) UnmanagedCollectionEnabled() bool {
@@ -69,7 +71,7 @@ func BuildDefaultStackOptions(platform, userWorkloads addon.LogsOptions, hubHost
 				Secrets: []corev1.Secret{
 					{
 						ObjectMeta: metav1.ObjectMeta{
-							Name:      DefaultCollectionMTLSSecretName,
+							Name:      mcoagateway.DefaultCollectionMTLSSecretName,
 							Namespace: addoncfg.InstallNamespace,
 						},
 					},
@@ -79,14 +81,20 @@ func BuildDefaultStackOptions(platform, userWorkloads addon.LogsOptions, hubHost
 				ObjStorageSecret: corev1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
 						// TODO(JoaoBraveCoding): Revisit this, I'm not sure if this makes sense as this should be something the user provides.
-						Name:      DefaultStorageMTLSSecretName,
+						Name:      DefaultStorageObjStorageSecretName,
 						Namespace: addoncfg.InstallNamespace,
 					},
 				},
 				MTLSSecret: corev1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      DefaultStorageMTLSSecretName,
-						Namespace: addoncfg.HubNamespace,
+						Name:      mcoagateway.DefaultStorageMTLSSecretName,
+						Namespace: addoncfg.InstallNamespace,
+					},
+				},
+				LokiClientCASecret: corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      mcoagateway.DefaultLokiClientMTLSSecretName,
+						Namespace: addoncfg.InstallNamespace,
 					},
 				},
 			},
