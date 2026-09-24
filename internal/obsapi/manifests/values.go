@@ -6,6 +6,12 @@ const (
 
 	legacyReadEndpoint = "http://observability-thanos-query-frontend.open-cluster-management-observability.svc.cluster.local:9090"
 	mcoaReadEndpoint   = "http://thanos-query-frontend-mcoa.open-cluster-management-observability.svc.cluster.local:9090"
+
+	// logsGatewayEndpoint points at the gateway of the real, Managed LokiStack
+	// (see internal/logging/manifests/var.go: DefaultStorageLSName, LoggingNamespace)
+	// that MCOA ships via ManifestWork. It is NOT the hub-side "mcoa-default-*"
+	// LokiStack, which is intentionally left Unmanaged and never gets a gateway.
+	logsGatewayEndpoint = "https://mcoa-logging-managed-storage-gateway-http.openshift-logging.svc:8080"
 )
 
 type ObsAPIValues struct {
@@ -13,6 +19,8 @@ type ObsAPIValues struct {
 	MetricsWriteEndpoint string `json:"metricsWriteEndpoint"`
 	MetricsReadEndpoint  string `json:"metricsReadEndpoint"`
 	LogsEnabled          bool   `json:"logsEnabled"`
+	LogsWriteEndpoint    string `json:"logsWriteEndpoint"`
+	LogsReadEndpoint     string `json:"logsReadEndpoint"`
 }
 
 func BuildValues(isHubCluster, obsAPIEnabled, thanosOperatorEnabled bool, logsEnabled bool) *ObsAPIValues {
@@ -32,5 +40,7 @@ func BuildValues(isHubCluster, obsAPIEnabled, thanosOperatorEnabled bool, logsEn
 		MetricsWriteEndpoint: writeEndpoint,
 		MetricsReadEndpoint:  readEndpoint,
 		LogsEnabled:          logsEnabled,
+		LogsWriteEndpoint:    logsGatewayEndpoint,
+		LogsReadEndpoint:     logsGatewayEndpoint,
 	}
 }
