@@ -426,7 +426,7 @@ func healthChecker(getter addonutils.AddOnDeploymentConfigGetter, fields []agent
 	if err := checkTracing(fields, opts); err != nil {
 		return err
 	}
-	if err := checkRightSizing(fields, opts); err != nil {
+	if err := checkRightSizing(fields, opts, isOpenShiftVendor); err != nil {
 		return err
 	}
 	return nil
@@ -559,7 +559,11 @@ func checkTracing(fields []agent.FieldResult, opts Options) error {
 	return nil
 }
 
-func checkRightSizing(fields []agent.FieldResult, opts Options) error {
+func checkRightSizing(fields []agent.FieldResult, opts Options, isOpenShiftVendor bool) error {
+	if !isOpenShiftVendor {
+		return nil
+	}
+
 	rs := opts.Platform.AnalyticsOptions.RightSizing
 	if !rs.Delegated {
 		return nil
