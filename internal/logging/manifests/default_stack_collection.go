@@ -3,6 +3,7 @@ package manifests
 import (
 	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
+	"github.com/stolostron/multicluster-observability-addon/internal/mcoagateway"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -21,19 +22,18 @@ func buildManagedCLFSpec(opts Options) (loggingv1.ClusterLogForwarderSpec, error
 				URL: opts.DefaultStack.LokiURL,
 			},
 			TLS: &loggingv1.OutputTLSSpec{
-				InsecureSkipVerify: true,
 				TLSSpec: loggingv1.TLSSpec{
 					CA: &loggingv1.ValueReference{
 						Key:        "ca.crt",
-						SecretName: DefaultCollectionMTLSSecretName,
+						SecretName: mcoagateway.DefaultCollectionMTLSSecretName,
 					},
 					Certificate: &loggingv1.ValueReference{
 						Key:        corev1.TLSCertKey,
-						SecretName: DefaultCollectionMTLSSecretName,
+						SecretName: mcoagateway.DefaultCollectionMTLSSecretName,
 					},
 					Key: &loggingv1.SecretReference{
 						Key:        corev1.TLSPrivateKeyKey,
-						SecretName: DefaultCollectionMTLSSecretName,
+						SecretName: mcoagateway.DefaultCollectionMTLSSecretName,
 					},
 				},
 			},
