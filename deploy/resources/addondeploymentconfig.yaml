@@ -37,3 +37,8 @@ spec:
   # Enables Observability UI Metrics
   - name: platformMetricsUI
     value: uiplugins.v1alpha1.observability.openshift.io
+  # Managed Logging
+  - name: platformLogsDefault
+    defaultValue: "false"
+  - name: hubHostname
+    defaultValue: ""

@@ -2,7 +2,7 @@
 apiVersion: operators.coreos.com/v1
 kind: OperatorGroup
 metadata:
-  name: openshift-logging
+  name: cluster-logging
   namespace: openshift-logging
   annotations:
     olm.providedAPIs: ClusterLogForwarder.v1.observability.openshift.io,ClusterLogging.v1.observability.openshift.io

@@ -1,0 +1,15 @@
+enabled: true
+
+# Expects json format
+clfSpec: {}
+
+# List of secrets referenced by clfSpec
+secrets:
+  - name: "secret-1"
+    # Expects json format
+    data: {}
+
+configmaps:
+  - name: "configmap-1"
+    # Expects json format
+    data: {}
