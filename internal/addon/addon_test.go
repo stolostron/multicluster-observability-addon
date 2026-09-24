@@ -322,6 +322,8 @@ func Test_AgentHealthProber_MissingResources(t *testing.T) {
 	})
 
 	t.Run("right-sizing enabled but missing prometheus rules", func(t *testing.T) {
+		ocpCluster := addontesting.NewManagedCluster("cluster-1")
+		ocpCluster.Labels = map[string]string{"vendor": "OpenShift"}
 		aodc := newAddonDeploymentConfig()
 		addRightSizingCustomizedVariables(aodc)
 		addAODCConfigReference(managedClusterAddOn, aodc)
@@ -329,13 +331,14 @@ func Test_AgentHealthProber_MissingResources(t *testing.T) {
 		healthProber := HealthProber(newTestGetter(aodc), logr.Discard())
 		err := healthProber.WorkProber.HealthChecker(
 			[]agent.FieldResult{scrapeConfigFieldResult()},
-			managedCluster, managedClusterAddOn)
+			ocpCluster, managedClusterAddOn)
 		require.ErrorIs(t, err, errMissingFields)
 	})
 }
 
 func Test_AgentHealthProber_RightSizing(t *testing.T) {
 	managedCluster := addontesting.NewManagedCluster("cluster-1")
+	managedCluster.Labels = map[string]string{"vendor": "OpenShift"}
 	managedClusterAddOn := addontesting.NewAddon("test", "cluster-1")
 	aodc := newAddonDeploymentConfig()
 	addRightSizingCustomizedVariables(aodc)
