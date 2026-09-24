@@ -31,7 +31,10 @@ func buildDefaultStackOptions(ctx context.Context, k8s client.Client, mcAddon *a
 	}
 	opts.DefaultStack.Collection.Secrets = []corev1.Secret{*mTLSSecret}
 
-	opts.DefaultStack.LokiURL = fmt.Sprintf("https://mcoa-observability-observatorium-api.%s.svc:8080/api/logs/v1/%s/otlp/v1/logs", addoncfg.InstallNamespace, mcAddon.Namespace)
+	// mcoa-gateway mounts logs at /api/logs/v1 with no tenant path segment; the write
+	// path derives the tenant from the client mTLS certificate's OU field instead
+	// (see internal/logging/manifests/default_stack_certificates.go).
+	opts.DefaultStack.LokiURL = fmt.Sprintf("https://mcoa-observability-observatorium-api.%s.svc:8080/api/logs/v1/otlp/v1/logs", addoncfg.InstallNamespace)
 
 	if opts.IsHub {
 		ls, err := common.GetResourceWithOwnerRef(ctx, k8s, mcAddon, lokiv1.GroupVersion.Group, addoncfg.LokiStacksResource, &lokiv1.LokiStack{})
