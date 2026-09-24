@@ -105,13 +105,6 @@ func BuildLokiStackResources(ctx context.Context, k8s client.Client, platform, u
 		PlacementRef: addoncfg.GlobalPlacementRef,
 		Config:       addonConfig,
 	}}
-	for _, tenant := range tenants {
-		certObjs, err := manifests.BuildSSAClusterCertificates(tenant)
-		if err != nil {
-			return nil, nil, err
-		}
-		objects = append(objects, certObjs...)
-	}
 
 	return objects, defaultConfig, nil
 }

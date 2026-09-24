@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-logr/logr"
 	lokiv1 "github.com/grafana/loki/operator/api/loki/v1"
+	routev1 "github.com/openshift/api/route/v1"
 	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
@@ -15,6 +16,7 @@ import (
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	rshandlers "github.com/stolostron/multicluster-observability-addon/internal/analytics/rightsizing/handlers"
 	lhandlers "github.com/stolostron/multicluster-observability-addon/internal/logging/handlers"
+	"github.com/stolostron/multicluster-observability-addon/internal/mcoagateway"
 	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	mresources "github.com/stolostron/multicluster-observability-addon/internal/metrics/resource"
 	corev1 "k8s.io/api/core/v1"
@@ -67,6 +69,24 @@ var cmaoPredicate = builder.WithPredicates(predicate.Funcs{
 
 var rsConfigMapPredicate = builder.WithPredicates(rshandlers.RSConfigMapPredicate())
 
+// isGatewayRoute matches the single Route rendered by the mcoa-gateway Helm
+// chart. It isn't MCOA-owned (no controller ref, no part-of label - it's
+// applied via the addon-framework's Helm rendering, not SSA'd by this
+// controller), so it needs its own targeted predicate rather than
+// enqueueForMCOAOwnedResources.
+func isGatewayRoute(namespace, name string) bool {
+	return namespace == addoncfg.InstallNamespace && name == mcoagateway.GatewayRouteName
+}
+
+var mcoaGatewayRoutePredicate = builder.WithPredicates(predicate.Funcs{
+	CreateFunc: func(e event.CreateEvent) bool { return isGatewayRoute(e.Object.GetNamespace(), e.Object.GetName()) },
+	UpdateFunc: func(e event.UpdateEvent) bool {
+		return isGatewayRoute(e.ObjectNew.GetNamespace(), e.ObjectNew.GetName())
+	},
+	DeleteFunc:  func(e event.DeleteEvent) bool { return false },
+	GenericFunc: func(e event.GenericEvent) bool { return false },
+})
+
 var partOfMCOALabelSelector = labels.SelectorFromSet(labels.Set{
 	addoncfg.PartOfK8sLabelKey: addoncfg.Name,
 })
@@ -96,6 +116,10 @@ func SetupWithManager(mgr ctrl.Manager, logger logr.Logger) error {
 		// Trigger reconciliations if logging resources change
 		Watches(&lokiv1.LokiStack{}, r.enqueueForMCOAOwnedResources()).
 		Watches(&loggingv1.ClusterLogForwarder{}, r.enqueueForMCOAOwnedResources()).
+		// Trigger reconciliations once the mcoa-gateway Route is admitted (or its
+		// host changes), so the gateway server certificate's SAN can be updated
+		// to match without waiting for an unrelated reconcile trigger.
+		Watches(&routev1.Route{}, r.enqueueAODC(), mcoaGatewayRoutePredicate).
 		Complete(r)
 }
 
@@ -156,6 +180,38 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	rsBuilder := &rshandlers.OptionsBuilder{Client: r.Client, Logger: r.Log.WithName("rightsizing")}
 	if rsErr := rsBuilder.ReconcileRSResources(ctx, opts); rsErr != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to reconcile right-sizing resources: %w", rsErr)
+	}
+
+	if opts.Platform.Logs.DefaultStack || opts.ThanosOperatorEnabled {
+		managedClusters := &clusterv1.ManagedClusterList{}
+		if err := r.List(ctx, managedClusters, &client.ListOptions{}); err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to get managed cluster list: %w", err)
+		}
+		tenants := make([]string, 0, len(managedClusters.Items))
+		for _, cluster := range managedClusters.Items {
+			tenants = append(tenants, cluster.Name)
+		}
+
+		gatewayHost, err := mcoagateway.GetGatewayRouteHost(ctx, r.Client)
+		if err != nil {
+			r.Log.V(1).Info("Failed to get MCOA gateway route host, certificate will be built without that SAN for now", "err", err)
+		}
+
+		certObjs := []client.Object{}
+		// this should create cert per cluster, each secret will be passed through manifestwork
+		for _, tenant := range tenants {
+			cert, err := mcoagateway.BuildGatewayCertificates(tenant, gatewayHost)
+			if err != nil {
+				r.Log.V(1).Info("Failed to create cert", "tenant", tenant, "err", err)
+			}
+			certObjs = append(certObjs, cert...)
+		}
+		for _, obj := range certObjs {
+			if err := common.ServerSideApply(ctx, r.Client, obj, cmao); err != nil {
+				r.Log.V(1).Info("Certificate SSA failed", "namespace", obj.GetNamespace(), "name", obj.GetName(), "err", err)
+			}
+		}
+
 	}
 
 	// Reconcile logging CLFs and LokiStack separately so CLFs aren't blocking LokiStack install
