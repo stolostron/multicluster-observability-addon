@@ -173,6 +173,16 @@ func TestBuildValues_DefaultStackStorage(t *testing.T) {
 		assert.NotEmpty(t, values.Managed.Storage.LSSpec)
 	})
 
+	t.Run("collection stays disabled until a CLF template exists", func(t *testing.T) {
+		opts := baseOpts
+		opts.DefaultStack.Collection.ClusterLogForwarder = nil
+
+		values, err := BuildValues(opts)
+		require.NoError(t, err)
+		assert.False(t, values.Managed.Collection.Enabled)
+		assert.Empty(t, values.Managed.Collection.CLFSpec)
+	})
+
 	t.Run("storage disabled without LokiStack even if IsHub", func(t *testing.T) {
 		opts := baseOpts
 		opts.IsHub = true

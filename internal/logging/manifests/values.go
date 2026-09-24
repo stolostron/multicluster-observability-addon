@@ -166,6 +166,12 @@ func buildManagedValues(opts Options) (ManagedValues, error) {
 }
 
 func buildManagedCollectionValues(opts Options) (CollectionValues, error) {
+	// The hub publishes the CLF only after storage is requested. Until that
+	// reference exists, leave collection disabled instead of rendering an empty spec.
+	if opts.DefaultStack.Collection.ClusterLogForwarder == nil {
+		return CollectionValues{}, nil
+	}
+
 	cValues := CollectionValues{
 		Enabled: true,
 	}

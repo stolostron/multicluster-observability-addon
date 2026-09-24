@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	lokiv1 "github.com/grafana/loki/operator/api/loki/v1"
+	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
@@ -14,6 +15,12 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+// legacyDefaultStackCLFName is the placement config shipped with the first
+// managed-logging manifest. The controller creates mcoa-default-<placement>
+// instead. Leaving the old name in place makes every spoke look up a
+// ClusterLogForwarder that is never created.
+const legacyDefaultStackCLFName = "default-stack-instance-global"
 
 func applyLoggingObjects(ctx context.Context, k8s client.Client, objs []client.Object, owner client.Object) error {
 	for _, obj := range objs {
@@ -25,15 +32,37 @@ func applyLoggingObjects(ctx context.Context, k8s client.Client, objs []client.O
 }
 
 // reconcileLoggingCollection applies spoke collection templates and returns CMAO placement configs.
-func (r *ResourceCreatorReconciler) reconcileLoggingCollection(ctx context.Context, cmao *addonv1beta1.ClusterManagementAddOn, opts addon.Options) ([]common.DefaultConfig, error) {
+func (r *ResourceCreatorReconciler) reconcileLoggingCollection(ctx context.Context, cmao *addonv1beta1.ClusterManagementAddOn, opts addon.Options) ([]common.DefaultConfig, ctrl.Result, error) {
+	if err := common.StripNamedPlacementConfig(ctx, r.Log, r.Client, loggingv1.GroupVersion.Group, addoncfg.ClusterLogForwardersResource, addoncfg.InstallNamespace, legacyDefaultStackCLFName); err != nil {
+		return nil, ctrl.Result{}, err
+	}
+
 	objs, configs, err := lhandlers.BuildDefaultStackCollectionResources(ctx, r.Client, cmao, opts.Platform.Logs, opts.UserWorkloads.Logs, opts.HubHostname)
 	if err != nil {
-		return nil, fmt.Errorf("failed to build default stack collection resources: %w", err)
+		return nil, ctrl.Result{}, fmt.Errorf("failed to build default stack collection resources: %w", err)
 	}
 	if err = applyLoggingObjects(ctx, r.Client, objs, cmao); err != nil {
-		return nil, err
+		return nil, ctrl.Result{}, err
 	}
-	return configs, nil
+
+	if !opts.Platform.Logs.DefaultStack {
+		return configs, ctrl.Result{}, nil
+	}
+
+	// Collectors verify the hub route host, so withhold their placement configs
+	// until that host is on the obs-api server certificate.
+	cert, ready, err := lhandlers.BuildObsAPIServerCertificate(ctx, r.Client)
+	if err != nil {
+		return nil, ctrl.Result{}, fmt.Errorf("failed to build obs-api server certificate: %w", err)
+	}
+	if err = applyLoggingObjects(ctx, r.Client, []client.Object{cert}, cmao); err != nil {
+		return nil, ctrl.Result{}, err
+	}
+	if !ready {
+		r.Log.Info("obs-api route has no host yet, requeueing")
+		return nil, ctrl.Result{RequeueAfter: addoncfg.DefaultContextTimeout}, nil
+	}
+	return configs, ctrl.Result{}, nil
 }
 
 // reconcileLoggingStorage applies the hub storage component (LokiStack template +

@@ -21,7 +21,6 @@ func buildManagedCLFSpec(opts Options) (loggingv1.ClusterLogForwarderSpec, error
 				URL: opts.DefaultStack.LokiURL,
 			},
 			TLS: &loggingv1.OutputTLSSpec{
-				InsecureSkipVerify: true,
 				TLSSpec: loggingv1.TLSSpec{
 					CA: &loggingv1.ValueReference{
 						Key:        "ca.crt",
