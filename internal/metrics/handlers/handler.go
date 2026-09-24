@@ -62,6 +62,7 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1beta1.Man
 		PlatformAlertsEnabled:     opts.Platform.Metrics.AlertsEnabled,
 		UserWorkloadAlertsEnabled: opts.UserWorkloads.Metrics.AlertsEnabled,
 		ThanosOperatorEnabled:     opts.ThanosOperatorEnabled,
+		TLSProfileEnabled:         common.HasTLSProfileSupport(managedCluster),
 	}
 
 	ret.ClusterName = managedCluster.Name
