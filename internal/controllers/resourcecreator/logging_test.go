@@ -8,6 +8,7 @@ import (
 	certmanagerv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	"github.com/go-logr/logr"
 	lokiv1 "github.com/grafana/loki/operator/api/loki/v1"
+	routev1 "github.com/openshift/api/route/v1"
 	"github.com/stolostron/cluster-lifecycle-api/constants"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
@@ -34,6 +35,7 @@ func loggingReconcileScheme(t *testing.T) *runtime.Scheme {
 	require.NoError(t, lokiv1.AddToScheme(scheme))
 	require.NoError(t, corev1.AddToScheme(scheme))
 	require.NoError(t, certmanagerv1.AddToScheme(scheme))
+	require.NoError(t, routev1.Install(scheme))
 	return scheme
 }
 
@@ -200,6 +202,76 @@ func TestIsHubManagedClusterAddOn(t *testing.T) {
 		}).Build()
 		assert.True(t, isHubManagedClusterAddOn(t.Context(), k8s, testHubMCAO()))
 		assert.False(t, isHubManagedClusterAddOn(t.Context(), k8s, spokeMCAO))
+	})
+}
+
+func TestReconcileLoggingCollectionStripsLegacyCLFConfig(t *testing.T) {
+	legacy := addonv1beta1.AddOnConfig{
+		ConfigGroupResource: addonv1beta1.ConfigGroupResource{
+			Group:    "observability.openshift.io",
+			Resource: addoncfg.ClusterLogForwardersResource,
+		},
+		ConfigReferent: addonv1beta1.ConfigReferent{
+			Name:      "default-stack-instance-global",
+			Namespace: addoncfg.InstallNamespace,
+		},
+	}
+	instance := clfAddonConfig()
+	instance.Name = "instance"
+	cmao := testCMAOWithPlacements(legacy, instance)
+	r := newLoggingReconciler(t, cmao)
+
+	configs, result, err := r.reconcileLoggingCollection(t.Context(), cmao, addon.Options{})
+	require.NoError(t, err)
+	assert.True(t, result.IsZero())
+	assert.Empty(t, configs)
+
+	got := &addonv1beta1.ClusterManagementAddOn{}
+	require.NoError(t, r.Get(t.Context(), client.ObjectKey{Name: addoncfg.Name}, got))
+	require.Len(t, got.Spec.InstallStrategy.Placements, 1)
+	require.ElementsMatch(t, []addonv1beta1.AddOnConfig{instance}, got.Spec.InstallStrategy.Placements[0].Configs)
+}
+
+func TestReconcileLoggingCollectionObsAPICertificate(t *testing.T) {
+	opts := addon.Options{Platform: addon.PlatformOptions{Logs: addon.LogsOptions{DefaultStack: true}}}
+
+	t.Run("requeues and omits the route host until the route exists", func(t *testing.T) {
+		cmao := testCMAO()
+		r := newLoggingReconciler(t, cmao)
+
+		configs, result, err := r.reconcileLoggingCollection(t.Context(), cmao, opts)
+		require.NoError(t, err)
+		assert.Nil(t, configs)
+		assert.Equal(t, addoncfg.DefaultContextTimeout, result.RequeueAfter)
+
+		cert := &certmanagerv1.Certificate{}
+		require.NoError(t, r.Get(t.Context(), client.ObjectKey{
+			Name:      manifests.ObsAPIServerMTLSSecretName,
+			Namespace: addoncfg.InstallNamespace,
+		}, cert))
+		assert.NotContains(t, cert.Spec.DNSNames, "obs-api.apps.example.com")
+		assert.Contains(t, cert.Spec.DNSNames, manifests.ObsAPIServerCertCommonName)
+	})
+
+	t.Run("adds the route host once the route is admitted", func(t *testing.T) {
+		cmao := testCMAO()
+		route := &routev1.Route{
+			ObjectMeta: metav1.ObjectMeta{Name: "mcoa-observatorium-api", Namespace: addoncfg.InstallNamespace},
+			Spec:       routev1.RouteSpec{Host: "obs-api.apps.example.com"},
+		}
+		r := newLoggingReconciler(t, cmao, route)
+
+		_, result, err := r.reconcileLoggingCollection(t.Context(), cmao, opts)
+		require.NoError(t, err)
+		assert.True(t, result.IsZero())
+
+		cert := &certmanagerv1.Certificate{}
+		require.NoError(t, r.Get(t.Context(), client.ObjectKey{
+			Name:      manifests.ObsAPIServerMTLSSecretName,
+			Namespace: addoncfg.InstallNamespace,
+		}, cert))
+		assert.Contains(t, cert.Spec.DNSNames, "obs-api.apps.example.com")
+		assert.Equal(t, manifests.ObsAPIServerCertCommonName, cert.Spec.CommonName)
 	})
 }
 

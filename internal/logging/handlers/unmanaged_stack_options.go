@@ -9,6 +9,7 @@ import (
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"github.com/stolostron/multicluster-observability-addon/internal/logging/manifests"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -67,6 +68,9 @@ func getUnmanagedClusterLogForwarder(ctx context.Context, k8s client.Client, mcA
 	for _, key := range keys {
 		clf := &loggingv1.ClusterLogForwarder{}
 		if err := k8s.Get(ctx, key, clf, &client.GetOptions{}); err != nil {
+			if apierrors.IsNotFound(err) {
+				continue
+			}
 			return nil, err
 		}
 

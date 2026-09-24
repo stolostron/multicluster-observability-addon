@@ -174,7 +174,7 @@ func TestDefaultStackStorageResourcesSurviveDeleteOrphan(t *testing.T) {
 			InstallStrategy: addonv1beta1.InstallStrategy{
 				Placements: []addonv1beta1.PlacementStrategy{
 					{
-						PlacementRef: addoncfg.GlobalPlacementRef,
+						PlacementRef: addonv1beta1.PlacementRef{Name: "spoke-placement", Namespace: "spoke-ns"},
 					},
 				},
 			},
@@ -200,7 +200,9 @@ func TestDefaultStackStorageResourcesSurviveDeleteOrphan(t *testing.T) {
 		Name:      fmt.Sprintf("%s-%s", addoncfg.DefaultStackPrefix, addoncfg.GlobalPlacementName),
 		Namespace: addoncfg.InstallNamespace,
 	}
-	require.NoError(t, fakeClient.Get(ctx, key, &lokiv1.LokiStack{}), "CMAO-owned LokiStack with a matching placement annotation must not be deleted")
+	got := &lokiv1.LokiStack{}
+	require.NoError(t, fakeClient.Get(ctx, key, got), "LokiStack is MCAO-scoped and must survive when the global placement is not on the CMAO")
+	assert.Equal(t, addoncfg.InstallNamespace+"/dummy", got.Annotations[addoncfg.PlacementAnnotationKey])
 }
 
 func TestBuildDefaultStackStorageResources_MissingObjStorageSecret(t *testing.T) {

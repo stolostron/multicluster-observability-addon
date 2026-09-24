@@ -183,23 +183,27 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	// appended only after LokiStack is requested on the hub MCAO so spokes do
 	// not start forwarding before storage is requested. Metrics configs stay
 	// on objs regardless of that wait.
-	lDefaultConfig, clfErr := r.reconcileLoggingCollection(ctx, cmao, opts)
+	lDefaultConfig, clfResult, clfErr := r.reconcileLoggingCollection(ctx, cmao, opts)
 	if clfErr != nil {
 		r.Log.Error(clfErr, "failed to build CLF resources, will requeue and continue to LokiStack")
 	}
 
 	// Hub storage component: LokiStack template + MCAO pointer (movable to another cluster later).
 	storageResult, storageErr := r.reconcileLoggingStorage(ctx, cmao, opts)
-	if storageErr != nil {
-		return ctrl.Result{}, storageErr
-	}
 
-	if storageResult.IsZero() && clfErr == nil {
+	// Publish CLF placement configs only once storage has been requested on the
+	// hub MCAO. A storage error or requeue keeps spokes from forwarding into a
+	// stack that is not ready, while metrics configs below are still applied.
+	if storageErr == nil && storageResult.IsZero() && clfErr == nil && clfResult.IsZero() {
 		objs = append(objs, lDefaultConfig...)
 	}
 
 	if err := common.EnsureAddonConfig(ctx, r.Log, r.Client, objs); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to patch default configs of the clustermanageraddon: %w", err)
+	}
+
+	if storageErr != nil {
+		return ctrl.Result{}, storageErr
 	}
 
 	if !storageResult.IsZero() {
@@ -209,6 +213,9 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	// If CLF had errors, requeue after LokiStack is applied and metrics configs are patched.
 	if clfErr != nil {
 		return ctrl.Result{}, clfErr
+	}
+	if !clfResult.IsZero() {
+		return clfResult, nil
 	}
 
 	// Retrieve the updated ClusterManagementAddOn with current default configs

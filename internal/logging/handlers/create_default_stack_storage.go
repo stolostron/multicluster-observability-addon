@@ -62,7 +62,10 @@ func BuildDefaultStackStorageResources(ctx context.Context, k8s client.Client, p
 	defaultOpts.DefaultStack.Storage.LokiStack = existingLS
 	defaultOpts.DefaultStack.Storage.Tenants = tenants
 
-	ls, err := manifests.BuildSSALokiStack(defaultOpts, resourceName, addoncfg.GlobalPlacementNamespace, addoncfg.GlobalPlacementName)
+	// Storage is attached to one ManagedClusterAddOn, not fanned out by a placement.
+	// The dummy placement sentinel keeps orphan cleanup from deleting the template
+	// when the global placement is missing or renamed.
+	ls, err := manifests.BuildSSALokiStack(defaultOpts, resourceName, addoncfg.InstallNamespace, "dummy")
 	if err != nil {
 		return nil, err
 	}

@@ -120,6 +120,33 @@ func StripPlacementConfigs(ctx context.Context, logger logr.Logger, k8s client.C
 	return nil
 }
 
+// StripNamedPlacementConfig removes one config identity from every CMAO placement.
+// Other configs of the same group/resource are left in place.
+func StripNamedPlacementConfig(ctx context.Context, logger logr.Logger, k8s client.Client, group, resource, namespace, name string) error {
+	cmao := &addonv1beta1.ClusterManagementAddOn{}
+	if err := k8s.Get(ctx, types.NamespacedName{Name: addoncfg.Name}, cmao); err != nil {
+		return fmt.Errorf("failed to get ClusterManagementAddOn: %w", err)
+	}
+
+	desiredCmao := cmao.DeepCopy()
+	desiredCmao.ManagedFields = nil // required for patching with ssa
+	if !removeNamedPlacementConfig(desiredCmao, group, resource, namespace, name) {
+		return nil
+	}
+
+	if err := ServerSideApply(ctx, k8s, desiredCmao, nil); err != nil {
+		return fmt.Errorf("failed to strip %s/%s %s/%s from ClusterManagementAddOn: %w", group, resource, namespace, name, err)
+	}
+
+	logger.Info("ClusterManagementAddOn placement config stripped",
+		"name", desiredCmao.Name,
+		"group", group,
+		"resource", resource,
+		"config", namespace+"/"+name)
+
+	return nil
+}
+
 func containsAddOnConfig(configs []addonv1beta1.AddOnConfig, cfg addonv1beta1.AddOnConfig) bool {
 	return slices.ContainsFunc(configs, func(e addonv1beta1.AddOnConfig) bool {
 		return e == cfg
@@ -150,6 +177,24 @@ func ensureConfigsInAddon(cmao *addonv1beta1.ClusterManagementAddOn, configs []D
 		}
 		cmao.Spec.InstallStrategy.Placements[i].Configs = append(cmao.Spec.InstallStrategy.Placements[i].Configs, dedupConfigs...)
 	}
+}
+
+// removeNamedPlacementConfig drops one config identity from every CMAO placement.
+// Returns true if any config was removed.
+func removeNamedPlacementConfig(cmao *addonv1beta1.ClusterManagementAddOn, group, resource, namespace, name string) bool {
+	changed := false
+	for i, placement := range cmao.Spec.InstallStrategy.Placements {
+		filtered := make([]addonv1beta1.AddOnConfig, 0, len(placement.Configs))
+		for _, cfg := range placement.Configs {
+			if cfg.Group == group && cfg.Resource == resource && cfg.Namespace == namespace && cfg.Name == name {
+				changed = true
+				continue
+			}
+			filtered = append(filtered, cfg)
+		}
+		cmao.Spec.InstallStrategy.Placements[i].Configs = filtered
+	}
+	return changed
 }
 
 // removePlacementConfigs drops configs matching group/resource from every CMAO
