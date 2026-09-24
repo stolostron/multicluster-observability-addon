@@ -7,3 +7,4 @@ replicas: 2
 resources:
   cpuRequest: "20m"
   memoryRequest: "128Mi"
+logsEnabled: false
