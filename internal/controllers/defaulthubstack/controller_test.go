@@ -45,31 +45,29 @@ func newTestScheme() *runtime.Scheme {
 }
 
 func TestManagedByPredicate(t *testing.T) {
-	t.Run("matches managed-by label", func(t *testing.T) {
-		obj := &corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Labels: map[string]string{
-					addoncfg.ManagedByK8sLabelKey: cooresource.ManagedByLabelValue,
-				},
+	managedObj := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: map[string]string{
+				addoncfg.ManagedByK8sLabelKey: cooresource.ManagedByLabelValue,
 			},
-		}
-		assert.True(t, managedByPredicate.Create(event.CreateEvent{Object: obj}))
+		},
+	}
+	unmanagedObj := &corev1.ConfigMap{}
+
+	t.Run("ignores create events", func(t *testing.T) {
+		assert.False(t, managedByPredicate.Create(event.CreateEvent{Object: managedObj}))
 	})
 
-	t.Run("rejects wrong label value", func(t *testing.T) {
-		obj := &corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Labels: map[string]string{
-					addoncfg.ManagedByK8sLabelKey: "someone-else",
-				},
-			},
-		}
-		assert.False(t, managedByPredicate.Create(event.CreateEvent{Object: obj}))
+	t.Run("ignores update events", func(t *testing.T) {
+		assert.False(t, managedByPredicate.Update(event.UpdateEvent{ObjectNew: managedObj}))
 	})
 
-	t.Run("rejects no label", func(t *testing.T) {
-		obj := &corev1.ConfigMap{}
-		assert.False(t, managedByPredicate.Create(event.CreateEvent{Object: obj}))
+	t.Run("delete triggers for managed resource", func(t *testing.T) {
+		assert.True(t, managedByPredicate.Delete(event.DeleteEvent{Object: managedObj}))
+	})
+
+	t.Run("delete ignores unmanaged resource", func(t *testing.T) {
+		assert.False(t, managedByPredicate.Delete(event.DeleteEvent{Object: unmanagedObj}))
 	})
 }
 
