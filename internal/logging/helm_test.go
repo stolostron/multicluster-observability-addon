@@ -57,7 +57,7 @@ func fakeGetValues(k8s client.Client) addonfactory.GetValuesFunc {
 			}
 		}
 
-		opts, err := handlers.BuildOptions(context.TODO(), k8s, mcAddon, addonOpts.Platform.Logs, addonOpts.UserWorkloads.Logs, isHub)
+		opts, err := handlers.BuildOptions(context.TODO(), k8s, mcAddon, addonOpts.Platform.Logs, addonOpts.UserWorkloads.Logs, isHub, "")
 		if err != nil {
 			return nil, err
 		}
