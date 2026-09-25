@@ -42,5 +42,5 @@ jobs:
       uses: shogo82148/actions-goveralls@v1
       with:
         path-to-profile: profile.cov
-        flag-name: Go-1.25
+        flag-name: Go-1.26
         shallow: true
