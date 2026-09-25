@@ -7,8 +7,6 @@ import (
 	"strings"
 
 	"github.com/go-logr/logr"
-	hyperv1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
-	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	rshandlers "github.com/stolostron/multicluster-observability-addon/internal/analytics/rightsizing/handlers"
@@ -18,7 +16,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/workqueue"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager"
@@ -73,8 +70,6 @@ func SetupWithManager(mgr ctrl.Manager, addonManager addonmanager.AddonManager, 
 		Watches(&corev1.ConfigMap{}, r.enqueueForConfigResource(), builder.OnlyMetadata).
 		Watches(&corev1.ConfigMap{}, r.enqueueForAllManagedClusters(), builder.WithPredicates(predicate.Or(imagesConfigMapPredicate, rshandlers.RSConfigMapPredicate())), builder.OnlyMetadata).
 		Watches(&corev1.ConfigMap{}, r.enqueueForLocalCluster(), builder.WithPredicates(coohandlers.CardinalityRulesConfigMapPredicate()), builder.OnlyMetadata).
-		Watches(&hyperv1.HostedCluster{}, r.enqueueForLocalCluster(), hostedClusterPredicate).
-		Watches(&prometheusv1.ServiceMonitor{}, r.enqueueForLocalCluster(), hypershiftServiceMonitorsPredicate(r.Log), builder.OnlyMetadata).
 		Watches(common.NewMultiClusterHub(), r.enqueueForAllManagedClusters(), builder.WithPredicates(mchNetworkPoliciesPredicate)).
 		Complete(r)
 }
@@ -245,17 +240,6 @@ var manifestWorkPredicate = predicate.Funcs{
 	},
 }
 
-var hostedClusterPredicate = builder.WithPredicates(predicate.Funcs{
-	UpdateFunc: func(e event.UpdateEvent) bool {
-		newHC := e.ObjectNew.(*hyperv1.HostedCluster)
-		oldHC := e.ObjectOld.(*hyperv1.HostedCluster)
-		return newHC.Spec.ClusterID != oldHC.Spec.ClusterID
-	},
-	CreateFunc:  func(e event.CreateEvent) bool { return true },
-	DeleteFunc:  func(e event.DeleteEvent) bool { return true },
-	GenericFunc: func(e event.GenericEvent) bool { return false },
-})
-
 var imagesConfigMapPredicate = predicate.Funcs{
 	UpdateFunc: func(e event.UpdateEvent) bool {
 		return e.ObjectNew.GetName() == mconfig.ImagesConfigMapObjKey.Name &&
@@ -272,35 +256,6 @@ var imagesConfigMapPredicate = predicate.Funcs{
 	GenericFunc: func(e event.GenericEvent) bool {
 		return false
 	},
-}
-
-func hypershiftServiceMonitorsPredicate(logger logr.Logger) builder.Predicates {
-	return builder.WithPredicates(predicate.Funcs{
-		UpdateFunc:  func(e event.UpdateEvent) bool { return isHypershiftServiceMonitor(logger, e.ObjectNew) },
-		CreateFunc:  func(e event.CreateEvent) bool { return isHypershiftServiceMonitor(logger, e.Object) },
-		DeleteFunc:  func(e event.DeleteEvent) bool { return isHypershiftServiceMonitor(logger, e.Object) },
-		GenericFunc: func(e event.GenericEvent) bool { return false },
-	})
-}
-
-// isHypershiftServiceMonitor returns true when the serviceMonitor is deployed by hypershift for etcd or the apiserver
-// This is used for metrics to ensure our own serviceMonitor, based on the original one deployed by hypershift remains in sync.
-func isHypershiftServiceMonitor(logger logr.Logger, obj client.Object) bool {
-	if obj.GetName() == mconfig.HypershiftEtcdServiceMonitorName || obj.GetName() == mconfig.HypershiftApiServerServiceMonitorName {
-		for _, owner := range obj.GetOwnerReferences() {
-			gv, err := schema.ParseGroupVersion(owner.APIVersion)
-			if err != nil {
-				logger.V(1).Info("failed to parse groupVersion", "apiVersion", owner.APIVersion, "error", err)
-				continue
-			}
-
-			if gv.Group == hyperv1.GroupVersion.Group {
-				return true
-			}
-		}
-	}
-
-	return false
 }
 
 func mchNetworkPoliciesEnabled(o client.Object) bool {
