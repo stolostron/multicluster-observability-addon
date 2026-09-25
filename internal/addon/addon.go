@@ -492,12 +492,10 @@ func healthChecker(getter addonutils.AddOnDeploymentConfigGetter, fields []agent
 		return err
 	}
 	if common.IsHubCluster(mc) {
-		if err := checkMetricsUIPlugin(fields, opts); err != nil {
-			return err
-		}
 		if err := checkThanos(fields, opts); err != nil {
 			return err
 		}
+	}
 	if err := checkRightSizing(fields, opts, isOpenShiftVendor); err != nil {
 		return err
 	}
