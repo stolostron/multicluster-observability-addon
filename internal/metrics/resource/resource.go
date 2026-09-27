@@ -61,7 +61,6 @@ func (d DefaultStackResources) Reconcile(ctx context.Context) ([]common.DefaultC
 		return configs, fmt.Errorf("failed to migrate agent placement labels: %w", err)
 	}
 
-	hasHostedClusters := config.HasHostedCLusters(ctx, d.Client, d.Logger)
 	if d.AddonOptions.Platform.Metrics.CollectionEnabled {
 		agentConfig, err := d.reconcileAgents(ctx, false)
 		if err != nil {
@@ -70,7 +69,7 @@ func (d DefaultStackResources) Reconcile(ctx context.Context) ([]common.DefaultC
 		configs = append(configs, agentConfig...)
 
 		// ScrapeConfigs are common to all placements
-		scConfigs, err := d.reconcileScrapeConfigs(ctx, mcoUID, false, hasHostedClusters)
+		scConfigs, err := d.reconcileScrapeConfigs(ctx, mcoUID, false)
 		if err != nil {
 			return configs, fmt.Errorf("failed to reconcile scrapeConfigs: %w", err)
 		}
@@ -85,7 +84,7 @@ func (d DefaultStackResources) Reconcile(ctx context.Context) ([]common.DefaultC
 		configs = append(configs, agentConfig...)
 
 		// ScrapeConfigs are common to all placements
-		scConfigs, err := d.reconcileScrapeConfigs(ctx, mcoUID, true, hasHostedClusters)
+		scConfigs, err := d.reconcileScrapeConfigs(ctx, mcoUID, true)
 		if err != nil {
 			return configs, fmt.Errorf("failed to reconcile scrapeConfigs: %w", err)
 		}
@@ -94,7 +93,7 @@ func (d DefaultStackResources) Reconcile(ctx context.Context) ([]common.DefaultC
 
 	if d.AddonOptions.Platform.Metrics.CollectionEnabled || d.AddonOptions.UserWorkloads.Metrics.CollectionEnabled {
 		// Platforn and uwl rules are processed the same way. They are common to all placements.
-		ruleConfigs, err := d.getPrometheusRules(ctx, mcoUID, hasHostedClusters)
+		ruleConfigs, err := d.getPrometheusRules(ctx, mcoUID)
 		if err != nil {
 			return configs, fmt.Errorf("failed to get prometheusRules: %w", err)
 		}
@@ -104,9 +103,9 @@ func (d DefaultStackResources) Reconcile(ctx context.Context) ([]common.DefaultC
 	return configs, nil
 }
 
-func (d DefaultStackResources) reconcileScrapeConfigs(ctx context.Context, mcoUID types.UID, isUWL, hasHostedClusters bool) ([]common.DefaultConfig, error) {
+func (d DefaultStackResources) reconcileScrapeConfigs(ctx context.Context, mcoUID types.UID, isUWL bool) ([]common.DefaultConfig, error) {
 	labelVals := []string{}
-	d.Logger.V(2).Info("reconciling ScrapeConfigs", "mcoUID", mcoUID, "isUWL", isUWL, "hasHostedClusters", hasHostedClusters)
+	d.Logger.V(2).Info("reconciling ScrapeConfigs", "mcoUID", mcoUID, "isUWL", isUWL)
 
 	if len(mcoUID) == 0 {
 		return []common.DefaultConfig{}, nil
@@ -114,10 +113,7 @@ func (d DefaultStackResources) reconcileScrapeConfigs(ctx context.Context, mcoUI
 
 	if isUWL {
 		labelVals = append(labelVals, config.UserWorkloadPrometheusMatchLabels[addoncfg.ComponentK8sLabelKey])
-		// Avoid adding HCP's specific confs when not needed
-		if hasHostedClusters {
-			labelVals = append(labelVals, config.EtcdHcpUserWorkloadPrometheusMatchLabels[addoncfg.ComponentK8sLabelKey], config.ApiserverHcpUserWorkloadPrometheusMatchLabels[addoncfg.ComponentK8sLabelKey])
-		}
+		labelVals = append(labelVals, config.EtcdHcpUserWorkloadPrometheusMatchLabels[addoncfg.ComponentK8sLabelKey], config.ApiserverHcpUserWorkloadPrometheusMatchLabels[addoncfg.ComponentK8sLabelKey])
 	} else {
 		labelVals = append(labelVals, config.PlatformPrometheusMatchLabels[addoncfg.ComponentK8sLabelKey])
 	}
@@ -186,11 +182,11 @@ func (d DefaultStackResources) reconcileScrapeConfigs(ctx context.Context, mcoUI
 	return configs, nil
 }
 
-func (d DefaultStackResources) getPrometheusRules(ctx context.Context, mcoUID types.UID, hasHostedClusters bool) ([]common.DefaultConfig, error) {
+func (d DefaultStackResources) getPrometheusRules(ctx context.Context, mcoUID types.UID) ([]common.DefaultConfig, error) {
 	if !d.AddonOptions.Platform.Metrics.CollectionEnabled && !d.AddonOptions.UserWorkloads.Metrics.CollectionEnabled {
 		return []common.DefaultConfig{}, nil
 	}
-	d.Logger.V(2).Info("reconciling PrometheusRules", "mcoUID", mcoUID, "hasHostedClusters", hasHostedClusters)
+	d.Logger.V(2).Info("reconciling PrometheusRules", "mcoUID", mcoUID)
 
 	if len(mcoUID) == 0 {
 		return []common.DefaultConfig{}, nil
@@ -202,11 +198,7 @@ func (d DefaultStackResources) getPrometheusRules(ctx context.Context, mcoUID ty
 	}
 	if d.AddonOptions.UserWorkloads.Metrics.CollectionEnabled {
 		labelVals = append(labelVals, config.UserWorkloadPrometheusMatchLabels[addoncfg.ComponentK8sLabelKey])
-
-		// Avoid adding HCP's specific confs when not needed
-		if hasHostedClusters {
-			labelVals = append(labelVals, config.EtcdHcpUserWorkloadPrometheusMatchLabels[addoncfg.ComponentK8sLabelKey], config.ApiserverHcpUserWorkloadPrometheusMatchLabels[addoncfg.ComponentK8sLabelKey])
-		}
+		labelVals = append(labelVals, config.EtcdHcpUserWorkloadPrometheusMatchLabels[addoncfg.ComponentK8sLabelKey], config.ApiserverHcpUserWorkloadPrometheusMatchLabels[addoncfg.ComponentK8sLabelKey])
 	}
 
 	req, err := labels.NewRequirement(addoncfg.ComponentK8sLabelKey, selection.In, labelVals)
