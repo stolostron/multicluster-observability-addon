@@ -565,8 +565,8 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 
 				verifyClusterScopedResourcesPrefix(t, objects)
 
-				// ensure that the number of objects is correct
-				expectedCount := 76
+				// ensure that the number of objects is correct (no ocm-tls-profile ConfigMap on non-OCP)
+				expectedCount := 75
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
@@ -686,8 +686,8 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				// For custom namespaces, chart labels SHOULD be present
 				assert.Equal(t, "metrics", ns[0].Labels["app"])
 
-				// ensure that the number of objects is correct
-				expectedCount := 76
+				// ensure that the number of objects is correct (no ocm-tls-profile ConfigMap on non-OCP)
+				expectedCount := 75
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
@@ -923,6 +923,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 			}
 			if tc.IsOCP {
 				managedCluster.Labels[clusterinfov1beta1.LabelKubeVendor] = string(clusterinfov1beta1.KubeVendorOpenShift)
+				managedCluster.Labels[clusterinfov1beta1.OCPVersionMajor] = "5"
 			}
 			if tc.IsHub {
 				managedCluster.Labels[clusterlifecycleconstants.SelfManagedClusterLabelKey] = "true"
@@ -1296,6 +1297,7 @@ func TestHelmBuild_Metrics_HCP(t *testing.T) {
 		config.LocalManagedClusterLabel:       "true",
 		config.HypershiftAddonStateLabel:      "available",
 		clusterinfov1beta1.LabelKubeVendor:    string(clusterinfov1beta1.KubeVendorOpenShift),
+		clusterinfov1beta1.OCPVersionMajor:    "5",
 	}
 	clientObjects = append(clientObjects, managedCluster)
 
