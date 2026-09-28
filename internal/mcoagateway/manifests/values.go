@@ -14,7 +14,7 @@ const (
 	logsGatewayEndpoint = "https://mcoa-logging-managed-storage-gateway-http.openshift-logging.svc:8080"
 )
 
-type ObsAPIValues struct {
+type MCOAGatewayValues struct {
 	Enabled              bool   `json:"enabled"`
 	MetricsWriteEndpoint string `json:"metricsWriteEndpoint"`
 	MetricsReadEndpoint  string `json:"metricsReadEndpoint"`
@@ -23,8 +23,8 @@ type ObsAPIValues struct {
 	LogsReadEndpoint     string `json:"logsReadEndpoint"`
 }
 
-func BuildValues(isHubCluster, obsAPIEnabled, thanosOperatorEnabled bool, logsEnabled bool) *ObsAPIValues {
-	if !isHubCluster || !obsAPIEnabled {
+func BuildValues(isHubCluster, mcoaGatewayEnabled, thanosOperatorEnabled bool, logsEnabled bool) *MCOAGatewayValues {
+	if !isHubCluster || !mcoaGatewayEnabled {
 		return nil
 	}
 
@@ -35,7 +35,7 @@ func BuildValues(isHubCluster, obsAPIEnabled, thanosOperatorEnabled bool, logsEn
 		readEndpoint = mcoaReadEndpoint
 	}
 
-	return &ObsAPIValues{
+	return &MCOAGatewayValues{
 		Enabled:              true,
 		MetricsWriteEndpoint: writeEndpoint,
 		MetricsReadEndpoint:  readEndpoint,
