@@ -62,6 +62,7 @@ const (
 	PlacementAnnotationKey        = "observability.open-cluster-management.io/placements"
 
 	ClusterClaimClusterID        = "id.k8s.io"
+	CooStatusClaimName           = "coo.observability.open-cluster-management.io"
 	ManagedClusterLabelClusterID = "clusterID"
 
 	// Feedback rule names

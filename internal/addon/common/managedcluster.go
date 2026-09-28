@@ -2,6 +2,7 @@ package common
 
 import (
 	"slices"
+	"strconv"
 
 	clusterinfov1beta1 "github.com/stolostron/cluster-lifecycle-api/clusterinfo/v1beta1"
 	clusterlifecycleconstants "github.com/stolostron/cluster-lifecycle-api/constants"
@@ -82,6 +83,22 @@ func getClusterClaim(cluster *clusterv1.ManagedCluster, name string) string {
 	return cluster.Status.ClusterClaims[idx].Value
 }
 
+// IsOCPVersionAtLeast checks if the managed cluster's major OCP version is at least the given value.
+// Returns false for non-OpenShift clusters or when the version label is missing.
+func IsOCPVersionAtLeast(cluster *clusterv1.ManagedCluster, major int) bool {
+	if cluster == nil {
+		return false
+	}
+	majorStr, ok := cluster.Labels[clusterinfov1beta1.OCPVersionMajor]
+	if !ok {
+		return false
+	}
+	majorVal, err := strconv.Atoi(majorStr)
+	if err != nil {
+		return false
+	}
+	return majorVal >= major
+}
 func VendorIsOverridden(cluster *clusterv1.ManagedCluster) string {
 	vendorOverride := cluster.Annotations[addoncfg.VendorOverrideAnnotationKey]
 	if vendorOverride != "" {
