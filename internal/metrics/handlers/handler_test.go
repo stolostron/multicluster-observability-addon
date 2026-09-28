@@ -241,6 +241,7 @@ func TestBuildOptions(t *testing.T) {
 					Labels: map[string]string{
 						config.ManagedClusterLabelClusterID: "test-cluster-id",
 						clusterinfov1beta1.LabelKubeVendor:  string(clusterinfov1beta1.KubeVendorOpenShift),
+						clusterinfov1beta1.OCPVersionMajor:  "5",
 					},
 				},
 			},

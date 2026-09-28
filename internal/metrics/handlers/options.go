@@ -36,6 +36,7 @@ type Options struct {
 	// prevents synchronization issues by ensuring the operator can watch these resources upon startup.
 	CRDEstablishedAnnotation string
 	ProxyConfig              addon.ProxyConfig
+	TLSProfileEnabled        bool
 	TLSMinVersion            string
 	TLSCipherSuites          string
 
