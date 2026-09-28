@@ -19,7 +19,7 @@ type ObsAPIResources struct {
 	MemoryRequest string `json:"memoryRequest"`
 }
 
-type ObsAPIValues struct {
+type MCOAGatewayValues struct {
 	Enabled              bool            `json:"enabled"`
 	MetricsWriteEndpoint string          `json:"metricsWriteEndpoint"`
 	MetricsReadEndpoint  string          `json:"metricsReadEndpoint"`
@@ -60,8 +60,8 @@ var obsAPIReplicas = map[string]int32{
 	"4xlarge": 12,
 }
 
-func BuildValues(isHubCluster, obsAPIEnabled, thanosOperatorEnabled bool, instanceSize string, logsEnabled bool) *ObsAPIValues {
-	if !isHubCluster || !obsAPIEnabled {
+func BuildValues(isHubCluster, mcoaGatewayEnabled, thanosOperatorEnabled bool, instanceSize string, logsEnabled bool) *MCOAGatewayValues {
+	if !isHubCluster || !mcoaGatewayEnabled {
 		return nil
 	}
 
@@ -88,8 +88,7 @@ func BuildValues(isHubCluster, obsAPIEnabled, thanosOperatorEnabled bool, instan
 	if replicas == 0 {
 		replicas = obsAPIReplicas["default"]
 	}
-
-	return &ObsAPIValues{
+	return &MCOAGatewayValues{
 		Enabled:              true,
 		MetricsWriteEndpoint: writeEndpoint,
 		MetricsReadEndpoint:  readEndpoint,
