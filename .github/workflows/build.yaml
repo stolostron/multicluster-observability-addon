@@ -14,7 +14,7 @@ jobs:
     - name: Set up Go 1.x
       uses: actions/setup-go@v6
       with:
-        go-version-file: 'go.mod'
+        go-version: '1.26'
       id: go
     - name: Install make
       run: sudo apt-get install make
