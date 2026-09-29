@@ -209,13 +209,20 @@ func shouldInstallCLO(opts Options, channel string) (bool, error) {
 		return true, nil
 	}
 
+	// Check if the Subscription is owned by MCOA, if it's owned by us, safe to upgrade the channel
+	// If not owned by MCOA, return that we can't touch the channel/upgrade it
+	// This fixes deadlock issue where MCOA would not be able to change the channel when user changed it
+	owned := false
+	if value, exists := opts.ClusterLoggingSubscription.Labels["release"]; exists && value == "multicluster-observability-addon" {
+		owned = true
+	}
+
 	if opts.ClusterLoggingSubscription.Spec.Channel != channel {
+		if owned {
+			return true, nil
+		}
 		return false, errInvalidSubscriptionChannel
 	}
 
-	if value, exists := opts.ClusterLoggingSubscription.Labels["release"]; exists && value == "multicluster-observability-addon" {
-		return true, nil
-	}
-
-	return false, nil
+	return owned, nil
 }
