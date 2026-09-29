@@ -4,7 +4,7 @@ import "errors"
 
 const (
 	subscriptionChannelValueKey     = "openshiftLoggingChannel"
-	defaultLoggingVersion           = "stable-6.3"
+	defaultLoggingVersion           = "stable-6.5"
 	CloSubscriptionInstallName      = "cluster-logging"
 	CloSubscriptionInstallNamespace = "openshift-logging"
 	LoggingNamespace                = "openshift-logging"
