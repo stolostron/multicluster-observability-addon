@@ -5,6 +5,7 @@ import (
 
 	"github.com/go-logr/logr"
 	persesv1 "github.com/perses/perses-operator/api/v1alpha1"
+	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -126,4 +127,72 @@ func TestAllPossibleDashboardNames(t *testing.T) {
 
 	second := allPossibleDashboardNames()
 	assert.Equal(t, names, second, "should return the same set on subsequent calls")
+
+	for _, name := range virtualizationDashboardNames {
+		assert.Contains(t, names, name)
+	}
+}
+
+var virtualizationDashboardNames = []string{
+	"acm-virtual-machines-inventory",
+	"acm-virtual-machines-utilization",
+	"acm-virtual-machines-service-level",
+	"acm-virtual-machines-by-time-in-status",
+	"acm-node-memory-overview",
+	"acm-openshift-virtualization-overview",
+	"acm-openshift-virtualization-single-cluster-view",
+	"acm-openshift-virtualization-single-vm-view",
+	"acm-virtual-machines-top-consumers",
+}
+
+func TestBuildVirtualizationPersesDashboards(t *testing.T) {
+	dashboards, err := buildVirtualizationPersesDashboards()
+	require.NoError(t, err)
+	require.Len(t, dashboards, len(virtualizationDashboardNames))
+
+	byName := map[string]persesv1.PersesDashboard{}
+	for _, db := range dashboards {
+		byName[db.Name] = db
+	}
+	for _, name := range virtualizationDashboardNames {
+		require.Contains(t, byName, name)
+		db := byName[name]
+		assert.Equal(t, addoncfg.InstallNamespace, db.Namespace)
+		assert.Equal(t, ManagedByLabelValue, db.Labels[addoncfg.ManagedByK8sLabelKey])
+	}
+}
+
+func TestBuildDesiredDashboardsIncludesVirtualizationWhenMetricsUIEnabled(t *testing.T) {
+	reconciler := &HubResourceReconciler{
+		Opts: addon.Options{
+			Platform: addon.PlatformOptions{
+				Metrics: addon.MetricsOptions{
+					CollectionEnabled: true,
+					UI:                addon.MetricsUIOptions{Enabled: true},
+				},
+			},
+		},
+	}
+
+	dashboards := reconciler.buildDesiredDashboards(false, false)
+	namespaces := map[string]string{}
+	for _, db := range dashboards {
+		namespaces[db.Name] = db.Namespace
+	}
+	for _, name := range virtualizationDashboardNames {
+		require.Contains(t, namespaces, name)
+		assert.Equal(t, addoncfg.InstallNamespace, namespaces[name])
+	}
+}
+
+func TestBuildDesiredDashboardsOmitsVirtualizationWhenMetricsUIDisabled(t *testing.T) {
+	reconciler := &HubResourceReconciler{}
+	dashboards := reconciler.buildDesiredDashboards(false, false)
+	names := map[string]struct{}{}
+	for _, db := range dashboards {
+		names[db.Name] = struct{}{}
+	}
+	for _, name := range virtualizationDashboardNames {
+		assert.NotContains(t, names, name)
+	}
 }
