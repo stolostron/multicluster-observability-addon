@@ -18,6 +18,7 @@ import (
 	slo "github.com/stolostron/multicluster-observability-addon/pkg/perses/dashboards/acm/k8s/slo"
 	incident_management "github.com/stolostron/multicluster-observability-addon/pkg/perses/dashboards/incident-management"
 	"github.com/stolostron/multicluster-observability-addon/pkg/perses/dashboards/thanos"
+	virt "github.com/stolostron/multicluster-observability-addon/pkg/perses/dashboards/virtualization"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -72,6 +73,7 @@ func BuildValues(opts addon.Options, installCOOIsNeeded bool, isHubCluster bool,
 			dashboards = append(dashboards, buildACMDashboards()...)
 			dashboards = append(dashboards, buildK8sDashboards()...)
 			dashboards = append(dashboards, buildThanosDashboards()...)
+			dashboards = append(dashboards, buildVirtualizationDashboards()...)
 			if hasCardinalityRules {
 				dashboards = append(dashboards, buildCardinalityDashboards()...)
 			}
@@ -293,4 +295,28 @@ func buildVMRSDashboards() []DashboardValue {
 	}
 
 	return buildDashboards(builders, dsThanos, config.AnalyticsNamespace)
+}
+
+func buildVirtualizationDashboards() []DashboardValue {
+	builders := []DashboardBuilder{
+		{projectDatasourceBuilder(virt.BuildVMInventory), "VMInventory"},
+		{projectDatasourceBuilder(virt.BuildVMUtilization), "VMUtilization"},
+		{projectDatasourceBuilder(virt.BuildVMServiceLevel), "VMServiceLevel"},
+		{projectDatasourceBuilder(virt.BuildVMByTimeInStatus), "VMByTimeInStatus"},
+		{projectDatasourceBuilder(virt.BuildNodeMemoryOverview), "NodeMemoryOverview"},
+		{projectDatasourceBuilder(virt.BuildVirtOverview), "VirtOverview"},
+		{projectDatasourceBuilder(virt.BuildSingleClusterView), "SingleClusterView"},
+		{projectDatasourceBuilder(virt.BuildSingleVMView), "SingleVMView"},
+		{projectDatasourceBuilder(virt.BuildTopConsumers), "TopConsumers"},
+	}
+
+	return buildDashboards(builders, dsThanos, config.InstallNamespace)
+}
+
+// projectDatasourceBuilder adapts virtualization builders, which do not
+// take a cluster label, to DashboardBuilderFunc.
+func projectDatasourceBuilder(fn func(project, datasource string) (dashboard.Builder, error)) DashboardBuilderFunc {
+	return func(project, datasource, _ string) (dashboard.Builder, error) {
+		return fn(project, datasource)
+	}
 }
