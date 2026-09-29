@@ -87,6 +87,29 @@ func TestShouldInstallCLO(t *testing.T) {
 			expectedError:  nil,
 		},
 		{
+			// Regression test: an owned Subscription whose channel diverges from the
+			// desired one must be treated as an upgrade-in-progress, not a foreign
+			// operator conflict. Otherwise changing openshiftLoggingChannel would
+			// permanently fail reconciliation since the updated Subscription would
+			// never get a chance to be rendered.
+			name: "Owned subscription with mismatched channel is an upgrade, not an error",
+			opts: Options{
+				ClusterLoggingSubscription: &operatorv1alpha1.Subscription{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "cluster-logging",
+						Labels: map[string]string{
+							"release": "multicluster-observability-addon",
+						},
+					},
+					Spec: &operatorv1alpha1.SubscriptionSpec{
+						Channel: "old-channel",
+					},
+				},
+			},
+			expectedResult: true,
+			expectedError:  nil,
+		},
+		{
 			name: "Subscription with different release label value",
 			opts: Options{
 				ClusterLoggingSubscription: &operatorv1alpha1.Subscription{
