@@ -29,6 +29,7 @@ import (
 	slo "github.com/stolostron/multicluster-observability-addon/pkg/perses/dashboards/acm/k8s/slo"
 	incident_management "github.com/stolostron/multicluster-observability-addon/pkg/perses/dashboards/incident-management"
 	"github.com/stolostron/multicluster-observability-addon/pkg/perses/dashboards/thanos"
+	virt "github.com/stolostron/multicluster-observability-addon/pkg/perses/dashboards/virtualization"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -496,6 +497,7 @@ func allPossibleDashboardNames() map[string]struct{} {
 			buildIncidentDetectionPersesDashboards,
 			buildNamespaceRSPersesDashboards,
 			buildVMRSPersesDashboards,
+			buildVirtualizationPersesDashboards,
 		}
 
 		knownDashboardNames = map[string]struct{}{}
@@ -520,6 +522,7 @@ func (r *HubResourceReconciler) buildDesiredDashboards(hasCardinalityRules, inci
 		dashboards = r.appendDashboards(dashboards, "ACM", buildACMPersesDashboards)
 		dashboards = r.appendDashboards(dashboards, "K8s", buildK8sPersesDashboards)
 		dashboards = r.appendDashboards(dashboards, "Thanos", buildThanosPersesDashboards)
+		dashboards = r.appendDashboards(dashboards, "virtualization", buildVirtualizationPersesDashboards)
 		if hasCardinalityRules {
 			dashboards = r.appendDashboards(dashboards, "cardinality", buildCardinalityPersesDashboards)
 		}
@@ -710,4 +713,26 @@ func buildVMRSPersesDashboards() ([]persesv1.PersesDashboard, error) {
 		rsperses.BuildVMOverestimation,
 		rsperses.BuildVMUnderestimation,
 	}, dsThanos, addoncfg.AnalyticsNamespace)
+}
+
+func buildVirtualizationPersesDashboards() ([]persesv1.PersesDashboard, error) {
+	return buildFromBuilders([]dashboardBuilderFunc{
+		projectDatasourceBuilder(virt.BuildVMInventory),
+		projectDatasourceBuilder(virt.BuildVMUtilization),
+		projectDatasourceBuilder(virt.BuildVMServiceLevel),
+		projectDatasourceBuilder(virt.BuildVMByTimeInStatus),
+		projectDatasourceBuilder(virt.BuildNodeMemoryOverview),
+		projectDatasourceBuilder(virt.BuildVirtOverview),
+		projectDatasourceBuilder(virt.BuildSingleClusterView),
+		projectDatasourceBuilder(virt.BuildSingleVMView),
+		projectDatasourceBuilder(virt.BuildTopConsumers),
+	}, dsThanos, addoncfg.InstallNamespace)
+}
+
+// projectDatasourceBuilder adapts virtualization builders, which do not
+// take a cluster label, to dashboardBuilderFunc.
+func projectDatasourceBuilder(fn func(project, datasource string) (dashboard.Builder, error)) dashboardBuilderFunc {
+	return func(project, datasource, _ string) (dashboard.Builder, error) {
+		return fn(project, datasource)
+	}
 }
