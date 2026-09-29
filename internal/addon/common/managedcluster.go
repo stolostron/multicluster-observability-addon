@@ -99,6 +99,7 @@ func IsOCPVersionAtLeast(cluster *clusterv1.ManagedCluster, major int) bool {
 	}
 	return majorVal >= major
 }
+
 func VendorIsOverridden(cluster *clusterv1.ManagedCluster) string {
 	vendorOverride := cluster.Annotations[addoncfg.VendorOverrideAnnotationKey]
 	if vendorOverride != "" {
