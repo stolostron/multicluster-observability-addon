@@ -400,6 +400,63 @@ func collectProfiles(rule monitoringv1.PrometheusRule, recordName string) []stri
 	return profiles
 }
 
+func TestCustomEvaluationInterval(t *testing.T) {
+	configData := rightsizing.RSConfigMapData{
+		PrometheusRuleConfig: rightsizing.RSPrometheusRuleConfig{
+			NamespaceFilterCriteria: struct {
+				InclusionCriteria []string `json:"inclusionCriteria"`
+				ExclusionCriteria []string `json:"exclusionCriteria"`
+			}{ExclusionCriteria: []string{"openshift.*"}},
+			EvaluationInterval:   "10m",
+			EvaluationInterval1d: "15m",
+		},
+	}
+
+	rule, err := GeneratePrometheusRule(configData)
+	require.NoError(t, err)
+
+	interval10m := monitoringv1.Duration("10m")
+	interval15m := monitoringv1.Duration("15m")
+
+	// Rolling-window groups must use the configured 10m interval.
+	assert.Equal(t, &interval10m, rule.Spec.Groups[0].Interval, "namespace rolling group interval")
+	assert.Equal(t, &interval10m, rule.Spec.Groups[2].Interval, "cluster rolling group interval")
+
+	// Daily-aggregation groups must use evaluationInterval1d.
+	assert.Equal(t, &interval15m, rule.Spec.Groups[1].Interval, "namespace 1d group interval")
+	assert.Equal(t, &interval15m, rule.Spec.Groups[3].Interval, "cluster 1d group interval")
+
+	// PromQL subquery step in all rolling rules must be [10m:], including
+	// the nested rate(...[10m:]) inside the cpu_usage expressions.
+	for _, r := range rule.Spec.Groups[0].Rules {
+		assert.Contains(t, r.Expr.String(), "[10m:]", "namespace rolling rule %q should use [10m:]", r.Record)
+		assert.NotContains(t, r.Expr.String(), "[5m:]", "namespace rolling rule %q should not contain old [5m:]", r.Record)
+	}
+	for _, r := range rule.Spec.Groups[2].Rules {
+		assert.Contains(t, r.Expr.String(), "[10m:]", "cluster rolling rule %q should use [10m:]", r.Record)
+		assert.NotContains(t, r.Expr.String(), "[5m:]", "cluster rolling rule %q should not contain old [5m:]", r.Record)
+	}
+}
+
+func TestCustomEvaluationInterval1d(t *testing.T) {
+	configData := rightsizing.RSConfigMapData{
+		PrometheusRuleConfig: rightsizing.RSPrometheusRuleConfig{
+			NamespaceFilterCriteria: struct {
+				InclusionCriteria []string `json:"inclusionCriteria"`
+				ExclusionCriteria []string `json:"exclusionCriteria"`
+			}{ExclusionCriteria: []string{"openshift.*"}},
+			EvaluationInterval1d: "30m",
+		},
+	}
+
+	rule, err := GeneratePrometheusRule(configData)
+	require.NoError(t, err)
+
+	interval30m := monitoringv1.Duration("30m")
+	assert.Equal(t, &interval30m, rule.Spec.Groups[1].Interval, "namespace 1d group interval")
+	assert.Equal(t, &interval30m, rule.Spec.Groups[3].Interval, "cluster 1d group interval")
+}
+
 func containsPrefix(s, prefix string) bool {
 	return len(s) >= len(prefix) && s[:len(prefix)] == prefix
 }

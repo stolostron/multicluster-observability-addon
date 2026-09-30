@@ -3,6 +3,7 @@ package rightsizing
 import (
 	"testing"
 
+	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -144,6 +145,56 @@ func TestGetDefaultRSPrometheusRuleConfig(t *testing.T) {
 	assert.Empty(t, config.NamespaceFilterCriteria.InclusionCriteria)
 	assert.Equal(t, DefaultCpuAggregator, config.CpuAggregator)
 	assert.Equal(t, DefaultMemoryAggregator, config.MemoryAggregator)
+	assert.Equal(t, DefaultEvaluationInterval, config.EvaluationInterval)
+	assert.Equal(t, DefaultEvaluationInterval1d, config.EvaluationInterval1d)
+}
+
+func TestValidatePrometheusDuration(t *testing.T) {
+	valid := []string{"1ms", "30s", "5m", "1h", "1d", "2w", "1y", "300s", "10m"}
+	for _, s := range valid {
+		assert.True(t, ValidatePrometheusDuration(s), "expected valid: %q", s)
+	}
+
+	// Empty string is accepted — treated as "use default" by callers.
+	assert.True(t, ValidatePrometheusDuration(""), "empty string should be accepted")
+
+	invalid := []string{
+		"0m", "0s", "0h", "0d",     // zero-value durations Prometheus rejects
+		"abc", "5minutes", "5 m",   // wrong format
+		"-5m", "5",                 // missing unit / negative
+		"1h30m",                    // compound durations are unsupported
+	}
+	for _, s := range invalid {
+		assert.False(t, ValidatePrometheusDuration(s), "expected invalid: %q", s)
+	}
+}
+
+func TestResolveEvaluationInterval(t *testing.T) {
+	t.Run("uses configured value when set", func(t *testing.T) {
+		cfg := RSPrometheusRuleConfig{EvaluationInterval: "10m"}
+		got := ResolveEvaluationInterval(cfg)
+		assert.Equal(t, monitoringv1.Duration("10m"), got)
+	})
+
+	t.Run("falls back to Duration5m when empty", func(t *testing.T) {
+		cfg := RSPrometheusRuleConfig{EvaluationInterval: ""}
+		got := ResolveEvaluationInterval(cfg)
+		assert.Equal(t, Duration5m, got)
+	})
+}
+
+func TestResolveEvaluationInterval1d(t *testing.T) {
+	t.Run("uses configured value when set", func(t *testing.T) {
+		cfg := RSPrometheusRuleConfig{EvaluationInterval1d: "30m"}
+		got := ResolveEvaluationInterval1d(cfg)
+		assert.Equal(t, monitoringv1.Duration("30m"), got)
+	})
+
+	t.Run("falls back to Duration1d when empty", func(t *testing.T) {
+		cfg := RSPrometheusRuleConfig{EvaluationInterval1d: ""}
+		got := ResolveEvaluationInterval1d(cfg)
+		assert.Equal(t, Duration1d, got)
+	})
 }
 
 func TestParseAggregatorNames(t *testing.T) {
