@@ -10,6 +10,45 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
+// prometheusDurationPattern matches a single-unit Prometheus duration and captures the
+// numeric part so it can be checked for zero. Compound durations (e.g. "1h30m") are
+// intentionally unsupported to keep validation simple and match ConfigMap usage patterns.
+var prometheusDurationPattern = regexp.MustCompile(`^(\d+)(ms|s|m|h|d|w|y)$`)
+
+// ValidatePrometheusDuration returns false when the string is not a valid single-unit
+// Prometheus duration (e.g. "5m", "1h", "300s") or when the numeric portion is zero
+// (Prometheus rejects zero-value intervals and subquery steps). Empty strings are
+// accepted and treated as "use default" by the callers.
+func ValidatePrometheusDuration(s string) bool {
+	if s == "" {
+		return true
+	}
+	m := prometheusDurationPattern.FindStringSubmatch(s)
+	if m == nil {
+		return false
+	}
+	n, err := strconv.Atoi(m[1])
+	return err == nil && n > 0
+}
+
+// ResolveEvaluationInterval returns the configured 5m-group eval interval as a
+// monitoringv1.Duration, falling back to Duration5m when the config value is absent.
+func ResolveEvaluationInterval(config RSPrometheusRuleConfig) monitoringv1.Duration {
+	if config.EvaluationInterval != "" {
+		return monitoringv1.Duration(config.EvaluationInterval)
+	}
+	return Duration5m
+}
+
+// ResolveEvaluationInterval1d returns the configured 1d-group eval interval as a
+// monitoringv1.Duration, falling back to Duration1d when the config value is absent.
+func ResolveEvaluationInterval1d(config RSPrometheusRuleConfig) monitoringv1.Duration {
+	if config.EvaluationInterval1d != "" {
+		return monitoringv1.Duration(config.EvaluationInterval1d)
+	}
+	return Duration1d
+}
+
 var percentileNamePattern = regexp.MustCompile(`^[Pp]([0-9]{1,2})$`)
 
 // Standard evaluation intervals for PrometheusRules

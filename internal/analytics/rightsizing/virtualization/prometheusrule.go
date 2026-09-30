@@ -23,6 +23,10 @@ func GeneratePrometheusRule(configData rightsizing.RSConfigMapData) (monitoringv
 	// Create rule builder with shared utilities
 	rb := rightsizing.NewRuleBuilder(labelJoin)
 
+	evalInterval := rightsizing.ResolveEvaluationInterval(configData.PrometheusRuleConfig)
+	eval1dInterval := rightsizing.ResolveEvaluationInterval1d(configData.PrometheusRuleConfig)
+	intervalStr := string(evalInterval)
+
 	return monitoringv1.PrometheusRule{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      rightsizing.VirtualizationPrometheusRuleName,
@@ -36,22 +40,22 @@ func GeneratePrometheusRule(configData rightsizing.RSConfigMapData) (monitoringv
 			Groups: []monitoringv1.RuleGroup{
 				{
 					Name:     "acm-vm-right-sizing-namespace-5m.rule",
-					Interval: &rightsizing.Duration5m,
-					Rules:    buildNamespaceRules5m(nsFilter, rb),
+					Interval: &evalInterval,
+					Rules:    buildNamespaceRulesRolling(nsFilter, rb, intervalStr),
 				},
 				{
 					Name:     "acm-vm-right-sizing-namespace-1d.rules",
-					Interval: &rightsizing.Duration1d,
+					Interval: &eval1dInterval,
 					Rules:    buildNamespaceRules1d(configData, rb),
 				},
 				{
 					Name:     "acm-vm-right-sizing-cluster-5m.rule",
-					Interval: &rightsizing.Duration5m,
-					Rules:    buildClusterRules5m(nsFilter, rb),
+					Interval: &evalInterval,
+					Rules:    buildClusterRulesRolling(nsFilter, rb, intervalStr),
 				},
 				{
 					Name:     "acm-vm-right-sizing-cluster-1d.rule",
-					Interval: &rightsizing.Duration1d,
+					Interval: &eval1dInterval,
 					Rules:    buildClusterRules1d(configData, rb),
 				},
 			},
@@ -59,9 +63,10 @@ func GeneratePrometheusRule(configData rightsizing.RSConfigMapData) (monitoringv
 	}, nil
 }
 
-// buildNamespaceRules5m builds 5-minute recording rules for VM namespace-level resource metrics.
+// buildNamespaceRulesRolling builds rolling-window recording rules for VM namespace-level resource metrics.
+// interval is the configured evaluation interval used as the PromQL subquery step (e.g. "5m", "10m").
 // Uses rb.Rule so the optional label_env join is appended (namespace label is preserved in aggregation).
-func buildNamespaceRules5m(nsFilter string, rb *rightsizing.RuleBuilder) []monitoringv1.Rule {
+func buildNamespaceRulesRolling(nsFilter string, rb *rightsizing.RuleBuilder, interval string) []monitoringv1.Rule {
 	return []monitoringv1.Rule{
 		rb.Rule(
 			"acm_rs_vm:namespace:cpu_request:5m",
@@ -69,9 +74,9 @@ func buildNamespaceRules5m(nsFilter string, rb *rightsizing.RuleBuilder) []monit
 				`max_over_time(
 					(
 						count by (name, namespace) (kubevirt_vmi_vcpu_seconds_total{%s})
-					)[5m:]
+					)[%s:]
 				)`,
-				nsFilter,
+				nsFilter, interval,
 			),
 		),
 		rb.Rule(
@@ -79,17 +84,17 @@ func buildNamespaceRules5m(nsFilter string, rb *rightsizing.RuleBuilder) []monit
 			fmt.Sprintf(
 				`max_over_time(max (
 				  kubevirt_vm_resource_requests{%s, resource="memory"}
-				) by (name,namespace)[5m:])`,
-				nsFilter,
+				) by (name,namespace)[%s:])`,
+				nsFilter, interval,
 			),
 		),
 		rb.Rule(
 			"acm_rs_vm:namespace:cpu_usage:5m",
 			fmt.Sprintf(
 				`max_over_time(sum (
-				  rate(kubevirt_vmi_cpu_usage_seconds_total{%s}[5m:])
-				) by (name,namespace)[5m:])`,
-				nsFilter,
+				  rate(kubevirt_vmi_cpu_usage_seconds_total{%s}[%s:])
+				) by (name,namespace)[%s:])`,
+				nsFilter, interval, interval,
 			),
 		),
 		rb.Rule(
@@ -98,8 +103,8 @@ func buildNamespaceRules5m(nsFilter string, rb *rightsizing.RuleBuilder) []monit
 				`max_over_time(sum (
 				  kubevirt_vmi_memory_available_bytes{%s} -
 				  kubevirt_vmi_memory_usable_bytes{%s}
-				) by (name,namespace)[5m:])`,
-				nsFilter, nsFilter,
+				) by (name,namespace)[%s:])`,
+				nsFilter, nsFilter, interval,
 			),
 		),
 	}
@@ -136,10 +141,11 @@ func buildNamespaceRules1d(configData rightsizing.RSConfigMapData, rb *rightsizi
 	return rules
 }
 
-// buildClusterRules5m builds 5-minute recording rules for VM cluster-level resource metrics.
+// buildClusterRulesRolling builds rolling-window recording rules for VM cluster-level resource metrics.
+// interval is the configured evaluation interval used as the PromQL subquery step (e.g. "5m", "10m").
 // Uses rb.RuleNoJoin because aggregation by (cluster) removes the namespace label,
 // making a post-aggregation "on (namespace)" label join invalid.
-func buildClusterRules5m(nsFilter string, rb *rightsizing.RuleBuilder) []monitoringv1.Rule {
+func buildClusterRulesRolling(nsFilter string, rb *rightsizing.RuleBuilder, interval string) []monitoringv1.Rule {
 	return []monitoringv1.Rule{
 		rb.RuleNoJoin(
 			"acm_rs_vm:cluster:cpu_request:5m",
@@ -147,18 +153,18 @@ func buildClusterRules5m(nsFilter string, rb *rightsizing.RuleBuilder) []monitor
 				`max_over_time(
 					(
 						count by (cluster) (kubevirt_vmi_vcpu_seconds_total{%s})
-					)[5m:]
+					)[%s:]
 				)`,
-				nsFilter,
+				nsFilter, interval,
 			),
 		),
 		rb.RuleNoJoin(
 			"acm_rs_vm:cluster:cpu_usage:5m",
 			fmt.Sprintf(
 				`max_over_time(sum (
-				  rate(kubevirt_vmi_cpu_usage_seconds_total{%s}[5m:])
-				) by (cluster)[5m:])`,
-				nsFilter,
+				  rate(kubevirt_vmi_cpu_usage_seconds_total{%s}[%s:])
+				) by (cluster)[%s:])`,
+				nsFilter, interval, interval,
 			),
 		),
 		rb.RuleNoJoin(
@@ -168,8 +174,8 @@ func buildClusterRules5m(nsFilter string, rb *rightsizing.RuleBuilder) []monitor
 				  max by (name, namespace, cluster) (
 				    kubevirt_vm_resource_requests{%s, resource="memory"}
 				  )
-				)[5m:])`,
-				nsFilter,
+				)[%s:])`,
+				nsFilter, interval,
 			),
 		),
 		rb.RuleNoJoin(
@@ -178,8 +184,8 @@ func buildClusterRules5m(nsFilter string, rb *rightsizing.RuleBuilder) []monitor
 				`max_over_time(sum (
 				  kubevirt_vmi_memory_available_bytes{%s} -
 				  kubevirt_vmi_memory_usable_bytes{%s}
-				) by (cluster)[5m:])`,
-				nsFilter, nsFilter,
+				) by (cluster)[%s:])`,
+				nsFilter, nsFilter, interval,
 			),
 		),
 	}
