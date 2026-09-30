@@ -63,6 +63,8 @@ func GetDefaultRSPrometheusRuleConfig() RSPrometheusRuleConfig {
 	ruleConfig.RecommendationPercentage = DefaultRecommendationPercentage
 	ruleConfig.CpuAggregator = DefaultCpuAggregator
 	ruleConfig.MemoryAggregator = DefaultMemoryAggregator
+	ruleConfig.EvaluationInterval = DefaultEvaluationInterval
+	ruleConfig.EvaluationInterval1d = DefaultEvaluationInterval1d
 	return ruleConfig
 }
 

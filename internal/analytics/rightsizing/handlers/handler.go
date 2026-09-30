@@ -34,6 +34,9 @@ import (
 var (
 	lastValidMu          sync.RWMutex
 	lastValidAggregators = make(map[string][]string)
+	// lastValidIntervals caches the last known valid evaluation interval per ConfigMap,
+	// keyed by "configMapName:evaluationInterval" or "configMapName:evaluationInterval1d".
+	lastValidIntervals = make(map[string]string)
 )
 
 func cacheKey(configMapName, field string) string {
@@ -58,6 +61,19 @@ func getCachedAggregator(configMapName, field string) ([]string, bool) {
 	dst := make([]string, len(v))
 	copy(dst, v)
 	return dst, true
+}
+
+func cacheValidInterval(configMapName, field, value string) {
+	lastValidMu.Lock()
+	defer lastValidMu.Unlock()
+	lastValidIntervals[cacheKey(configMapName, field)] = value
+}
+
+func getCachedInterval(configMapName, field string) (string, bool) {
+	lastValidMu.RLock()
+	defer lastValidMu.RUnlock()
+	v, ok := lastValidIntervals[cacheKey(configMapName, field)]
+	return v, ok
 }
 
 // OptionsBuilder builds right-sizing options for the helm chart
@@ -233,6 +249,44 @@ func (o *OptionsBuilder) validateAndSanitizeConfig(configData *rightsizing.RSCon
 		cacheValidAggregator(configMapName, "memory", configData.PrometheusRuleConfig.MemoryAggregator)
 	}
 
+	if !rightsizing.ValidatePrometheusDuration(configData.PrometheusRuleConfig.EvaluationInterval) {
+		reverted = true
+		if cached, ok := getCachedInterval(configMapName, "evaluationInterval"); ok {
+			o.Logger.Info("Invalid evaluationInterval in ConfigMap, rejecting edit and keeping previous valid config",
+				"configMap", configMapName,
+				"invalidValue", configData.PrometheusRuleConfig.EvaluationInterval,
+				"restoredConfig", cached)
+			configData.PrometheusRuleConfig.EvaluationInterval = cached
+		} else {
+			o.Logger.Info("Invalid evaluationInterval in ConfigMap, no previous config cached, falling back to default",
+				"configMap", configMapName,
+				"invalidValue", configData.PrometheusRuleConfig.EvaluationInterval,
+				"default", rightsizing.DefaultEvaluationInterval)
+			configData.PrometheusRuleConfig.EvaluationInterval = rightsizing.DefaultEvaluationInterval
+		}
+	} else {
+		cacheValidInterval(configMapName, "evaluationInterval", configData.PrometheusRuleConfig.EvaluationInterval)
+	}
+
+	if !rightsizing.ValidatePrometheusDuration(configData.PrometheusRuleConfig.EvaluationInterval1d) {
+		reverted = true
+		if cached, ok := getCachedInterval(configMapName, "evaluationInterval1d"); ok {
+			o.Logger.Info("Invalid evaluationInterval1d in ConfigMap, rejecting edit and keeping previous valid config",
+				"configMap", configMapName,
+				"invalidValue", configData.PrometheusRuleConfig.EvaluationInterval1d,
+				"restoredConfig", cached)
+			configData.PrometheusRuleConfig.EvaluationInterval1d = cached
+		} else {
+			o.Logger.Info("Invalid evaluationInterval1d in ConfigMap, no previous config cached, falling back to default",
+				"configMap", configMapName,
+				"invalidValue", configData.PrometheusRuleConfig.EvaluationInterval1d,
+				"default", rightsizing.DefaultEvaluationInterval1d)
+			configData.PrometheusRuleConfig.EvaluationInterval1d = rightsizing.DefaultEvaluationInterval1d
+		}
+	} else {
+		cacheValidInterval(configMapName, "evaluationInterval1d", configData.PrometheusRuleConfig.EvaluationInterval1d)
+	}
+
 	return reverted
 }
 
@@ -253,10 +307,12 @@ func (o *OptionsBuilder) revertConfigMap(ctx context.Context, configMapName stri
 		return
 	}
 
-	o.Logger.Info("Reverted ConfigMap to previous valid configuration after detecting invalid aggregator values",
+	o.Logger.Info("Reverted ConfigMap to valid configuration after detecting invalid values",
 		"configMap", configMapName,
 		"cpuAggregator", validConfig.PrometheusRuleConfig.CpuAggregator,
-		"memoryAggregator", validConfig.PrometheusRuleConfig.MemoryAggregator)
+		"memoryAggregator", validConfig.PrometheusRuleConfig.MemoryAggregator,
+		"evaluationInterval", validConfig.PrometheusRuleConfig.EvaluationInterval,
+		"evaluationInterval1d", validConfig.PrometheusRuleConfig.EvaluationInterval1d)
 }
 
 // ensureNamespaceConfigMap ensures the namespace right-sizing ConfigMap exists on the hub.
@@ -313,10 +369,11 @@ func (o *OptionsBuilder) createDefaultConfigMap(ctx context.Context, name string
 	return nil
 }
 
-// backfillAggregatorKeys patches an existing ConfigMap to add cpuAggregator and
-// memoryAggregator with default values when they are absent. This covers upgraded
-// clusters where the ConfigMap was created before these keys existed.
-// Only missing keys are added — existing user customizations are never overwritten.
+// backfillAggregatorKeys patches an existing ConfigMap to add cpuAggregator,
+// memoryAggregator, evaluationInterval, and evaluationInterval1d with default values
+// when they are absent. This covers upgraded clusters where the ConfigMap was created
+// before these keys existed. Only missing keys are added — existing user
+// customizations are never overwritten.
 func (o *OptionsBuilder) backfillAggregatorKeys(ctx context.Context, cm *corev1.ConfigMap) error {
 	raw, ok := cm.Data["prometheusRuleConfig"]
 	if !ok {
@@ -328,13 +385,15 @@ func (o *OptionsBuilder) backfillAggregatorKeys(ctx context.Context, cm *corev1.
 	// upgraded clusters without visible aggregator keys.
 	var config map[string]any
 	if err := sigYaml.Unmarshal([]byte(raw), &config); err != nil {
-		o.Logger.Error(err, "Cannot parse prometheusRuleConfig, skipping aggregator backfill", "name", cm.Name)
+		o.Logger.Error(err, "Cannot parse prometheusRuleConfig, skipping backfill", "name", cm.Name)
 		return nil
 	}
 
 	_, hasCpu := config["cpuAggregator"]
 	_, hasMem := config["memoryAggregator"]
-	if hasCpu && hasMem {
+	_, hasEvalInterval := config["evaluationInterval"]
+	_, hasEvalInterval1d := config["evaluationInterval1d"]
+	if hasCpu && hasMem && hasEvalInterval && hasEvalInterval1d {
 		return nil
 	}
 
@@ -343,6 +402,12 @@ func (o *OptionsBuilder) backfillAggregatorKeys(ctx context.Context, cm *corev1.
 	}
 	if !hasMem {
 		config["memoryAggregator"] = rightsizing.DefaultMemoryAggregator
+	}
+	if !hasEvalInterval {
+		config["evaluationInterval"] = rightsizing.DefaultEvaluationInterval
+	}
+	if !hasEvalInterval1d {
+		config["evaluationInterval1d"] = rightsizing.DefaultEvaluationInterval1d
 	}
 
 	// Detect whether the original data was YAML (from MCO 2.17) or JSON (from MCOA)
@@ -360,11 +425,14 @@ func (o *OptionsBuilder) backfillAggregatorKeys(ctx context.Context, cm *corev1.
 
 	cm.Data["prometheusRuleConfig"] = string(updated)
 	if err := o.Client.Update(ctx, cm); err != nil {
-		return fmt.Errorf("failed to backfill aggregator keys in ConfigMap %s: %w", cm.Name, err)
+		return fmt.Errorf("failed to backfill keys in ConfigMap %s: %w", cm.Name, err)
 	}
 
-	o.Logger.Info("Backfilled missing aggregator keys in ConfigMap",
-		"name", cm.Name, "addedCpu", !hasCpu, "addedMem", !hasMem)
+	o.Logger.Info("Backfilled missing keys in ConfigMap",
+		"name", cm.Name,
+		"addedCpu", !hasCpu, "addedMem", !hasMem,
+		"addedEvaluationInterval", !hasEvalInterval,
+		"addedEvaluationInterval1d", !hasEvalInterval1d)
 	return nil
 }
 

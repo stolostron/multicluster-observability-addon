@@ -23,6 +23,10 @@ func GeneratePrometheusRule(configData rightsizing.RSConfigMapData) (monitoringv
 	// Create rule builder with shared utilities
 	rb := rightsizing.NewRuleBuilder(labelJoin)
 
+	evalInterval := rightsizing.ResolveEvaluationInterval(configData.PrometheusRuleConfig)
+	eval1dInterval := rightsizing.ResolveEvaluationInterval1d(configData.PrometheusRuleConfig)
+	intervalStr := string(evalInterval)
+
 	return monitoringv1.PrometheusRule{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      rightsizing.NamespacePrometheusRuleName,
@@ -36,22 +40,22 @@ func GeneratePrometheusRule(configData rightsizing.RSConfigMapData) (monitoringv
 			Groups: []monitoringv1.RuleGroup{
 				{
 					Name:     "acm-right-sizing-namespace-5m.rule",
-					Interval: &rightsizing.Duration5m,
-					Rules:    buildNamespaceRules5m(nsFilter, rb),
+					Interval: &evalInterval,
+					Rules:    buildNamespaceRulesRolling(nsFilter, rb, intervalStr),
 				},
 				{
 					Name:     "acm-right-sizing-namespace-1d.rules",
-					Interval: &rightsizing.Duration1d,
+					Interval: &eval1dInterval,
 					Rules:    buildNamespaceRules1d(configData, rb),
 				},
 				{
 					Name:     "acm-right-sizing-cluster-5m.rule",
-					Interval: &rightsizing.Duration5m,
-					Rules:    buildClusterRules5m(nsFilter, rb),
+					Interval: &evalInterval,
+					Rules:    buildClusterRulesRolling(nsFilter, rb, intervalStr),
 				},
 				{
 					Name:     "acm-right-sizing-cluster-1d.rule",
-					Interval: &rightsizing.Duration1d,
+					Interval: &eval1dInterval,
 					Rules:    buildClusterRules1d(configData, rb),
 				},
 			},
@@ -59,23 +63,24 @@ func GeneratePrometheusRule(configData rightsizing.RSConfigMapData) (monitoringv
 	}, nil
 }
 
-// buildNamespaceRules5m builds 5-minute recording rules for namespace-level resource metrics.
+// buildNamespaceRulesRolling builds rolling-window recording rules for namespace-level resource metrics.
+// interval is the configured evaluation interval used as the PromQL subquery step (e.g. "5m", "10m").
 // Uses rb.Rule so the optional label_env join is appended (namespace label is preserved in aggregation).
-func buildNamespaceRules5m(nsFilter string, rb *rightsizing.RuleBuilder) []monitoringv1.Rule {
+func buildNamespaceRulesRolling(nsFilter string, rb *rightsizing.RuleBuilder, interval string) []monitoringv1.Rule {
 	return []monitoringv1.Rule{
 		rb.Rule(
 			"acm_rs:namespace:cpu_request_hard:5m",
 			fmt.Sprintf(
-				`max_over_time(sum(kube_resourcequota{resource=~"requests.cpu", type="hard", %s}) by (namespace)[5m:])`,
-				nsFilter,
+				`max_over_time(sum(kube_resourcequota{resource=~"requests.cpu", type="hard", %s}) by (namespace)[%s:])`,
+				nsFilter, interval,
 			),
 		),
 		rb.Rule(
 			"acm_rs:namespace:cpu_request:5m",
 			fmt.Sprintf(
 				`max_over_time(sum(kube_pod_container_resource_requests{`+
-					`%s, resource="cpu", container!=""}) by (namespace)[5m:])`,
-				nsFilter,
+					`%s, resource="cpu", container!=""}) by (namespace)[%s:])`,
+				nsFilter, interval,
 			),
 		),
 		rb.Rule(
@@ -83,31 +88,31 @@ func buildNamespaceRules5m(nsFilter string, rb *rightsizing.RuleBuilder) []monit
 			fmt.Sprintf(
 				`max_over_time(sum(node_namespace_pod_container:`+
 					`container_cpu_usage_seconds_total:sum_irate{`+
-					`%s, container!=""}) by (namespace)[5m:])`,
-				nsFilter,
+					`%s, container!=""}) by (namespace)[%s:])`,
+				nsFilter, interval,
 			),
 		),
 		rb.Rule(
 			"acm_rs:namespace:memory_request_hard:5m",
 			fmt.Sprintf(
-				`max_over_time(sum(kube_resourcequota{resource=~"requests.memory", type="hard", %s}) by (namespace)[5m:])`,
-				nsFilter,
+				`max_over_time(sum(kube_resourcequota{resource=~"requests.memory", type="hard", %s}) by (namespace)[%s:])`,
+				nsFilter, interval,
 			),
 		),
 		rb.Rule(
 			"acm_rs:namespace:memory_request:5m",
 			fmt.Sprintf(
 				`max_over_time(sum(kube_pod_container_resource_requests{`+
-					`%s, resource="memory", container!=""}) by (namespace)[5m:])`,
-				nsFilter,
+					`%s, resource="memory", container!=""}) by (namespace)[%s:])`,
+				nsFilter, interval,
 			),
 		),
 		rb.Rule(
 			"acm_rs:namespace:memory_usage:5m",
 			fmt.Sprintf(
 				`max_over_time(sum(container_memory_working_set_bytes{`+
-					`%s, container!=""}) by (namespace)[5m:])`,
-				nsFilter,
+					`%s, container!=""}) by (namespace)[%s:])`,
+				nsFilter, interval,
 			),
 		),
 	}
@@ -147,24 +152,25 @@ func buildNamespaceRules1d(configData rightsizing.RSConfigMapData, rb *rightsizi
 	return rules
 }
 
-// buildClusterRules5m builds 5-minute recording rules for cluster-level resource metrics.
+// buildClusterRulesRolling builds rolling-window recording rules for cluster-level resource metrics.
+// interval is the configured evaluation interval used as the PromQL subquery step (e.g. "5m", "10m").
 // Uses rb.RuleNoJoin because aggregation by (cluster) removes the namespace label,
 // making a post-aggregation "on (namespace)" label join invalid.
-func buildClusterRules5m(nsFilter string, rb *rightsizing.RuleBuilder) []monitoringv1.Rule {
+func buildClusterRulesRolling(nsFilter string, rb *rightsizing.RuleBuilder, interval string) []monitoringv1.Rule {
 	return []monitoringv1.Rule{
 		rb.RuleNoJoin(
 			"acm_rs:cluster:cpu_request_hard:5m",
 			fmt.Sprintf(
-				`max_over_time(sum(kube_resourcequota{resource=~"requests.cpu", type="hard", %s}) by (cluster)[5m:])`,
-				nsFilter,
+				`max_over_time(sum(kube_resourcequota{resource=~"requests.cpu", type="hard", %s}) by (cluster)[%s:])`,
+				nsFilter, interval,
 			),
 		),
 		rb.RuleNoJoin(
 			"acm_rs:cluster:cpu_request:5m",
 			fmt.Sprintf(
 				`max_over_time(sum(kube_pod_container_resource_requests{`+
-					`%s, resource="cpu", container!=""}) by (cluster)[5m:])`,
-				nsFilter,
+					`%s, resource="cpu", container!=""}) by (cluster)[%s:])`,
+				nsFilter, interval,
 			),
 		),
 		rb.RuleNoJoin(
@@ -172,31 +178,31 @@ func buildClusterRules5m(nsFilter string, rb *rightsizing.RuleBuilder) []monitor
 			fmt.Sprintf(
 				`max_over_time(sum(node_namespace_pod_container:`+
 					`container_cpu_usage_seconds_total:sum_irate{`+
-					`%s, container!=""}) by (cluster)[5m:])`,
-				nsFilter,
+					`%s, container!=""}) by (cluster)[%s:])`,
+				nsFilter, interval,
 			),
 		),
 		rb.RuleNoJoin(
 			"acm_rs:cluster:memory_request_hard:5m",
 			fmt.Sprintf(
-				`max_over_time(sum(kube_resourcequota{resource=~"requests.memory", type="hard", %s}) by (cluster)[5m:])`,
-				nsFilter,
+				`max_over_time(sum(kube_resourcequota{resource=~"requests.memory", type="hard", %s}) by (cluster)[%s:])`,
+				nsFilter, interval,
 			),
 		),
 		rb.RuleNoJoin(
 			"acm_rs:cluster:memory_request:5m",
 			fmt.Sprintf(
 				`max_over_time(sum(kube_pod_container_resource_requests{`+
-					`%s, resource="memory", container!=""}) by (cluster)[5m:])`,
-				nsFilter,
+					`%s, resource="memory", container!=""}) by (cluster)[%s:])`,
+				nsFilter, interval,
 			),
 		),
 		rb.RuleNoJoin(
 			"acm_rs:cluster:memory_usage:5m",
 			fmt.Sprintf(
 				`max_over_time(sum(container_memory_working_set_bytes{`+
-					`%s, container!=""}) by (cluster)[5m:])`,
-				nsFilter,
+					`%s, container!=""}) by (cluster)[%s:])`,
+				nsFilter, interval,
 			),
 		),
 	}

@@ -626,10 +626,12 @@ func TestBackfillAggregatorKeys_AddsMissingKeys(t *testing.T) {
 	assert.Contains(t, updated.Data["prometheusRuleConfig"], `"cpuAggregator"`)
 	assert.Contains(t, updated.Data["prometheusRuleConfig"], `"memoryAggregator"`)
 	assert.Contains(t, updated.Data["prometheusRuleConfig"], `"recommendationPercentage":110`)
+	assert.Contains(t, updated.Data["prometheusRuleConfig"], `"evaluationInterval"`)
+	assert.Contains(t, updated.Data["prometheusRuleConfig"], `"evaluationInterval1d"`)
 }
 
 func TestBackfillAggregatorKeys_SkipsWhenKeysExist(t *testing.T) {
-	original := `{"recommendationPercentage":110,"cpuAggregator":["P90"],"memoryAggregator":["P99"]}`
+	original := `{"recommendationPercentage":110,"cpuAggregator":["P90"],"memoryAggregator":["P99"],"evaluationInterval":"5m","evaluationInterval1d":"15m"}`
 	cm := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      rightsizing.NamespaceConfigMapName,
@@ -650,7 +652,7 @@ func TestBackfillAggregatorKeys_SkipsWhenKeysExist(t *testing.T) {
 	}, &updated))
 
 	assert.Equal(t, original, updated.Data["prometheusRuleConfig"],
-		"should not modify ConfigMap when both keys already exist")
+		"should not modify ConfigMap when all keys already exist")
 }
 
 func TestBackfillAggregatorKeys_PreservesExistingFields(t *testing.T) {
@@ -751,6 +753,8 @@ cpuAggregator:
 memoryAggregator:
 - Max OverAll
 - P99
+evaluationInterval: 5m
+evaluationInterval1d: 15m
 `
 	cm := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
@@ -772,5 +776,5 @@ memoryAggregator:
 	}, &updated))
 
 	assert.YAMLEq(t, yamlConfig, updated.Data["prometheusRuleConfig"],
-		"should not modify YAML ConfigMap when both aggregator keys already exist")
+		"should not modify YAML ConfigMap when all keys already exist")
 }
