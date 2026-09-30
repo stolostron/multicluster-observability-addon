@@ -2,36 +2,141 @@ package rightsizing
 
 import (
 	"fmt"
+	"math"
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 // prometheusDurationPattern matches a single-unit Prometheus duration and captures the
-// numeric part so it can be checked for zero. Compound durations (e.g. "1h30m") are
+// numeric part and the unit separately. Compound durations (e.g. "1h30m") are
 // intentionally unsupported to keep validation simple and match ConfigMap usage patterns.
 var prometheusDurationPattern = regexp.MustCompile(`^(\d+)(ms|s|m|h|d|w|y)$`)
 
-// ValidatePrometheusDuration returns false when the string is not a valid single-unit
-// Prometheus duration (e.g. "5m", "1h", "300s") or when the numeric portion is zero
-// (Prometheus rejects zero-value intervals and subquery steps). Empty strings are
-// accepted and treated as "use default" by the callers.
-func ValidatePrometheusDuration(s string) bool {
+// durationUnitMultiplier maps Prometheus duration units to their time.Duration value.
+// Prometheus defines d/w/y as fixed spans (24h / 7d / 365d), so no calendar math applies.
+var durationUnitMultiplier = map[string]time.Duration{
+	"ms": time.Millisecond,
+	"s":  time.Second,
+	"m":  time.Minute,
+	"h":  time.Hour,
+	"d":  24 * time.Hour,
+	"w":  7 * 24 * time.Hour,
+	"y":  365 * 24 * time.Hour,
+}
+
+// Bounds for the ConfigMap-driven evaluation intervals. The two fields feed different
+// parts of the pipeline, so they do not share an upper bound.
+const (
+	// AggregationWindow is the fixed lookback of the daily aggregation rules. It is
+	// hardcoded as [1d] in Build1dMaxAggregationExpr and the percentile builders, which
+	// is what constrains how coarse EvaluationInterval may become.
+	AggregationWindow = 24 * time.Hour
+
+	// MinSamplesPerAggregationWindow is the smallest number of rolling-window samples the
+	// daily rules need for the percentile profiles to stay distinguishable. Below this,
+	// quantile_over_time has so few points that P99/P95/P90 all collapse onto the maximum
+	// and the configurable-profile feature silently stops meaning anything.
+	MinSamplesPerAggregationWindow = 24
+
+	// MinEvaluationInterval applies to both fields. The rolling interval doubles as the
+	// lookback window of a PromQL subquery whose resolution defaults to the global
+	// evaluation interval (typically 30s on OpenShift), so below a minute the window holds
+	// barely more than a single sample while Prometheus is still forced to re-evaluate the
+	// whole rule group at that rate.
+	MinEvaluationInterval = time.Minute
+
+	// MaxEvaluationInterval caps the rolling-window interval so the daily rules always see
+	// at least MinSamplesPerAggregationWindow points. It also bounds the subquery range:
+	// the value is substituted into [X:], and at a 30s resolution an unbounded window such
+	// as "1y" expands to over a million points per series, stalling or OOM-ing Prometheus
+	// on every managed cluster.
+	MaxEvaluationInterval = AggregationWindow / MinSamplesPerAggregationWindow
+
+	// MaxEvaluationInterval1d caps how rarely the daily rules may re-run. Each evaluation
+	// aggregates the trailing AggregationWindow, so re-evaluating less often than that
+	// leaves gaps between consecutive windows: data that no evaluation ever observes.
+	MaxEvaluationInterval1d = AggregationWindow
+)
+
+// parsePrometheusDuration converts a single-unit Prometheus duration into a time.Duration.
+// It reports false for malformed input, a zero numeric part (Prometheus rejects zero-value
+// intervals and subquery ranges), or a value so large it would overflow time.Duration.
+func parsePrometheusDuration(s string) (time.Duration, bool) {
+	m := prometheusDurationPattern.FindStringSubmatch(s)
+	if m == nil {
+		return 0, false
+	}
+	n, err := strconv.Atoi(m[1])
+	if err != nil || n <= 0 {
+		return 0, false
+	}
+	unit := durationUnitMultiplier[m[2]]
+	// Guard against int64 overflow on absurd inputs such as "999999999999y".
+	if int64(n) > int64(math.MaxInt64)/int64(unit) {
+		return 0, false
+	}
+	return time.Duration(n) * unit, true
+}
+
+// validateInterval reports whether s is a single-unit Prometheus duration (e.g. "5m",
+// "1h", "300s") with a non-zero value inside [MinEvaluationInterval, maxAllowed].
+// Empty strings are accepted and treated as "use default" by the callers.
+func validateInterval(s string, maxAllowed time.Duration) bool {
 	if s == "" {
 		return true
 	}
-	m := prometheusDurationPattern.FindStringSubmatch(s)
-	if m == nil {
+	d, ok := parsePrometheusDuration(s)
+	if !ok {
 		return false
 	}
-	n, err := strconv.Atoi(m[1])
-	return err == nil && n > 0
+	return d >= MinEvaluationInterval && d <= maxAllowed
 }
 
-// ResolveEvaluationInterval returns the configured 5m-group eval interval as a
+// ValidateEvaluationInterval reports whether s is usable as the rolling-window evaluation
+// interval. Beyond MaxEvaluationInterval the daily aggregation rules no longer see enough
+// samples for the percentile profiles to differ from the maximum.
+func ValidateEvaluationInterval(s string) bool {
+	return validateInterval(s, MaxEvaluationInterval)
+}
+
+// ValidateEvaluationInterval1d reports whether s is usable as the daily-aggregation
+// evaluation interval. Its ceiling is the aggregation window itself, since re-running less
+// often than that would leave gaps no evaluation ever covers.
+func ValidateEvaluationInterval1d(s string) bool {
+	return validateInterval(s, MaxEvaluationInterval1d)
+}
+
+// RedundantEvaluationFactor reports how many times the daily aggregation rules re-run per
+// new rolling-window sample when the rolling interval is the coarser of the two. A factor
+// above 1 means those rules recompute over input that has not changed since the last run:
+// the recorded value is still correct, but the extra evaluations and the duplicate samples
+// they append to the recommendation series are pure overhead. This is a quality warning,
+// not a validation failure — the configuration works, it is just wasteful.
+//
+// Empty fields are resolved to their defaults first, so the comparison reflects the
+// intervals that will actually run. ok is false when the intervals are already well
+// ordered or when either value cannot be parsed.
+func RedundantEvaluationFactor(rolling, daily string) (int, bool) {
+	if rolling == "" {
+		rolling = DefaultEvaluationInterval
+	}
+	if daily == "" {
+		daily = DefaultEvaluationInterval1d
+	}
+	r, rok := parsePrometheusDuration(rolling)
+	d, dok := parsePrometheusDuration(daily)
+	if !rok || !dok || r <= d {
+		return 0, false
+	}
+	return int(r / d), true
+}
+
+// ResolveEvaluationInterval returns the configured rolling-window eval interval as a
 // monitoringv1.Duration, falling back to Duration5m when the config value is absent.
 func ResolveEvaluationInterval(config RSPrometheusRuleConfig) monitoringv1.Duration {
 	if config.EvaluationInterval != "" {
@@ -51,14 +156,16 @@ func ResolveEvaluationInterval1d(config RSPrometheusRuleConfig) monitoringv1.Dur
 
 var percentileNamePattern = regexp.MustCompile(`^[Pp]([0-9]{1,2})$`)
 
-// Standard evaluation intervals for PrometheusRules
+// Standard evaluation intervals for PrometheusRules. These are the fallbacks used when
+// the ConfigMap does not set the corresponding field, so they are derived from the same
+// constants the handler writes into the ConfigMap to keep the two paths from drifting.
 var (
-	// Duration5m is the evaluation interval for high-resolution metrics (5-minute aggregations)
-	Duration5m = monitoringv1.Duration("5m")
-	// Duration15m is the evaluation interval for daily aggregated metrics.
+	// Duration5m is the default evaluation interval for the rolling-window rule groups.
+	Duration5m = monitoringv1.Duration(DefaultEvaluationInterval)
+	// Duration1d is the default evaluation interval for daily aggregated metrics.
 	// Rules evaluate every 15 minutes but aggregate data over 1 day (via max_over_time(...[1d])).
 	// This provides fresh dashboard data without waiting a full day between evaluations.
-	Duration1d = monitoringv1.Duration("15m")
+	Duration1d = monitoringv1.Duration(DefaultEvaluationInterval1d)
 )
 
 // RuleBuilder provides common utilities for building PrometheusRule rules

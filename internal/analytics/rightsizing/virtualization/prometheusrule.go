@@ -64,7 +64,8 @@ func GeneratePrometheusRule(configData rightsizing.RSConfigMapData) (monitoringv
 }
 
 // buildNamespaceRulesRolling builds rolling-window recording rules for VM namespace-level resource metrics.
-// interval is the configured evaluation interval used as the PromQL subquery step (e.g. "5m", "10m").
+// interval is the configured evaluation interval, used as the PromQL subquery lookback
+// window (e.g. "5m", "10m").
 // Uses rb.Rule so the optional label_env join is appended (namespace label is preserved in aggregation).
 func buildNamespaceRulesRolling(nsFilter string, rb *rightsizing.RuleBuilder, interval string) []monitoringv1.Rule {
 	return []monitoringv1.Rule{
@@ -142,7 +143,8 @@ func buildNamespaceRules1d(configData rightsizing.RSConfigMapData, rb *rightsizi
 }
 
 // buildClusterRulesRolling builds rolling-window recording rules for VM cluster-level resource metrics.
-// interval is the configured evaluation interval used as the PromQL subquery step (e.g. "5m", "10m").
+// interval is the configured evaluation interval, used as the PromQL subquery lookback
+// window (e.g. "5m", "10m").
 // Uses rb.RuleNoJoin because aggregation by (cluster) removes the namespace label,
 // making a post-aggregation "on (namespace)" label join invalid.
 func buildClusterRulesRolling(nsFilter string, rb *rightsizing.RuleBuilder, interval string) []monitoringv1.Rule {
