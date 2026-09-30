@@ -843,6 +843,16 @@ func TestValidateAndSanitizeConfig_InvalidEvaluationIntervalRestoresCachedValue(
 }
 
 func TestValidateAndSanitizeConfig_ZeroValueDurationIsInvalid(t *testing.T) {
+	// Clear interval cache so this test always exercises the default-fallback path
+	// regardless of which other tests ran first. Sibling tests seed "10m" into the
+	// cache using the same ConfigMap name, which would otherwise cause this test to
+	// restore "10m" instead of the hardcoded default — passing either way but testing
+	// the wrong path.
+	lastValidMu.Lock()
+	delete(lastValidIntervals, cacheKey(rightsizing.NamespaceConfigMapName, "evaluationInterval"))
+	delete(lastValidIntervals, cacheKey(rightsizing.NamespaceConfigMapName, "evaluationInterval1d"))
+	lastValidMu.Unlock()
+
 	cm := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      rightsizing.NamespaceConfigMapName,
@@ -860,6 +870,9 @@ func TestValidateAndSanitizeConfig_ZeroValueDurationIsInvalid(t *testing.T) {
 
 	reverted := ob.validateAndSanitizeConfig(&configData, rightsizing.NamespaceConfigMapName)
 	assert.True(t, reverted, "zero-value durations must be rejected")
-	assert.NotEqual(t, "0s", configData.PrometheusRuleConfig.EvaluationInterval)
-	assert.NotEqual(t, "0h", configData.PrometheusRuleConfig.EvaluationInterval1d)
+	// With cold cache, both fields fall back to the hardcoded defaults.
+	assert.Equal(t, rightsizing.DefaultEvaluationInterval, configData.PrometheusRuleConfig.EvaluationInterval,
+		"zero-value interval should be replaced by default, not just any non-zero value")
+	assert.Equal(t, rightsizing.DefaultEvaluationInterval1d, configData.PrometheusRuleConfig.EvaluationInterval1d,
+		"zero-value interval1d should be replaced by default")
 }

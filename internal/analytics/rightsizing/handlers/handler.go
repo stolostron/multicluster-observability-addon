@@ -64,6 +64,13 @@ func getCachedAggregator(configMapName, field string) ([]string, bool) {
 }
 
 func cacheValidInterval(configMapName, field, value string) {
+	if value == "" {
+		// Empty string means "use default" — there is no user-set value to restore,
+		// so don't cache it. Caching "" would cause a misleading log on the next
+		// invalid edit ("keeping previous valid config: ") and a 2-reconcile
+		// convergence cycle before backfill restores the default.
+		return
+	}
 	lastValidMu.Lock()
 	defer lastValidMu.Unlock()
 	lastValidIntervals[cacheKey(configMapName, field)] = value

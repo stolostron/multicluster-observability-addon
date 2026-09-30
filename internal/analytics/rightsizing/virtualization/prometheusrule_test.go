@@ -446,13 +446,21 @@ func TestCustomEvaluationInterval1d(t *testing.T) {
 				ExclusionCriteria []string `json:"exclusionCriteria"`
 			}{ExclusionCriteria: []string{"openshift.*"}},
 			EvaluationInterval1d: "30m",
+			// EvaluationInterval intentionally left empty → should default to Duration5m
 		},
 	}
 
 	rule, err := GeneratePrometheusRule(configData)
 	require.NoError(t, err)
 
+	interval5m := monitoringv1.Duration(rightsizing.DefaultEvaluationInterval)
 	interval30m := monitoringv1.Duration("30m")
+
+	// Rolling groups must fall back to the default 5m when EvaluationInterval is unset.
+	assert.Equal(t, &interval5m, rule.Spec.Groups[0].Interval, "namespace rolling group should default to 5m")
+	assert.Equal(t, &interval5m, rule.Spec.Groups[2].Interval, "cluster rolling group should default to 5m")
+
+	// Only the 1d groups should use the configured 30m.
 	assert.Equal(t, &interval30m, rule.Spec.Groups[1].Interval, "namespace 1d group interval")
 	assert.Equal(t, &interval30m, rule.Spec.Groups[3].Interval, "cluster 1d group interval")
 }
