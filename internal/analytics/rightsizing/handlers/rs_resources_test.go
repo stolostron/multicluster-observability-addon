@@ -778,3 +778,88 @@ evaluationInterval1d: 15m
 	assert.YAMLEq(t, yamlConfig, updated.Data["prometheusRuleConfig"],
 		"should not modify YAML ConfigMap when all keys already exist")
 }
+
+func TestValidateAndSanitizeConfig_InvalidEvaluationIntervalFallsBackToDefault(t *testing.T) {
+	// Clear interval cache to simulate process restart (no prior valid value).
+	lastValidMu.Lock()
+	delete(lastValidIntervals, cacheKey(rightsizing.NamespaceConfigMapName, "evaluationInterval"))
+	lastValidMu.Unlock()
+
+	cm := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      rightsizing.NamespaceConfigMapName,
+			Namespace: addoncfg.InstallNamespace,
+			Labels:    rightsizing.RSLabels(),
+		},
+		Data: map[string]string{
+			"prometheusRuleConfig": `{"cpuAggregator":["Max OverAll"],"memoryAggregator":["Max OverAll"],"evaluationInterval":"badvalue","evaluationInterval1d":"15m"}`,
+		},
+	}
+	ob := newTestOptionsBuilder(t, cm)
+	ctx := t.Context()
+
+	configData, err := rightsizing.ParseConfigMapData(cm.Data)
+	require.NoError(t, err)
+
+	reverted := ob.validateAndSanitizeConfig(&configData, rightsizing.NamespaceConfigMapName)
+	assert.True(t, reverted, "invalid evaluationInterval should trigger revert")
+	assert.Equal(t, rightsizing.DefaultEvaluationInterval, configData.PrometheusRuleConfig.EvaluationInterval,
+		"should fall back to default when no cached value exists")
+
+	// Write-back should remove the bad value.
+	ob.revertConfigMap(ctx, rightsizing.NamespaceConfigMapName, configData)
+
+	var updated corev1.ConfigMap
+	require.NoError(t, ob.Client.Get(ctx, types.NamespacedName{
+		Name: rightsizing.NamespaceConfigMapName, Namespace: addoncfg.InstallNamespace,
+	}, &updated))
+	assert.NotContains(t, updated.Data["prometheusRuleConfig"], "badvalue")
+	assert.Contains(t, updated.Data["prometheusRuleConfig"], rightsizing.DefaultEvaluationInterval)
+}
+
+func TestValidateAndSanitizeConfig_InvalidEvaluationIntervalRestoresCachedValue(t *testing.T) {
+	// Pre-seed the cache with a previously valid custom interval.
+	cacheValidInterval(rightsizing.NamespaceConfigMapName, "evaluationInterval", "10m")
+
+	cm := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      rightsizing.NamespaceConfigMapName,
+			Namespace: addoncfg.InstallNamespace,
+			Labels:    rightsizing.RSLabels(),
+		},
+		Data: map[string]string{
+			"prometheusRuleConfig": `{"cpuAggregator":["Max OverAll"],"memoryAggregator":["Max OverAll"],"evaluationInterval":"0m","evaluationInterval1d":"15m"}`,
+		},
+	}
+	ob := newTestOptionsBuilder(t, cm)
+
+	configData, err := rightsizing.ParseConfigMapData(cm.Data)
+	require.NoError(t, err)
+
+	reverted := ob.validateAndSanitizeConfig(&configData, rightsizing.NamespaceConfigMapName)
+	assert.True(t, reverted, "zero-value duration should trigger revert")
+	assert.Equal(t, "10m", configData.PrometheusRuleConfig.EvaluationInterval,
+		"should restore previously cached valid value, not hardcoded default")
+}
+
+func TestValidateAndSanitizeConfig_ZeroValueDurationIsInvalid(t *testing.T) {
+	cm := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      rightsizing.NamespaceConfigMapName,
+			Namespace: addoncfg.InstallNamespace,
+			Labels:    rightsizing.RSLabels(),
+		},
+		Data: map[string]string{
+			"prometheusRuleConfig": `{"cpuAggregator":["Max OverAll"],"memoryAggregator":["Max OverAll"],"evaluationInterval":"0s","evaluationInterval1d":"0h"}`,
+		},
+	}
+	ob := newTestOptionsBuilder(t, cm)
+
+	configData, err := rightsizing.ParseConfigMapData(cm.Data)
+	require.NoError(t, err)
+
+	reverted := ob.validateAndSanitizeConfig(&configData, rightsizing.NamespaceConfigMapName)
+	assert.True(t, reverted, "zero-value durations must be rejected")
+	assert.NotEqual(t, "0s", configData.PrometheusRuleConfig.EvaluationInterval)
+	assert.NotEqual(t, "0h", configData.PrometheusRuleConfig.EvaluationInterval1d)
+}
