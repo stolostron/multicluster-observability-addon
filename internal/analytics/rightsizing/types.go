@@ -31,8 +31,8 @@ const (
 	VirtualizationConfigMapName      = "rs-virt-config"
 
 	// Default evaluation intervals for PrometheusRule groups.
-	// EvaluationInterval controls how often the raw 5m rolling-window groups are evaluated
-	// and the subquery step used in PromQL expressions (e.g. [5m:]).
+	// EvaluationInterval controls how often the raw rolling-window groups are evaluated
+	// and the lookback window of the PromQL subqueries they contain (e.g. [5m:]).
 	// EvaluationInterval1d controls how often the daily-aggregation groups are re-evaluated.
 	DefaultEvaluationInterval   = "5m"
 	DefaultEvaluationInterval1d = "15m"
@@ -62,12 +62,22 @@ type RSPrometheusRuleConfig struct {
 	CpuAggregator            []string        `json:"cpuAggregator"`
 	MemoryAggregator         []string        `json:"memoryAggregator"`
 	// EvaluationInterval controls how often the raw rolling-window PrometheusRule groups
-	// are evaluated and the subquery step used in PromQL (e.g. [5m:]). Defaults to "5m".
-	// Valid Prometheus duration strings: e.g. "1m", "5m", "10m", "1h".
+	// are evaluated, and doubles as the lookback window of the PromQL subqueries inside
+	// them (e.g. [5m:]). Raising it reduces both evaluation cost and the number of
+	// samples stored per recorded series. Defaults to "5m".
+	//
+	// Must be a single-unit Prometheus duration between 1m and 1h: e.g. "1m", "5m", "10m", "1h".
+	// The 1h ceiling comes from the fixed 1d aggregation window the daily rules apply on
+	// top of these series — at 1h they see 24 samples per day, and anything coarser leaves
+	// too few points for the P99/P95 profiles to differ from the maximum.
 	EvaluationInterval string `json:"evaluationInterval,omitempty"`
 	// EvaluationInterval1d controls how often the daily-aggregation PrometheusRule groups
-	// are re-evaluated. Defaults to "15m".
-	// Valid Prometheus duration strings: e.g. "5m", "15m", "30m", "1h".
+	// are re-evaluated. It does not change the aggregation window itself, which is always
+	// 1d, so lowering it only makes dashboards refresh sooner. Defaults to "15m".
+	//
+	// Must be a single-unit Prometheus duration between 1m and 24h: e.g. "5m", "15m", "30m", "1h".
+	// The 24h ceiling is the aggregation window itself: re-running less often than that
+	// would leave gaps between consecutive windows that no evaluation ever covers.
 	EvaluationInterval1d string `json:"evaluationInterval1d,omitempty"`
 }
 

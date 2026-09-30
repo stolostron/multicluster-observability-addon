@@ -2,12 +2,14 @@ package handlers
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/go-logr/logr"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"github.com/stolostron/multicluster-observability-addon/internal/analytics/rightsizing"
+	rsnamespace "github.com/stolostron/multicluster-observability-addon/internal/analytics/rightsizing/namespace"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -875,4 +877,134 @@ func TestValidateAndSanitizeConfig_ZeroValueDurationIsInvalid(t *testing.T) {
 		"zero-value interval should be replaced by default, not just any non-zero value")
 	assert.Equal(t, rightsizing.DefaultEvaluationInterval1d, configData.PrometheusRuleConfig.EvaluationInterval1d,
 		"zero-value interval1d should be replaced by default")
+}
+
+// TestValidateAndSanitizeConfig_OutOfRangeDurationsAreRejected covers durations that are
+// syntactically valid Prometheus durations but operationally dangerous: "1ms" would make
+// every spoke re-evaluate the rule groups a thousand times a second, and "1y" expands the
+// subquery lookback to over a million points per series.
+func TestValidateAndSanitizeConfig_OutOfRangeDurationsAreRejected(t *testing.T) {
+	for _, tc := range []struct {
+		name                 string
+		evaluationInterval   string
+		evaluationInterval1d string
+	}{
+		{"below minimum", "1ms", "1s"},
+		{"above maximum", "1y", "2w"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			lastValidMu.Lock()
+			delete(lastValidIntervals, cacheKey(rightsizing.NamespaceConfigMapName, "evaluationInterval"))
+			delete(lastValidIntervals, cacheKey(rightsizing.NamespaceConfigMapName, "evaluationInterval1d"))
+			lastValidMu.Unlock()
+
+			cm := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      rightsizing.NamespaceConfigMapName,
+					Namespace: addoncfg.InstallNamespace,
+					Labels:    rightsizing.RSLabels(),
+				},
+				Data: map[string]string{
+					"prometheusRuleConfig": fmt.Sprintf(
+						`{"cpuAggregator":["Max OverAll"],"memoryAggregator":["Max OverAll"],`+
+							`"evaluationInterval":%q,"evaluationInterval1d":%q}`,
+						tc.evaluationInterval, tc.evaluationInterval1d),
+				},
+			}
+			ob := newTestOptionsBuilder(t, cm)
+
+			configData, err := rightsizing.ParseConfigMapData(cm.Data)
+			require.NoError(t, err)
+
+			reverted := ob.validateAndSanitizeConfig(&configData, rightsizing.NamespaceConfigMapName)
+			assert.True(t, reverted, "out-of-range durations must be rejected")
+			assert.Equal(t, rightsizing.DefaultEvaluationInterval, configData.PrometheusRuleConfig.EvaluationInterval)
+			assert.Equal(t, rightsizing.DefaultEvaluationInterval1d, configData.PrometheusRuleConfig.EvaluationInterval1d)
+
+			// The sanitized value is what reaches the generated PrometheusRule.
+			rule, err := rsnamespace.GeneratePrometheusRule(configData)
+			require.NoError(t, err)
+			assert.Equal(t, rightsizing.DefaultEvaluationInterval, string(*rule.Spec.Groups[0].Interval))
+			assert.NotContains(t, rule.Spec.Groups[0].Rules[0].Expr.String(), tc.evaluationInterval)
+		})
+	}
+}
+
+// TestValidateAndSanitizeConfig_IntervalCeilingsAreIndependent pins the asymmetry between
+// the two fields. "2h" is too coarse for the rolling group — the daily rules would see
+// only 12 samples per [1d] window — but it is a legitimate cadence for re-running the
+// daily rules themselves, so only the first field may be rejected.
+func TestValidateAndSanitizeConfig_IntervalCeilingsAreIndependent(t *testing.T) {
+	lastValidMu.Lock()
+	delete(lastValidIntervals, cacheKey(rightsizing.NamespaceConfigMapName, "evaluationInterval"))
+	delete(lastValidIntervals, cacheKey(rightsizing.NamespaceConfigMapName, "evaluationInterval1d"))
+	lastValidMu.Unlock()
+
+	cm := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      rightsizing.NamespaceConfigMapName,
+			Namespace: addoncfg.InstallNamespace,
+			Labels:    rightsizing.RSLabels(),
+		},
+		Data: map[string]string{
+			"prometheusRuleConfig": `{"cpuAggregator":["Max OverAll"],"memoryAggregator":["Max OverAll"],` +
+				`"evaluationInterval":"2h","evaluationInterval1d":"2h"}`,
+		},
+	}
+	ob := newTestOptionsBuilder(t, cm)
+
+	configData, err := rightsizing.ParseConfigMapData(cm.Data)
+	require.NoError(t, err)
+
+	reverted := ob.validateAndSanitizeConfig(&configData, rightsizing.NamespaceConfigMapName)
+	assert.True(t, reverted, "the rolling interval is above its ceiling and must be rejected")
+	assert.Equal(t, rightsizing.DefaultEvaluationInterval, configData.PrometheusRuleConfig.EvaluationInterval,
+		"2h exceeds MaxEvaluationInterval and should fall back to the default")
+	assert.Equal(t, "2h", configData.PrometheusRuleConfig.EvaluationInterval1d,
+		"2h is within MaxEvaluationInterval1d and must be preserved")
+}
+
+// TestValidateAndSanitizeConfig_WastefulIntervalOrderingWarnsButKeepsConfig covers the
+// case a user hits by raising only evaluationInterval: 30m is legal, but it is coarser
+// than the untouched 15m default for evaluationInterval1d, so the daily rules recompute
+// twice per new sample. That is wasteful, not wrong, and must not be reverted — otherwise
+// a single legal edit would be silently undone because of a field the user never set.
+func TestValidateAndSanitizeConfig_WastefulIntervalOrderingWarnsButKeepsConfig(t *testing.T) {
+	lastValidMu.Lock()
+	delete(lastValidIntervals, cacheKey(rightsizing.NamespaceConfigMapName, "evaluationInterval"))
+	delete(lastValidIntervals, cacheKey(rightsizing.NamespaceConfigMapName, "evaluationInterval1d"))
+	lastValidMu.Unlock()
+
+	cm := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      rightsizing.NamespaceConfigMapName,
+			Namespace: addoncfg.InstallNamespace,
+			Labels:    rightsizing.RSLabels(),
+		},
+		Data: map[string]string{
+			"prometheusRuleConfig": `{"cpuAggregator":["Max OverAll"],"memoryAggregator":["Max OverAll"],` +
+				`"evaluationInterval":"30m","evaluationInterval1d":"15m"}`,
+		},
+	}
+	ob := newTestOptionsBuilder(t, cm)
+
+	configData, err := rightsizing.ParseConfigMapData(cm.Data)
+	require.NoError(t, err)
+
+	reverted := ob.validateAndSanitizeConfig(&configData, rightsizing.NamespaceConfigMapName)
+	assert.False(t, reverted, "a wasteful but correct ordering must not trigger a revert")
+	assert.Equal(t, "30m", configData.PrometheusRuleConfig.EvaluationInterval,
+		"the user's legal evaluationInterval must be preserved")
+	assert.Equal(t, "15m", configData.PrometheusRuleConfig.EvaluationInterval1d)
+
+	// The ordering is surfaced as a diagnosable factor rather than a rejection.
+	factor, warn := rightsizing.RedundantEvaluationFactor("30m", "15m")
+	assert.True(t, warn)
+	assert.Equal(t, 2, factor)
+
+	// The user's value is what reaches the generated PrometheusRule.
+	rule, err := rsnamespace.GeneratePrometheusRule(configData)
+	require.NoError(t, err)
+	assert.Equal(t, "30m", string(*rule.Spec.Groups[0].Interval))
+	assert.Contains(t, rule.Spec.Groups[0].Rules[0].Expr.String(), "[30m:]")
 }

@@ -256,7 +256,7 @@ func (o *OptionsBuilder) validateAndSanitizeConfig(configData *rightsizing.RSCon
 		cacheValidAggregator(configMapName, "memory", configData.PrometheusRuleConfig.MemoryAggregator)
 	}
 
-	if !rightsizing.ValidatePrometheusDuration(configData.PrometheusRuleConfig.EvaluationInterval) {
+	if !rightsizing.ValidateEvaluationInterval(configData.PrometheusRuleConfig.EvaluationInterval) {
 		reverted = true
 		if cached, ok := getCachedInterval(configMapName, "evaluationInterval"); ok {
 			o.Logger.Info("Invalid evaluationInterval in ConfigMap, rejecting edit and keeping previous valid config",
@@ -275,7 +275,7 @@ func (o *OptionsBuilder) validateAndSanitizeConfig(configData *rightsizing.RSCon
 		cacheValidInterval(configMapName, "evaluationInterval", configData.PrometheusRuleConfig.EvaluationInterval)
 	}
 
-	if !rightsizing.ValidatePrometheusDuration(configData.PrometheusRuleConfig.EvaluationInterval1d) {
+	if !rightsizing.ValidateEvaluationInterval1d(configData.PrometheusRuleConfig.EvaluationInterval1d) {
 		reverted = true
 		if cached, ok := getCachedInterval(configMapName, "evaluationInterval1d"); ok {
 			o.Logger.Info("Invalid evaluationInterval1d in ConfigMap, rejecting edit and keeping previous valid config",
@@ -292,6 +292,23 @@ func (o *OptionsBuilder) validateAndSanitizeConfig(configData *rightsizing.RSCon
 		}
 	} else {
 		cacheValidInterval(configMapName, "evaluationInterval1d", configData.PrometheusRuleConfig.EvaluationInterval1d)
+	}
+
+	// Both fields are individually valid at this point, but they can still be ordered in a
+	// wasteful way. Warn rather than revert: the rules produce correct results, and because
+	// evaluationInterval1d defaults to 15m, rejecting this would undo a perfectly legal
+	// single-field edit such as evaluationInterval: 30m.
+	if factor, ok := rightsizing.RedundantEvaluationFactor(
+		configData.PrometheusRuleConfig.EvaluationInterval,
+		configData.PrometheusRuleConfig.EvaluationInterval1d,
+	); ok {
+		o.Logger.Info("evaluationInterval is coarser than evaluationInterval1d, so the daily "+
+			"aggregation rules recompute over unchanged input and append duplicate samples to the "+
+			"recommendation series; raise evaluationInterval1d to match to avoid the overhead",
+			"configMap", configMapName,
+			"evaluationInterval", configData.PrometheusRuleConfig.EvaluationInterval,
+			"evaluationInterval1d", configData.PrometheusRuleConfig.EvaluationInterval1d,
+			"redundantEvaluationsPerSample", factor)
 	}
 
 	return reverted
