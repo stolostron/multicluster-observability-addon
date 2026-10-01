@@ -17,7 +17,7 @@ COPY internal/ internal/
 
 # Build
 # Enable CGO for FIPS compliance (dynamic linking)
-RUN CGO_ENABLED=1 GOOS=linux GO111MODULE=on go build -mod=readonly -a -o multicluster-observability-addon main.go
+RUN CGO_ENABLED=1 GOEXPERIMENT=strictfipsruntime GOOS=linux GO111MODULE=on go build -mod=readonly -a -o multicluster-observability-addon main.go
 
 # IMPORTANT: When changing base image RHEL version (ubi9 → ubi10):
 # 1. Update FROM statement below
