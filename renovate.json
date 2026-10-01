@@ -1,7 +1,11 @@
 {
-  "baseBranches": ["/^release-\\d+\\.\\d+/"],
+  "baseBranchPatterns": [
+    "/^release-\\d+\\.\\d+/"
+  ],
   "gomod": {
     "updatePinnedDependencies": false
   },
-  "lockFileMaintenance": false,
+  "lockFileMaintenance": {
+    "enabled": false
+  },
 }
