@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/url"
 	"slices"
-	"strconv"
 	"strings"
 	"testing"
 
@@ -26,8 +25,6 @@ import (
 	internalres "github.com/stolostron/multicluster-observability-addon/internal/metrics/resource"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/text/cases"
-	"golang.org/x/text/language"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -340,7 +337,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				assert.Equal(t, int64(300), *cleanupJob.Spec.ActiveDeadlineSeconds)
 				assert.Contains(t, cleanupJob.Spec.Template.Spec.Tolerations, corev1.Toleration{Operator: corev1.TolerationOpExists})
 				// ensure that the number of objects is correct
-				expectedCount := 47
+				expectedCount := 46
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
@@ -412,12 +409,12 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 			IsHub:           true,
 			Expects: func(t *testing.T, objects []client.Object) {
 				crds := common.FilterResourcesByLabelSelector[*apiextensionsv1.CustomResourceDefinition](objects, nil)
-				expectedCount := 3 // alertmanagers + prometheusagents + scrapeconfigs (ReadOnly stubs for feedback)
+				expectedCount := 2 // prometheusagents + scrapeconfigs (ReadOnly stubs for feedback)
 				if len(crds) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d", expectedCount, len(crds))
 				}
 				// ensure that the number of objects is correct
-				expectedCount = 47
+				expectedCount = 46
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
@@ -436,7 +433,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				assert.Equal(t, "observability-operator", agent[0].Labels["app.kubernetes.io/managed-by"])
 				assert.Empty(t, agent[0].Annotations["operator.prometheus.io/controller-id"])
 				// ensure that the number of objects is correct
-				expectedCount := 39
+				expectedCount := 38
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
@@ -468,7 +465,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				cooRecordingRules := common.FilterResourcesByLabelSelector[*cooprometheusv1.PrometheusRule](objects, config.UserWorkloadPrometheusMatchLabels)
 				assert.Len(t, cooRecordingRules, 2)
 				assert.Empty(t, cooRecordingRules[0].Annotations["operator.prometheus.io/controller-id"])
-				expectedCount := 49
+				expectedCount := 48
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
@@ -490,10 +487,10 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				assert.Empty(t, agent[0].Annotations["operator.prometheus.io/controller-id"])
 
 				crds := common.FilterResourcesByLabelSelector[*apiextensionsv1.CustomResourceDefinition](objects, nil)
-				assert.Len(t, crds, 3) // alertmanagers + prometheusagents + scrapeconfigs (ReadOnly stubs, always present when metrics enabled)
+				assert.Len(t, crds, 2) // prometheusagents + scrapeconfigs (ReadOnly stubs, always present when metrics enabled)
 
 				// ensure that the number of objects is correct
-				expectedCount := 41
+				expectedCount := 40
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
@@ -617,7 +614,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				verifyClusterScopedResourcesPrefix(t, objects)
 
 				// ensure that the number of objects is correct (no ocm-tls-profile ConfigMap on non-OCP)
-				expectedCount := 75
+				expectedCount := 74
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
@@ -738,7 +735,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				assert.Equal(t, "metrics", ns[0].Labels["app"])
 
 				// ensure that the number of objects is correct (no ocm-tls-profile ConfigMap on non-OCP)
-				expectedCount := 75
+				expectedCount := 74
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
@@ -1048,7 +1045,12 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				},
 			}
 			clientObjects = append(clientObjects, imagesCM)
-			clientObjects = append(clientObjects, newManifestWork("cluster-1", tc.COOIsInstalled))
+			clientObjects = append(clientObjects, newManifestWork("cluster-1"))
+			if tc.COOIsInstalled {
+				managedCluster.Status.ClusterClaims = []clusterv1.ManagedClusterClaim{
+					{Name: addoncfg.CooStatusClaimName, Value: "external"},
+				}
+			}
 
 			// Setup the fake k8s client
 			client := fakeclient.NewClientBuilder().
@@ -1601,7 +1603,7 @@ func newCMOA() *addonapiv1beta1.ClusterManagementAddOn {
 	}
 }
 
-func newManifestWork(name string, isOLMSubscrided bool) *workv1.ManifestWork {
+func newManifestWork(name string) *workv1.ManifestWork {
 	return &workv1.ManifestWork{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -1658,32 +1660,6 @@ func newManifestWork(name string, isOLMSubscrided bool) *workv1.ManifestWork {
 									Value: workv1.FieldValue{
 										Type:   workv1.String,
 										String: ptr.To("12:00"),
-									},
-								},
-							},
-						},
-					},
-					{
-						ResourceMeta: workv1.ManifestResourceMeta{
-							Group:    apiextensionsv1.GroupName,
-							Resource: "customresourcedefinitions",
-							Name:     config.AlertmanagerCRDName,
-						},
-						Conditions: []metav1.Condition{
-							{
-								Type:               workv1.WorkAvailable,
-								Status:             metav1.ConditionTrue,
-								Reason:             "ResourceAvailable",
-								LastTransitionTime: metav1.Now(),
-							},
-						},
-						StatusFeedbacks: workv1.StatusFeedbackResult{
-							Values: []workv1.FeedbackValue{
-								{
-									Name: addoncfg.IsOLMManagedFeedbackName,
-									Value: workv1.FieldValue{
-										Type:   workv1.String,
-										String: ptr.To(cases.Title(language.English).String(strconv.FormatBool(isOLMSubscrided))),
 									},
 								},
 							},
