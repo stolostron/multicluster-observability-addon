@@ -98,7 +98,6 @@ func NewAddonManager(ctx context.Context, kubeConfig *rest.Config, scheme *runti
 		WithConfigGVRs(configGVRs...).
 		WithAgentHealthProber(addon.HealthProber(getter, agentLogger)).
 		WithGetValuesFuncs(addonConfigValuesFn, addonhelm.GetValuesFunc(ctx, k8sClient, getter, agentLogger)).
-		WithAgentHealthProber(addon.HealthProber(getter, agentLogger)).
 		WithAgentRegistrationOption(registrationOption).
 		WithAgentDeployTriggerClusterFilter(func(old, new *clusterv1.ManagedCluster) bool {
 			return !maps.Equal(old.Labels, new.Labels)

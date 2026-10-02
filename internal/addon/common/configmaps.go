@@ -12,7 +12,7 @@ import (
 // GetConfigMap fetches a single Kubernetes ConfigMap by name and namespace.
 // Returns the ConfigMap and any error encountered.
 // Use apierrors.IsNotFound(err) to check if the ConfigMap doesn't exist.
-func GetConfigMap(ctx context.Context, k8s client.Client, namespace, name string) (*corev1.ConfigMap, error) {
+func GetConfigMap(ctx context.Context, k8s client.Reader, namespace, name string) (*corev1.ConfigMap, error) {
 	configMap := &corev1.ConfigMap{}
 	key := client.ObjectKey{Name: name, Namespace: namespace}
 	if err := k8s.Get(ctx, key, configMap); err != nil {

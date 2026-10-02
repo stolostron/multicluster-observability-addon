@@ -61,6 +61,82 @@ func TestValidateAODC(t *testing.T) {
 	}
 }
 
+func TestMCOAAODCPredicate(t *testing.T) {
+	t.Run("matches valid AODC create", func(t *testing.T) {
+		aodc := &addonv1beta1.AddOnDeploymentConfig{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      addoncfg.Name,
+				Namespace: addoncfg.InstallNamespace,
+			},
+		}
+		assert.True(t, mcoaAODCPredicate.Create(event.CreateEvent{Object: aodc}))
+	})
+
+	t.Run("rejects wrong name or namespace on create", func(t *testing.T) {
+		wrongName := &addonv1beta1.AddOnDeploymentConfig{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "other",
+				Namespace: addoncfg.InstallNamespace,
+			},
+		}
+		assert.False(t, mcoaAODCPredicate.Create(event.CreateEvent{Object: wrongName}))
+
+		wrongNs := &addonv1beta1.AddOnDeploymentConfig{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      addoncfg.Name,
+				Namespace: "other",
+			},
+		}
+		assert.False(t, mcoaAODCPredicate.Create(event.CreateEvent{Object: wrongNs}))
+	})
+
+	t.Run("ignores update when generation is unchanged", func(t *testing.T) {
+		oldAODC := &addonv1beta1.AddOnDeploymentConfig{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:       addoncfg.Name,
+				Namespace:  addoncfg.InstallNamespace,
+				Generation: 1,
+			},
+		}
+		newAODC := &addonv1beta1.AddOnDeploymentConfig{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:       addoncfg.Name,
+				Namespace:  addoncfg.InstallNamespace,
+				Generation: 1,
+			},
+		}
+		assert.False(t, mcoaAODCPredicate.Update(event.UpdateEvent{ObjectOld: oldAODC, ObjectNew: newAODC}))
+	})
+
+	t.Run("triggers update when generation changed", func(t *testing.T) {
+		oldAODC := &addonv1beta1.AddOnDeploymentConfig{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:       addoncfg.Name,
+				Namespace:  addoncfg.InstallNamespace,
+				Generation: 1,
+			},
+		}
+		newAODC := &addonv1beta1.AddOnDeploymentConfig{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:       addoncfg.Name,
+				Namespace:  addoncfg.InstallNamespace,
+				Generation: 2,
+			},
+		}
+		assert.True(t, mcoaAODCPredicate.Update(event.UpdateEvent{ObjectOld: oldAODC, ObjectNew: newAODC}))
+	})
+
+	t.Run("matches valid AODC delete", func(t *testing.T) {
+		aodc := &addonv1beta1.AddOnDeploymentConfig{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      addoncfg.Name,
+				Namespace: addoncfg.InstallNamespace,
+			},
+		}
+		assert.True(t, mcoaAODCPredicate.Delete(event.DeleteEvent{Object: aodc}))
+	})
+}
+
 func TestCMAOPlacementsChanged(t *testing.T) {
 	tests := []struct {
 		name     string
