@@ -105,3 +105,23 @@ func TestTransformStripManagedFields(t *testing.T) {
 	assert.Equal(t, map[string]string{"test.annotation": "true"}, resultObj.GetAnnotations())
 	assert.Equal(t, "open-cluster-management-agent-addon", resultObj.Spec.AgentInstallNamespace)
 }
+
+func TestNewControllerCommandFlags(t *testing.T) {
+	cmd := newControllerCommand()
+	require.NotNil(t, cmd)
+
+	flags := cmd.Flags()
+
+	// Verify metrics-bind-address flag
+	bindAddrFlag := flags.Lookup("metrics-bind-address")
+	require.NotNil(t, bindAddrFlag)
+	assert.Equal(t, "127.0.0.1:8080", bindAddrFlag.DefValue)
+
+	// Test flag override
+	err := cmd.ParseFlags([]string{
+		"--metrics-bind-address=0.0.0.0:8084",
+	})
+	require.NoError(t, err)
+
+	assert.Equal(t, "0.0.0.0:8084", metricsBindAddress)
+}
