@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"crypto/tls"
 	"errors"
 	goflag "flag"
 	"fmt"
@@ -56,6 +55,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
+
+	_ "github.com/stolostron/multicluster-observability-addon/internal/addon/metrics"
 )
 
 var scheme = runtime.NewScheme()
@@ -89,6 +90,8 @@ var (
 	logVerbosity int
 	enablePprof  bool
 	pprofAddr    string
+
+	metricsBindAddress string
 )
 
 func main() {
@@ -138,6 +141,7 @@ func newControllerCommand() *cobra.Command {
 	cmd.Flags().IntVar(&logVerbosity, "log-verbosity", 0, "Log verbosity level. The higher the level, the noisier the logs.")
 	cmd.Flags().BoolVar(&enablePprof, "enable-pprof", false, "Enable pprof profiling.")
 	cmd.Flags().StringVar(&pprofAddr, "pprof-addr", "127.0.0.1:6060", "The address the pprof server will bind to.")
+	cmd.Flags().StringVar(&metricsBindAddress, "metrics-bind-address", "127.0.0.1:8080", "The address the metrics server will bind to.")
 
 	return cmd
 }
@@ -196,9 +200,8 @@ func runControllers(ctx context.Context, kubeConfig *rest.Config) error {
 		return fmt.Errorf("failed to create addon manager: %w", err)
 	}
 
-	tlsOpts, err := tlshelper.GetOrCreateTLSConfig(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get TLS config: %w", err)
+	metricsOpts := server.Options{
+		BindAddress: metricsBindAddress,
 	}
 
 	// Create a single shared controller-runtime Manager for our custom controllers
@@ -211,11 +214,7 @@ func runControllers(ctx context.Context, kubeConfig *rest.Config) error {
 		Client: client.Options{
 			HTTPClient: httpClient,
 		},
-		Metrics: server.Options{
-			BindAddress:   ":8084",
-			SecureServing: true,
-			TLSOpts:       []func(*tls.Config){tlsOpts},
-		},
+		Metrics: metricsOpts,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to start shared manager: %w", err)

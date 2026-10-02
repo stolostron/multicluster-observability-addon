@@ -7,6 +7,7 @@ import (
 	"maps"
 	"net/http"
 	"slices"
+	"time"
 
 	"github.com/go-logr/logr"
 	otelv1alpha1 "github.com/open-telemetry/opentelemetry-operator/apis/v1alpha1"
@@ -20,6 +21,7 @@ import (
 	addoncommon "github.com/stolostron/multicluster-observability-addon/internal/addon/common"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	addonhelm "github.com/stolostron/multicluster-observability-addon/internal/addon/helm"
+	addonmetrics "github.com/stolostron/multicluster-observability-addon/internal/addon/metrics"
 	thanosbuilder "github.com/stolostron/multicluster-observability-addon/internal/metrics/thanos"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -144,12 +146,23 @@ type AgentAddonWithSortedManifests struct {
 	objectBuilders []ObjectBuilder
 }
 
-func (a *AgentAddonWithSortedManifests) Manifests(ctx context.Context, cluster *clusterv1.ManagedCluster, mcAddon *addonapiv1beta1.ManagedClusterAddOn) ([]runtime.Object, error) {
-	if err := addoncommon.ValidateConfigNamespaces(mcAddon); err != nil {
+func (a *AgentAddonWithSortedManifests) Manifests(ctx context.Context, cluster *clusterv1.ManagedCluster, mcAddon *addonapiv1beta1.ManagedClusterAddOn) (objects []runtime.Object, err error) {
+	start := time.Now()
+	defer func() {
+		result := addonmetrics.ResultSuccess
+		if err != nil {
+			result = addonmetrics.ResultError
+		}
+		addonmetrics.ManifestRenderDuration.WithLabelValues(result).Observe(time.Since(start).Seconds())
+	}()
+
+	if err = addoncommon.ValidateConfigNamespaces(mcAddon); err != nil {
+		addonmetrics.ManifestRenderErrors.WithLabelValues(addonmetrics.StageValidation).Inc()
 		return nil, err
 	}
-	objects, err := a.agent.Manifests(ctx, cluster, mcAddon)
+	objects, err = a.agent.Manifests(ctx, cluster, mcAddon)
 	if err != nil {
+		addonmetrics.ManifestRenderErrors.WithLabelValues(addonmetrics.StageRender).Inc()
 		return nil, err
 	}
 
@@ -160,19 +173,25 @@ func (a *AgentAddonWithSortedManifests) Manifests(ctx context.Context, cluster *
 	}
 
 	if len(a.objectBuilders) > 0 {
-		aodc, err := addoncommon.GetAddOnDeploymentConfig(ctx, a.getter, mcAddon)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get AddOnDeploymentConfig: %w", err)
+		aodc, aodcErr := addoncommon.GetAddOnDeploymentConfig(ctx, a.getter, mcAddon)
+		if aodcErr != nil {
+			addonmetrics.ManifestRenderErrors.WithLabelValues(addonmetrics.StageRender).Inc()
+			err = fmt.Errorf("failed to get AddOnDeploymentConfig: %w", aodcErr)
+			return nil, err
 		}
-		opts, err := addon.BuildOptions(aodc)
-		if err != nil {
-			return nil, fmt.Errorf("failed to build addon options: %w", err)
+		opts, optsErr := addon.BuildOptions(aodc)
+		if optsErr != nil {
+			addonmetrics.ManifestRenderErrors.WithLabelValues(addonmetrics.StageRender).Inc()
+			err = fmt.Errorf("failed to build addon options: %w", optsErr)
+			return nil, err
 		}
 
 		for _, builder := range a.objectBuilders {
 			objs, buildErr := builder.Build(ctx, cluster, opts)
 			if buildErr != nil {
-				return nil, fmt.Errorf("failed to build programmatic objects: %w", buildErr)
+				addonmetrics.ManifestRenderErrors.WithLabelValues(addonmetrics.StageRender).Inc()
+				err = fmt.Errorf("failed to build programmatic objects: %w", buildErr)
+				return nil, err
 			}
 			objects = append(objects, objs...)
 		}
