@@ -55,6 +55,7 @@ const (
 	DefaultStackPrefix = "mcoa-default"
 
 	// Label keys
+	ReleaseLabelKey               = "release"
 	PlacementRefNameLabelKey      = "placement-ref-name"
 	PlacementRefNamespaceLabelKey = "placement-ref-namespace"
 	ComponentK8sLabelKey          = "app.kubernetes.io/component"
