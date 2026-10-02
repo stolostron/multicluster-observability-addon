@@ -7,10 +7,13 @@ import (
 	otelv1alpha1 "github.com/open-telemetry/opentelemetry-operator/apis/v1alpha1"
 	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	"github.com/prometheus/client_golang/prometheus/testutil"
 	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
+	addonmetrics "github.com/stolostron/multicluster-observability-addon/internal/addon/metrics"
 	"github.com/stolostron/multicluster-observability-addon/internal/analytics/rightsizing"
 	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -83,9 +86,13 @@ func Test_AgentHealthProber_PPA(t *testing.T) {
 				}, managedCluster, managedClusterAddOn)
 			if tc.expectedErr != nil {
 				require.ErrorIs(t, err, tc.expectedErr)
+				assert.InDelta(t, 0.0, testutil.ToFloat64(addonmetrics.HealthCheckStatus.WithLabelValues("cluster-1", addonmetrics.SubsystemOverall)), 0.001)
+				assert.InDelta(t, 0.0, testutil.ToFloat64(addonmetrics.HealthCheckStatus.WithLabelValues("cluster-1", addonmetrics.SubsystemMetrics)), 0.001)
 				return
 			}
 			require.NoError(t, err)
+			assert.InDelta(t, 1.0, testutil.ToFloat64(addonmetrics.HealthCheckStatus.WithLabelValues("cluster-1", addonmetrics.SubsystemOverall)), 0.001)
+			assert.InDelta(t, 1.0, testutil.ToFloat64(addonmetrics.HealthCheckStatus.WithLabelValues("cluster-1", addonmetrics.SubsystemMetrics)), 0.001)
 		})
 	}
 }

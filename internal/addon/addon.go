@@ -14,6 +14,7 @@ import (
 	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
+	addonmetrics "github.com/stolostron/multicluster-observability-addon/internal/addon/metrics"
 	"github.com/stolostron/multicluster-observability-addon/internal/analytics/rightsizing"
 	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -62,9 +63,11 @@ func HealthProber(getter addonutils.AddOnDeploymentConfigGetter, logger logr.Log
 			ProbeFields: probeFields,
 			HealthChecker: func(fields []agent.FieldResult, mc *v1.ManagedCluster, mcao *addonapiv1beta1.ManagedClusterAddOn) error {
 				if err := healthChecker(getter, fields, mc, mcao); err != nil {
+					addonmetrics.HealthCheckStatus.WithLabelValues(mc.Name, addonmetrics.SubsystemOverall).Set(0)
 					logger.V(1).Info("Health check failed for managed cluster", "clusterName", mc.Name, "error", err.Error())
 					return fmt.Errorf("healthChecker failed: %w", err)
 				}
+				addonmetrics.HealthCheckStatus.WithLabelValues(mc.Name, addonmetrics.SubsystemOverall).Set(1)
 				return nil
 			},
 		},
@@ -466,6 +469,7 @@ func ManifestConfigs() []workv1.ManifestConfigOption {
 
 func healthChecker(getter addonutils.AddOnDeploymentConfigGetter, fields []agent.FieldResult, mc *v1.ManagedCluster, mcao *addonapiv1beta1.ManagedClusterAddOn) error {
 	if len(fields) == 0 {
+		addonmetrics.HealthCheckFailures.WithLabelValues(addonmetrics.SubsystemOverall).Inc()
 		return errMissingFields
 	}
 
@@ -474,30 +478,61 @@ func healthChecker(getter addonutils.AddOnDeploymentConfigGetter, fields []agent
 
 	aodc, err := common.GetAddOnDeploymentConfig(ctx, getter, mcao)
 	if err != nil {
+		addonmetrics.HealthCheckFailures.WithLabelValues(addonmetrics.SubsystemOverall).Inc()
 		return fmt.Errorf("failed to get AddOnDeploymentConfig: %w", err)
 	}
 	opts, err := BuildOptions(aodc)
 	if err != nil {
+		addonmetrics.HealthCheckFailures.WithLabelValues(addonmetrics.SubsystemOverall).Inc()
 		return fmt.Errorf("failed to build addon options: %w", err)
 	}
 
 	isOpenShiftVendor := common.IsOpenShiftVendor(mc)
 	if err := checkMetrics(fields, opts, isOpenShiftVendor); err != nil {
+		addonmetrics.HealthCheckStatus.WithLabelValues(mc.Name, addonmetrics.SubsystemMetrics).Set(0)
+		addonmetrics.HealthCheckFailures.WithLabelValues(addonmetrics.SubsystemMetrics).Inc()
 		return err
 	}
+	if opts.Platform.Metrics.CollectionEnabled || opts.UserWorkloads.Metrics.CollectionEnabled {
+		addonmetrics.HealthCheckStatus.WithLabelValues(mc.Name, addonmetrics.SubsystemMetrics).Set(1)
+	}
+
 	if err := checkLogging(fields, opts); err != nil {
+		addonmetrics.HealthCheckStatus.WithLabelValues(mc.Name, addonmetrics.SubsystemLogs).Set(0)
+		addonmetrics.HealthCheckFailures.WithLabelValues(addonmetrics.SubsystemLogs).Inc()
 		return err
 	}
+	if opts.Platform.Logs.CollectionEnabled || opts.UserWorkloads.Logs.CollectionEnabled {
+		addonmetrics.HealthCheckStatus.WithLabelValues(mc.Name, addonmetrics.SubsystemLogs).Set(1)
+	}
+
 	if err := checkTracing(fields, opts); err != nil {
+		addonmetrics.HealthCheckStatus.WithLabelValues(mc.Name, addonmetrics.SubsystemTraces).Set(0)
+		addonmetrics.HealthCheckFailures.WithLabelValues(addonmetrics.SubsystemTraces).Inc()
 		return err
 	}
+	if opts.UserWorkloads.Traces.CollectionEnabled {
+		addonmetrics.HealthCheckStatus.WithLabelValues(mc.Name, addonmetrics.SubsystemTraces).Set(1)
+	}
+
 	if common.IsHubCluster(mc) {
 		if err := checkThanos(fields, opts); err != nil {
+			addonmetrics.HealthCheckStatus.WithLabelValues(mc.Name, addonmetrics.SubsystemThanos).Set(0)
+			addonmetrics.HealthCheckFailures.WithLabelValues(addonmetrics.SubsystemThanos).Inc()
 			return err
 		}
+		if opts.ThanosOperatorEnabled {
+			addonmetrics.HealthCheckStatus.WithLabelValues(mc.Name, addonmetrics.SubsystemThanos).Set(1)
+		}
 	}
+
 	if err := checkRightSizing(fields, opts, isOpenShiftVendor); err != nil {
+		addonmetrics.HealthCheckStatus.WithLabelValues(mc.Name, addonmetrics.SubsystemRightSizing).Set(0)
+		addonmetrics.HealthCheckFailures.WithLabelValues(addonmetrics.SubsystemRightSizing).Inc()
 		return err
+	}
+	if isOpenShiftVendor && opts.Platform.AnalyticsOptions.RightSizing.Delegated {
+		addonmetrics.HealthCheckStatus.WithLabelValues(mc.Name, addonmetrics.SubsystemRightSizing).Set(1)
 	}
 	return nil
 }
