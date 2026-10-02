@@ -133,10 +133,6 @@ func getMetricsProbeFields() []agent.ProbeField {
 							Name: addoncfg.LastTransitionTimeFeedbackName,
 							Path: addoncfg.LastTransitionTimeFeedbackPath,
 						},
-						{
-							Name: addoncfg.IsOLMManagedFeedbackName,
-							Path: addoncfg.IsOLMManagedFeedbackPath,
-						},
 					},
 				},
 			},
@@ -158,24 +154,6 @@ func getMetricsProbeFields() []agent.ProbeField {
 						{
 							Name: addoncfg.LastTransitionTimeFeedbackName,
 							Path: addoncfg.LastTransitionTimeFeedbackPath,
-						},
-					},
-				},
-			},
-		},
-		{
-			ResourceIdentifier: workv1.ResourceIdentifier{
-				Group:    apiextensionsv1.GroupName,
-				Resource: crdResourceName,
-				Name:     mconfig.AlertmanagerCRDName,
-			},
-			ProbeRules: []workv1.FeedbackRule{
-				{
-					Type: workv1.JSONPathsType,
-					JsonPaths: []workv1.JsonPath{
-						{
-							Name: addoncfg.IsOLMManagedFeedbackName,
-							Path: addoncfg.IsOLMManagedFeedbackPath,
 						},
 					},
 				},
@@ -368,16 +346,6 @@ func ManifestConfigs() []workv1.ManifestConfigOption {
 						},
 					},
 				},
-			},
-		},
-		workv1.ManifestConfigOption{
-			ResourceIdentifier: workv1.ResourceIdentifier{
-				Group:    apiextensionsv1.GroupName,
-				Resource: crdResourceName,
-				Name:     mconfig.AlertmanagerCRDName,
-			},
-			UpdateStrategy: &workv1.UpdateStrategy{
-				Type: workv1.UpdateStrategyTypeCreateOnly,
 			},
 		},
 		workv1.ManifestConfigOption{

@@ -78,9 +78,6 @@ const (
 	PrometheusOperatorVersionFeedbackPath = `.metadata.annotations.operator\.prometheus\.io/version`
 	LastTransitionTimeFeedbackName        = "lastTransitionTime"
 	LastTransitionTimeFeedbackPath        = ".status.conditions[?(@.type==\"Established\")].lastTransitionTime"
-	IsOLMManagedFeedbackName              = "isOLMManaged"
-	IsOLMManagedFeedbackPath              = `.metadata.labels.olm\.managed`
-
 	// TLS profile feedback
 	TLSProfileConfigMapNamespace = "open-cluster-management-agent"
 	TLSProfileConfigMapName      = "ocm-tls-profile"

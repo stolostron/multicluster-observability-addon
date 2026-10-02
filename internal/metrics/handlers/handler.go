@@ -220,9 +220,7 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1beta1.Man
 	ret.MonitoringStackPatches = rawPatches
 
 	if isOpenShiftVendor {
-		if ret.COOIsSubscribed, err = o.cooIsSubscribed(ctx, managedCluster); err != nil {
-			return ret, fmt.Errorf("failed to check if coo is subscribed on the managed cluster: %w", err)
-		}
+		ret.COOIsSubscribed = o.cooIsSubscribed(managedCluster)
 		if !ret.COOIsSubscribed {
 			// If we deploy our own operator, create an annotation to restart it once the CRDs are established.
 			promAgentCRD := workv1.ResourceIdentifier{
@@ -554,26 +552,20 @@ func (o *OptionsBuilder) getAvailableConfigResources(ctx context.Context, mcAddo
 	return ret, nil
 }
 
-// cooIsSubscribed returns true if coo is considered installed, preventing conflicting resources creation.
-// It checks the feedback rules for the alertmanagers.monitoring.rhobs CRD.
-func (o *OptionsBuilder) cooIsSubscribed(ctx context.Context, managedCluster *clusterv1.ManagedCluster) (bool, error) {
-	subscribed, hasFeedback, err := common.IsCOOSubscribedOnSpoke(ctx, o.Client, managedCluster.Name, addoncfg.Name)
-	if err != nil {
-		return false, fmt.Errorf("failed to check if coo is subscribed on the managed cluster: %w", err)
+// cooIsSubscribed returns true if COO was installed by an external party, preventing
+// MCOA from deploying its own COO resources. It reads ClusterClaims set by the
+// endpoint-monitoring-operator.
+func (o *OptionsBuilder) cooIsSubscribed(managedCluster *clusterv1.ManagedCluster) bool {
+	externallyInstalled, hasReport := common.IsCOOExternallyInstalledOnSpoke(managedCluster)
+	if !hasReport {
+		o.Logger.V(2).Info("no COO ClusterClaim yet, waiting for endpoint operator to report", "cluster", managedCluster.Name)
+		return false
 	}
-
-	if !hasFeedback {
-		o.Logger.V(2).Info("CRD not found in manifestwork status, considering COO as not subscribed", "crd", config.AlertmanagerCRDName)
-		return false, nil
+	if externallyInstalled {
+		o.Logger.V(2).Info("COO installed by external party, MCOA will not deploy its own COO resources", "cluster", managedCluster.Name)
+		return true
 	}
-
-	if subscribed {
-		o.Logger.V(2).Info("found CRD with OLM label, considering COO as subscribed", "crd", config.AlertmanagerCRDName)
-		return true, nil
-	}
-
-	o.Logger.V(2).Info("CRD missing the OLM label, considering COO as not subscribed", "crd", config.AlertmanagerCRDName)
-	return false, nil
+	return false
 }
 
 func createWriteRelabelConfigs(clusterName, clusterID string, isHypershiftLocalCluster bool) []cooprometheusv1.RelabelConfig {
