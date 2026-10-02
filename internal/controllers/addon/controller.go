@@ -154,6 +154,15 @@ func (a *AgentAddonWithSortedManifests) Manifests(ctx context.Context, cluster *
 			result = addonmetrics.ResultError
 		}
 		addonmetrics.ManifestRenderDuration.WithLabelValues(result).Observe(time.Since(start).Seconds())
+
+		clusterName := ""
+		if cluster != nil {
+			clusterName = cluster.GetName()
+		}
+		if clusterName == "" && mcAddon != nil {
+			clusterName = mcAddon.GetNamespace()
+		}
+		addonmetrics.ClusterReconcileTotal.WithLabelValues(clusterName, result).Inc()
 	}()
 
 	if err = addoncommon.ValidateConfigNamespaces(mcAddon); err != nil {

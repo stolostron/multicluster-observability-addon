@@ -67,6 +67,16 @@ var (
 		},
 		[]string{"subsystem"},
 	)
+
+	// ClusterReconcileTotal counts manifest reconciliations per managed cluster and result.
+	ClusterReconcileTotal = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Subsystem: Subsystem,
+			Name:      "cluster_reconcile_total",
+			Help:      "Total number of manifest reconciliations per managed cluster.",
+		},
+		[]string{"cluster", "result"},
+	)
 )
 
 func init() {
@@ -75,5 +85,6 @@ func init() {
 		ManifestRenderErrors,
 		HealthCheckStatus,
 		HealthCheckFailures,
+		ClusterReconcileTotal,
 	)
 }

@@ -427,9 +427,11 @@ func TestManifestsMetricsTracking(t *testing.T) {
 		}
 
 		initialSuccessCount := testutil.CollectAndCount(addonmetrics.ManifestRenderDuration)
+		initialClusterSuccess := testutil.ToFloat64(addonmetrics.ClusterReconcileTotal.WithLabelValues("test-cluster", addonmetrics.ResultSuccess))
 		_, err := wrapper.Manifests(ctx, cluster, validAddon)
 		require.NoError(t, err)
 		assert.GreaterOrEqual(t, testutil.CollectAndCount(addonmetrics.ManifestRenderDuration), initialSuccessCount)
+		assert.InDelta(t, initialClusterSuccess+1, testutil.ToFloat64(addonmetrics.ClusterReconcileTotal.WithLabelValues("test-cluster", addonmetrics.ResultSuccess)), 0.001)
 	})
 
 	t.Run("records error on validation failure", func(t *testing.T) {
@@ -457,9 +459,11 @@ func TestManifestsMetricsTracking(t *testing.T) {
 		}
 
 		initialValidationErrors := testutil.ToFloat64(addonmetrics.ManifestRenderErrors.WithLabelValues(addonmetrics.StageValidation))
+		initialClusterErrors := testutil.ToFloat64(addonmetrics.ClusterReconcileTotal.WithLabelValues("test-cluster", addonmetrics.ResultError))
 		_, err := wrapper.Manifests(ctx, cluster, invalidAddon)
 		require.Error(t, err)
 		assert.InDelta(t, initialValidationErrors+1, testutil.ToFloat64(addonmetrics.ManifestRenderErrors.WithLabelValues(addonmetrics.StageValidation)), 0.001)
+		assert.InDelta(t, initialClusterErrors+1, testutil.ToFloat64(addonmetrics.ClusterReconcileTotal.WithLabelValues("test-cluster", addonmetrics.ResultError)), 0.001)
 	})
 
 	t.Run("records error on render failure", func(t *testing.T) {
@@ -471,9 +475,11 @@ func TestManifestsMetricsTracking(t *testing.T) {
 		}
 
 		initialRenderErrors := testutil.ToFloat64(addonmetrics.ManifestRenderErrors.WithLabelValues(addonmetrics.StageRender))
+		initialClusterErrors := testutil.ToFloat64(addonmetrics.ClusterReconcileTotal.WithLabelValues("test-cluster", addonmetrics.ResultError))
 		_, err := wrapper.Manifests(ctx, cluster, validAddon)
 		require.Error(t, err)
 		assert.InDelta(t, initialRenderErrors+1, testutil.ToFloat64(addonmetrics.ManifestRenderErrors.WithLabelValues(addonmetrics.StageRender)), 0.001)
+		assert.InDelta(t, initialClusterErrors+1, testutil.ToFloat64(addonmetrics.ClusterReconcileTotal.WithLabelValues("test-cluster", addonmetrics.ResultError)), 0.001)
 	})
 
 	t.Run("records error on builder failure", func(t *testing.T) {
