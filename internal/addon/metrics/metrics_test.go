@@ -40,4 +40,11 @@ func TestMetricsRegistrationAndRecording(t *testing.T) {
 
 	assert.InDelta(t, 1.0, testutil.ToFloat64(HealthCheckFailures.WithLabelValues(SubsystemMetrics)), 0.001)
 	assert.InDelta(t, 2.0, testutil.ToFloat64(HealthCheckFailures.WithLabelValues(SubsystemLogs)), 0.001)
+
+	// Verify ClusterReconcileTotal
+	ClusterReconcileTotal.WithLabelValues("cluster-1", ResultSuccess).Inc()
+	ClusterReconcileTotal.WithLabelValues("cluster-1", ResultError).Add(3)
+
+	assert.InDelta(t, 1.0, testutil.ToFloat64(ClusterReconcileTotal.WithLabelValues("cluster-1", ResultSuccess)), 0.001)
+	assert.InDelta(t, 3.0, testutil.ToFloat64(ClusterReconcileTotal.WithLabelValues("cluster-1", ResultError)), 0.001)
 }
