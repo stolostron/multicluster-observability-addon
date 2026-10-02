@@ -9,8 +9,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-const crdResourceName = "customresourcedefinitions"
-
 // GetFeedbackValuesForResources finds all feedback values for a list of specific resources
 // across all ManifestWorks for the addon. It performs a single pass over the ManifestWorks
 // and returns a map where each key is a ResourceIdentifier and the value is a slice
