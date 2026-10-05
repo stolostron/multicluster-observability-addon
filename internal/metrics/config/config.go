@@ -52,13 +52,11 @@ const (
 	AcmEtcdServiceMonitorName             = "acm-etcd"
 	AcmApiServerServiceMonitorName        = "acm-kube-apiserver"
 
-	RemoteWriteCfgName        = "acm-observability"
-	ScrapeClassCfgName        = "ocp-monitoring"
-	NonOCPScrapeClassName     = "non-ocp-monitoring"
-	ScrapeClassPlatformTarget = "prometheus-k8s.openshift-monitoring.svc:9091"
-	ScrapeClassUWLTarget      = "prometheus-user-workload.openshift-user-workload-monitoring.svc:9092"
-	AlertmanagerCRDName       = "alertmanagers.monitoring.rhobs"
-
+	RemoteWriteCfgName            = "acm-observability"
+	ScrapeClassCfgName            = "ocp-monitoring"
+	NonOCPScrapeClassName         = "non-ocp-monitoring"
+	ScrapeClassPlatformTarget     = "prometheus-k8s.openshift-monitoring.svc:9091"
+	ScrapeClassUWLTarget          = "prometheus-user-workload.openshift-user-workload-monitoring.svc:9092"
 	RawResolutionAnnotation       = "observability.open-cluster-management.io/resolution-strategy"
 	RawResolutionValue            = "raw"
 	RawLabelSuffix                = "-raw"
