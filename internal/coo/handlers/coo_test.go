@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
@@ -176,6 +177,61 @@ func TestInstallCOO(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, tc.expectedUIPluginInstall, cooValues.Enabled)
 			assert.Equal(t, tc.expectedCOOInstall, cooValues.InstallCOO)
+		})
+	}
+}
+
+func TestInstallOfCOOOnSpokeIsNeeded(t *testing.T) {
+	tests := []struct {
+		name            string
+		claims          []clusterv1.ManagedClusterClaim
+		expectedInstall bool
+	}{
+		{
+			name:            "no ClusterClaims yet: defer",
+			claims:          nil,
+			expectedInstall: false,
+		},
+		{
+			name: "COO not installed: safe to install",
+			claims: []clusterv1.ManagedClusterClaim{
+				{Name: addoncfg.CooStatusClaimName, Value: "not-installed"},
+			},
+			expectedInstall: true,
+		},
+		{
+			name: "COO installed by MCOA: keep managing",
+			claims: []clusterv1.ManagedClusterClaim{
+				{Name: addoncfg.CooStatusClaimName, Value: "mcoa"},
+			},
+			expectedInstall: true,
+		},
+		{
+			name: "COO installed by external party: don't install",
+			claims: []clusterv1.ManagedClusterClaim{
+				{Name: addoncfg.CooStatusClaimName, Value: "external"},
+			},
+			expectedInstall: false,
+		},
+		{
+			name: "unknown status value: defer",
+			claims: []clusterv1.ManagedClusterClaim{
+				{Name: addoncfg.CooStatusClaimName, Value: "something-unexpected"},
+			},
+			expectedInstall: false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			cluster := &clusterv1.ManagedCluster{
+				ObjectMeta: metav1.ObjectMeta{Name: "spoke-1"},
+				Status: clusterv1.ManagedClusterStatus{
+					ClusterClaims: tc.claims,
+				},
+			}
+			result := InstallOfCOOOnSpokeIsNeeded(cluster, logr.Discard())
+			assert.Equal(t, tc.expectedInstall, result)
 		})
 	}
 }

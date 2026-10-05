@@ -10,6 +10,7 @@ import (
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
@@ -38,6 +39,21 @@ func InstallOfCOOOnTheHubIsNeeded(ctx context.Context, k8s client.Client, logger
 	}
 
 	return false, nil
+}
+
+// InstallOfCOOOnSpokeIsNeeded decides whether MCOA should install COO on a spoke.
+// It backs off only when COO was installed by an external party.
+func InstallOfCOOOnSpokeIsNeeded(cluster *clusterv1.ManagedCluster, logger logr.Logger) bool {
+	externallyInstalled, hasReport := common.IsCOOExternallyInstalledOnSpoke(cluster)
+	if !hasReport {
+		logger.V(2).Info("no COO ClusterClaim yet, waiting for endpoint operator to report", "cluster", cluster.Name)
+		return false
+	}
+	if externallyInstalled {
+		logger.V(2).Info("COO installed by external party, MCOA will not install its own", "cluster", cluster.Name)
+		return false
+	}
+	return true
 }
 
 const thanosRulerCustomRulesName = "thanos-ruler-custom-rules"
