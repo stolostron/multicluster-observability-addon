@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/url"
-	"strconv"
 	"strings"
 	"testing"
 
@@ -19,8 +18,6 @@ import (
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/text/cases"
-	"golang.org/x/text/language"
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -393,7 +390,7 @@ func TestBuildOptions(t *testing.T) {
 		"platform collection is enabled, coo is not installed": {
 			resources: func() []client.Object {
 				ret := createResources()
-				ret = append(ret, newManifestWork(spokeName, false))
+				ret = append(ret, newManifestWork(spokeName))
 				return ret
 			},
 			addon:           platformManagedClusterAddOn,
@@ -428,28 +425,60 @@ func TestBuildOptions(t *testing.T) {
 				assert.Len(t, opts.Platform.Rules, 1, "expected one monitoring.coreos.com PrometheusRule")
 				assert.Equal(t, platformRule.Name, opts.Platform.Rules[0].Name, "expected CoreOS PrometheusRule")
 				assert.Empty(t, opts.Platform.COORules, "platform should not have COO rules")
-				assert.False(t, opts.COOIsSubscribed)
+				assert.False(t, opts.COOInstalled)
 				assert.NotEmpty(t, opts.CRDEstablishedAnnotation)
 			},
 		},
 		"platform collection is enabled, coo is installed": {
 			resources: func() []client.Object {
 				ret := createResources()
-				ret = append(ret, newManifestWork(spokeName, true))
+				ret = append(ret, newManifestWork(spokeName))
+				for i, obj := range ret {
+					if mc, ok := obj.(*clusterv1.ManagedCluster); ok {
+						mc.Status.ClusterClaims = []clusterv1.ManagedClusterClaim{
+							{Name: addoncfg.CooStatusClaimName, Value: "external"},
+						}
+						ret[i] = mc
+						break
+					}
+				}
 				return ret
 			},
 			addon:           platformManagedClusterAddOn,
 			platformEnabled: true,
 			expects: func(t *testing.T, opts Options, err error) {
 				require.NoError(t, err)
-				assert.True(t, opts.COOIsSubscribed)
+				assert.True(t, opts.COOInstalled)
+				assert.Empty(t, opts.CRDEstablishedAnnotation)
+			},
+		},
+		"platform collection is enabled, coo is installed by mcoa": {
+			resources: func() []client.Object {
+				ret := createResources()
+				ret = append(ret, newManifestWork(spokeName))
+				for i, obj := range ret {
+					if mc, ok := obj.(*clusterv1.ManagedCluster); ok {
+						mc.Status.ClusterClaims = []clusterv1.ManagedClusterClaim{
+							{Name: addoncfg.CooStatusClaimName, Value: "mcoa"},
+						}
+						ret[i] = mc
+						break
+					}
+				}
+				return ret
+			},
+			addon:           platformManagedClusterAddOn,
+			platformEnabled: true,
+			expects: func(t *testing.T, opts Options, err error) {
+				require.NoError(t, err)
+				assert.True(t, opts.COOInstalled)
 				assert.Empty(t, opts.CRDEstablishedAnnotation)
 			},
 		},
 		"TLS profile values are extracted from feedback": {
 			resources: func() []client.Object {
 				ret := createResources()
-				ret = append(ret, newManifestWork(spokeName, false))
+				ret = append(ret, newManifestWork(spokeName))
 				return ret
 			},
 			addon:           platformManagedClusterAddOn,
@@ -506,7 +535,7 @@ func TestBuildOptions(t *testing.T) {
 				assert.Equal(t, spokeName, *opts.UserWorkloads.PrometheusAgent.Spec.CommonPrometheusFields.RemoteWrite[0].WriteRelabelConfigs[0].Replacement)
 				assert.Equal(t, config.ClusterNameMetricLabel, opts.UserWorkloads.PrometheusAgent.Spec.CommonPrometheusFields.RemoteWrite[0].WriteRelabelConfigs[0].TargetLabel)
 				assert.Len(t, opts.UserWorkloads.PrometheusAgent.Spec.CommonPrometheusFields.RemoteWrite[0].WriteRelabelConfigs, 5)
-				assert.False(t, opts.COOIsSubscribed)
+				assert.False(t, opts.COOInstalled)
 			},
 		},
 		"user workloads collection with monitoring.rhobs PrometheusRule (federating from COO)": {
@@ -567,7 +596,7 @@ func TestBuildOptions(t *testing.T) {
 				// When federating UWL metrics from COO, users define PrometheusRules with monitoring.rhobs API; MCOA must include them.
 				require.Len(t, opts.UserWorkloads.COORules, 1, "expected one monitoring.rhobs PrometheusRule for UWL")
 				assert.Equal(t, uwlCooRule.Name, opts.UserWorkloads.COORules[0].Name, "expected RHOBS UWL PrometheusRule to be loaded")
-				assert.False(t, opts.COOIsSubscribed)
+				assert.False(t, opts.COOInstalled)
 			},
 		},
 		"user workload is enabled and is hypershift hub": {
@@ -851,7 +880,7 @@ func filterOutResource[T client.Object](resources []client.Object, name string) 
 	return filtered
 }
 
-func newManifestWork(name string, isOLMSubscrided bool) *workv1.ManifestWork {
+func newManifestWork(name string) *workv1.ManifestWork {
 	return &workv1.ManifestWork{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -908,32 +937,6 @@ func newManifestWork(name string, isOLMSubscrided bool) *workv1.ManifestWork {
 									Value: workv1.FieldValue{
 										Type:   workv1.String,
 										String: ptr.To("12:00"),
-									},
-								},
-							},
-						},
-					},
-					{
-						ResourceMeta: workv1.ManifestResourceMeta{
-							Group:    apiextensionsv1.GroupName,
-							Resource: "customresourcedefinitions",
-							Name:     config.AlertmanagerCRDName,
-						},
-						Conditions: []metav1.Condition{
-							{
-								Type:               workv1.WorkAvailable,
-								Status:             metav1.ConditionTrue,
-								Reason:             "ResourceAvailable",
-								LastTransitionTime: metav1.Now(),
-							},
-						},
-						StatusFeedbacks: workv1.StatusFeedbackResult{
-							Values: []workv1.FeedbackValue{
-								{
-									Name: addoncfg.IsOLMManagedFeedbackName,
-									Value: workv1.FieldValue{
-										Type:   workv1.String,
-										String: ptr.To(cases.Title(language.English).String(strconv.FormatBool(isOLMSubscrided))),
 									},
 								},
 							},
