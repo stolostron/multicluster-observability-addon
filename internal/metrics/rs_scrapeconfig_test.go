@@ -105,6 +105,11 @@ func setupFullMCOA(t *testing.T, s rsSetup) (agent.AgentAddon, *clusterv1.Manage
 		addoncfg.ManagedClusterLabelClusterID: testClusterID,
 		clusterinfov1beta1.LabelKubeVendor:    string(clusterinfov1beta1.KubeVendorOpenShift),
 	}
+	if s.cooInstalled {
+		managedCluster.Status.ClusterClaims = []clusterv1.ManagedClusterClaim{
+			{Name: addoncfg.CooStatusClaimName, Value: "external"},
+		}
+	}
 	cmao := newCMOA()
 
 	clientObjects := []client.Object{
@@ -112,7 +117,7 @@ func setupFullMCOA(t *testing.T, s rsSetup) (agent.AgentAddon, *clusterv1.Manage
 		newSecret(config.HubCASecretName, hubNamespace),
 		newSecret(config.ClientCertSecretName, hubNamespace),
 		newSecret(config.AlertmanagerAccessorSecretName, hubNamespace),
-		newManifestWork("cluster-1", s.cooInstalled),
+		newManifestWork("cluster-1"),
 		&corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{Name: config.ImagesConfigMapObjKey.Name, Namespace: config.ImagesConfigMapObjKey.Namespace},
 			Data: map[string]string{
