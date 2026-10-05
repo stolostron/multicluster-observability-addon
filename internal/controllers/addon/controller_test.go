@@ -50,33 +50,53 @@ func TestAgentConfigNamespaces(t *testing.T) {
 	} {
 		for _, namespace := range []string{addoncfg.InstallNamespace, "cluster-a", "openshift-logging", "cluster-b", ""} {
 			t.Run(resource.Group+"/"+resource.Resource+"/"+namespace, func(t *testing.T) {
+				var configRefs []addonapiv1beta1.ConfigReference
+				if resource.Group == "addon.open-cluster-management.io" && resource.Resource == addoncfg.AddonDeploymentConfigResource {
+					configRefs = []addonapiv1beta1.ConfigReference{
+						{
+							ConfigGroupResource: resource,
+							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+								ConfigReferent: addonapiv1beta1.ConfigReferent{Name: addoncfg.Name, Namespace: namespace},
+								SpecHash:       "test-hash",
+							},
+						},
+					}
+				} else {
+					configRefs = []addonapiv1beta1.ConfigReference{
+						{
+							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
+								Group: "addon.open-cluster-management.io", Resource: addoncfg.AddonDeploymentConfigResource,
+							},
+							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+								ConfigReferent: addonapiv1beta1.ConfigReferent{Name: addoncfg.Name, Namespace: addoncfg.InstallNamespace},
+								SpecHash:       "test-hash",
+							},
+						},
+						{
+							ConfigGroupResource: resource,
+							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+								ConfigReferent: addonapiv1beta1.ConfigReferent{Name: "instance", Namespace: namespace},
+							},
+						},
+					}
+				}
 				mcAddon := &addonapiv1beta1.ManagedClusterAddOn{
 					ObjectMeta: metav1.ObjectMeta{Name: addoncfg.Name, Namespace: "cluster-a"},
 					Status: addonapiv1beta1.ManagedClusterAddOnStatus{
-						ConfigReferences: []addonapiv1beta1.ConfigReference{
-							{
-								ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
-									Group: "addon.open-cluster-management.io", Resource: addoncfg.AddonDeploymentConfigResource,
-								},
-								DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
-									ConfigReferent: addonapiv1beta1.ConfigReferent{Name: addoncfg.Name, Namespace: addoncfg.InstallNamespace},
-									SpecHash:       "test-hash",
-								},
-							},
-							{
-								ConfigGroupResource: resource,
-								DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
-									ConfigReferent: addonapiv1beta1.ConfigReferent{Name: "instance", Namespace: namespace},
-								},
-							},
-						},
+						ConfigReferences: configRefs,
 					},
 				}
 				//nolint:staticcheck // The generated client does not provide NewClientset.
-				client := fakeaddon.NewSimpleClientset(&addonapiv1beta1.AddOnDeploymentConfig{
-					ObjectMeta: metav1.ObjectMeta{Name: addoncfg.Name, Namespace: addoncfg.InstallNamespace},
-					Spec:       addonapiv1beta1.AddOnDeploymentConfigSpec{AgentInstallNamespace: "custom-agent-namespace"},
-				})
+				client := fakeaddon.NewSimpleClientset(
+					&addonapiv1beta1.AddOnDeploymentConfig{
+						ObjectMeta: metav1.ObjectMeta{Name: addoncfg.Name, Namespace: addoncfg.InstallNamespace},
+						Spec:       addonapiv1beta1.AddOnDeploymentConfigSpec{AgentInstallNamespace: "custom-agent-namespace"},
+					},
+					&addonapiv1beta1.AddOnDeploymentConfig{
+						ObjectMeta: metav1.ObjectMeta{Name: addoncfg.Name, Namespace: "cluster-a"},
+						Spec:       addonapiv1beta1.AddOnDeploymentConfigSpec{AgentInstallNamespace: "custom-agent-namespace"},
+					},
+				)
 				mock := &mockAgent{
 					manifests: []runtime.Object{&corev1.Secret{}},
 					options: agent.AgentAddonOptions{

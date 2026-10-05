@@ -1,6 +1,6 @@
 module github.com/stolostron/multicluster-observability-addon
 
-go 1.25.7
+go 1.26.0
 
 require (
 	github.com/ViaQ/logerr/v2 v2.1.0
@@ -22,8 +22,8 @@ require (
 	k8s.io/component-base v0.35.4
 	k8s.io/klog/v2 v2.140.0
 	k8s.io/utils v0.0.0-20260210185600-b8788abfbbc2
-	open-cluster-management.io/addon-framework v1.3.0
-	open-cluster-management.io/api v1.3.0
+	open-cluster-management.io/addon-framework v1.3.1-0.20260930170247-beb8699d3a96
+	open-cluster-management.io/api v1.3.1-0.20260826151356-f3f2452d45ee
 	sigs.k8s.io/controller-runtime v0.23.3
 )
 
