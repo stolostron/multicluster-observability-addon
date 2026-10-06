@@ -1013,10 +1013,10 @@ func TestValidateAndSanitizeConfig_WastefulIntervalOrderingWarnsButKeepsConfig(t
 // regression test for the "cache resurrects deleted interval" bug.
 //
 // Sequence that was broken:
-//   1. evaluationInterval: "10m"  → cached as "10m"
-//   2. evaluationInterval: ""     → old code: skip cache; "10m" stays   ← BUG
-//      new code: delete cache entry; "10m" is gone               ← FIXED
-//   3. evaluationInterval: "bad"  → invalid; cache miss → default "5m"
+//  1. evaluationInterval: "10m"  → cached as "10m"
+//  2. evaluationInterval: ""     → old code: skip cache; "10m" stays   ← BUG
+//     new code: delete cache entry; "10m" is gone               ← FIXED
+//  3. evaluationInterval: "bad"  → invalid; cache miss → default "5m"
 //
 // The old code restored "10m" at step 3, silently reinstating a value the
 // user had explicitly removed.

@@ -1,6 +1,7 @@
 package virtualization
 
 import (
+	"strings"
 	"testing"
 
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
@@ -426,15 +427,57 @@ func TestCustomEvaluationInterval(t *testing.T) {
 	assert.Equal(t, &interval15m, rule.Spec.Groups[1].Interval, "namespace 1d group interval")
 	assert.Equal(t, &interval15m, rule.Spec.Groups[3].Interval, "cluster 1d group interval")
 
-	// PromQL subquery step in all rolling rules must be [10m:], including
-	// the nested rate(...[10m:]) inside the cpu_usage expressions.
+	// The subquery lookback of every rolling rule must follow the interval: [10m:].
+	// Only the rate() nested in the cpu_usage rules keeps its own 5m window, which
+	// TestCPUUsageRateWindowIgnoresEvaluationInterval pins.
 	for _, r := range rule.Spec.Groups[0].Rules {
 		assert.Contains(t, r.Expr.String(), "[10m:]", "namespace rolling rule %q should use [10m:]", r.Record)
-		assert.NotContains(t, r.Expr.String(), "[5m:]", "namespace rolling rule %q should not contain old [5m:]", r.Record)
+		if r.Record != "acm_rs_vm:namespace:cpu_usage:5m" {
+			assert.NotContains(t, r.Expr.String(), "[5m:]", "namespace rolling rule %q should not contain old [5m:]", r.Record)
+		}
 	}
 	for _, r := range rule.Spec.Groups[2].Rules {
 		assert.Contains(t, r.Expr.String(), "[10m:]", "cluster rolling rule %q should use [10m:]", r.Record)
-		assert.NotContains(t, r.Expr.String(), "[5m:]", "cluster rolling rule %q should not contain old [5m:]", r.Record)
+		if r.Record != "acm_rs_vm:cluster:cpu_usage:5m" {
+			assert.NotContains(t, r.Expr.String(), "[5m:]", "cluster rolling rule %q should not contain old [5m:]", r.Record)
+		}
+	}
+}
+
+// TestCPUUsageRateWindowIgnoresEvaluationInterval pins the two windows of the VM
+// cpu_usage rules. The outer subquery looks back exactly one evaluation interval, so
+// consecutive evaluations cover the timeline without gaps. The nested rate() window is
+// the measurement resolution and must stay at 5m for every interval, below and above the
+// default: when it followed the interval, a 5m burst of one core was recorded as 0.38
+// cores at 15m, and a single missed scrape doubled the recorded usage at 1m.
+func TestCPUUsageRateWindowIgnoresEvaluationInterval(t *testing.T) {
+	for _, interval := range []string{"1m", "3m", "5m", "10m", "1h"} {
+		t.Run(interval, func(t *testing.T) {
+			rule, err := GeneratePrometheusRule(rightsizing.RSConfigMapData{
+				PrometheusRuleConfig: rightsizing.RSPrometheusRuleConfig{EvaluationInterval: interval},
+			})
+			require.NoError(t, err)
+
+			// rate(kubevirt_vmi_cpu_usage_seconds_total{...}[5m:]) closes on "}[5m:])",
+			// max_over_time(sum (...) by (...)[<interval>:]) closes on ")[<interval>:])".
+			rateWindow := "}[5m:])"
+			lookback := ")[" + interval + ":])"
+
+			checked := 0
+			for _, group := range []int{0, 2} {
+				for _, r := range rule.Spec.Groups[group].Rules {
+					if r.Record != "acm_rs_vm:namespace:cpu_usage:5m" && r.Record != "acm_rs_vm:cluster:cpu_usage:5m" {
+						continue
+					}
+					expr := r.Expr.String()
+					assert.Equal(t, 1, strings.Count(expr, rateWindow), "%q: rate() window must stay 5m: %s", r.Record, expr)
+					assert.Equal(t, 1, strings.Count(expr, lookback), "%q: lookback must follow the interval: %s", r.Record, expr)
+					assert.Equal(t, 2, strings.Count(expr, ":]"), "%q: expected exactly two subquery windows: %s", r.Record, expr)
+					checked++
+				}
+			}
+			assert.Equal(t, 2, checked, "the namespace and the cluster cpu_usage rule must both be checked")
+		})
 	}
 }
 
