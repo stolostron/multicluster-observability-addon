@@ -56,17 +56,31 @@ func IsOpenShiftVendor(cluster *clusterv1.ManagedCluster) bool {
 	return idx != -1
 }
 
-// IsCOOExternallyInstalledOnSpoke reports whether the Cluster Observability Operator was
-// installed on a spoke by someone other than MCOA, based on a ClusterClaim set by the
-// endpoint-monitoring-operator. Returns (true, true) when COO is externally installed,
-// (false, true) when not installed or installed by MCOA, and (false, false) when the
-// endpoint operator hasn't reported yet or the value is unrecognized.
+// IsCOOExternallyInstalledOnSpoke reports whether COO was installed by someone other than
+// MCOA. Used by the COO Subscription install decision: MCOA keeps its own Subscription
+// ("mcoa") but backs off when COO was installed externally.
 func IsCOOExternallyInstalledOnSpoke(cluster *clusterv1.ManagedCluster) (externallyInstalled bool, hasReport bool) {
 	status := getClusterClaim(cluster, addoncfg.CooStatusClaimName)
 	switch status {
 	case "not-installed", "mcoa":
 		return false, true
 	case "external":
+		return true, true
+	default:
+		return false, false
+	}
+}
+
+// IsCOOInstalledOnSpoke reports whether COO is installed on a spoke, regardless of who
+// installed it (MCOA or an external party). Returns (true, true) when COO is installed,
+// (false, true) when not installed, and (false, false) when the endpoint operator hasn't
+// reported yet.
+func IsCOOInstalledOnSpoke(cluster *clusterv1.ManagedCluster) (installed bool, hasReport bool) {
+	status := getClusterClaim(cluster, addoncfg.CooStatusClaimName)
+	switch status {
+	case "not-installed":
+		return false, true
+	case "mcoa", "external":
 		return true, true
 	default:
 		return false, false

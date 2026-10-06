@@ -41,11 +41,8 @@ func InstallOfCOOOnTheHubIsNeeded(ctx context.Context, k8s client.Client, logger
 	return false, nil
 }
 
-// InstallOfCOOOnSpokeIsNeeded decides, from the hub, whether MCOA should install COO on
-// a spoke cluster. It reads ClusterClaims set by the endpoint-monitoring-operator on the
-// spoke, which report whether COO is installed and by whom. If COO was installed by an
-// external party (admin), MCOA will not install its own Subscription. If the endpoint
-// operator hasn't reported yet, MCOA defers the decision.
+// InstallOfCOOOnSpokeIsNeeded decides whether MCOA should install COO on a spoke.
+// It backs off only when COO was installed by an external party.
 func InstallOfCOOOnSpokeIsNeeded(cluster *clusterv1.ManagedCluster, logger logr.Logger) bool {
 	externallyInstalled, hasReport := common.IsCOOExternallyInstalledOnSpoke(cluster)
 	if !hasReport {
