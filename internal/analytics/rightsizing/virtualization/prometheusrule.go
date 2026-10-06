@@ -8,6 +8,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// cpuUsageRateWindow is the window of the rate() that turns the VM CPU counter into
+// cores. It sets the resolution of the measurement, not how far back a rule looks, so it
+// is deliberately not tied to the configured evaluation interval: a wider window dilutes
+// short bursts and a narrower one amplifies scrape jitter, either of which would make the
+// recorded usage depend on how often it is recorded.
+const cpuUsageRateWindow = "5m"
+
 // GeneratePrometheusRule builds PrometheusRule based on configdata
 func GeneratePrometheusRule(configData rightsizing.RSConfigMapData) (monitoringv1.PrometheusRule, error) {
 	nsFilter, err := rightsizing.BuildNamespaceFilter(configData.PrometheusRuleConfig)
@@ -65,7 +72,7 @@ func GeneratePrometheusRule(configData rightsizing.RSConfigMapData) (monitoringv
 
 // buildNamespaceRulesRolling builds rolling-window recording rules for VM namespace-level resource metrics.
 // interval is the configured evaluation interval, used as the PromQL subquery lookback
-// window (e.g. "5m", "10m").
+// window (e.g. "5m", "10m"). The rate() nested in cpu_usage keeps cpuUsageRateWindow instead.
 // Uses rb.Rule so the optional label_env join is appended (namespace label is preserved in aggregation).
 func buildNamespaceRulesRolling(nsFilter string, rb *rightsizing.RuleBuilder, interval string) []monitoringv1.Rule {
 	return []monitoringv1.Rule{
@@ -95,7 +102,7 @@ func buildNamespaceRulesRolling(nsFilter string, rb *rightsizing.RuleBuilder, in
 				`max_over_time(sum (
 				  rate(kubevirt_vmi_cpu_usage_seconds_total{%s}[%s:])
 				) by (name,namespace)[%s:])`,
-				nsFilter, interval, interval,
+				nsFilter, cpuUsageRateWindow, interval,
 			),
 		),
 		rb.Rule(
@@ -144,7 +151,7 @@ func buildNamespaceRules1d(configData rightsizing.RSConfigMapData, rb *rightsizi
 
 // buildClusterRulesRolling builds rolling-window recording rules for VM cluster-level resource metrics.
 // interval is the configured evaluation interval, used as the PromQL subquery lookback
-// window (e.g. "5m", "10m").
+// window (e.g. "5m", "10m"). The rate() nested in cpu_usage keeps cpuUsageRateWindow instead.
 // Uses rb.RuleNoJoin because aggregation by (cluster) removes the namespace label,
 // making a post-aggregation "on (namespace)" label join invalid.
 func buildClusterRulesRolling(nsFilter string, rb *rightsizing.RuleBuilder, interval string) []monitoringv1.Rule {
@@ -166,7 +173,7 @@ func buildClusterRulesRolling(nsFilter string, rb *rightsizing.RuleBuilder, inte
 				`max_over_time(sum (
 				  rate(kubevirt_vmi_cpu_usage_seconds_total{%s}[%s:])
 				) by (cluster)[%s:])`,
-				nsFilter, interval, interval,
+				nsFilter, cpuUsageRateWindow, interval,
 			),
 		),
 		rb.RuleNoJoin(

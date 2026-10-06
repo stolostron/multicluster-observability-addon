@@ -66,6 +66,9 @@ type RSPrometheusRuleConfig struct {
 	// them (e.g. [5m:]). Raising it reduces both evaluation cost and the number of
 	// samples stored per recorded series. Defaults to "5m".
 	//
+	// The one window it does not drive is the rate() that turns the VM CPU counter into
+	// cores: that stays at 5m, so usage peaks keep the same meaning at every interval.
+	//
 	// Must be a single-unit Prometheus duration between 1m and 1h: e.g. "1m", "5m", "10m", "1h".
 	// The 1h ceiling comes from the fixed 1d aggregation window the daily rules apply on
 	// top of these series — at 1h they see 24 samples per day, and anything coarser leaves
