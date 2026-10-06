@@ -2,6 +2,7 @@ package defaulthubstack
 
 import (
 	"context"
+	stderrors "errors"
 	"fmt"
 	"time"
 
@@ -91,7 +92,7 @@ func (r *DefaultHubStackReconciler) Reconcile(ctx context.Context, _ ctrl.Reques
 		var buildErr error
 		opts, buildErr = addon.BuildOptions(aodc)
 		if buildErr != nil {
-			return ctrl.Result{}, fmt.Errorf("failed to build addon options: %w", buildErr)
+			return ctrl.Result{}, reconcile.TerminalError(fmt.Errorf("failed to build addon options: %w", buildErr))
 		}
 	}
 
@@ -99,6 +100,9 @@ func (r *DefaultHubStackReconciler) Reconcile(ctx context.Context, _ ctrl.Reques
 
 	installCOO, err := chandlers.InstallOfCOOOnTheHubIsNeeded(ctx, r.Client, r.Log)
 	if err != nil {
+		if stderrors.Is(err, addoncfg.ErrInvalidSubscriptionChannel) {
+			return ctrl.Result{}, reconcile.TerminalError(fmt.Errorf("failed to check COO installation: %w", err))
+		}
 		return ctrl.Result{}, fmt.Errorf("failed to check COO installation: %w", err)
 	}
 

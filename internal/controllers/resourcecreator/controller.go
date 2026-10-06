@@ -112,7 +112,7 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 	opts, err := addon.BuildOptions(aodc)
 	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to build addon options: %w", err)
+		return ctrl.Result{}, reconcile.TerminalError(fmt.Errorf("failed to build addon options: %w", err))
 	}
 
 	key = client.ObjectKey{Name: addoncfg.Name}

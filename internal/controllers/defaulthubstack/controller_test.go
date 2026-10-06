@@ -288,3 +288,57 @@ func TestReconcile_IncidentDetectionInstallsCOOOnHub(t *testing.T) {
 	require.NotNil(t, uip.Spec.Monitoring.Incidents)
 	assert.True(t, uip.Spec.Monitoring.Incidents.Enabled)
 }
+
+func TestReconcile_BuildOptionsError_ReturnsTerminalError(t *testing.T) {
+	scheme := newTestScheme()
+	invalidAODC := &addonv1beta1.AddOnDeploymentConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      addoncfg.Name,
+			Namespace: addoncfg.InstallNamespace,
+		},
+		Spec: addonv1beta1.AddOnDeploymentConfigSpec{
+			ProxyConfig: addonv1beta1.ProxyConfig{
+				HTTPProxy: "http://invalid proxy url with spaces",
+			},
+		},
+	}
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(invalidAODC).Build()
+
+	r := &DefaultHubStackReconciler{
+		Client:      fakeClient,
+		Log:         logr.Discard(),
+		Scheme:      scheme,
+		watchedGVKs: allGVKsRegistered(),
+	}
+
+	_, err := r.Reconcile(t.Context(), reconcile.Request{})
+	require.Error(t, err)
+	require.ErrorIs(t, err, reconcile.TerminalError(nil))
+	require.ErrorIs(t, err, addoncfg.ErrInvalidProxyURL)
+}
+
+func TestReconcile_InvalidSubscriptionChannel_ReturnsTerminalError(t *testing.T) {
+	scheme := newTestScheme()
+	invalidSub := &operatorsv1alpha1.Subscription{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      addoncfg.CooSubscriptionName,
+			Namespace: addoncfg.CooSubscriptionNamespace,
+		},
+		Spec: &operatorsv1alpha1.SubscriptionSpec{
+			Channel: "unsupported-channel",
+		},
+	}
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(invalidSub).Build()
+
+	r := &DefaultHubStackReconciler{
+		Client:      fakeClient,
+		Log:         logr.Discard(),
+		Scheme:      scheme,
+		watchedGVKs: allGVKsRegistered(),
+	}
+
+	_, err := r.Reconcile(t.Context(), reconcile.Request{})
+	require.Error(t, err)
+	require.ErrorIs(t, err, reconcile.TerminalError(nil))
+	require.ErrorIs(t, err, addoncfg.ErrInvalidSubscriptionChannel)
+}
