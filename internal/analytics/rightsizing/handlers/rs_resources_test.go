@@ -1008,3 +1008,51 @@ func TestValidateAndSanitizeConfig_WastefulIntervalOrderingWarnsButKeepsConfig(t
 	assert.Equal(t, "30m", string(*rule.Spec.Groups[0].Interval))
 	assert.Contains(t, rule.Spec.Groups[0].Rules[0].Expr.String(), "[30m:]")
 }
+
+// TestValidateAndSanitizeConfig_ClearingIntervalDoesNotResurrectOldValue is the key
+// regression test for the "cache resurrects deleted interval" bug.
+//
+// Sequence that was broken:
+//   1. evaluationInterval: "10m"  → cached as "10m"
+//   2. evaluationInterval: ""     → old code: skip cache; "10m" stays   ← BUG
+//      new code: delete cache entry; "10m" is gone               ← FIXED
+//   3. evaluationInterval: "bad"  → invalid; cache miss → default "5m"
+//
+// The old code restored "10m" at step 3, silently reinstating a value the
+// user had explicitly removed.
+func TestValidateAndSanitizeConfig_ClearingIntervalDoesNotResurrectOldValue(t *testing.T) {
+	cmName := rightsizing.NamespaceConfigMapName
+
+	// Step 1: prime the cache with a custom value.
+	cacheValidInterval(cmName, "evaluationInterval", "10m")
+	cached, ok := getCachedInterval(cmName, "evaluationInterval")
+	require.True(t, ok)
+	require.Equal(t, "10m", cached, "pre-condition: cache must hold the custom value")
+
+	// Step 2: user removes the key (empty string = "use default").
+	// This must evict the cache entry, not leave "10m" behind.
+	cacheValidInterval(cmName, "evaluationInterval", "")
+	_, ok = getCachedInterval(cmName, "evaluationInterval")
+	assert.False(t, ok, "clearing the interval must evict the cache entry")
+
+	// Step 3: user now makes a typo.
+	// With an empty cache the handler must use the hardcoded default, NOT resurrect "10m".
+	cm := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      cmName,
+			Namespace: addoncfg.InstallNamespace,
+			Labels:    rightsizing.RSLabels(),
+		},
+		Data: map[string]string{
+			"prometheusRuleConfig": `{"cpuAggregator":["Max OverAll"],"memoryAggregator":["Max OverAll"],"evaluationInterval":"badvalue","evaluationInterval1d":"15m"}`,
+		},
+	}
+	ob := newTestOptionsBuilder(t, cm)
+	configData, err := rightsizing.ParseConfigMapData(cm.Data)
+	require.NoError(t, err)
+
+	reverted := ob.validateAndSanitizeConfig(&configData, cmName)
+	assert.True(t, reverted)
+	assert.Equal(t, rightsizing.DefaultEvaluationInterval, configData.PrometheusRuleConfig.EvaluationInterval,
+		"after clearing then mistyping, must fall back to the default, not resurrect the stale 10m")
+}

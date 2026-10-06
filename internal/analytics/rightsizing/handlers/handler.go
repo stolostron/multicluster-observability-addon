@@ -69,15 +69,21 @@ func getCachedAggregator(configMapName, field string) ([]string, bool) {
 }
 
 func cacheValidInterval(configMapName, field, value string) {
-	if value == "" {
-		// Empty string means "use default" — there is no user-set value to restore,
-		// so don't cache it. Caching "" would cause a misleading log on the next
-		// invalid edit ("keeping previous valid config: ") and a 2-reconcile
-		// convergence cycle before backfill restores the default.
-		return
-	}
 	lastValidMu.Lock()
 	defer lastValidMu.Unlock()
+	if value == "" {
+		// Empty string means "use default" — the user removed a previously-set value.
+		// Delete the cache entry so a subsequent invalid edit falls back to the
+		// hardcoded default (via the "no previous config cached" path) rather than
+		// resurrecting the stale custom value.
+		//
+		// Deleting (rather than storing "") avoids both the misleading log
+		// ("keeping previous valid config: ") and the 2-reconcile convergence cycle
+		// that storing "" would cause: a cache miss writes the hardcoded default,
+		// which backfill would not need to touch.
+		delete(lastValidIntervals, cacheKey(configMapName, field))
+		return
+	}
 	lastValidIntervals[cacheKey(configMapName, field)] = value
 }
 
