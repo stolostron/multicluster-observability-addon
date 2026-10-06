@@ -2,11 +2,15 @@ package addon
 
 import (
 	"context"
+	"errors"
 	"testing"
 
+	"github.com/prometheus/client_golang/prometheus/testutil"
 	monitoringv1alpha1 "github.com/rhobs/observability-operator/pkg/apis/monitoring/v1alpha1"
+	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	addoncommon "github.com/stolostron/multicluster-observability-addon/internal/addon/common"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
+	addonmetrics "github.com/stolostron/multicluster-observability-addon/internal/addon/metrics"
 	thanosbuilder "github.com/stolostron/multicluster-observability-addon/internal/metrics/thanos"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -27,11 +31,15 @@ import (
 type mockAgent struct {
 	manifests []runtime.Object
 	called    bool
+	err       error
 	options   agent.AgentAddonOptions
 }
 
 func (m *mockAgent) Manifests(_ context.Context, cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) ([]runtime.Object, error) {
 	m.called = true
+	if m.err != nil {
+		return nil, m.err
+	}
 	return m.manifests, nil
 }
 
@@ -411,4 +419,124 @@ func TestManifestsObjectBuildersSkippedForNonHub(t *testing.T) {
 	objects, err := wrapper.Manifests(t.Context(), spokeCluster, mcAddon)
 	require.NoError(t, err)
 	assert.Empty(t, objects, "no Thanos objects should be built for non-hub clusters")
+}
+
+var (
+	errBuilderSimulated = errors.New("builder simulated failure")
+	errHelmRender       = errors.New("helm render error")
+)
+
+type mockFailingBuilder struct{}
+
+func (b *mockFailingBuilder) Build(_ context.Context, _ *clusterv1.ManagedCluster, _ addon.Options) ([]runtime.Object, error) {
+	return nil, errBuilderSimulated
+}
+
+func TestManifestsMetricsTracking(t *testing.T) {
+	ctx := t.Context()
+	cluster := &clusterv1.ManagedCluster{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-cluster"},
+	}
+
+	t.Run("records duration on success", func(t *testing.T) {
+		validAddon := &addonapiv1beta1.ManagedClusterAddOn{
+			ObjectMeta: metav1.ObjectMeta{Name: addoncfg.Name, Namespace: "test-cluster"},
+		}
+		wrapper := &AgentAddonWithSortedManifests{
+			agent: &mockAgent{manifests: []runtime.Object{}},
+		}
+
+		initialSuccessCount := testutil.CollectAndCount(addonmetrics.ManifestRenderDuration)
+		initialClusterSuccess := testutil.ToFloat64(addonmetrics.ClusterReconcileTotal.WithLabelValues("test-cluster", addonmetrics.ResultSuccess))
+		_, err := wrapper.Manifests(ctx, cluster, validAddon)
+		require.NoError(t, err)
+		assert.GreaterOrEqual(t, testutil.CollectAndCount(addonmetrics.ManifestRenderDuration), initialSuccessCount)
+		assert.InDelta(t, initialClusterSuccess+1, testutil.ToFloat64(addonmetrics.ClusterReconcileTotal.WithLabelValues("test-cluster", addonmetrics.ResultSuccess)), 0.001)
+	})
+
+	t.Run("records error on validation failure", func(t *testing.T) {
+		invalidAddon := &addonapiv1beta1.ManagedClusterAddOn{
+			ObjectMeta: metav1.ObjectMeta{Name: addoncfg.Name, Namespace: "cluster-a"},
+			Status: addonapiv1beta1.ManagedClusterAddOnStatus{
+				ConfigReferences: []addonapiv1beta1.ConfigReference{
+					{
+						ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
+							Group:    "addon.open-cluster-management.io",
+							Resource: addoncfg.AddonDeploymentConfigResource,
+						},
+						DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+							ConfigReferent: addonapiv1beta1.ConfigReferent{
+								Namespace: "cluster-b",
+								Name:      addoncfg.Name,
+							},
+						},
+					},
+				},
+			},
+		}
+		wrapper := &AgentAddonWithSortedManifests{
+			agent: &mockAgent{manifests: []runtime.Object{}},
+		}
+
+		initialValidationErrors := testutil.ToFloat64(addonmetrics.ManifestRenderErrors.WithLabelValues(addonmetrics.StageValidation))
+		initialClusterErrors := testutil.ToFloat64(addonmetrics.ClusterReconcileTotal.WithLabelValues("test-cluster", addonmetrics.ResultError))
+		_, err := wrapper.Manifests(ctx, cluster, invalidAddon)
+		require.Error(t, err)
+		assert.InDelta(t, initialValidationErrors+1, testutil.ToFloat64(addonmetrics.ManifestRenderErrors.WithLabelValues(addonmetrics.StageValidation)), 0.001)
+		assert.InDelta(t, initialClusterErrors+1, testutil.ToFloat64(addonmetrics.ClusterReconcileTotal.WithLabelValues("test-cluster", addonmetrics.ResultError)), 0.001)
+	})
+
+	t.Run("records error on render failure", func(t *testing.T) {
+		validAddon := &addonapiv1beta1.ManagedClusterAddOn{
+			ObjectMeta: metav1.ObjectMeta{Name: addoncfg.Name, Namespace: "test-cluster"},
+		}
+		wrapper := &AgentAddonWithSortedManifests{
+			agent: &mockAgent{err: errHelmRender},
+		}
+
+		initialRenderErrors := testutil.ToFloat64(addonmetrics.ManifestRenderErrors.WithLabelValues(addonmetrics.StageRender))
+		initialClusterErrors := testutil.ToFloat64(addonmetrics.ClusterReconcileTotal.WithLabelValues("test-cluster", addonmetrics.ResultError))
+		_, err := wrapper.Manifests(ctx, cluster, validAddon)
+		require.Error(t, err)
+		assert.InDelta(t, initialRenderErrors+1, testutil.ToFloat64(addonmetrics.ManifestRenderErrors.WithLabelValues(addonmetrics.StageRender)), 0.001)
+		assert.InDelta(t, initialClusterErrors+1, testutil.ToFloat64(addonmetrics.ClusterReconcileTotal.WithLabelValues("test-cluster", addonmetrics.ResultError)), 0.001)
+	})
+
+	t.Run("records error on builder failure", func(t *testing.T) {
+		aodc := &addonapiv1beta1.AddOnDeploymentConfig{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      addoncfg.Name,
+				Namespace: addoncfg.InstallNamespace,
+			},
+		}
+		validAddon := &addonapiv1beta1.ManagedClusterAddOn{
+			ObjectMeta: metav1.ObjectMeta{Name: addoncfg.Name, Namespace: "test-cluster"},
+			Status: addonapiv1beta1.ManagedClusterAddOnStatus{
+				ConfigReferences: []addonapiv1beta1.ConfigReference{
+					{
+						ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
+							Group:    "addon.open-cluster-management.io",
+							Resource: addoncfg.AddonDeploymentConfigResource,
+						},
+						DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+							ConfigReferent: addonapiv1beta1.ConfigReferent{
+								Namespace: addoncfg.InstallNamespace,
+								Name:      addoncfg.Name,
+							},
+						},
+					},
+				},
+			},
+		}
+		wrapper := &AgentAddonWithSortedManifests{
+			agent:          &mockAgent{manifests: []runtime.Object{}},
+			getter:         &mockAODCGetter{aodc: aodc},
+			objectBuilders: []ObjectBuilder{&mockFailingBuilder{}},
+		}
+
+		initialRenderErrors := testutil.ToFloat64(addonmetrics.ManifestRenderErrors.WithLabelValues(addonmetrics.StageRender))
+		_, err := wrapper.Manifests(ctx, cluster, validAddon)
+		require.Error(t, err)
+		assert.InDelta(t, initialRenderErrors+1, testutil.ToFloat64(addonmetrics.ManifestRenderErrors.WithLabelValues(addonmetrics.StageRender)), 0.001)
+	})
 }
