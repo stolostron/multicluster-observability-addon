@@ -30,6 +30,7 @@ import (
 	uiplugin "github.com/rhobs/observability-operator/pkg/apis/uiplugin/v1alpha1"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	addonctrl "github.com/stolostron/multicluster-observability-addon/internal/controllers/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/controllers/defaulthubstack"
 	"github.com/stolostron/multicluster-observability-addon/internal/controllers/resourcecreator"
@@ -39,6 +40,7 @@ import (
 	crdClientSet "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -52,6 +54,7 @@ import (
 	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 	workv1 "open-cluster-management.io/api/work/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
@@ -205,6 +208,7 @@ func runControllers(ctx context.Context, kubeConfig *rest.Config) error {
 	sharedMgr, err := ctrl.NewManager(kubeConfig, ctrl.Options{
 		Scheme: scheme,
 		Logger: logger.WithName("manager"),
+		Cache:  getCacheOptions(),
 		MapperProvider: func(c *rest.Config, hc *http.Client) (meta.RESTMapper, error) {
 			return mapper, nil
 		},
@@ -261,6 +265,27 @@ func runControllers(ctx context.Context, kubeConfig *rest.Config) error {
 	<-ctx.Done()
 
 	return nil
+}
+
+// getCacheOptions configures the in-memory cache for sharedMgr.
+// It applies TransformStripManagedFields to all cached objects to strip
+// metadata.managedFields, significantly reducing memory consumption in large fleets.
+// It also scopes AddOnDeploymentConfig to the install namespace and
+// ClusterManagementAddOn to the MCOA instance name to prevent unbounded cache growth.
+func getCacheOptions() cache.Options {
+	return cache.Options{
+		DefaultTransform: cache.TransformStripManagedFields(),
+		ByObject: map[client.Object]cache.ByObject{
+			&addonv1beta1.AddOnDeploymentConfig{}: {
+				Namespaces: map[string]cache.Config{
+					addoncfg.InstallNamespace: {},
+				},
+			},
+			&addonv1beta1.ClusterManagementAddOn{}: {
+				Field: fields.SelectorFromSet(fields.Set{"metadata.name": addoncfg.Name}),
+			},
+		},
+	}
 }
 
 func setupSecurityProfileWatcher(ctx context.Context, kubeConfig *rest.Config, mgr ctrl.Manager, logger logr.Logger) error {
