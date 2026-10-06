@@ -156,6 +156,10 @@ var malformedDurations = []string{
 	"-5m", "5", // missing unit / negative
 	"1h30m",                  // compound durations are unsupported
 	"999999999999999999999y", // numeric overflow must not panic or wrap
+	// Fits in an int, but in nanoseconds it is 1000 * 2^64 plus a minute: without the
+	// overflow guard the multiplication wraps to 1m0.448384s, which looks like a legal
+	// interval to both validators.
+	"18446744073770s",
 }
 
 func TestValidateEvaluationInterval(t *testing.T) {

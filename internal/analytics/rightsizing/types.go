@@ -69,14 +69,29 @@ type RSPrometheusRuleConfig struct {
 	// The one window it does not drive is the rate() that turns the VM CPU counter into
 	// cores: that stays at 5m, so usage peaks keep the same meaning at every interval.
 	//
+	// It does shape the percentile profiles. The daily rules take P99/P95 over the samples
+	// recorded in a day, and each sample is the peak of one interval, so a coarser
+	// interval gives them fewer points that each stand for a longer stretch. The same
+	// workload then yields different percentiles, higher or lower depending on where its
+	// bursts fall between evaluations. Max OverAll, a maximum of those peaks, is not
+	// affected. Percentile recommendations are only comparable between clusters and
+	// periods that used the same interval.
+	//
 	// Must be a single-unit Prometheus duration between 1m and 1h: e.g. "1m", "5m", "10m", "1h".
 	// The 1h ceiling comes from the fixed 1d aggregation window the daily rules apply on
-	// top of these series — at 1h they see 24 samples per day, and anything coarser leaves
-	// too few points for the P99/P95 profiles to differ from the maximum.
+	// top of these series: at 1h they see 24 samples per day, where P99/P95 are already
+	// read off the top two or three samples, and anything coarser leaves them saying
+	// little more than the maximum.
 	EvaluationInterval string `json:"evaluationInterval,omitempty"`
 	// EvaluationInterval1d controls how often the daily-aggregation PrometheusRule groups
 	// are re-evaluated. It does not change the aggregation window itself, which is always
 	// 1d, so lowering it only makes dashboards refresh sooner. Defaults to "15m".
+	//
+	// Raising it has a cost on the hub side. Of the recorded series only these daily ones
+	// are federated, at most one sample per evaluation, so the dashboard graphs that plot
+	// them directly thin out as the interval grows and are close to empty once it reaches
+	// hours. Stat and table panels aggregate over days, so they stay populated, but each
+	// value rests on fewer samples.
 	//
 	// Must be a single-unit Prometheus duration between 1m and 24h: e.g. "5m", "15m", "30m", "1h".
 	// The 24h ceiling is the aggregation window itself: re-running less often than that

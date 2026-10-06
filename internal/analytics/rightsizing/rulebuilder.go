@@ -38,9 +38,10 @@ const (
 	AggregationWindow = 24 * time.Hour
 
 	// MinSamplesPerAggregationWindow is the smallest number of rolling-window samples the
-	// daily rules need for the percentile profiles to stay distinguishable. Below this,
-	// quantile_over_time has so few points that P99/P95/P90 all collapse onto the maximum
-	// and the configurable-profile feature silently stops meaning anything.
+	// daily rules need for the percentile profiles to stay distinguishable. At this count
+	// quantile_over_time already reads P99/P95 off the top two or three samples; below it
+	// they say little more than the maximum and the configurable-profile feature silently
+	// stops meaning anything.
 	MinSamplesPerAggregationWindow = 24
 
 	// MinEvaluationInterval applies to both fields. The rolling interval doubles as the
@@ -99,7 +100,7 @@ func validateInterval(s string, maxAllowed time.Duration) bool {
 
 // ValidateEvaluationInterval reports whether s is usable as the rolling-window evaluation
 // interval. Beyond MaxEvaluationInterval the daily aggregation rules no longer see enough
-// samples for the percentile profiles to differ from the maximum.
+// samples for the percentile profiles to say more than the maximum does.
 func ValidateEvaluationInterval(s string) bool {
 	return validateInterval(s, MaxEvaluationInterval)
 }
