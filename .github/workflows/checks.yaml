@@ -19,7 +19,7 @@ jobs:
         go-version-file: 'go.mod'
       id: go  
     - name: Lint
-      uses: golangci/golangci-lint-action@v7
+      uses: golangci/golangci-lint-action@v9
       with:
         version: v2.7.2
         args: --timeout=4m
