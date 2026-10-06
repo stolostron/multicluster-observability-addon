@@ -228,6 +228,9 @@ func TestRedundantEvaluationFactor(t *testing.T) {
 		{"equal intervals are not redundant", "15m", "15m", 0, false},
 		{"rolling coarser than daily", "1h", "5m", 12, true},
 		{"rolling just past daily", "30m", "15m", 2, true},
+		// Uneven ratios must round up: truncating 20m/15m to 1 would report "no
+		// redundancy" alongside a warning that says the opposite.
+		{"uneven ratio rounds up", "20m", "15m", 2, true},
 		{"empty rolling resolves to 5m default", "", "1m", 5, true},
 		{"empty daily resolves to 15m default", "1h", "", 4, true},
 		{"unparseable input never warns", "bogus", "15m", 0, false},
