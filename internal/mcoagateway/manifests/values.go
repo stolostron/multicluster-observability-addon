@@ -24,7 +24,10 @@ type MCOAGatewayValues struct {
 }
 
 func BuildValues(isHubCluster, mcoaGatewayEnabled, thanosOperatorEnabled bool, logsEnabled bool) *MCOAGatewayValues {
-	if !isHubCluster || !mcoaGatewayEnabled {
+	// Default logging needs the gateway on the hub: spoke ClusterLogForwarders write
+	// OTLP to it, and it forwards to the Loki gateway. The annotation remains
+	// the switch for metrics-only use.
+	if !isHubCluster || (!mcoaGatewayEnabled && !logsEnabled) {
 		return nil
 	}
 

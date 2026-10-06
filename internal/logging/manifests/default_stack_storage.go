@@ -17,6 +17,8 @@ func buildManagedLokistackSpec(opts Options) (lokiv1.LokiStackSpec, error) {
 			},
 			// TODO(JoaoBraveCoding): For now we're gonna put everything in the infrastructure tenant, obs/api should
 			// detect the tenant based on the cert and write to Loki using X-Scope-OrgID header.
+			// Collection client certs set Subject.OU to the ManagedCluster name; the
+			// MCOA gateway requires mTLS and forwards with that tenant header.
 			DefaultTenant: "infrastructure",
 		},
 	}

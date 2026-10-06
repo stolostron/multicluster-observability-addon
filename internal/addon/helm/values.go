@@ -71,7 +71,11 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, getter addonutils.Add
 
 		userValues.Logging, err = getLoggingValues(ctx, k8s, cluster, mcAddon, opts)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get logging values: %w", err)
+			// Leave metrics (and the rest of the addon) deployable when logging
+			// options are not ready yet. Collection/storage skip missing refs
+			// themselves; this covers remaining lookup failures.
+			logger.Error(err, "failed to get logging values, continuing without logging")
+			userValues.Logging = nil
 		}
 
 		userValues.Tracing, err = getTracingValues(ctx, k8s, cluster, mcAddon, opts)

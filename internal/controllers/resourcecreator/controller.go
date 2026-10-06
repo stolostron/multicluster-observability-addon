@@ -15,7 +15,6 @@ import (
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	rshandlers "github.com/stolostron/multicluster-observability-addon/internal/analytics/rightsizing/handlers"
-	lhandlers "github.com/stolostron/multicluster-observability-addon/internal/logging/handlers"
 	"github.com/stolostron/multicluster-observability-addon/internal/mcoagateway"
 	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	mresources "github.com/stolostron/multicluster-observability-addon/internal/metrics/resource"
@@ -67,6 +66,26 @@ var cmaoPredicate = builder.WithPredicates(predicate.Funcs{
 	GenericFunc: func(e event.GenericEvent) bool { return false },
 })
 
+func isHubManagedClusterAddOn(ctx context.Context, k8s client.Client, obj client.Object) bool {
+	// Every cluster's ManagedClusterAddOn is named after the addon. Match the
+	// same hub name used when attaching LokiStack (labeled self-managed cluster,
+	// or local-cluster when none is labeled).
+	if obj.GetName() != addoncfg.Name {
+		return false
+	}
+	hubName, err := common.LookupHubClusterName(ctx, k8s)
+	if err != nil {
+		return obj.GetNamespace() == addoncfg.HubNamespace
+	}
+	return obj.GetNamespace() == hubName
+}
+
+func hubMCAOPredicate(k8s client.Client) builder.Predicates {
+	return builder.WithPredicates(predicate.NewPredicateFuncs(func(obj client.Object) bool {
+		return isHubManagedClusterAddOn(context.TODO(), k8s, obj)
+	}))
+}
+
 var rsConfigMapPredicate = builder.WithPredicates(rshandlers.RSConfigMapPredicate())
 
 // isGatewayRoute matches the single Route rendered by the mcoa-gateway Helm
@@ -82,6 +101,21 @@ var mcoaGatewayRoutePredicate = builder.WithPredicates(predicate.Funcs{
 	CreateFunc: func(e event.CreateEvent) bool { return isGatewayRoute(e.Object.GetNamespace(), e.Object.GetName()) },
 	UpdateFunc: func(e event.UpdateEvent) bool {
 		return isGatewayRoute(e.ObjectNew.GetNamespace(), e.ObjectNew.GetName())
+	},
+	DeleteFunc:  func(e event.DeleteEvent) bool { return false },
+	GenericFunc: func(e event.GenericEvent) bool { return false },
+})
+
+func isGatewayServerCertSecret(namespace, name string) bool {
+	return namespace == addoncfg.InstallNamespace && name == mcoagateway.DefaultStorageMTLSSecretName
+}
+
+var mcoaGatewayServerCertPredicate = builder.WithPredicates(predicate.Funcs{
+	CreateFunc: func(e event.CreateEvent) bool {
+		return isGatewayServerCertSecret(e.Object.GetNamespace(), e.Object.GetName())
+	},
+	UpdateFunc: func(e event.UpdateEvent) bool {
+		return isGatewayServerCertSecret(e.ObjectNew.GetNamespace(), e.ObjectNew.GetName())
 	},
 	DeleteFunc:  func(e event.DeleteEvent) bool { return false },
 	GenericFunc: func(e event.GenericEvent) bool { return false },
@@ -120,6 +154,12 @@ func SetupWithManager(mgr ctrl.Manager, logger logr.Logger) error {
 		// host changes), so the gateway server certificate's SAN can be updated
 		// to match without waiting for an unrelated reconcile trigger.
 		Watches(&routev1.Route{}, r.enqueueAODC(), mcoaGatewayRoutePredicate).
+		// Trigger when cert-manager issues/rotates the gateway server secret so
+		// CLF placements are published as soon as the Route host is on the SAN.
+		Watches(&corev1.Secret{}, r.enqueueAODC(), mcoaGatewayServerCertPredicate).
+		// Trigger when the hub ManagedClusterAddOn is created so LokiStack can be attached to it.
+		// Hub namespace is resolved the same way as storage attach (not hardcoded to local-cluster).
+		Watches(&addonv1beta1.ManagedClusterAddOn{}, r.enqueueAODC(), hubMCAOPredicate(r.Client)).
 		Complete(r)
 }
 
@@ -168,11 +208,12 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		PrometheusImage:    images.Prometheus,
 	}
 
-	mDefaultConfig, err := mdefault.Reconcile(ctx)
-	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to reconcile metrics resources: %w", err)
+	mDefaultConfig, metricsErr := mdefault.Reconcile(ctx)
+	if metricsErr != nil {
+		r.Log.Error(metricsErr, "failed to reconcile metrics resources, continuing with logging")
+	} else {
+		objs = append(objs, mDefaultConfig...)
 	}
-	objs = append(objs, mDefaultConfig...)
 
 	// Reconcile right-sizing resources (hub-wide concern).
 	// ConfigMap resources are created/updated/deleted here, not per-cluster in handler.go,
@@ -182,73 +223,86 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, fmt.Errorf("failed to reconcile right-sizing resources: %w", rsErr)
 	}
 
-	if opts.Platform.Logs.DefaultStack || opts.ThanosOperatorEnabled {
-		managedClusters := &clusterv1.ManagedClusterList{}
-		if err := r.List(ctx, managedClusters, &client.ListOptions{}); err != nil {
-			return ctrl.Result{}, fmt.Errorf("failed to get managed cluster list: %w", err)
-		}
-		tenants := make([]string, 0, len(managedClusters.Items))
-		for _, cluster := range managedClusters.Items {
-			tenants = append(tenants, cluster.Name)
-		}
-
+	gatewayEnabled := opts.Platform.Logs.DefaultStack || opts.ThanosOperatorEnabled || aodc.Annotations["mcoa-obs-api"] == "true"
+	if gatewayEnabled {
 		gatewayHost, err := mcoagateway.GetGatewayRouteHost(ctx, r.Client)
 		if err != nil {
 			r.Log.V(1).Info("Failed to get MCOA gateway route host, certificate will be built without that SAN for now", "err", err)
 		}
 
-		certObjs := []client.Object{}
-		// this should create cert per cluster, each secret will be passed through manifestwork
-		for _, tenant := range tenants {
-			cert, err := mcoagateway.BuildGatewayCertificates(tenant, gatewayHost)
-			if err != nil {
-				r.Log.V(1).Info("Failed to create cert", "tenant", tenant, "err", err)
-			}
-			certObjs = append(certObjs, cert...)
+		serverCert, err := mcoagateway.BuildServerCertificate(gatewayHost)
+		if err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to build MCOA gateway server certificate: %w", err)
 		}
+		certObjs := []client.Object{serverCert}
+
+		if opts.Platform.Logs.DefaultStack {
+			lokiClientCert, err := mcoagateway.BuildLokiClientCertificate()
+			if err != nil {
+				return ctrl.Result{}, fmt.Errorf("failed to build MCOA gateway Loki client certificate: %w", err)
+			}
+			certObjs = append(certObjs, lokiClientCert)
+
+			managedClusters := &clusterv1.ManagedClusterList{}
+			if err := r.List(ctx, managedClusters, &client.ListOptions{}); err != nil {
+				return ctrl.Result{}, fmt.Errorf("failed to get managed cluster list: %w", err)
+			}
+			// One collector client cert per cluster; secret data is copied to the
+			// spoke via the managed collection Helm chart. OU is the cluster name
+			// so the gateway can set X-Scope-OrgID from the client certificate.
+			for _, cluster := range managedClusters.Items {
+				clientCert, err := mcoagateway.BuildCollectionCertificate(cluster.Name)
+				if err != nil {
+					return ctrl.Result{}, fmt.Errorf("failed to build MCOA gateway collection certificate for %s: %w", cluster.Name, err)
+				}
+				certObjs = append(certObjs, clientCert)
+			}
+		}
+
 		for _, obj := range certObjs {
 			if err := common.ServerSideApply(ctx, r.Client, obj, cmao); err != nil {
-				r.Log.V(1).Info("Certificate SSA failed", "namespace", obj.GetNamespace(), "name", obj.GetName(), "err", err)
+				return ctrl.Result{}, fmt.Errorf("failed to apply certificate %s/%s: %w", obj.GetNamespace(), obj.GetName(), err)
 			}
 		}
-
 	}
 
-	// Reconcile logging CLFs and LokiStack separately so CLFs aren't blocking LokiStack install
-	lCLFObjs, lCLFDefaultConfig, clfErr := lhandlers.BuildCLFResources(ctx, r.Client, cmao, opts.Platform.Logs, opts.UserWorkloads.Logs, opts.HubHostname)
+	// Spoke collection: CLF templates are applied here. Placement configs are
+	// appended only after LokiStack is requested on the hub MCAO so spokes do
+	// not start forwarding before storage is requested. Metrics configs stay
+	// on objs regardless of that wait.
+	lDefaultConfig, clfResult, clfErr := r.reconcileLoggingCollection(ctx, cmao, opts)
 	if clfErr != nil {
 		r.Log.Error(clfErr, "failed to build CLF resources, will requeue and continue to LokiStack")
-	} else {
-		var clfSSAErrs []error
-		for _, obj := range lCLFObjs {
-			if err := common.ServerSideApply(ctx, r.Client, obj, cmao); err != nil {
-				r.Log.V(1).Info("CLF SSA failed", "namespace", obj.GetNamespace(), "name", obj.GetName(), "err", err)
-				clfSSAErrs = append(clfSSAErrs, fmt.Errorf("%s/%s: %w", obj.GetNamespace(), obj.GetName(), err))
-			}
-		}
-		if len(clfSSAErrs) > 0 {
-			clfErr = errors.Join(clfSSAErrs...)
-		}
-		objs = append(objs, lCLFDefaultConfig...)
 	}
 
-	lsObjs, lsDefaultConfig, lsErr := lhandlers.BuildLokiStackResources(ctx, r.Client, opts.Platform.Logs, opts.UserWorkloads.Logs, opts.HubHostname)
-	if lsErr != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to build LokiStack resources: %w", lsErr)
-	}
-	for _, obj := range lsObjs {
-		if err := common.ServerSideApply(ctx, r.Client, obj, cmao); err != nil {
-			return ctrl.Result{}, fmt.Errorf("failed to apply LokiStack resource %s/%s: %w", obj.GetNamespace(), obj.GetName(), err)
+	// Hub storage component: LokiStack template + MCAO pointer (movable to another cluster later).
+	storageResult, storageErr := r.reconcileLoggingStorage(ctx, cmao, opts)
+
+	// Publish CLF placement configs only once storage has been requested on the
+	// hub MCAO. A storage error or requeue keeps spokes from forwarding into a
+	// stack that is not ready, while metrics configs below are still applied.
+	if storageErr == nil && storageResult.IsZero() && clfErr == nil && clfResult.IsZero() {
+		objs = append(objs, lDefaultConfig...)
+	} else if opts.Platform.Logs.DefaultStack {
+		if stripErr := r.stripDefaultStackCLFPlacementConfigs(ctx); stripErr != nil {
+			return ctrl.Result{}, stripErr
 		}
-	}
-	objs = append(objs, lsDefaultConfig...)
-	// If CLF had errors, requeue after LokiStack is applied
-	if clfErr != nil {
-		return ctrl.Result{}, clfErr
 	}
 
 	if err := common.EnsureAddonConfig(ctx, r.Log, r.Client, objs); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to patch default configs of the clustermanageraddon: %w", err)
+	}
+
+	if err := errors.Join(metricsErr, storageErr, clfErr); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	if !storageResult.IsZero() {
+		return storageResult, nil
+	}
+
+	if !clfResult.IsZero() {
+		return clfResult, nil
 	}
 
 	// Retrieve the updated ClusterManagementAddOn with current default configs

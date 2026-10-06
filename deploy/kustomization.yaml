@@ -19,5 +19,28 @@ resources:
 - crds/monitoring.coreos.com_prometheusagents.yaml
 - crds/monitoring.coreos.com_scrapeconfigs.yaml
 
+# ClusterIssuer CA secrets are read from cert-manager's cluster-resource
+# namespace. The kustomization namespace would otherwise rewrite the root
+# Issuer/Certificate into open-cluster-management-observability.
+patches:
+- target:
+    group: cert-manager.io
+    version: v1
+    kind: Issuer
+    name: mcoa-root-ca
+  patch: |-
+    - op: replace
+      path: /metadata/namespace
+      value: cert-manager
+- target:
+    group: cert-manager.io
+    version: v1
+    kind: Certificate
+    name: mcoa-root-cert
+  patch: |-
+    - op: replace
+      path: /metadata/namespace
+      value: cert-manager
+
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization

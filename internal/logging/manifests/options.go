@@ -41,9 +41,7 @@ type Collection struct {
 }
 
 type Storage struct {
-	Tenants            []string
 	ObjStorageSecret   corev1.Secret
-	MTLSSecret         corev1.Secret
 	LokiClientCASecret corev1.Secret
 	LokiStack          *lokiv1.LokiStack
 }
@@ -82,12 +80,6 @@ func BuildDefaultStackOptions(platform, userWorkloads addon.LogsOptions, hubHost
 					ObjectMeta: metav1.ObjectMeta{
 						// TODO(JoaoBraveCoding): Revisit this, I'm not sure if this makes sense as this should be something the user provides.
 						Name:      DefaultStorageObjStorageSecretName,
-						Namespace: addoncfg.InstallNamespace,
-					},
-				},
-				MTLSSecret: corev1.Secret{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      mcoagateway.DefaultStorageMTLSSecretName,
 						Namespace: addoncfg.InstallNamespace,
 					},
 				},

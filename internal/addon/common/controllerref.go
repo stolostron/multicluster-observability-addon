@@ -19,6 +19,13 @@ var (
 	errMissingOwnerRef     = errors.New("no resource owned by MCOA found in references")
 )
 
+// IsAbsentOwnedConfig is true when no MCOA-owned object exists for the
+// referenced group/resource yet (stale or user-authored refs only). Helm
+// builders should skip the default stack instead of failing the whole chart.
+func IsAbsentOwnedConfig(err error) bool {
+	return errors.Is(err, errMissingResource) || errors.Is(err, errMissingOwnerRef)
+}
+
 // cmaoOwnerStub returns a minimal ClusterManagementAddOn object suitable for owner
 // reference comparisons via controllerutil.HasOwnerReference.
 func cmaoOwnerStub() *addonv1beta1.ClusterManagementAddOn {
@@ -54,14 +61,18 @@ func GetResourceWithOwnerRef[T client.Object](
 
 	cmao := cmaoOwnerStub()
 
+	// A missing object is skipped so one stale config reference (for example a
+	// renamed template) does not hide another reference that is present and owned.
+	sawObject := false
 	for _, key := range keys {
 		tempObj := obj.DeepCopyObject().(T)
 		if err := k8s.Get(ctx, key, tempObj, &client.GetOptions{}); err != nil {
 			if k8serrors.IsNotFound(err) {
-				return obj, fmt.Errorf("%w: %s/%s %s/%s", errMissingResource, group, resource, key.Namespace, key.Name)
+				continue
 			}
 			return obj, err
 		}
+		sawObject = true
 
 		hasOwnerRef, err := controllerutil.HasOwnerReference(tempObj.GetOwnerReferences(), cmao, k8s.Scheme())
 		if err != nil {
@@ -75,6 +86,9 @@ func GetResourceWithOwnerRef[T client.Object](
 	}
 
 	if obj.GetName() == "" {
+		if !sawObject {
+			return obj, fmt.Errorf("%w: %s/%s", errMissingResource, group, resource)
+		}
 		return obj, fmt.Errorf("%w: group=%s, resource=%s", errMissingOwnerRef, group, resource)
 	}
 
