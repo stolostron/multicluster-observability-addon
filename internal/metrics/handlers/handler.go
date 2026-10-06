@@ -140,24 +140,28 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1beta1.Man
 		}
 	}
 
-	// Read TLS profile from ManifestWork feedback
-	tlsProfileCM := workv1.ResourceIdentifier{
-		Group:     "",
-		Resource:  "configmaps",
-		Name:      addoncfg.TLSProfileConfigMapName,
-		Namespace: addoncfg.TLSProfileConfigMapNamespace,
-	}
-	feedback, err := common.GetFeedbackValuesForResources(ctx, o.Client, managedCluster.Name, addoncfg.Name, tlsProfileCM)
-	if err != nil {
-		return ret, fmt.Errorf("failed to get TLS profile feedback: %w", err)
-	}
-
-	tlsFeedback := feedback[tlsProfileCM]
-	if minVersionValues := common.FilterFeedbackValuesByName(tlsFeedback, addoncfg.TLSMinVersionFeedbackName); len(minVersionValues) > 0 && minVersionValues[0].Value.String != nil {
-		ret.TLSMinVersion = *minVersionValues[0].Value.String
-	}
-	if cipherValues := common.FilterFeedbackValuesByName(tlsFeedback, addoncfg.TLSCipherSuitesFeedbackName); len(cipherValues) > 0 && cipherValues[0].Value.String != nil {
-		ret.TLSCipherSuites = *cipherValues[0].Value.String
+	// Read TLS profile from ManifestWork feedback (OCP 5.0+ only — the ocm-tls-profile
+	// ConfigMap is populated by the OCM registration agent which is not present on older clusters).
+	if common.IsOCPVersionAtLeast(managedCluster, 5) {
+		ret.TLSProfileEnabled = true
+		tlsProfileCM := workv1.ResourceIdentifier{
+			Group:     "",
+			Resource:  "configmaps",
+			Name:      addoncfg.TLSProfileConfigMapName,
+			Namespace: addoncfg.TLSProfileConfigMapNamespace,
+		}
+		var tlsFeedback []workv1.FeedbackValue
+		if feedback, tlsErr := common.GetFeedbackValuesForResources(ctx, o.Client, managedCluster.Name, addoncfg.Name, tlsProfileCM); tlsErr != nil {
+			return ret, fmt.Errorf("failed to get TLS profile feedback: %w", tlsErr)
+		} else {
+			tlsFeedback = feedback[tlsProfileCM]
+		}
+		if minVersionValues := common.FilterFeedbackValuesByName(tlsFeedback, addoncfg.TLSMinVersionFeedbackName); len(minVersionValues) > 0 && minVersionValues[0].Value.String != nil {
+			ret.TLSMinVersion = *minVersionValues[0].Value.String
+		}
+		if cipherValues := common.FilterFeedbackValuesByName(tlsFeedback, addoncfg.TLSCipherSuitesFeedbackName); len(cipherValues) > 0 && cipherValues[0].Value.String != nil {
+			ret.TLSCipherSuites = *cipherValues[0].Value.String
+		}
 	}
 
 	caTargetName := config.GetHubMtlsCASecretName(config.GetTrimmedClusterID(ret.HubClusterID))
@@ -225,7 +229,7 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1beta1.Man
 				Name:     fmt.Sprintf("%s.%s", cooprometheusv1alpha1.ScrapeConfigName, cooprometheusv1alpha1.SchemeGroupVersion.Group),
 			}
 
-			feedback, err = common.GetFeedbackValuesForResources(ctx, o.Client, managedCluster.Name, addoncfg.Name, promAgentCRD, scrapeConfigCRD)
+			feedback, err := common.GetFeedbackValuesForResources(ctx, o.Client, managedCluster.Name, addoncfg.Name, promAgentCRD, scrapeConfigCRD)
 			if err != nil {
 				return ret, fmt.Errorf("failed to get feedback for CRDs: %w", err)
 			}
