@@ -19,5 +19,45 @@ resources:
 - crds/monitoring.coreos.com_prometheusagents.yaml
 - crds/monitoring.coreos.com_scrapeconfigs.yaml
 
+# ClusterIssuer CA secrets are read from cert-manager's cluster-resource
+# namespace. The kustomization namespace would otherwise rewrite the root
+# Issuer/Certificate into open-cluster-management-observability.
+# Use transformers, not patches: NamespaceTransformer runs after `patches`
+# and would overwrite metadata.namespace.
+transformers:
+- |-
+  apiVersion: builtin
+  kind: PatchTransformer
+  metadata:
+    name: pin-mcoa-root-ca-issuer-ns
+  target:
+    group: cert-manager.io
+    version: v1
+    kind: Issuer
+    name: mcoa-root-ca
+  patch: '[{"op":"replace","path":"/metadata/namespace","value":"cert-manager"}]'
+- |-
+  apiVersion: builtin
+  kind: PatchTransformer
+  metadata:
+    name: pin-mcoa-root-cert-ns
+  target:
+    group: cert-manager.io
+    version: v1
+    kind: Certificate
+    name: mcoa-root-cert
+  patch: '[{"op":"replace","path":"/metadata/namespace","value":"cert-manager"}]'
+- |-
+  apiVersion: builtin
+  kind: PatchTransformer
+  metadata:
+    name: strip-mcoa-root-clusterissuer-ns
+  target:
+    group: cert-manager.io
+    version: v1
+    kind: ClusterIssuer
+    name: mcoa-root-issuer
+  patch: '[{"op":"remove","path":"/metadata/namespace"}]'
+
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
