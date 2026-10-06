@@ -614,7 +614,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				verifyClusterScopedResourcesPrefix(t, objects)
 
 				// ensure that the number of objects is correct (no ocm-tls-profile ConfigMap on non-OCP)
-				expectedCount := 75
+				expectedCount := 74
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
