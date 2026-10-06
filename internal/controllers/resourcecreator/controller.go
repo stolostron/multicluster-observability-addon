@@ -39,12 +39,12 @@ func validateAODC(namespace, name string) bool {
 	return true
 }
 
-var mcoaAODCPredicate = builder.WithPredicates(predicate.Funcs{
-	CreateFunc:  func(e event.CreateEvent) bool { return validateAODC(e.Object.GetNamespace(), e.Object.GetName()) },
-	UpdateFunc:  func(e event.UpdateEvent) bool { return validateAODC(e.ObjectOld.GetNamespace(), e.ObjectOld.GetName()) },
-	DeleteFunc:  func(e event.DeleteEvent) bool { return validateAODC(e.Object.GetNamespace(), e.Object.GetName()) },
-	GenericFunc: func(e event.GenericEvent) bool { return validateAODC(e.Object.GetNamespace(), e.Object.GetName()) },
-})
+var mcoaAODCPredicate = predicate.And(
+	predicate.GenerationChangedPredicate{},
+	predicate.NewPredicateFuncs(func(obj client.Object) bool {
+		return validateAODC(obj.GetNamespace(), obj.GetName())
+	}),
+)
 
 func cmaoPlacementsChanged(old, new client.Object) bool {
 	oldCMAO := old.(*addonv1beta1.ClusterManagementAddOn)
@@ -78,7 +78,7 @@ func SetupWithManager(mgr ctrl.Manager, logger logr.Logger) error {
 	}
 
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&addonv1beta1.AddOnDeploymentConfig{}, mcoaAODCPredicate).
+		For(&addonv1beta1.AddOnDeploymentConfig{}, builder.WithPredicates(mcoaAODCPredicate)).
 		// Trigger reconciliations due to changes in Placements
 		Watches(&addonv1beta1.ClusterManagementAddOn{}, r.enqueueAODC(), cmaoPredicate).
 		// Trigger reconciliations if the pool of ManagedClusters changes

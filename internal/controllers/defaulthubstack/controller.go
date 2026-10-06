@@ -3,15 +3,18 @@ package defaulthubstack
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/go-logr/logr"
+	operatorsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	persesv1 "github.com/perses/perses-operator/api/v1alpha1"
 	uiplugin "github.com/rhobs/observability-operator/pkg/apis/uiplugin/v1alpha1"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	chandlers "github.com/stolostron/multicluster-observability-addon/internal/coo/handlers"
 	cooresource "github.com/stolostron/multicluster-observability-addon/internal/coo/resource"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -39,35 +42,54 @@ var managedByPredicate = predicate.Funcs{
 	},
 }
 
-var mcoaAODCPredicate = predicate.NewPredicateFuncs(func(obj client.Object) bool {
-	return obj.GetNamespace() == addoncfg.InstallNamespace && obj.GetName() == addoncfg.Name
-})
+var mcoaAODCPredicate = predicate.And(
+	predicate.GenerationChangedPredicate{},
+	predicate.NewPredicateFuncs(func(obj client.Object) bool {
+		return obj.GetNamespace() == addoncfg.InstallNamespace && obj.GetName() == addoncfg.Name
+	}),
+)
 
 // DefaultHubStackReconciler watches hub-only COO resources (dashboards, datasources,
 // UIPlugin) and re-reconciles them without triggering ManifestWork updates
 // for all managed clusters.
 type DefaultHubStackReconciler struct {
 	client.Client
+	APIReader   client.Reader
 	Log         logr.Logger
 	Scheme      *runtime.Scheme
 	ctrl        controller.Controller
 	cache       cache.Cache
 	mapper      meta.RESTMapper
+	mu          sync.RWMutex
 	watchedGVKs map[schema.GroupVersionKind]bool
+}
+
+func (r *DefaultHubStackReconciler) enqueueAODC() handler.EventHandler {
+	return handler.EnqueueRequestsFromMapFunc(func(_ context.Context, _ client.Object) []reconcile.Request {
+		return []reconcile.Request{{
+			NamespacedName: types.NamespacedName{
+				Namespace: addoncfg.InstallNamespace,
+				Name:      addoncfg.Name,
+			},
+		}}
+	})
 }
 
 func SetupWithManager(mgr ctrl.Manager, logger logr.Logger) error {
 	r := &DefaultHubStackReconciler{
-		Client: mgr.GetClient(),
-		Log:    logger.WithName("coo-hub"),
-		Scheme: mgr.GetScheme(),
-		cache:  mgr.GetCache(),
-		mapper: mgr.GetRESTMapper(),
+		Client:    mgr.GetClient(),
+		APIReader: mgr.GetAPIReader(),
+		Log:       logger.WithName("coo-hub"),
+		Scheme:    mgr.GetScheme(),
+		cache:     mgr.GetCache(),
+		mapper:    mgr.GetRESTMapper(),
 	}
 
 	c, err := ctrl.NewControllerManagedBy(mgr).
 		Named("default-hub-stack").
 		For(&addonv1beta1.AddOnDeploymentConfig{}, builder.WithPredicates(mcoaAODCPredicate)).
+		Watches(&corev1.ConfigMap{}, r.enqueueAODC(), builder.WithPredicates(chandlers.CardinalityRulesConfigMapPredicate()), builder.OnlyMetadata).
+		Watches(&operatorsv1alpha1.Subscription{}, r.enqueueAODC(), builder.WithPredicates(chandlers.CooSubscriptionPredicate())).
 		Build(r)
 	if err != nil {
 		return err
@@ -95,9 +117,13 @@ func (r *DefaultHubStackReconciler) Reconcile(ctx context.Context, _ ctrl.Reques
 		}
 	}
 
-	hasCardinalityRules := chandlers.HasCardinalityRules(ctx, r.Client)
+	reader := client.Reader(r.Client)
+	if r.APIReader != nil {
+		reader = r.APIReader
+	}
+	hasCardinalityRules := chandlers.HasCardinalityRules(ctx, reader)
 
-	installCOO, err := chandlers.InstallOfCOOOnTheHubIsNeeded(ctx, r.Client, r.Log)
+	canManageCOO, err := chandlers.CanManageCOOOnTheHub(ctx, r.Client, r.Log)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to check COO installation: %w", err)
 	}
@@ -107,54 +133,94 @@ func (r *DefaultHubStackReconciler) Reconcile(ctx context.Context, _ ctrl.Reques
 		Logger: r.Log,
 		Opts:   opts,
 	}
-	if err := hubReconciler.Reconcile(ctx, hasCardinalityRules, installCOO); err != nil {
+	if err := hubReconciler.Reconcile(ctx, hasCardinalityRules, canManageCOO); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to reconcile COO hub resources: %w", err)
 	}
 
-	r.registerDynamicWatches()
+	features := cooresource.EvaluateHubStackFeatures(opts)
+	allWatchesBound := r.registerDynamicWatches(features)
+	if !allWatchesBound {
+		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
+	}
 
-	return ctrl.Result{RequeueAfter: 5 * time.Minute}, nil
+	return ctrl.Result{}, nil
 }
 
-func (r *DefaultHubStackReconciler) registerDynamicWatches() {
+func (r *DefaultHubStackReconciler) registerDynamicWatches(features cooresource.HubStackFeatures) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	if r.watchedGVKs == nil {
 		r.watchedGVKs = make(map[schema.GroupVersionKind]bool)
 	}
 
-	enqueue := handler.EnqueueRequestsFromMapFunc(func(_ context.Context, _ client.Object) []reconcile.Request {
-		return []reconcile.Request{{
-			NamespacedName: types.NamespacedName{
-				Namespace: addoncfg.InstallNamespace,
-				Name:      addoncfg.Name,
-			},
-		}}
-	})
+	enqueue := r.enqueueAODC()
 
 	watchTargets := []struct {
-		obj client.Object
-		gvk schema.GroupVersionKind
+		obj      client.Object
+		gvk      schema.GroupVersionKind
+		pred     predicate.Predicate
+		required bool
 	}{
-		{&persesv1.PersesDashboard{}, schema.GroupVersionKind{Group: "perses.dev", Version: "v1alpha1", Kind: "PersesDashboard"}},
-		{&persesv1.PersesDatasource{}, schema.GroupVersionKind{Group: "perses.dev", Version: "v1alpha1", Kind: "PersesDatasource"}},
-		{&uiplugin.UIPlugin{}, schema.GroupVersionKind{Group: "observability.openshift.io", Version: "v1alpha1", Kind: "UIPlugin"}},
+		{
+			obj:      &persesv1.PersesDashboard{},
+			gvk:      schema.GroupVersionKind{Group: "perses.dev", Version: "v1alpha1", Kind: "PersesDashboard"},
+			pred:     managedByPredicate,
+			required: features.PersesEnabled,
+		},
+		{
+			obj:      &persesv1.PersesDatasource{},
+			gvk:      schema.GroupVersionKind{Group: "perses.dev", Version: "v1alpha1", Kind: "PersesDatasource"},
+			pred:     managedByPredicate,
+			required: features.PersesEnabled,
+		},
+		{
+			obj:      &uiplugin.UIPlugin{},
+			gvk:      schema.GroupVersionKind{Group: "observability.openshift.io", Version: "v1alpha1", Kind: "UIPlugin"},
+			pred:     managedByPredicate,
+			required: features.PersesEnabled || features.IncidentDetectionEnabled,
+		},
 	}
 
+	allBound := true
 	for _, w := range watchTargets {
 		if r.watchedGVKs[w.gvk] {
 			continue
 		}
 
-		if _, err := r.mapper.RESTMapping(w.gvk.GroupKind(), w.gvk.Version); err != nil {
-			r.Log.V(2).Info("CRD not yet available, will retry on next reconcile", "kind", w.gvk.Kind)
+		if r.mapper == nil {
+			if w.required {
+				allBound = false
+			}
 			continue
 		}
 
-		if err := r.ctrl.Watch(source.Kind(r.cache, w.obj, enqueue, managedByPredicate)); err != nil {
+		if _, err := r.mapper.RESTMapping(w.gvk.GroupKind(), w.gvk.Version); err != nil {
+			r.Log.V(2).Info("CRD not yet available", "kind", w.gvk.Kind)
+			if w.required {
+				allBound = false
+			}
+			continue
+		}
+
+		if r.ctrl == nil || r.cache == nil {
+			if w.required {
+				allBound = false
+			}
+			continue
+		}
+
+		if err := r.ctrl.Watch(source.Kind(r.cache, w.obj, enqueue, w.pred)); err != nil {
 			r.Log.Error(err, "failed to register dynamic watch", "kind", w.gvk.Kind)
+			if w.required {
+				allBound = false
+			}
 			continue
 		}
 
 		r.watchedGVKs[w.gvk] = true
 		r.Log.Info("registered dynamic watch", "kind", w.gvk.Kind)
 	}
+
+	return allBound
 }

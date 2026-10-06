@@ -2,6 +2,7 @@ package defaulthubstack
 
 import (
 	"testing"
+	"time"
 
 	"github.com/go-logr/logr"
 	operatorsv1 "github.com/operator-framework/api/pkg/operators/v1"
@@ -101,6 +102,42 @@ func TestMCOAAODCPredicate(t *testing.T) {
 		}
 		assert.False(t, mcoaAODCPredicate.Create(event.CreateEvent{Object: obj}))
 	})
+
+	t.Run("ignores update when generation is unchanged", func(t *testing.T) {
+		oldObj := &addonv1beta1.AddOnDeploymentConfig{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:       addoncfg.Name,
+				Namespace:  addoncfg.InstallNamespace,
+				Generation: 1,
+			},
+		}
+		newObj := &addonv1beta1.AddOnDeploymentConfig{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:       addoncfg.Name,
+				Namespace:  addoncfg.InstallNamespace,
+				Generation: 1,
+			},
+		}
+		assert.False(t, mcoaAODCPredicate.Update(event.UpdateEvent{ObjectOld: oldObj, ObjectNew: newObj}))
+	})
+
+	t.Run("triggers update when generation changed", func(t *testing.T) {
+		oldObj := &addonv1beta1.AddOnDeploymentConfig{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:       addoncfg.Name,
+				Namespace:  addoncfg.InstallNamespace,
+				Generation: 1,
+			},
+		}
+		newObj := &addonv1beta1.AddOnDeploymentConfig{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:       addoncfg.Name,
+				Namespace:  addoncfg.InstallNamespace,
+				Generation: 2,
+			},
+		}
+		assert.True(t, mcoaAODCPredicate.Update(event.UpdateEvent{ObjectOld: oldObj, ObjectNew: newObj}))
+	})
 }
 
 func TestReconcile_AODCNotFound(t *testing.T) {
@@ -108,15 +145,42 @@ func TestReconcile_AODCNotFound(t *testing.T) {
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
 
 	r := &DefaultHubStackReconciler{
-		Client:      fakeClient,
-		Log:         logr.Discard(),
-		Scheme:      scheme,
-		watchedGVKs: allGVKsRegistered(),
+		Client: fakeClient,
+		Log:    logr.Discard(),
+		Scheme: scheme,
 	}
 
 	result, err := r.Reconcile(t.Context(), reconcile.Request{})
 	require.NoError(t, err)
-	assert.NotZero(t, result.RequeueAfter)
+	assert.Zero(t, result.RequeueAfter)
+}
+
+func TestReconcile_DynamicWatchesPendingRequeues(t *testing.T) {
+	scheme := newTestScheme()
+	aodc := &addonv1beta1.AddOnDeploymentConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      addoncfg.Name,
+			Namespace: addoncfg.InstallNamespace,
+		},
+		Spec: addonv1beta1.AddOnDeploymentConfigSpec{
+			CustomizedVariables: []addonv1beta1.CustomizedVariable{
+				{Name: addon.KeyRightSizingDelegated, Value: "true"},
+				{Name: addon.KeyPlatformNamespaceRightSizing, Value: "enabled"},
+			},
+		},
+	}
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(aodc).Build()
+
+	r := &DefaultHubStackReconciler{
+		Client: fakeClient,
+		Log:    logr.Discard(),
+		Scheme: scheme,
+		// watchedGVKs is empty and mapper is nil -> registration incomplete for required Perses resources
+	}
+
+	result, err := r.Reconcile(t.Context(), reconcile.Request{})
+	require.NoError(t, err)
+	assert.Equal(t, 30*time.Second, result.RequeueAfter)
 }
 
 func TestReconcile_EmptyOptions(t *testing.T) {
@@ -130,15 +194,15 @@ func TestReconcile_EmptyOptions(t *testing.T) {
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(aodc).Build()
 
 	r := &DefaultHubStackReconciler{
-		Client:      fakeClient,
-		Log:         logr.Discard(),
-		Scheme:      scheme,
-		watchedGVKs: allGVKsRegistered(),
+		Client: fakeClient,
+		Log:    logr.Discard(),
+		Scheme: scheme,
+		// watchedGVKs is intentionally empty to ensure disabled features do not cause 30s requeue
 	}
 
 	result, err := r.Reconcile(t.Context(), reconcile.Request{})
 	require.NoError(t, err)
-	assert.NotZero(t, result.RequeueAfter)
+	assert.Zero(t, result.RequeueAfter)
 
 	uip := &uiplugin.UIPlugin{}
 	err = fakeClient.Get(t.Context(), client.ObjectKey{Name: "monitoring"}, uip)
@@ -206,7 +270,7 @@ func TestReconcile_RightSizingInstallsCOOOnHub(t *testing.T) {
 
 	result, err := r.Reconcile(t.Context(), reconcile.Request{})
 	require.NoError(t, err)
-	assert.NotZero(t, result.RequeueAfter)
+	assert.Zero(t, result.RequeueAfter)
 
 	// COO Subscription should be created on hub for right-sizing dashboards
 	sub := &operatorsv1alpha1.Subscription{}
@@ -264,7 +328,7 @@ func TestReconcile_IncidentDetectionInstallsCOOOnHub(t *testing.T) {
 
 	result, err := r.Reconcile(t.Context(), reconcile.Request{})
 	require.NoError(t, err)
-	assert.NotZero(t, result.RequeueAfter)
+	assert.Zero(t, result.RequeueAfter)
 
 	// COO Subscription should be created on hub for incident detection
 	sub := &operatorsv1alpha1.Subscription{}

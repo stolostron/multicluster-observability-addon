@@ -60,6 +60,37 @@ var thanosVariableMetricRenames = strings.NewReplacer(
 	"prometheus_tsdb_head_max_time", "acm_prometheus_tsdb_head_max_time",
 )
 
+// HubStackFeatures contains flags indicating which hub-level stack features are enabled.
+type HubStackFeatures struct {
+	HasDashboards            bool
+	HasAnalyticsDashboards   bool
+	PersesEnabled            bool
+	IncidentDetectionEnabled bool
+}
+
+// EvaluateHubStackFeatures evaluates which hub-level stack features are enabled in the addon options.
+func EvaluateHubStackFeatures(opts addon.Options) HubStackFeatures {
+	metricsUI := cmanifests.EnableUI(opts.Platform.Metrics, true)
+	hasDashboards := metricsUI != nil && metricsUI.Enabled
+
+	incidentDetection := imanifests.EnableUI(opts.Platform.AnalyticsOptions.IncidentDetection)
+	incidentDetectionEnabled := incidentDetection != nil && incidentDetection.Enabled
+
+	hasAnalyticsDashboards := incidentDetectionEnabled ||
+		(opts.Platform.AnalyticsOptions.RightSizing.Delegated &&
+			(opts.Platform.AnalyticsOptions.RightSizing.NamespaceEnabled ||
+				opts.Platform.AnalyticsOptions.RightSizing.VirtualizationEnabled))
+
+	persesEnabled := hasDashboards || hasAnalyticsDashboards
+
+	return HubStackFeatures{
+		HasDashboards:            hasDashboards,
+		HasAnalyticsDashboards:   hasAnalyticsDashboards,
+		PersesEnabled:            persesEnabled,
+		IncidentDetectionEnabled: incidentDetectionEnabled,
+	}
+}
+
 // HubResourceReconciler reconciles hub-only COO resources (PersesDashboards,
 // PersesDatasources, UIPlugin, analytics namespace) directly on the hub,
 // independent of the ManifestWork lifecycle.
@@ -69,20 +100,9 @@ type HubResourceReconciler struct {
 	Opts   addon.Options
 }
 
-func (r *HubResourceReconciler) Reconcile(ctx context.Context, hasCardinalityRules, installCOO bool) error {
-	metricsUI := cmanifests.EnableUI(r.Opts.Platform.Metrics, true)
-	hasDashboards := metricsUI != nil && metricsUI.Enabled
-
-	incidentDetection := imanifests.EnableUI(r.Opts.Platform.AnalyticsOptions.IncidentDetection)
-	incidentDetectionEnabled := incidentDetection != nil && incidentDetection.Enabled
-
-	hasAnalyticsDashboards := incidentDetectionEnabled ||
-		(r.Opts.Platform.AnalyticsOptions.RightSizing.Delegated &&
-			(r.Opts.Platform.AnalyticsOptions.RightSizing.NamespaceEnabled ||
-				r.Opts.Platform.AnalyticsOptions.RightSizing.VirtualizationEnabled))
-
-	persesEnabled := hasDashboards || hasAnalyticsDashboards
-	cooNeeded := persesEnabled && installCOO
+func (r *HubResourceReconciler) Reconcile(ctx context.Context, hasCardinalityRules, canManageCOO bool) error {
+	features := EvaluateHubStackFeatures(r.Opts)
+	cooNeeded := features.PersesEnabled && canManageCOO
 
 	// Install COO first — Perses CRD conversion webhooks must be available
 	// before we can create/update dashboards and datasources.
@@ -92,25 +112,25 @@ func (r *HubResourceReconciler) Reconcile(ctx context.Context, hasCardinalityRul
 		}
 	}
 
-	if hasAnalyticsDashboards {
+	if features.HasAnalyticsDashboards {
 		if err := r.ensureAnalyticsNamespace(ctx); err != nil {
 			return fmt.Errorf("failed to ensure analytics namespace: %w", err)
 		}
 	}
 
-	if err := r.reconcileDashboards(ctx, hasCardinalityRules, incidentDetectionEnabled); err != nil {
+	if err := r.reconcileDashboards(ctx, hasCardinalityRules, features.IncidentDetectionEnabled); err != nil {
 		return fmt.Errorf("failed to reconcile dashboards: %w", err)
 	}
 
-	if err := r.reconcileDatasources(ctx, hasDashboards, hasAnalyticsDashboards); err != nil {
+	if err := r.reconcileDatasources(ctx, features.HasDashboards, features.HasAnalyticsDashboards); err != nil {
 		return fmt.Errorf("failed to reconcile datasources: %w", err)
 	}
 
-	if err := r.reconcileUIPlugin(ctx, persesEnabled, incidentDetectionEnabled); err != nil {
+	if err := r.reconcileUIPlugin(ctx, features.PersesEnabled, features.IncidentDetectionEnabled); err != nil {
 		return fmt.Errorf("failed to reconcile UIPlugin: %w", err)
 	}
 
-	if !hasAnalyticsDashboards {
+	if !features.HasAnalyticsDashboards {
 		if err := r.deleteIfManaged(ctx, &corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{Name: addoncfg.AnalyticsNamespace},
 		}); err != nil {
@@ -199,7 +219,7 @@ func (r *HubResourceReconciler) reconcileCOOOperator(ctx context.Context, instal
 			Namespace: addoncfg.CooSubscriptionNamespace,
 			Labels: map[string]string{
 				addoncfg.ManagedByK8sLabelKey: ManagedByLabelValue,
-				"release":                     "multicluster-observability-addon",
+				addoncfg.ReleaseLabelKey:      addoncfg.Name,
 			},
 		},
 		Spec: &operatorsv1alpha1.SubscriptionSpec{
