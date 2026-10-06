@@ -37,6 +37,11 @@ var (
 	// lastValidIntervals caches the last known valid evaluation interval per ConfigMap,
 	// keyed by "configMapName:evaluationInterval" or "configMapName:evaluationInterval1d".
 	lastValidIntervals = make(map[string]string)
+	// lastOrderingState records the interval pair last observed per ConfigMap, so the
+	// wasteful-ordering warning is logged once per change instead of once per cluster.
+	// That warning covers a legal configuration which is never reverted, so without this
+	// it would repeat on every managed cluster on every reconcile, forever.
+	lastOrderingState = make(map[string]string)
 )
 
 func cacheKey(configMapName, field string) string {
@@ -81,6 +86,21 @@ func getCachedInterval(configMapName, field string) (string, bool) {
 	defer lastValidMu.RUnlock()
 	v, ok := lastValidIntervals[cacheKey(configMapName, field)]
 	return v, ok
+}
+
+// recordOrderingState stores the resolved interval pair for configMapName and reports
+// whether it differs from the previously recorded one. Used to log the wasteful-ordering
+// warning once per configuration change rather than once per cluster reconcile, while
+// still re-warning if the user fixes the ordering and later reintroduces it.
+func recordOrderingState(configMapName, rolling, daily string) bool {
+	state := rolling + "|" + daily
+	lastValidMu.Lock()
+	defer lastValidMu.Unlock()
+	if lastOrderingState[configMapName] == state {
+		return false
+	}
+	lastOrderingState[configMapName] = state
+	return true
 }
 
 // OptionsBuilder builds right-sizing options for the helm chart
@@ -298,16 +318,20 @@ func (o *OptionsBuilder) validateAndSanitizeConfig(configData *rightsizing.RSCon
 	// wasteful way. Warn rather than revert: the rules produce correct results, and because
 	// evaluationInterval1d defaults to 15m, rejecting this would undo a perfectly legal
 	// single-field edit such as evaluationInterval: 30m.
-	if factor, ok := rightsizing.RedundantEvaluationFactor(
-		configData.PrometheusRuleConfig.EvaluationInterval,
-		configData.PrometheusRuleConfig.EvaluationInterval1d,
-	); ok {
+	//
+	// Build runs once per managed cluster per reconcile and this configuration is never
+	// reverted, so the warning is emitted only when the interval pair changes; otherwise
+	// a single legal edit would log on every cluster on every reconcile indefinitely.
+	rolling := configData.PrometheusRuleConfig.EvaluationInterval
+	daily := configData.PrometheusRuleConfig.EvaluationInterval1d
+	factor, wasteful := rightsizing.RedundantEvaluationFactor(rolling, daily)
+	if changed := recordOrderingState(configMapName, rolling, daily); wasteful && changed {
 		o.Logger.Info("evaluationInterval is coarser than evaluationInterval1d, so the daily "+
 			"aggregation rules recompute over unchanged input and append duplicate samples to the "+
 			"recommendation series; raise evaluationInterval1d to match to avoid the overhead",
 			"configMap", configMapName,
-			"evaluationInterval", configData.PrometheusRuleConfig.EvaluationInterval,
-			"evaluationInterval1d", configData.PrometheusRuleConfig.EvaluationInterval1d,
+			"evaluationInterval", rolling,
+			"evaluationInterval1d", daily,
 			"redundantEvaluationsPerSample", factor)
 	}
 
