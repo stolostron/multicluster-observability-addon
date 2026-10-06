@@ -4,10 +4,12 @@ import (
 	"context"
 	"testing"
 
+	"github.com/go-logr/logr"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -490,4 +492,45 @@ func TestEnqueueFunctions(t *testing.T) {
 			assert.Equal(t, 0, q.Len())
 		})
 	})
+}
+
+func TestResourceCreatorReconciler_Reconcile_TerminalError(t *testing.T) {
+	scheme := runtime.NewScheme()
+	_ = addonv1beta1.Install(scheme)
+
+	// Create an AddOnDeploymentConfig with an invalid proxy URL (control characters or invalid format)
+	invalidAODC := &addonv1beta1.AddOnDeploymentConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      addoncfg.Name,
+			Namespace: addoncfg.InstallNamespace,
+		},
+		Spec: addonv1beta1.AddOnDeploymentConfigSpec{
+			ProxyConfig: addonv1beta1.ProxyConfig{
+				HTTPProxy: "http://invalid proxy url with spaces",
+			},
+		},
+	}
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(invalidAODC).
+		Build()
+
+	r := &ResourceCreatorReconciler{
+		Client: fakeClient,
+		Log:    logr.Discard(),
+		Scheme: scheme,
+	}
+
+	req := reconcile.Request{
+		NamespacedName: types.NamespacedName{
+			Namespace: addoncfg.InstallNamespace,
+			Name:      addoncfg.Name,
+		},
+	}
+
+	_, err := r.Reconcile(t.Context(), req)
+	require.Error(t, err)
+	require.ErrorIs(t, err, reconcile.TerminalError(nil))
+	require.ErrorIs(t, err, addoncfg.ErrInvalidProxyURL)
 }
