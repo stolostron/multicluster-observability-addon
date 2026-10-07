@@ -1,6 +1,8 @@
 package common
 
 import (
+	"context"
+	"fmt"
 	"slices"
 	"strconv"
 
@@ -8,6 +10,7 @@ import (
 	clusterlifecycleconstants "github.com/stolostron/cluster-lifecycle-api/constants"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // GetManagedClusterID returns the cluster ID with following priotity order:
@@ -31,6 +34,26 @@ func GetManagedClusterID(cluster *clusterv1.ManagedCluster) string {
 
 func IsHubCluster(cluster *clusterv1.ManagedCluster) bool {
 	return cluster.Labels[clusterlifecycleconstants.SelfManagedClusterLabelKey] == "true"
+}
+
+// HubClusterName returns the name of the self-managed (hub) cluster, or the
+// conventional local-cluster name when none is labeled as such.
+func HubClusterName(clusters []clusterv1.ManagedCluster) string {
+	for i := range clusters {
+		if IsHubCluster(&clusters[i]) {
+			return clusters[i].Name
+		}
+	}
+	return addoncfg.HubNamespace
+}
+
+// LookupHubClusterName lists ManagedClusters and returns the hub cluster name.
+func LookupHubClusterName(ctx context.Context, k8s client.Client) (string, error) {
+	list := &clusterv1.ManagedClusterList{}
+	if err := k8s.List(ctx, list); err != nil {
+		return "", fmt.Errorf("failed to list ManagedClusters: %w", err)
+	}
+	return HubClusterName(list.Items), nil
 }
 
 func IsOpenShiftVendor(cluster *clusterv1.ManagedCluster) bool {

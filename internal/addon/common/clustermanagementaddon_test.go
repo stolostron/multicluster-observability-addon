@@ -219,6 +219,100 @@ func TestEnsureConfigsInAddon(t *testing.T) {
 	}
 }
 
+func TestRemovePlacementConfigs(t *testing.T) {
+	lokiCfg := addonv1beta1.AddOnConfig{
+		ConfigGroupResource: addonv1beta1.ConfigGroupResource{
+			Group:    "loki.grafana.com",
+			Resource: addoncfg.LokiStacksResource,
+		},
+		ConfigReferent: addonv1beta1.ConfigReferent{
+			Name:      "mcoa-default-global",
+			Namespace: addoncfg.InstallNamespace,
+		},
+	}
+	clfCfg := addonv1beta1.AddOnConfig{
+		ConfigGroupResource: addonv1beta1.ConfigGroupResource{
+			Group:    "observability.openshift.io",
+			Resource: addoncfg.ClusterLogForwardersResource,
+		},
+		ConfigReferent: addonv1beta1.ConfigReferent{
+			Name:      "mcoa-default-global",
+			Namespace: addoncfg.InstallNamespace,
+		},
+	}
+	placementRefA := addonv1beta1.PlacementRef{Namespace: "ns", Name: "a"}
+	placementRefB := addonv1beta1.PlacementRef{Namespace: "ns", Name: "b"}
+
+	t.Run("removes matching configs and keeps others", func(t *testing.T) {
+		cmao := &addonv1beta1.ClusterManagementAddOn{
+			Spec: addonv1beta1.ClusterManagementAddOnSpec{
+				InstallStrategy: addonv1beta1.InstallStrategy{
+					Placements: []addonv1beta1.PlacementStrategy{
+						{PlacementRef: placementRefA, Configs: []addonv1beta1.AddOnConfig{clfCfg, lokiCfg}},
+						{PlacementRef: placementRefB, Configs: []addonv1beta1.AddOnConfig{lokiCfg}},
+					},
+				},
+			},
+		}
+
+		assert.True(t, removePlacementConfigs(cmao, "loki.grafana.com", addoncfg.LokiStacksResource))
+		assert.Equal(t, []addonv1beta1.AddOnConfig{clfCfg}, cmao.Spec.InstallStrategy.Placements[0].Configs)
+		assert.Empty(t, cmao.Spec.InstallStrategy.Placements[1].Configs)
+	})
+
+	t.Run("no-op when no matching configs", func(t *testing.T) {
+		cmao := &addonv1beta1.ClusterManagementAddOn{
+			Spec: addonv1beta1.ClusterManagementAddOnSpec{
+				InstallStrategy: addonv1beta1.InstallStrategy{
+					Placements: []addonv1beta1.PlacementStrategy{
+						{PlacementRef: placementRefA, Configs: []addonv1beta1.AddOnConfig{clfCfg}},
+					},
+				},
+			},
+		}
+
+		assert.False(t, removePlacementConfigs(cmao, "loki.grafana.com", addoncfg.LokiStacksResource))
+		assert.Equal(t, []addonv1beta1.AddOnConfig{clfCfg}, cmao.Spec.InstallStrategy.Placements[0].Configs)
+	})
+}
+
+func TestRemovePlacementConfigsMatching(t *testing.T) {
+	managedCLF := addonv1beta1.AddOnConfig{
+		ConfigGroupResource: addonv1beta1.ConfigGroupResource{
+			Group:    "observability.openshift.io",
+			Resource: addoncfg.ClusterLogForwardersResource,
+		},
+		ConfigReferent: addonv1beta1.ConfigReferent{
+			Name:      "mcoa-default-global",
+			Namespace: addoncfg.InstallNamespace,
+		},
+	}
+	userCLF := addonv1beta1.AddOnConfig{
+		ConfigGroupResource: addonv1beta1.ConfigGroupResource{
+			Group:    "observability.openshift.io",
+			Resource: addoncfg.ClusterLogForwardersResource,
+		},
+		ConfigReferent: addonv1beta1.ConfigReferent{
+			Name:      "user-clf",
+			Namespace: "user-ns",
+		},
+	}
+	cmao := &addonv1beta1.ClusterManagementAddOn{
+		Spec: addonv1beta1.ClusterManagementAddOnSpec{
+			InstallStrategy: addonv1beta1.InstallStrategy{
+				Placements: []addonv1beta1.PlacementStrategy{
+					{PlacementRef: addonv1beta1.PlacementRef{Namespace: "ns", Name: "a"}, Configs: []addonv1beta1.AddOnConfig{managedCLF, userCLF}},
+				},
+			},
+		},
+	}
+
+	assert.True(t, removePlacementConfigsMatching(cmao, func(cfg addonv1beta1.AddOnConfig) bool {
+		return cfg.Name == managedCLF.Name
+	}))
+	assert.Equal(t, []addonv1beta1.AddOnConfig{userCLF}, cmao.Spec.InstallStrategy.Placements[0].Configs)
+}
+
 func newCMAOTestScheme(t *testing.T) *runtime.Scheme {
 	t.Helper()
 	scheme := runtime.NewScheme()

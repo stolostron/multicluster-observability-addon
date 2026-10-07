@@ -28,6 +28,13 @@ type DefaultConfig struct {
 	Config       addonv1beta1.AddOnConfig
 }
 
+// ClusterAddonConfig is an addon config applied to a single ManagedClusterAddOn
+// (the cluster namespace on the hub) rather than fanned out through CMAO placements.
+type ClusterAddonConfig struct {
+	ClusterNamespace string
+	Config           addonv1beta1.AddOnConfig
+}
+
 func NewMCOAClusterManagementAddOn() *addonv1beta1.ClusterManagementAddOn {
 	return &addonv1beta1.ClusterManagementAddOn{
 		TypeMeta: metav1.TypeMeta{
@@ -86,18 +93,66 @@ func EnsureAddonConfig(ctx context.Context, logger logr.Logger, k8s client.Clien
 	return nil
 }
 
-func ensureConfigsInAddon(cmao *addonv1beta1.ClusterManagementAddOn, configs []DefaultConfig) {
-	containsConfig := func(configs []addonv1beta1.AddOnConfig, cfg addonv1beta1.AddOnConfig) bool {
-		// Loops through each of the configs and checks if config is equal to the config passed in
-		return slices.ContainsFunc(configs, func(e addonv1beta1.AddOnConfig) bool {
-			return e == cfg
-		})
+// StripPlacementConfigs removes configs of the given group/resource from every
+// CMAO placement. Used when a config must live on a single ManagedClusterAddOn
+// (LokiStack) after it was previously fanned out through placements.
+func StripPlacementConfigs(ctx context.Context, logger logr.Logger, k8s client.Client, group, resource string) error {
+	cmao := &addonv1beta1.ClusterManagementAddOn{}
+	if err := k8s.Get(ctx, types.NamespacedName{Name: addoncfg.Name}, cmao); err != nil {
+		return fmt.Errorf("failed to get ClusterManagementAddOn: %w", err)
 	}
 
+	desiredCmao := cmao.DeepCopy()
+	desiredCmao.ManagedFields = nil // required for patching with ssa
+	if !removePlacementConfigs(desiredCmao, group, resource) {
+		return nil
+	}
+
+	if err := ServerSideApply(ctx, k8s, desiredCmao, nil); err != nil {
+		return fmt.Errorf("failed to strip %s/%s configs from ClusterManagementAddOn: %w", group, resource, err)
+	}
+
+	logger.Info("ClusterManagementAddOn placement configs stripped",
+		"name", desiredCmao.Name,
+		"group", group,
+		"resource", resource)
+
+	return nil
+}
+
+// StripPlacementConfigsMatching removes every placement config for which match
+// returns true. Unrelated configs are left in place.
+func StripPlacementConfigsMatching(ctx context.Context, logger logr.Logger, k8s client.Client, match func(addonv1beta1.AddOnConfig) bool) error {
+	cmao := &addonv1beta1.ClusterManagementAddOn{}
+	if err := k8s.Get(ctx, types.NamespacedName{Name: addoncfg.Name}, cmao); err != nil {
+		return fmt.Errorf("failed to get ClusterManagementAddOn: %w", err)
+	}
+
+	desiredCmao := cmao.DeepCopy()
+	desiredCmao.ManagedFields = nil // required for patching with ssa
+	if !removePlacementConfigsMatching(desiredCmao, match) {
+		return nil
+	}
+
+	if err := ServerSideApply(ctx, k8s, desiredCmao, nil); err != nil {
+		return fmt.Errorf("failed to strip matching configs from ClusterManagementAddOn: %w", err)
+	}
+
+	logger.Info("ClusterManagementAddOn matching placement configs stripped", "name", desiredCmao.Name)
+	return nil
+}
+
+func containsAddOnConfig(configs []addonv1beta1.AddOnConfig, cfg addonv1beta1.AddOnConfig) bool {
+	return slices.ContainsFunc(configs, func(e addonv1beta1.AddOnConfig) bool {
+		return e == cfg
+	})
+}
+
+func ensureConfigsInAddon(cmao *addonv1beta1.ClusterManagementAddOn, configs []DefaultConfig) {
 	// Group configs by placement.
 	placementConfigs := map[addonv1beta1.PlacementRef][]addonv1beta1.AddOnConfig{}
 	for _, cfg := range configs {
-		if containsConfig(placementConfigs[cfg.PlacementRef], cfg.Config) {
+		if containsAddOnConfig(placementConfigs[cfg.PlacementRef], cfg.Config) {
 			continue
 		}
 
@@ -110,13 +165,40 @@ func ensureConfigsInAddon(cmao *addonv1beta1.ClusterManagementAddOn, configs []D
 		desiredConfigs := placementConfigs[placement.PlacementRef]
 		dedupConfigs := make([]addonv1beta1.AddOnConfig, 0, len(desiredConfigs))
 		for _, cfg := range desiredConfigs {
-			if containsConfig(placement.Configs, cfg) {
+			if containsAddOnConfig(placement.Configs, cfg) {
 				continue
 			}
 			dedupConfigs = append(dedupConfigs, cfg)
 		}
 		cmao.Spec.InstallStrategy.Placements[i].Configs = append(cmao.Spec.InstallStrategy.Placements[i].Configs, dedupConfigs...)
 	}
+}
+
+// removePlacementConfigs drops configs matching group/resource from every CMAO
+// placement. Returns true if any config was removed.
+func removePlacementConfigs(cmao *addonv1beta1.ClusterManagementAddOn, group, resource string) bool {
+	return removePlacementConfigsMatching(cmao, func(cfg addonv1beta1.AddOnConfig) bool {
+		return cfg.Group == group && cfg.Resource == resource
+	})
+}
+
+func removePlacementConfigsMatching(cmao *addonv1beta1.ClusterManagementAddOn, match func(addonv1beta1.AddOnConfig) bool) bool {
+	if match == nil {
+		return false
+	}
+	changed := false
+	for i, placement := range cmao.Spec.InstallStrategy.Placements {
+		filtered := make([]addonv1beta1.AddOnConfig, 0, len(placement.Configs))
+		for _, cfg := range placement.Configs {
+			if match(cfg) {
+				changed = true
+				continue
+			}
+			filtered = append(filtered, cfg)
+		}
+		cmao.Spec.InstallStrategy.Placements[i].Configs = filtered
+	}
+	return changed
 }
 
 // removeStaleConfigs removes any user-defined PrometheusRule or ScrapeConfig, along with any PrometheusAgent
