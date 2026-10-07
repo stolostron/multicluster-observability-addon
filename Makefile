@@ -95,7 +95,7 @@ envtest-bins: $(SETUP_ENVTEST) ## Download envtest kubernetes binaries
 .PHONY: test-integration
 test-integration: envtest-bins ## Run controller integration tests using envtest
 	KUBEBUILDER_ASSETS="$$($(SETUP_ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(BIN_DIR) -p path)" \
-	go test -v ./test/integration/... ./internal/controllers/...
+	go test -v ./test/integration/...
 
 .PHONY: prepare-bin
 prepare-bin:

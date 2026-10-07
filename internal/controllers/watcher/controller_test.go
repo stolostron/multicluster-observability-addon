@@ -4,13 +4,17 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sync"
 	"testing"
 
 	"github.com/go-logr/logr"
 	hyperv1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
+	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	addoncommon "github.com/stolostron/multicluster-observability-addon/internal/addon/common"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -20,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/util/workqueue"
+	"open-cluster-management.io/addon-framework/pkg/addonmanager"
 	workv1 "open-cluster-management.io/api/work/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -313,6 +318,82 @@ func createTestObject(name string, owners []metav1.OwnerReference) client.Object
 	return u
 }
 
+func TestMCHNetworkPoliciesPredicate(t *testing.T) {
+	createMCH := func(enabled *bool) *unstructured.Unstructured {
+		u := addoncommon.NewMultiClusterHub()
+		if enabled != nil {
+			_ = unstructured.SetNestedField(u.Object, *enabled, "spec", "networkPolicies", "enabled")
+		}
+		return u
+	}
+
+	trueVal := true
+	falseVal := false
+
+	t.Run("CreateFunc", func(t *testing.T) {
+		assert.True(t, mchNetworkPoliciesPredicate.Create(event.CreateEvent{Object: createMCH(&trueVal)}))
+		assert.False(t, mchNetworkPoliciesPredicate.Create(event.CreateEvent{Object: createMCH(&falseVal)}))
+		assert.False(t, mchNetworkPoliciesPredicate.Create(event.CreateEvent{Object: createMCH(nil)}))
+		assert.False(t, mchNetworkPoliciesPredicate.Create(event.CreateEvent{Object: &corev1.ConfigMap{}}))
+		assert.False(t, mchNetworkPoliciesPredicate.Create(event.CreateEvent{}))
+	})
+
+	t.Run("UpdateFunc", func(t *testing.T) {
+		// Enabled flipped false -> true: must trigger
+		assert.True(t, mchNetworkPoliciesPredicate.Update(event.UpdateEvent{
+			ObjectOld: createMCH(&falseVal),
+			ObjectNew: createMCH(&trueVal),
+		}))
+
+		// Enabled flipped true -> false: must trigger
+		assert.True(t, mchNetworkPoliciesPredicate.Update(event.UpdateEvent{
+			ObjectOld: createMCH(&trueVal),
+			ObjectNew: createMCH(&falseVal),
+		}))
+
+		// Enabled missing -> true: must trigger
+		assert.True(t, mchNetworkPoliciesPredicate.Update(event.UpdateEvent{
+			ObjectOld: createMCH(nil),
+			ObjectNew: createMCH(&trueVal),
+		}))
+
+		// Enabled true -> missing (implicitly false): must trigger
+		assert.True(t, mchNetworkPoliciesPredicate.Update(event.UpdateEvent{
+			ObjectOld: createMCH(&trueVal),
+			ObjectNew: createMCH(nil),
+		}))
+
+		// Unchanged (true -> true): must NOT trigger (prevents spurious reconciles on status updates)
+		assert.False(t, mchNetworkPoliciesPredicate.Update(event.UpdateEvent{
+			ObjectOld: createMCH(&trueVal),
+			ObjectNew: createMCH(&trueVal),
+		}))
+
+		// Unchanged (false -> false): must NOT trigger
+		assert.False(t, mchNetworkPoliciesPredicate.Update(event.UpdateEvent{
+			ObjectOld: createMCH(&falseVal),
+			ObjectNew: createMCH(&falseVal),
+		}))
+
+		// Unchanged (nil -> nil): must NOT trigger
+		assert.False(t, mchNetworkPoliciesPredicate.Update(event.UpdateEvent{
+			ObjectOld: createMCH(nil),
+			ObjectNew: createMCH(nil),
+		}))
+
+		// Non-unstructured objects: safe fallback without panic
+		assert.False(t, mchNetworkPoliciesPredicate.Update(event.UpdateEvent{
+			ObjectOld: &corev1.ConfigMap{},
+			ObjectNew: &corev1.ConfigMap{},
+		}))
+	})
+
+	t.Run("DeleteFunc and GenericFunc", func(t *testing.T) {
+		assert.False(t, mchNetworkPoliciesPredicate.Delete(event.DeleteEvent{Object: createMCH(&trueVal)}))
+		assert.False(t, mchNetworkPoliciesPredicate.Generic(event.GenericEvent{Object: createMCH(&trueVal)}))
+	})
+}
+
 func TestUpdateCache(t *testing.T) {
 	s := scheme.Scheme
 	_ = workv1.Install(s)
@@ -526,4 +607,205 @@ func mustMarshal(obj any) []byte {
 		panic(err)
 	}
 	return b
+}
+
+type fakeAddonManager struct {
+	addonmanager.AddonManager
+	mu       sync.Mutex
+	triggers []types.NamespacedName
+}
+
+func (f *fakeAddonManager) Trigger(clusterName, addonName string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.triggers = append(f.triggers, types.NamespacedName{
+		Namespace: clusterName,
+		Name:      addonName,
+	})
+}
+
+func (f *fakeAddonManager) getTriggers() []types.NamespacedName {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	out := make([]types.NamespacedName, len(f.triggers))
+	copy(out, f.triggers)
+	return out
+}
+
+func (f *fakeAddonManager) reset() {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.triggers = nil
+}
+
+func drainQueue(q workqueue.TypedRateLimitingInterface[reconcile.Request]) []reconcile.Request {
+	var requests []reconcile.Request
+	for q.Len() > 0 {
+		item, _ := q.Get()
+		requests = append(requests, item)
+		q.Done(item)
+	}
+	return requests
+}
+
+// TestWatcherReconciler_EnqueueForAllManagedClusters verifies that enqueueForAllManagedClusters fans out
+// reconciliation requests to all managed clusters with active MCOA ManifestWorks, as used by both the
+// global images ConfigMap and MultiClusterHub network policies watches.
+func TestWatcherReconciler_EnqueueForAllManagedClusters(t *testing.T) {
+	ctx := t.Context()
+	s := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(s))
+	require.NoError(t, workv1.Install(s))
+
+	clusters := []string{"cluster-east", "cluster-west", "cluster-central"}
+	var initObjs []client.Object
+	for _, cluster := range clusters {
+		initObjs = append(initObjs, &workv1.ManifestWork{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "mcoa-work",
+				Namespace: cluster,
+				Labels: map[string]string{
+					addoncfg.LabelOCMAddonName: addoncfg.Name,
+				},
+			},
+		})
+	}
+
+	fakeClient := fake.NewClientBuilder().WithScheme(s).WithObjects(initObjs...).Build()
+	addonMgr := &fakeAddonManager{}
+	reconciler := &WatcherReconciler{
+		Client:       fakeClient,
+		Log:          logr.Discard(),
+		Scheme:       s,
+		addonManager: addonMgr,
+		Cache:        NewReferenceCache(),
+	}
+
+	imgConfigMap := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      mconfig.ImagesConfigMapObjKey.Name,
+			Namespace: mconfig.ImagesConfigMapObjKey.Namespace,
+		},
+	}
+
+	h := reconciler.enqueueForAllManagedClusters()
+	q := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[reconcile.Request]())
+	h.Update(ctx, event.UpdateEvent{ObjectOld: imgConfigMap, ObjectNew: imgConfigMap}, q)
+
+	requests := drainQueue(q)
+	assert.Len(t, requests, len(clusters))
+
+	for _, req := range requests {
+		_, err := reconciler.Reconcile(ctx, req)
+		require.NoError(t, err)
+	}
+
+	triggers := addonMgr.getTriggers()
+	assert.Len(t, triggers, len(clusters))
+	triggeredClusters := make([]string, 0, len(triggers))
+	for _, tr := range triggers {
+		triggeredClusters = append(triggeredClusters, tr.Namespace)
+	}
+	for _, c := range clusters {
+		assert.Contains(t, triggeredClusters, c)
+	}
+}
+
+func TestWatcherReconciler_HypershiftServiceMonitorDiscovery(t *testing.T) {
+	ctx := t.Context()
+
+	addonMgr := &fakeAddonManager{}
+	reconciler := &WatcherReconciler{
+		Log:          logr.Discard(),
+		addonManager: addonMgr,
+		Cache:        NewReferenceCache(),
+	}
+
+	// Positive Test 1: ServiceMonitor "etcd" owned by HostedCluster
+	etcdSm := &prometheusv1.ServiceMonitor{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      mconfig.HypershiftEtcdServiceMonitorName,
+			Namespace: "clusters-hosted-cluster-1",
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: hyperv1.GroupVersion.String(),
+					Kind:       "HostedCluster",
+					Name:       "hosted-cluster-1",
+					UID:        types.UID("12345"),
+				},
+			},
+		},
+	}
+
+	assert.True(t, isHypershiftServiceMonitor(logr.Discard(), etcdSm), "etcd ServiceMonitor owned by HostedCluster must match")
+
+	// Map to local-cluster request
+	h := reconciler.enqueueForLocalCluster()
+	q := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[reconcile.Request]())
+	h.Create(ctx, event.CreateEvent{Object: etcdSm}, q)
+
+	requests := drainQueue(q)
+	require.Len(t, requests, 1)
+	assert.Equal(t, "local-cluster", requests[0].Namespace)
+	assert.Equal(t, addoncfg.Name, requests[0].Name)
+
+	_, err := reconciler.Reconcile(ctx, requests[0])
+	require.NoError(t, err)
+
+	triggers := addonMgr.getTriggers()
+	require.Len(t, triggers, 1)
+	assert.Equal(t, "local-cluster", triggers[0].Namespace)
+	assert.Equal(t, addoncfg.Name, triggers[0].Name)
+
+	// Positive Test 2: ServiceMonitor "kube-apiserver" owned by HostedCluster
+	addonMgr.reset()
+	apiserverSm := &prometheusv1.ServiceMonitor{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      mconfig.HypershiftApiServerServiceMonitorName,
+			Namespace: "clusters-hosted-cluster-1",
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: hyperv1.GroupVersion.String(),
+					Kind:       "HostedCluster",
+					Name:       "hosted-cluster-1",
+					UID:        types.UID("12345"),
+				},
+			},
+		},
+	}
+	assert.True(t, isHypershiftServiceMonitor(logr.Discard(), apiserverSm), "kube-apiserver ServiceMonitor owned by HostedCluster must match")
+
+	// Negative Test 1: ServiceMonitor "etcd" owned by non-hypershift CRD
+	unrelatedOwnerSm := &prometheusv1.ServiceMonitor{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      mconfig.HypershiftEtcdServiceMonitorName,
+			Namespace: "clusters-hosted-cluster-1",
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: "monitoring.coreos.com/v1",
+					Kind:       "Prometheus",
+					Name:       "k8s",
+					UID:        types.UID("67890"),
+				},
+			},
+		},
+	}
+	assert.False(t, isHypershiftServiceMonitor(logr.Discard(), unrelatedOwnerSm), "etcd ServiceMonitor with non-HostedCluster owner must NOT match")
+
+	// Negative Test 2: ServiceMonitor not named etcd or kube-apiserver even if owned by HostedCluster
+	otherAppSm := &prometheusv1.ServiceMonitor{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "custom-application-monitor",
+			Namespace: "clusters-hosted-cluster-1",
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: hyperv1.GroupVersion.String(),
+					Kind:       "HostedCluster",
+					Name:       "hosted-cluster-1",
+					UID:        types.UID("12345"),
+				},
+			},
+		},
+	}
+	assert.False(t, isHypershiftServiceMonitor(logr.Discard(), otherAppSm), "unrelated ServiceMonitor name must NOT match even if owned by HostedCluster")
 }
