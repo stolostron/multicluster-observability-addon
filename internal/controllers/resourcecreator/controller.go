@@ -183,35 +183,50 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 
 	if opts.Platform.Logs.DefaultStack || opts.ThanosOperatorEnabled {
+		gatewayHost, err := mcoagateway.GetGatewayRouteHost(ctx, r.Client)
+		if err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to get MCOA gateway route host: %w", err)
+		}
+
+		certObjs := []client.Object{}
+		// Server cert SAN needs the Route host. Skip apply until it exists so
+		// cert-manager does not issue a cert that collectors cannot use for TLS.
+		if gatewayHost != "" {
+			serverCert, err := mcoagateway.BuildServerCertificate(gatewayHost)
+			if err != nil {
+				return ctrl.Result{}, fmt.Errorf("failed to build MCOA gateway server certificate: %w", err)
+			}
+			certObjs = append(certObjs, serverCert)
+		}
+
+		if opts.Platform.Logs.DefaultStack {
+			lokiClientCert, err := mcoagateway.BuildLokiClientCertificate()
+			if err != nil {
+				return ctrl.Result{}, fmt.Errorf("failed to build MCOA gateway Loki client certificate: %w", err)
+			}
+			certObjs = append(certObjs, lokiClientCert)
+		}
+
 		managedClusters := &clusterv1.ManagedClusterList{}
 		if err := r.List(ctx, managedClusters, &client.ListOptions{}); err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to get managed cluster list: %w", err)
 		}
-		tenants := make([]string, 0, len(managedClusters.Items))
+		// One collector client cert per cluster; secret data is copied to the
+		// spoke via ManifestWork. OU is the cluster name so the gateway can set
+		// X-Scope-OrgID from the client certificate.
 		for _, cluster := range managedClusters.Items {
-			tenants = append(tenants, cluster.Name)
-		}
-
-		gatewayHost, err := mcoagateway.GetGatewayRouteHost(ctx, r.Client)
-		if err != nil {
-			r.Log.V(1).Info("Failed to get MCOA gateway route host, certificate will be built without that SAN for now", "err", err)
-		}
-
-		certObjs := []client.Object{}
-		// this should create cert per cluster, each secret will be passed through manifestwork
-		for _, tenant := range tenants {
-			cert, err := mcoagateway.BuildGatewayCertificates(tenant, gatewayHost)
+			clientCert, err := mcoagateway.BuildCollectionCertificate(cluster.Name)
 			if err != nil {
-				r.Log.V(1).Info("Failed to create cert", "tenant", tenant, "err", err)
+				return ctrl.Result{}, fmt.Errorf("failed to build MCOA gateway collection certificate for %s: %w", cluster.Name, err)
 			}
-			certObjs = append(certObjs, cert...)
+			certObjs = append(certObjs, clientCert)
 		}
+
 		for _, obj := range certObjs {
 			if err := common.ServerSideApply(ctx, r.Client, obj, cmao); err != nil {
-				r.Log.V(1).Info("Certificate SSA failed", "namespace", obj.GetNamespace(), "name", obj.GetName(), "err", err)
+				return ctrl.Result{}, fmt.Errorf("failed to apply certificate %s/%s: %w", obj.GetNamespace(), obj.GetName(), err)
 			}
 		}
-
 	}
 
 	// Reconcile logging CLFs and LokiStack separately so CLFs aren't blocking LokiStack install
