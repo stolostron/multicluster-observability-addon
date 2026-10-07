@@ -1,6 +1,7 @@
 package common_test
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
@@ -10,6 +11,11 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 )
 
 func TestSetSSAManagedFieldsAnnotation(t *testing.T) {
@@ -123,4 +129,39 @@ func TestSetSSAManagedFieldsAnnotationFromObject(t *testing.T) {
 	common.SetSSAManagedFieldsAnnotationFromObject(obj)
 
 	assert.Equal(t, ".spec.image", obj.GetAnnotations()[addoncfg.SSAManagedFieldsAnnotationKey])
+}
+
+func TestServerSideApply_PopulatesGVKWhenEmpty(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+
+	var appliedData []byte
+	var gvkDuringPatch schema.GroupVersionKind
+
+	cl := fake.NewClientBuilder().WithScheme(scheme).WithInterceptorFuncs(interceptor.Funcs{
+		Patch: func(ctx context.Context, client client.WithWatch, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
+			gvkDuringPatch = obj.GetObjectKind().GroupVersionKind()
+			data, err := patch.Data(obj)
+			if err != nil {
+				return err
+			}
+			appliedData = data
+			return client.Patch(ctx, obj, patch, opts...)
+		},
+	}).Build()
+
+	cm := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-cm",
+			Namespace: "default",
+		},
+	}
+	require.True(t, cm.GetObjectKind().GroupVersionKind().Empty())
+
+	err := common.ServerSideApply(t.Context(), cl, cm, nil)
+	require.NoError(t, err)
+
+	assert.Equal(t, corev1.SchemeGroupVersion.WithKind("ConfigMap"), gvkDuringPatch)
+	assert.Contains(t, string(appliedData), `"kind":"ConfigMap"`)
+	assert.Contains(t, string(appliedData), `"apiVersion":"v1"`)
 }
