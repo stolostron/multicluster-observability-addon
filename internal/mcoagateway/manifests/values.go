@@ -20,14 +20,15 @@ type ObsAPIResources struct {
 }
 
 type MCOAGatewayValues struct {
-	Enabled              bool            `json:"enabled"`
-	MetricsWriteEndpoint string          `json:"metricsWriteEndpoint"`
-	MetricsReadEndpoint  string          `json:"metricsReadEndpoint"`
-	Replicas             int32           `json:"replicas"`
-	Resources            ObsAPIResources `json:"resources"`
-	LogsEnabled          bool            `json:"logsEnabled"`
-	LogsWriteEndpoint    string          `json:"logsWriteEndpoint"`
-	LogsReadEndpoint     string          `json:"logsReadEndpoint"`
+	Enabled               bool            `json:"enabled"`
+	MetricsWriteEndpoint  string          `json:"metricsWriteEndpoint"`
+	MetricsReadEndpoint   string          `json:"metricsReadEndpoint"`
+	Replicas              int32           `json:"replicas"`
+	Resources             ObsAPIResources `json:"resources"`
+	LogsEnabled           bool            `json:"logsEnabled"`
+	LogsWriteEndpoint     string          `json:"logsWriteEndpoint"`
+	LogsReadEndpoint      string          `json:"logsReadEndpoint"`
+	AlertmanagerEndpoints []string        `json:"alertmanagerEndpoints,omitempty"`
 }
 
 var obsAPICPURequest = map[string]string{
