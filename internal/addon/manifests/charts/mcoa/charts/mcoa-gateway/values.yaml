@@ -10,3 +10,4 @@ resources:
 logsEnabled: false
 logsWriteEndpoint: "https://mcoa-logging-managed-storage-gateway-http.openshift-logging.svc:8080"
 logsReadEndpoint: "https://mcoa-logging-managed-storage-gateway-http.openshift-logging.svc:8080"
+alertmanagerEndpoints: []
