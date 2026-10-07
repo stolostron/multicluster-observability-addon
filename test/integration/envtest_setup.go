@@ -71,12 +71,16 @@ const defaultEnvtestK8sVersion = "1.35.0"
 //  2. Local repo ./bin/k8s/ directory containing pre-downloaded binaries.
 //  3. Dynamic resolution via setup-envtest CLI using ENVTEST_K8S_VERSION (or defaultEnvtestK8sVersion).
 func ResolveEnvtestAssetsDir() string {
+	repoRoot := FindRepoRoot()
+
 	if assets := os.Getenv("KUBEBUILDER_ASSETS"); assets != "" {
+		if !filepath.IsAbs(assets) {
+			return filepath.Join(repoRoot, assets)
+		}
 		return assets
 	}
 
 	version := os.Getenv("ENVTEST_K8S_VERSION")
-	repoRoot := FindRepoRoot()
 
 	if version != "" {
 		matches, _ := filepath.Glob(filepath.Join(repoRoot, "bin", "k8s", version+"-*"))
@@ -91,7 +95,20 @@ func ResolveEnvtestAssetsDir() string {
 		version = defaultEnvtestK8sVersion
 	}
 
-	out, err := exec.Command("setup-envtest", "use", "-p", "path", version).Output()
+	setupEnvtestCmd := "setup-envtest"
+	var cmdArgs []string
+	if _, err := exec.LookPath(setupEnvtestCmd); err != nil {
+		localBin := filepath.Join(repoRoot, "bin", "setup-envtest")
+		if _, statErr := os.Stat(localBin); statErr == nil {
+			setupEnvtestCmd = localBin
+			cmdArgs = []string{"use", version, "--bin-dir", filepath.Join(repoRoot, "bin"), "-p", "path"}
+		}
+	}
+	if len(cmdArgs) == 0 {
+		cmdArgs = []string{"use", "-p", "path", version}
+	}
+
+	out, err := exec.Command(setupEnvtestCmd, cmdArgs...).Output()
 	if err == nil {
 		return strings.TrimSpace(string(out))
 	}

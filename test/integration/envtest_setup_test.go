@@ -1,7 +1,6 @@
 package integration
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -17,7 +16,7 @@ func TestEnvtestBootstrap(t *testing.T) {
 	require.NotNil(t, testEnv)
 	require.NotNil(t, testEnv.K8sClient)
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Verify core namespace creation
 	ns := &corev1.Namespace{
