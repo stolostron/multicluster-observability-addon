@@ -36,8 +36,10 @@ import (
 	"github.com/stolostron/multicluster-observability-addon/internal/controllers/defaulthubstack"
 	"github.com/stolostron/multicluster-observability-addon/internal/controllers/resourcecreator"
 	"github.com/stolostron/multicluster-observability-addon/internal/controllers/watcher"
+	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	tlshelper "github.com/stolostron/multicluster-observability-addon/pkg/util"
 	thanosv1alpha1 "github.com/thanos-community/thanos-operator/api/v1alpha1"
+	appsv1 "k8s.io/api/apps/v1"
 	crdClientSet "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -218,6 +220,15 @@ func runControllers(ctx context.Context, kubeConfig *rest.Config) error {
 		Cache:  getCacheOptions(),
 		MapperProvider: func(c *rest.Config, hc *http.Client) (meta.RESTMapper, error) {
 			return mapper, nil
+		},
+		Cache: cache.Options{
+			ByObject: map[client.Object]cache.ByObject{
+				&appsv1.StatefulSet{}: {
+					Namespaces: map[string]cache.Config{
+						mconfig.HubInstallNamespace: {},
+					},
+				},
+			},
 		},
 		Client: client.Options{
 			HTTPClient: httpClient,

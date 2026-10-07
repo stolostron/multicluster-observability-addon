@@ -120,5 +120,7 @@
     - apiGroups: ["route.openshift.io"]
       resources: ["routes"]
       verbs: ["get", "list", "watch"]
-
-
+    # Read Alertmanager StatefulSet replicas to configure the hub gateway.
+    - apiGroups: ["apps"]
+      resources: ["statefulsets"]
+      verbs: ["get", "list", "watch"]
