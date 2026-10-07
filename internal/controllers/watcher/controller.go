@@ -14,6 +14,7 @@ import (
 	rshandlers "github.com/stolostron/multicluster-observability-addon/internal/analytics/rightsizing/handlers"
 	coohandlers "github.com/stolostron/multicluster-observability-addon/internal/coo/handlers"
 	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -33,7 +34,8 @@ import (
 )
 
 const (
-	localClusterNamespace = "local-cluster"
+	localClusterNamespace          = "local-cluster"
+	alertmanagerStatefulSetService = "alertmanager-operated"
 )
 
 // WatcherReconciler triggers reconciliation in the AddonManager when something changes in an upstream resource
@@ -76,6 +78,8 @@ func SetupWithManager(mgr ctrl.Manager, addonManager addonmanager.AddonManager, 
 		Watches(&hyperv1.HostedCluster{}, r.enqueueForLocalCluster(), hostedClusterPredicate).
 		Watches(&prometheusv1.ServiceMonitor{}, r.enqueueForLocalCluster(), hypershiftServiceMonitorsPredicate(r.Log), builder.OnlyMetadata).
 		Watches(common.NewMultiClusterHub(), r.enqueueForAllManagedClusters(), builder.WithPredicates(mchNetworkPoliciesPredicate)).
+		// Re-render the hub gateway when Alertmanager's desired replica count changes.
+		Watches(&appsv1.StatefulSet{}, r.enqueueForLocalCluster(), alertmanagerStatefulSetPredicate).
 		Complete(r)
 }
 
@@ -282,6 +286,51 @@ func hypershiftServiceMonitorsPredicate(logger logr.Logger) builder.Predicates {
 		GenericFunc: func(e event.GenericEvent) bool { return false },
 	})
 }
+
+func isAlertmanagerStatefulSet(obj client.Object) bool {
+	statefulSet, ok := obj.(*appsv1.StatefulSet)
+	return ok && obj.GetNamespace() == mconfig.HubInstallNamespace &&
+		statefulSet.Spec.ServiceName == alertmanagerStatefulSetService
+}
+
+// alertmanagerStatefulSetPredicate filters events to the Alertmanager StatefulSet.
+// Its desired replica count determines the set of stable pod URLs sent to the gateway.
+var alertmanagerStatefulSetPredicate = builder.WithPredicates(predicate.Funcs{
+	CreateFunc: func(e event.CreateEvent) bool {
+		return isAlertmanagerStatefulSet(e.Object)
+	},
+	UpdateFunc: func(e event.UpdateEvent) bool {
+		oldStatefulSet, oldOK := e.ObjectOld.(*appsv1.StatefulSet)
+		newStatefulSet, newOK := e.ObjectNew.(*appsv1.StatefulSet)
+		if !oldOK || !newOK {
+			return false
+		}
+
+		oldMatches := isAlertmanagerStatefulSet(oldStatefulSet)
+		newMatches := isAlertmanagerStatefulSet(newStatefulSet)
+		if !oldMatches && !newMatches {
+			return false
+		}
+		if oldMatches != newMatches {
+			return true
+		}
+
+		oldReplicas, newReplicas := int32(1), int32(1)
+		if oldStatefulSet.Spec.Replicas != nil {
+			oldReplicas = *oldStatefulSet.Spec.Replicas
+		}
+		if newStatefulSet.Spec.Replicas != nil {
+			newReplicas = *newStatefulSet.Spec.Replicas
+		}
+		return oldReplicas != newReplicas
+	},
+	DeleteFunc: func(e event.DeleteEvent) bool {
+		return isAlertmanagerStatefulSet(e.Object)
+	},
+	GenericFunc: func(e event.GenericEvent) bool {
+		return false
+	},
+})
 
 // isHypershiftServiceMonitor returns true when the serviceMonitor is deployed by hypershift for etcd or the apiserver
 // This is used for metrics to ensure our own serviceMonitor, based on the original one deployed by hypershift remains in sync.
