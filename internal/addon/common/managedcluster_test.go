@@ -3,9 +3,14 @@ package common
 import (
 	"testing"
 
+	clusterlifecycleconstants "github.com/stolostron/cluster-lifecycle-api/constants"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
 func TestGetManagedClusterID(t *testing.T) {
@@ -241,4 +246,69 @@ func TestIsOpenShiftVendor(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestHubClusterName(t *testing.T) {
+	tests := []struct {
+		name     string
+		clusters []clusterv1.ManagedCluster
+		want     string
+	}{
+		{
+			name:     "no clusters falls back to local-cluster",
+			clusters: nil,
+			want:     addoncfg.HubNamespace,
+		},
+		{
+			name: "spoke only falls back to local-cluster",
+			clusters: []clusterv1.ManagedCluster{
+				{ObjectMeta: metav1.ObjectMeta{Name: "spoke-1"}},
+			},
+			want: addoncfg.HubNamespace,
+		},
+		{
+			name: "labeled hub is selected even when not named local-cluster",
+			clusters: []clusterv1.ManagedCluster{
+				{ObjectMeta: metav1.ObjectMeta{Name: "spoke-1"}},
+				{ObjectMeta: metav1.ObjectMeta{
+					Name:   "my-hub",
+					Labels: map[string]string{clusterlifecycleconstants.SelfManagedClusterLabelKey: "true"},
+				}},
+			},
+			want: "my-hub",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, HubClusterName(tt.clusters))
+		})
+	}
+}
+
+func TestLookupHubClusterName(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, clusterv1.Install(scheme))
+
+	t.Run("returns the labeled hub", func(t *testing.T) {
+		hub := &clusterv1.ManagedCluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   "my-hub",
+				Labels: map[string]string{clusterlifecycleconstants.SelfManagedClusterLabelKey: "true"},
+			},
+		}
+		spoke := &clusterv1.ManagedCluster{ObjectMeta: metav1.ObjectMeta{Name: "spoke-1"}}
+		k8s := fake.NewClientBuilder().WithScheme(scheme).WithObjects(hub, spoke).Build()
+		got, err := LookupHubClusterName(t.Context(), k8s)
+		require.NoError(t, err)
+		assert.Equal(t, "my-hub", got)
+	})
+
+	t.Run("falls back when no hub label is present", func(t *testing.T) {
+		spoke := &clusterv1.ManagedCluster{ObjectMeta: metav1.ObjectMeta{Name: "spoke-1"}}
+		k8s := fake.NewClientBuilder().WithScheme(scheme).WithObjects(spoke).Build()
+		got, err := LookupHubClusterName(t.Context(), k8s)
+		require.NoError(t, err)
+		assert.Equal(t, addoncfg.HubNamespace, got)
+	})
 }
