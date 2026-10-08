@@ -2,20 +2,32 @@ package resourcecreator
 
 import (
 	"context"
+	"errors"
 	"testing"
 
+	certmanagerv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
+	"github.com/go-logr/logr"
+	lokiv1 "github.com/grafana/loki/operator/api/loki/v1"
+	routev1 "github.com/openshift/api/route/v1"
+	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
+	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/workqueue"
 	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
@@ -489,5 +501,106 @@ func TestEnqueueFunctions(t *testing.T) {
 			h.Delete(context.Background(), event.DeleteEvent{Object: obj}, q)
 			assert.Equal(t, 0, q.Len())
 		})
+	})
+}
+
+func TestHasCRD(t *testing.T) {
+	scheme := runtime.NewScheme()
+	_ = lokiv1.AddToScheme(scheme)
+	_ = loggingv1.AddToScheme(scheme)
+
+	// Mapper that only knows about ClusterLogForwarder: the Loki Operator is not
+	// installed on this hub, so lokistacks is not served.
+	mapper := meta.NewDefaultRESTMapper([]schema.GroupVersion{loggingv1.GroupVersion})
+	mapper.Add(clusterLogForwarderGVK, meta.RESTScopeNamespace)
+
+	reconciler := &ResourceCreatorReconciler{
+		Client: fake.NewClientBuilder().WithScheme(scheme).WithRESTMapper(mapper).Build(),
+		Scheme: scheme,
+	}
+
+	assert.True(t, reconciler.hasCRD(clusterLogForwarderGVK))
+	assert.False(t, reconciler.hasCRD(lokiStackGVK))
+}
+
+// errKindNotServed stands in for what the API server returns for a kind whose
+// CRD is not installed.
+var errKindNotServed = errors.New("the server could not find the requested resource")
+
+// TestReconcileWithoutLokiStackCRD covers a hub where neither the Loki Operator
+// nor the Cluster Logging Operator is installed. Whether that is fatal depends
+// entirely on whether the user asked for the default logging stack.
+func TestReconcileWithoutLokiStackCRD(t *testing.T) {
+	scheme := runtime.NewScheme()
+	_ = corev1.AddToScheme(scheme)
+	_ = addonv1beta1.Install(scheme)
+	_ = clusterv1.Install(scheme)
+	_ = cooprometheusv1alpha1.AddToScheme(scheme)
+	_ = prometheusv1.AddToScheme(scheme)
+	_ = lokiv1.AddToScheme(scheme)
+	_ = loggingv1.AddToScheme(scheme)
+	// Enabling the default stack also drives the mcoa-gateway certificates.
+	_ = routev1.AddToScheme(scheme)
+	_ = certmanagerv1.AddToScheme(scheme)
+
+	newReconciler := func(defaultStack bool) *ResourceCreatorReconciler {
+		aodc := &addonv1beta1.AddOnDeploymentConfig{
+			ObjectMeta: metav1.ObjectMeta{Name: addoncfg.Name, Namespace: addoncfg.InstallNamespace},
+		}
+		if defaultStack {
+			aodc.Spec.CustomizedVariables = []addonv1beta1.CustomizedVariable{
+				{Name: addon.KeyPlatformLogsDefault, Value: "true"},
+			}
+		}
+		cmao := &addonv1beta1.ClusterManagementAddOn{
+			ObjectMeta: metav1.ObjectMeta{Name: addoncfg.Name},
+			Spec: addonv1beta1.ClusterManagementAddOnSpec{
+				InstallStrategy: addonv1beta1.InstallStrategy{
+					Type:       "Placements",
+					Placements: []addonv1beta1.PlacementStrategy{{PlacementRef: addoncfg.GlobalPlacementRef}},
+				},
+			},
+		}
+
+		// Empty REST mapper: the API server serves neither lokistacks nor
+		// clusterlogforwarders. The interceptor makes any call that slips
+		// through anyway fail the way a real API server would.
+		fakeClient := fake.NewClientBuilder().
+			WithScheme(scheme).
+			WithRESTMapper(meta.NewDefaultRESTMapper([]schema.GroupVersion{})).
+			WithObjects(aodc, cmao).
+			WithInterceptorFuncs(interceptor.Funcs{
+				List: func(ctx context.Context, c client.WithWatch, list client.ObjectList, opts ...client.ListOption) error {
+					switch list.(type) {
+					case *lokiv1.LokiStackList, *loggingv1.ClusterLogForwarderList:
+						return errKindNotServed
+					}
+					return c.List(ctx, list, opts...)
+				},
+				Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+					switch obj.(type) {
+					case *lokiv1.LokiStack, *loggingv1.ClusterLogForwarder:
+						return errKindNotServed
+					}
+					return c.Get(ctx, key, obj, opts...)
+				},
+			}).
+			Build()
+
+		return &ResourceCreatorReconciler{Client: fakeClient, Log: logr.Discard(), Scheme: scheme}
+	}
+
+	request := reconcile.Request{
+		NamespacedName: types.NamespacedName{Name: addoncfg.Name, Namespace: addoncfg.InstallNamespace},
+	}
+
+	t.Run("logging disabled: reconciles cleanly", func(t *testing.T) {
+		_, err := newReconciler(false).Reconcile(context.Background(), request)
+		assert.NoError(t, err, "a hub without the Loki Operator must still reconcile metrics and right-sizing")
+	})
+
+	t.Run("logging enabled: reports the missing CRD", func(t *testing.T) {
+		_, err := newReconciler(true).Reconcile(context.Background(), request)
+		require.ErrorIs(t, err, errLokiStackCRDMissing)
 	})
 }
