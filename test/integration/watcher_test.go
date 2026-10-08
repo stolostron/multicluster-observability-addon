@@ -58,23 +58,9 @@ func (f *watcherFakeAddonManager) reset() {
 	f.triggers = nil
 }
 
-// TestWatcherReconciler_SecretMutationTrigger serves as the representative end-to-end integration test
-// for the Watcher controller.
-//
-// Architectural Scope:
-// This test exercises the most complex asynchronous path in WatcherReconciler:
-//  1. Live controller-runtime Manager bootstrap and Informer cache synchronization.
-//  2. Dynamic cache ingestion (updateCache) extracting original-resource annotations from ManifestWorks.
-//  3. HTTP/2 watch stream event dispatch from kube-apiserver upon discrete upstream Secret mutation.
-//  4. ReferenceCache reverse-lookup resolving the mutated Secret to the downstream spoke cluster namespace.
-//  5. Reconciliation queue dispatch invoking Reconcile() and addonManager.Trigger().
-//
-// Testing Pyramid Boundary:
-// Once this test proves that the live Informer -> Cache -> Queue -> Reconciler pipeline functions correctly against
-// real kube-apiserver and etcd binaries, other watch triggers (such as the global images ConfigMap, Hypershift
-// ServiceMonitors, and MultiClusterHub network policies) do not need redundant envtest suites. Their custom behavior
-// lies strictly in deterministic predicates and queue mappers (e.g., mchNetworkPoliciesPredicate, isHypershiftServiceMonitor,
-// enqueueForAllManagedClusters), which are tested exhaustively in milliseconds in internal/controllers/watcher/controller_test.go.
+// TestWatcherReconciler_SecretMutationTrigger verifies that the Watcher controller detects
+// an upstream Secret mutation, resolves referencing clusters via ReferenceCache, and dispatches
+// addonManager.Trigger().
 func TestWatcherReconciler_SecretMutationTrigger(t *testing.T) {
 	testEnv := SetupTestEnv(t)
 	ctx := t.Context()

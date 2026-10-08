@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/go-logr/logr"
+	ocinfrav1 "github.com/openshift/api/config/v1"
 	hyperv1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	cooprometheusv1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1"
@@ -42,6 +43,7 @@ func NewTestScheme() *runtime.Scheme {
 	utilruntime.Must(cooprometheusv1alpha1.AddToScheme(s))
 	utilruntime.Must(prometheusv1.AddToScheme(s))
 	utilruntime.Must(hyperv1.AddToScheme(s))
+	utilruntime.Must(ocinfrav1.Install(s))
 	return s
 }
 
