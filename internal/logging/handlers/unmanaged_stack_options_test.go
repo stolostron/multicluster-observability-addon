@@ -102,6 +102,29 @@ func TestGetUnmanagedClusterLogForwarder(t *testing.T) {
 		assert.Equal(t, "user-clf", got.Name, "must pick the admin-authored CLF, not MCOA's own managed one")
 	})
 
+	t.Run("ignores a reference whose CLF does not exist", func(t *testing.T) {
+		scheme := buildTestScheme(t)
+		userCLF := &loggingv1.ClusterLogForwarder{
+			ObjectMeta: metav1.ObjectMeta{Name: "user-clf", Namespace: "user-ns"},
+		}
+		fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(userCLF).Build()
+
+		mcAddon := &addonapiv1beta1.ManagedClusterAddOn{
+			Status: addonapiv1beta1.ManagedClusterAddOnStatus{
+				ConfigReferences: []addonapiv1beta1.ConfigReference{
+					// Dangling reference to the default-stack CLF, which only
+					// exists while managed logging is enabled.
+					buildCLFConfigReference(addoncfg.InstallNamespace, "default-stack-instance-global"),
+					buildCLFConfigReference("user-ns", "user-clf"),
+				},
+			},
+		}
+
+		got, err := getUnmanagedClusterLogForwarder(ctx, fakeClient, mcAddon)
+		require.NoError(t, err, "a reference to a CLF that was never created must not fail unmanaged collection")
+		assert.Equal(t, "user-clf", got.Name)
+	})
+
 	t.Run("errors when multiple non-owned CLFs are referenced", func(t *testing.T) {
 		scheme := buildTestScheme(t)
 		clf1 := &loggingv1.ClusterLogForwarder{ObjectMeta: metav1.ObjectMeta{Name: "clf-1", Namespace: "user-ns"}}
