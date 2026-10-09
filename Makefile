@@ -79,6 +79,24 @@ fmt: lint-fix
 test:
 	go test ./internal/...
 
+ENVTEST_K8S_VERSION ?= 1.35.0
+SETUP_ENVTEST ?= $(BIN_DIR)/setup-envtest
+
+$(SETUP_ENVTEST): prepare-bin
+	@if [ ! -f $(SETUP_ENVTEST) ]; then \
+		echo "Installing setup-envtest to $(BIN_DIR)..."; \
+		GOBIN=$(BIN_DIR) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest; \
+	fi
+
+.PHONY: envtest-bins
+envtest-bins: $(SETUP_ENVTEST) ## Download envtest kubernetes binaries
+	@$(SETUP_ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(BIN_DIR) > /dev/null
+
+.PHONY: test-integration
+test-integration: envtest-bins ## Run controller integration tests using envtest
+	KUBEBUILDER_ASSETS="$$($(SETUP_ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(BIN_DIR) -p path)" \
+	go test -v ./test/integration/...
+
 .PHONY: prepare-bin
 prepare-bin:
 	@mkdir -p $(BIN_DIR)
