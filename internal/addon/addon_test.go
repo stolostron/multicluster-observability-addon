@@ -23,12 +23,11 @@ import (
 	workv1 "open-cluster-management.io/api/work/v1"
 )
 
+//nolint:staticcheck // fakeaddon.NewSimpleClientset is deprecated in client-go but open-cluster-management.io/api does not generate NewClientset
 func newTestGetter(aodc *addonapiv1beta1.AddOnDeploymentConfig) addonutils.AddOnDeploymentConfigGetter {
 	if aodc == nil {
-		//nolint:staticcheck // client.Apply is deprecated, but alternative requires ApplyConfigurations which we don't have
 		return addonutils.NewAddOnDeploymentConfigGetter(fakeaddon.NewSimpleClientset())
 	}
-	//nolint:staticcheck // client.Apply is deprecated, but alternative requires ApplyConfigurations which we don't have
 	return addonutils.NewAddOnDeploymentConfigGetter(fakeaddon.NewSimpleClientset(aodc))
 }
 
