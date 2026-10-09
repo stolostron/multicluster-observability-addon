@@ -8,6 +8,7 @@ import (
 
 	cooprometheusv1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1"
 	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
+	"github.com/stolostron/multicluster-observability-addon/internal/mcoagateway"
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/handlers"
 	corev1 "k8s.io/api/core/v1"
@@ -15,38 +16,40 @@ import (
 )
 
 type MetricsValues struct {
-	PlatformEnabled                bool                              `json:"platformEnabled"`
-	UserWorkloadsEnabled           bool                              `json:"userWorkloadsEnabled"`
-	Secrets                        []ConfigValue                     `json:"secrets"`
-	ConfigMaps                     []ConfigValue                     `json:"configMaps"`
-	Images                         ImagesValues                      `json:"images"`
-	PrometheusControllerID         string                            `json:"prometheusControllerID"`
-	PrometheusCAConfigMapName      string                            `json:"prometheusCAConfigMapName"`
-	PrometheusServerName           string                            `json:"prometheusServerName"`
-	AlertmanagerRouterCASecretName string                            `json:"alertmanagerRouterCASecretName"`
-	AlertmanagerAccessorSecretName string                            `json:"alertmanagerAccessorSecretName"`
-	ClientCertSecretName           string                            `json:"clientCertSecretName"`
-	HubClusterID                   string                            `json:"hubClusterID"`
-	ClusterID                      string                            `json:"clusterID"`
-	ClusterName                    string                            `json:"clusterName"`
-	PlatformAlertsEnabled          bool                              `json:"platformAlertsEnabled"`
-	UserWorkloadAlertsEnabled      bool                              `json:"userWorkloadAlertsEnabled"`
-	Platform                       Collector                         `json:"platform"`
-	UserWorkload                   Collector                         `json:"userWorkload"`
-	DeployNonOCPStack              bool                              `json:"deployNonOCPStack"`
-	DeployCOOResources             bool                              `json:"deployCOOResources"`
-	IsHub                          bool                              `json:"isHub"`
-	PrometheusOperatorAnnotations  string                            `json:"prometheusOperatorAnnotations,omitempty"`
-	HubEndpoint                    string                            `json:"hubEndpoint,omitempty"`
-	Tolerations                    []corev1.Toleration               `json:"tolerations"`
-	NodeSelector                   map[string]string                 `json:"nodeSelector"`
-	NodeExporter                   NodeExporterValues                `json:"nodeExporter"`
-	ThanosOperator                 ThanosOperatorValues              `json:"thanosOperator"`
-	TLSProfileEnabled              bool                              `json:"tlsProfileEnabled"`
-	TLSMinVersion                  string                            `json:"tlsMinVersion,omitempty"`
-	TLSCipherSuites                string                            `json:"tlsCipherSuites,omitempty"`
-	MonitoringStackPatches         []MonitoringStackPatchValues      `json:"monitoringStackPatches"`
-	PrometheusServerRemoteWrite    []cooprometheusv1.RemoteWriteSpec `json:"prometheusServerRemoteWrite,omitempty"`
+	PlatformEnabled                  bool                              `json:"platformEnabled"`
+	UserWorkloadsEnabled             bool                              `json:"userWorkloadsEnabled"`
+	Secrets                          []ConfigValue                     `json:"secrets"`
+	ConfigMaps                       []ConfigValue                     `json:"configMaps"`
+	Images                           ImagesValues                      `json:"images"`
+	PrometheusControllerID           string                            `json:"prometheusControllerID"`
+	PrometheusCAConfigMapName        string                            `json:"prometheusCAConfigMapName"`
+	PrometheusServerName             string                            `json:"prometheusServerName"`
+	AlertmanagerRouterCASecretName   string                            `json:"alertmanagerRouterCASecretName"`
+	AlertmanagerAccessorSecretName   string                            `json:"alertmanagerAccessorSecretName"`
+	ClientCertSecretName             string                            `json:"clientCertSecretName"`
+	HubClusterID                     string                            `json:"hubClusterID"`
+	ClusterID                        string                            `json:"clusterID"`
+	ClusterName                      string                            `json:"clusterName"`
+	PlatformAlertsEnabled            bool                              `json:"platformAlertsEnabled"`
+	UserWorkloadAlertsEnabled        bool                              `json:"userWorkloadAlertsEnabled"`
+	Platform                         Collector                         `json:"platform"`
+	UserWorkload                     Collector                         `json:"userWorkload"`
+	DeployNonOCPStack                bool                              `json:"deployNonOCPStack"`
+	DeployCOOResources               bool                              `json:"deployCOOResources"`
+	IsHub                            bool                              `json:"isHub"`
+	PrometheusOperatorAnnotations    string                            `json:"prometheusOperatorAnnotations,omitempty"`
+	HubEndpoint                      string                            `json:"hubEndpoint,omitempty"`
+	AlertmanagerGatewayHost          string                            `json:"alertmanagerGatewayHost,omitempty"`
+	AlertmanagerGatewayTLSSecretName string                            `json:"alertmanagerGatewayTLSSecretName"`
+	Tolerations                      []corev1.Toleration               `json:"tolerations"`
+	NodeSelector                     map[string]string                 `json:"nodeSelector"`
+	NodeExporter                     NodeExporterValues                `json:"nodeExporter"`
+	ThanosOperator                   ThanosOperatorValues              `json:"thanosOperator"`
+	TLSProfileEnabled                bool                              `json:"tlsProfileEnabled"`
+	TLSMinVersion                    string                            `json:"tlsMinVersion,omitempty"`
+	TLSCipherSuites                  string                            `json:"tlsCipherSuites,omitempty"`
+	MonitoringStackPatches           []MonitoringStackPatchValues      `json:"monitoringStackPatches"`
+	PrometheusServerRemoteWrite      []cooprometheusv1.RemoteWriteSpec `json:"prometheusServerRemoteWrite,omitempty"`
 }
 
 type MonitoringStackPatchValues struct {
@@ -124,10 +127,11 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 			RBACProxyTLSSecret: config.UserWorkloadRBACProxyTLSSecret,
 			RBACProxyPort:      strconv.Itoa(config.RBACProxyPort),
 		},
-		HubEndpoint:  opts.HubEndpoint,
-		NodeSelector: opts.NodeSelector,
-		Tolerations:  opts.Tolerations,
-		IsHub:        opts.IsHub,
+		HubEndpoint:                      opts.HubEndpoint,
+		AlertmanagerGatewayTLSSecretName: mcoagateway.DefaultCollectionMTLSSecretName,
+		NodeSelector:                     opts.NodeSelector,
+		Tolerations:                      opts.Tolerations,
+		IsHub:                            opts.IsHub,
 		NodeExporter: NodeExporterValues{
 			HostPort:     opts.NodeExporter.HostPort,
 			InternalPort: opts.NodeExporter.InternalPort,
