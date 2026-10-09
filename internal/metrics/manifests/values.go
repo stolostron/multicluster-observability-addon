@@ -8,6 +8,7 @@ import (
 
 	cooprometheusv1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1"
 	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
+	"github.com/stolostron/multicluster-observability-addon/internal/mcoagateway"
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/handlers"
 	corev1 "k8s.io/api/core/v1"
@@ -129,10 +130,11 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 			RBACProxyTLSSecret: config.UserWorkloadRBACProxyTLSSecret,
 			RBACProxyPort:      strconv.Itoa(config.RBACProxyPort),
 		},
-		HubEndpoint:  opts.HubEndpoint,
-		NodeSelector: opts.NodeSelector,
-		Tolerations:  opts.Tolerations,
-		IsHub:        opts.IsHub,
+		HubEndpoint:                      opts.HubEndpoint,
+		AlertmanagerGatewayTLSSecretName: mcoagateway.DefaultCollectionMTLSSecretName,
+		NodeSelector:                     opts.NodeSelector,
+		Tolerations:                      opts.Tolerations,
+		IsHub:                            opts.IsHub,
 		NodeExporter: NodeExporterValues{
 			HostPort:     opts.NodeExporter.HostPort,
 			InternalPort: opts.NodeExporter.InternalPort,

@@ -122,8 +122,13 @@ spec:
               mountPath: /var/run/loki-client-tls/service-ca.crt
               subPath: service-ca.crt
             {{- end }}
+            {{- if .Values.thanosOperatorEnabled }}
+            - name: alertmanager-accessor
+              readOnly: true
+              mountPath: /var/run/alertmanager-accessor
+            {{- end }}
           terminationMessagePolicy: File
-          image: 'quay.io/rh-ee-dbuchana/mcoa-gateway:add-alert-fanout-2026-10-06-v0.1.2-724-ge81de4a ' # TODO replace stolostron image when we get one
+          image: 'quay.io/rh-ee-dbuchana/mcoa-gateway:add-alert-fanout-2026-10-09-v0.1.2-726-gd70ba0f' # TODO replace stolostron image when we get one
           args:
             - '--web.listen=0.0.0.0:8080'
             - '--web.internal.listen=0.0.0.0:8081'
@@ -154,8 +159,8 @@ spec:
             - '--logs.tls.key-file=/var/run/loki-client-tls/tls.key'
             - '--logs.tls.ca-file=/var/run/loki-client-tls/service-ca.crt'
             {{- end }}
-            {{- range .Values.alertmanagerEndpoints }}
-            - '--metrics.alertmanager.endpoint={{ . }}'
+            {{- if .Values.alertmanagerEndpoints }}
+            - '--alertmanager.endpoint={{ join "," .Values.alertmanagerEndpoints }}'
             {{- end }}
       serviceAccount: observability-observatorium-api
       volumes:
@@ -175,6 +180,12 @@ spec:
         - name: openshift-service-ca
           configMap:
             name: openshift-service-ca.crt
+            defaultMode: 420
+        {{- end }}
+        {{- if .Values.thanosOperatorEnabled }}
+        - name: alertmanager-accessor
+          secret:
+            secretName: {{ .Values.alertmanagerAccessorSecretName }}
             defaultMode: 420
         {{- end }}
       dnsPolicy: ClusterFirst
