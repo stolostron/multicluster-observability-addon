@@ -20,15 +20,18 @@ type ObsAPIResources struct {
 }
 
 type MCOAGatewayValues struct {
-	Enabled               bool            `json:"enabled"`
-	MetricsWriteEndpoint  string          `json:"metricsWriteEndpoint"`
-	MetricsReadEndpoint   string          `json:"metricsReadEndpoint"`
-	Replicas              int32           `json:"replicas"`
-	Resources             ObsAPIResources `json:"resources"`
-	LogsEnabled           bool            `json:"logsEnabled"`
-	LogsWriteEndpoint     string          `json:"logsWriteEndpoint"`
-	LogsReadEndpoint      string          `json:"logsReadEndpoint"`
-	AlertmanagerEndpoints []string        `json:"alertmanagerEndpoints,omitempty"`
+	Enabled                        bool            `json:"enabled"`
+	ThanosOperatorEnabled          bool            `json:"thanosOperatorEnabled"`
+	AlertmanagerAccessorSecretName string          `json:"alertmanagerAccessorSecretName,omitempty"`
+	AlertmanagerGatewayHost        string          `json:"alertmanagerGatewayHost,omitempty"`
+	MetricsWriteEndpoint           string          `json:"metricsWriteEndpoint"`
+	MetricsReadEndpoint            string          `json:"metricsReadEndpoint"`
+	LogsEnabled                    bool            `json:"logsEnabled"`
+	LogsWriteEndpoint              string          `json:"logsWriteEndpoint"`
+	LogsReadEndpoint               string          `json:"logsReadEndpoint"`
+	AlertmanagerEndpoints          []string        `json:"alertmanagerEndpoints,omitempty"`
+	Replicas                       int32           `json:"replicas"`
+	Resources                      ObsAPIResources `json:"resources"`
 }
 
 var obsAPICPURequest = map[string]string{
@@ -65,6 +68,9 @@ func BuildValues(isHubCluster, mcoaGatewayEnabled, thanosOperatorEnabled bool, i
 	if !isHubCluster || !mcoaGatewayEnabled {
 		return nil
 	}
+	if !isHubCluster {
+		return &MCOAGatewayValues{}
+	}
 
 	writeEndpoint := legacyReceiveEndpoint
 	readEndpoint := legacyReadEndpoint
@@ -98,8 +104,9 @@ func BuildValues(isHubCluster, mcoaGatewayEnabled, thanosOperatorEnabled bool, i
 			CPURequest:    cpu,
 			MemoryRequest: mem,
 		},
-		LogsEnabled:       logsEnabled,
-		LogsWriteEndpoint: logsGatewayEndpoint,
-		LogsReadEndpoint:  logsGatewayEndpoint,
+		LogsEnabled:           logsEnabled,
+		LogsWriteEndpoint:     logsGatewayEndpoint,
+		LogsReadEndpoint:      logsGatewayEndpoint,
+		ThanosOperatorEnabled: thanosOperatorEnabled,
 	}
 }
