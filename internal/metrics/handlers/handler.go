@@ -284,10 +284,9 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1beta1.Man
 		}
 	}
 
-	// Override remote write URL to point to MCOA gateway when thanos-operator is enabled
 	if opts.ThanosOperatorEnabled {
 		if err = o.overrideRemoteWriteEndpoint(ctx, &ret); err != nil {
-			o.Logger.Error(err, "failed to override remote write endpoint, keeping original")
+			o.Logger.Error(err, "failed to override MCOA gateway endpoints, keeping original")
 		}
 	}
 
@@ -387,6 +386,10 @@ func (o *OptionsBuilder) buildPrometheusAgent(ctx context.Context, opts *Options
 		mainRw.TLSConfig.KeyFile = fmt.Sprintf("/etc/prometheus/secrets/%s/%s", certTargetName, config.MTLSCertKeySecretKey)
 	}
 
+	if opts.ThanosOperatorEnabled && !slices.Contains(agent.Spec.Secrets, mcoagateway.DefaultCollectionMTLSSecretName) {
+		agent.Spec.Secrets = append(agent.Spec.Secrets, mcoagateway.DefaultCollectionMTLSSecretName)
+	}
+
 	// Fetch related secrets
 	for _, secretName := range agent.Spec.Secrets {
 		var sourceName string
@@ -400,6 +403,12 @@ func (o *OptionsBuilder) buildPrometheusAgent(ctx context.Context, opts *Options
 		} else if secretName == config.GetAlertmanagerAccessorSecretName(trimmedClusterID) {
 			sourceName = config.AlertmanagerAccessorSecretName
 			sourceNamespace = config.HubInstallNamespace
+		} else if secretName == mcoagateway.DefaultCollectionMTLSSecretName {
+			// The gateway's client mTLS secret lives in the managed cluster's namespace on
+			// the hub (same source used by addAlertmanagerMtlsSecrets), not the agent's own
+			// namespace.
+			sourceName = mcoagateway.DefaultCollectionMTLSSecretName
+			sourceNamespace = opts.ClusterName
 		} else {
 			sourceName = secretName
 		}
@@ -990,12 +999,22 @@ func (o *OptionsBuilder) overrideRemoteWriteEndpoint(ctx context.Context, opts *
 		if agent == nil {
 			continue
 		}
+
+		gatewayTLSSecret := mcoagateway.DefaultCollectionMTLSSecretName
+
 		for i := range agent.Spec.RemoteWrite {
 			if agent.Spec.RemoteWrite[i].Name != nil && *agent.Spec.RemoteWrite[i].Name == config.RemoteWriteCfgName {
 				agent.Spec.RemoteWrite[i].URL = cooprometheusv1.URL(endpoint)
+				if agent.Spec.RemoteWrite[i].TLSConfig != nil {
+					agent.Spec.RemoteWrite[i].TLSConfig.CAFile = fmt.Sprintf("/etc/prometheus/secrets/%s/%s", gatewayTLSSecret, config.MTLSCASecretKey)
+					agent.Spec.RemoteWrite[i].TLSConfig.CertFile = fmt.Sprintf("/etc/prometheus/secrets/%s/%s", gatewayTLSSecret, config.MTLSCertSecretKey)
+					agent.Spec.RemoteWrite[i].TLSConfig.KeyFile = fmt.Sprintf("/etc/prometheus/secrets/%s/%s", gatewayTLSSecret, config.MTLSCertKeySecretKey)
+				}
 			}
 		}
 	}
+
+	opts.AlertmanagerGatewayHost = route.Spec.Host
 
 	return nil
 }
