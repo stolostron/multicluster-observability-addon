@@ -128,6 +128,7 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 			RBACProxyPort:      strconv.Itoa(config.RBACProxyPort),
 		},
 		HubEndpoint:                      opts.HubEndpoint,
+		AlertmanagerGatewayHost:          opts.AlertmanagerGatewayHost,
 		AlertmanagerGatewayTLSSecretName: mcoagateway.DefaultCollectionMTLSSecretName,
 		NodeSelector:                     opts.NodeSelector,
 		Tolerations:                      opts.Tolerations,

@@ -56,9 +56,8 @@ spec:
         - --hub-alertmanager-url=https://{{ $alertmanagerHost }}{{ $alertmanagerPath }}
         {{- end }}
         - --hub-alertmanager-cert-secret={{ $alertmanagerCertSecret }}
-        {{- if not .Values.alertmanagerGatewayHost }}
+        # TODO endpoint-monitoring-operator requires alertmanager accessor secret, change endpoint-monitoring-operator so not needed
         - --hub-alertmanager-accessor-secret={{ .Values.alertmanagerAccessorSecretName }}
-        {{- end }}
         - --hub-alertmanager-ca-secret={{ $alertmanagerCASecret }}
         {{- if .Values.deployNonOCPStack }}
         ports:

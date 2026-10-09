@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	configv1 "github.com/openshift/api/config/v1"
+	routev1 "github.com/openshift/api/route/v1"
 	hyperv1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	cooprometheusv1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1"
@@ -19,6 +20,7 @@ import (
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
+	"github.com/stolostron/multicluster-observability-addon/internal/mcoagateway"
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/handlers"
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/manifests"
@@ -87,19 +89,21 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 	}
 
 	testCases := map[string]struct {
-		PlatformMetrics     bool
-		UserMetrics         bool
-		COOIsInstalled      bool
-		IsOCP               bool
-		IsHub               bool
-		InstallNamespace    string
-		ResourceReqs        bool
-		Registries          []addonapiv1beta1.ImageMirror
-		NodeExporterOpts    addon.NodeExporterOptions
-		AgentMissing        bool
-		AlertsEnabled       bool
-		WithRawScrapeConfig bool
-		Expects             func(*testing.T, []client.Object)
+		PlatformMetrics       bool
+		UserMetrics           bool
+		COOIsInstalled        bool
+		IsOCP                 bool
+		IsHub                 bool
+		InstallNamespace      string
+		ResourceReqs          bool
+		Registries            []addonapiv1beta1.ImageMirror
+		NodeExporterOpts      addon.NodeExporterOptions
+		AgentMissing          bool
+		AlertsEnabled         bool
+		ThanosOperatorEnabled bool
+		GatewayRouteHost      string
+		WithRawScrapeConfig   bool
+		Expects               func(*testing.T, []client.Object)
 	}{
 		"no metrics": {
 			PlatformMetrics: false,
@@ -664,6 +668,47 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				assert.Equal(t, "--enable-uwl-alert-forwarding=false", enableUWLAlertForwarding)
 			},
 		},
+		"is ocp with alert forwarding via mcoa-gateway": {
+			// When the MCOA gateway is in front of Alertmanager, Prometheus in
+			// openshift-monitoring is pointed at the gateway (not the hub
+			// Alertmanager directly) via endpoint-monitoring-operator's
+			// additional-alertmanager-config args, and authenticates with the
+			// gateway's own mTLS client cert instead of the bearer-token
+			// accessor secret.
+			PlatformMetrics:       true,
+			UserMetrics:           false,
+			IsOCP:                 true,
+			AlertsEnabled:         true,
+			ThanosOperatorEnabled: true,
+			GatewayRouteHost:      "mcoa-gateway.example.com",
+			Expects: func(t *testing.T, objects []client.Object) {
+				deployments := common.FilterResourcesByLabelSelector[*appsv1.Deployment](objects, nil)
+				var emoDeployment *appsv1.Deployment
+				for _, dep := range deployments {
+					if dep.GetName() == "endpoint-monitoring-operator" {
+						emoDeployment = dep
+						break
+					}
+				}
+				require.NotNil(t, emoDeployment)
+
+				var hubAlertmanagerURL, hubAlertmanagerCert, hubAlertmanagerCA string
+				for _, arg := range emoDeployment.Spec.Template.Spec.Containers[0].Args {
+					switch {
+					case strings.HasPrefix(arg, "--hub-alertmanager-url="):
+						hubAlertmanagerURL = arg
+					case strings.HasPrefix(arg, "--hub-alertmanager-cert-secret="):
+						hubAlertmanagerCert = arg
+					case strings.HasPrefix(arg, "--hub-alertmanager-ca-secret="):
+						hubAlertmanagerCA = arg
+					}
+				}
+
+				assert.Equal(t, "--hub-alertmanager-url=https://mcoa-gateway.example.com/api/alertmanager/v2", hubAlertmanagerURL)
+				assert.Equal(t, "--hub-alertmanager-cert-secret=mcoa-gateway-tls", hubAlertmanagerCert)
+				assert.Equal(t, "--hub-alertmanager-ca-secret=mcoa-gateway-tls", hubAlertmanagerCA)
+			},
+		},
 		"node exporter custom ports": {
 			PlatformMetrics: true,
 			UserMetrics:     false,
@@ -844,6 +889,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 	assert.NoError(t, addonapiv1beta1.Install(scheme))
 	assert.NoError(t, workv1.Install(scheme))
 	assert.NoError(t, hyperv1.AddToScheme(scheme))
+	assert.NoError(t, routev1.AddToScheme(scheme))
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
@@ -963,6 +1009,21 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 
 			// Add alermanager secrets
 			clientObjects = append(clientObjects, newSecret(config.AlertmanagerAccessorSecretName, hubNamespace))
+
+			// Add the MCOA gateway Route and client certificate when thanos-operator alert/metrics
+			// forwarding is under test
+			if tc.ThanosOperatorEnabled && tc.GatewayRouteHost != "" {
+				clientObjects = append(clientObjects, &routev1.Route{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "mcoa-observatorium-api",
+						Namespace: hubNamespace,
+					},
+					Spec: routev1.RouteSpec{
+						Host: tc.GatewayRouteHost,
+					},
+				})
+				clientObjects = append(clientObjects, newSecret(mcoagateway.DefaultCollectionMTLSSecretName, "cluster-1"))
+			}
 
 			// Setup a managed cluster
 			managedCluster := addontesting.NewManagedCluster("cluster-1")
@@ -1115,7 +1176,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 
 			// Wire everything together to a fake addon instance
 			agentAddon, err := addonfactory.NewAgentAddonFactory(addoncfg.Name, addon.FS, addoncfg.MetricsChartDir).
-				WithGetValuesFuncs(addonConfigValuesFn, fakeGetValues(client, tc.PlatformMetrics, tc.UserMetrics, tc.InstallNamespace, aodc.Spec.ResourceRequirements, tc.Registries, tc.NodeExporterOpts, tc.AlertsEnabled)).
+				WithGetValuesFuncs(addonConfigValuesFn, fakeGetValues(client, tc.PlatformMetrics, tc.UserMetrics, tc.InstallNamespace, aodc.Spec.ResourceRequirements, tc.Registries, tc.NodeExporterOpts, tc.AlertsEnabled, tc.ThanosOperatorEnabled)).
 				WithAgentRegistrationOption(&agent.RegistrationOption{}).
 				WithAgentInstallNamespace(
 					// Set agent install namespace from addon deployment config if it exists
@@ -1414,7 +1475,7 @@ func TestHelmBuild_Metrics_HCP(t *testing.T) {
 
 	// Wire everything together to a fake addon instance
 	agentAddon, err := addonfactory.NewAgentAddonFactory(addoncfg.Name, addon.FS, addoncfg.MetricsChartDir).
-		WithGetValuesFuncs(addonConfigValuesFn, fakeGetValues(client, false, true, "", nil, nil, addon.NodeExporterOptions{}, false)).
+		WithGetValuesFuncs(addonConfigValuesFn, fakeGetValues(client, false, true, "", nil, nil, addon.NodeExporterOptions{}, false, false)).
 		WithAgentRegistrationOption(&agent.RegistrationOption{}).
 		WithScheme(scheme).
 		BuildHelmAgentAddon()
@@ -1474,7 +1535,7 @@ func newSecret(name, ns string) *corev1.Secret {
 	}
 }
 
-func fakeGetValues(k8s client.Client, platformMetrics, userWorkloadMetrics bool, installNs string, resReqs []addonapiv1beta1.ContainerResourceRequirements, registries []addonapiv1beta1.ImageMirror, nodeExporterOpts addon.NodeExporterOptions, alertsEnabled bool) addonfactory.GetValuesFunc {
+func fakeGetValues(k8s client.Client, platformMetrics, userWorkloadMetrics bool, installNs string, resReqs []addonapiv1beta1.ContainerResourceRequirements, registries []addonapiv1beta1.ImageMirror, nodeExporterOpts addon.NodeExporterOptions, alertsEnabled, thanosOperatorEnabled bool) addonfactory.GetValuesFunc {
 	return func(
 		cluster *clusterv1.ManagedCluster,
 		mcAddon *addonapiv1beta1.ManagedClusterAddOn,
@@ -1500,7 +1561,8 @@ func fakeGetValues(k8s client.Client, platformMetrics, userWorkloadMetrics bool,
 					AlertsEnabled:     alertsEnabled,
 				},
 			},
-			Registries: registries,
+			Registries:            registries,
+			ThanosOperatorEnabled: thanosOperatorEnabled,
 		}
 
 		if installNs != "" {
@@ -1521,6 +1583,12 @@ func fakeGetValues(k8s client.Client, platformMetrics, userWorkloadMetrics bool,
 		if err != nil {
 			return nil, err
 		}
+
+		// Mirrors the hub-only gating applied in internal/addon/helm/values.go: the
+		// thanos-operator controller/CRDs are only ever deployed to the hub cluster, even
+		// when thanos-operator mode (and therefore MCOA gateway alert/metrics forwarding) is
+		// enabled for every cluster.
+		helmValues.ThanosOperator.Enabled = thanosOperatorEnabled && common.IsHubCluster(cluster)
 
 		return addonfactory.JsonStructToValues(helmValues)
 	}

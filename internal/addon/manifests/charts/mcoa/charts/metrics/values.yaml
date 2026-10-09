@@ -40,5 +40,4 @@ images:
   nodeExporter: ""
   prometheus: ""
   thanosOperator: ""
-alertmanagerGatewayHost: ""
-alertmanagerGatewayTLSSecretName: mcoa-gateway-tls
+  

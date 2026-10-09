@@ -262,19 +262,15 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		}
 
 		certObjs := []client.Object{}
-		// The Route host is only one of the server cert SANs, and the Route is
-		// created by the addon-framework alongside the gateway Deployment, so on
-		// a fresh install it does not exist yet. Issue the cert right away with
-		// the in-cluster SANs only - otherwise the Deployment comes up with no
-		// mcoa-gateway-server-tls secret to mount and crash-loops until the
-		// Route shows up. Once the Route is admitted this reconciles again (see
-		// mcoaGatewayRoutePredicate), cert-manager reissues with the host added,
-		// and the gateway picks the new cert up via --tls.reload-interval.
-		serverCert, err := mcoagateway.BuildServerCertificate(gatewayHost)
-		if err != nil {
-			return ctrl.Result{}, fmt.Errorf("failed to build MCOA gateway server certificate: %w", err)
+		// Server cert SAN needs the Route host. Skip apply until it exists so
+		// cert-manager does not issue a cert that collectors cannot use for TLS.
+		if gatewayHost != "" {
+			serverCert, err := mcoagateway.BuildServerCertificate(gatewayHost)
+			if err != nil {
+				return ctrl.Result{}, fmt.Errorf("failed to build MCOA gateway server certificate: %w", err)
+			}
+			certObjs = append(certObjs, serverCert)
 		}
-		certObjs = append(certObjs, serverCert)
 
 		if opts.Platform.Logs.DefaultStack {
 			lokiClientCert, err := mcoagateway.BuildLokiClientCertificate()
