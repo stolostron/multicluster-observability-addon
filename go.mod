@@ -43,7 +43,6 @@ require (
 	github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring v0.90.1-rhobs1
 	github.com/rhobs/observability-operator/pkg/apis v0.0.0-20250902133632-f98bd8a20a80
 	github.com/thanos-community/thanos-operator v0.0.0-20260313095634-17889a0e1c1a
-	golang.org/x/text v0.41.0
 )
 
 require (
@@ -63,6 +62,7 @@ require (
 	github.com/perses/plugins/barchart v0.11.1 // indirect
 	github.com/perses/plugins/piechart v0.13.2-0.20260326134814-37e86f6b1c58 // indirect
 	github.com/prometheus/otlptranslator v1.0.0 // indirect
+	golang.org/x/text v0.41.0 // indirect
 	sigs.k8s.io/gateway-api v1.5.0 // indirect
 )
 

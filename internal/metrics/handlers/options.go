@@ -42,6 +42,10 @@ type Options struct {
 
 	ThanosOperatorEnabled bool
 
+	// AlertmanagerGatewayHost is the MCOA gateway Route host used to forward
+	// alerts through the gateway instead of directly to the hub Alertmanager.
+	AlertmanagerGatewayHost string
+
 	// Thanos holds the hub-only Thanos component specifications.
 	// These are only populated when IsHub is true and platform metrics collection is enabled.
 	Thanos ThanosOptions

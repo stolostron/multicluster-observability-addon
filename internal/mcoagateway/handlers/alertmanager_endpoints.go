@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 
@@ -11,9 +12,11 @@ import (
 )
 
 const (
-	alertmanagerServiceName  = "alertmanager-operated"
-	alertmanagerEndpointPort = 9095
+	alertmanagerOperatedService = "alertmanager-operated"
+	alertmanagerEndpointPort    = 9095
 )
+
+var errMultipleAlertmanagerStatefulSets = errors.New("multiple StatefulSets use Alertmanager Service in namespace")
 
 // BuildAlertmanagerEndpoints derives one stable pod URL per desired Alertmanager
 // replica from the StatefulSet that uses the alertmanager-operated Service.
@@ -28,11 +31,11 @@ func BuildAlertmanagerEndpoints(ctx context.Context, k8s client.Client) ([]strin
 	var alertmanager *appsv1.StatefulSet
 	for i := range statefulSetList.Items {
 		statefulSet := &statefulSetList.Items[i]
-		if statefulSet.Spec.ServiceName != alertmanagerServiceName {
+		if statefulSet.Spec.ServiceName != alertmanagerOperatedService {
 			continue
 		}
 		if alertmanager != nil {
-			return nil, fmt.Errorf("multiple StatefulSets use Alertmanager Service %q in namespace %q", alertmanagerServiceName, mconfig.HubInstallNamespace)
+			return nil, fmt.Errorf("%w %q: %q", errMultipleAlertmanagerStatefulSets, alertmanagerOperatedService, mconfig.HubInstallNamespace)
 		}
 		alertmanager = statefulSet
 	}
@@ -49,7 +52,7 @@ func BuildAlertmanagerEndpoints(ctx context.Context, k8s client.Client) ([]strin
 	urls := make([]string, 0, replicas)
 	for ordinal := range replicas {
 		urls = append(urls, "https://"+alertmanager.Name+"-"+strconv.Itoa(int(ordinal))+"."+
-			alertmanager.Spec.ServiceName+"."+alertmanager.Namespace+".svc:"+
+			alertmanagerOperatedService+"."+alertmanager.Namespace+".svc:"+
 			strconv.Itoa(alertmanagerEndpointPort))
 	}
 
