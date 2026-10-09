@@ -6,6 +6,7 @@ import (
 	"maps"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/prometheus/prometheus/model/labels"
@@ -25,7 +26,7 @@ func Transpile(scrapeConfig *cooprometheusv1alpha1.ScrapeConfig, agent *cooprome
 		return nil, nil
 	}
 
-	var parsedSelectors [][]*labels.Matcher
+	parsedSelectors := make([][]*labels.Matcher, 0, len(matchersList))
 	for _, mStr := range matchersList {
 		matchers, err := parser.ParseMetricSelector(mStr)
 		if err != nil {
@@ -40,7 +41,8 @@ func Transpile(scrapeConfig *cooprometheusv1alpha1.ScrapeConfig, agent *cooprome
 		return nil, nil
 	}
 
-	var relabelConfigs []cooprometheusv1.RelabelConfig
+	estimatedRelabels := len(parsedSelectors)*2 + 4 + len(scrapeConfig.Spec.MetricRelabelConfigs)
+	relabelConfigs := make([]cooprometheusv1.RelabelConfig, 0, estimatedRelabels)
 
 	// 1. Process each selector individually to handle negation (OR disjunction semantics)
 	for i, sel := range parsedSelectors {
@@ -49,14 +51,14 @@ func Transpile(scrapeConfig *cooprometheusv1alpha1.ScrapeConfig, agent *cooprome
 			value string
 		}
 
-		var posMatchers []posMatcher
+		posMatchers := make([]posMatcher, 0, len(sel))
 		for _, lm := range sel {
 			if lm.Type == labels.MatchEqual || lm.Type == labels.MatchRegexp {
 				var val string
 				if lm.Type == labels.MatchEqual {
 					val = regexp.QuoteMeta(lm.Value)
 				} else {
-					val = fmt.Sprintf("(?:%s)", lm.Value)
+					val = "(?:" + lm.Value + ")"
 				}
 				posMatchers = append(posMatchers, posMatcher{
 					name:  lm.Name,
@@ -73,15 +75,15 @@ func Transpile(scrapeConfig *cooprometheusv1alpha1.ScrapeConfig, agent *cooprome
 			return cmp.Compare(a.value, b.value)
 		})
 
-		var sourceLabels []cooprometheusv1.LabelName
-		var posValues []string
-		for _, pm := range posMatchers {
-			sourceLabels = append(sourceLabels, cooprometheusv1.LabelName(pm.name))
-			posValues = append(posValues, pm.value)
+		sourceLabels := make([]cooprometheusv1.LabelName, len(posMatchers))
+		posValues := make([]string, len(posMatchers))
+		for j, pm := range posMatchers {
+			sourceLabels[j] = cooprometheusv1.LabelName(pm.name)
+			posValues[j] = pm.value
 		}
 
 		// Positive Matchers Phase (Initialize __tmp_keep_i to "keep" if metric matches positive selectors)
-		tmpKeepLabel := fmt.Sprintf("__tmp_keep_%d", i)
+		tmpKeepLabel := "__tmp_keep_" + strconv.Itoa(i)
 		if len(sourceLabels) > 0 {
 			relabelConfigs = append(relabelConfigs, cooprometheusv1.RelabelConfig{
 				Action:       "replace",
@@ -105,13 +107,13 @@ func Transpile(scrapeConfig *cooprometheusv1alpha1.ScrapeConfig, agent *cooprome
 				if lm.Type == labels.MatchNotEqual {
 					regexVal = regexp.QuoteMeta(lm.Value)
 				} else {
-					regexVal = fmt.Sprintf("(?:%s)", lm.Value)
+					regexVal = "(?:" + lm.Value + ")"
 				}
 
 				relabelConfigs = append(relabelConfigs, cooprometheusv1.RelabelConfig{
 					Action:       "replace",
 					SourceLabels: []cooprometheusv1.LabelName{cooprometheusv1.LabelName(tmpKeepLabel), cooprometheusv1.LabelName(lm.Name)},
-					Regex:        fmt.Sprintf("keep;%s", regexVal),
+					Regex:        "keep;" + regexVal,
 					TargetLabel:  tmpKeepLabel,
 					Replacement:  ptr.To(""),
 				})
@@ -127,9 +129,9 @@ func Transpile(scrapeConfig *cooprometheusv1alpha1.ScrapeConfig, agent *cooprome
 	})
 
 	// 3. Combine selector decisions: set global __tmp_keep to "keep" if any __tmp_keep_i is "keep" (OR logic)
-	var combineSourceLabels []cooprometheusv1.LabelName
+	combineSourceLabels := make([]cooprometheusv1.LabelName, len(parsedSelectors))
 	for i := range parsedSelectors {
-		combineSourceLabels = append(combineSourceLabels, cooprometheusv1.LabelName(fmt.Sprintf("__tmp_keep_%d", i)))
+		combineSourceLabels[i] = cooprometheusv1.LabelName("__tmp_keep_" + strconv.Itoa(i))
 	}
 
 	relabelConfigs = append(relabelConfigs, cooprometheusv1.RelabelConfig{
@@ -165,9 +167,9 @@ func Transpile(scrapeConfig *cooprometheusv1alpha1.ScrapeConfig, agent *cooprome
 		return []*cooprometheusv1.RemoteWriteSpec{baseSpec}, nil
 	}
 
-	var specs []*cooprometheusv1.RemoteWriteSpec
+	specs := make([]*cooprometheusv1.RemoteWriteSpec, 0, len(agent.Spec.RemoteWrite))
 	for _, agentRw := range agent.Spec.RemoteWrite {
-		relabelConfigsCopy := make([]cooprometheusv1.RelabelConfig, len(relabelConfigs))
+		relabelConfigsCopy := make([]cooprometheusv1.RelabelConfig, len(relabelConfigs), len(relabelConfigs)+len(agentRw.WriteRelabelConfigs))
 		for i, cfg := range relabelConfigs {
 			cfg.DeepCopyInto(&relabelConfigsCopy[i])
 		}

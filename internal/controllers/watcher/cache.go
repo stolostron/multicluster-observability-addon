@@ -1,7 +1,6 @@
 package watcher
 
 import (
-	"fmt"
 	"maps"
 	"sync"
 )
@@ -28,7 +27,7 @@ func NewReferenceCache() *ReferenceCache {
 }
 
 func (c *ReferenceCache) Add(mwNamespace, mwName string, newConfigs map[string]struct{}) {
-	mwKey := fmt.Sprintf("%s/%s", mwNamespace, mwName)
+	mwKey := mwNamespace + "/" + mwName
 
 	c.RLock()
 	oldConfigs, exists := c.mwKeyToConfigs[mwKey]
@@ -67,7 +66,7 @@ func (c *ReferenceCache) Add(mwNamespace, mwName string, newConfigs map[string]s
 }
 
 func (c *ReferenceCache) Remove(mwNamespace, mwName string) {
-	mwKey := fmt.Sprintf("%s/%s", mwNamespace, mwName)
+	mwKey := mwNamespace + "/" + mwName
 
 	c.RLock()
 	_, exists := c.mwKeyToConfigs[mwKey]
@@ -103,6 +102,7 @@ func (c *ReferenceCache) GetNamespaces(configKey string) []string {
 
 	var result []string
 	if nss, ok := c.configToMWNs[configKey]; ok {
+		result = make([]string, 0, len(nss))
 		for ns := range nss {
 			result = append(result, ns)
 		}

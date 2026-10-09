@@ -1,6 +1,7 @@
 package watcher
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -31,6 +32,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
+
+var originalResourceAnnotationBytes = []byte(addoncfg.AnnotationOriginalResource)
 
 const (
 	localClusterNamespace = "local-cluster"
@@ -122,6 +125,13 @@ func (r *WatcherReconciler) updateCache(mw *workv1.ManifestWork) {
 	keys := map[string]struct{}{}
 
 	for _, m := range mw.Spec.Workload.Manifests {
+		// Fast path: Only Secret and ConfigMap resources carrying AnnotationOriginalResource
+		// are ever tracked in the cache. Skip expensive JSON unmarshaling and heap allocation
+		// if the raw manifest bytes do not contain the annotation key.
+		if !bytes.Contains(m.Raw, originalResourceAnnotationBytes) {
+			continue
+		}
+
 		minimalObj := &metav1.PartialObjectMetadata{}
 		if err := json.Unmarshal(m.Raw, minimalObj); err != nil {
 			r.Log.V(3).Error(err, "failed to unmarshal manifest to PartialObjectMetadata")
@@ -138,21 +148,18 @@ func (r *WatcherReconciler) updateCache(mw *workv1.ManifestWork) {
 				continue
 			}
 
-			parts := strings.Split(originalResource, "/")
-			if len(parts) != 2 {
+			namespace, name, ok := strings.Cut(originalResource, "/")
+			if !ok || strings.Contains(name, "/") {
 				r.Log.V(3).Info("original-resource annotation is malformed, expected format 'namespace/name'", "annotation", originalResource)
 				continue
 			}
-
-			namespace := parts[0]
-			name := parts[1]
 
 			if namespace == "" || name == "" {
 				r.Log.V(3).Info("original-resource annotation contains empty namespace or name")
 				continue
 			}
 
-			key := fmt.Sprintf("%s/%s/%s/%s", gvk.Group, gvk.Kind, namespace, name)
+			key := gvk.Group + "/" + gvk.Kind + "/" + namespace + "/" + name
 			keys[key] = struct{}{}
 		}
 	}
