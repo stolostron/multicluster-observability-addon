@@ -17,6 +17,7 @@ import (
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
+	"github.com/stolostron/multicluster-observability-addon/internal/mcoagateway"
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/remotewrite"
 	corev1 "k8s.io/api/core/v1"
@@ -94,7 +95,7 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1beta1.Man
 	}
 	ret.HubClusterID = hubId
 
-	if err = o.addAlertmanagerMtlsSecrets(ctx, &ret.Secrets, config.GetTrimmedClusterID(hubId), opts, isOpenShiftVendor); err != nil {
+	if err = o.addAlertmanagerMtlsSecrets(ctx, &ret.Secrets, config.GetTrimmedClusterID(hubId), opts, isOpenShiftVendor, managedCluster.Name); err != nil {
 		return ret, fmt.Errorf("failed to add alertmanager secrets: %w", err)
 	}
 
@@ -645,7 +646,7 @@ func createWriteRelabelConfigs(clusterName, clusterID string, isHypershiftLocalC
 		})
 }
 
-func (o *OptionsBuilder) addAlertmanagerMtlsSecrets(ctx context.Context, secrets *[]*corev1.Secret, trimmedClusterID string, opts addon.Options, isOCP bool) error {
+func (o *OptionsBuilder) addAlertmanagerMtlsSecrets(ctx context.Context, secrets *[]*corev1.Secret, trimmedClusterID string, opts addon.Options, isOCP bool, clusterNamespace string) error {
 	// Add secrets based on enabled metric collection
 	if opts.Platform.Metrics.CollectionEnabled {
 		targetNamespace := config.AlertmanagerPlatformNamespace
@@ -691,6 +692,26 @@ func (o *OptionsBuilder) addAlertmanagerMtlsSecrets(ctx context.Context, secrets
 		accessorTargetName := config.GetAlertmanagerAccessorSecretName(trimmedClusterID)
 		if err := o.addSecret(ctx, secrets, config.AlertmanagerAccessorSecretName, config.HubInstallNamespace, accessorTargetName, targetNamespace); err != nil {
 			return fmt.Errorf("failed to add uwl accessor secret: %w", err)
+		}
+	}
+
+	if opts.ThanosOperatorEnabled {
+		if opts.Platform.Metrics.CollectionEnabled {
+			targetNamespace := config.AlertmanagerPlatformNamespace
+			if !isOCP {
+				targetNamespace = "" // This is replaced by the default value in the help template that is the installation namespace
+			}
+
+			if err := o.addSecret(ctx, secrets, mcoagateway.DefaultCollectionMTLSSecretName, clusterNamespace, mcoagateway.DefaultCollectionMTLSSecretName, targetNamespace); err != nil {
+				return fmt.Errorf("failed to add platform MCOA gateway client certificate secret: %w", err)
+			}
+		}
+
+		if isOCP && opts.UserWorkloads.Metrics.CollectionEnabled {
+			targetNamespace := config.AlertmanagerUWLNamespace
+			if err := o.addSecret(ctx, secrets, mcoagateway.DefaultCollectionMTLSSecretName, clusterNamespace, mcoagateway.DefaultCollectionMTLSSecretName, targetNamespace); err != nil {
+				return fmt.Errorf("failed to add user workload MCOA gateway client certificate secret: %w", err)
+			}
 		}
 	}
 
