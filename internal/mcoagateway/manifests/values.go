@@ -15,20 +15,17 @@ const (
 )
 
 type MCOAGatewayValues struct {
-	Enabled                        bool     `json:"enabled"`
-	ThanosOperatorEnabled          bool     `json:"thanosOperatorEnabled"`
-	AlertmanagerAccessorSecretName string   `json:"alertmanagerAccessorSecretName,omitempty"`
-	AlertmanagerGatewayHost        string   `json:"alertmanagerGatewayHost,omitempty"`
-	MetricsWriteEndpoint           string   `json:"metricsWriteEndpoint"`
-	MetricsReadEndpoint            string   `json:"metricsReadEndpoint"`
-	LogsEnabled                    bool     `json:"logsEnabled"`
-	LogsWriteEndpoint              string   `json:"logsWriteEndpoint"`
-	LogsReadEndpoint               string   `json:"logsReadEndpoint"`
-	AlertmanagerEndpoints          []string `json:"alertmanagerEndpoints,omitempty"`
+	Enabled               bool     `json:"enabled"`
+	MetricsWriteEndpoint  string   `json:"metricsWriteEndpoint"`
+	MetricsReadEndpoint   string   `json:"metricsReadEndpoint"`
+	LogsEnabled           bool     `json:"logsEnabled"`
+	LogsWriteEndpoint     string   `json:"logsWriteEndpoint"`
+	LogsReadEndpoint      string   `json:"logsReadEndpoint"`
+	AlertmanagerEndpoints []string `json:"alertmanagerEndpoints,omitempty"`
 }
 
 func BuildValues(isHubCluster, mcoaGatewayEnabled, thanosOperatorEnabled bool, logsEnabled bool) *MCOAGatewayValues {
-	if !mcoaGatewayEnabled {
+	if !isHubCluster || !mcoaGatewayEnabled {
 		return nil
 	}
 	if !isHubCluster {
@@ -43,12 +40,11 @@ func BuildValues(isHubCluster, mcoaGatewayEnabled, thanosOperatorEnabled bool, l
 	}
 
 	return &MCOAGatewayValues{
-		Enabled:               true,
-		ThanosOperatorEnabled: thanosOperatorEnabled,
-		MetricsWriteEndpoint:  writeEndpoint,
-		MetricsReadEndpoint:   readEndpoint,
-		LogsEnabled:           logsEnabled,
-		LogsWriteEndpoint:     logsGatewayEndpoint,
-		LogsReadEndpoint:      logsGatewayEndpoint,
+		Enabled:              true,
+		MetricsWriteEndpoint: writeEndpoint,
+		MetricsReadEndpoint:  readEndpoint,
+		LogsEnabled:          logsEnabled,
+		LogsWriteEndpoint:    logsGatewayEndpoint,
+		LogsReadEndpoint:     logsGatewayEndpoint,
 	}
 }
