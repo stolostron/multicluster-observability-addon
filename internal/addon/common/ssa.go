@@ -3,17 +3,28 @@ package common
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"reflect"
 	"slices"
 	"strings"
 
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
+// ErrNilObject is returned when attempting to server-side apply a nil object.
+var ErrNilObject = errors.New("cannot server-side apply a nil object")
+
+// ServerSideApply applies the provided object using Kubernetes Server-Side Apply (SSA).
+// If owner is non-nil, a controller reference is established before applying.
 func ServerSideApply(ctx context.Context, c client.Client, obj client.Object, owner client.Object) error {
+	if obj == nil {
+		return ErrNilObject
+	}
+
 	// Only set controller reference if an owner is provided
 	if owner != nil {
 		if err := controllerutil.SetControllerReference(owner, obj, c.Scheme()); err != nil {
@@ -21,12 +32,62 @@ func ServerSideApply(ctx context.Context, c client.Client, obj client.Object, ow
 		}
 	}
 
-	//nolint:staticcheck // client.Apply is deprecated, but alternative requires ApplyConfigurations which we don't have
-	if err := c.Patch(ctx, obj, client.Apply, client.ForceOwnership, client.FieldOwner(addoncfg.Name)); err != nil {
+	u, err := toUnstructuredApply(c, obj)
+	if err != nil {
+		return fmt.Errorf("failed to prepare object for server-side apply: %w", err)
+	}
+
+	applyConfig := client.ApplyConfigurationFromUnstructured(u)
+	if err := c.Apply(ctx, applyConfig, client.FieldOwner(addoncfg.Name), client.ForceOwnership); err != nil {
 		return fmt.Errorf("failed to patch with SSA: %w", err)
 	}
 
+	syncBackToObject(u, obj)
 	return nil
+}
+
+func toUnstructuredApply(c client.Client, obj client.Object) (*unstructured.Unstructured, error) {
+	var u *unstructured.Unstructured
+	if unstr, ok := obj.(*unstructured.Unstructured); ok {
+		u = unstr.DeepCopy()
+	} else {
+		data, err := json.Marshal(obj)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal %T to JSON: %w", obj, err)
+		}
+		u = &unstructured.Unstructured{Object: map[string]any{}}
+		if err := json.Unmarshal(data, &u.Object); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal JSON into unstructured: %w", err)
+		}
+	}
+
+	if u.GetAPIVersion() == "" || u.GetKind() == "" {
+		gvk, err := c.GroupVersionKindFor(obj)
+		if err != nil {
+			return nil, fmt.Errorf("failed to determine GVK for %T: %w", obj, err)
+		}
+		u.SetGroupVersionKind(gvk)
+	}
+
+	// Defensive stripping of managedFields to avoid API server rejection
+	u.SetManagedFields(nil)
+	return u, nil
+}
+
+func syncBackToObject(u *unstructured.Unstructured, obj client.Object) {
+	if unstr, ok := obj.(*unstructured.Unstructured); ok {
+		*unstr = *u
+		return
+	}
+
+	obj.SetResourceVersion(u.GetResourceVersion())
+	obj.SetUID(u.GetUID())
+	obj.SetGeneration(u.GetGeneration())
+	obj.SetCreationTimestamp(u.GetCreationTimestamp())
+
+	if gvk := u.GroupVersionKind(); !gvk.Empty() {
+		obj.GetObjectKind().SetGroupVersionKind(gvk)
+	}
 }
 
 // DeriveSSAManagedFields returns JSON paths for fields obj sets relative to a
@@ -84,7 +145,7 @@ func specKeyDiff(zeroSpec, objSpec any) []string {
 		zeroMap = map[string]any{}
 	}
 
-	paths := []string{}
+	paths := make([]string, 0, len(objMap))
 	for key, val := range objMap {
 		zeroVal, exists := zeroMap[key]
 		if !exists || !reflect.DeepEqual(zeroVal, val) {
@@ -102,7 +163,7 @@ func labelKeyDiff(zeroPayload, objPayload map[string]any) []string {
 	}
 	zeroLabels := labelsFromPayload(zeroPayload)
 
-	paths := []string{}
+	paths := make([]string, 0, len(objLabels))
 	for key, val := range objLabels {
 		zeroVal, exists := zeroLabels[key]
 		if !exists || !reflect.DeepEqual(zeroVal, val) {

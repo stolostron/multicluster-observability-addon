@@ -142,7 +142,6 @@ func (d DefaultStackResources) reconcileScrapeConfigs(ctx context.Context, mcoUI
 		}
 
 		desiredSC := existingSC.DeepCopy()
-		desiredSC.ManagedFields = nil // required for patching with ssa
 		applyScrapeConfigSSAInvariants(desiredSC, isUWL)
 		common.SetSSAManagedFieldsAnnotation(desiredSC, common.DeriveSSAManagedFields(scrapeConfigSSAIntent(isUWL)))
 
