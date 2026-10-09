@@ -14,7 +14,6 @@ import (
 )
 
 var (
-	errMissingResource     = errors.New("resource referenced in ManagedClusterAddOn config not found")
 	errMissingResourceRefs = errors.New("no references to the resource found in ManagedClusterAddOn config")
 	errMissingOwnerRef     = errors.New("no resource owned by MCOA found in references")
 )
@@ -57,8 +56,15 @@ func GetResourceWithOwnerRef[T client.Object](
 	for _, key := range keys {
 		tempObj := obj.DeepCopyObject().(T)
 		if err := k8s.Get(ctx, key, tempObj, &client.GetOptions{}); err != nil {
+			// A reference can outlive - or precede - the object it points at. The
+			// ClusterManagementAddOn advertises slots an admin is expected to fill
+			// (clusterlogforwarders/instance) and slots that only exist while a
+			// feature is on (the default-stack CLF and LokiStack), and the
+			// addon-framework keeps resolving those references either way. Only the
+			// MCOA-owned object matters here, so skip the rest instead of letting an
+			// unrelated empty slot abort the lookup.
 			if k8serrors.IsNotFound(err) {
-				return obj, fmt.Errorf("%w: %s/%s %s/%s", errMissingResource, group, resource, key.Namespace, key.Name)
+				continue
 			}
 			return obj, err
 		}
