@@ -16,26 +16,28 @@ import (
 )
 
 type MetricsValues struct {
-	PlatformEnabled                bool          `json:"platformEnabled"`
-	UserWorkloadsEnabled           bool          `json:"userWorkloadsEnabled"`
-	Secrets                        []ConfigValue `json:"secrets"`
-	ConfigMaps                     []ConfigValue `json:"configMaps"`
-	Images                         ImagesValues  `json:"images"`
-	PrometheusControllerID         string        `json:"prometheusControllerID"`
-	PrometheusCAConfigMapName      string        `json:"prometheusCAConfigMapName"`
-	PrometheusServerName           string        `json:"prometheusServerName"`
-	AlertmanagerRouterCASecretName string        `json:"alertmanagerRouterCASecretName"`
-	AlertmanagerAccessorSecretName string        `json:"alertmanagerAccessorSecretName"`
-	ClientCertSecretName           string        `json:"clientCertSecretName"`
-	HubClusterID                   string        `json:"hubClusterID"`
-	ClusterID                      string        `json:"clusterID"`
-	ClusterName                    string        `json:"clusterName"`
-	PlatformAlertsEnabled          bool          `json:"platformAlertsEnabled"`
-	UserWorkloadAlertsEnabled      bool          `json:"userWorkloadAlertsEnabled"`
-	Platform                       Collector     `json:"platform"`
-	UserWorkload                   Collector     `json:"userWorkload"`
-	DeployNonOCPStack              bool          `json:"deployNonOCPStack"`
-	DeployCOOResources             bool          `json:"deployCOOResources"`
+	PlatformEnabled                  bool          `json:"platformEnabled"`
+	UserWorkloadsEnabled             bool          `json:"userWorkloadsEnabled"`
+	Secrets                          []ConfigValue `json:"secrets"`
+	ConfigMaps                       []ConfigValue `json:"configMaps"`
+	Images                           ImagesValues  `json:"images"`
+	PrometheusControllerID           string        `json:"prometheusControllerID"`
+	PrometheusCAConfigMapName        string        `json:"prometheusCAConfigMapName"`
+	PrometheusServerName             string        `json:"prometheusServerName"`
+	AlertmanagerRouterCASecretName   string        `json:"alertmanagerRouterCASecretName"`
+	AlertmanagerAccessorSecretName   string        `json:"alertmanagerAccessorSecretName"`
+	AlertmanagerGatewayHost          string        `json:"alertmanagerGatewayHost,omitempty"`
+	AlertmanagerGatewayTLSSecretName string        `json:"alertmanagerGatewayTLSSecretName,omitempty"`
+	ClientCertSecretName             string        `json:"clientCertSecretName"`
+	HubClusterID                     string        `json:"hubClusterID"`
+	ClusterID                        string        `json:"clusterID"`
+	ClusterName                      string        `json:"clusterName"`
+	PlatformAlertsEnabled            bool          `json:"platformAlertsEnabled"`
+	UserWorkloadAlertsEnabled        bool          `json:"userWorkloadAlertsEnabled"`
+	Platform                         Collector     `json:"platform"`
+	UserWorkload                     Collector     `json:"userWorkload"`
+	DeployNonOCPStack                bool          `json:"deployNonOCPStack"`
+	DeployCOOResources               bool          `json:"deployCOOResources"`
 	// IsOpenShiftVendor explicitly tracks whether the target cluster is an OpenShift cluster.
 	// This is decoupled from DeployNonOCPStack because DeployNonOCPStack is only true when
 	// metrics collection is enabled, whereas endpoint-monitoring-operator may still be deployed
@@ -133,6 +135,7 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 			RBACProxyPort:      strconv.Itoa(config.RBACProxyPort),
 		},
 		HubEndpoint:                      opts.HubEndpoint,
+		AlertmanagerGatewayHost:          opts.AlertmanagerGatewayHost,
 		AlertmanagerGatewayTLSSecretName: mcoagateway.DefaultCollectionMTLSSecretName,
 		NodeSelector:                     opts.NodeSelector,
 		Tolerations:                      opts.Tolerations,

@@ -16,6 +16,7 @@ import (
 	clusterinfov1beta1 "github.com/stolostron/cluster-lifecycle-api/clusterinfo/v1beta1"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
+	"github.com/stolostron/multicluster-observability-addon/internal/mcoagateway"
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -883,11 +884,22 @@ func TestBuildOptions(t *testing.T) {
 				res := createResources()
 				res = append(res, &routev1.Route{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      mcoaObsAPIRouteName,
+						Name:      mcoagateway.GatewayRouteName,
 						Namespace: config.HubInstallNamespace,
 					},
 					Spec: routev1.RouteSpec{
 						Host: "obs-api.apps.example.com",
+					},
+				})
+				res = append(res, &corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      mcoagateway.DefaultCollectionMTLSSecretName,
+						Namespace: spokeName,
+					},
+					Data: map[string][]byte{
+						"ca.crt":  []byte("test-ca"),
+						"tls.crt": []byte("test-crt"),
+						"tls.key": []byte("test-key"),
 					},
 				})
 				return res
@@ -898,7 +910,7 @@ func TestBuildOptions(t *testing.T) {
 				require.Len(t, opts.Platform.PrometheusAgent.Spec.RemoteWrite, 1)
 
 				rw := opts.Platform.PrometheusAgent.Spec.RemoteWrite[0]
-				assert.Equal(t, cooprometheusv1.URL("https://obs-api.apps.example.com/api/metrics/v1/default/api/v1/receive"), rw.URL)
+				assert.Equal(t, cooprometheusv1.URL("https://obs-api.apps.example.com/api/metrics/v1/api/v1/receive"), rw.URL)
 				require.NotNil(t, rw.ProxyURL)
 				// Overridden endpoint is HTTPS, so ProxyURL must recompute to the HTTPS proxy instead of the initial HTTP proxy
 				assert.Equal(t, "https://secure-proxy.example.com:8443", *rw.ProxyURL)
