@@ -37,10 +37,25 @@ jobs:
         go-version: '1.26'
       id: go
     - name: Run tests
-      run: go test -coverprofile=profile.cov ./...
+      run: go test -coverprofile=profile.cov ./internal/...
     - name: Send coverage
       uses: shogo82148/actions-goveralls@v1
       with:
         path-to-profile: profile.cov
         flag-name: Go-1.26
         shallow: true
+
+  test-integration:
+    name: test integration
+    runs-on: ubuntu-latest
+    steps:
+    - name: Install make
+      run: sudo apt-get install make
+    - uses: actions/checkout@v6
+    - name: Set up Go 1.x
+      uses: actions/setup-go@v6
+      with:
+        go-version: '1.26'
+      id: go
+    - name: Run integration tests
+      run: make test-integration
