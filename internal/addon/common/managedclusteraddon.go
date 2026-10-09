@@ -5,10 +5,11 @@ import (
 	"errors"
 	"fmt"
 
-	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	addonutils "open-cluster-management.io/addon-framework/pkg/utils"
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 )
 
 var (

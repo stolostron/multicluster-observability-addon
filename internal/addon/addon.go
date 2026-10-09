@@ -12,16 +12,17 @@ import (
 	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
-	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
-	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
-	"github.com/stolostron/multicluster-observability-addon/internal/analytics/rightsizing"
-	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	addonutils "open-cluster-management.io/addon-framework/pkg/utils"
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	v1 "open-cluster-management.io/api/cluster/v1"
 	workv1 "open-cluster-management.io/api/work/v1"
+
+	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
+	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
+	"github.com/stolostron/multicluster-observability-addon/internal/analytics/rightsizing"
+	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 )
 
 const (
@@ -62,7 +63,7 @@ func HealthProber(getter addonutils.AddOnDeploymentConfigGetter, logger logr.Log
 			ProbeFields: probeFields,
 			HealthChecker: func(fields []agent.FieldResult, mc *v1.ManagedCluster, mcao *addonapiv1beta1.ManagedClusterAddOn) error {
 				if err := healthChecker(getter, fields, mc, mcao); err != nil {
-					logger.V(1).Info("Health check failed for managed cluster", "clusterName", mc.Name, "error", err.Error())
+					logger.V(1).Info("health check failed for managed cluster", "clusterName", mc.Name, "error", err)
 					return fmt.Errorf("healthChecker failed: %w", err)
 				}
 				return nil

@@ -8,9 +8,10 @@ import (
 	"slices"
 	"strings"
 
-	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+
+	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 )
 
 func ServerSideApply(ctx context.Context, c client.Client, obj client.Object, owner client.Object) error {

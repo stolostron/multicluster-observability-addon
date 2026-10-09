@@ -16,11 +16,6 @@ import (
 	coomonitoringv1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1"
 	coomonitoringv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	monitoringv1alpha1 "github.com/rhobs/observability-operator/pkg/apis/monitoring/v1alpha1"
-	"github.com/stolostron/multicluster-observability-addon/internal/addon"
-	addoncommon "github.com/stolostron/multicluster-observability-addon/internal/addon/common"
-	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
-	addonhelm "github.com/stolostron/multicluster-observability-addon/internal/addon/helm"
-	thanosbuilder "github.com/stolostron/multicluster-observability-addon/internal/metrics/thanos"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -35,6 +30,12 @@ import (
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/stolostron/multicluster-observability-addon/internal/addon"
+	addoncommon "github.com/stolostron/multicluster-observability-addon/internal/addon/common"
+	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
+	addonhelm "github.com/stolostron/multicluster-observability-addon/internal/addon/helm"
+	thanosbuilder "github.com/stolostron/multicluster-observability-addon/internal/metrics/thanos"
 )
 
 func NewAddonManager(ctx context.Context, kubeConfig *rest.Config, scheme *runtime.Scheme, logger logr.Logger, httpClient *http.Client, mapper meta.RESTMapper) (addonmanager.AddonManager, error) {
@@ -96,9 +97,9 @@ func NewAddonManager(ctx context.Context, kubeConfig *rest.Config, scheme *runti
 
 	mcoaAgentAddon, err := addonfactory.NewAgentAddonFactory(addoncfg.Name, addon.FS, "manifests/charts/mcoa").
 		WithConfigGVRs(configGVRs...).
+		//nolint:contextcheck // AddonHealthCheckerFunc interface does not accept context; prober runs asynchronously across process lifecycle
 		WithAgentHealthProber(addon.HealthProber(getter, agentLogger)).
 		WithGetValuesFuncs(addonConfigValuesFn, addonhelm.GetValuesFunc(ctx, k8sClient, getter, agentLogger)).
-		WithAgentHealthProber(addon.HealthProber(getter, agentLogger)).
 		WithAgentRegistrationOption(registrationOption).
 		WithAgentDeployTriggerClusterFilter(func(old, new *clusterv1.ManagedCluster) bool {
 			return !maps.Equal(old.Labels, new.Labels)

@@ -4,9 +4,10 @@ import (
 	"testing"
 
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
-	"github.com/stolostron/multicluster-observability-addon/internal/analytics/rightsizing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/stolostron/multicluster-observability-addon/internal/analytics/rightsizing"
 )
 
 // TestGeneratePrometheusRule validates namespace PrometheusRule generation across

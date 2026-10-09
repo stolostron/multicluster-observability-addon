@@ -8,10 +8,6 @@ import (
 	"github.com/go-logr/logr"
 	persesv1 "github.com/perses/perses-operator/api/v1alpha1"
 	uiplugin "github.com/rhobs/observability-operator/pkg/apis/uiplugin/v1alpha1"
-	"github.com/stolostron/multicluster-observability-addon/internal/addon"
-	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
-	chandlers "github.com/stolostron/multicluster-observability-addon/internal/coo/handlers"
-	cooresource "github.com/stolostron/multicluster-observability-addon/internal/coo/resource"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -28,6 +24,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+
+	"github.com/stolostron/multicluster-observability-addon/internal/addon"
+	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
+	chandlers "github.com/stolostron/multicluster-observability-addon/internal/coo/handlers"
+	cooresource "github.com/stolostron/multicluster-observability-addon/internal/coo/resource"
 )
 
 var managedByPredicate = predicate.Funcs{
@@ -78,7 +79,8 @@ func SetupWithManager(mgr ctrl.Manager, logger logr.Logger) error {
 }
 
 func (r *DefaultHubStackReconciler) Reconcile(ctx context.Context, _ ctrl.Request) (ctrl.Result, error) {
-	r.Log.V(2).Info("reconciliation triggered")
+	log := ctrl.LoggerFrom(ctx)
+	log.V(2).Info("reconciliation triggered")
 
 	var opts addon.Options
 	aodc := &addonv1beta1.AddOnDeploymentConfig{}
@@ -86,7 +88,7 @@ func (r *DefaultHubStackReconciler) Reconcile(ctx context.Context, _ ctrl.Reques
 		if !errors.IsNotFound(err) {
 			return ctrl.Result{}, fmt.Errorf("failed to get AddOnDeploymentConfig: %w", err)
 		}
-		r.Log.Info("AddOnDeploymentConfig not found, reconciling with empty options to clean up hub resources")
+		log.Info("AddOnDeploymentConfig not found, reconciling with empty options to clean up hub resources")
 	} else {
 		var buildErr error
 		opts, buildErr = addon.BuildOptions(aodc)
@@ -97,14 +99,14 @@ func (r *DefaultHubStackReconciler) Reconcile(ctx context.Context, _ ctrl.Reques
 
 	hasCardinalityRules := chandlers.HasCardinalityRules(ctx, r.Client)
 
-	installCOO, err := chandlers.InstallOfCOOOnTheHubIsNeeded(ctx, r.Client, r.Log)
+	installCOO, err := chandlers.InstallOfCOOOnTheHubIsNeeded(ctx, r.Client, log)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to check COO installation: %w", err)
 	}
 
 	hubReconciler := &cooresource.HubResourceReconciler{
 		Client: r.Client,
-		Logger: r.Log,
+		Logger: log,
 		Opts:   opts,
 	}
 	if err := hubReconciler.Reconcile(ctx, hasCardinalityRules, installCOO); err != nil {
@@ -145,7 +147,7 @@ func (r *DefaultHubStackReconciler) registerDynamicWatches() {
 		}
 
 		if _, err := r.mapper.RESTMapping(w.gvk.GroupKind(), w.gvk.Version); err != nil {
-			r.Log.V(2).Info("CRD not yet available, will retry on next reconcile", "kind", w.gvk.Kind)
+			r.Log.V(2).Info("crd not yet available, will retry on next reconcile", "kind", w.gvk.Kind)
 			continue
 		}
 
