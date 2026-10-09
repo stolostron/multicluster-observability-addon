@@ -47,6 +47,9 @@ func buildDefaultStackOptions(ctx context.Context, k8s client.Client, mcAddon *a
 		if host == "" {
 			return fmt.Errorf("%w: %q", errGatewayRouteNoHost, mcoagateway.GatewayRouteName)
 		}
+		if err := mcoagateway.ServerCertIncludesHost(ctx, k8s, host); err != nil {
+			return fmt.Errorf("MCOA gateway server certificate is not ready for Route host %q: %w", host, err)
+		}
 		opts.DefaultStack.LokiURL = "https://" + host + lokiOTLPWritePathSuffix
 	}
 
