@@ -6,9 +6,10 @@ import (
 	"strconv"
 	"strings"
 
-	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	corev1 "k8s.io/api/core/v1"
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
+
+	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 )
 
 const (

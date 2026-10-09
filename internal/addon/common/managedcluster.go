@@ -6,8 +6,9 @@ import (
 
 	clusterinfov1beta1 "github.com/stolostron/cluster-lifecycle-api/clusterinfo/v1beta1"
 	clusterlifecycleconstants "github.com/stolostron/cluster-lifecycle-api/constants"
-	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+
+	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 )
 
 // GetManagedClusterID returns the cluster ID with following priotity order:

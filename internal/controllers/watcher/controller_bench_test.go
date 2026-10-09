@@ -6,11 +6,12 @@ import (
 	"testing"
 
 	"github.com/go-logr/logr"
-	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	workv1 "open-cluster-management.io/api/work/v1"
+
+	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 )
 
 func BenchmarkUpdateCache(b *testing.B) {

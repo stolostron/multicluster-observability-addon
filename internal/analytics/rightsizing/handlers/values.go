@@ -5,8 +5,9 @@ import (
 
 	cooprometheusv1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1"
 	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
-	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	"k8s.io/utils/ptr"
+
+	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 )
 
 // RightSizingValues contains the helm values for right-sizing

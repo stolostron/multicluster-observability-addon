@@ -9,10 +9,6 @@ import (
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
-	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
-	addonmetrics "github.com/stolostron/multicluster-observability-addon/internal/addon/metrics"
-	"github.com/stolostron/multicluster-observability-addon/internal/analytics/rightsizing"
-	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -24,6 +20,11 @@ import (
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	fakeaddon "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
 	workv1 "open-cluster-management.io/api/work/v1"
+
+	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
+	addonmetrics "github.com/stolostron/multicluster-observability-addon/internal/addon/metrics"
+	"github.com/stolostron/multicluster-observability-addon/internal/analytics/rightsizing"
+	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 )
 
 func newTestGetter(aodc *addonapiv1beta1.AddOnDeploymentConfig) addonutils.AddOnDeploymentConfigGetter {

@@ -11,10 +11,6 @@ import (
 	operatorsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	persesv1 "github.com/perses/perses-operator/api/v1alpha1"
 	uiplugin "github.com/rhobs/observability-operator/pkg/apis/uiplugin/v1alpha1"
-	"github.com/stolostron/multicluster-observability-addon/internal/addon"
-	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
-	chandlers "github.com/stolostron/multicluster-observability-addon/internal/coo/handlers"
-	cooresource "github.com/stolostron/multicluster-observability-addon/internal/coo/resource"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -32,6 +28,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+
+	"github.com/stolostron/multicluster-observability-addon/internal/addon"
+	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
+	chandlers "github.com/stolostron/multicluster-observability-addon/internal/coo/handlers"
+	cooresource "github.com/stolostron/multicluster-observability-addon/internal/coo/resource"
 )
 
 var managedByPredicate = predicate.Funcs{
@@ -101,7 +102,8 @@ func SetupWithManager(mgr ctrl.Manager, logger logr.Logger) error {
 }
 
 func (r *DefaultHubStackReconciler) Reconcile(ctx context.Context, _ ctrl.Request) (ctrl.Result, error) {
-	r.Log.V(2).Info("reconciliation triggered")
+	log := ctrl.LoggerFrom(ctx)
+	log.V(2).Info("reconciliation triggered")
 
 	var opts addon.Options
 	aodc := &addonv1beta1.AddOnDeploymentConfig{}
@@ -109,7 +111,7 @@ func (r *DefaultHubStackReconciler) Reconcile(ctx context.Context, _ ctrl.Reques
 		if !errors.IsNotFound(err) {
 			return ctrl.Result{}, fmt.Errorf("failed to get AddOnDeploymentConfig: %w", err)
 		}
-		r.Log.Info("AddOnDeploymentConfig not found, reconciling with empty options to clean up hub resources")
+		log.Info("AddOnDeploymentConfig not found, reconciling with empty options to clean up hub resources")
 	} else {
 		var buildErr error
 		opts, buildErr = addon.BuildOptions(aodc)
@@ -124,7 +126,7 @@ func (r *DefaultHubStackReconciler) Reconcile(ctx context.Context, _ ctrl.Reques
 	}
 	hasCardinalityRules := chandlers.HasCardinalityRules(ctx, reader)
 
-	canManageCOO, err := chandlers.CanManageCOOOnTheHub(ctx, r.Client, r.Log)
+	canManageCOO, err := chandlers.CanManageCOOOnTheHub(ctx, r.Client, log)
 	if err != nil {
 		if stderrors.Is(err, addoncfg.ErrInvalidSubscriptionChannel) {
 			return ctrl.Result{}, reconcile.TerminalError(fmt.Errorf("failed to check COO installation: %w", err))
@@ -134,7 +136,7 @@ func (r *DefaultHubStackReconciler) Reconcile(ctx context.Context, _ ctrl.Reques
 
 	hubReconciler := &cooresource.HubResourceReconciler{
 		Client: r.Client,
-		Logger: r.Log,
+		Logger: log,
 		Opts:   opts,
 	}
 	if err := hubReconciler.Reconcile(ctx, hasCardinalityRules, canManageCOO); err != nil {

@@ -8,8 +8,6 @@ import (
 
 	"github.com/go-logr/logr"
 	hyperv1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
-	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
-	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -25,6 +23,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
+	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
+	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 )
 
 func TestEnqueueForConfigResource(t *testing.T) {
