@@ -6,6 +6,12 @@ import (
 	"slices"
 
 	"github.com/go-logr/logr"
+	"open-cluster-management.io/addon-framework/pkg/addonfactory"
+	addonutils "open-cluster-management.io/addon-framework/pkg/utils"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
 	"github.com/stolostron/multicluster-observability-addon/internal/analytics/rightsizing"
@@ -18,11 +24,6 @@ import (
 	omanifests "github.com/stolostron/multicluster-observability-addon/internal/obsapi/manifests"
 	thandlers "github.com/stolostron/multicluster-observability-addon/internal/tracing/handlers"
 	tmanifests "github.com/stolostron/multicluster-observability-addon/internal/tracing/manifests"
-	"open-cluster-management.io/addon-framework/pkg/addonfactory"
-	addonutils "open-cluster-management.io/addon-framework/pkg/utils"
-	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
-	clusterv1 "open-cluster-management.io/api/cluster/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type GlobalValues struct {

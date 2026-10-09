@@ -4,9 +4,11 @@ version: "2"
 linters:
   default: standard # use default linters: errcheck, govet, ineffassign staticcheck unused
   enable:
+    - contextcheck # checks whether functions use non-inherited contexts
     - copyloopvar # catches accidental copies of loop variables, including aliases
     - err113 # checks that errors are wrapped according to go 1.13 error wrapping tools
     - errorlint # checks modern error wrapping, comparisons, and assertions
+    - loggercheck # checks key-value pairs for logger libraries (logr)
     - misspell # spell checker
     - modernize # suggests newer stdlib and language idioms when applicable
     - nolintlint # validates nolint directives so they stay intentional
@@ -45,7 +47,7 @@ formatters:
       sections:
         - standard
         - default
-        - prefix(github.com/stolostron/multi-cluster-obsevability-addon)
+        - prefix(github.com/stolostron/multicluster-observability-addon)
         - blank
         - dot
   exclusions:

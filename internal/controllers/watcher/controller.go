@@ -9,11 +9,6 @@ import (
 	"github.com/go-logr/logr"
 	hyperv1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
-	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
-	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
-	rshandlers "github.com/stolostron/multicluster-observability-addon/internal/analytics/rightsizing/handlers"
-	coohandlers "github.com/stolostron/multicluster-observability-addon/internal/coo/handlers"
-	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -30,6 +25,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
+	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
+	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
+	rshandlers "github.com/stolostron/multicluster-observability-addon/internal/analytics/rightsizing/handlers"
+	coohandlers "github.com/stolostron/multicluster-observability-addon/internal/coo/handlers"
+	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 )
 
 const (
@@ -48,7 +49,8 @@ type WatcherReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.11.0/pkg/reconcile
 func (r *WatcherReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	r.Log.V(2).Info("reconciliation triggered", "request", req.String())
+	log := ctrl.LoggerFrom(ctx)
+	log.V(2).Info("reconciliation triggered")
 	r.addonManager.Trigger(req.Namespace, req.Name)
 
 	return ctrl.Result{}, nil
@@ -162,7 +164,7 @@ func (r *WatcherReconciler) updateCache(mw *workv1.ManifestWork) {
 
 func (r *WatcherReconciler) enqueueForLocalCluster() handler.EventHandler {
 	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
-		r.Log.V(2).Info("Enqueue for local cluster event", "gvk", obj.GetObjectKind().GroupVersionKind().String(), "name", obj.GetName(), "namespace", obj.GetNamespace())
+		r.Log.V(2).Info("enqueuing for local cluster event", "gvk", obj.GetObjectKind().GroupVersionKind().String(), "name", obj.GetName(), "namespace", obj.GetNamespace())
 		return []reconcile.Request{
 			{
 				NamespacedName: types.NamespacedName{
@@ -176,7 +178,7 @@ func (r *WatcherReconciler) enqueueForLocalCluster() handler.EventHandler {
 
 func (r *WatcherReconciler) enqueueForAllManagedClusters() handler.EventHandler {
 	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
-		r.Log.V(2).Info("Enqueue for all managed clusters", "gvk", obj.GetObjectKind().GroupVersionKind().String(), "name", obj.GetName(), "namespace", obj.GetNamespace())
+		r.Log.V(2).Info("enqueuing for all managed clusters", "gvk", obj.GetObjectKind().GroupVersionKind().String(), "name", obj.GetName(), "namespace", obj.GetNamespace())
 
 		mwList := &workv1.ManifestWorkList{}
 		if err := r.List(ctx, mwList, client.MatchingLabels{addoncfg.LabelOCMAddonName: addoncfg.Name}); err != nil {
@@ -211,7 +213,7 @@ func (r *WatcherReconciler) enqueueForConfigResource() handler.EventHandler {
 		}
 
 		rqs := make([]reconcile.Request, 0, len(namespaces))
-		r.Log.V(2).Info("Enqueue for config resource event", "gvk", obj.GetObjectKind().GroupVersionKind().String(), "name", obj.GetName(), "namespace", obj.GetNamespace(), "clustersCount", len(namespaces))
+		r.Log.V(2).Info("enqueuing for config resource event", "gvk", obj.GetObjectKind().GroupVersionKind().String(), "name", obj.GetName(), "namespace", obj.GetNamespace(), "clustersCount", len(namespaces))
 
 		for _, ns := range namespaces {
 			rqs = append(rqs,

@@ -5,9 +5,6 @@ import (
 	"maps"
 
 	"github.com/go-logr/logr"
-	"github.com/stolostron/multicluster-observability-addon/internal/addon"
-	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
-	"github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	thanosv1alpha1 "github.com/thanos-community/thanos-operator/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -15,6 +12,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/stolostron/multicluster-observability-addon/internal/addon"
+	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
+	"github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 )
 
 var mcoaLabels = map[string]string{

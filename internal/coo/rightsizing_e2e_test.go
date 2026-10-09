@@ -6,9 +6,6 @@ import (
 	"testing"
 
 	persesv1 "github.com/perses/perses-operator/api/v1alpha1"
-	"github.com/stolostron/multicluster-observability-addon/internal/addon"
-	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
-	cooresource "github.com/stolostron/multicluster-observability-addon/internal/coo/resource"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -18,6 +15,10 @@ import (
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+
+	"github.com/stolostron/multicluster-observability-addon/internal/addon"
+	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
+	cooresource "github.com/stolostron/multicluster-observability-addon/internal/coo/resource"
 )
 
 var (

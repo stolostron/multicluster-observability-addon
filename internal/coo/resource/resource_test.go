@@ -5,14 +5,15 @@ import (
 
 	"github.com/go-logr/logr"
 	persesv1 "github.com/perses/perses-operator/api/v1alpha1"
-	"github.com/stolostron/multicluster-observability-addon/internal/addon"
-	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+
+	"github.com/stolostron/multicluster-observability-addon/internal/addon"
+	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 )
 
 func newTestScheme() *runtime.Scheme {

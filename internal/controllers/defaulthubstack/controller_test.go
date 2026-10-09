@@ -8,9 +8,6 @@ import (
 	operatorsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	persesv1 "github.com/perses/perses-operator/api/v1alpha1"
 	uiplugin "github.com/rhobs/observability-operator/pkg/apis/uiplugin/v1alpha1"
-	"github.com/stolostron/multicluster-observability-addon/internal/addon"
-	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
-	cooresource "github.com/stolostron/multicluster-observability-addon/internal/coo/resource"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -23,6 +20,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
+	"github.com/stolostron/multicluster-observability-addon/internal/addon"
+	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
+	cooresource "github.com/stolostron/multicluster-observability-addon/internal/coo/resource"
 )
 
 func allGVKsRegistered() map[schema.GroupVersionKind]bool {

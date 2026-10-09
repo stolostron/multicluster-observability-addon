@@ -5,12 +5,13 @@ import (
 	"testing"
 
 	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
-	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
+
+	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 )
 
 func Test_BuildSubscriptionChannel(t *testing.T) {
