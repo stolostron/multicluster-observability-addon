@@ -55,11 +55,8 @@ spec:
             resource: instrumentations
             name: instance
             namespace: open-cluster-management-observability
-          - group: observability.openshift.io
-            resource: clusterlogforwarders
-            name: default-stack-instance-global
-            namespace: open-cluster-management-observability
-          - group: loki.grafana.com
-            resource: lokistacks
-            name: default-stack-instance-global
-            namespace: open-cluster-management-observability
+          # The default-stack ClusterLogForwarder and LokiStack are NOT listed
+          # here: they only exist while platformLogsDefault is enabled, and the
+          # resourcecreator controller adds/keeps them on this placement itself
+          # (see common.EnsureAddonConfig). Hardcoding them would advertise
+          # configs that never resolve when managed logging is off.
