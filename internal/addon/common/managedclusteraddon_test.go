@@ -98,12 +98,12 @@ func TestGetAddOnDeploymentConfig(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			//nolint:staticcheck // client.Apply is deprecated, but alternative requires ApplyConfigurations which we don't have
-			fakeAddonClient := fakeaddon.NewSimpleClientset()
+			var existingObjs []runtime.Object
 			if tt.existingAODC != nil {
-				//nolint:staticcheck // client.Apply is deprecated, but alternative requires ApplyConfigurations which we don't have
-				fakeAddonClient = fakeaddon.NewSimpleClientset(tt.existingAODC)
+				existingObjs = append(existingObjs, tt.existingAODC)
 			}
+			//nolint:staticcheck // fakeaddon.NewSimpleClientset is deprecated in client-go but open-cluster-management.io/api does not generate NewClientset
+			fakeAddonClient := fakeaddon.NewSimpleClientset(existingObjs...)
 			scheme := runtime.NewScheme()
 			require.NoError(t, addonapiv1beta1.Install(scheme))
 			getter := addonutils.NewAddOnDeploymentConfigGetter(fakeAddonClient)
