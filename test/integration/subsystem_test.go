@@ -166,7 +166,7 @@ func extractManifestFromManifestWork(mw *workv1.ManifestWork, kind, name string)
 	return nil, false
 }
 
-// TestSubsystem_ConvergenceAndCascade serves as the Tier 2 Subsystem integration test.
+// TestSubsystem_PlatformMetricsDeploymentAndSecretRotation serves as the Tier 2 Subsystem integration test.
 //
 // Architectural Scope:
 // This test validates the full end-to-end multi-controller integration loop across MCOA:
@@ -183,7 +183,7 @@ func extractManifestFromManifestWork(mw *workv1.ManifestWork, kind, name string)
 //  3. Steady-State Quiescence Assertion:
 //     Proves absence of runaway event storms, ping-pong reconciliations, or resource version drift across
 //     the entire subsystem once steady-state converges.
-func TestSubsystem_ConvergenceAndCascade(t *testing.T) {
+func TestSubsystem_PlatformMetricsDeploymentAndSecretRotation(t *testing.T) {
 	testEnv := SetupTestEnv(t)
 	ctx := t.Context()
 
