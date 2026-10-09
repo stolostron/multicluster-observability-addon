@@ -79,6 +79,10 @@ fmt: lint-fix
 test:
 	go test ./internal/...
 
+.PHONY: bench
+bench: ## Run Go performance benchmarks with memory allocation profiling
+	go test -run=^# -bench=. -benchmem ./internal/...
+
 .PHONY: prepare-bin
 prepare-bin:
 	@mkdir -p $(BIN_DIR)
