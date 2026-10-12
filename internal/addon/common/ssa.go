@@ -20,15 +20,23 @@ import (
 // ErrNilObject is returned when attempting to server-side apply a nil object.
 var ErrNilObject = errors.New("cannot server-side apply a nil object")
 
+func isNil(obj client.Object) bool {
+	if obj == nil {
+		return true
+	}
+	val := reflect.ValueOf(obj)
+	return val.Kind() == reflect.Pointer && val.IsNil()
+}
+
 // ServerSideApply applies the provided object using Kubernetes Server-Side Apply (SSA).
 // If owner is non-nil, a controller reference is established before applying.
 func ServerSideApply(ctx context.Context, c client.Client, obj client.Object, owner client.Object) error {
-	if obj == nil {
+	if isNil(obj) {
 		return ErrNilObject
 	}
 
 	// Only set controller reference if an owner is provided
-	if owner != nil {
+	if !isNil(owner) {
 		if err := controllerutil.SetControllerReference(owner, obj, c.Scheme()); err != nil {
 			return fmt.Errorf("failed to set controller reference: %w", err)
 		}
@@ -49,7 +57,7 @@ func ServerSideApply(ctx context.Context, c client.Client, obj client.Object, ow
 
 	applyConfig := client.ApplyConfigurationFromUnstructured(u)
 	if err := c.Apply(ctx, applyConfig, client.FieldOwner(addoncfg.Name), client.ForceOwnership); err != nil {
-		return fmt.Errorf("failed to patch with SSA: %w", err)
+		return fmt.Errorf("failed to apply with SSA: %w", err)
 	}
 
 	if err := syncBackToObject(u, obj); err != nil {
@@ -104,7 +112,7 @@ func syncBackToObject(u *unstructured.Unstructured, obj client.Object) error {
 // automatically without a hand-maintained path list, and ignores zero-value
 // noise from typed structs (empty slices, nested structs without omitempty).
 func DeriveSSAManagedFields(obj client.Object) []string {
-	if obj == nil {
+	if isNil(obj) {
 		return nil
 	}
 
@@ -191,7 +199,7 @@ func labelsFromPayload(payload map[string]any) map[string]any {
 // SetSSAManagedFieldsAnnotation records the JSON paths MCOA enforces with server-side apply.
 // The annotation is sorted for a stable value so reconciles are not retriggered by field-order churn.
 func SetSSAManagedFieldsAnnotation(obj client.Object, fields []string) {
-	if obj == nil || len(fields) == 0 {
+	if isNil(obj) || len(fields) == 0 {
 		return
 	}
 
@@ -209,12 +217,15 @@ func SetSSAManagedFieldsAnnotation(obj client.Object, fields []string) {
 // SetSSAManagedFieldsAnnotationFromObject derives managed-field paths from obj and
 // writes them onto obj. obj should contain only the fields MCOA is applying.
 func SetSSAManagedFieldsAnnotationFromObject(obj client.Object) {
+	if isNil(obj) {
+		return
+	}
 	SetSSAManagedFieldsAnnotation(obj, DeriveSSAManagedFields(obj))
 }
 
 // SSAManagedFieldsAnnotation returns the SSA managed-fields annotation value, or "" if unset.
 func SSAManagedFieldsAnnotation(obj client.Object) string {
-	if obj == nil {
+	if isNil(obj) {
 		return ""
 	}
 	return obj.GetAnnotations()[addoncfg.SSAManagedFieldsAnnotationKey]
