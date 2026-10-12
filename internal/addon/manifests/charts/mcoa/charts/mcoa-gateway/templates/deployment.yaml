@@ -101,18 +101,13 @@ spec:
               readOnly: true
               mountPath: /etc/observatorium/tenants.yaml
               subPath: tenants.yaml
+            # Mounted as a whole secret rather than with subPath: subPath
+            # mounts are snapshotted at pod start and never updated, so the
+            # kubelet would not surface the reissued certificate that adds the
+            # Route host to the SANs and --tls.reload-interval would be a no-op.
             - name: tls-secret
               readOnly: true
-              mountPath: /var/run/tls/tls.crt
-              subPath: tls.crt
-            - name: tls-secret
-              readOnly: true
-              mountPath: /var/run/tls/tls.key
-              subPath: tls.key
-            - name: tls-secret
-              readOnly: true
-              mountPath: /var/run/tls/ca.crt
-              subPath: ca.crt
+              mountPath: /var/run/tls
             {{- if .Values.logsEnabled }}
             - name: loki-client-tls
               readOnly: true
@@ -141,6 +136,11 @@ spec:
             - '--tls.server.cert-file=/var/run/tls/tls.crt'
             - '--tls.server.key-file=/var/run/tls/tls.key'
             - '--tls.client-ca-file=/var/run/tls/ca.crt'
+            # The server cert is first issued without the Route host SAN (the
+            # Route does not exist yet at install time) and reissued once the
+            # Route is admitted. Re-read it from disk so the gateway serves the
+            # complete cert without a restart.
+            - '--tls.reload-interval=1m'
             - '--tls.healthchecks.server-ca-file=/var/run/tls/ca.crt'
             - '--tls.healthchecks.server-name=mcoa-observability-observatorium-api.open-cluster-management-observability.svc'
             - '--tls.healthchecks.client-cert-file=/var/run/tls/tls.crt'
