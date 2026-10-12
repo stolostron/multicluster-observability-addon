@@ -11,6 +11,7 @@ import (
 
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -51,7 +52,9 @@ func ServerSideApply(ctx context.Context, c client.Client, obj client.Object, ow
 		return fmt.Errorf("failed to patch with SSA: %w", err)
 	}
 
-	syncBackToObject(u, obj)
+	if err := syncBackToObject(u, obj); err != nil {
+		return fmt.Errorf("failed to sync server response back to object: %w", err)
+	}
 	return nil
 }
 
@@ -60,14 +63,11 @@ func toUnstructuredApply(c client.Client, obj client.Object) (*unstructured.Unst
 	if unstr, ok := obj.(*unstructured.Unstructured); ok {
 		u = unstr.DeepCopy()
 	} else {
-		data, err := json.Marshal(obj)
+		unstrMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
 		if err != nil {
-			return nil, fmt.Errorf("failed to marshal %T to JSON: %w", obj, err)
+			return nil, fmt.Errorf("failed to convert %T to unstructured map: %w", obj, err)
 		}
-		u = &unstructured.Unstructured{Object: map[string]any{}}
-		if err := json.Unmarshal(data, &u.Object); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal JSON into unstructured: %w", err)
-		}
+		u = &unstructured.Unstructured{Object: unstrMap}
 	}
 
 	if u.GetAPIVersion() == "" || u.GetKind() == "" {
@@ -83,20 +83,20 @@ func toUnstructuredApply(c client.Client, obj client.Object) (*unstructured.Unst
 	return u, nil
 }
 
-func syncBackToObject(u *unstructured.Unstructured, obj client.Object) {
+func syncBackToObject(u *unstructured.Unstructured, obj client.Object) error {
 	if unstr, ok := obj.(*unstructured.Unstructured); ok {
 		*unstr = *u
-		return
+		return nil
 	}
 
-	obj.SetResourceVersion(u.GetResourceVersion())
-	obj.SetUID(u.GetUID())
-	obj.SetGeneration(u.GetGeneration())
-	obj.SetCreationTimestamp(u.GetCreationTimestamp())
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(u.Object, obj); err != nil {
+		return fmt.Errorf("failed to sync server response to %T: %w", obj, err)
+	}
 
 	if gvk := u.GroupVersionKind(); !gvk.Empty() {
 		obj.GetObjectKind().SetGroupVersionKind(gvk)
 	}
+	return nil
 }
 
 // DeriveSSAManagedFields returns JSON paths for fields obj sets relative to a
