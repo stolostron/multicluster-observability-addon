@@ -41,6 +41,20 @@ func TestBuildServerCertificate(t *testing.T) {
 	assert.Contains(t, cert.Spec.Usages, certmanagerv1.UsageServerAuth)
 }
 
+func TestBuildServerCertificateWithoutRouteHost(t *testing.T) {
+	// The Route does not exist on a fresh install, so the cert has to be
+	// issuable with the in-cluster SANs alone - the gateway cannot start
+	// without the secret.
+	cert, err := BuildServerCertificate("")
+	require.NoError(t, err)
+	assert.Equal(t, []string{
+		DefaultStorageCertCommonName,
+		fmt.Sprintf("%s.%s.svc", DefaultStorageCertCommonName, addoncfg.InstallNamespace),
+		fmt.Sprintf("%s.%s.svc.cluster.local", DefaultStorageCertCommonName, addoncfg.InstallNamespace),
+	}, cert.Spec.DNSNames)
+	assert.NotContains(t, cert.Spec.DNSNames, "")
+}
+
 func TestBuildLokiClientCertificate(t *testing.T) {
 	cert, err := BuildLokiClientCertificate()
 	require.NoError(t, err)
