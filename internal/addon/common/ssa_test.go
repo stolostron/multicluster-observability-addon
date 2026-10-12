@@ -47,6 +47,12 @@ func TestServerSideApply(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "test-cm",
 				Namespace: "default",
+				Labels: map[string]string{
+					"app": "mcoa",
+				},
+				Annotations: map[string]string{
+					"note": "synced",
+				},
 			},
 			Data: map[string]string{
 				"key": "value",
@@ -56,8 +62,10 @@ func TestServerSideApply(t *testing.T) {
 		err := common.ServerSideApply(ctx, c, cm, nil)
 		require.NoError(t, err)
 
-		// Assert server-managed metadata and GVK are synchronized back onto the typed object
+		// Assert server-managed metadata, labels, annotations and GVK are synchronized back onto the typed object
 		assert.NotEmpty(t, cm.GetResourceVersion())
+		assert.Equal(t, "mcoa", cm.Labels["app"])
+		assert.Equal(t, "synced", cm.Annotations["note"])
 		assert.Equal(t, schema.GroupVersionKind{Group: "", Version: "v1", Kind: "ConfigMap"}, cm.GetObjectKind().GroupVersionKind())
 
 		// Verify object exists in client store
@@ -66,6 +74,8 @@ func TestServerSideApply(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "value", retrieved.Data["key"])
 		assert.Equal(t, cm.GetResourceVersion(), retrieved.GetResourceVersion())
+		assert.Equal(t, "mcoa", retrieved.Labels["app"])
+		assert.Equal(t, "synced", retrieved.Annotations["note"])
 	})
 
 	t.Run("applies unstructured object and updates in place", func(t *testing.T) {
