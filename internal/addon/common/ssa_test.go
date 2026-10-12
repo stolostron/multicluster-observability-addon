@@ -40,6 +40,42 @@ func TestServerSideApply(t *testing.T) {
 		require.ErrorIs(t, err, common.ErrNilObject)
 	})
 
+	t.Run("typed nil object returns ErrNilObject", func(t *testing.T) {
+		scheme := runtime.NewScheme()
+		c := fake.NewClientBuilder().WithScheme(scheme).Build()
+
+		var u *unstructured.Unstructured
+		err := common.ServerSideApply(ctx, c, u, nil)
+		require.ErrorIs(t, err, common.ErrNilObject)
+
+		var cm *corev1.ConfigMap
+		err = common.ServerSideApply(ctx, c, cm, nil)
+		require.ErrorIs(t, err, common.ErrNilObject)
+	})
+
+	t.Run("typed nil owner does not attempt controller reference assignment", func(t *testing.T) {
+		scheme := runtime.NewScheme()
+		require.NoError(t, corev1.AddToScheme(scheme))
+		c := fake.NewClientBuilder().WithScheme(scheme).Build()
+
+		cm := &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "typed-nil-owner-cm",
+				Namespace: "default",
+			},
+			Data: map[string]string{"foo": "bar"},
+		}
+
+		var nilOwner *corev1.ConfigMap
+		err := common.ServerSideApply(ctx, c, cm, nilOwner)
+		require.NoError(t, err)
+
+		var retrieved corev1.ConfigMap
+		err = c.Get(ctx, types.NamespacedName{Name: "typed-nil-owner-cm", Namespace: "default"}, &retrieved)
+		require.NoError(t, err)
+		assert.Empty(t, retrieved.GetOwnerReferences())
+	})
+
 	t.Run("applies typed object and synchronizes metadata and GVK", func(t *testing.T) {
 		scheme := runtime.NewScheme()
 		require.NoError(t, corev1.AddToScheme(scheme))
@@ -283,10 +319,19 @@ func TestSetSSAManagedFieldsAnnotation(t *testing.T) {
 		common.SetSSAManagedFieldsAnnotation(obj, nil)
 		assert.Empty(t, obj.Annotations)
 	})
+
+	t.Run("typed nil object is a no-op", func(t *testing.T) {
+		var u *unstructured.Unstructured
+		assert.NotPanics(t, func() {
+			common.SetSSAManagedFieldsAnnotation(u, []string{".spec.image"})
+		})
+	})
 }
 
 func TestSSAManagedFieldsAnnotation(t *testing.T) {
 	assert.Empty(t, common.SSAManagedFieldsAnnotation(nil))
+	var nilObj *corev1.ConfigMap
+	assert.Empty(t, common.SSAManagedFieldsAnnotation(nilObj))
 
 	obj := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
@@ -343,20 +388,31 @@ func TestDeriveSSAManagedFields(t *testing.T) {
 
 	t.Run("nil object yields no paths", func(t *testing.T) {
 		assert.Empty(t, common.DeriveSSAManagedFields(nil))
+		var u *unstructured.Unstructured
+		assert.Empty(t, common.DeriveSSAManagedFields(u))
 	})
 }
 
 func TestSetSSAManagedFieldsAnnotationFromObject(t *testing.T) {
-	obj := &unstructured.Unstructured{Object: map[string]any{
-		"spec": map[string]any{
-			"image": "foo",
-		},
-	}}
-	obj.SetName("w")
+	t.Run("sets annotation on unstructured object", func(t *testing.T) {
+		obj := &unstructured.Unstructured{Object: map[string]any{
+			"spec": map[string]any{
+				"image": "foo",
+			},
+		}}
+		obj.SetName("w")
 
-	common.SetSSAManagedFieldsAnnotationFromObject(obj)
+		common.SetSSAManagedFieldsAnnotationFromObject(obj)
 
-	assert.Equal(t, ".spec.image", obj.GetAnnotations()[addoncfg.SSAManagedFieldsAnnotationKey])
+		assert.Equal(t, ".spec.image", obj.GetAnnotations()[addoncfg.SSAManagedFieldsAnnotationKey])
+	})
+
+	t.Run("typed nil object is a no-op", func(t *testing.T) {
+		var u *unstructured.Unstructured
+		assert.NotPanics(t, func() {
+			common.SetSSAManagedFieldsAnnotationFromObject(u)
+		})
+	})
 }
 
 func TestServerSideApply_PopulatesGVKWhenEmpty(t *testing.T) {
