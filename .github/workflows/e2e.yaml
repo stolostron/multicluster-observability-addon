@@ -1,0 +1,47 @@
+name: addon e2e tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  e2e:
+    name: e2e (kind)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: '1.26'
+        id: go
+
+      - name: Install kind
+        run: |
+          if ! command -v kind >/dev/null 2>&1; then
+            echo "Installing KinD..."
+            curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.25.0/kind-linux-amd64
+            chmod +x ./kind
+            sudo mv ./kind /usr/local/bin/kind
+          fi
+          kind version
+
+      - name: Install clusteradm
+        run: |
+          curl -sSL https://raw.githubusercontent.com/open-cluster-management-io/clusteradm/main/install.sh | bash
+          clusteradm version
+
+      - name: Run E2E tests
+        run: |
+          make test-e2e
+
+      - name: Debug on failure
+        if: failure()
+        run: |
+          echo "=== Pod Status ==="
+          KUBECONFIG=/tmp/mcoa-e2e.kubeconfig kubectl get pods -A || true
+          echo "=== Recent Events ==="
+          KUBECONFIG=/tmp/mcoa-e2e.kubeconfig kubectl get events -A --sort-by='.metadata.creationTimestamp' | tail -n 50 || true
