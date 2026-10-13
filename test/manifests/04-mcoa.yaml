@@ -1,0 +1,212 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: multicluster-observability-addon-manager
+  namespace: open-cluster-management-observability
+---
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: multicluster-observability-addon-manager
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps", "events"]
+    verbs: ["get", "list", "watch", "create", "update", "delete", "deletecollection", "patch"]
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
+  - apiGroups: ["authorization.k8s.io"]
+    resources: ["subjectaccessreviews"]
+    verbs: ["get", "create"]
+  - apiGroups: ["cluster.open-cluster-management.io"]
+    resources: ["managedclusters", "placementdecisions"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["addon.open-cluster-management.io"]
+    resources: ["managedclusteraddons/finalizers"]
+    verbs: ["update"]
+  - apiGroups: ["addon.open-cluster-management.io"]
+    resources: ["clustermanagementaddons/finalizers"]
+    verbs: ["update"]
+  - apiGroups: ["addon.open-cluster-management.io"]
+    resources: ["clustermanagementaddons/status"]
+    verbs: ["update", "patch"]
+  - apiGroups: ["addon.open-cluster-management.io"]
+    resources: ["clustermanagementaddons"]
+    verbs: ["get", "list", "watch", "patch"]
+  - apiGroups: ["addon.open-cluster-management.io"]
+    resources: ["managedclusteraddons"]
+    verbs: ["get", "list", "watch", "create", "update", "delete"]
+  - apiGroups: ["addon.open-cluster-management.io"]
+    resources: ["managedclusteraddons/status"]
+    verbs: ["update", "patch"]
+  - apiGroups: ["addon.open-cluster-management.io"]
+    resources: ["addontemplates"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["addon.open-cluster-management.io"]
+    resources: ["addondeploymentconfigs"]
+    verbs: ["get", "list", "watch", "update"]
+  - apiGroups: ["work.open-cluster-management.io"]
+    resources: ["manifestworks"]
+    verbs: ["get", "list", "watch", "create", "update", "delete", "patch"]
+  - apiGroups: ["certificates.k8s.io"]
+    resources: ["certificatesigningrequests"]
+    verbs: ["create", "get", "list", "watch"]
+  - apiGroups: ["certificates.k8s.io"]
+    resources: ["certificatesigningrequests/approval", "certificatesigningrequests/status"]
+    verbs: ["update"]
+  - apiGroups: ["certificates.k8s.io"]
+    resources: ["signers"]
+    verbs: ["approve", "sign"]
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["rolebindings"]
+    verbs: ["get", "list", "watch", "create", "delete"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["operators.coreos.com"]
+    resources: ["subscriptions"]
+    verbs: ["get", "list", "watch", "create", "update", "delete", "patch"]
+  - apiGroups: ["operators.coreos.com"]
+    resources: ["operatorgroups"]
+    verbs: ["get", "list", "watch", "create", "update", "delete", "patch"]
+  - apiGroups: ["observability.openshift.io"]
+    resources: ["clusterlogforwarders"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["opentelemetry.io"]
+    resources: ["opentelemetrycollectors", "instrumentations"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["monitoring.coreos.com"]
+    resources: ["prometheusrules", "servicemonitors"]
+    verbs: ["get", "list", "watch", "create", "update", "delete", "patch"]
+  - apiGroups: ["monitoring.rhobs"]
+    resources: ["prometheusagents", "scrapeconfigs", "prometheusrules"]
+    verbs: ["get", "list", "watch", "create", "update", "delete", "patch"]
+  - apiGroups: ["hypershift.openshift.io"]
+    resources: ["hostedclusters"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["config.openshift.io"]
+    resources: ["apiservers", "clusterversions"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apiextensions.k8s.io"]
+    resources: ["customresourcedefinitions"]
+    verbs: ["get"]
+  - apiGroups: ["operator.open-cluster-management.io"]
+    resources: ["multiclusterhubs"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["get", "list", "watch", "create", "update", "delete", "patch"]
+  - apiGroups: ["perses.dev"]
+    resources: ["persesdashboards", "persesdatasources"]
+    verbs: ["get", "list", "watch", "create", "update", "delete", "patch"]
+  - apiGroups: ["observability.openshift.io"]
+    resources: ["uiplugins"]
+    verbs: ["get", "list", "watch", "create", "update", "delete", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: multicluster-observability-addon-manager
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: multicluster-observability-addon-manager
+subjects:
+  - kind: ServiceAccount
+    name: multicluster-observability-addon-manager
+    namespace: open-cluster-management-observability
+---
+apiVersion: addon.open-cluster-management.io/v1beta1
+kind: ClusterManagementAddOn
+metadata:
+  name: multicluster-observability-addon
+  ownerReferences:
+  - apiVersion: observability.open-cluster-management.io/v1beta2
+    controller: true
+    kind: MultiClusterObservability
+    name: observability
+    uid: e2e-mco-uid
+  annotations:
+    addon.open-cluster-management.io/lifecycle: addon-manager
+spec:
+  addOnMeta:
+    displayName: Multicluster Observability Addon
+    description: "multicluster-observability-addon is the addon to configure spoke clusters to collect and forward logs/traces to a given set of outputs"
+  defaultConfigs:
+    - group: addon.open-cluster-management.io
+      resource: addondeploymentconfigs
+      name: multicluster-observability-addon
+      namespace: open-cluster-management-observability
+  installStrategy:
+    type: Placements
+    placements:
+      - name: global
+        namespace: open-cluster-management-global-set
+        configs: []
+---
+apiVersion: addon.open-cluster-management.io/v1beta1
+kind: AddOnDeploymentConfig
+metadata:
+  name: multicluster-observability-addon
+  namespace: open-cluster-management-observability
+spec:
+  agentInstallNamespace: open-cluster-management-addon-observability
+  customizedVariables:
+  - name: metricsHubHostname
+    value: "http://hub-prometheus.open-cluster-management-observability.svc:9090"
+  - name: platformMetricsCollection
+    value: prometheusagents.v1alpha1.monitoring.rhobs
+  - name: platformNamespaceRightSizing
+    value: disabled
+  - name: platformVirtualizationRightSizing
+    value: disabled
+  - name: openshiftLoggingChannel
+    value: stable-6.3
+  - name: platformLogsCollection
+    value: disabled
+  - name: userWorkloadMetricsCollection
+    value: disabled
+  - name: userWorkloadLogsCollection
+    value: disabled
+  - name: userWorkloadTracesCollection
+    value: disabled
+  - name: userWorkloadInstrumentation
+    value: disabled
+  - name: platformIncidentDetection
+    value: disabled
+  - name: platformMetricsUI
+    value: disabled
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: multicluster-observability-addon-manager
+  namespace: open-cluster-management-observability
+  labels:
+    app: multicluster-observability-addon-manager
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: multicluster-observability-addon-manager
+  template:
+    metadata:
+      labels:
+        app: multicluster-observability-addon-manager
+    spec:
+      serviceAccountName: multicluster-observability-addon-manager
+      containers:
+        - name: controller
+          image: localhost/mcoa:e2e
+          imagePullPolicy: IfNotPresent
+          args:
+            - "controller"
+            - "--log-verbosity=2"
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            privileged: false
+            runAsNonRoot: true
+            runAsUser: 65532

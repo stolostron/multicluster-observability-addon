@@ -54,17 +54,32 @@ $(CRD_DIR)/monitoring.rhobs_prometheusrules.yaml:
 
 $(CRD_DIR)/core.observatorium.io_observatoria.yaml:
 	@mkdir -p $(CRD_DIR)
-	@curl https://raw.githubusercontent.com/stolostron/observatorium-operator/blob/main/manifests/crds/core.observatorium.io_observatoria.yaml  > $(CRD_DIR)/core.observatorium.io_observatoria.yaml
+	@curl -s -L https://raw.githubusercontent.com/stolostron/observatorium-operator/main/manifests/crds/core.observatorium.io_observatoria.yaml > $(CRD_DIR)/core.observatorium.io_observatoria.yaml
 
 .PHONY: download-crds
 download-crds: $(CRD_DIR)/observability.openshift.io_clusterlogforwarders.yaml $(CRD_DIR)/opentelemetry.io_opentelemetrycollectors.yaml $(CRD_DIR)/opentelemetry.io_instrumentations.yaml $(CRD_DIR)/monitoring.coreos.com_prometheusagents.yaml $(CRD_DIR)/monitoring.coreos.com_scrapeconfigs.yaml $(CRD_DIR)/monitoring.rhobs_prometheusrules.yaml $(CRD_DIR)/core.observatorium.io_observatoria.yaml
+
+SHELLCHECK ?= $(shell which shellcheck 2>/dev/null)
+SHELL_SCRIPTS := $(shell find . -name "*.sh" -not -path "*/.*" -not -path "*/vendor/*")
 
 .PHONY: verify-dockerfile-labels
 verify-dockerfile-labels: ## Verify Dockerfile.Konflux RHEL version consistency
 	@./hack/verify-dockerfile-labels.sh
 
+.PHONY: lint-scripts
+lint-scripts: ## Run shellcheck on repository shell scripts
+	@if [ -n "$(SHELLCHECK)" ]; then \
+		echo "Running shellcheck on shell scripts..."; \
+		$(SHELLCHECK) $(SHELL_SCRIPTS); \
+	elif [ -n "$(CONTAINER_ENGINE)" ]; then \
+		echo "Running shellcheck via $(CONTAINER_ENGINE)..."; \
+		$(CONTAINER_ENGINE) run --rm -v "$(CURDIR):/mnt:ro" -w /mnt docker.io/koalaman/shellcheck:stable $(SHELL_SCRIPTS); \
+	else \
+		echo "Warning: shellcheck not found and no container engine available. Skipping shell lint."; \
+	fi
+
 .PHONY: lint
-lint: $(GOLANGCI_LINT) verify-dockerfile-labels ## Run golangci-lint and dockerfile verification
+lint: $(GOLANGCI_LINT) verify-dockerfile-labels lint-scripts ## Run all linters (golangci-lint, dockerfile, shellcheck)
 	$(GOLANGCI_LINT) config verify
 	$(GOLANGCI_LINT) run --timeout=5m ./...
 
@@ -110,3 +125,18 @@ addon-deploy: download-crds
 .PHONY: addon-undeploy
 addon-undeploy: download-crds
 	$(KUSTOMIZE) build ./deploy | kubectl delete -f -
+
+.PHONY: test-e2e-setup
+test-e2e-setup: ## Setup KinD cluster and dependencies for E2E tests
+	./test/scripts/setup-kind.sh
+
+.PHONY: test-e2e-run
+test-e2e-run: ## Run E2E tests against running KinD cluster
+	KUBECONFIG=/tmp/mcoa-e2e.kubeconfig go test -v -tags=e2e -count=1 -timeout=15m ./test/e2e/...
+
+.PHONY: test-e2e-clean
+test-e2e-clean: ## Teardown KinD E2E cluster
+	./test/scripts/cleanup-kind.sh
+
+.PHONY: test-e2e
+test-e2e: test-e2e-setup test-e2e-run ## Run complete E2E test lifecycle

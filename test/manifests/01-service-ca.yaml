@@ -1,0 +1,102 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: openshift-service-ca-operator
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  namespace: openshift-service-ca-operator
+  name: service-ca-operator
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: system:openshift:operator:service-ca-operator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+- kind: ServiceAccount
+  name: service-ca-operator
+  namespace: openshift-service-ca-operator
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  namespace: openshift-service-ca-operator
+  name: service-ca-operator-config
+data:
+  operator-config.yaml: |
+    apiVersion: operator.openshift.io/v1alpha1
+    kind: GenericOperatorConfig
+---
+apiVersion: config.openshift.io/v1
+kind: Infrastructure
+metadata:
+  name: cluster
+spec:
+  platformSpec:
+    type: None
+status:
+  controlPlaneTopology: SingleReplica
+  infrastructureTopology: SingleReplica
+  platform: None
+---
+apiVersion: operator.openshift.io/v1
+kind: ServiceCA
+metadata:
+  name: cluster
+  annotations:
+    release.openshift.io/create-only: "true"
+spec:
+  managementState: Managed
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: openshift-service-ca-operator
+  name: service-ca-operator
+  labels:
+    app: service-ca-operator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: service-ca-operator
+  template:
+    metadata:
+      labels:
+        app: service-ca-operator
+    spec:
+      serviceAccountName: service-ca-operator
+      containers:
+      - name: service-ca-operator
+        image: localhost/origin-service-ca-operator:kind-e2e
+        imagePullPolicy: IfNotPresent
+        command: ["service-ca-operator", "operator"]
+        args:
+        - "--config=/var/run/configmaps/config/operator-config.yaml"
+        - "-v=4"
+        resources:
+          requests:
+            memory: 80Mi
+            cpu: 10m
+        env:
+        - name: CONTROLLER_IMAGE
+          value: localhost/origin-service-ca-operator:kind-e2e
+        - name: OPERATOR_IMAGE_VERSION
+          value: "0.0.1-snapshot"
+        volumeMounts:
+        - mountPath: /var/run/configmaps/config
+          name: config
+      volumes:
+      - name: config
+        configMap:
+          defaultMode: 440
+          name: service-ca-operator-config
+      nodeSelector:
+        kubernetes.io/os: linux
+      tolerations:
+      - operator: Exists
