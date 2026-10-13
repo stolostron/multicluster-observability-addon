@@ -45,3 +45,5 @@ jobs:
           KUBECONFIG=/tmp/mcoa-e2e.kubeconfig kubectl get pods -A || true
           echo "=== Recent Events ==="
           KUBECONFIG=/tmp/mcoa-e2e.kubeconfig kubectl get events -A --sort-by='.metadata.creationTimestamp' | tail -n 50 || true
+          echo "=== MCOA Manager Logs ==="
+          KUBECONFIG=/tmp/mcoa-e2e.kubeconfig kubectl logs -n open-cluster-management-observability deployment/multicluster-observability-addon-manager --tail=100 || true
