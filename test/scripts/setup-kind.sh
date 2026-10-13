@@ -93,10 +93,13 @@ USER 0
 RUN git clone --depth 1 -b release-4.16 https://github.com/openshift/service-ca-operator.git /src
 WORKDIR /src
 ENV GOTOOLCHAIN=local
-RUN CGO_ENABLED=0 go build -mod=vendor -o /bin/service-ca-operator ./cmd/service-ca-operator
+RUN CGO_ENABLED=0 go build -mod=vendor -o /bin/service-ca-operator ./cmd/service-ca-operator && \
+    chmod 0755 /bin/service-ca-operator
 
 FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
 COPY --from=builder /bin/service-ca-operator /usr/bin/service-ca-operator
+RUN chmod 0755 /usr/bin/service-ca-operator && \
+    ln -sf /usr/bin/service-ca-operator /usr/local/bin/service-ca-operator
 USER 1001
 ENTRYPOINT ["/usr/bin/service-ca-operator"]
 EOF
@@ -198,16 +201,16 @@ kubectl wait --for condition=established --timeout=30s \
 echo "=== 10. Deploying OpenShift service-ca Operator & Service ==="
 kubectl apply -f "${SCRIPT_DIR}/../manifests/01-service-ca.yaml"
 echo "Waiting for service-ca-operator deployment..."
-kubectl wait -n openshift-service-ca-operator --for=condition=Available deployment/service-ca-operator --timeout=60s
+kubectl wait -n openshift-service-ca-operator --for=condition=Available deployment/service-ca-operator --timeout=120s
 
 echo "Waiting for service-ca deployment in openshift-service-ca..."
-for _ in {1..30}; do
+for _ in {1..60}; do
     if kubectl get deployment -n openshift-service-ca service-ca &>/dev/null; then
         break
     fi
     sleep 2
 done
-kubectl wait -n openshift-service-ca --for=condition=Available deployment/service-ca --timeout=60s
+kubectl wait -n openshift-service-ca --for=condition=Available deployment/service-ca --timeout=120s
 
 echo "=== 11. Deploying Hub Setup (Prometheus receiver + TLS secrets + ScrapeConfig) ==="
 kubectl apply -f "${SCRIPT_DIR}/../manifests/02-hub-setup.yaml"
@@ -237,16 +240,16 @@ kubectl create secret generic observability-alertmanager-accessor \
 rm -rf "${CERT_DIR}"
 
 echo "Waiting for hub-prometheus deployment..."
-kubectl wait -n open-cluster-management-observability --for=condition=Available deployment/hub-prometheus --timeout=60s
+kubectl wait -n open-cluster-management-observability --for=condition=Available deployment/hub-prometheus --timeout=120s
 
 echo "=== 12. Deploying Spoke CMO (prometheus-k8s with dynamic serving cert) ==="
 kubectl apply -f "${SCRIPT_DIR}/../manifests/03-spoke-cmo.yaml"
 echo "Waiting for prometheus-k8s deployment..."
-kubectl wait -n openshift-monitoring --for=condition=Available deployment/prometheus-k8s --timeout=60s
+kubectl wait -n openshift-monitoring --for=condition=Available deployment/prometheus-k8s --timeout=120s
 
 echo "=== 13. Deploying MCOA Operator ==="
 kubectl apply -f "${SCRIPT_DIR}/../manifests/04-mcoa.yaml"
 echo "Waiting for multicluster-observability-addon-manager deployment..."
-kubectl wait -n open-cluster-management-observability --for=condition=Available deployment/multicluster-observability-addon-manager --timeout=60s
+kubectl wait -n open-cluster-management-observability --for=condition=Available deployment/multicluster-observability-addon-manager --timeout=120s
 
 echo "=== KinD E2E Environment Setup Complete! ==="
