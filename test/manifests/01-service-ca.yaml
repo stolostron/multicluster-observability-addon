@@ -75,7 +75,7 @@ spec:
       - name: service-ca-operator
         image: localhost/origin-service-ca-operator:kind-e2e
         imagePullPolicy: IfNotPresent
-        command: ["service-ca-operator", "operator"]
+        command: ["/usr/bin/service-ca-operator", "operator"]
         args:
         - "--config=/var/run/configmaps/config/operator-config.yaml"
         - "-v=4"
