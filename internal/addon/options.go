@@ -21,6 +21,8 @@ const (
 	KeyPlatformIncidentDetection         = "platformIncidentDetection"
 	KeyPlatformNamespaceRightSizing      = "platformNamespaceRightSizing"
 	KeyPlatformVirtualizationRightSizing = "platformVirtualizationRightSizing"
+	KeyPlatformWorkloadRightSizing       = "platformWorkloadRightSizing"
+	KeyPlatformPodRightSizing            = "platformPodRightSizing"
 	KeyRightSizingDelegated              = "rightSizingDelegated"
 	KeyMetricsHubHostname                = "metricsHubHostname"
 	KeyNodeExporterHostPort              = "nodeExporterHostPort"
@@ -96,6 +98,8 @@ type RightSizingOptions struct {
 	Delegated             bool
 	NamespaceEnabled      bool
 	VirtualizationEnabled bool
+	WorkloadEnabled       bool
+	PodEnabled            bool
 }
 
 type AnalyticsOptions struct {
@@ -184,13 +188,19 @@ func BuildOptions(addOnDeployment *addonapiv1beta1.AddOnDeploymentConfig) (Optio
 	opts.Platform.Metrics.AlertsEnabled = false
 	opts.UserWorkloads.Metrics.AlertsEnabled = false
 
+	// In MCOA mode (ACM 5.x), right-sizing is delegated to MCOA by default.
+	// MCO can explicitly set rightSizingDelegated=false to reclaim ownership.
+	opts.Platform.AnalyticsOptions.RightSizing.Delegated = true
+
 	// Do NOT return early when CustomizedVariables is nil. The for-range
 	// loop below is a safe no-op on a nil slice, and we must always fall
-	// through to the auto-enable right-sizing logic that follows it.
+	// through to the default right-sizing logic that follows it.
 
 	// Track if right-sizing keys were explicitly set
 	nsRSExplicitlySet := false
 	virtRSExplicitlySet := false
+	workloadRSExplicitlySet := false
+	podRSExplicitlySet := false
 
 	for _, keyvalue := range addOnDeployment.Spec.CustomizedVariables {
 		switch keyvalue.Name {
@@ -254,9 +264,7 @@ func BuildOptions(addOnDeployment *addonapiv1beta1.AddOnDeploymentConfig) (Optio
 				opts.Platform.AnalyticsOptions.IncidentDetection.Enabled = true
 			}
 		case KeyRightSizingDelegated:
-			if keyvalue.Value == "true" {
-				opts.Platform.AnalyticsOptions.RightSizing.Delegated = true
-			}
+			opts.Platform.AnalyticsOptions.RightSizing.Delegated = keyvalue.Value == "true"
 		case KeyPlatformNamespaceRightSizing:
 			nsRSExplicitlySet = true
 			// Always mark platform as enabled when RS key is present (even "disabled").
@@ -272,6 +280,14 @@ func BuildOptions(addOnDeployment *addonapiv1beta1.AddOnDeploymentConfig) (Optio
 			if keyvalue.Value == "enabled" {
 				opts.Platform.AnalyticsOptions.RightSizing.VirtualizationEnabled = true
 			}
+		case KeyPlatformWorkloadRightSizing:
+			workloadRSExplicitlySet = true
+			opts.Platform.Enabled = true
+			opts.Platform.AnalyticsOptions.RightSizing.WorkloadEnabled = keyvalue.Value == "enabled"
+		case KeyPlatformPodRightSizing:
+			podRSExplicitlySet = true
+			opts.Platform.Enabled = true
+			opts.Platform.AnalyticsOptions.RightSizing.PodEnabled = keyvalue.Value == "enabled"
 		// User Workload Observability Options
 		case KeyUserWorkloadMetricsCollection:
 			if keyvalue.Value == string(PrometheusAgentV1alpha1) {
@@ -301,18 +317,19 @@ func BuildOptions(addOnDeployment *addonapiv1beta1.AddOnDeploymentConfig) (Optio
 		}
 	}
 
-	// Auto-enable right-sizing by default when keys are not yet present in ADC.
+	// Auto-enable namespace and virtualization right-sizing when their keys are
+	// not yet present in ADC.
 	//
 	// This is a bootstrap safety net for the window between ADC creation (by MCO
 	// main controller) and first analytics controller reconcile (which calls
 	// syncRightSizingStateToADC to explicitly set the keys).
 	//
 	// Once syncRightSizingStateToADC runs, the keys are always present:
-	// - MCO mode: both keys set to "disabled" (MCO manages RS via Policy)
+	// - MCO mode: all keys set to "disabled" (MCO manages RS via Policy)
 	// - MCOA mode: keys set to "enabled"/"disabled" based on MCO CR spec
 	//
-	// The auto-enable ensures right-sizing works immediately on fresh installs
-	// before the analytics controller has had time to sync state to ADC.
+	// Each feature defaults to enabled. Separate workload and pod keys override
+	// the legacy combined key regardless of CustomizedVariables ordering.
 	if !nsRSExplicitlySet {
 		opts.Platform.Enabled = true
 		opts.Platform.AnalyticsOptions.RightSizing.NamespaceEnabled = true
@@ -321,7 +338,14 @@ func BuildOptions(addOnDeployment *addonapiv1beta1.AddOnDeploymentConfig) (Optio
 		opts.Platform.Enabled = true
 		opts.Platform.AnalyticsOptions.RightSizing.VirtualizationEnabled = true
 	}
-
+	if !workloadRSExplicitlySet {
+		opts.Platform.Enabled = true
+		opts.Platform.AnalyticsOptions.RightSizing.WorkloadEnabled = true
+	}
+	if !podRSExplicitlySet {
+		opts.Platform.Enabled = true
+		opts.Platform.AnalyticsOptions.RightSizing.PodEnabled = true
+	}
 	if !opts.Platform.Metrics.CollectionEnabled {
 		opts.Platform.Metrics.UI.Enabled = false
 	}

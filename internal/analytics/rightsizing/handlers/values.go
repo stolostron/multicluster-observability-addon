@@ -13,6 +13,8 @@ import (
 type RightSizingValues struct {
 	NamespaceRightSizing      *ComponentValues   `json:"namespaceRightSizing,omitempty"`
 	VirtualizationRightSizing *ComponentValues   `json:"virtRightSizing,omitempty"`
+	WorkloadRightSizing       *ComponentValues   `json:"workloadRightSizing,omitempty"`
+	PodRightSizing            *ComponentValues   `json:"podRightSizing,omitempty"`
 	ScrapeConfig              *ScrapeConfigValue `json:"scrapeConfig,omitempty"`
 }
 
@@ -38,7 +40,7 @@ type PrometheusRuleValue struct {
 
 // BuildValues builds the helm values from the right-sizing options
 func BuildValues(opts Options) (*RightSizingValues, error) {
-	if !opts.NamespaceRightSizing.Enabled && !opts.VirtualizationRightSizing.Enabled {
+	if !opts.NamespaceRightSizing.Enabled && !opts.VirtualizationRightSizing.Enabled && !opts.WorkloadRightSizing.Enabled && !opts.PodRightSizing.Enabled {
 		return nil, nil
 	}
 
@@ -78,6 +80,27 @@ func BuildValues(opts Options) (*RightSizingValues, error) {
 			})
 		}
 		ret.VirtualizationRightSizing = virtValues
+	}
+
+	for _, item := range []struct {
+		component *ComponentOptions
+		dest      **ComponentValues
+	}{
+		{&opts.WorkloadRightSizing, &ret.WorkloadRightSizing},
+		{&opts.PodRightSizing, &ret.PodRightSizing},
+	} {
+		if !item.component.Enabled {
+			continue
+		}
+		values := &ComponentValues{Enabled: true}
+		for _, rule := range item.component.PrometheusRules {
+			ruleJSON, err := json.Marshal(rule.Spec)
+			if err != nil {
+				return nil, err
+			}
+			values.Rules = append(values.Rules, PrometheusRuleValue{Name: rule.Name, Data: string(ruleJSON)})
+		}
+		*item.dest = values
 	}
 
 	if opts.ScrapeConfig != nil {

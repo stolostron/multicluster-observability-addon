@@ -146,6 +146,16 @@ func TestGetDefaultRSPrometheusRuleConfig(t *testing.T) {
 	assert.Equal(t, DefaultMemoryAggregator, config.MemoryAggregator)
 }
 
+func TestWorkloadAndPodDefaultsIncludeAllNamespaces(t *testing.T) {
+	config := GetDefaultWorkloadPrometheusRuleConfig()
+	assert.Empty(t, config.NamespaceFilterCriteria.ExclusionCriteria)
+	assert.Empty(t, config.NamespaceFilterCriteria.InclusionCriteria)
+	assert.Equal(t, DefaultRecommendationPercentage, config.RecommendationPercentage)
+	data, err := ParseConfigMapData(GetDefaultWorkloadConfigData())
+	require.NoError(t, err)
+	assert.Empty(t, data.PrometheusRuleConfig.NamespaceFilterCriteria.ExclusionCriteria)
+}
+
 func TestParseAggregatorNames(t *testing.T) {
 	tests := []struct {
 		name     string

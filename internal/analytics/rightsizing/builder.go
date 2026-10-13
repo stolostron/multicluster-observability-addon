@@ -169,3 +169,21 @@ func GetDefaultVirtualizationConfigData() map[string]string {
 		"placementConfiguration": FormatYAML(placement),
 	}
 }
+
+// GetDefaultWorkloadPrometheusRuleConfig includes all namespaces for workload and
+// pod right-sizing. Namespace and virtualization defaults remain unchanged.
+func GetDefaultWorkloadPrometheusRuleConfig() RSPrometheusRuleConfig {
+	ruleConfig := GetDefaultRSPrometheusRuleConfig()
+	ruleConfig.NamespaceFilterCriteria.ExclusionCriteria = nil
+	return ruleConfig
+}
+
+// GetDefaultWorkloadConfigData returns default config data for workload-pod right-sizing
+func GetDefaultWorkloadConfigData() map[string]string {
+	ruleConfig := GetDefaultWorkloadPrometheusRuleConfig()
+	placement := GetDefaultRSPlacement()
+	return map[string]string{
+		"prometheusRuleConfig":   FormatYAML(ruleConfig),
+		"placementConfiguration": FormatYAML(placement),
+	}
+}

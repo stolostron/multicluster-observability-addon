@@ -471,6 +471,7 @@ func TestRightSizing_DrillDownLinksPassBothProfiles(t *testing.T) {
 // TestRightSizing_MCOMode_NoDashboardsWhenNotDelegated verifies no RS dashboards render in MCO mode.
 func TestRightSizing_MCOMode_NoDashboardsWhenNotDelegated(t *testing.T) {
 	cv := []addonapiv1beta1.CustomizedVariable{
+		{Name: addon.KeyRightSizingDelegated, Value: "false"},
 		{Name: addon.KeyPlatformNamespaceRightSizing, Value: "enabled"},
 		{Name: addon.KeyPlatformVirtualizationRightSizing, Value: "enabled"},
 	}
