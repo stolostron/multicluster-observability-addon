@@ -113,20 +113,32 @@ if ! image_exists localhost/prometheus:v3.0.0; then
     printf "FROM quay.io/prometheus/prometheus:v3.0.0\nUSER 65534\n" | "${CONTAINER_ENGINE}" build --platform "linux/${PLATFORM}" -t localhost/prometheus:v3.0.0 -
 fi
 
-if ! image_exists localhost/obo-prometheus-operator:v4.18; then
+if ! image_exists localhost/obo-prometheus-operator:v4.18 || ! "${CONTAINER_ENGINE}" image inspect localhost/obo-prometheus-operator:v4.18 2>/dev/null | grep -q "rhobs"; then
     echo "Building localhost/obo-prometheus-operator:v4.18..."
-    OBO_SRC="quay.io/prometheus-operator/prometheus-operator:v0.83.0"
+    OBO_SRC="${OBO_SRC:-quay.io/rhobs/obo-prometheus-operator:v0.93.1-rhobs1}"
     if ! image_exists "${OBO_SRC}"; then
-        "${CONTAINER_ENGINE}" pull "${OBO_SRC}"
+        # Quay only publishes linux/amd64 manifests for RHOBS images.
+        # On arm64 hosts, omitting --platform causes Docker/Podman to fail with:
+        # "no image found in manifest list for architecture arm64".
+        # We try the host platform first, falling back to linux/amd64 (run via Rosetta/QEMU emulation).
+        "${CONTAINER_ENGINE}" pull --platform "linux/${PLATFORM}" "${OBO_SRC}" 2>/dev/null || \
+            "${CONTAINER_ENGINE}" pull --platform linux/amd64 "${OBO_SRC}"
     fi
-    printf "FROM %s\nLABEL kind.e2e=true\n" "${OBO_SRC}" | "${CONTAINER_ENGINE}" build --platform "linux/${PLATFORM}" -t localhost/obo-prometheus-operator:v4.18 -
+    printf "FROM %s\nLABEL kind.e2e=true\n" "${OBO_SRC}" | "${CONTAINER_ENGINE}" build --platform linux/amd64 -t localhost/obo-prometheus-operator:v4.18 -
 fi
 
-if ! image_exists localhost/prometheus-config-reloader:v4.18; then
-    if ! image_exists quay.io/prometheus-operator/prometheus-config-reloader:v0.83.0; then
-        "${CONTAINER_ENGINE}" pull quay.io/prometheus-operator/prometheus-config-reloader:v0.83.0
+if ! image_exists localhost/prometheus-config-reloader:v4.18 || ! "${CONTAINER_ENGINE}" image inspect localhost/prometheus-config-reloader:v4.18 2>/dev/null | grep -q "rhobs"; then
+    echo "Building localhost/prometheus-config-reloader:v4.18..."
+    RELOADER_SRC="${RELOADER_SRC:-quay.io/rhobs/obo-prometheus-config-reloader:v0.93.1-rhobs1}"
+    if ! image_exists "${RELOADER_SRC}"; then
+        # Quay only publishes linux/amd64 manifests for RHOBS images.
+        # On arm64 hosts, omitting --platform causes Docker/Podman to fail with:
+        # "no image found in manifest list for architecture arm64".
+        # We try the host platform first, falling back to linux/amd64 (run via Rosetta/QEMU emulation).
+        "${CONTAINER_ENGINE}" pull --platform "linux/${PLATFORM}" "${RELOADER_SRC}" 2>/dev/null || \
+            "${CONTAINER_ENGINE}" pull --platform linux/amd64 "${RELOADER_SRC}"
     fi
-    printf "FROM quay.io/prometheus-operator/prometheus-config-reloader:v0.83.0\nUSER 65534\n" | "${CONTAINER_ENGINE}" build --platform "linux/${PLATFORM}" -t localhost/prometheus-config-reloader:v4.18 -
+    printf "FROM %s\nUSER 65534\n" "${RELOADER_SRC}" | "${CONTAINER_ENGINE}" build --platform linux/amd64 -t localhost/prometheus-config-reloader:v4.18 -
 fi
 
 if ! image_exists localhost/endpoint-monitoring-operator:kind-e2e; then
@@ -160,7 +172,7 @@ done
 echo "Loading ${#IMAGES_TO_LOAD[@]} images individually into KinD control plane..."
 for img in "${IMAGES_TO_LOAD[@]}"; do
     echo "  Loading ${img}..."
-    "${CONTAINER_ENGINE}" save "${img}" | "${CONTAINER_ENGINE}" exec -i "${CLUSTER_NAME}-control-plane" ctr -n k8s.io images import -
+    "${CONTAINER_ENGINE}" save "${img}" | "${CONTAINER_ENGINE}" exec -i "${CLUSTER_NAME}-control-plane" ctr -n k8s.io images import --all-platforms -
 done
 
 echo "Verifying loaded images in KinD node:"
@@ -171,6 +183,9 @@ JOIN_FILE="/tmp/mcoa-join.sh"
 rm -f "${JOIN_FILE}"
 
 "${CLUSTERADM_BIN}" init --wait --output-join-command-file="${JOIN_FILE}" --kubeconfig "${KUBECONFIG}"
+
+echo "Waiting for OCM webhooks in open-cluster-management-hub..."
+kubectl wait -n open-cluster-management-hub --for=condition=Available deployment --all --timeout=120s
 
 echo "=== 6. Joining local-cluster spoke to Hub ==="
 JOIN_CMD=$(cat "${JOIN_FILE}")
@@ -196,13 +211,17 @@ if [ ! -d "${REPO_ROOT}/deploy/crds" ] || [ -z "$(ls -A "${REPO_ROOT}/deploy/crd
     echo "Downloading CRDs..."
     make -C "${REPO_ROOT}" download-crds
 fi
-kubectl apply --server-side -f "${REPO_ROOT}/deploy/crds/"
-kubectl apply --server-side -f "${SCRIPT_DIR}/../manifests/crds/"
+kubectl apply --server-side --force-conflicts -f "${REPO_ROOT}/deploy/crds/"
+kubectl apply --server-side --force-conflicts -f "${SCRIPT_DIR}/../manifests/crds/"
 kubectl wait --for condition=established --timeout=30s \
     crd/clusterversions.config.openshift.io \
     crd/servicecas.operator.openshift.io \
     crd/scrapeconfigs.monitoring.rhobs \
-    crd/prometheusagents.monitoring.rhobs
+    crd/prometheusagents.monitoring.rhobs \
+    crd/servicemonitors.monitoring.rhobs \
+    crd/podmonitors.monitoring.rhobs \
+    crd/probes.monitoring.rhobs \
+    crd/prometheuses.monitoring.rhobs
 
 echo "=== 10. Deploying OpenShift service-ca Operator & Service ==="
 kubectl apply -f "${SCRIPT_DIR}/../manifests/01-service-ca.yaml"
@@ -254,7 +273,24 @@ echo "Waiting for prometheus-k8s deployment..."
 kubectl wait -n openshift-monitoring --for=condition=Available deployment/prometheus-k8s --timeout=120s
 
 echo "=== 13. Deploying MCOA Operator ==="
-kubectl apply -f "${SCRIPT_DIR}/../manifests/04-mcoa.yaml"
+# Applying 04-mcoa.yaml creates the ClusterManagementAddOn (CMAO) resource, which triggers
+# OCM's admission/conversion webhook (cluster-manager-addon-webhook in open-cluster-management-hub).
+# Even after the webhook deployment reports Available, kube-apiserver service routing,
+# TLS handshakes, or endpoint propagation can briefly reject connections with 'connection refused'.
+# We retry up to 10 times with backoff to absorb this transient webhook startup latency.
+APPLIED=0
+for i in {1..10}; do
+    if kubectl apply -f "${SCRIPT_DIR}/../manifests/04-mcoa.yaml"; then
+        APPLIED=1
+        break
+    fi
+    echo "Retrying kubectl apply for 04-mcoa.yaml in 3s (attempt ${i}/10)..."
+    sleep 3
+done
+if [ "${APPLIED}" -eq 0 ]; then
+    echo "Error: Failed to apply 04-mcoa.yaml after 10 attempts" >&2
+    exit 1
+fi
 echo "Waiting for multicluster-observability-addon-manager deployment..."
 kubectl wait -n open-cluster-management-observability --for=condition=Available deployment/multicluster-observability-addon-manager --timeout=120s
 

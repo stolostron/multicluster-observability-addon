@@ -57,3 +57,9 @@ jobs:
           kubectl get events -A --sort-by='.metadata.creationTimestamp' | tail -n 50 || true
           echo "=== MCOA Manager Logs ==="
           kubectl logs -n open-cluster-management-observability deployment/multicluster-observability-addon-manager --tail=100 || true
+          echo "=== Prometheus Operator Logs ==="
+          kubectl logs -n open-cluster-management-addon-observability deployment/prometheus-operator -c prometheus-operator --tail=100 || true
+          echo "=== Prometheus Agent Logs ==="
+          kubectl logs -n open-cluster-management-addon-observability statefulset/prom-agent-platform-metrics-collector -c prometheus --tail=100 || true
+          echo "=== Hub Prometheus Logs ==="
+          kubectl logs -n open-cluster-management-observability deployment/hub-prometheus -c prometheus --tail=100 || true
