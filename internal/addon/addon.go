@@ -237,7 +237,12 @@ func getTracesProbeFields() []agent.ProbeField {
 }
 
 func getRightSizingProbeFields() []agent.ProbeField {
-	names := []string{rightsizing.NamespacePrometheusRuleName, rightsizing.VirtualizationPrometheusRuleName}
+	names := []string{
+		rightsizing.NamespacePrometheusRuleName,
+		rightsizing.VirtualizationPrometheusRuleName,
+		rightsizing.WorkloadPrometheusRuleName,
+		rightsizing.PodPrometheusRuleName,
+	}
 	fields := make([]agent.ProbeField, 0, len(names))
 	for _, name := range names {
 		fields = append(fields, agent.ProbeField{
@@ -668,19 +673,21 @@ func checkRightSizing(fields []agent.FieldResult, opts Options, isOpenShiftVendo
 	if !rs.Delegated {
 		return nil
 	}
-	if !rs.NamespaceEnabled && !rs.VirtualizationEnabled {
+	enabledNames := map[string]bool{
+		rightsizing.NamespacePrometheusRuleName:      rs.NamespaceEnabled,
+		rightsizing.VirtualizationPrometheusRuleName: rs.VirtualizationEnabled,
+		rightsizing.WorkloadPrometheusRuleName:       rs.WorkloadEnabled,
+		rightsizing.PodPrometheusRuleName:             rs.PodEnabled,
+	}
+	if !rs.NamespaceEnabled && !rs.VirtualizationEnabled && !rs.WorkloadEnabled && !rs.PodEnabled {
 		return nil
 	}
 	if !isOpenShiftVendor {
 		return checkEndpointMonitoringOperator(fields)
 	}
 
-	// Only the rules that report are checked. The rs-namespace-config and rs-virt-config
+	// Only the rules that report are checked. The rs-*-config
 	// placements can leave this cluster out, and then its rule is not rendered at all.
-	enabledNames := map[string]bool{
-		rightsizing.NamespacePrometheusRuleName:      rs.NamespaceEnabled,
-		rightsizing.VirtualizationPrometheusRuleName: rs.VirtualizationEnabled,
-	}
 	for _, field := range fields {
 		id := field.ResourceIdentifier
 		if id.Resource != addoncfg.PrometheusRulesResource || !enabledNames[id.Name] {
