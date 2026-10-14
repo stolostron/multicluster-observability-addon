@@ -30,7 +30,7 @@ var durationUnitMultiplier = map[string]time.Duration{
 }
 
 // Bounds for the ConfigMap-driven evaluation intervals. The two fields feed different
-// parts of the pipeline, so they do not share an upper bound.
+// parts of the pipeline, so each has its own bounds.
 const (
 	// AggregationWindow is the fixed lookback of the daily aggregation rules. It is
 	// hardcoded as [1d] in Build1dMaxAggregationExpr and the percentile builders, which
@@ -44,12 +44,13 @@ const (
 	// stops meaning anything.
 	MinSamplesPerAggregationWindow = 24
 
-	// MinEvaluationInterval applies to both fields. The rolling interval doubles as the
-	// lookback window of a PromQL subquery whose resolution defaults to the global
-	// evaluation interval (typically 30s on OpenShift), so below a minute the window holds
-	// barely more than a single sample while Prometheus is still forced to re-evaluate the
-	// whole rule group at that rate.
-	MinEvaluationInterval = time.Minute
+	// MinEvaluationInterval is the floor of the rolling field. It is the default, so the
+	// setting can only make the rolling rules cheaper. A 1m interval would evaluate them and
+	// store their samples five times as often on every managed cluster, and every daily run
+	// would read five times as many samples, while changing nothing but the percentile
+	// profiles, which would then be taken over shorter peaks. Max OverAll would not move,
+	// and the VM CPU rate() window stays at 5m at every interval.
+	MinEvaluationInterval = 5 * time.Minute
 
 	// MaxEvaluationInterval caps the rolling-window interval so the daily rules always see
 	// at least MinSamplesPerAggregationWindow points. It also bounds the subquery range:
@@ -67,6 +68,13 @@ const (
 	// runs are skipped, not caught up). At this count it survives three, and without
 	// losses the newest recommendation on the hub is at most about a quarter of a day old.
 	MinDailyRunsPerAggregationWindow = 4
+
+	// MinEvaluationInterval1d is the floor of the daily field. It is the default, so the
+	// setting can only make the daily rules run less often. Each run re-reads a full day of
+	// rolling-window samples for every daily rule on every managed cluster, and can reach
+	// the hub as one more sample per recorded series, so running more often would multiply
+	// both, only to refresh a 1d aggregate that barely moves between runs.
+	MinEvaluationInterval1d = 15 * time.Minute
 
 	// MaxEvaluationInterval1d caps how rarely the daily rules may re-run, so the hub receives
 	// at least MinDailyRunsPerAggregationWindow samples per day. Running only once per
@@ -97,9 +105,9 @@ func parsePrometheusDuration(s string) (time.Duration, bool) {
 }
 
 // validateInterval reports whether s is a single-unit Prometheus duration (e.g. "5m",
-// "1h", "300s") with a non-zero value inside [MinEvaluationInterval, maxAllowed].
+// "1h", "300s") with a non-zero value inside [minAllowed, maxAllowed].
 // Empty strings are accepted and treated as "use default" by the callers.
-func validateInterval(s string, maxAllowed time.Duration) bool {
+func validateInterval(s string, minAllowed, maxAllowed time.Duration) bool {
 	if s == "" {
 		return true
 	}
@@ -107,22 +115,24 @@ func validateInterval(s string, maxAllowed time.Duration) bool {
 	if !ok {
 		return false
 	}
-	return d >= MinEvaluationInterval && d <= maxAllowed
+	return d >= minAllowed && d <= maxAllowed
 }
 
 // ValidateEvaluationInterval reports whether s is usable as the rolling-window evaluation
-// interval. Beyond MaxEvaluationInterval the daily aggregation rules no longer see enough
-// samples for the percentile profiles to say more than the maximum does.
+// interval. Below MinEvaluationInterval the rolling rules would cost more than they do at
+// the default. Beyond MaxEvaluationInterval the daily aggregation rules no longer see
+// enough samples for the percentile profiles to say more than the maximum does.
 func ValidateEvaluationInterval(s string) bool {
-	return validateInterval(s, MaxEvaluationInterval)
+	return validateInterval(s, MinEvaluationInterval, MaxEvaluationInterval)
 }
 
 // ValidateEvaluationInterval1d reports whether s is usable as the daily-aggregation
-// evaluation interval. Beyond MaxEvaluationInterval1d some 1d windows hold fewer than
+// evaluation interval. Below MinEvaluationInterval1d the daily rules would cost more than
+// they do at the default. Beyond MaxEvaluationInterval1d some 1d windows hold fewer than
 // MinDailyRunsPerAggregationWindow hub samples, which leaves the shortest dashboard window
 // too little margin for lost samples.
 func ValidateEvaluationInterval1d(s string) bool {
-	return validateInterval(s, MaxEvaluationInterval1d)
+	return validateInterval(s, MinEvaluationInterval1d, MaxEvaluationInterval1d)
 }
 
 // RedundantEvaluationFactor reports how many times the daily aggregation rules re-run per

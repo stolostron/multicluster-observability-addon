@@ -1182,6 +1182,8 @@ func TestValidateAndSanitizeConfig_InvalidIntervalRestoresItsOwnLastValidValue(t
 		{"only evaluationInterval is invalid", "2h", "1h", "10m", "1h"},
 		{"only evaluationInterval1d is invalid", "20m", "2d", "20m", "30m"},
 		{"evaluationInterval1d above its 6h ceiling is invalid", "20m", "24h", "20m", "30m"},
+		{"evaluationInterval below its 5m floor is invalid", "4m", "1h", "10m", "1h"},
+		{"evaluationInterval1d below its 15m floor is invalid", "20m", "5m", "20m", "30m"},
 		{"both are invalid", "bogus", "0m", "10m", "30m"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -1231,15 +1233,15 @@ func TestValidateAndSanitizeConfig_WastefulIntervalOrderingIsLoggedOncePerChange
 		ob, lines := newLoggingOptionsBuilder(t)
 
 		for range 3 {
-			validate(t, ob, rightsizing.NamespaceConfigMapName, "1h", "5m")
+			validate(t, ob, rightsizing.NamespaceConfigMapName, "1h", "20m")
 		}
 
 		warnings := orderingWarnings(*lines)
 		require.Len(t, warnings, 1)
 		assert.Contains(t, warnings[0], `"configMap"="rs-namespace-config"`)
 		assert.Contains(t, warnings[0], `"evaluationInterval"="1h"`)
-		assert.Contains(t, warnings[0], `"evaluationInterval1d"="5m"`)
-		assert.Contains(t, warnings[0], `"redundantEvaluationsPerSample"=12`)
+		assert.Contains(t, warnings[0], `"evaluationInterval1d"="20m"`)
+		assert.Contains(t, warnings[0], `"redundantEvaluationsPerSample"=3`)
 	})
 
 	t.Run("not logged for a well-ordered pair", func(t *testing.T) {
@@ -1265,27 +1267,22 @@ func TestValidateAndSanitizeConfig_WastefulIntervalOrderingIsLoggedOncePerChange
 		assert.Len(t, orderingWarnings(*lines), 3)
 	})
 
-	t.Run("an empty field is reported as the default that runs", func(t *testing.T) {
+	t.Run("an empty evaluationInterval1d is reported as the default that runs", func(t *testing.T) {
 		resetIntervalState(t)
 		ob, lines := newLoggingOptionsBuilder(t)
 
-		// evaluationInterval is empty, so the rolling groups run at the 5m default, which
-		// is coarser than an evaluationInterval1d of 1m.
-		validate(t, ob, rightsizing.NamespaceConfigMapName, "", "1m")
-		// Spelling the default out is the same configuration, not a change.
-		validate(t, ob, rightsizing.NamespaceConfigMapName, rightsizing.DefaultEvaluationInterval, "1m")
-		// The same holds for an empty evaluationInterval1d, which runs at the 15m default.
+		// evaluationInterval1d is empty, so the daily groups run at the 15m default, which
+		// is finer than an evaluationInterval of 1h. An empty evaluationInterval never
+		// triggers the warning: its 5m default is finer than any valid evaluationInterval1d.
 		validate(t, ob, rightsizing.NamespaceConfigMapName, "1h", "")
+		// Spelling the default out is the same configuration, not a change.
 		validate(t, ob, rightsizing.NamespaceConfigMapName, "1h", rightsizing.DefaultEvaluationInterval1d)
 
 		warnings := orderingWarnings(*lines)
-		require.Len(t, warnings, 2)
-		assert.Contains(t, warnings[0], `"evaluationInterval"="5m"`)
-		assert.Contains(t, warnings[0], `"evaluationInterval1d"="1m"`)
-		assert.Contains(t, warnings[0], `"redundantEvaluationsPerSample"=5`)
-		assert.Contains(t, warnings[1], `"evaluationInterval"="1h"`)
-		assert.Contains(t, warnings[1], `"evaluationInterval1d"="15m"`)
-		assert.Contains(t, warnings[1], `"redundantEvaluationsPerSample"=4`)
+		require.Len(t, warnings, 1)
+		assert.Contains(t, warnings[0], `"evaluationInterval"="1h"`)
+		assert.Contains(t, warnings[0], `"evaluationInterval1d"="15m"`)
+		assert.Contains(t, warnings[0], `"redundantEvaluationsPerSample"=4`)
 	})
 
 	t.Run("tracked per ConfigMap", func(t *testing.T) {
@@ -1423,6 +1420,18 @@ func TestBuild_EvaluationIntervals(t *testing.T) {
 		setIntervals(t, ob, rightsizing.VirtualizationConfigMapName, intervalPair{"5m", "24h"})
 
 		assertBuild(t, ob, intervalPair{"5m", "6h"}, intervalPair{"5m", rightsizing.DefaultEvaluationInterval1d})
+	})
+
+	t.Run("intervals are kept at their floors and rejected below them", func(t *testing.T) {
+		resetIntervalState(t)
+		ob := newTestOptionsBuilder(t)
+		// 300s and 900s are the floors spelled differently from the 5m and 15m defaults, so
+		// keeping them cannot be mistaken for a revert to the defaults. 5m is the rolling
+		// floor, which is still below the daily one.
+		setIntervals(t, ob, rightsizing.NamespaceConfigMapName, intervalPair{"300s", "900s"})
+		setIntervals(t, ob, rightsizing.VirtualizationConfigMapName, intervalPair{"4m", "5m"})
+
+		assertBuild(t, ob, intervalPair{"300s", "900s"}, defaults)
 	})
 
 	t.Run("an invalid edit keeps the intervals of the last valid config", func(t *testing.T) {
