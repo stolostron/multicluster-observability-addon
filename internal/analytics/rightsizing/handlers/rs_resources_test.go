@@ -1181,6 +1181,7 @@ func TestValidateAndSanitizeConfig_InvalidIntervalRestoresItsOwnLastValidValue(t
 	}{
 		{"only evaluationInterval is invalid", "2h", "1h", "10m", "1h"},
 		{"only evaluationInterval1d is invalid", "20m", "2d", "20m", "30m"},
+		{"evaluationInterval1d above its 6h ceiling is invalid", "20m", "24h", "20m", "30m"},
 		{"both are invalid", "bogus", "0m", "10m", "30m"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -1412,6 +1413,16 @@ func TestBuild_EvaluationIntervals(t *testing.T) {
 		setIntervals(t, ob, rightsizing.VirtualizationConfigMapName, intervalPair{"20m", "2d"})
 
 		assertBuild(t, ob, defaults, intervalPair{"20m", rightsizing.DefaultEvaluationInterval1d})
+	})
+
+	t.Run("evaluationInterval1d is kept at its 6h ceiling and rejected above it", func(t *testing.T) {
+		resetIntervalState(t)
+		ob := newTestOptionsBuilder(t)
+		// 24h, one run per aggregation window, leaves no gaps but too few hub samples per day.
+		setIntervals(t, ob, rightsizing.NamespaceConfigMapName, intervalPair{"5m", "6h"})
+		setIntervals(t, ob, rightsizing.VirtualizationConfigMapName, intervalPair{"5m", "24h"})
+
+		assertBuild(t, ob, intervalPair{"5m", "6h"}, intervalPair{"5m", rightsizing.DefaultEvaluationInterval1d})
 	})
 
 	t.Run("an invalid edit keeps the intervals of the last valid config", func(t *testing.T) {

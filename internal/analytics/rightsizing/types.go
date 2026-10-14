@@ -97,9 +97,10 @@ type RSPrometheusRuleConfig struct {
 	// hours. Stat and table panels aggregate over days, so they stay populated, but each
 	// value rests on fewer samples.
 	//
-	// Must be a single-unit Prometheus duration between 1m and 24h: e.g. "5m", "15m", "30m", "1h".
-	// The 24h ceiling is the aggregation window itself: re-running less often than that
-	// would leave gaps between consecutive windows that no evaluation ever covers.
+	// Must be a single-unit Prometheus duration between 1m and 6h: e.g. "5m", "15m", "30m", "1h".
+	// The 6h ceiling keeps at least four runs a day. The hub receives at most one sample per
+	// run and the shortest dashboard window is 1d, so at four a day that window still has data
+	// after three lost samples in a row, where at 24h a single lost one would empty it for a day.
 	EvaluationInterval1d string `json:"evaluationInterval1d,omitempty"`
 }
 

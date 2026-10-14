@@ -185,10 +185,10 @@ func TestValidateEvaluationInterval(t *testing.T) {
 
 func TestValidateEvaluationInterval1d(t *testing.T) {
 	// The 1d field has a looser ceiling than the rolling field: it only controls how often
-	// the daily rules re-run, so values up to the 1d aggregation window are legitimate.
+	// the daily rules re-run, so values up to MaxEvaluationInterval1d (6h) are legitimate.
 	valid := []string{
-		"1m", "15m", "30m", "1h", "6h", // ordinary settings
-		"60s", "24h", "1d", "1440m", // boundaries: exactly Min and exactly Max
+		"1m", "15m", "30m", "1h", // ordinary settings
+		"60s", "6h", "360m", "21600s", // boundaries: exactly Min and exactly Max
 		"2h", // rejected for the rolling field, allowed here
 	}
 	for _, s := range valid {
@@ -199,7 +199,9 @@ func TestValidateEvaluationInterval1d(t *testing.T) {
 
 	invalid := append([]string{
 		"1ms", "59s", // below MinEvaluationInterval
-		"25h", "2d", "2w", "1y", // above MaxEvaluationInterval1d (24h)
+		"361m", "21601s", "7h", "12h", // above MaxEvaluationInterval1d (6h)
+		"24h", "1d", "1440m", // a single run per aggregation window: too few hub samples
+		"25h", "2d", "2w", "1y",
 	}, malformedDurations...)
 	for _, s := range invalid {
 		assert.False(t, ValidateEvaluationInterval1d(s), "expected invalid: %q", s)
@@ -212,6 +214,12 @@ func TestEvaluationIntervalBoundsAreCoherent(t *testing.T) {
 	// The rolling ceiling must leave the daily rules enough samples to tell percentiles apart.
 	assert.Equal(t, MinSamplesPerAggregationWindow, int(AggregationWindow/MaxEvaluationInterval),
 		"MaxEvaluationInterval must yield exactly MinSamplesPerAggregationWindow samples per [1d]")
+	// The daily ceiling must leave the hub enough samples per shortest dashboard window,
+	// and must never exceed the aggregation window, which would leave gaps between runs.
+	assert.Equal(t, MinDailyRunsPerAggregationWindow, int(AggregationWindow/MaxEvaluationInterval1d),
+		"MaxEvaluationInterval1d must yield exactly MinDailyRunsPerAggregationWindow runs per [1d]")
+	assert.LessOrEqual(t, MaxEvaluationInterval1d, AggregationWindow,
+		"the daily ceiling must not exceed the aggregation window")
 	// The rolling field must never be allowed to be coarser than the daily field.
 	assert.LessOrEqual(t, MaxEvaluationInterval, MaxEvaluationInterval1d,
 		"rolling ceiling must not exceed the daily-aggregation ceiling")

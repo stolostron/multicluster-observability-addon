@@ -34,7 +34,7 @@ var durationUnitMultiplier = map[string]time.Duration{
 const (
 	// AggregationWindow is the fixed lookback of the daily aggregation rules. It is
 	// hardcoded as [1d] in Build1dMaxAggregationExpr and the percentile builders, which
-	// is what constrains how coarse EvaluationInterval may become.
+	// is what constrains how coarse both intervals may become.
 	AggregationWindow = 24 * time.Hour
 
 	// MinSamplesPerAggregationWindow is the smallest number of rolling-window samples the
@@ -58,10 +58,22 @@ const (
 	// on every managed cluster.
 	MaxEvaluationInterval = AggregationWindow / MinSamplesPerAggregationWindow
 
-	// MaxEvaluationInterval1d caps how rarely the daily rules may re-run. Each evaluation
-	// aggregates the trailing AggregationWindow, so re-evaluating less often than that
-	// leaves gaps between consecutive windows: data that no evaluation ever observes.
-	MaxEvaluationInterval1d = AggregationWindow
+	// MinDailyRunsPerAggregationWindow is the smallest number of times the daily rules must
+	// run per AggregationWindow. Only their output is federated to the hub, and each run
+	// reaches it as at most one sample, picked up by a single federation scrape. The
+	// dashboards aggregate those samples over a selectable number of days, the shortest
+	// being 1d, so with N runs per day that view still has data after N-1 lost samples in
+	// a row: a failed federation scrape, or Prometheus being down when a run is due (missed
+	// runs are skipped, not caught up). At this count it survives three, and without
+	// losses the newest recommendation on the hub is at most about a quarter of a day old.
+	MinDailyRunsPerAggregationWindow = 4
+
+	// MaxEvaluationInterval1d caps how rarely the daily rules may re-run, so the hub receives
+	// at least MinDailyRunsPerAggregationWindow samples per day. Running only once per
+	// AggregationWindow would still leave no gaps between consecutive windows, but a single
+	// lost sample would then empty the 1d dashboard view for about a day, and the evaluation
+	// cost saved beyond this point is small next to the default cadence.
+	MaxEvaluationInterval1d = AggregationWindow / MinDailyRunsPerAggregationWindow
 )
 
 // parsePrometheusDuration converts a single-unit Prometheus duration into a time.Duration.
@@ -106,8 +118,9 @@ func ValidateEvaluationInterval(s string) bool {
 }
 
 // ValidateEvaluationInterval1d reports whether s is usable as the daily-aggregation
-// evaluation interval. Its ceiling is the aggregation window itself, since re-running less
-// often than that would leave gaps no evaluation ever covers.
+// evaluation interval. Beyond MaxEvaluationInterval1d some 1d windows hold fewer than
+// MinDailyRunsPerAggregationWindow hub samples, which leaves the shortest dashboard window
+// too little margin for lost samples.
 func ValidateEvaluationInterval1d(s string) bool {
 	return validateInterval(s, MaxEvaluationInterval1d)
 }
