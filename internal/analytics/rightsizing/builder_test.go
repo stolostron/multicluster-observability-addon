@@ -164,8 +164,8 @@ var malformedDurations = []string{
 
 func TestValidateEvaluationInterval(t *testing.T) {
 	valid := []string{
-		"1m", "5m", "10m", "300s", // ordinary settings
-		"60s", "1h", "60m", "3600s", // boundaries: exactly Min and exactly Max
+		"10m", "15m", "30m", "600s", // ordinary settings
+		"5m", "300s", "1h", "60m", "3600s", // boundaries: exactly Min and exactly Max
 	}
 	for _, s := range valid {
 		assert.True(t, ValidateEvaluationInterval(s), "expected valid: %q", s)
@@ -175,7 +175,8 @@ func TestValidateEvaluationInterval(t *testing.T) {
 	assert.True(t, ValidateEvaluationInterval(""), "empty string should be accepted")
 
 	invalid := append([]string{
-		"1ms", "999ms", "59s", "1s", // below MinEvaluationInterval
+		"1ms", "999ms", "59s", "1s", "1m", "60s", // far below MinEvaluationInterval
+		"4m", "299s", // just under MinEvaluationInterval (5m)
 		"61m", "2h", "24h", "1d", "2w", "1y", // above MaxEvaluationInterval (1h)
 	}, malformedDurations...)
 	for _, s := range invalid {
@@ -184,11 +185,12 @@ func TestValidateEvaluationInterval(t *testing.T) {
 }
 
 func TestValidateEvaluationInterval1d(t *testing.T) {
-	// The 1d field has a looser ceiling than the rolling field: it only controls how often
-	// the daily rules re-run, so values up to MaxEvaluationInterval1d (6h) are legitimate.
+	// The 1d field has its own bounds: it only controls how often the daily rules re-run,
+	// so its floor is its own 15m default and values up to MaxEvaluationInterval1d (6h)
+	// are legitimate.
 	valid := []string{
-		"1m", "15m", "30m", "1h", // ordinary settings
-		"60s", "6h", "360m", "21600s", // boundaries: exactly Min and exactly Max
+		"20m", "30m", "1h", "1800s", // ordinary settings
+		"15m", "900s", "6h", "360m", "21600s", // boundaries: exactly Min and exactly Max
 		"2h", // rejected for the rolling field, allowed here
 	}
 	for _, s := range valid {
@@ -198,7 +200,9 @@ func TestValidateEvaluationInterval1d(t *testing.T) {
 	assert.True(t, ValidateEvaluationInterval1d(""), "empty string should be accepted")
 
 	invalid := append([]string{
-		"1ms", "59s", // below MinEvaluationInterval
+		"1ms", "59s", "1m", "60s", // far below MinEvaluationInterval1d
+		"5m", "300s", "10m", // allowed for the rolling field, below the floor here
+		"14m", "899s", // just under MinEvaluationInterval1d (15m)
 		"361m", "21601s", "7h", "12h", // above MaxEvaluationInterval1d (6h)
 		"24h", "1d", "1440m", // a single run per aggregation window: too few hub samples
 		"25h", "2d", "2w", "1y",
@@ -225,6 +229,18 @@ func TestEvaluationIntervalBoundsAreCoherent(t *testing.T) {
 		"rolling ceiling must not exceed the daily-aggregation ceiling")
 	assert.Less(t, MinEvaluationInterval, MaxEvaluationInterval,
 		"minimum must be below the rolling maximum")
+	assert.Less(t, MinEvaluationInterval1d, MaxEvaluationInterval1d,
+		"minimum must be below the daily-aggregation maximum")
+	// Each floor is its field's default, so the settings can only make the rules cheaper
+	// than the defaults, never more expensive.
+	defaultRolling, ok := parsePrometheusDuration(DefaultEvaluationInterval)
+	require.True(t, ok, "DefaultEvaluationInterval must parse")
+	assert.Equal(t, MinEvaluationInterval, defaultRolling,
+		"MinEvaluationInterval must equal DefaultEvaluationInterval")
+	defaultDaily, ok := parsePrometheusDuration(DefaultEvaluationInterval1d)
+	require.True(t, ok, "DefaultEvaluationInterval1d must parse")
+	assert.Equal(t, MinEvaluationInterval1d, defaultDaily,
+		"MinEvaluationInterval1d must equal DefaultEvaluationInterval1d")
 }
 
 func TestRedundantEvaluationFactor(t *testing.T) {
@@ -238,11 +254,14 @@ func TestRedundantEvaluationFactor(t *testing.T) {
 		{"defaults are well ordered", "5m", "15m", 0, false},
 		{"both empty resolves to defaults", "", "", 0, false},
 		{"equal intervals are not redundant", "15m", "15m", 0, false},
-		{"rolling coarser than daily", "1h", "5m", 12, true},
+		{"rolling coarser than daily", "1h", "20m", 3, true},
 		{"rolling just past daily", "30m", "15m", 2, true},
 		// Uneven ratios must round up: truncating 20m/15m to 1 would report "no
 		// redundancy" alongside a warning that says the opposite.
 		{"uneven ratio rounds up", "20m", "15m", 2, true},
+		// The helper does not validate. Only a daily value below both floors can make the
+		// resolved 5m rolling default the coarser one, so this pair never passes validation,
+		// but it is the one way to observe that resolution.
 		{"empty rolling resolves to 5m default", "", "1m", 5, true},
 		{"empty daily resolves to 15m default", "1h", "", 4, true},
 		{"unparseable input never warns", "bogus", "15m", 0, false},

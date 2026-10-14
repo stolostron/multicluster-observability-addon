@@ -77,7 +77,11 @@ type RSPrometheusRuleConfig struct {
 	// affected. Percentile recommendations are only comparable between clusters and
 	// periods that used the same interval.
 	//
-	// Must be a single-unit Prometheus duration between 1m and 1h: e.g. "1m", "5m", "10m", "1h".
+	// Must be a single-unit Prometheus duration between 5m and 1h: e.g. "5m", "10m", "30m", "1h".
+	// The 5m floor is the default, so this setting can only make the rolling rules cheaper.
+	// Below it every managed cluster would evaluate them and store their samples more often,
+	// and the daily rules would read more samples per run, while only the percentile
+	// profiles would change.
 	// The 1h ceiling comes from the fixed 1d aggregation window the daily rules apply on
 	// top of these series: at 1h they see 24 samples per day, where P99/P95 are already
 	// read off the top two or three samples, and anything coarser leaves them saying
@@ -85,19 +89,19 @@ type RSPrometheusRuleConfig struct {
 	EvaluationInterval string `json:"evaluationInterval,omitempty"`
 	// EvaluationInterval1d controls how often the daily-aggregation PrometheusRule groups
 	// are re-evaluated. It does not change the aggregation window itself, which is always
-	// 1d, so lowering it makes dashboards refresh sooner. Defaults to "15m".
+	// 1d, only how often the dashboards get a new value. Defaults to "15m".
 	//
-	// Lowering it has a cost on every managed cluster. Each run re-reads a full day of the
-	// rolling-window series for every daily rule, so at "1m" Prometheus does about 15 times
-	// the work of the default.
+	// Raising it saves work on every managed cluster, since each run re-reads a full day of
+	// the rolling-window series for every daily rule, but it has a cost on the hub side. Of
+	// the recorded series only these daily ones are federated, at most one sample per
+	// evaluation, so the dashboard graphs that plot them directly thin out as the interval
+	// grows and are close to empty once it reaches hours. Stat and table panels aggregate
+	// over days, so they stay populated, but each value rests on fewer samples.
 	//
-	// Raising it has a cost on the hub side. Of the recorded series only these daily ones
-	// are federated, at most one sample per evaluation, so the dashboard graphs that plot
-	// them directly thin out as the interval grows and are close to empty once it reaches
-	// hours. Stat and table panels aggregate over days, so they stay populated, but each
-	// value rests on fewer samples.
-	//
-	// Must be a single-unit Prometheus duration between 1m and 6h: e.g. "5m", "15m", "30m", "1h".
+	// Must be a single-unit Prometheus duration between 15m and 6h: e.g. "15m", "30m", "1h", "2h".
+	// The 15m floor is the default, so this setting can only make the daily rules run less
+	// often. Running them more often would multiply their work on every managed cluster, and
+	// the samples sent to the hub, only to refresh a 1d aggregate that barely moves between runs.
 	// The 6h ceiling keeps at least four runs a day. The hub receives at most one sample per
 	// run and the shortest dashboard window is 1d, so at four a day that window still has data
 	// after three lost samples in a row, where at 24h a single lost one would empty it for a day.
