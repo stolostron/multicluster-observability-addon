@@ -1428,3 +1428,109 @@ func TestBuild_EvaluationIntervals(t *testing.T) {
 		assertBuild(t, ob, intervalPair{"10m", "1h"}, intervalPair{"20m", "2h"})
 	})
 }
+
+// TestRevertConfigMap_IntervalRevertKeepsOtherFields checks that writing back a rejected
+// interval leaves the rest of the user's configuration alone: the write-back rewrites the
+// whole prometheusRuleConfig key, so every other field has to survive the round trip, and
+// placementConfiguration, a separate key, must not be touched at all.
+func TestRevertConfigMap_IntervalRevertKeepsOtherFields(t *testing.T) {
+	resetIntervalState(t)
+
+	ruleConfig := `namespaceFilterCriteria:
+  inclusionCriteria:
+  - team-.*
+  exclusionCriteria:
+  - team-sandbox
+labelFilterCriteria:
+- labelName: label_env
+  inclusionCriteria:
+  - prod
+recommendationPercentage: 125
+cpuAggregator:
+- P90
+memoryAggregator:
+- Max OverAll
+- P99
+evaluationInterval: 2h
+evaluationInterval1d: 30m
+`
+	placement := `{"spec":{"predicates":[{"requiredClusterSelector":{"labelSelector":{"matchLabels":{"env":"prod"}}}}]}}`
+	cm := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      rightsizing.NamespaceConfigMapName,
+			Namespace: addoncfg.InstallNamespace,
+			Labels:    rightsizing.RSLabels(),
+		},
+		Data: map[string]string{
+			"prometheusRuleConfig":   ruleConfig,
+			"placementConfiguration": placement,
+		},
+	}
+	ob := newTestOptionsBuilder(t, cm)
+	ctx := t.Context()
+
+	before, err := rightsizing.ParseConfigMapData(cm.Data)
+	require.NoError(t, err)
+
+	configData := before
+	require.True(t, ob.validateAndSanitizeConfig(&configData, rightsizing.NamespaceConfigMapName),
+		"2h is above the rolling ceiling and must be rejected")
+	ob.revertConfigMap(ctx, rightsizing.NamespaceConfigMapName, configData)
+
+	var updated corev1.ConfigMap
+	require.NoError(t, ob.Client.Get(ctx, types.NamespacedName{
+		Name: rightsizing.NamespaceConfigMapName, Namespace: addoncfg.InstallNamespace,
+	}, &updated))
+	assert.Equal(t, placement, updated.Data["placementConfiguration"],
+		"placementConfiguration is a separate key and must not be rewritten")
+
+	after, err := rightsizing.ParseConfigMapData(updated.Data)
+	require.NoError(t, err)
+
+	// Only the rejected field may differ.
+	want := before.PrometheusRuleConfig
+	want.EvaluationInterval = rightsizing.DefaultEvaluationInterval
+	assert.Equal(t, want, after.PrometheusRuleConfig)
+}
+
+// TestValidateAndSanitizeConfig_YAMLNumberIntervalIsRejected covers a user who writes an
+// interval without a unit. YAML reads it as a number, which the ConfigMap parser turns
+// into the string "5"; that must be rejected like any other malformed value, not fail
+// the reconcile, and the write-back must replace it with a proper duration.
+func TestValidateAndSanitizeConfig_YAMLNumberIntervalIsRejected(t *testing.T) {
+	resetIntervalState(t)
+
+	cm := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      rightsizing.NamespaceConfigMapName,
+			Namespace: addoncfg.InstallNamespace,
+			Labels:    rightsizing.RSLabels(),
+		},
+		Data: map[string]string{
+			"prometheusRuleConfig": "cpuAggregator:\n- Max OverAll\nmemoryAggregator:\n- Max OverAll\n" +
+				"evaluationInterval: 5\nevaluationInterval1d: 30\n",
+		},
+	}
+	ob := newTestOptionsBuilder(t, cm)
+	ctx := t.Context()
+
+	configData, err := rightsizing.ParseConfigMapData(cm.Data)
+	require.NoError(t, err, "a bare number must not make the ConfigMap unparseable")
+	require.Equal(t, "5", configData.PrometheusRuleConfig.EvaluationInterval)
+	require.Equal(t, "30", configData.PrometheusRuleConfig.EvaluationInterval1d)
+
+	assert.True(t, ob.validateAndSanitizeConfig(&configData, rightsizing.NamespaceConfigMapName))
+	assert.Equal(t, rightsizing.DefaultEvaluationInterval, configData.PrometheusRuleConfig.EvaluationInterval)
+	assert.Equal(t, rightsizing.DefaultEvaluationInterval1d, configData.PrometheusRuleConfig.EvaluationInterval1d)
+
+	ob.revertConfigMap(ctx, rightsizing.NamespaceConfigMapName, configData)
+
+	var updated corev1.ConfigMap
+	require.NoError(t, ob.Client.Get(ctx, types.NamespacedName{
+		Name: rightsizing.NamespaceConfigMapName, Namespace: addoncfg.InstallNamespace,
+	}, &updated))
+	assert.Contains(t, updated.Data["prometheusRuleConfig"],
+		"evaluationInterval: "+rightsizing.DefaultEvaluationInterval+"\n")
+	assert.Contains(t, updated.Data["prometheusRuleConfig"],
+		"evaluationInterval1d: "+rightsizing.DefaultEvaluationInterval1d+"\n")
+}

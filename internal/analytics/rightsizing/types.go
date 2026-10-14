@@ -85,7 +85,11 @@ type RSPrometheusRuleConfig struct {
 	EvaluationInterval string `json:"evaluationInterval,omitempty"`
 	// EvaluationInterval1d controls how often the daily-aggregation PrometheusRule groups
 	// are re-evaluated. It does not change the aggregation window itself, which is always
-	// 1d, so lowering it only makes dashboards refresh sooner. Defaults to "15m".
+	// 1d, so lowering it makes dashboards refresh sooner. Defaults to "15m".
+	//
+	// Lowering it has a cost on every managed cluster. Each run re-reads a full day of the
+	// rolling-window series for every daily rule, so at "1m" Prometheus does about 15 times
+	// the work of the default.
 	//
 	// Raising it has a cost on the hub side. Of the recorded series only these daily ones
 	// are federated, at most one sample per evaluation, so the dashboard graphs that plot
