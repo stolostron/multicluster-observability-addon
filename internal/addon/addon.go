@@ -677,7 +677,7 @@ func checkRightSizing(fields []agent.FieldResult, opts Options, isOpenShiftVendo
 		rightsizing.NamespacePrometheusRuleName:      rs.NamespaceEnabled,
 		rightsizing.VirtualizationPrometheusRuleName: rs.VirtualizationEnabled,
 		rightsizing.WorkloadPrometheusRuleName:       rs.WorkloadEnabled,
-		rightsizing.PodPrometheusRuleName:             rs.PodEnabled,
+		rightsizing.PodPrometheusRuleName:            rs.PodEnabled,
 	}
 	if !rs.NamespaceEnabled && !rs.VirtualizationEnabled && !rs.WorkloadEnabled && !rs.PodEnabled {
 		return nil

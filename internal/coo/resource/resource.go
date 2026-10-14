@@ -79,7 +79,9 @@ func EvaluateHubStackFeatures(opts addon.Options) HubStackFeatures {
 	hasAnalyticsDashboards := incidentDetectionEnabled ||
 		(opts.Platform.AnalyticsOptions.RightSizing.Delegated &&
 			(opts.Platform.AnalyticsOptions.RightSizing.NamespaceEnabled ||
-				opts.Platform.AnalyticsOptions.RightSizing.VirtualizationEnabled))
+				opts.Platform.AnalyticsOptions.RightSizing.VirtualizationEnabled ||
+				opts.Platform.AnalyticsOptions.RightSizing.WorkloadEnabled ||
+				opts.Platform.AnalyticsOptions.RightSizing.PodEnabled))
 
 	persesEnabled := hasDashboards || hasAnalyticsDashboards
 
@@ -517,6 +519,8 @@ func allPossibleDashboardNames() map[string]struct{} {
 			buildIncidentDetectionPersesDashboards,
 			buildNamespaceRSPersesDashboards,
 			buildVMRSPersesDashboards,
+			buildWorkloadRSPersesDashboards(true),
+			buildPodRSPersesDashboards,
 			buildVirtualizationPersesDashboards,
 		}
 
@@ -558,6 +562,12 @@ func (r *HubResourceReconciler) buildDesiredDashboards(hasCardinalityRules, inci
 		}
 		if r.Opts.Platform.AnalyticsOptions.RightSizing.VirtualizationEnabled {
 			dashboards = r.appendDashboards(dashboards, "vm-rightsizing", buildVMRSPersesDashboards)
+		}
+		if r.Opts.Platform.AnalyticsOptions.RightSizing.WorkloadEnabled {
+			dashboards = r.appendDashboards(dashboards, "workload-rightsizing", buildWorkloadRSPersesDashboards(r.Opts.Platform.AnalyticsOptions.RightSizing.PodEnabled))
+		}
+		if r.Opts.Platform.AnalyticsOptions.RightSizing.PodEnabled {
+			dashboards = r.appendDashboards(dashboards, "pod-rightsizing", buildPodRSPersesDashboards)
 		}
 	}
 
@@ -732,6 +742,25 @@ func buildVMRSPersesDashboards() ([]persesv1.PersesDashboard, error) {
 		rsperses.BuildVMOverview,
 		rsperses.BuildVMOverestimation,
 		rsperses.BuildVMUnderestimation,
+	}, dsThanos, addoncfg.AnalyticsNamespace)
+}
+
+func buildWorkloadRSPersesDashboards(includePods bool) func() ([]persesv1.PersesDashboard, error) {
+	return func() ([]persesv1.PersesDashboard, error) {
+		detail := func(project, datasource, clusterLabel string) (dashboard.Builder, error) {
+			return rsperses.BuildWorkloadDetailForFeatures(project, datasource, clusterLabel, includePods)
+		}
+		return buildFromBuilders([]dashboardBuilderFunc{
+			rsperses.BuildWorkloadRightSizing,
+			detail,
+		}, dsThanos, addoncfg.AnalyticsNamespace)
+	}
+}
+
+func buildPodRSPersesDashboards() ([]persesv1.PersesDashboard, error) {
+	return buildFromBuilders([]dashboardBuilderFunc{
+		rsperses.BuildPodRightSizing,
+		rsperses.BuildPodDetail,
 	}, dsThanos, addoncfg.AnalyticsNamespace)
 }
 
