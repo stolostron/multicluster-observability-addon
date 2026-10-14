@@ -1439,8 +1439,6 @@ func TestRevertConfigMap_IntervalRevertKeepsOtherFields(t *testing.T) {
 	ruleConfig := `namespaceFilterCriteria:
   inclusionCriteria:
   - team-.*
-  exclusionCriteria:
-  - team-sandbox
 labelFilterCriteria:
 - labelName: label_env
   inclusionCriteria:
@@ -1475,6 +1473,10 @@ evaluationInterval1d: 30m
 	configData := before
 	require.True(t, ob.validateAndSanitizeConfig(&configData, rightsizing.NamespaceConfigMapName),
 		"2h is above the rolling ceiling and must be rejected")
+	// Apart from the interval, the fixture has to be a configuration the rule builder
+	// accepts; otherwise the round trip would be checked on a ConfigMap no hub can use.
+	_, err = rsnamespace.GeneratePrometheusRule(configData)
+	require.NoError(t, err, "the sanitized fixture must generate rules")
 	ob.revertConfigMap(ctx, rightsizing.NamespaceConfigMapName, configData)
 
 	var updated corev1.ConfigMap
