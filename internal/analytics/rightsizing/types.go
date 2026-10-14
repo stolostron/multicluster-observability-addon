@@ -30,6 +30,12 @@ const (
 	VirtualizationPrometheusRuleName = "acm-rs-virt-prometheus-rules"
 	VirtualizationConfigMapName      = "rs-virt-config"
 
+	// Workload-pod right-sizing constants
+	WorkloadPrometheusRuleName = "acm-rs-workload-prometheus-rules"
+	WorkloadConfigMapName      = "rs-workload-config"
+	PodPrometheusRuleName      = "acm-rs-pod-prometheus-rules"
+	PodConfigMapName           = "rs-pod-config"
+
 	// Default evaluation intervals for PrometheusRule groups.
 	// EvaluationInterval controls how often the raw rolling-window groups are evaluated
 	// and the lookback window of the PromQL subqueries they contain (e.g. [5m:]).
