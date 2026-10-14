@@ -157,8 +157,14 @@ for img in "${IMAGES_TO_LOAD[@]}"; do
     fi
 done
 
-echo "Streaming ${#IMAGES_TO_LOAD[@]} images directly into KinD control plane..."
-"${CONTAINER_ENGINE}" save "${IMAGES_TO_LOAD[@]}" | "${CONTAINER_ENGINE}" exec -i "${CLUSTER_NAME}-control-plane" ctr -n k8s.io images import -
+echo "Loading ${#IMAGES_TO_LOAD[@]} images individually into KinD control plane..."
+for img in "${IMAGES_TO_LOAD[@]}"; do
+    echo "  Loading ${img}..."
+    "${CONTAINER_ENGINE}" save "${img}" | "${CONTAINER_ENGINE}" exec -i "${CLUSTER_NAME}-control-plane" ctr -n k8s.io images import -
+done
+
+echo "Verifying loaded images in KinD node:"
+"${CONTAINER_ENGINE}" exec "${CLUSTER_NAME}-control-plane" crictl images
 
 echo "=== 5. Initializing OCM Hub via clusteradm ==="
 JOIN_FILE="/tmp/mcoa-join.sh"
