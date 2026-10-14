@@ -17,6 +17,7 @@ import (
 	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -114,6 +115,26 @@ func TestMetricsFederation(t *testing.T) {
 		}, agent)
 		assert.NoError(c, agentErr, "PrometheusAgent 'platform-metrics-collector' not found in spoke namespace")
 	}, 2*time.Minute, 3*time.Second, "PrometheusAgent was not created in spoke namespace within timeout")
+
+	t.Log("=== Step 4b: Asserting prom-agent-platform-metrics-collector pod is running and ready ===")
+	assert.EventuallyWithT(t, func(c *assert.CollectT) {
+		pod := &corev1.Pod{}
+		podErr := k8sClient.Get(ctx, client.ObjectKey{
+			Namespace: "open-cluster-management-addon-observability",
+			Name:      "prom-agent-platform-metrics-collector-0",
+		}, pod)
+		if !assert.NoError(c, podErr, "Pod 'prom-agent-platform-metrics-collector-0' not found yet") {
+			return
+		}
+		ready := false
+		for _, cond := range pod.Status.Conditions {
+			if cond.Type == corev1.PodReady && cond.Status == corev1.ConditionTrue {
+				ready = true
+				break
+			}
+		}
+		assert.True(c, ready, "Pod 'prom-agent-platform-metrics-collector-0' is not ready yet (phase: %s)", pod.Status.Phase)
+	}, 3*time.Minute, 3*time.Second, "prom-agent-platform-metrics-collector-0 did not reach Ready state within timeout")
 
 	t.Log("=== Step 5: Asserting Hub Prometheus receives federated metrics from local-cluster ===")
 	hubURL := os.Getenv("HUB_PROMETHEUS_URL")
