@@ -144,9 +144,10 @@ fi
 if ! image_exists localhost/endpoint-monitoring-operator:kind-e2e; then
     EMO_SRC="quay.io/stolostron/endpoint-monitoring-operator:5.1.0-SNAPSHOT-2026-10-12-16-50-23"
     if ! image_exists "${EMO_SRC}"; then
-        "${CONTAINER_ENGINE}" pull "${EMO_SRC}"
+        "${CONTAINER_ENGINE}" pull --platform "linux/${PLATFORM}" "${EMO_SRC}" 2>/dev/null || \
+            "${CONTAINER_ENGINE}" pull --platform linux/amd64 "${EMO_SRC}"
     fi
-    printf "FROM %s\nLABEL kind.e2e=true\n" "${EMO_SRC}" | "${CONTAINER_ENGINE}" build --platform "linux/${PLATFORM}" -t localhost/endpoint-monitoring-operator:kind-e2e -
+    printf "FROM %s\nLABEL kind.e2e=true\n" "${EMO_SRC}" | "${CONTAINER_ENGINE}" build --platform linux/amd64 -t localhost/endpoint-monitoring-operator:kind-e2e -
 fi
 
 echo "=== 4. Loading Images into KinD ==="
