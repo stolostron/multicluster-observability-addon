@@ -238,6 +238,9 @@ func TestRedundantEvaluationFactor(t *testing.T) {
 		{"empty rolling resolves to 5m default", "", "1m", 5, true},
 		{"empty daily resolves to 15m default", "1h", "", 4, true},
 		{"unparseable input never warns", "bogus", "15m", 0, false},
+		// Close to the time.Duration maximum: rounding up by adding the divisor first
+		// would overflow and report a negative factor.
+		{"huge rolling value does not overflow", "9223372036s", "15m", 10248192, true},
 	}
 
 	for _, tt := range tests {

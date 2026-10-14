@@ -125,7 +125,8 @@ func ValidateEvaluationInterval1d(s string) bool {
 //
 // The factor is rounded up: when the intervals do not divide evenly (e.g. 20m rolling
 // against 15m daily) truncating would report 1, which reads as "no redundancy" and
-// contradicts the warning being emitted alongside it.
+// contradicts the warning being emitted alongside it. The rounding avoids the usual
+// (r + d - 1) / d form, which overflows time.Duration for inputs near its maximum.
 func RedundantEvaluationFactor(rolling, daily string) (int, bool) {
 	if rolling == "" {
 		rolling = DefaultEvaluationInterval
@@ -138,7 +139,11 @@ func RedundantEvaluationFactor(rolling, daily string) (int, bool) {
 	if !rok || !dok || r <= d {
 		return 0, false
 	}
-	return int((r + d - 1) / d), true
+	factor := r / d
+	if r%d != 0 {
+		factor++
+	}
+	return int(factor), true
 }
 
 // ResolveEvaluationInterval returns the configured rolling-window eval interval as a
