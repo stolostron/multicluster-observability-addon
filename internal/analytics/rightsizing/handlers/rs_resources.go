@@ -35,7 +35,7 @@ func isRSConfigMap(namespace, name string) bool {
 		return false
 	}
 	switch name {
-	case rightsizing.NamespaceConfigMapName, rightsizing.VirtualizationConfigMapName:
+	case rightsizing.NamespaceConfigMapName, rightsizing.VirtualizationConfigMapName, rightsizing.WorkloadConfigMapName, rightsizing.PodConfigMapName:
 		return true
 	}
 	return false
@@ -58,6 +58,17 @@ func (o *OptionsBuilder) ReconcileRSResources(ctx context.Context, opts addon.Op
 	if !opts.Platform.AnalyticsOptions.RightSizing.VirtualizationEnabled {
 		if err := o.deleteRSConfigMap(ctx, rightsizing.VirtualizationConfigMapName); err != nil {
 			return fmt.Errorf("failed to cleanup virtualization configmap: %w", err)
+		}
+	}
+
+	if !opts.Platform.AnalyticsOptions.RightSizing.WorkloadEnabled {
+		if err := o.deleteRSConfigMap(ctx, rightsizing.WorkloadConfigMapName); err != nil {
+			return fmt.Errorf("failed to cleanup workload configmap: %w", err)
+		}
+	}
+	if !opts.Platform.AnalyticsOptions.RightSizing.PodEnabled {
+		if err := o.deleteRSConfigMap(ctx, rightsizing.PodConfigMapName); err != nil {
+			return fmt.Errorf("failed to cleanup pod configmap: %w", err)
 		}
 	}
 

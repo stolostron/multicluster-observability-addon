@@ -142,7 +142,7 @@ func TestReconcile_EmptyOptions(t *testing.T) {
 
 	uip := &uiplugin.UIPlugin{}
 	err = fakeClient.Get(t.Context(), client.ObjectKey{Name: "monitoring"}, uip)
-	assert.Error(t, err, "UIPlugin should not exist with empty options")
+	assert.NoError(t, err, "UIPlugin should exist because right-sizing defaults to delegated and enabled")
 }
 
 func TestReconcile_COOSubscriptionWrongChannel(t *testing.T) {

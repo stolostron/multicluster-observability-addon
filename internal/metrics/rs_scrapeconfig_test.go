@@ -55,6 +55,8 @@ type rsSetup struct {
 	cooInstalled   bool
 	namespaceRS    string
 	virtRS         string
+	workloadRS     string
+	podRS          string
 	withMCOCopy    bool
 	platformSCName string
 }
@@ -98,6 +100,8 @@ func setupFullMCOA(t *testing.T, s rsSetup) (agent.AgentAddon, *clusterv1.Manage
 		addonapiv1beta1.CustomizedVariable{Name: addon.KeyRightSizingDelegated, Value: "true"},
 		addonapiv1beta1.CustomizedVariable{Name: addon.KeyPlatformNamespaceRightSizing, Value: s.namespaceRS},
 		addonapiv1beta1.CustomizedVariable{Name: addon.KeyPlatformVirtualizationRightSizing, Value: s.virtRS},
+		addonapiv1beta1.CustomizedVariable{Name: addon.KeyPlatformWorkloadRightSizing, Value: s.workloadRS},
+		addonapiv1beta1.CustomizedVariable{Name: addon.KeyPlatformPodRightSizing, Value: s.podRS},
 	)
 
 	managedCluster := addontesting.NewManagedCluster("cluster-1")
@@ -226,39 +230,39 @@ func TestHelmBuild_MCOA_RightSizingScrapeConfig(t *testing.T) {
 	}{
 		{
 			name:             "MCO copy present, both right-sizing features, MCOA prometheus operator",
-			setup:            rsSetup{namespaceRS: "enabled", virtRS: "enabled", withMCOCopy: true},
+			setup:            rsSetup{namespaceRS: "enabled", virtRS: "enabled", workloadRS: "disabled", podRS: "disabled", withMCOCopy: true},
 			wantMatch:        matchParams(rightsizing.NamespaceMetrics, rightsizing.VirtualizationMetrics),
 			wantControllerID: config.PrometheusControllerID,
 			wantManagedBy:    "multicluster-observability-addon-manager",
 		},
 		{
 			name:             "MCO copy present, both right-sizing features, COO installed",
-			setup:            rsSetup{cooInstalled: true, namespaceRS: "enabled", virtRS: "enabled", withMCOCopy: true},
+			setup:            rsSetup{cooInstalled: true, namespaceRS: "enabled", virtRS: "enabled", workloadRS: "disabled", podRS: "disabled", withMCOCopy: true},
 			wantMatch:        matchParams(rightsizing.NamespaceMetrics, rightsizing.VirtualizationMetrics),
 			wantControllerID: "",
 			wantManagedBy:    "observability-operator",
 		},
 		{
 			name:             "MCO copy present, namespace right-sizing only",
-			setup:            rsSetup{namespaceRS: "enabled", virtRS: "disabled", withMCOCopy: true},
+			setup:            rsSetup{namespaceRS: "enabled", virtRS: "disabled", workloadRS: "disabled", podRS: "disabled", withMCOCopy: true},
 			wantMatch:        matchParams(rightsizing.NamespaceMetrics),
 			wantControllerID: config.PrometheusControllerID,
 			wantManagedBy:    "multicluster-observability-addon-manager",
 		},
 		{
 			name:             "MCO copy present, virtualization right-sizing only",
-			setup:            rsSetup{namespaceRS: "disabled", virtRS: "enabled", withMCOCopy: true},
+			setup:            rsSetup{namespaceRS: "disabled", virtRS: "enabled", workloadRS: "disabled", podRS: "disabled", withMCOCopy: true},
 			wantMatch:        matchParams(rightsizing.VirtualizationMetrics),
 			wantControllerID: config.PrometheusControllerID,
 			wantManagedBy:    "multicluster-observability-addon-manager",
 		},
 		{
 			name:  "MCO copy present, right-sizing disabled",
-			setup: rsSetup{namespaceRS: "disabled", virtRS: "disabled", withMCOCopy: true},
+			setup: rsSetup{namespaceRS: "disabled", virtRS: "disabled", workloadRS: "disabled", podRS: "disabled", withMCOCopy: true},
 		},
 		{
 			name:             "MCO copy absent, both right-sizing features",
-			setup:            rsSetup{namespaceRS: "enabled", virtRS: "enabled"},
+			setup:            rsSetup{namespaceRS: "enabled", virtRS: "enabled", workloadRS: "disabled", podRS: "disabled"},
 			wantMatch:        matchParams(rightsizing.NamespaceMetrics, rightsizing.VirtualizationMetrics),
 			wantControllerID: config.PrometheusControllerID,
 			wantManagedBy:    "multicluster-observability-addon-manager",

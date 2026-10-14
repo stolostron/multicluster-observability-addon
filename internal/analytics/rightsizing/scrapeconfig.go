@@ -1,6 +1,8 @@
 package rightsizing
 
 import (
+	"strings"
+
 	cooprometheusv1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1"
 	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -41,6 +43,28 @@ var NamespaceMetrics = []string{
 	"acm_rs:cluster:memory_recommendation",
 }
 
+// WorkloadPodMetrics are the profiled resource metrics and pod inventory to federate.
+// Inventory keeps pods without resource samples visible, with empty resource fields.
+var WorkloadPodMetrics = []string{
+	"acm_rs:pod:info",
+	"acm_rs:pod:cpu_request",
+	"acm_rs:pod:cpu_limit",
+	"acm_rs:pod:cpu_usage",
+	"acm_rs:pod:cpu_recommendation",
+	"acm_rs:pod:memory_request",
+	"acm_rs:pod:memory_limit",
+	"acm_rs:pod:memory_usage",
+	"acm_rs:pod:memory_recommendation",
+	"acm_rs:workload:cpu_request",
+	"acm_rs:workload:cpu_limit",
+	"acm_rs:workload:cpu_usage",
+	"acm_rs:workload:cpu_recommendation",
+	"acm_rs:workload:memory_request",
+	"acm_rs:workload:memory_limit",
+	"acm_rs:workload:memory_usage",
+	"acm_rs:workload:memory_recommendation",
+}
+
 // VirtualizationMetrics are the metrics to federate for virtualization right-sizing
 // Uses 1d aggregated metrics matching MCO Grafana dashboard patterns
 var VirtualizationMetrics = []string{
@@ -64,11 +88,23 @@ var VirtualizationMetrics = []string{
 // invocation on metrics collection being enabled, which guarantees the ScrapeConfig
 // CRD exists on the spoke. The work agent then tracks the resource via
 // AppliedManifestWork and deletes it when it disappears from the ManifestWork spec.
-func GenerateScrapeConfig(includeNamespace, includeVirtualization bool) *cooprometheusv1alpha1.ScrapeConfig {
+func GenerateScrapeConfig(includeNamespace, includeVirtualization, includeWorkloadPod bool) *cooprometheusv1alpha1.ScrapeConfig {
+	return GenerateScrapeConfigForFeatures(includeNamespace, includeVirtualization, includeWorkloadPod, includeWorkloadPod)
+}
+
+// GenerateScrapeConfigForFeatures federates only metrics for enabled, selected features.
+func GenerateScrapeConfigForFeatures(includeNamespace, includeVirtualization, includeWorkload, includePod bool) *cooprometheusv1alpha1.ScrapeConfig {
 	var matchParams []string
 
 	if includeNamespace {
 		for _, metric := range NamespaceMetrics {
+			matchParams = append(matchParams, "{__name__=\""+metric+"\"}")
+		}
+	}
+
+	for _, metric := range WorkloadPodMetrics {
+		if (includeWorkload && strings.HasPrefix(metric, "acm_rs:workload:")) ||
+			(includePod && strings.HasPrefix(metric, "acm_rs:pod:")) {
 			matchParams = append(matchParams, "{__name__=\""+metric+"\"}")
 		}
 	}

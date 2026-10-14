@@ -289,6 +289,8 @@ func TestRSOnlyBothDisabled_ManifestsNotEmpty(t *testing.T) {
 			CustomizedVariables: []addonapiv1beta1.CustomizedVariable{
 				{Name: addon.KeyPlatformNamespaceRightSizing, Value: "disabled"},
 				{Name: addon.KeyPlatformVirtualizationRightSizing, Value: "disabled"},
+				{Name: addon.KeyPlatformWorkloadRightSizing, Value: "disabled"},
+				{Name: addon.KeyPlatformPodRightSizing, Value: "disabled"},
 			},
 		},
 	}

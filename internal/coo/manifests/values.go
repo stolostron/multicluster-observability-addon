@@ -46,6 +46,12 @@ func BuildValues(opts addon.Options, isHubCluster bool) *COOValues {
 		if opts.Platform.AnalyticsOptions.RightSizing.VirtualizationEnabled {
 			rightSizingEnabled = true
 		}
+		if opts.Platform.AnalyticsOptions.RightSizing.WorkloadEnabled {
+			rightSizingEnabled = true
+		}
+		if opts.Platform.AnalyticsOptions.RightSizing.PodEnabled {
+			rightSizingEnabled = true
+		}
 	}
 
 	var installCOO bool

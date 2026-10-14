@@ -627,5 +627,21 @@ func addUserWorkloadMetricsCustomizedVariables(aodc *addonapiv1beta1.AddOnDeploy
 			Name:  KeyMetricsHubHostname,
 			Value: "https://the-hub.com",
 		},
+		{
+			Name:  KeyPlatformNamespaceRightSizing,
+			Value: "disabled",
+		},
+		{
+			Name:  KeyPlatformVirtualizationRightSizing,
+			Value: "disabled",
+		},
+		{
+			Name:  KeyPlatformWorkloadRightSizing,
+			Value: "disabled",
+		},
+		{
+			Name:  KeyPlatformPodRightSizing,
+			Value: "disabled",
+		},
 	}...)
 }

@@ -33,6 +33,9 @@ func TestBuildOptions(t *testing.T) {
 					Enabled: true,
 					AnalyticsOptions: AnalyticsOptions{
 						RightSizing: RightSizingOptions{
+							Delegated:             true,
+							WorkloadEnabled:       true,
+							PodEnabled:            true,
 							NamespaceEnabled:      true,
 							VirtualizationEnabled: true,
 						},
@@ -54,6 +57,9 @@ func TestBuildOptions(t *testing.T) {
 					Enabled: true,
 					AnalyticsOptions: AnalyticsOptions{
 						RightSizing: RightSizingOptions{
+							Delegated:             true,
+							WorkloadEnabled:       true,
+							PodEnabled:            true,
 							NamespaceEnabled:      true,
 							VirtualizationEnabled: true,
 						},
@@ -85,6 +91,9 @@ func TestBuildOptions(t *testing.T) {
 					},
 					AnalyticsOptions: AnalyticsOptions{
 						RightSizing: RightSizingOptions{
+							Delegated:             true,
+							WorkloadEnabled:       true,
+							PodEnabled:            true,
 							NamespaceEnabled:      true,
 							VirtualizationEnabled: true,
 						},
@@ -122,6 +131,9 @@ func TestBuildOptions(t *testing.T) {
 					},
 					AnalyticsOptions: AnalyticsOptions{
 						RightSizing: RightSizingOptions{
+							Delegated:             true,
+							WorkloadEnabled:       true,
+							PodEnabled:            true,
 							NamespaceEnabled:      true,
 							VirtualizationEnabled: true,
 						},
@@ -166,6 +178,9 @@ func TestBuildOptions(t *testing.T) {
 					},
 					AnalyticsOptions: AnalyticsOptions{
 						RightSizing: RightSizingOptions{
+							Delegated:             true,
+							WorkloadEnabled:       true,
+							PodEnabled:            true,
 							NamespaceEnabled:      true,
 							VirtualizationEnabled: true,
 						},
@@ -195,6 +210,9 @@ func TestBuildOptions(t *testing.T) {
 					Enabled: true,
 					AnalyticsOptions: AnalyticsOptions{
 						RightSizing: RightSizingOptions{
+							Delegated:             true,
+							WorkloadEnabled:       true,
+							PodEnabled:            true,
 							NamespaceEnabled:      true,
 							VirtualizationEnabled: true,
 						},
@@ -226,6 +244,9 @@ func TestBuildOptions(t *testing.T) {
 							Enabled: true,
 						},
 						RightSizing: RightSizingOptions{
+							Delegated:             true,
+							WorkloadEnabled:       true,
+							PodEnabled:            true,
 							NamespaceEnabled:      true,
 							VirtualizationEnabled: true,
 						},
@@ -248,6 +269,9 @@ func TestBuildOptions(t *testing.T) {
 					Enabled: true,
 					AnalyticsOptions: AnalyticsOptions{
 						RightSizing: RightSizingOptions{
+							Delegated:             true,
+							WorkloadEnabled:       true,
+							PodEnabled:            true,
 							NamespaceEnabled:      true,
 							VirtualizationEnabled: true,
 						},
@@ -256,7 +280,32 @@ func TestBuildOptions(t *testing.T) {
 			},
 		},
 		{
-			name: "right-sizing disabled explicitly",
+			name: "workload and pod right-sizing enabled explicitly",
+			addOnDeploy: &addonapiv1beta1.AddOnDeploymentConfig{
+				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+					CustomizedVariables: []addonapiv1beta1.CustomizedVariable{
+						{Name: KeyPlatformNamespaceRightSizing, Value: "disabled"},
+						{Name: KeyPlatformVirtualizationRightSizing, Value: "disabled"},
+						{Name: KeyPlatformWorkloadRightSizing, Value: "enabled"},
+						{Name: KeyPlatformPodRightSizing, Value: "enabled"},
+					},
+				},
+			},
+			expectedOpts: Options{
+				Platform: PlatformOptions{
+					Enabled: true,
+					AnalyticsOptions: AnalyticsOptions{
+						RightSizing: RightSizingOptions{
+							Delegated:       true,
+							WorkloadEnabled: true,
+							PodEnabled:      true,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "namespace and virtualization disabled independently",
 			addOnDeploy: &addonapiv1beta1.AddOnDeploymentConfig{
 				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
 					CustomizedVariables: []addonapiv1beta1.CustomizedVariable{
@@ -269,7 +318,7 @@ func TestBuildOptions(t *testing.T) {
 			// This ensures the rendering pipeline runs so the addon framework can prune
 			// stale ManifestWork content when both RS features are disabled.
 			expectedOpts: Options{
-				Platform: PlatformOptions{Enabled: true},
+				Platform: PlatformOptions{Enabled: true, AnalyticsOptions: AnalyticsOptions{RightSizing: RightSizingOptions{Delegated: true, WorkloadEnabled: true, PodEnabled: true}}},
 			},
 		},
 		{
@@ -293,7 +342,7 @@ func TestBuildOptions(t *testing.T) {
 				},
 			},
 			expectedOpts: Options{
-				Platform:     PlatformOptions{Enabled: true},
+				Platform:     PlatformOptions{Enabled: true, AnalyticsOptions: AnalyticsOptions{RightSizing: RightSizingOptions{Delegated: true, WorkloadEnabled: true, PodEnabled: true}}},
 				NodeSelector: map[string]string{"node-role.kubernetes.io/infra": ""},
 				Tolerations: []corev1.Toleration{
 					{
@@ -345,6 +394,9 @@ func TestBuildOptions(t *testing.T) {
 					Enabled: true,
 					AnalyticsOptions: AnalyticsOptions{
 						RightSizing: RightSizingOptions{
+							Delegated:             true,
+							WorkloadEnabled:       true,
+							PodEnabled:            true,
 							NamespaceEnabled:      true,
 							VirtualizationEnabled: true,
 						},
@@ -367,7 +419,7 @@ func TestBuildOptions(t *testing.T) {
 				},
 			},
 			expectedOpts: Options{
-				Platform: PlatformOptions{Enabled: true},
+				Platform: PlatformOptions{Enabled: true, AnalyticsOptions: AnalyticsOptions{RightSizing: RightSizingOptions{Delegated: true, WorkloadEnabled: true, PodEnabled: true}}},
 				ProxyConfig: ProxyConfig{
 					ProxyURL: &url.URL{
 						Scheme: "http",
@@ -398,6 +450,9 @@ func TestBuildOptions(t *testing.T) {
 					},
 					AnalyticsOptions: AnalyticsOptions{
 						RightSizing: RightSizingOptions{
+							Delegated:             true,
+							WorkloadEnabled:       true,
+							PodEnabled:            true,
 							NamespaceEnabled:      true,
 							VirtualizationEnabled: true,
 						},
@@ -423,6 +478,9 @@ func TestBuildOptions(t *testing.T) {
 					},
 					AnalyticsOptions: AnalyticsOptions{
 						RightSizing: RightSizingOptions{
+							Delegated:             true,
+							WorkloadEnabled:       true,
+							PodEnabled:            true,
 							NamespaceEnabled:      true,
 							VirtualizationEnabled: true,
 						},
