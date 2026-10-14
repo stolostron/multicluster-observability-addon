@@ -2,6 +2,7 @@ package common
 
 import (
 	"slices"
+	"strconv"
 
 	clusterinfov1beta1 "github.com/stolostron/cluster-lifecycle-api/clusterinfo/v1beta1"
 	clusterlifecycleconstants "github.com/stolostron/cluster-lifecycle-api/constants"
@@ -53,6 +54,49 @@ func IsOpenShiftVendor(cluster *clusterv1.ManagedCluster) bool {
 		return c.Name == "id.openshift.io"
 	})
 	return idx != -1
+}
+
+// IsCOOInstalledOnSpoke reports whether COO is installed on a spoke, regardless of who
+// installed it (MCOA or an external party). Returns (true, true) when COO is installed,
+// (false, true) when not installed, and (false, false) when the endpoint operator hasn't
+// reported yet.
+func IsCOOInstalledOnSpoke(cluster *clusterv1.ManagedCluster) (installed bool, hasReport bool) {
+	status := getClusterClaim(cluster, addoncfg.CooStatusClaimName)
+	switch status {
+	case "not-installed":
+		return false, true
+	case "mcoa", "external":
+		return true, true
+	default:
+		return false, false
+	}
+}
+
+func getClusterClaim(cluster *clusterv1.ManagedCluster, name string) string {
+	idx := slices.IndexFunc(cluster.Status.ClusterClaims, func(c clusterv1.ManagedClusterClaim) bool {
+		return c.Name == name
+	})
+	if idx == -1 {
+		return ""
+	}
+	return cluster.Status.ClusterClaims[idx].Value
+}
+
+// IsOCPVersionAtLeast checks if the managed cluster's major OCP version is at least the given value.
+// Returns false for non-OpenShift clusters or when the version label is missing.
+func IsOCPVersionAtLeast(cluster *clusterv1.ManagedCluster, major int) bool {
+	if cluster == nil {
+		return false
+	}
+	majorStr, ok := cluster.Labels[clusterinfov1beta1.OCPVersionMajor]
+	if !ok {
+		return false
+	}
+	majorVal, err := strconv.Atoi(majorStr)
+	if err != nil {
+		return false
+	}
+	return majorVal >= major
 }
 
 func VendorIsOverridden(cluster *clusterv1.ManagedCluster) string {

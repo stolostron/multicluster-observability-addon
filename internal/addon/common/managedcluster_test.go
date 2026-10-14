@@ -77,6 +77,77 @@ func TestGetManagedClusterID(t *testing.T) {
 	}
 }
 
+func TestIsOCPVersionAtLeast(t *testing.T) {
+	cases := []struct {
+		name     string
+		cluster  *clusterv1.ManagedCluster
+		major    int
+		expected bool
+	}{
+		{
+			name: "OCP 5 meets minimum 5",
+			cluster: &clusterv1.ManagedCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"openshiftVersion-major": "5"},
+				},
+			},
+			major:    5,
+			expected: true,
+		},
+		{
+			name: "OCP 4 does not meet minimum 5",
+			cluster: &clusterv1.ManagedCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"openshiftVersion-major": "4"},
+				},
+			},
+			major:    5,
+			expected: false,
+		},
+		{
+			name: "OCP 6 meets minimum 5",
+			cluster: &clusterv1.ManagedCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"openshiftVersion-major": "6"},
+				},
+			},
+			major:    5,
+			expected: true,
+		},
+		{
+			name:     "missing label returns false",
+			cluster:  &clusterv1.ManagedCluster{},
+			major:    5,
+			expected: false,
+		},
+		{
+			name:     "nil cluster returns false",
+			cluster:  nil,
+			major:    5,
+			expected: false,
+		},
+		{
+			name: "non-numeric label returns false",
+			cluster: &clusterv1.ManagedCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"openshiftVersion-major": "abc"},
+				},
+			},
+			major:    5,
+			expected: false,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			result := IsOCPVersionAtLeast(c.cluster, c.major)
+			if result != c.expected {
+				t.Errorf("expected IsOCPVersionAtLeast to be %v, got %v", c.expected, result)
+			}
+		})
+	}
+}
+
 func TestIsOpenShiftVendor(t *testing.T) {
 	cases := []struct {
 		name     string

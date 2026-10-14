@@ -216,8 +216,8 @@ func TestBuildValues(t *testing.T) {
 				Platform: handlers.Collector{
 					PrometheusAgent: &cooprometheusv1alpha1.PrometheusAgent{},
 				},
-				IsHub:           false,
-				COOIsSubscribed: false,
+				IsHub:        false,
+				COOInstalled: false,
 			},
 			Expect: func(t *testing.T, values *manifests.MetricsValues) {
 				assert.True(t, values.DeployCOOResources)

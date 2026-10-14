@@ -48,6 +48,16 @@ const memUnderestCond = `(floor((max_over_time(sum by (name, namespace) (acm_rs_
 // Design: "filter the VMs based on current state" — only show VMs that are currently running.
 const runningVMFilter = `(max by (name, namespace) (kubevirt_vm_running_status_last_transition_timestamp_seconds{cluster="$cluster", namespace=~"$namespace"} > 0) > 0)`
 
+// runningVMFilterAtEnd is runningVMFilter pinned to the end of the dashboard time range.
+// Perses evaluates StatChart queries as range queries and displays the last non-null
+// point ("last-number"), whereas Table panels run instant queries at the range end. Without
+// "@ end()" a stopped VM keeps contributing to the stat totals until its last running point
+// leaves the selected time range, while it disappears from the tables immediately.
+// Pinning every selector of the stat queries with "@ end()" makes each step evaluate at the
+// range end, so stat totals and table rows always agree. Replace with the per-query
+// "instant" option once the shipped Perses Prometheus plugin (>= 0.59) supports it.
+const runningVMFilterAtEnd = `(max by (name, namespace) (kubevirt_vm_running_status_last_transition_timestamp_seconds{cluster="$cluster", namespace=~"$namespace"} @ end() > 0) > 0)`
+
 var overestRedThreshold = &commonSdk.Thresholds{
 	Steps: []commonSdk.StepOption{
 		{Value: 0, Color: "#1A7311"},
@@ -76,9 +86,9 @@ func VMTotalCPUOverestimationPanel(datasourceName string) panelgroup.Option {
 		Title:       "Total CPU Overestimation",
 		Description: "Total number of overestimated CPU cores across all VMs in the selected namespace(s).\nRepresents the total CPU cores that can be reclaimed.",
 		Query: `sum(` +
-			"\n" + `(floor(max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:cpu_request{cluster="$cluster", profile="$cpu_profile", namespace=~"$namespace"})[$days:])-` +
-			"\n" + `max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:cpu_recommendation{cluster="$cluster", profile="$cpu_profile", namespace=~"$namespace"})[$days:])) > 0)` +
-			"\n" + `and on (name, namespace) ` + runningVMFilter +
+			"\n" + `(floor(max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:cpu_request{cluster="$cluster", profile="$cpu_profile", namespace=~"$namespace"})[$days:] @ end())-` +
+			"\n" + `max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:cpu_recommendation{cluster="$cluster", profile="$cpu_profile", namespace=~"$namespace"})[$days:] @ end())) > 0)` +
+			"\n" + `and on (name, namespace) ` + runningVMFilterAtEnd +
 			"\n" + `)`,
 		Unit:       &dashboards.DecimalUnit,
 		Decimals:   0,
@@ -92,9 +102,9 @@ func VMTotalCPUUnderestimationPanel(datasourceName string) panelgroup.Option {
 		Title:       "Total CPU Underestimation",
 		Description: "Total number of underestimated CPU cores across all VMs in the selected namespace(s).\nRepresents the total additional CPU cores needed.",
 		Query: `sum(` +
-			"\n" + `(floor(max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:cpu_request{cluster="$cluster", profile="$cpu_profile", namespace=~"$namespace"})[$days:])-` +
-			"\n" + `max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:cpu_recommendation{cluster="$cluster", profile="$cpu_profile", namespace=~"$namespace"})[$days:])) < 0) * (-1)` +
-			"\n" + `and on (name, namespace) ` + runningVMFilter +
+			"\n" + `(floor(max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:cpu_request{cluster="$cluster", profile="$cpu_profile", namespace=~"$namespace"})[$days:] @ end())-` +
+			"\n" + `max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:cpu_recommendation{cluster="$cluster", profile="$cpu_profile", namespace=~"$namespace"})[$days:] @ end())) < 0) * (-1)` +
+			"\n" + `and on (name, namespace) ` + runningVMFilterAtEnd +
 			"\n" + `)`,
 		Unit:       &dashboards.DecimalUnit,
 		Decimals:   0,
@@ -108,9 +118,9 @@ func VMTotalMemOverestimationPanel(datasourceName string) panelgroup.Option {
 		Title:       "Total Memory Overestimation",
 		Description: "Total overestimated memory across all VMs in the selected namespace(s).\nRepresents the total memory that can be reclaimed.",
 		Query: `(sum(` +
-			"\n" + `(floor((max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:memory_request{cluster="$cluster", profile="$memory_profile", namespace=~"$namespace"})[$days:]) / 1073741824)-` +
-			"\n" + `(max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:memory_recommendation{cluster="$cluster", profile="$memory_profile", namespace=~"$namespace"})[$days:]) / 1073741824)) > 0)` +
-			"\n" + `and on (name, namespace) ` + runningVMFilter +
+			"\n" + `(floor((max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:memory_request{cluster="$cluster", profile="$memory_profile", namespace=~"$namespace"})[$days:] @ end()) / 1073741824)-` +
+			"\n" + `(max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:memory_recommendation{cluster="$cluster", profile="$memory_profile", namespace=~"$namespace"})[$days:] @ end()) / 1073741824)) > 0)` +
+			"\n" + `and on (name, namespace) ` + runningVMFilterAtEnd +
 			"\n" + `)) * 1073741824`,
 		Unit:       &dashboards.BytesUnit,
 		Decimals:   2,
@@ -124,9 +134,9 @@ func VMTotalMemUnderestimationPanel(datasourceName string) panelgroup.Option {
 		Title:       "Total Memory Underestimation",
 		Description: "Total underestimated memory across all VMs in the selected namespace(s).\nRepresents the total additional memory needed.",
 		Query: `(sum(` +
-			"\n" + `(floor((max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:memory_request{cluster="$cluster", profile="$memory_profile", namespace=~"$namespace"})[$days:]) / 1073741824)-` +
-			"\n" + `(max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:memory_recommendation{cluster="$cluster", profile="$memory_profile", namespace=~"$namespace"})[$days:]) / 1073741824)) < 0) * (-1)` +
-			"\n" + `and on (name, namespace) ` + runningVMFilter +
+			"\n" + `(floor((max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:memory_request{cluster="$cluster", profile="$memory_profile", namespace=~"$namespace"})[$days:] @ end()) / 1073741824)-` +
+			"\n" + `(max_over_time(sum by (name, namespace) (acm_rs_vm:namespace:memory_recommendation{cluster="$cluster", profile="$memory_profile", namespace=~"$namespace"})[$days:] @ end()) / 1073741824)) < 0) * (-1)` +
+			"\n" + `and on (name, namespace) ` + runningVMFilterAtEnd +
 			"\n" + `)) * 1073741824`,
 		Unit:       &dashboards.BytesUnit,
 		Decimals:   2,

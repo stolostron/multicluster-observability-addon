@@ -26,42 +26,50 @@ The following CRDs have large schemas. They are owned and applied directly by th
 
 **CRDs managed by ManifestWork (on the hub)**
 
-The addon manager still makes use of the following "dummy" CRD to detect the state of the managed cluster and apply relevant configuration. This CRD is small and does not contain the full schema. They are used to leverage the `feedbackRules` API from ManifestWorks to detect COO's presence and the establishment of the CRDs.
+The addon manager ships lightweight "stub" CRDs via ManifestWork to leverage the `feedbackRules` API for detecting CRD establishment and triggering operator restarts.
 
 | CRD | Strategy | Purpose |
 |-----|----------|---------|
-| `alertmanagers.monitoring.rhobs` | `CreateOnly` | COO detection anchor — OLM takes it over when COO is installed. Feedback rule fetches the OLM label from it. |
 | `prometheusagents.monitoring.rhobs` | `ReadOnly` | Feedback only — hub reads `isEstablished` and timestamps to trigger prometheus-operator restart |
 | `scrapeconfigs.monitoring.rhobs` | `ReadOnly` | Feedback only — same as above, also carries `prometheusOperatorVersion` |
 
-`prometheusagents` and `scrapeconfigs` use `ReadOnly`: the Work Agent never creates or modifies them — it only reads their status to report feedback back to the hub. The endpoint operator is the sole owner of their content.
+These use `ReadOnly`: the Work Agent never creates or modifies them — it only reads their status to report feedback back to the hub. The endpoint operator is the sole owner of their content.
 
 ### COO Detection Strategy
 
-To detect whether COO is installed, MCOA leverages the `feedbackRules` API from `ManifestWorks`.
+MCOA detects whether COO is installed on a spoke cluster using **ClusterClaims** set by the endpoint-monitoring-operator.
 
-#### Choosing the Detection Resource
-A key challenge is selecting a stable resource for detection that does not negatively impact addon health:
-- **Constraints**: `feedbackRules` can only be used on objects already present in the `ManifestWork`'s manifest list.
-- **Why not use COO-only resources?**: If we include a resource that only exists when COO is installed, the addon will be marked as **Degraded** when COO is missing (as the resource won't be "Available").
-- **Why not always include the full CRDs?**: If MCOA provides the CRDs and OLM (via COO) also tries to manage them, it leads to reconciliation conflicts and a degraded health status.
+The endpoint operator runs on the spoke, inspects the local OLM Subscriptions, and writes a single ClusterClaim:
 
-#### The "Dummy" CRD Solution
-The chosen solution is to create a "dummy" `alertmanagers.monitoring.rhobs` CRD with the minimum required fields to be accepted by the API server.
-- **Update Strategy**: Set to `CreateOnly`. This ensures that when OLM installs COO and takes over the CRD, the OCM Work Agent does not try to revert OLM's changes, preventing conflicts and keeping the resource clean.
-- **Continuous Feedback**: This dummy resource allows the OLM presence `feedbackRule` to fetch the OLM subscription label, determining whether COO is currently installed/subscribed.
-- **Conditional Deletion-Orphan Annotation**: The dummy `alertmanagers.monitoring.rhobs` CRD conditionally applies the deletion-orphan annotation:
-  ```yaml
-  {{- if not .Values.deployCOOResources }}
-  addon.open-cluster-management.io/deletion-orphan: ""
-  {{- end }}
-  ```
-  This is critical for proper uninstallation behavior. When COO is installed (`.Values.deployCOOResources` is `false`), MCOA does not manage the CRDs, so the OCM Work Agent should not delete the `alertmanagers.monitoring.rhobs` CRD at uninstallation time (preserving the COO-managed resource). However, when COO is not installed (`.Values.deployCOOResources` is `true`), MCOA manages the resources and does not apply this annotation, allowing the OCM Work Agent to clean up the dummy `alertmanagers.monitoring.rhobs` CRD along with the other resources listed in the `ManifestWork` during uninstallation.
+- **Claim name**: `coo.observability.open-cluster-management.io`
+- **Values**:
+  - `"not-installed"` — COO is not present on the spoke
+  - `"mcoa"` — COO was installed by MCOA itself
+  - `"external"` — COO was installed by an external party (admin, OLM subscription)
+
+ClusterClaims are automatically synced to `ManagedCluster.Status.ClusterClaims` on the hub by the OCM registration agent, so the hub controller reads them directly without any ManifestWork feedback.
+
+#### Detection Logic
+
+The hub-side function `IsCOOExternallyInstalledOnSpoke()` reads the ClusterClaim and returns:
+
+| Claim value | Result | MCOA behavior |
+|-------------|--------|---------------|
+| `"not-installed"` | Not external | MCOA deploys its own prometheus-operator and CRDs |
+| `"mcoa"` | Not external | COO installed by MCOA — MCOA keeps the Subscription but does not deploy its own prometheus-operator |
+| `"external"` | Externally installed | COO installed by someone else — MCOA does not deploy COO resources |
+| Empty / missing | Unknown (defer) | MCOA waits for endpoint operator to report |
+
+This is used in two places with different helpers:
+1. **COO install decision** (`InstallOfCOOOnSpokeIsNeeded` → `IsCOOExternallyInstalledOnSpoke`) — whether to install/keep the COO Subscription. Only backs off for `"external"`.
+2. **COO resources deployment** (`COOInstalled` → `IsCOOInstalledOnSpoke` → `DeployCOOResources`) — whether to deploy the prometheus-operator and CRDs. Backs off for both `"mcoa"` and `"external"`, since in both cases COO already provides an operator.
 
 ### Adaptation Logic
 
-1.  **COO Detected**: When `feedbackRules` indicate COO is present, MCOA disables the deployment of its own Prometheus Operator manifests (relying on COO to provide/manage the operator) to avoid reconciliation conflicts.
-2.  **COO Uninstalled**: If a user uninstalls COO, MCOA detects its absence and re-installs its own Prometheus Operator manifests on the managed cluster to ensure continuous metrics collection.
+1.  **No COO** (`"not-installed"`): MCOA deploys and manages its own Prometheus Operator and CRDs on the spoke.
+2.  **COO installed by MCOA** (`"mcoa"`): MCOA keeps the COO Subscription but does not deploy its own prometheus-operator, since COO already provides one.
+3.  **COO installed externally** (`"external"`): MCOA does not deploy COO resources and does not install a Subscription, deferring entirely to the external operator.
+4.  **COO uninstalled**: If a user uninstalls COO, the endpoint operator updates the ClusterClaim to `"not-installed"`, and MCOA re-installs its own Prometheus Operator manifests on the managed cluster to ensure continuous metrics collection.
 
 ### Operator Synchronization and Restarts
 
@@ -100,69 +108,65 @@ sequenceDiagram
     participant EndpointOp as Endpoint Operator (Spoke)
     participant PromOperator as Prometheus Operator (Spoke)
 
-    AddonManager->>ManifestWork: Adds "dummy" Alertmanager CRD (CreateOnly)
+    EndpointOp->>ManagedCluster: Creates ClusterClaim: coo.observability.open-cluster-management.io = "not-installed"
+    ManagedCluster-->>AddonManager: ClusterClaim synced to ManagedCluster.Status
+    AddonManager->>AddonManager: Reads ClusterClaim → COO not installed
     AddonManager->>ManifestWork: Adds ReadOnly stubs for PrometheusAgent & ScrapeConfig CRDs
-    AddonManager->>ManifestWork: Sets feedbackRules for OLM detection & CRD establishment
+    AddonManager->>ManifestWork: Sets feedbackRules for CRD establishment
     AddonManager->>ManifestWork: Adds Endpoint Operator + Prometheus Operator manifests
     WorkAgent->>ManifestWork: Watches ManifestWork, detects new revision
-    WorkAgent->>ManifestWork: Reads manifest list
     WorkAgent->>ManagedCluster: Deploys all resources (CRD stubs, Endpoint Op, Prometheus Op, ...)
-    ManagedCluster-->>WorkAgent: Returns status (Alertmanager CRD conditions)
-    WorkAgent->>ManifestWork: Updates feedback: COO not detected
     EndpointOp->>ManagedCluster: Applies full CRD schemas (PrometheusAgent, ScrapeConfig, etc.)
     ManagedCluster-->>WorkAgent: CRDs become Established (detected via ReadOnly stubs)
     WorkAgent->>ManifestWork: Updates feedback: CRDs Established & Timestamps
     ManifestWork-->>AddonManager: Status update trigger
     AddonManager->>ManifestWork: Adds restart annotation (timestamp) to Prometheus Operator Deployment
-    WorkAgent->>ManifestWork: Watches ManifestWork, detects updated Deployment
-    WorkAgent->>ManifestWork: Reads updated manifest
     WorkAgent->>PromOperator: Applies updated Deployment (triggering restart)
     PromOperator->>ManagedCluster: Restarts and discovers new CRDs
 ```
 
 ### 2. COO Installation (Dynamic Transition)
 
-When a user or OLM installs COO on the managed cluster, MCOA detects the transition and steps back to avoid management conflicts.
+When a user or OLM installs COO on the managed cluster, MCOA detects the transition via ClusterClaims and steps back to avoid management conflicts.
 
 ```mermaid
 sequenceDiagram
     autonumber
     participant AddonManager as Addon Manager (Hub)
     participant ManifestWork as ManifestWork (Hub)
-    participant WorkAgent as Work Agent (Spoke)
-    participant OLM
     participant EndpointOp as Endpoint Operator (Spoke)
+    participant OLM
     participant User
 
     User->>OLM: Installs COO
-    OLM->>OLM: Takes over all COO CRDs (adds OLM label)
-    WorkAgent->>OLM: Detects OLM label on Alertmanager (via feedbackRule)
-    WorkAgent->>ManifestWork: Updates feedback: COOIsInstalled=true
-    ManifestWork-->>AddonManager: Status update trigger
-    AddonManager->>ManifestWork: Adds 'deletion-orphan' to Alertmanager
+    OLM->>OLM: Takes over all COO CRDs
+    EndpointOp->>EndpointOp: Detects COO Subscription (external)
+    EndpointOp->>EndpointOp: Updates ClusterClaim: coo.observability.open-cluster-management.io = "external"
+    Note over EndpointOp,AddonManager: ClusterClaim synced to hub via OCM registration agent
+    AddonManager->>AddonManager: Reads ClusterClaim → COO externally installed
     AddonManager->>ManifestWork: Sets deployCOOResources=false (removes prometheus-operator)
-    EndpointOp->>EndpointOp: Detects COO, stops reconciling CRDs
-    Note over WorkAgent: ReadOnly CRD stubs remain in ManifestWork<br/>but Work Agent never deletes ReadOnly resources
+    EndpointOp->>EndpointOp: Stops reconciling CRDs (COO owns them now)
+    Note over ManifestWork: ReadOnly CRD stubs remain in ManifestWork<br/>but Work Agent never deletes ReadOnly resources
 ```
 
 ### 3. COO Uninstallation
 
-If COO is removed, MCOA detects the deletion and the endpoint operator restores its managed versions.
+If COO is removed, MCOA detects the deletion via ClusterClaims and the endpoint operator restores its managed versions.
 
 ```mermaid
 sequenceDiagram
     autonumber
     participant AddonManager as Addon Manager (Hub)
     participant ManifestWork as ManifestWork (Hub)
-    participant WorkAgent as Work Agent (Spoke)
     participant ManagedCluster as Managed Cluster API
     participant EndpointOp as Endpoint Operator (Spoke)
     participant User
 
-    User->>ManagedCluster: Uninstalls COO & deletes Alertmanager CRD
-    WorkAgent->>ManagedCluster: Detects Alertmanager is missing and recreates it (CreateOnly)
-    WorkAgent->>ManifestWork: Updates feedback: COO not detected
-    ManifestWork-->>AddonManager: Status update trigger
+    User->>ManagedCluster: Uninstalls COO
+    EndpointOp->>EndpointOp: Detects COO removal
+    EndpointOp->>EndpointOp: Updates ClusterClaim: coo.observability.open-cluster-management.io = "not-installed"
+    Note over EndpointOp,AddonManager: ClusterClaim synced to hub via OCM registration agent
+    AddonManager->>AddonManager: Reads ClusterClaim → COO not installed
     AddonManager->>ManifestWork: Re-enables deployCOOResources (restores prometheus-operator)
     EndpointOp->>ManagedCluster: Re-applies full CRD schemas
 ```

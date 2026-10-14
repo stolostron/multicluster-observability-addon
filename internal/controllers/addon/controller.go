@@ -98,7 +98,6 @@ func NewAddonManager(ctx context.Context, kubeConfig *rest.Config, scheme *runti
 		WithConfigGVRs(configGVRs...).
 		WithAgentHealthProber(addon.HealthProber(getter, agentLogger)).
 		WithGetValuesFuncs(addonConfigValuesFn, addonhelm.GetValuesFunc(ctx, k8sClient, getter, agentLogger)).
-		WithAgentHealthProber(addon.HealthProber(getter, agentLogger)).
 		WithAgentRegistrationOption(registrationOption).
 		WithAgentDeployTriggerClusterFilter(func(old, new *clusterv1.ManagedCluster) bool {
 			return !maps.Equal(old.Labels, new.Labels)
@@ -145,6 +144,9 @@ type AgentAddonWithSortedManifests struct {
 }
 
 func (a *AgentAddonWithSortedManifests) Manifests(ctx context.Context, cluster *clusterv1.ManagedCluster, mcAddon *addonapiv1beta1.ManagedClusterAddOn) ([]runtime.Object, error) {
+	if err := addoncommon.ValidateConfigNamespaces(mcAddon); err != nil {
+		return nil, err
+	}
 	objects, err := a.agent.Manifests(ctx, cluster, mcAddon)
 	if err != nil {
 		return nil, err
@@ -214,6 +216,15 @@ func (a *AgentAddonWithSortedManifests) Manifests(ctx context.Context, cluster *
 func (a *AgentAddonWithSortedManifests) GetAgentAddonOptions() agent.AgentAddonOptions {
 	options := a.agent.GetAgentAddonOptions()
 	options.ManifestConfigs = addon.ManifestConfigs()
+	if installNamespace := options.AgentInstallNamespace; installNamespace != nil {
+		// Registration also invokes this callback independently of manifest generation.
+		options.AgentInstallNamespace = func(ctx context.Context, mcAddon *addonapiv1beta1.ManagedClusterAddOn) (string, error) {
+			if err := addoncommon.ValidateConfigNamespaces(mcAddon); err != nil {
+				return "", err
+			}
+			return installNamespace(ctx, mcAddon)
+		}
+	}
 	return options
 }
 

@@ -4,8 +4,12 @@ import (
 	"context"
 	"testing"
 
+	"github.com/go-logr/logr"
+	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -57,6 +61,82 @@ func TestValidateAODC(t *testing.T) {
 			assert.Equal(t, tt.expected, result)
 		})
 	}
+}
+
+func TestMCOAAODCPredicate(t *testing.T) {
+	t.Run("matches valid AODC create", func(t *testing.T) {
+		aodc := &addonv1beta1.AddOnDeploymentConfig{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      addoncfg.Name,
+				Namespace: addoncfg.InstallNamespace,
+			},
+		}
+		assert.True(t, mcoaAODCPredicate.Create(event.CreateEvent{Object: aodc}))
+	})
+
+	t.Run("rejects wrong name or namespace on create", func(t *testing.T) {
+		wrongName := &addonv1beta1.AddOnDeploymentConfig{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "other",
+				Namespace: addoncfg.InstallNamespace,
+			},
+		}
+		assert.False(t, mcoaAODCPredicate.Create(event.CreateEvent{Object: wrongName}))
+
+		wrongNs := &addonv1beta1.AddOnDeploymentConfig{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      addoncfg.Name,
+				Namespace: "other",
+			},
+		}
+		assert.False(t, mcoaAODCPredicate.Create(event.CreateEvent{Object: wrongNs}))
+	})
+
+	t.Run("ignores update when generation is unchanged", func(t *testing.T) {
+		oldAODC := &addonv1beta1.AddOnDeploymentConfig{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:       addoncfg.Name,
+				Namespace:  addoncfg.InstallNamespace,
+				Generation: 1,
+			},
+		}
+		newAODC := &addonv1beta1.AddOnDeploymentConfig{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:       addoncfg.Name,
+				Namespace:  addoncfg.InstallNamespace,
+				Generation: 1,
+			},
+		}
+		assert.False(t, mcoaAODCPredicate.Update(event.UpdateEvent{ObjectOld: oldAODC, ObjectNew: newAODC}))
+	})
+
+	t.Run("triggers update when generation changed", func(t *testing.T) {
+		oldAODC := &addonv1beta1.AddOnDeploymentConfig{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:       addoncfg.Name,
+				Namespace:  addoncfg.InstallNamespace,
+				Generation: 1,
+			},
+		}
+		newAODC := &addonv1beta1.AddOnDeploymentConfig{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:       addoncfg.Name,
+				Namespace:  addoncfg.InstallNamespace,
+				Generation: 2,
+			},
+		}
+		assert.True(t, mcoaAODCPredicate.Update(event.UpdateEvent{ObjectOld: oldAODC, ObjectNew: newAODC}))
+	})
+
+	t.Run("matches valid AODC delete", func(t *testing.T) {
+		aodc := &addonv1beta1.AddOnDeploymentConfig{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      addoncfg.Name,
+				Namespace: addoncfg.InstallNamespace,
+			},
+		}
+		assert.True(t, mcoaAODCPredicate.Delete(event.DeleteEvent{Object: aodc}))
+	})
 }
 
 func TestCMAOPlacementsChanged(t *testing.T) {
@@ -136,6 +216,8 @@ func TestEnqueueFunctions(t *testing.T) {
 	scheme := runtime.NewScheme()
 	_ = corev1.AddToScheme(scheme)
 	_ = addonv1beta1.Install(scheme)
+	_ = cooprometheusv1alpha1.AddToScheme(scheme)
+	_ = prometheusv1.AddToScheme(scheme)
 
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
 	reconciler := &ResourceCreatorReconciler{
@@ -184,10 +266,129 @@ func TestEnqueueFunctions(t *testing.T) {
 			assert.Equal(t, mcoaAODCRequest(), actual)
 		})
 
-		t.Run("unowned resource", func(t *testing.T) {
+		t.Run("user-defined resource with part-of label", func(t *testing.T) {
+			obj := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						addoncfg.PartOfK8sLabelKey: addoncfg.Name,
+					},
+				},
+			}
+			q := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[reconcile.Request]())
+			h.Create(context.Background(), event.CreateEvent{Object: obj}, q)
+
+			var actual []reconcile.Request
+			for q.Len() > 0 {
+				item, _ := q.Get()
+				actual = append(actual, item)
+				q.Done(item)
+			}
+			assert.Equal(t, mcoaAODCRequest(), actual)
+		})
+
+		t.Run("user-defined PrometheusAgent with part-of label", func(t *testing.T) {
+			agent := &cooprometheusv1alpha1.PrometheusAgent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "user-agent",
+					Namespace: addoncfg.InstallNamespace,
+					Labels: map[string]string{
+						addoncfg.PartOfK8sLabelKey: addoncfg.Name,
+					},
+				},
+			}
+			q := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[reconcile.Request]())
+			h.Create(context.Background(), event.CreateEvent{Object: agent}, q)
+
+			var actual []reconcile.Request
+			for q.Len() > 0 {
+				item, _ := q.Get()
+				actual = append(actual, item)
+				q.Done(item)
+			}
+			assert.Equal(t, mcoaAODCRequest(), actual)
+		})
+
+		t.Run("unowned resource without label", func(t *testing.T) {
 			obj := &corev1.ConfigMap{}
 			q := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[reconcile.Request]())
 			h.Create(context.Background(), event.CreateEvent{Object: obj}, q)
+			assert.Equal(t, 0, q.Len())
+		})
+
+		t.Run("nil object", func(t *testing.T) {
+			q := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[reconcile.Request]())
+			h.Create(context.Background(), event.CreateEvent{Object: nil}, q)
+			assert.Equal(t, 0, q.Len())
+		})
+
+		t.Run("update event: label removed triggers reconciliation", func(t *testing.T) {
+			oldObj := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{addoncfg.PartOfK8sLabelKey: addoncfg.Name},
+				},
+			}
+			newObj := &corev1.ConfigMap{}
+			q := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[reconcile.Request]())
+			h.Update(context.Background(), event.UpdateEvent{ObjectOld: oldObj, ObjectNew: newObj}, q)
+
+			var actual []reconcile.Request
+			for q.Len() > 0 {
+				item, _ := q.Get()
+				actual = append(actual, item)
+				q.Done(item)
+			}
+			assert.Equal(t, mcoaAODCRequest(), actual)
+		})
+
+		t.Run("update event: label added triggers reconciliation", func(t *testing.T) {
+			oldObj := &corev1.ConfigMap{}
+			newObj := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{addoncfg.PartOfK8sLabelKey: addoncfg.Name},
+				},
+			}
+			q := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[reconcile.Request]())
+			h.Update(context.Background(), event.UpdateEvent{ObjectOld: oldObj, ObjectNew: newObj}, q)
+
+			var actual []reconcile.Request
+			for q.Len() > 0 {
+				item, _ := q.Get()
+				actual = append(actual, item)
+				q.Done(item)
+			}
+			assert.Equal(t, mcoaAODCRequest(), actual)
+		})
+
+		t.Run("update event: unlabeled resource does not trigger", func(t *testing.T) {
+			oldObj := &corev1.ConfigMap{}
+			newObj := &corev1.ConfigMap{}
+			q := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[reconcile.Request]())
+			h.Update(context.Background(), event.UpdateEvent{ObjectOld: oldObj, ObjectNew: newObj}, q)
+			assert.Equal(t, 0, q.Len())
+		})
+
+		t.Run("delete event: labeled resource triggers reconciliation", func(t *testing.T) {
+			obj := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{addoncfg.PartOfK8sLabelKey: addoncfg.Name},
+				},
+			}
+			q := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[reconcile.Request]())
+			h.Delete(context.Background(), event.DeleteEvent{Object: obj}, q)
+
+			var actual []reconcile.Request
+			for q.Len() > 0 {
+				item, _ := q.Get()
+				actual = append(actual, item)
+				q.Done(item)
+			}
+			assert.Equal(t, mcoaAODCRequest(), actual)
+		})
+
+		t.Run("delete event: unlabeled resource does not trigger", func(t *testing.T) {
+			obj := &corev1.ConfigMap{}
+			q := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[reconcile.Request]())
+			h.Delete(context.Background(), event.DeleteEvent{Object: obj}, q)
 			assert.Equal(t, 0, q.Len())
 		})
 	})
@@ -219,11 +420,193 @@ func TestEnqueueFunctions(t *testing.T) {
 			assert.Equal(t, mcoaAODCRequest(), actual)
 		})
 
-		t.Run("not controlled by MCO", func(t *testing.T) {
+		t.Run("user-defined resource with part-of label", func(t *testing.T) {
+			obj := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						addoncfg.PartOfK8sLabelKey: addoncfg.Name,
+					},
+				},
+			}
+			q := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[reconcile.Request]())
+			h.Create(context.Background(), event.CreateEvent{Object: obj}, q)
+
+			var actual []reconcile.Request
+			for q.Len() > 0 {
+				item, _ := q.Get()
+				actual = append(actual, item)
+				q.Done(item)
+			}
+			assert.Equal(t, mcoaAODCRequest(), actual)
+		})
+
+		t.Run("user-defined ScrapeConfig with part-of label", func(t *testing.T) {
+			sc := &cooprometheusv1alpha1.ScrapeConfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "user-sc",
+					Namespace: addoncfg.InstallNamespace,
+					Labels: map[string]string{
+						addoncfg.PartOfK8sLabelKey: addoncfg.Name,
+					},
+				},
+			}
+			q := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[reconcile.Request]())
+			h.Create(context.Background(), event.CreateEvent{Object: sc}, q)
+
+			var actual []reconcile.Request
+			for q.Len() > 0 {
+				item, _ := q.Get()
+				actual = append(actual, item)
+				q.Done(item)
+			}
+			assert.Equal(t, mcoaAODCRequest(), actual)
+		})
+
+		t.Run("user-defined PrometheusRule with part-of label", func(t *testing.T) {
+			rule := &prometheusv1.PrometheusRule{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "user-rule",
+					Namespace: addoncfg.InstallNamespace,
+					Labels: map[string]string{
+						addoncfg.PartOfK8sLabelKey: addoncfg.Name,
+					},
+				},
+			}
+			q := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[reconcile.Request]())
+			h.Create(context.Background(), event.CreateEvent{Object: rule}, q)
+
+			var actual []reconcile.Request
+			for q.Len() > 0 {
+				item, _ := q.Get()
+				actual = append(actual, item)
+				q.Done(item)
+			}
+			assert.Equal(t, mcoaAODCRequest(), actual)
+		})
+
+		t.Run("not controlled by MCO without label", func(t *testing.T) {
 			obj := &corev1.ConfigMap{}
 			q := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[reconcile.Request]())
 			h.Create(context.Background(), event.CreateEvent{Object: obj}, q)
 			assert.Equal(t, 0, q.Len())
 		})
+
+		t.Run("nil object", func(t *testing.T) {
+			q := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[reconcile.Request]())
+			h.Create(context.Background(), event.CreateEvent{Object: nil}, q)
+			assert.Equal(t, 0, q.Len())
+		})
+
+		t.Run("update event: label removed triggers reconciliation", func(t *testing.T) {
+			oldObj := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{addoncfg.PartOfK8sLabelKey: addoncfg.Name},
+				},
+			}
+			newObj := &corev1.ConfigMap{}
+			q := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[reconcile.Request]())
+			h.Update(context.Background(), event.UpdateEvent{ObjectOld: oldObj, ObjectNew: newObj}, q)
+
+			var actual []reconcile.Request
+			for q.Len() > 0 {
+				item, _ := q.Get()
+				actual = append(actual, item)
+				q.Done(item)
+			}
+			assert.Equal(t, mcoaAODCRequest(), actual)
+		})
+
+		t.Run("update event: label added triggers reconciliation", func(t *testing.T) {
+			oldObj := &corev1.ConfigMap{}
+			newObj := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{addoncfg.PartOfK8sLabelKey: addoncfg.Name},
+				},
+			}
+			q := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[reconcile.Request]())
+			h.Update(context.Background(), event.UpdateEvent{ObjectOld: oldObj, ObjectNew: newObj}, q)
+
+			var actual []reconcile.Request
+			for q.Len() > 0 {
+				item, _ := q.Get()
+				actual = append(actual, item)
+				q.Done(item)
+			}
+			assert.Equal(t, mcoaAODCRequest(), actual)
+		})
+
+		t.Run("update event: unlabeled resource does not trigger", func(t *testing.T) {
+			oldObj := &corev1.ConfigMap{}
+			newObj := &corev1.ConfigMap{}
+			q := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[reconcile.Request]())
+			h.Update(context.Background(), event.UpdateEvent{ObjectOld: oldObj, ObjectNew: newObj}, q)
+			assert.Equal(t, 0, q.Len())
+		})
+
+		t.Run("delete event: labeled resource triggers reconciliation", func(t *testing.T) {
+			obj := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{addoncfg.PartOfK8sLabelKey: addoncfg.Name},
+				},
+			}
+			q := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[reconcile.Request]())
+			h.Delete(context.Background(), event.DeleteEvent{Object: obj}, q)
+
+			var actual []reconcile.Request
+			for q.Len() > 0 {
+				item, _ := q.Get()
+				actual = append(actual, item)
+				q.Done(item)
+			}
+			assert.Equal(t, mcoaAODCRequest(), actual)
+		})
+
+		t.Run("delete event: unlabeled resource does not trigger", func(t *testing.T) {
+			obj := &corev1.ConfigMap{}
+			q := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[reconcile.Request]())
+			h.Delete(context.Background(), event.DeleteEvent{Object: obj}, q)
+			assert.Equal(t, 0, q.Len())
+		})
 	})
+}
+
+func TestResourceCreatorReconciler_Reconcile_TerminalError(t *testing.T) {
+	scheme := runtime.NewScheme()
+	_ = addonv1beta1.Install(scheme)
+
+	// Create an AddOnDeploymentConfig with an invalid proxy URL (control characters or invalid format)
+	invalidAODC := &addonv1beta1.AddOnDeploymentConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      addoncfg.Name,
+			Namespace: addoncfg.InstallNamespace,
+		},
+		Spec: addonv1beta1.AddOnDeploymentConfigSpec{
+			ProxyConfig: addonv1beta1.ProxyConfig{
+				HTTPProxy: "http://invalid proxy url with spaces",
+			},
+		},
+	}
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(invalidAODC).
+		Build()
+
+	r := &ResourceCreatorReconciler{
+		Client: fakeClient,
+		Log:    logr.Discard(),
+		Scheme: scheme,
+	}
+
+	req := reconcile.Request{
+		NamespacedName: types.NamespacedName{
+			Namespace: addoncfg.InstallNamespace,
+			Name:      addoncfg.Name,
+		},
+	}
+
+	_, err := r.Reconcile(t.Context(), req)
+	require.Error(t, err)
+	require.ErrorIs(t, err, reconcile.TerminalError(nil))
+	require.ErrorIs(t, err, addoncfg.ErrInvalidProxyURL)
 }

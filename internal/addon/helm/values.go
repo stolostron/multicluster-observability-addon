@@ -3,12 +3,13 @@ package helm
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	"github.com/go-logr/logr"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
+	"github.com/stolostron/multicluster-observability-addon/internal/analytics/rightsizing"
 	rshandlers "github.com/stolostron/multicluster-observability-addon/internal/analytics/rightsizing/handlers"
-	chandlers "github.com/stolostron/multicluster-observability-addon/internal/coo/handlers"
 	cmanifests "github.com/stolostron/multicluster-observability-addon/internal/coo/manifests"
 	lhandlers "github.com/stolostron/multicluster-observability-addon/internal/logging/handlers"
 	lmanifests "github.com/stolostron/multicluster-observability-addon/internal/logging/manifests"
@@ -69,6 +70,7 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, getter addonutils.Add
 		if err != nil {
 			return nil, fmt.Errorf("failed to get monitoring values: %w", err)
 		}
+		dropRightSizingScrapeConfigs(userValues.Metrics)
 
 		userValues.Logging, err = getLoggingValues(ctx, k8s, cluster, mcAddon, opts)
 		if err != nil {
@@ -107,6 +109,20 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, getter addonutils.Add
 
 		return addonfactory.JsonStructToValues(userValues)
 	}
+}
+
+// dropRightSizingScrapeConfigs removes ScrapeConfigs named like the right-sizing one from the
+// metrics values. MCOA renders that ScrapeConfig from the right-sizing values; a copy with the
+// same name reaching the metrics values through configuration references (MCO ships one) would
+// collide with it, and the ManifestWork would keep one of the two at random. The filter stays
+// once MCO stops shipping its copy, since a hub restore can bring the old object back.
+func dropRightSizingScrapeConfigs(values *mmanifests.MetricsValues) {
+	if values == nil {
+		return
+	}
+	isRightSizing := func(c mmanifests.ConfigValue) bool { return c.Name == rightsizing.ScrapeConfigName }
+	values.Platform.ScrapeConfigs = slices.DeleteFunc(values.Platform.ScrapeConfigs, isRightSizing)
+	values.UserWorkload.ScrapeConfigs = slices.DeleteFunc(values.UserWorkload.ScrapeConfigs, isRightSizing)
 }
 
 func getMonitoringValues(ctx context.Context, k8s client.Client, logger logr.Logger, cluster *clusterv1.ManagedCluster, mcAddon *addonapiv1beta1.ManagedClusterAddOn, opts addon.Options) (*mmanifests.MetricsValues, error) {
@@ -161,27 +177,12 @@ func getTracingValues(ctx context.Context, k8s client.Client, cluster *clusterv1
 	return &tracing, nil
 }
 
-func getCOOValues(ctx context.Context, k8s client.Client, logger logr.Logger, cluster *clusterv1.ManagedCluster, opts addon.Options) (*cmanifests.COOValues, error) {
+func getCOOValues(_ context.Context, _ client.Client, _ logr.Logger, cluster *clusterv1.ManagedCluster, opts addon.Options) (*cmanifests.COOValues, error) {
 	if !common.IsOpenShiftVendor(cluster) {
 		return nil, nil
 	}
 
-	isHub := common.IsHubCluster(cluster)
-
-	var installCOO bool
-	var err error
-	var hasCardinalityRules bool
-	if isHub {
-		installCOO, err = chandlers.InstallOfCOOOnTheHubIsNeeded(ctx, k8s, logger)
-		hasCardinalityRules = chandlers.HasCardinalityRules(ctx, k8s)
-	} else {
-		installCOO, err = chandlers.InstallOfCOOOnSpokeIsNeeded(ctx, k8s, logger, cluster.Name)
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	return cmanifests.BuildValues(opts, installCOO, isHub, hasCardinalityRules), nil
+	return cmanifests.BuildValues(opts, common.IsHubCluster(cluster)), nil
 }
 
 func getRightSizingValues(ctx context.Context, k8s client.Client, logger logr.Logger, cluster *clusterv1.ManagedCluster, opts addon.Options) (*rshandlers.RightSizingValues, error) {

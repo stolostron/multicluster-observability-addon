@@ -1,4 +1,9 @@
-{{- if and .Values.rightSizing .Values.rightSizing.scrapeConfig }}
+{{- /*
+Right-sizing ScrapeConfig, scraped by the platform PrometheusAgent. The selection label and the
+COO-dependent controller-id/managed-by must stay in sync with
+charts/metrics/templates/platform-agent/scrape-configs.yaml.
+*/}}
+{{- if and .Values.rightSizing .Values.rightSizing.scrapeConfig .Values.metrics .Values.metrics.platformEnabled }}
 apiVersion: monitoring.rhobs/v1alpha1
 kind: ScrapeConfig
 metadata:
@@ -7,11 +12,18 @@ metadata:
   labels:
     {{- $incomingLabels := .Values.rightSizing.scrapeConfig.labels }}
     {{- $mcoaHelmLabels := fromYaml (include "mcoahelm.labels" $) }}
-    {{- $customLabel := dict "app.kubernetes.io/component" "right-sizing" }}
+    {{- $customLabel := dict }}
+    {{- if not .Values.metrics.deployCOOResources }}
+    {{- $_ := set $customLabel "app.kubernetes.io/managed-by" "observability-operator" }}
+    {{- end }}
     {{- $mergedLabels := mergeOverwrite $incomingLabels $mcoaHelmLabels $customLabel }}
     {{- toYaml $mergedLabels | nindent 4 }}
   annotations:
-    operator.prometheus.io/controller-id: {{ default "" .Values.metrics.prometheusControllerID }}
+    {{- if .Values.metrics.deployCOOResources }}
+    operator.prometheus.io/controller-id: {{ .Values.metrics.prometheusControllerID }}
+    {{- else }}
+    operator.prometheus.io/controller-id: ""
+    {{- end }}
 spec:
 {{ fromJson .Values.rightSizing.scrapeConfig.data | toYaml | nindent 2 }}
 {{- end }}

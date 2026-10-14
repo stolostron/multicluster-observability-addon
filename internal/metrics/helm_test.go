@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/url"
 	"slices"
-	"strconv"
 	"strings"
 	"testing"
 
@@ -26,8 +25,6 @@ import (
 	internalres "github.com/stolostron/multicluster-observability-addon/internal/metrics/resource"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/text/cases"
-	"golang.org/x/text/language"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -145,12 +142,48 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 
 				sa := common.FilterResourcesByLabelSelector[*corev1.ServiceAccount](objects, nil)
 				assert.Len(t, sa, 2)
+				var cleanupSA *corev1.ServiceAccount
+				for _, s := range sa {
+					if s.GetName() == "observability-pre-delete-sa" {
+						cleanupSA = s
+						break
+					}
+				}
+				require.NotNil(t, cleanupSA)
+				assert.Contains(t, cleanupSA.Annotations, "addon.open-cluster-management.io/addon-pre-delete")
+				assert.Contains(t, cleanupSA.Annotations, "addon.open-cluster-management.io/deletion-orphan")
+				assert.Empty(t, cleanupSA.Annotations["addon.open-cluster-management.io/addon-pre-delete"])
+				assert.Empty(t, cleanupSA.Annotations["addon.open-cluster-management.io/deletion-orphan"])
 
 				cr := common.FilterResourcesByLabelSelector[*rbacv1.ClusterRole](objects, nil)
 				assert.Len(t, cr, 3)
+				var cleanupCR *rbacv1.ClusterRole
+				for _, c := range cr {
+					if strings.Contains(c.GetName(), "observability-addon-cleanup") {
+						cleanupCR = c
+						break
+					}
+				}
+				require.NotNil(t, cleanupCR)
+				assert.Contains(t, cleanupCR.Annotations, "addon.open-cluster-management.io/addon-pre-delete")
+				assert.Contains(t, cleanupCR.Annotations, "addon.open-cluster-management.io/deletion-orphan")
+				assert.Empty(t, cleanupCR.Annotations["addon.open-cluster-management.io/addon-pre-delete"])
+				assert.Empty(t, cleanupCR.Annotations["addon.open-cluster-management.io/deletion-orphan"])
 
 				crb := common.FilterResourcesByLabelSelector[*rbacv1.ClusterRoleBinding](objects, nil)
 				assert.Len(t, crb, 3)
+				var cleanupCRB *rbacv1.ClusterRoleBinding
+				for _, b := range crb {
+					if strings.Contains(b.GetName(), "observability-addon-cleanup") {
+						cleanupCRB = b
+						break
+					}
+				}
+				require.NotNil(t, cleanupCRB)
+				assert.Contains(t, cleanupCRB.Annotations, "addon.open-cluster-management.io/addon-pre-delete")
+				assert.Contains(t, cleanupCRB.Annotations, "addon.open-cluster-management.io/deletion-orphan")
+				assert.Empty(t, cleanupCRB.Annotations["addon.open-cluster-management.io/addon-pre-delete"])
+				assert.Empty(t, cleanupCRB.Annotations["addon.open-cluster-management.io/deletion-orphan"])
 
 				svc := common.FilterResourcesByLabelSelector[*corev1.Service](objects, nil)
 				assert.Len(t, svc, 1)
@@ -161,8 +194,13 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				assert.Equal(t, "endpoint-monitoring-operator-metrics", sm[0].GetName())
 
 				job := common.FilterResourcesByLabelSelector[*batchv1.Job](objects, nil)
-				assert.Len(t, job, 1)
+				require.Len(t, job, 1)
 				assert.Equal(t, "observability-monitoring-cleanup", job[0].GetName())
+				require.NotNil(t, job[0].Spec.TTLSecondsAfterFinished)
+				assert.Equal(t, int32(180), *job[0].Spec.TTLSecondsAfterFinished)
+				require.NotNil(t, job[0].Spec.ActiveDeadlineSeconds)
+				assert.Equal(t, int64(300), *job[0].Spec.ActiveDeadlineSeconds)
+				assert.Contains(t, job[0].Spec.Template.Spec.Tolerations, corev1.Toleration{Operator: corev1.TolerationOpExists})
 			},
 		},
 		"platform metrics enabled but agent missing": {
@@ -179,8 +217,13 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				sa := common.FilterResourcesByLabelSelector[*corev1.ServiceAccount](objects, nil)
 				assert.Len(t, sa, 2)
 				job := common.FilterResourcesByLabelSelector[*batchv1.Job](objects, nil)
-				assert.Len(t, job, 1)
+				require.Len(t, job, 1)
 				assert.Equal(t, "observability-monitoring-cleanup", job[0].GetName())
+				require.NotNil(t, job[0].Spec.TTLSecondsAfterFinished)
+				assert.Equal(t, int32(180), *job[0].Spec.TTLSecondsAfterFinished)
+				require.NotNil(t, job[0].Spec.ActiveDeadlineSeconds)
+				assert.Equal(t, int64(300), *job[0].Spec.ActiveDeadlineSeconds)
+				assert.Contains(t, job[0].Spec.Template.Spec.Tolerations, corev1.Toleration{Operator: corev1.TolerationOpExists})
 				secrets := common.FilterResourcesByLabelSelector[*corev1.Secret](objects, nil)
 				assert.Len(t, secrets, 3)
 			},
@@ -288,8 +331,13 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				}
 				assert.Equal(t, "--cluster-name=cluster-1", jobClusterNameArg)
 				assert.Equal(t, "--hub-alertmanager-ca-secret=hub-mtls-ca-97e513873da14ae489e", jobHubCASecretArg)
+				require.NotNil(t, cleanupJob.Spec.TTLSecondsAfterFinished)
+				assert.Equal(t, int32(180), *cleanupJob.Spec.TTLSecondsAfterFinished)
+				require.NotNil(t, cleanupJob.Spec.ActiveDeadlineSeconds)
+				assert.Equal(t, int64(300), *cleanupJob.Spec.ActiveDeadlineSeconds)
+				assert.Contains(t, cleanupJob.Spec.Template.Spec.Tolerations, corev1.Toleration{Operator: corev1.TolerationOpExists})
 				// ensure that the number of objects is correct
-				expectedCount := 47
+				expectedCount := 46
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
@@ -361,12 +409,12 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 			IsHub:           true,
 			Expects: func(t *testing.T, objects []client.Object) {
 				crds := common.FilterResourcesByLabelSelector[*apiextensionsv1.CustomResourceDefinition](objects, nil)
-				expectedCount := 3 // alertmanagers + prometheusagents + scrapeconfigs (ReadOnly stubs for feedback)
+				expectedCount := 2 // prometheusagents + scrapeconfigs (ReadOnly stubs for feedback)
 				if len(crds) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d", expectedCount, len(crds))
 				}
 				// ensure that the number of objects is correct
-				expectedCount = 47
+				expectedCount = 46
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
@@ -385,7 +433,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				assert.Equal(t, "observability-operator", agent[0].Labels["app.kubernetes.io/managed-by"])
 				assert.Empty(t, agent[0].Annotations["operator.prometheus.io/controller-id"])
 				// ensure that the number of objects is correct
-				expectedCount := 39
+				expectedCount := 38
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
@@ -417,7 +465,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				cooRecordingRules := common.FilterResourcesByLabelSelector[*cooprometheusv1.PrometheusRule](objects, config.UserWorkloadPrometheusMatchLabels)
 				assert.Len(t, cooRecordingRules, 2)
 				assert.Empty(t, cooRecordingRules[0].Annotations["operator.prometheus.io/controller-id"])
-				expectedCount := 49
+				expectedCount := 48
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
@@ -439,10 +487,10 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				assert.Empty(t, agent[0].Annotations["operator.prometheus.io/controller-id"])
 
 				crds := common.FilterResourcesByLabelSelector[*apiextensionsv1.CustomResourceDefinition](objects, nil)
-				assert.Len(t, crds, 3) // alertmanagers + prometheusagents + scrapeconfigs (ReadOnly stubs, always present when metrics enabled)
+				assert.Len(t, crds, 2) // prometheusagents + scrapeconfigs (ReadOnly stubs, always present when metrics enabled)
 
 				// ensure that the number of objects is correct
-				expectedCount := 41
+				expectedCount := 40
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
@@ -565,8 +613,8 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 
 				verifyClusterScopedResourcesPrefix(t, objects)
 
-				// ensure that the number of objects is correct
-				expectedCount := 76
+				// ensure that the number of objects is correct (no ocm-tls-profile ConfigMap on non-OCP)
+				expectedCount := 74
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
@@ -686,8 +734,8 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				// For custom namespaces, chart labels SHOULD be present
 				assert.Equal(t, "metrics", ns[0].Labels["app"])
 
-				// ensure that the number of objects is correct
-				expectedCount := 76
+				// ensure that the number of objects is correct (no ocm-tls-profile ConfigMap on non-OCP)
+				expectedCount := 74
 				if len(objects) != expectedCount {
 					t.Fatalf("expected %d objects, but got %d:\n%s", expectedCount, len(objects), formatObjects(objects))
 				}
@@ -923,6 +971,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 			}
 			if tc.IsOCP {
 				managedCluster.Labels[clusterinfov1beta1.LabelKubeVendor] = string(clusterinfov1beta1.KubeVendorOpenShift)
+				managedCluster.Labels[clusterinfov1beta1.OCPVersionMajor] = "5"
 			}
 			if tc.IsHub {
 				managedCluster.Labels[clusterlifecycleconstants.SelfManagedClusterLabelKey] = "true"
@@ -996,7 +1045,12 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				},
 			}
 			clientObjects = append(clientObjects, imagesCM)
-			clientObjects = append(clientObjects, newManifestWork("cluster-1", tc.COOIsInstalled))
+			clientObjects = append(clientObjects, newManifestWork("cluster-1"))
+			if tc.COOIsInstalled {
+				managedCluster.Status.ClusterClaims = []clusterv1.ManagedClusterClaim{
+					{Name: addoncfg.CooStatusClaimName, Value: "external"},
+				}
+			}
 
 			// Setup the fake k8s client
 			client := fakeclient.NewClientBuilder().
@@ -1296,6 +1350,7 @@ func TestHelmBuild_Metrics_HCP(t *testing.T) {
 		config.LocalManagedClusterLabel:       "true",
 		config.HypershiftAddonStateLabel:      "available",
 		clusterinfov1beta1.LabelKubeVendor:    string(clusterinfov1beta1.KubeVendorOpenShift),
+		clusterinfov1beta1.OCPVersionMajor:    "5",
 	}
 	clientObjects = append(clientObjects, managedCluster)
 
@@ -1548,7 +1603,7 @@ func newCMOA() *addonapiv1beta1.ClusterManagementAddOn {
 	}
 }
 
-func newManifestWork(name string, isOLMSubscrided bool) *workv1.ManifestWork {
+func newManifestWork(name string) *workv1.ManifestWork {
 	return &workv1.ManifestWork{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -1605,32 +1660,6 @@ func newManifestWork(name string, isOLMSubscrided bool) *workv1.ManifestWork {
 									Value: workv1.FieldValue{
 										Type:   workv1.String,
 										String: ptr.To("12:00"),
-									},
-								},
-							},
-						},
-					},
-					{
-						ResourceMeta: workv1.ManifestResourceMeta{
-							Group:    apiextensionsv1.GroupName,
-							Resource: "customresourcedefinitions",
-							Name:     config.AlertmanagerCRDName,
-						},
-						Conditions: []metav1.Condition{
-							{
-								Type:               workv1.WorkAvailable,
-								Status:             metav1.ConditionTrue,
-								Reason:             "ResourceAvailable",
-								LastTransitionTime: metav1.Now(),
-							},
-						},
-						StatusFeedbacks: workv1.StatusFeedbackResult{
-							Values: []workv1.FeedbackValue{
-								{
-									Name: addoncfg.IsOLMManagedFeedbackName,
-									Value: workv1.FieldValue{
-										Type:   workv1.String,
-										String: ptr.To(cases.Title(language.English).String(strconv.FormatBool(isOLMSubscrided))),
 									},
 								},
 							},

@@ -36,20 +36,26 @@ func (b *ObjectBuilder) Build(ctx context.Context, cluster *clusterv1.ManagedClu
 		return nil, nil
 	}
 
-	var storeImage string
+	var images config.ImageOverrides
 	if b.Client != nil {
-		images, err := config.GetImageOverrides(ctx, b.Client, opts.Registries, b.Logger)
+		var err error
+		images, err = config.GetImageOverrides(ctx, b.Client, opts.Registries, b.Logger)
 		if err != nil {
-			b.Logger.Error(err, "failed to get image overrides, thanos store will use operator default image")
-		} else {
-			storeImage = images.ThanosStore
+			b.Logger.Error(err, "failed to get image overrides, will use default images")
+			images = config.ImageOverrides{}
 		}
 	}
 
-	store := b.buildStore(opts, storeImage)
+	store := b.buildStore(opts, images.ThanosStore)
 	receive := b.buildReceive(opts)
+	query := b.buildQuery(opts)
+	ruler := b.buildRuler(opts)
+	compact := b.buildCompact(opts)
+	memcachedObjects := b.buildMemcachedObjects(images)
 
-	return []runtime.Object{store, receive}, nil
+	objects := []runtime.Object{store, receive, query, ruler, compact}
+	objects = append(objects, memcachedObjects...)
+	return objects, nil
 }
 
 func (b *ObjectBuilder) buildStore(opts addon.Options, storeImage string) *thanosv1alpha1.ThanosStore {
@@ -77,6 +83,12 @@ func (b *ObjectBuilder) buildStore(opts addon.Options, storeImage string) *thano
 			ShardingStrategy: thanosv1alpha1.ShardingStrategy{
 				Type:   thanosv1alpha1.Block,
 				Shards: shards,
+			},
+			IndexCacheConfig: &thanosv1alpha1.CacheConfig{
+				ExternalCacheConfig: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{Name: config.StoreCacheConfigSecretName},
+					Key:                  config.StoreCacheConfigSecretKey,
+				},
 			},
 		},
 	}
@@ -142,6 +154,158 @@ func (b *ObjectBuilder) buildReceive(opts addon.Options) *thanosv1alpha1.ThanosR
 	return receive
 }
 
+func (b *ObjectBuilder) buildQuery(opts addon.Options) *thanosv1alpha1.ThanosQuery {
+	query := &thanosv1alpha1.ThanosQuery{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: thanosv1alpha1.GroupVersion.String(),
+			Kind:       "ThanosQuery",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "mcoa",
+			Namespace: config.HubInstallNamespace,
+			Labels:    queryLabels(),
+		},
+		Spec: thanosv1alpha1.ThanosQuerySpec{
+			Replicas:      config.DefaultQueryReplicas,
+			ReplicaLabels: []string{"replica"},
+			QueryFrontend: &thanosv1alpha1.QueryFrontendSpec{
+				Replicas:          config.DefaultQueryFrontendReplicas,
+				CompressResponses: true,
+				QueryRangeResponseCacheConfig: &thanosv1alpha1.CacheConfig{
+					ExternalCacheConfig: &corev1.SecretKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{Name: config.QueryFECacheConfigSecretName},
+						Key:                  config.QueryFECacheConfigSecretKey,
+					},
+				},
+			},
+		},
+	}
+
+	ApplyCommonThanosFields(&query.Spec.CommonFields, opts, config.ThanosQueryContainerID)
+	if query.Spec.QueryFrontend != nil {
+		ApplyCommonThanosFields(&query.Spec.QueryFrontend.CommonFields, opts, config.ThanosQueryFrontendContainerID)
+	}
+
+	return query
+}
+
+func (b *ObjectBuilder) buildRuler(opts addon.Options) *thanosv1alpha1.ThanosRuler {
+	retention := thanosv1alpha1.Duration(config.DefaultRulerRetention)
+	evalInterval := thanosv1alpha1.Duration(config.DefaultRulerEvalInterval)
+
+	ruler := &thanosv1alpha1.ThanosRuler{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: thanosv1alpha1.GroupVersion.String(),
+			Kind:       "ThanosRuler",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "mcoa",
+			Namespace: config.HubInstallNamespace,
+			Labels:    rulerLabels(),
+		},
+		Spec: thanosv1alpha1.ThanosRulerSpec{
+			Replicas: config.DefaultRulerReplicas,
+			ObjectStorageConfig: thanosv1alpha1.ObjectStorageConfig{
+				LocalObjectReference: corev1.LocalObjectReference{Name: config.ObjectStorageSecretName},
+				Key:                  config.ObjectStorageSecretKey,
+			},
+			StorageConfiguration: thanosv1alpha1.StorageConfiguration{
+				Size: thanosv1alpha1.StorageSize(config.DefaultRulerStorageSize),
+			},
+			AlertmanagerURL:    config.DefaultRulerAlertmanagerURL,
+			Retention:          retention,
+			EvaluationInterval: evalInterval,
+			RuleConfigSelector: metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"app.kubernetes.io/part-of": "multicluster-observability-addon",
+				},
+			},
+			ExternalLabels: thanosv1alpha1.ExternalLabels{
+				"rule_replica": "$(NAME)",
+			},
+		},
+	}
+
+	ApplyCommonThanosFields(&ruler.Spec.CommonFields, opts, config.ThanosRulerContainerID)
+
+	return ruler
+}
+
+func (b *ObjectBuilder) buildCompact(opts addon.Options) *thanosv1alpha1.ThanosCompact {
+	acceptMalformedIndex := true
+	compactConc := config.DefaultCompactConcurrency
+	downsampleConc := config.DefaultCompactDownsampleConc
+
+	compact := &thanosv1alpha1.ThanosCompact{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: thanosv1alpha1.GroupVersion.String(),
+			Kind:       "ThanosCompact",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "mcoa",
+			Namespace: config.HubInstallNamespace,
+			Labels:    compactLabels(),
+		},
+		Spec: thanosv1alpha1.ThanosCompactSpec{
+			ObjectStorageConfig: thanosv1alpha1.ObjectStorageConfig{
+				LocalObjectReference: corev1.LocalObjectReference{Name: config.ObjectStorageSecretName},
+				Key:                  config.ObjectStorageSecretKey,
+			},
+			StorageConfiguration: thanosv1alpha1.StorageConfiguration{
+				Size: thanosv1alpha1.StorageSize(config.DefaultCompactStorageSize),
+			},
+			RetentionConfig: thanosv1alpha1.RetentionResolutionConfig{
+				Raw:         thanosv1alpha1.Duration(config.DefaultCompactRetentionRaw),
+				FiveMinutes: thanosv1alpha1.Duration(config.DefaultCompactRetention5m),
+				OneHour:     thanosv1alpha1.Duration(config.DefaultCompactRetention1h),
+			},
+			BlockConfig: &thanosv1alpha1.BlockConfig{
+				BlockDiscoveryStrategy: thanosv1alpha1.BlockDiscoveryStrategyRecursive,
+			},
+			CompactConfig: &thanosv1alpha1.CompactConfig{
+				CompactConcurrency: &compactConc,
+			},
+			DownsamplingConfig: &thanosv1alpha1.DownsamplingConfig{
+				Concurrency: &downsampleConc,
+			},
+			VerticalCompactionConfig: &thanosv1alpha1.VerticalCompactionConfig{
+				ReplicaLabels: []string{"replica"},
+			},
+			DebugConfig: &thanosv1alpha1.DebugConfig{
+				AcceptMalformedIndex: &acceptMalformedIndex,
+			},
+		},
+	}
+
+	ApplyCommonThanosFields(&compact.Spec.CommonFields, opts, config.ThanosCompactContainerID)
+
+	return compact
+}
+
+func rulerLabels() map[string]string {
+	labels := make(map[string]string, len(mcoaLabels)+2)
+	maps.Copy(labels, mcoaLabels)
+	labels["app.kubernetes.io/component"] = "ruler"
+	labels["app.kubernetes.io/name"] = config.ThanosOperatorAppName
+	return labels
+}
+
+func compactLabels() map[string]string {
+	labels := make(map[string]string, len(mcoaLabels)+2)
+	maps.Copy(labels, mcoaLabels)
+	labels["app.kubernetes.io/component"] = "compact"
+	labels["app.kubernetes.io/name"] = config.ThanosOperatorAppName
+	return labels
+}
+
+func queryLabels() map[string]string {
+	labels := make(map[string]string, len(mcoaLabels)+2)
+	maps.Copy(labels, mcoaLabels)
+	labels["app.kubernetes.io/component"] = "query"
+	labels["app.kubernetes.io/name"] = config.ThanosOperatorAppName
+	return labels
+}
+
 func receiveLabels() map[string]string {
 	labels := make(map[string]string, len(mcoaLabels)+2)
 	maps.Copy(labels, mcoaLabels)
@@ -199,6 +363,34 @@ func defaultResources(containerID string) *corev1.ResourceRequirements {
 			Requests: corev1.ResourceList{
 				corev1.ResourceCPU:    resource.MustParse(config.DefaultReceiveIngesterCPURequest),
 				corev1.ResourceMemory: resource.MustParse(config.DefaultReceiveIngesterMemRequest),
+			},
+		}
+	case config.ThanosQueryContainerID:
+		return &corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse(config.DefaultQueryCPURequest),
+				corev1.ResourceMemory: resource.MustParse(config.DefaultQueryMemRequest),
+			},
+		}
+	case config.ThanosQueryFrontendContainerID:
+		return &corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse(config.DefaultQueryFrontendCPURequest),
+				corev1.ResourceMemory: resource.MustParse(config.DefaultQueryFrontendMemRequest),
+			},
+		}
+	case config.ThanosRulerContainerID:
+		return &corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse(config.DefaultRulerCPURequest),
+				corev1.ResourceMemory: resource.MustParse(config.DefaultRulerMemRequest),
+			},
+		}
+	case config.ThanosCompactContainerID:
+		return &corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse(config.DefaultCompactCPURequest),
+				corev1.ResourceMemory: resource.MustParse(config.DefaultCompactMemRequest),
 			},
 		}
 	default:

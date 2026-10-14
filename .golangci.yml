@@ -23,6 +23,9 @@ linters:
       locale: US
       ignore-rules:
         - utilisation
+    modernize:
+      disable:
+        - newexpr
     revive:
       rules:
         - name: package-comments

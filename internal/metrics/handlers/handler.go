@@ -151,24 +151,28 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1beta1.Man
 		}
 	}
 
-	// Read TLS profile from ManifestWork feedback
-	tlsProfileCM := workv1.ResourceIdentifier{
-		Group:     "",
-		Resource:  "configmaps",
-		Name:      addoncfg.TLSProfileConfigMapName,
-		Namespace: addoncfg.TLSProfileConfigMapNamespace,
-	}
-	feedback, err := common.GetFeedbackValuesForResources(ctx, o.Client, managedCluster.Name, addoncfg.Name, tlsProfileCM)
-	if err != nil {
-		return ret, fmt.Errorf("failed to get TLS profile feedback: %w", err)
-	}
-
-	tlsFeedback := feedback[tlsProfileCM]
-	if minVersionValues := common.FilterFeedbackValuesByName(tlsFeedback, addoncfg.TLSMinVersionFeedbackName); len(minVersionValues) > 0 && minVersionValues[0].Value.String != nil {
-		ret.TLSMinVersion = *minVersionValues[0].Value.String
-	}
-	if cipherValues := common.FilterFeedbackValuesByName(tlsFeedback, addoncfg.TLSCipherSuitesFeedbackName); len(cipherValues) > 0 && cipherValues[0].Value.String != nil {
-		ret.TLSCipherSuites = *cipherValues[0].Value.String
+	// Read TLS profile from ManifestWork feedback (OCP 5.0+ only — the ocm-tls-profile
+	// ConfigMap is populated by the OCM registration agent which is not present on older clusters).
+	if common.IsOCPVersionAtLeast(managedCluster, 5) {
+		ret.TLSProfileEnabled = true
+		tlsProfileCM := workv1.ResourceIdentifier{
+			Group:     "",
+			Resource:  "configmaps",
+			Name:      addoncfg.TLSProfileConfigMapName,
+			Namespace: addoncfg.TLSProfileConfigMapNamespace,
+		}
+		var tlsFeedback []workv1.FeedbackValue
+		if feedback, tlsErr := common.GetFeedbackValuesForResources(ctx, o.Client, managedCluster.Name, addoncfg.Name, tlsProfileCM); tlsErr != nil {
+			return ret, fmt.Errorf("failed to get TLS profile feedback: %w", tlsErr)
+		} else {
+			tlsFeedback = feedback[tlsProfileCM]
+		}
+		if minVersionValues := common.FilterFeedbackValuesByName(tlsFeedback, addoncfg.TLSMinVersionFeedbackName); len(minVersionValues) > 0 && minVersionValues[0].Value.String != nil {
+			ret.TLSMinVersion = *minVersionValues[0].Value.String
+		}
+		if cipherValues := common.FilterFeedbackValuesByName(tlsFeedback, addoncfg.TLSCipherSuitesFeedbackName); len(cipherValues) > 0 && cipherValues[0].Value.String != nil {
+			ret.TLSCipherSuites = *cipherValues[0].Value.String
+		}
 	}
 
 	caTargetName := config.GetHubMtlsCASecretName(config.GetTrimmedClusterID(ret.HubClusterID))
@@ -222,10 +226,8 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1beta1.Man
 	ret.MonitoringStackPatches = rawPatches
 
 	if isOpenShiftVendor {
-		if ret.COOIsSubscribed, err = o.cooIsSubscribed(ctx, managedCluster); err != nil {
-			return ret, fmt.Errorf("failed to check if coo is subscribed on the managed cluster: %w", err)
-		}
-		if !ret.COOIsSubscribed {
+		ret.COOInstalled = o.isCOOInstalled(managedCluster)
+		if !ret.COOInstalled {
 			// If we deploy our own operator, create an annotation to restart it once the CRDs are established.
 			promAgentCRD := workv1.ResourceIdentifier{
 				Group:    apiextensionsv1.GroupName,
@@ -556,26 +558,20 @@ func (o *OptionsBuilder) getAvailableConfigResources(ctx context.Context, mcAddo
 	return ret, nil
 }
 
-// cooIsSubscribed returns true if coo is considered installed, preventing conflicting resources creation.
-// It checks the feedback rules for the alertmanagers.monitoring.rhobs CRD.
-func (o *OptionsBuilder) cooIsSubscribed(ctx context.Context, managedCluster *clusterv1.ManagedCluster) (bool, error) {
-	subscribed, hasFeedback, err := common.IsCOOSubscribedOnSpoke(ctx, o.Client, managedCluster.Name, addoncfg.Name)
-	if err != nil {
-		return false, fmt.Errorf("failed to check if coo is subscribed on the managed cluster: %w", err)
+// isCOOInstalled returns true if COO is installed on the spoke (by MCOA or externally),
+// meaning MCOA should not deploy its own prometheus-operator. It reads ClusterClaims set
+// by the endpoint-monitoring-operator.
+func (o *OptionsBuilder) isCOOInstalled(managedCluster *clusterv1.ManagedCluster) bool {
+	installed, hasReport := common.IsCOOInstalledOnSpoke(managedCluster)
+	if !hasReport {
+		o.Logger.V(2).Info("no COO ClusterClaim yet, waiting for endpoint operator to report", "cluster", managedCluster.Name)
+		return false
 	}
-
-	if !hasFeedback {
-		o.Logger.V(2).Info("CRD not found in manifestwork status, considering COO as not subscribed", "crd", config.AlertmanagerCRDName)
-		return false, nil
+	if installed {
+		o.Logger.V(2).Info("COO is installed, MCOA will not deploy its own COO resources", "cluster", managedCluster.Name)
+		return true
 	}
-
-	if subscribed {
-		o.Logger.V(2).Info("found CRD with OLM label, considering COO as subscribed", "crd", config.AlertmanagerCRDName)
-		return true, nil
-	}
-
-	o.Logger.V(2).Info("CRD missing the OLM label, considering COO as not subscribed", "crd", config.AlertmanagerCRDName)
-	return false, nil
+	return false
 }
 
 func createWriteRelabelConfigs(clusterName, clusterID, hubClusterName string, isHypershiftLocalCluster bool) []cooprometheusv1.RelabelConfig {

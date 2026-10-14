@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	monitoringv1alpha1 "github.com/rhobs/observability-operator/pkg/apis/monitoring/v1alpha1"
+	addoncommon "github.com/stolostron/multicluster-observability-addon/internal/addon/common"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	thanosbuilder "github.com/stolostron/multicluster-observability-addon/internal/metrics/thanos"
 	"github.com/stretchr/testify/assert"
@@ -17,20 +18,115 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2"
 	"open-cluster-management.io/addon-framework/pkg/agent"
+	"open-cluster-management.io/addon-framework/pkg/utils"
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
+	fakeaddon "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 )
 
 type mockAgent struct {
 	manifests []runtime.Object
+	called    bool
+	options   agent.AgentAddonOptions
 }
 
 func (m *mockAgent) Manifests(_ context.Context, cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) ([]runtime.Object, error) {
+	m.called = true
 	return m.manifests, nil
 }
 
 func (m *mockAgent) GetAgentAddonOptions() agent.AgentAddonOptions {
-	return agent.AgentAddonOptions{}
+	return m.options
+}
+
+func TestAgentConfigNamespaces(t *testing.T) {
+	for _, resource := range []addonapiv1beta1.ConfigGroupResource{
+		{Group: "addon.open-cluster-management.io", Resource: addoncfg.AddonDeploymentConfigResource},
+		{Group: "observability.openshift.io", Resource: addoncfg.ClusterLogForwardersResource},
+		{Group: "opentelemetry.io", Resource: addoncfg.OpenTelemetryCollectorsResource},
+		{Group: "opentelemetry.io", Resource: addoncfg.InstrumentationResource},
+		{Group: "monitoring.rhobs", Resource: "prometheusagents"},
+		{Group: "monitoring.rhobs", Resource: "scrapeconfigs"},
+		{Group: "monitoring.coreos.com", Resource: "prometheusrules"},
+		{Group: "monitoring.rhobs", Resource: "prometheusrules"},
+		{Resource: "configmaps"},
+	} {
+		for _, namespace := range []string{addoncfg.InstallNamespace, "cluster-a", "openshift-logging", "cluster-b", ""} {
+			t.Run(resource.Group+"/"+resource.Resource+"/"+namespace, func(t *testing.T) {
+				var configRefs []addonapiv1beta1.ConfigReference
+				if resource.Group == "addon.open-cluster-management.io" && resource.Resource == addoncfg.AddonDeploymentConfigResource {
+					configRefs = []addonapiv1beta1.ConfigReference{
+						{
+							ConfigGroupResource: resource,
+							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+								ConfigReferent: addonapiv1beta1.ConfigReferent{Name: addoncfg.Name, Namespace: namespace},
+								SpecHash:       "test-hash",
+							},
+						},
+					}
+				} else {
+					configRefs = []addonapiv1beta1.ConfigReference{
+						{
+							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
+								Group: "addon.open-cluster-management.io", Resource: addoncfg.AddonDeploymentConfigResource,
+							},
+							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+								ConfigReferent: addonapiv1beta1.ConfigReferent{Name: addoncfg.Name, Namespace: addoncfg.InstallNamespace},
+								SpecHash:       "test-hash",
+							},
+						},
+						{
+							ConfigGroupResource: resource,
+							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+								ConfigReferent: addonapiv1beta1.ConfigReferent{Name: "instance", Namespace: namespace},
+							},
+						},
+					}
+				}
+				mcAddon := &addonapiv1beta1.ManagedClusterAddOn{
+					ObjectMeta: metav1.ObjectMeta{Name: addoncfg.Name, Namespace: "cluster-a"},
+					Status: addonapiv1beta1.ManagedClusterAddOnStatus{
+						ConfigReferences: configRefs,
+					},
+				}
+				//nolint:staticcheck // The generated client does not provide NewClientset.
+				client := fakeaddon.NewSimpleClientset(
+					&addonapiv1beta1.AddOnDeploymentConfig{
+						ObjectMeta: metav1.ObjectMeta{Name: addoncfg.Name, Namespace: addoncfg.InstallNamespace},
+						Spec:       addonapiv1beta1.AddOnDeploymentConfigSpec{AgentInstallNamespace: "custom-agent-namespace"},
+					},
+					&addonapiv1beta1.AddOnDeploymentConfig{
+						ObjectMeta: metav1.ObjectMeta{Name: addoncfg.Name, Namespace: "cluster-a"},
+						Spec:       addonapiv1beta1.AddOnDeploymentConfigSpec{AgentInstallNamespace: "custom-agent-namespace"},
+					},
+				)
+				mock := &mockAgent{
+					manifests: []runtime.Object{&corev1.Secret{}},
+					options: agent.AgentAddonOptions{
+						AgentInstallNamespace: utils.AgentInstallNamespaceFromDeploymentConfigFunc(utils.NewAddOnDeploymentConfigGetter(client)),
+					},
+				}
+				wrapper := &AgentAddonWithSortedManifests{agent: mock}
+				installNamespace, installErr := wrapper.GetAgentAddonOptions().AgentInstallNamespace(t.Context(), mcAddon)
+				objects, err := wrapper.Manifests(t.Context(), nil, mcAddon)
+				if namespace == addoncfg.InstallNamespace || namespace == mcAddon.Namespace {
+					require.NoError(t, installErr)
+					require.Equal(t, "custom-agent-namespace", installNamespace)
+					require.Len(t, client.Actions(), 1)
+					require.NoError(t, err)
+					require.True(t, mock.called)
+					require.Len(t, objects, 1)
+					return
+				}
+				require.ErrorIs(t, err, addoncommon.ErrInvalidConfigNamespace)
+				require.ErrorIs(t, installErr, addoncommon.ErrInvalidConfigNamespace)
+				require.Empty(t, installNamespace)
+				require.Empty(t, client.Actions(), "registration must reject references before fetching configuration")
+				require.Nil(t, objects)
+				require.False(t, mock.called, "reject the entire reference list before framework config reads or rendering")
+			})
+		}
+	}
 }
 
 func TestManifestsSorting(t *testing.T) {
@@ -72,7 +168,7 @@ func TestManifestsSorting(t *testing.T) {
 		agent: mock,
 	}
 
-	sorted, err := prober.Manifests(t.Context(), nil, nil)
+	sorted, err := prober.Manifests(t.Context(), nil, &addonapiv1beta1.ManagedClusterAddOn{})
 	require.NoError(t, err)
 	assert.Len(t, sorted, 4)
 
@@ -116,7 +212,7 @@ func TestManifestsConvertsMonitoringStackToUnstructured(t *testing.T) {
 	mock := &mockAgent{manifests: []runtime.Object{ms}}
 	agent := &AgentAddonWithSortedManifests{agent: mock}
 
-	objects, err := agent.Manifests(t.Context(), nil, nil)
+	objects, err := agent.Manifests(t.Context(), nil, &addonapiv1beta1.ManagedClusterAddOn{})
 	require.NoError(t, err)
 	require.Len(t, objects, 1)
 
@@ -216,16 +312,25 @@ func TestManifestsWithObjectBuilders(t *testing.T) {
 
 	objects, err := wrapper.Manifests(t.Context(), hubCluster, mcAddon)
 	require.NoError(t, err)
-	require.Len(t, objects, 2, "expected ThanosReceive and ThanosStore objects")
+	require.Len(t, objects, 13, "expected 5 Thanos CRs + 8 memcached objects (2 deployments, 2 services, 2 secrets, 2 service monitors)")
 
 	var store *thanosv1alpha1.ThanosStore
 	var receive *thanosv1alpha1.ThanosReceive
+	var query *thanosv1alpha1.ThanosQuery
+	var ruler *thanosv1alpha1.ThanosRuler
+	var compact *thanosv1alpha1.ThanosCompact
 	for _, obj := range objects {
 		switch o := obj.(type) {
 		case *thanosv1alpha1.ThanosStore:
 			store = o
 		case *thanosv1alpha1.ThanosReceive:
 			receive = o
+		case *thanosv1alpha1.ThanosQuery:
+			query = o
+		case *thanosv1alpha1.ThanosRuler:
+			ruler = o
+		case *thanosv1alpha1.ThanosCompact:
+			compact = o
 		}
 	}
 
@@ -238,6 +343,22 @@ func TestManifestsWithObjectBuilders(t *testing.T) {
 	assert.Equal(t, addoncfg.InstallNamespace, receive.Namespace)
 	require.Len(t, receive.Spec.Ingester.Hashrings, 1)
 	assert.Equal(t, "default", receive.Spec.Ingester.Hashrings[0].Name)
+
+	require.NotNil(t, query, "expected ThanosQuery object")
+	assert.Equal(t, "mcoa", query.Name)
+	assert.Equal(t, addoncfg.InstallNamespace, query.Namespace)
+	assert.Equal(t, int32(2), query.Spec.Replicas)
+	require.NotNil(t, query.Spec.QueryFrontend)
+	assert.Equal(t, int32(2), query.Spec.QueryFrontend.Replicas)
+
+	require.NotNil(t, ruler, "expected ThanosRuler object")
+	assert.Equal(t, "mcoa", ruler.Name)
+	assert.Equal(t, addoncfg.InstallNamespace, ruler.Namespace)
+	assert.Equal(t, int32(3), ruler.Spec.Replicas)
+
+	require.NotNil(t, compact, "expected ThanosCompact object")
+	assert.Equal(t, "mcoa", compact.Name)
+	assert.Equal(t, addoncfg.InstallNamespace, compact.Namespace)
 }
 
 func TestManifestsObjectBuildersSkippedForNonHub(t *testing.T) {

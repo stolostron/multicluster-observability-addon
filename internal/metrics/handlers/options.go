@@ -27,7 +27,7 @@ type Options struct {
 	InstallNamespace          string
 	Images                    mconfig.ImageOverrides
 	IsHub                     bool
-	COOIsSubscribed           bool
+	COOInstalled              bool
 	Tolerations               []corev1.Toleration
 	NodeSelector              map[string]string
 	ResourceReqs              []addonv1beta1.ContainerResourceRequirements
@@ -37,6 +37,7 @@ type Options struct {
 	// prevents synchronization issues by ensuring the operator can watch these resources upon startup.
 	CRDEstablishedAnnotation string
 	ProxyConfig              addon.ProxyConfig
+	TLSProfileEnabled        bool
 	TLSMinVersion            string
 	TLSCipherSuites          string
 

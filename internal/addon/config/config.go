@@ -25,6 +25,8 @@ const (
 	CooSubscriptionNamespace = "openshift-cluster-observability-operator"
 	CooSubscriptionChannel   = "stable"
 
+	CooStatusClaimName = "coo.observability.open-cluster-management.io"
+
 	PaProbeKey  = "isAvailable"
 	PaProbePath = ".status.conditions[?(@.type==\"Available\")].status"
 
@@ -47,9 +49,13 @@ const (
 	UipProbeKey       = "isAvailable"
 	UipProbePath      = ".status.conditions[?(@.type==\"Available\")].status"
 
+	ThanosProbeKey  = "isReady"
+	ThanosProbePath = ".status.conditions[?(@.type==\"Ready\")].status"
+
 	DefaultStackPrefix = "mcoa-default"
 
 	// Label keys
+	ReleaseLabelKey               = "release"
 	PlacementRefNameLabelKey      = "placement-ref-name"
 	PlacementRefNamespaceLabelKey = "placement-ref-namespace"
 	ComponentK8sLabelKey          = "app.kubernetes.io/component"
@@ -73,9 +79,6 @@ const (
 	PrometheusOperatorVersionFeedbackPath = `.metadata.annotations.operator\.prometheus\.io/version`
 	LastTransitionTimeFeedbackName        = "lastTransitionTime"
 	LastTransitionTimeFeedbackPath        = ".status.conditions[?(@.type==\"Established\")].lastTransitionTime"
-	IsOLMManagedFeedbackName              = "isOLMManaged"
-	IsOLMManagedFeedbackPath              = `.metadata.labels.olm\.managed`
-
 	// TLS profile feedback
 	TLSProfileConfigMapNamespace = "open-cluster-management-agent"
 	TLSProfileConfigMapName      = "ocm-tls-profile"
@@ -86,6 +89,10 @@ const (
 	TLSCipherSuitesFeedbackName  = "cipherSuites"
 	TLSCipherSuitesFeedbackPath  = ".data.cipherSuites"
 	TLSDefaultMinVersion         = "VersionTLS12"
+
+	PrometheusRulesResource = "prometheusrules"
+	RsProbeKey              = "ruleName"
+	RsProbePath             = ".metadata.name"
 
 	VendorOverrideAnnotationKey = "mcoa-override-vendor"
 	AnnotationOriginalResource  = "mcoa.openshift.io/original-resource"

@@ -43,6 +43,7 @@ type MetricsValues struct {
 	NodeSelector                   map[string]string                 `json:"nodeSelector"`
 	NodeExporter                   NodeExporterValues                `json:"nodeExporter"`
 	ThanosOperator                 ThanosOperatorValues              `json:"thanosOperator"`
+	TLSProfileEnabled              bool                              `json:"tlsProfileEnabled"`
 	TLSMinVersion                  string                            `json:"tlsMinVersion,omitempty"`
 	TLSCipherSuites                string                            `json:"tlsCipherSuites,omitempty"`
 	MonitoringStackPatches         []MonitoringStackPatchValues      `json:"monitoringStackPatches"`
@@ -133,8 +134,9 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 			HostPort:     opts.NodeExporter.HostPort,
 			InternalPort: opts.NodeExporter.InternalPort,
 		},
-		TLSMinVersion:   opts.TLSMinVersion,
-		TLSCipherSuites: opts.TLSCipherSuites,
+		TLSProfileEnabled: opts.TLSProfileEnabled,
+		TLSMinVersion:     opts.TLSMinVersion,
+		TLSCipherSuites:   opts.TLSCipherSuites,
 	}
 
 	if opts.IsOpenShiftVendor {
@@ -319,7 +321,7 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 	ret.PlatformEnabled = opts.IsPlatformEnabled()
 	ret.UserWorkloadsEnabled = opts.IsUserWorkloadsEnabled()
 	ret.DeployNonOCPStack = !opts.IsOpenShiftVendor && (ret.PlatformEnabled || ret.UserWorkloadsEnabled)
-	ret.DeployCOOResources = (ret.PlatformEnabled || ret.UserWorkloadsEnabled) && !opts.COOIsSubscribed
+	ret.DeployCOOResources = (ret.PlatformEnabled || ret.UserWorkloadsEnabled) && !opts.COOInstalled
 	ret.PrometheusOperatorAnnotations = opts.CRDEstablishedAnnotation
 
 	// Set images

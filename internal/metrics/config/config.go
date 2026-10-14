@@ -52,49 +52,16 @@ const (
 	AcmEtcdServiceMonitorName             = "acm-etcd"
 	AcmApiServerServiceMonitorName        = "acm-kube-apiserver"
 
-	RemoteWriteCfgName        = "acm-observability"
-	ScrapeClassCfgName        = "ocp-monitoring"
-	NonOCPScrapeClassName     = "non-ocp-monitoring"
-	ScrapeClassPlatformTarget = "prometheus-k8s.openshift-monitoring.svc:9091"
-	ScrapeClassUWLTarget      = "prometheus-user-workload.openshift-user-workload-monitoring.svc:9092"
-	AlertmanagerCRDName       = "alertmanagers.monitoring.rhobs"
-
+	RemoteWriteCfgName            = "acm-observability"
+	ScrapeClassCfgName            = "ocp-monitoring"
+	NonOCPScrapeClassName         = "non-ocp-monitoring"
+	ScrapeClassPlatformTarget     = "prometheus-k8s.openshift-monitoring.svc:9091"
+	ScrapeClassUWLTarget          = "prometheus-user-workload.openshift-user-workload-monitoring.svc:9092"
 	RawResolutionAnnotation       = "observability.open-cluster-management.io/resolution-strategy"
 	RawResolutionValue            = "raw"
 	RawLabelSuffix                = "-raw"
 	COOMonitoringStacksAnnotation = "observability.open-cluster-management.io/coo-monitoring-stacks"
 	MonitoringStackResource       = "monitoringstacks"
-
-	// Thanos Operator
-	ThanosOperatorAppName = "thanos-operator"
-	// TODO: replace with image from ACM image overrides ConfigMap once available.
-	ThanosOperatorImage = "quay.io/thanos/thanos-operator:main-2026-04-09-a4dc024"
-
-	// Thanos Store defaults
-	DefaultStoreShards      = 3
-	DefaultStoreStorageSize = "10Gi"
-	DefaultStoreCPURequest  = "100m"
-	DefaultStoreMemRequest  = "1Gi"
-	ThanosStoreContainerID  = "statefulsets:mcoa:thanos"
-
-	// Thanos Receive defaults
-	DefaultReceiveRouterReplicas      = 1
-	DefaultReceiveRouterReplication   = 3
-	DefaultReceiveIngesterReplicas    = 3
-	DefaultReceiveIngesterStorageSize = "10Gi"
-	DefaultReceiveRetention           = "24h"
-	DefaultReceiveTooFarInFuture      = "5m"
-	DefaultReceiveRouterCPURequest    = "100m"
-	DefaultReceiveRouterMemRequest    = "256Mi"
-	DefaultReceiveIngesterCPURequest  = "300m"
-	DefaultReceiveIngesterMemRequest  = "512Mi"
-	ThanosReceiveRouterContainerID    = "deployments:mcoa:thanos-receive-router"
-	ThanosReceiveIngesterContainerID  = "statefulsets:mcoa:thanos-receive-ingester"
-	DefaultReceiveHashringName        = "default"
-
-	// Thanos object storage configuration
-	ObjectStorageSecretName = "thanos-object-storage"
-	ObjectStorageSecretKey  = "thanos.yaml"
 
 	AlertmanagerAccessorSecretName = "observability-alertmanager-accessor"
 	AlertmanagerRouterCASecretName = "hub-alertmanager-router-ca"
@@ -143,6 +110,8 @@ type ImageOverrides struct {
 	EndpointMonitoringOperator string `json:"endpoint_monitoring_operator"`
 	ThanosOperator             string `json:"thanos_operator"`
 	ThanosStore                string `json:"thanos_store"`
+	Memcached                  string `json:"memcached"`
+	MemcachedExporter          string `json:"memcached_exporter"`
 }
 
 func GetImageOverrides(ctx context.Context, c client.Client, registries []addonapiv1beta1.ImageMirror, logger logr.Logger) (ImageOverrides, error) {
@@ -186,6 +155,12 @@ func GetImageOverrides(ctx context.Context, c client.Client, registries []addona
 		}
 		if ret.ThanosStore != "" {
 			ret.ThanosStore = overrideImage(ret.ThanosStore, registries, logger)
+		}
+		if ret.Memcached != "" {
+			ret.Memcached = overrideImage(ret.Memcached, registries, logger)
+		}
+		if ret.MemcachedExporter != "" {
+			ret.MemcachedExporter = overrideImage(ret.MemcachedExporter, registries, logger)
 		}
 	}
 

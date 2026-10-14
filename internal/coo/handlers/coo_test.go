@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/go-logr/logr"
@@ -9,27 +10,18 @@ import (
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"github.com/stolostron/multicluster-observability-addon/internal/coo/manifests"
-	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/utils/ptr"
-	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
-	workv1 "open-cluster-management.io/api/work/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 )
 
-const testClusterName = "spoke-1"
-
-var (
-	_ = operatorv1alpha1.AddToScheme(scheme.Scheme)
-	_ = workv1.Install(scheme.Scheme)
-)
+var _ = operatorv1alpha1.AddToScheme(scheme.Scheme)
 
 func TestInstallCOO(t *testing.T) {
 	tests := []struct {
@@ -39,12 +31,46 @@ func TestInstallCOO(t *testing.T) {
 		subscription            *operatorv1alpha1.Subscription
 		expectedUIPluginInstall bool
 		expectedCOOInstall      bool
+		expectedHubCOOInstall   *bool
 		expectedErrMsg          string
 	}{
 		{
 			name:                    "Non-hub cluster with no features enabled",
 			isHub:                   false,
 			options:                 addon.Options{},
+			expectedUIPluginInstall: false,
+			expectedCOOInstall:      false,
+		},
+		{
+			name:  "Non-hub cluster with incident detection enabled installs COO",
+			isHub: false,
+			options: addon.Options{
+				Platform: addon.PlatformOptions{
+					Enabled: true,
+					AnalyticsOptions: addon.AnalyticsOptions{
+						IncidentDetection: addon.IncidentDetection{
+							Enabled: true,
+						},
+					},
+				},
+			},
+			expectedUIPluginInstall: true,
+			expectedCOOInstall:      true,
+		},
+		{
+			name:  "Non-hub cluster with right-sizing does not install COO",
+			isHub: false,
+			options: addon.Options{
+				Platform: addon.PlatformOptions{
+					Enabled: true,
+					AnalyticsOptions: addon.AnalyticsOptions{
+						RightSizing: addon.RightSizingOptions{
+							Delegated:        true,
+							NamespaceEnabled: true,
+						},
+					},
+				},
+			},
 			expectedUIPluginInstall: false,
 			expectedCOOInstall:      false,
 		},
@@ -62,7 +88,8 @@ func TestInstallCOO(t *testing.T) {
 				},
 			},
 			expectedUIPluginInstall: true,
-			expectedCOOInstall:      true,
+			expectedCOOInstall:      false, // hub COO installation handled by HubResourceReconciler
+			expectedHubCOOInstall:   ptr.To(true),
 		},
 		{
 			name:                    "Hub cluster with no features enabled",
@@ -70,6 +97,7 @@ func TestInstallCOO(t *testing.T) {
 			options:                 addon.Options{},
 			expectedUIPluginInstall: false,
 			expectedCOOInstall:      false,
+			expectedHubCOOInstall:   ptr.To(true),
 		},
 		{
 			name:  "Hub cluster with COO installed and incident detection enabled",
@@ -95,6 +123,51 @@ func TestInstallCOO(t *testing.T) {
 			},
 			expectedUIPluginInstall: true,
 			expectedCOOInstall:      false,
+			expectedHubCOOInstall:   ptr.To(false),
+		},
+		{
+			name:  "Hub cluster with COO installed externally in openshift-operators",
+			isHub: true,
+			options: addon.Options{
+				Platform: addon.PlatformOptions{
+					Enabled: true,
+					AnalyticsOptions: addon.AnalyticsOptions{
+						IncidentDetection: addon.IncidentDetection{
+							Enabled: true,
+						},
+					},
+				},
+			},
+			subscription: &operatorv1alpha1.Subscription{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      addoncfg.CooSubscriptionName,
+					Namespace: "openshift-operators",
+				},
+				Spec: &operatorv1alpha1.SubscriptionSpec{
+					Channel: addoncfg.CooSubscriptionChannel,
+				},
+			},
+			expectedUIPluginInstall: true,
+			expectedCOOInstall:      false,
+			expectedHubCOOInstall:   ptr.To(false),
+		},
+		{
+			name:    "Hub cluster with external COO subscription carrying release label in openshift-operators is not mistaken for MCOA managed",
+			isHub:   true,
+			options: addon.Options{},
+			subscription: &operatorv1alpha1.Subscription{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      addoncfg.CooSubscriptionName,
+					Namespace: "openshift-operators",
+					Labels: map[string]string{
+						addoncfg.ReleaseLabelKey: addoncfg.Name,
+					},
+				},
+				Spec: &operatorv1alpha1.SubscriptionSpec{
+					Channel: addoncfg.CooSubscriptionChannel,
+				},
+			},
+			expectedHubCOOInstall: ptr.To(false),
 		},
 		{
 			name:  "Hub cluster with COO installed with multicluster-observability-addon release label",
@@ -114,7 +187,7 @@ func TestInstallCOO(t *testing.T) {
 					Name:      addoncfg.CooSubscriptionName,
 					Namespace: addoncfg.CooSubscriptionNamespace,
 					Labels: map[string]string{
-						"release": "multicluster-observability-addon",
+						addoncfg.ReleaseLabelKey: addoncfg.Name,
 					},
 				},
 				Spec: &operatorv1alpha1.SubscriptionSpec{
@@ -122,7 +195,8 @@ func TestInstallCOO(t *testing.T) {
 				},
 			},
 			expectedUIPluginInstall: true,
-			expectedCOOInstall:      true,
+			expectedCOOInstall:      false, // hub COO installation handled by HubResourceReconciler
+			expectedHubCOOInstall:   ptr.To(true),
 		},
 		{
 			name:  "Hub cluster with wrong version of COO installed and incident detection enabled",
@@ -151,6 +225,38 @@ func TestInstallCOO(t *testing.T) {
 			expectedErrMsg:          addoncfg.ErrInvalidSubscriptionChannel.Error(),
 		},
 		{
+			name:    "Hub cluster with nil Subscription spec returns ErrInvalidSubscriptionChannel",
+			isHub:   true,
+			options: addon.Options{},
+			subscription: &operatorv1alpha1.Subscription{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      addoncfg.CooSubscriptionName,
+					Namespace: addoncfg.CooSubscriptionNamespace,
+				},
+				Spec: nil,
+			},
+			expectedErrMsg: addoncfg.ErrInvalidSubscriptionChannel.Error(),
+		},
+		{
+			name:  "Hub cluster with right-sizing enabled",
+			isHub: true,
+			options: addon.Options{
+				Platform: addon.PlatformOptions{
+					Enabled: true,
+					AnalyticsOptions: addon.AnalyticsOptions{
+						RightSizing: addon.RightSizingOptions{
+							Delegated:             true,
+							NamespaceEnabled:      true,
+							VirtualizationEnabled: true,
+						},
+					},
+				},
+			},
+			expectedUIPluginInstall: true,
+			expectedCOOInstall:      false,
+			expectedHubCOOInstall:   ptr.To(true),
+		},
+		{
 			name:  "Hub cluster with metrics enabled but not incident detection",
 			isHub: true,
 			options: addon.Options{
@@ -163,6 +269,7 @@ func TestInstallCOO(t *testing.T) {
 			},
 			expectedUIPluginInstall: false,
 			expectedCOOInstall:      false,
+			expectedHubCOOInstall:   ptr.To(true),
 		},
 	}
 
@@ -175,165 +282,145 @@ func TestInstallCOO(t *testing.T) {
 				k8sClientBuilder = k8sClientBuilder.WithObjects(tc.subscription)
 			}
 
-			var result bool
+			var canManage bool
 			var err error
 			if tc.isHub {
-				result, err = InstallOfCOOOnTheHubIsNeeded(context.Background(), k8sClientBuilder.Build(), logr.Discard())
+				canManage, err = CanManageCOOOnTheHub(context.Background(), k8sClientBuilder.Build(), logr.Discard())
 			}
-			cooValues := manifests.BuildValues(tc.options, result, tc.isHub, false)
+			cooValues := manifests.BuildValues(tc.options, tc.isHub)
 
 			if tc.expectedErrMsg != "" {
+				assert.False(t, canManage)
 				assert.EqualError(t, err, tc.expectedErrMsg)
 				return
 			}
 			require.NoError(t, err)
+			if tc.isHub && tc.expectedHubCOOInstall != nil {
+				assert.Equal(t, *tc.expectedHubCOOInstall, canManage, "CanManageCOOOnTheHub return mismatch")
+			}
 			assert.Equal(t, tc.expectedUIPluginInstall, cooValues.Enabled)
 			assert.Equal(t, tc.expectedCOOInstall, cooValues.InstallCOO)
 		})
 	}
 }
 
-// manifestWorkWithNoFeedback builds a ManifestWork for the addon that hasn't reported any
-// status feedback yet, mimicking the very first reconcile(s) for a cluster before the work
-// agent has observed anything on the spoke.
-func manifestWorkWithNoFeedback(name string) *workv1.ManifestWork {
-	return &workv1.ManifestWork{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: testClusterName,
-			Labels:    map[string]string{addonapiv1beta1.AddonLabelKey: addoncfg.Name},
-		},
-	}
+type errorReader struct {
+	client.Reader
+	err error
 }
 
-// manifestWorkWithCRDFeedback builds a ManifestWork carrying status feedback for the
-// alertmanagers.monitoring.rhobs CRD, mimicking what the work agent reports back once it
-// has observed the CRD on the spoke. When olmManaged is nil, the CRD is reported as observed
-// (Available) but carries no "olm.managed" label value at all, e.g. because the label is
-// absent on the object (as opposed to present with value "false").
-func manifestWorkWithCRDFeedback(name string, olmManaged *string) *workv1.ManifestWork {
-	var values []workv1.FeedbackValue
-	if olmManaged != nil {
-		values = []workv1.FeedbackValue{
-			{
-				Name:  addoncfg.IsOLMManagedFeedbackName,
-				Value: workv1.FieldValue{Type: workv1.String, String: olmManaged},
-			},
-		}
-	}
-
-	return &workv1.ManifestWork{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: testClusterName,
-			Labels:    map[string]string{addonapiv1beta1.AddonLabelKey: addoncfg.Name},
-		},
-		Status: workv1.ManifestWorkStatus{
-			ResourceStatus: workv1.ManifestResourceStatus{
-				Manifests: []workv1.ManifestCondition{
-					{
-						ResourceMeta: workv1.ManifestResourceMeta{
-							Group:    apiextensionsv1.GroupName,
-							Resource: "customresourcedefinitions",
-							Name:     mconfig.AlertmanagerCRDName,
-						},
-						Conditions: []metav1.Condition{
-							{
-								Type:               workv1.WorkAvailable,
-								Status:             metav1.ConditionTrue,
-								Reason:             "ResourceAvailable",
-								LastTransitionTime: metav1.Now(),
-							},
-						},
-						StatusFeedbacks: workv1.StatusFeedbackResult{
-							Values: values,
-						},
-					},
-				},
-			},
-		},
-	}
+func (e *errorReader) List(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error {
+	return e.err
 }
 
-// manifestWorkWithCommittedSubscription builds a ManifestWork whose spec already renders
-// the COO Subscription manifest, mimicking a previous reconcile where MCOA committed to
-// installing COO on the spoke.
-func manifestWorkWithCommittedSubscription(name string) *workv1.ManifestWork {
-	sub := &unstructured.Unstructured{
-		Object: map[string]any{
-			"apiVersion": "operators.coreos.com/v1alpha1",
-			"kind":       "Subscription",
-			"metadata": map[string]any{
-				"name":      addoncfg.CooSubscriptionName,
-				"namespace": addoncfg.CooSubscriptionNamespace,
-			},
-		},
-	}
+var errSimulatedAPI = errors.New("simulated API error")
 
-	return &workv1.ManifestWork{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: testClusterName,
-			Labels:    map[string]string{addonapiv1beta1.AddonLabelKey: addoncfg.Name},
-		},
-		Spec: workv1.ManifestWorkSpec{
-			Workload: workv1.ManifestsTemplate{
-				Manifests: []workv1.Manifest{
-					{RawExtension: runtime.RawExtension{Object: sub}},
-				},
-			},
-		},
-	}
+func TestCanManageCOOOnTheHub_Error(t *testing.T) {
+	reader := &errorReader{err: errSimulatedAPI}
+	canManage, err := CanManageCOOOnTheHub(context.Background(), reader, logr.Discard())
+	assert.False(t, canManage)
+	assert.ErrorContains(t, err, "failed to get cluster observability operator subscription: simulated API error")
 }
 
-func TestInstallOfCOOOnSpokeIsNeeded(t *testing.T) {
-	tests := []struct {
-		name            string
-		objects         []client.Object
-		expectedInstall bool
-	}{
-		{
-			name:            "no manifestwork yet: bootstrap, defer decision",
-			objects:         nil,
-			expectedInstall: false,
+func TestCardinalityRulesConfigMapPredicate(t *testing.T) {
+	pred := CardinalityRulesConfigMapPredicate()
+
+	validCM := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      thanosRulerCustomRulesName,
+			Namespace: addoncfg.InstallNamespace,
 		},
-		{
-			name:            "manifestwork exists but no status feedback yet: defer decision",
-			objects:         []client.Object{manifestWorkWithNoFeedback("addon-deploy-0")},
-			expectedInstall: false,
+	}
+	wrongNameCM := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "other-rules",
+			Namespace: addoncfg.InstallNamespace,
 		},
-		{
-			name:            "COO already OLM-managed on spoke: don't install our own",
-			objects:         []client.Object{manifestWorkWithCRDFeedback("addon-deploy-0", ptr.To("True"))},
-			expectedInstall: false,
-		},
-		{
-			name:            "COO CRD reported but not OLM-managed: safe to install",
-			objects:         []client.Object{manifestWorkWithCRDFeedback("addon-deploy-0", ptr.To("False"))},
-			expectedInstall: true,
-		},
-		{
-			name:            "COO CRD observed but olm.managed label absent entirely (e.g. after a full COO purge): safe to install",
-			objects:         []client.Object{manifestWorkWithCRDFeedback("addon-deploy-0", nil)},
-			expectedInstall: true,
-		},
-		{
-			name:            "previously committed to install: sticky, keep installing even though CRD now looks OLM-managed",
-			objects:         []client.Object{manifestWorkWithCommittedSubscription("addon-deploy-0")},
-			expectedInstall: true,
+	}
+	wrongNamespaceCM := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      thanosRulerCustomRulesName,
+			Namespace: "other-namespace",
 		},
 	}
 
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			k8sClient := fake.NewClientBuilder().
-				WithScheme(scheme.Scheme).
-				WithObjects(tc.objects...).
-				Build()
+	assert.True(t, pred.Create(event.CreateEvent{Object: validCM}))
+	assert.False(t, pred.Create(event.CreateEvent{Object: wrongNameCM}))
+	assert.False(t, pred.Create(event.CreateEvent{Object: wrongNamespaceCM}))
 
-			result, err := InstallOfCOOOnSpokeIsNeeded(context.Background(), k8sClient, logr.Discard(), testClusterName)
-			require.NoError(t, err)
-			assert.Equal(t, tc.expectedInstall, result)
-		})
+	assert.True(t, pred.Update(event.UpdateEvent{ObjectNew: validCM}))
+	assert.False(t, pred.Update(event.UpdateEvent{ObjectNew: wrongNameCM}))
+	assert.False(t, pred.Update(event.UpdateEvent{ObjectNew: wrongNamespaceCM}))
+
+	assert.True(t, pred.Delete(event.DeleteEvent{Object: validCM}))
+	assert.False(t, pred.Delete(event.DeleteEvent{Object: wrongNameCM}))
+	assert.False(t, pred.Delete(event.DeleteEvent{Object: wrongNamespaceCM}))
+
+	assert.False(t, pred.Generic(event.GenericEvent{Object: validCM}))
+}
+
+func TestCooSubscriptionPredicate(t *testing.T) {
+	pred := CooSubscriptionPredicate()
+
+	validSub := &operatorv1alpha1.Subscription{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:       addoncfg.CooSubscriptionName,
+			Namespace:  addoncfg.CooSubscriptionNamespace,
+			Generation: 1,
+			Labels:     map[string]string{addoncfg.ReleaseLabelKey: addoncfg.Name},
+		},
 	}
+	wrongNameSub := &operatorv1alpha1.Subscription{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:       "other-operator",
+			Namespace:  addoncfg.CooSubscriptionNamespace,
+			Generation: 1,
+		},
+	}
+	otherNamespaceSub := &operatorv1alpha1.Subscription{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:       addoncfg.CooSubscriptionName,
+			Namespace:  "openshift-operators",
+			Generation: 1,
+		},
+	}
+	packageMatchSub := &operatorv1alpha1.Subscription{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:       "custom-coo",
+			Namespace:  "openshift-operators",
+			Generation: 1,
+		},
+		Spec: &operatorv1alpha1.SubscriptionSpec{
+			Package: addoncfg.CooSubscriptionName,
+		},
+	}
+
+	assert.True(t, pred.Create(event.CreateEvent{Object: validSub}))
+	assert.False(t, pred.Create(event.CreateEvent{Object: wrongNameSub}))
+	assert.True(t, pred.Create(event.CreateEvent{Object: otherNamespaceSub}))
+	assert.True(t, pred.Create(event.CreateEvent{Object: packageMatchSub}))
+
+	assert.True(t, pred.Delete(event.DeleteEvent{Object: validSub}))
+	assert.False(t, pred.Delete(event.DeleteEvent{Object: wrongNameSub}))
+	assert.True(t, pred.Delete(event.DeleteEvent{Object: otherNamespaceSub}))
+	assert.True(t, pred.Delete(event.DeleteEvent{Object: packageMatchSub}))
+
+	// Status-only update (generation and labels unchanged) should be ignored
+	statusUpdateSub := validSub.DeepCopy()
+	assert.False(t, pred.Update(event.UpdateEvent{ObjectOld: validSub, ObjectNew: statusUpdateSub}))
+
+	// Spec update (generation bumped) should trigger reconciliation
+	specUpdateSub := validSub.DeepCopy()
+	specUpdateSub.SetGeneration(2)
+	assert.True(t, pred.Update(event.UpdateEvent{ObjectOld: validSub, ObjectNew: specUpdateSub}))
+
+	// Label update should trigger reconciliation
+	labelUpdateSub := validSub.DeepCopy()
+	labelUpdateSub.SetLabels(map[string]string{addoncfg.ReleaseLabelKey: "changed"})
+	assert.True(t, pred.Update(event.UpdateEvent{ObjectOld: validSub, ObjectNew: labelUpdateSub}))
+
+	// Updates to wrong name should be ignored even if generation changed
+	wrongNameUpdate := wrongNameSub.DeepCopy()
+	wrongNameUpdate.SetGeneration(2)
+	assert.False(t, pred.Update(event.UpdateEvent{ObjectOld: wrongNameSub, ObjectNew: wrongNameUpdate}))
 }
