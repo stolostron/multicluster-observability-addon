@@ -10,12 +10,13 @@ import (
 
 func TestGetResourcesForSize(t *testing.T) {
 	tests := []struct {
-		name         string
-		containerID  string
-		instanceSize string
-		expectNil    bool
-		expectCPU    string
-		expectMem    string
+		name           string
+		containerID    string
+		instanceSize   string
+		expectNil      bool
+		expectCPU      string
+		expectMem      string
+		expectMemLimit string
 	}{
 		{
 			name:         "empty instance size defaults to default",
@@ -65,18 +66,27 @@ func TestGetResourcesForSize(t *testing.T) {
 			expectMem:    "18Gi",
 		},
 		{
-			name:         "memcached store large size",
-			containerID:  config.MemcachedStoreContainerID,
-			instanceSize: "large",
-			expectCPU:    "500m",
-			expectMem:    "2Gi",
+			name:           "memcached store large size includes memory limit",
+			containerID:    config.MemcachedStoreContainerID,
+			instanceSize:   "large",
+			expectCPU:      "500m",
+			expectMem:      "2Gi",
+			expectMemLimit: "3Gi",
 		},
 		{
-			name:         "memcached query-frontend default size",
-			containerID:  config.MemcachedQueryFrontendContainerID,
+			name:           "memcached query-frontend default size includes memory limit",
+			containerID:    config.MemcachedQueryFrontendContainerID,
+			instanceSize:   "default",
+			expectCPU:      "45m",
+			expectMem:      "128Mi",
+			expectMemLimit: "1224Mi",
+		},
+		{
+			name:         "thanos components have no memory limit",
+			containerID:  config.ThanosQueryContainerID,
 			instanceSize: "default",
-			expectCPU:    "45m",
-			expectMem:    "128Mi",
+			expectCPU:    "300m",
+			expectMem:    "1Gi",
 		},
 	}
 
@@ -90,6 +100,11 @@ func TestGetResourcesForSize(t *testing.T) {
 			assert.NotNil(t, res)
 			assert.Equal(t, resource.MustParse(tt.expectCPU), res.Requests["cpu"])
 			assert.Equal(t, resource.MustParse(tt.expectMem), res.Requests["memory"])
+			if tt.expectMemLimit != "" {
+				assert.Equal(t, resource.MustParse(tt.expectMemLimit), res.Limits["memory"])
+			} else {
+				assert.Nil(t, res.Limits)
+			}
 		})
 	}
 }
