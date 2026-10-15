@@ -11,6 +11,7 @@ type resourceSizeMap map[string]string
 var componentResources = map[string]struct {
 	cpuRequest resourceSizeMap
 	memRequest resourceSizeMap
+	memLimit   resourceSizeMap
 }{
 	config.ThanosReceiveIngesterContainerID: {
 		cpuRequest: resourceSizeMap{
@@ -151,6 +152,15 @@ var componentResources = map[string]struct {
 			"2xlarge": "4Gi",
 			"4xlarge": "6Gi",
 		},
+		memLimit: resourceSizeMap{
+			"default": "1224Mi",
+			"small":   "2Gi",
+			"medium":  "3Gi",
+			"large":   "3Gi",
+			"xlarge":  "5Gi",
+			"2xlarge": "5Gi",
+			"4xlarge": "7Gi",
+		},
 	},
 	config.MemcachedQueryFrontendContainerID: {
 		cpuRequest: resourceSizeMap{
@@ -170,6 +180,15 @@ var componentResources = map[string]struct {
 			"xlarge":  "512Mi",
 			"2xlarge": "1Gi",
 			"4xlarge": "1Gi",
+		},
+		memLimit: resourceSizeMap{
+			"default": "1224Mi",
+			"small":   "1324Mi",
+			"medium":  "1324Mi",
+			"large":   "1536Mi",
+			"xlarge":  "1536Mi",
+			"2xlarge": "2Gi",
+			"4xlarge": "2Gi",
 		},
 	},
 	config.ThanosStoreContainerID: {
@@ -213,10 +232,18 @@ func GetResourcesForSize(containerID, instanceSize string) *corev1.ResourceRequi
 		return nil
 	}
 
-	return &corev1.ResourceRequirements{
+	res := &corev1.ResourceRequirements{
 		Requests: corev1.ResourceList{
 			corev1.ResourceCPU:    resource.MustParse(cpuReq),
 			corev1.ResourceMemory: resource.MustParse(memReq),
 		},
 	}
+
+	if memLim, ok := comp.memLimit[instanceSize]; ok {
+		res.Limits = corev1.ResourceList{
+			corev1.ResourceMemory: resource.MustParse(memLim),
+		}
+	}
+
+	return res
 }
