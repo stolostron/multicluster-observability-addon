@@ -64,6 +64,20 @@ func TestGetResourcesForSize(t *testing.T) {
 			expectCPU:    "6",
 			expectMem:    "18Gi",
 		},
+		{
+			name:         "memcached store large size",
+			containerID:  config.MemcachedStoreContainerID,
+			instanceSize: "large",
+			expectCPU:    "500m",
+			expectMem:    "2Gi",
+		},
+		{
+			name:         "memcached query-frontend default size",
+			containerID:  config.MemcachedQueryFrontendContainerID,
+			instanceSize: "default",
+			expectCPU:    "45m",
+			expectMem:    "128Mi",
+		},
 	}
 
 	for _, tt := range tests {

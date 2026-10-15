@@ -132,6 +132,46 @@ var componentResources = map[string]struct {
 			"4xlarge": "18Gi",
 		},
 	},
+	config.MemcachedStoreContainerID: {
+		cpuRequest: resourceSizeMap{
+			"default": "45m",
+			"small":   "250m",
+			"medium":  "250m",
+			"large":   "500m",
+			"xlarge":  "1",
+			"2xlarge": "1",
+			"4xlarge": "2",
+		},
+		memRequest: resourceSizeMap{
+			"default": "128Mi",
+			"small":   "1Gi",
+			"medium":  "2Gi",
+			"large":   "2Gi",
+			"xlarge":  "4Gi",
+			"2xlarge": "4Gi",
+			"4xlarge": "6Gi",
+		},
+	},
+	config.MemcachedQueryFrontendContainerID: {
+		cpuRequest: resourceSizeMap{
+			"default": "45m",
+			"small":   "100m",
+			"medium":  "250m",
+			"large":   "500m",
+			"xlarge":  "1",
+			"2xlarge": "1",
+			"4xlarge": "1500m",
+		},
+		memRequest: resourceSizeMap{
+			"default": "128Mi",
+			"small":   "256Mi",
+			"medium":  "256Mi",
+			"large":   "512Mi",
+			"xlarge":  "512Mi",
+			"2xlarge": "1Gi",
+			"4xlarge": "1Gi",
+		},
+	},
 	config.ThanosStoreContainerID: {
 		cpuRequest: resourceSizeMap{
 			"default": "100m",
