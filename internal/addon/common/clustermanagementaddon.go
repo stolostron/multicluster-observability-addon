@@ -18,7 +18,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 var errUnsupportedKind = errors.New("unsupported resource kind")
@@ -38,19 +37,6 @@ func NewMCOAClusterManagementAddOn() *addonv1beta1.ClusterManagementAddOn {
 			Name: addoncfg.Name,
 		},
 	}
-}
-
-// HasCMAOOwnerReference returns true when the ClusterManagementAddOn is among the owners of the object
-func HasCMAOOwnerReference(ctx context.Context, k8s client.Client, obj client.Object) (bool, error) {
-	cmao := NewMCOAClusterManagementAddOn()
-	if err := k8s.Get(ctx, client.ObjectKeyFromObject(cmao), cmao); err != nil {
-		return false, fmt.Errorf("failed to get the ClusterManagementAddOn: %w", err)
-	}
-	isOwned, err := controllerutil.HasOwnerReference(obj.GetOwnerReferences(), cmao, k8s.Scheme())
-	if err != nil {
-		return false, fmt.Errorf("failed to check owner reference: %w", err)
-	}
-	return isOwned, nil
 }
 
 // EnsureAddonConfig ensures that the provided configurations are present in the CMAO

@@ -17,6 +17,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -44,31 +45,50 @@ func TestCreateDefaultAgent(t *testing.T) {
 			Namespace: testGlobalNamespace,
 		},
 	}
+	customPlacement := addonv1beta1.PlacementStrategy{
+		PlacementRef: addonv1beta1.PlacementRef{
+			Name:      "custom",
+			Namespace: config.HubInstallNamespace,
+		},
+	}
 
 	testCases := []struct {
-		name               string
-		isUWL              bool
-		placements         []addonv1beta1.PlacementStrategy
-		initObjs           []client.Object
-		expectCreated      bool
-		expectTargetsDummy bool
+		name                    string
+		isUWL                   bool
+		placements              []addonv1beta1.PlacementStrategy
+		initObjs                []client.Object
+		expectCreatedCount      int
+		expectCreatedPlacements []string
+		expectDeletedNames      []string
+		expectPresentNames      []string
 	}{
 		{
-			name:               "creates dummy agent when no global placement",
+			name:               "does not create agent when no placement",
 			isUWL:              false,
 			placements:         []addonv1beta1.PlacementStrategy{},
-			expectCreated:      true,
-			expectTargetsDummy: true,
+			expectCreatedCount: 0,
 		},
 		{
-			name:               "creates global agent when global placement exists and no agent covers it",
-			isUWL:              false,
-			placements:         []addonv1beta1.PlacementStrategy{globalPlacement},
-			expectCreated:      true,
-			expectTargetsDummy: false,
+			name:                    "creates default agent when placement exists and no agent covers it",
+			isUWL:                   false,
+			placements:              []addonv1beta1.PlacementStrategy{globalPlacement},
+			expectCreatedCount:      1,
+			expectCreatedPlacements: []string{testGlobalNamespace + "/global"},
+			expectPresentNames:      []string{makeAgentName(config.PlatformMetricsCollectorApp, "global")},
 		},
 		{
-			name:       "creates dummy agent when global exists but another user agent already covers it",
+			name:                    "creates default agents for multiple placements when no agents cover them",
+			isUWL:                   false,
+			placements:              []addonv1beta1.PlacementStrategy{globalPlacement, customPlacement},
+			expectCreatedCount:      2,
+			expectCreatedPlacements: []string{testGlobalNamespace + "/global", config.HubInstallNamespace + "/custom"},
+			expectPresentNames: []string{
+				makeAgentName(config.PlatformMetricsCollectorApp, "global"),
+				makeAgentName(config.PlatformMetricsCollectorApp, "custom"),
+			},
+		},
+		{
+			name:       "does not create default agent when placement is already covered by a user agent",
 			isUWL:      false,
 			placements: []addonv1beta1.PlacementStrategy{globalPlacement},
 			initObjs: []client.Object{
@@ -81,17 +101,93 @@ func TestCreateDefaultAgent(t *testing.T) {
 					return a
 				}(),
 			},
-			expectCreated:      true,
-			expectTargetsDummy: true,
+			expectCreatedCount: 0,
+			expectPresentNames: []string{"user-agent"},
 		},
 		{
-			name:       "returns nil when default global agent already exists",
+			name:       "deletes existing CMAO-owned default agent when a separate user agent covers the same placement",
 			isUWL:      false,
 			placements: []addonv1beta1.PlacementStrategy{globalPlacement},
 			initObjs: []client.Object{
 				func() client.Object {
 					appName := config.PlatformMetricsCollectorApp
-					a := NewDefaultPrometheusAgent(config.HubInstallNamespace, makeAgentName(appName, "global")+"-default", false)
+					a := NewDefaultPrometheusAgent(config.HubInstallNamespace, makeAgentName(appName, "global"), false)
+					a.Annotations = map[string]string{
+						addoncfg.PlacementAnnotationKey: testGlobalNamespace + "/global",
+					}
+					a.OwnerReferences = []metav1.OwnerReference{
+						{UID: types.UID("test-cmao-uid"), Controller: ptr.To(true)},
+					}
+					return a
+				}(),
+				func() client.Object {
+					a := NewDefaultPrometheusAgent(config.HubInstallNamespace, "user-agent", false)
+					a.Labels[addoncfg.PartOfK8sLabelKey] = addoncfg.Name
+					a.Annotations = map[string]string{
+						addoncfg.PlacementAnnotationKey: testGlobalNamespace + "/global",
+					}
+					return a
+				}(),
+			},
+			expectCreatedCount: 0,
+			expectDeletedNames: []string{makeAgentName(config.PlatformMetricsCollectorApp, "global")},
+			expectPresentNames: []string{"user-agent"},
+		},
+		{
+			name:       "keeps user-modified default agent even when a separate user agent also covers the placement",
+			isUWL:      false,
+			placements: []addonv1beta1.PlacementStrategy{globalPlacement},
+			initObjs: []client.Object{
+				func() client.Object {
+					appName := config.PlatformMetricsCollectorApp
+					a := NewDefaultPrometheusAgent(config.HubInstallNamespace, makeAgentName(appName, "global"), false)
+					a.Annotations = map[string]string{
+						addoncfg.PlacementAnnotationKey: testGlobalNamespace + "/global",
+					}
+					a.OwnerReferences = []metav1.OwnerReference{
+						{UID: types.UID("test-cmao-uid"), Controller: ptr.To(true)},
+					}
+					a.ManagedFields = []metav1.ManagedFieldsEntry{
+						{
+							Manager:    addoncfg.Name,
+							Operation:  metav1.ManagedFieldsOperationApply,
+							APIVersion: cooprometheusv1alpha1.SchemeGroupVersion.String(),
+							FieldsType: "FieldsV1",
+							FieldsV1:   &metav1.FieldsV1{Raw: []byte(`{"f:metadata":{"f:annotations":{}}}`)},
+						},
+						{
+							Manager:    "kubectl-edit",
+							Operation:  metav1.ManagedFieldsOperationUpdate,
+							APIVersion: cooprometheusv1alpha1.SchemeGroupVersion.String(),
+							FieldsType: "FieldsV1",
+							FieldsV1:   &metav1.FieldsV1{Raw: []byte(`{"f:spec":{"f:replicas":{}}}`)},
+						},
+					}
+					return a
+				}(),
+				func() client.Object {
+					a := NewDefaultPrometheusAgent(config.HubInstallNamespace, "user-agent", false)
+					a.Labels[addoncfg.PartOfK8sLabelKey] = addoncfg.Name
+					a.Annotations = map[string]string{
+						addoncfg.PlacementAnnotationKey: testGlobalNamespace + "/global",
+					}
+					return a
+				}(),
+			},
+			expectCreatedCount: 0,
+			expectPresentNames: []string{
+				makeAgentName(config.PlatformMetricsCollectorApp, "global"),
+				"user-agent",
+			},
+		},
+		{
+			name:       "does not create when default agent already exists for placement",
+			isUWL:      false,
+			placements: []addonv1beta1.PlacementStrategy{globalPlacement},
+			initObjs: []client.Object{
+				func() client.Object {
+					appName := config.PlatformMetricsCollectorApp
+					a := NewDefaultPrometheusAgent(config.HubInstallNamespace, makeAgentName(appName, "global"), false)
 					a.Annotations = map[string]string{
 						addoncfg.PlacementAnnotationKey: testGlobalNamespace + "/global",
 					}
@@ -101,40 +197,146 @@ func TestCreateDefaultAgent(t *testing.T) {
 					return a
 				}(),
 			},
-			expectCreated: false,
+			expectCreatedCount: 0,
+			expectPresentNames: []string{makeAgentName(config.PlatformMetricsCollectorApp, "global")},
 		},
 		{
-			name:       "returns nil when dummy agent already exists",
-			isUWL:      false,
-			placements: []addonv1beta1.PlacementStrategy{},
+			name:               "does not create uwl agent when no placement",
+			isUWL:              true,
+			placements:         []addonv1beta1.PlacementStrategy{},
+			expectCreatedCount: 0,
+		},
+		{
+			name:                    "creates uwl agent when placement exists",
+			isUWL:                   true,
+			placements:              []addonv1beta1.PlacementStrategy{customPlacement},
+			expectCreatedCount:      1,
+			expectCreatedPlacements: []string{config.HubInstallNamespace + "/custom"},
+			expectPresentNames:      []string{makeAgentName(config.UserWorkloadMetricsCollectorApp, "custom")},
+		},
+		{
+			name:  "does not create default agent when placement already lists a PrometheusAgent in placement configs",
+			isUWL: false,
+			placements: []addonv1beta1.PlacementStrategy{
+				{
+					PlacementRef: globalPlacement.PlacementRef,
+					Configs: []addonv1beta1.AddOnConfig{
+						{
+							ConfigGroupResource: addonv1beta1.ConfigGroupResource{
+								Group:    cooprometheusv1alpha1.SchemeGroupVersion.Group,
+								Resource: cooprometheusv1alpha1.PrometheusAgentName,
+							},
+							ConfigReferent: addonv1beta1.ConfigReferent{
+								Namespace: config.HubInstallNamespace,
+								Name:      "custom-agent-in-configs",
+							},
+						},
+					},
+				},
+			},
+			initObjs: []client.Object{
+				NewDefaultPrometheusAgent(config.HubInstallNamespace, "custom-agent-in-configs", false),
+			},
+			expectCreatedCount: 0,
+			expectPresentNames: []string{"custom-agent-in-configs"},
+		},
+		{
+			name:  "deletes existing CMAO-owned default agent when placement configs list a user PrometheusAgent",
+			isUWL: false,
+			placements: []addonv1beta1.PlacementStrategy{
+				{
+					PlacementRef: globalPlacement.PlacementRef,
+					Configs: []addonv1beta1.AddOnConfig{
+						{
+							ConfigGroupResource: addonv1beta1.ConfigGroupResource{
+								Group:    cooprometheusv1alpha1.SchemeGroupVersion.Group,
+								Resource: cooprometheusv1alpha1.PrometheusAgentName,
+							},
+							ConfigReferent: addonv1beta1.ConfigReferent{
+								Namespace: config.HubInstallNamespace,
+								Name:      "user-agent-in-configs",
+							},
+						},
+					},
+				},
+			},
 			initObjs: []client.Object{
 				func() client.Object {
 					appName := config.PlatformMetricsCollectorApp
-					a := NewDefaultPrometheusAgent(config.HubInstallNamespace, makeAgentName(appName, "dummy"), false)
+					a := NewDefaultPrometheusAgent(config.HubInstallNamespace, makeAgentName(appName, "global"), false)
 					a.Annotations = map[string]string{
-						addoncfg.PlacementAnnotationKey: config.HubInstallNamespace + "/dummy",
+						addoncfg.PlacementAnnotationKey: testGlobalNamespace + "/global",
 					}
 					a.OwnerReferences = []metav1.OwnerReference{
 						{UID: types.UID("test-cmao-uid"), Controller: ptr.To(true)},
 					}
 					return a
 				}(),
+				func() client.Object {
+					return NewDefaultPrometheusAgent(config.HubInstallNamespace, "user-agent-in-configs", false)
+				}(),
 			},
-			expectCreated: false,
+			expectCreatedCount: 0,
+			expectDeletedNames: []string{makeAgentName(config.PlatformMetricsCollectorApp, "global")},
+			expectPresentNames: []string{"user-agent-in-configs"},
 		},
 		{
-			name:               "creates uwl dummy agent when no global placement",
-			isUWL:              true,
-			placements:         []addonv1beta1.PlacementStrategy{},
-			expectCreated:      true,
-			expectTargetsDummy: true,
+			name:  "creates uwl default agent when placement configs only list a platform PrometheusAgent",
+			isUWL: true,
+			placements: []addonv1beta1.PlacementStrategy{
+				{
+					PlacementRef: customPlacement.PlacementRef,
+					Configs: []addonv1beta1.AddOnConfig{
+						{
+							ConfigGroupResource: addonv1beta1.ConfigGroupResource{
+								Group:    cooprometheusv1alpha1.SchemeGroupVersion.Group,
+								Resource: cooprometheusv1alpha1.PrometheusAgentName,
+							},
+							ConfigReferent: addonv1beta1.ConfigReferent{
+								Namespace: config.HubInstallNamespace,
+								Name:      "platform-agent",
+							},
+						},
+					},
+				},
+			},
+			initObjs: []client.Object{
+				func() client.Object {
+					a := NewDefaultPrometheusAgent(config.HubInstallNamespace, "platform-agent", false)
+					a.Labels[addoncfg.PartOfK8sLabelKey] = addoncfg.Name
+					return a
+				}(),
+			},
+			expectCreatedCount:      1,
+			expectCreatedPlacements: []string{config.HubInstallNamespace + "/custom"},
+			expectPresentNames: []string{
+				"platform-agent",
+				makeAgentName(config.UserWorkloadMetricsCollectorApp, "custom"),
+			},
 		},
 		{
-			name:               "creates uwl global agent when global placement exists",
-			isUWL:              true,
-			placements:         []addonv1beta1.PlacementStrategy{globalPlacement},
-			expectCreated:      true,
-			expectTargetsDummy: false,
+			name:  "recreates default agent immediately when placement configs contain a stale entry for a deleted default agent",
+			isUWL: false,
+			placements: []addonv1beta1.PlacementStrategy{
+				{
+					PlacementRef: globalPlacement.PlacementRef,
+					Configs: []addonv1beta1.AddOnConfig{
+						{
+							ConfigGroupResource: addonv1beta1.ConfigGroupResource{
+								Group:    cooprometheusv1alpha1.SchemeGroupVersion.Group,
+								Resource: cooprometheusv1alpha1.PrometheusAgentName,
+							},
+							ConfigReferent: addonv1beta1.ConfigReferent{
+								Namespace: config.HubInstallNamespace,
+								Name:      makeAgentName(config.PlatformMetricsCollectorApp, "global"),
+							},
+						},
+					},
+				},
+			},
+			expectCreatedCount:      1,
+			expectCreatedPlacements: []string{testGlobalNamespace + "/global"},
+			expectPresentNames:      []string{makeAgentName(config.PlatformMetricsCollectorApp, "global")},
 		},
 	}
 
@@ -142,38 +344,45 @@ func TestCreateDefaultAgent(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			cmao := newCMAO(tc.placements...)
 			initObjs := append(tc.initObjs, cmao)
-			fakeClient := fake.NewClientBuilder().WithScheme(newTestScheme()).WithObjects(initObjs...).Build()
+			fakeClient := fake.NewClientBuilder().WithScheme(newTestScheme()).WithReturnManagedFields().WithObjects(initObjs...).Build()
 			d := DefaultStackResources{
 				Client: fakeClient,
 				CMAO:   cmao,
 				Logger: klog.Background(),
 			}
 
-			gotAgent, err := d.CreateDefaultAgent(context.Background(), tc.isUWL)
+			gotAgents, err := d.CreateDefaultAgent(context.Background(), tc.isUWL)
 			require.NoError(t, err)
 
-			if !tc.expectCreated {
-				assert.Nil(t, gotAgent)
-				return
+			for _, deletedName := range tc.expectDeletedNames {
+				err := fakeClient.Get(context.Background(), types.NamespacedName{
+					Namespace: config.HubInstallNamespace,
+					Name:      deletedName,
+				}, &cooprometheusv1alpha1.PrometheusAgent{})
+				assert.True(t, apierrors.IsNotFound(err), "expected agent %s to be deleted, got err: %v", deletedName, err)
 			}
 
-			require.NotNil(t, gotAgent)
-			assert.True(t, controllerutil.HasControllerReference(gotAgent))
-
-			// ensure correct labels
-			if tc.isUWL {
-				assert.Equal(t, config.UserWorkloadMetricsCollectorApp, gotAgent.Labels[addoncfg.ComponentK8sLabelKey])
-			} else {
-				assert.Equal(t, config.PlatformMetricsCollectorApp, gotAgent.Labels[addoncfg.ComponentK8sLabelKey])
+			for _, presentName := range tc.expectPresentNames {
+				err := fakeClient.Get(context.Background(), types.NamespacedName{
+					Namespace: config.HubInstallNamespace,
+					Name:      presentName,
+				}, &cooprometheusv1alpha1.PrometheusAgent{})
+				require.NoError(t, err, "expected agent %s to still exist", presentName)
 			}
 
-			// ensure annotation is set
-			annotation := gotAgent.Annotations[addoncfg.PlacementAnnotationKey]
-			assert.NotEmpty(t, annotation)
-			if tc.expectTargetsDummy {
-				assert.Contains(t, annotation, "/dummy")
-			} else {
-				assert.Contains(t, annotation, "/global")
+			require.Len(t, gotAgents, tc.expectCreatedCount)
+			for i, gotAgent := range gotAgents {
+				assert.True(t, controllerutil.HasControllerReference(gotAgent))
+				assert.True(t, common.IsFullyOwnedByCMAO(gotAgent, cmao), "newly created default agent must be fully owned by CMAO")
+
+				if tc.isUWL {
+					assert.Equal(t, config.UserWorkloadMetricsCollectorApp, gotAgent.Labels[addoncfg.ComponentK8sLabelKey])
+				} else {
+					assert.Equal(t, config.PlatformMetricsCollectorApp, gotAgent.Labels[addoncfg.ComponentK8sLabelKey])
+				}
+
+				annotation := gotAgent.Annotations[addoncfg.PlacementAnnotationKey]
+				assert.Equal(t, tc.expectCreatedPlacements[i], annotation)
 			}
 		})
 	}
@@ -340,7 +549,7 @@ func TestReconcileAgentsUserDefined(t *testing.T) {
 		configs, err := d.reconcileAgents(context.Background(), false)
 		require.NoError(t, err)
 
-		// User agent targets both placements, plus dummy agent creates a config for dummy
+		// User agent targets both placements; no default agent is created since global is already covered
 		globalConfigs := 0
 		customConfigs := 0
 		for _, cfg := range configs {
@@ -377,10 +586,9 @@ func TestReconcileAgentsUserDefined(t *testing.T) {
 		configs, err := d.reconcileAgents(context.Background(), false)
 		require.NoError(t, err)
 
-		// The agent without annotation should not generate any configs
-		// Only the dummy agent (created by CreateDefaultAgent since global is covered by no one with annotation)
-		// Actually since "no-annotation-agent" doesn't target global, CreateDefaultAgent creates global-default
-		// global-default targets global → 1 config
+		// The agent without annotation should not generate any configs.
+		// Since "no-annotation-agent" doesn't target global, CreateDefaultAgent creates a default agent
+		// which targets global → 1 config.
 		for _, cfg := range configs {
 			assert.NotEqual(t, "no-annotation-agent", cfg.Config.Name,
 				"agent without annotation should not produce a config")
@@ -418,7 +626,7 @@ func TestReconcileAgentsUserDefined(t *testing.T) {
 		configs, err := d.reconcileAgents(context.Background(), false)
 		require.NoError(t, err)
 
-		// User agent targets custom-placement, CreateDefaultAgent creates global-default for global
+		// User agent targets custom-placement, CreateDefaultAgent creates a default agent for global
 		globalConfigs := 0
 		customConfigs := 0
 		for _, cfg := range configs {
@@ -491,6 +699,8 @@ func TestReconcileAgentsUserDefined(t *testing.T) {
 		err = fakeClient.Get(context.Background(), types.NamespacedName{Namespace: config.HubInstallNamespace, Name: "no-managed-by-agent"}, &foundAgent)
 		require.NoError(t, err)
 		assert.Equal(t, prometheusImage, *foundAgent.Spec.Image, "SSA should have been applied to the user agent")
+		assert.False(t, controllerutil.HasControllerReference(&foundAgent), "user agent must not acquire CMAO controller owner reference")
+		assert.False(t, common.IsFullyOwnedByCMAO(&foundAgent, cmao), "user agent must not be considered owned by CMAO")
 	})
 
 	t.Run("unrecognized agent is ignored", func(t *testing.T) {
@@ -529,18 +739,73 @@ func TestReconcileAgentsUserDefined(t *testing.T) {
 		require.NoError(t, err)
 		assert.Nil(t, foundAgent.Spec.Image, "unrecognized agent should not have image overwritten")
 
-		// CreateDefaultAgent should also not consider the unrecognized agent as covering global
-		// so a default global agent should have been created
+		// CreateDefaultAgent should also not consider the unrecognized agent as covering the placement
+		// so a default agent should have been created
 		agents := cooprometheusv1alpha1.PrometheusAgentList{}
 		err = fakeClient.List(context.Background(), &agents)
 		require.NoError(t, err)
 		defaultFound := false
 		for _, a := range agents.Items {
-			if a.Name == makeAgentName(config.PlatformMetricsCollectorApp, "global")+"-default" {
+			if a.Name == makeAgentName(config.PlatformMetricsCollectorApp, "global") {
 				defaultFound = true
 			}
 		}
-		assert.True(t, defaultFound, "default global agent should be created since unrecognized agent is ignored")
+		assert.True(t, defaultFound, "default agent should be created since unrecognized agent is ignored")
+	})
+
+	t.Run("user agent referenced in placement.Configs without part-of label is reconciled with SSA", func(t *testing.T) {
+		placementWithConfig := addonv1beta1.PlacementStrategy{
+			PlacementRef: globalPlacement.PlacementRef,
+			Configs: []addonv1beta1.AddOnConfig{
+				{
+					ConfigGroupResource: addonv1beta1.ConfigGroupResource{
+						Group:    cooprometheusv1alpha1.SchemeGroupVersion.Group,
+						Resource: cooprometheusv1alpha1.PrometheusAgentName,
+					},
+					ConfigReferent: addonv1beta1.ConfigReferent{
+						Namespace: config.HubInstallNamespace,
+						Name:      "user-agent-in-configs",
+					},
+				},
+			},
+		}
+		cmao := newCMAO(placementWithConfig)
+		opts := newAddonOptions(true, false)
+
+		userAgent := &cooprometheusv1alpha1.PrometheusAgent{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       cooprometheusv1alpha1.PrometheusAgentsKind,
+				APIVersion: cooprometheusv1alpha1.SchemeGroupVersion.String(),
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "user-agent-in-configs",
+				Namespace: config.HubInstallNamespace,
+				Labels: map[string]string{
+					addoncfg.ComponentK8sLabelKey: config.PlatformMetricsCollectorApp,
+				},
+			},
+		}
+
+		scheme := newTestScheme()
+		fakeClient := fake.NewClientBuilder().WithInterceptorFuncs(ensureGVKIsSet(scheme)).WithScheme(scheme).WithObjects(cmao, userAgent).Build()
+		d := DefaultStackResources{
+			Client:             fakeClient,
+			CMAO:               cmao,
+			AddonOptions:       opts,
+			Logger:             klog.Background(),
+			KubeRBACProxyImage: kubeRbacImage,
+			PrometheusImage:    prometheusImage,
+		}
+
+		_, err := d.reconcileAgents(context.Background(), false)
+		require.NoError(t, err)
+
+		foundAgent := cooprometheusv1alpha1.PrometheusAgent{}
+		err = fakeClient.Get(context.Background(), types.NamespacedName{Namespace: config.HubInstallNamespace, Name: "user-agent-in-configs"}, &foundAgent)
+		require.NoError(t, err)
+		require.NotNil(t, foundAgent.Spec.Image)
+		assert.Equal(t, prometheusImage, *foundAgent.Spec.Image, "SSA should have been applied to the placement.Configs-referenced user agent")
+		assert.False(t, controllerutil.HasControllerReference(&foundAgent), "user agent must not acquire CMAO controller owner reference")
 	})
 }
 
@@ -795,8 +1060,47 @@ func TestReconcile(t *testing.T) {
 			platformEnabled:    true,
 			uwlEnabled:         true,
 			initObjs:           []client.Object{platformAgent, platformSC, uwlSC},
-			expectAgentsCount:  3, // existing platform agent + dummy platform agent + default uwl agent
+			expectAgentsCount:  2, // existing platform agent + default uwl agent
 			expectConfigsCount: 4, // existing platform agent (targets global) + uwl agent + platformSC + uwlSC
+		},
+		{
+			name: "day-2 user platform agent covering global deletes default global agent and prunes its config",
+			initialPlacements: []addonv1beta1.PlacementStrategy{
+				{
+					Configs: []addonv1beta1.AddOnConfig{
+						{
+							ConfigGroupResource: addonv1beta1.ConfigGroupResource{
+								Group:    cooprometheusv1alpha1.SchemeGroupVersion.Group,
+								Resource: cooprometheusv1alpha1.PrometheusAgentName,
+							},
+							ConfigReferent: addonv1beta1.ConfigReferent{
+								Namespace: config.HubInstallNamespace,
+								Name:      makeAgentName(config.PlatformMetricsCollectorApp, "global"),
+							},
+						},
+					},
+					PlacementRef: globalPlacementRef,
+				},
+			},
+			platformEnabled: true,
+			uwlEnabled:      true,
+			initObjs: []client.Object{
+				func() client.Object {
+					a := NewDefaultPrometheusAgent(config.HubInstallNamespace, makeAgentName(config.PlatformMetricsCollectorApp, "global"), false)
+					a.Annotations = map[string]string{
+						addoncfg.PlacementAnnotationKey: testGlobalNamespace + "/global",
+					}
+					a.OwnerReferences = []metav1.OwnerReference{
+						{UID: types.UID("test-cmao-uid"), Controller: ptr.To(true)},
+					}
+					return a
+				}(),
+				platformAgent,
+				platformSC,
+				uwlSC,
+			},
+			expectAgentsCount:  2, // default platform agent deleted; user platform agent + default uwl agent remain
+			expectConfigsCount: 4, // stale default platform agent config pruned; user platform agent + uwl agent + platformSC + uwlSC
 		},
 		{
 			name: "global placement with enabled platform only",
@@ -1514,8 +1818,6 @@ func TestMigrateAgentPlacementLabelsToAnnotation(t *testing.T) {
 }
 
 func TestGeneratePlacementRefs(t *testing.T) {
-	d := DefaultStackResources{}
-
 	testCases := []struct {
 		name        string
 		annotations string
@@ -1585,7 +1887,7 @@ func TestGeneratePlacementRefs(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			refs, err := d.generatePlacementRefs(tc.annotations)
+			refs, err := generatePlacementRefs(tc.annotations)
 			if tc.expectErr {
 				assert.Error(t, err)
 				return

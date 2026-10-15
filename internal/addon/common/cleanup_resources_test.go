@@ -64,7 +64,7 @@ func TestCleanOrphanResources(t *testing.T) {
 			},
 		},
 		{
-			name: "user-defined resource (part-of label, not owned) is deleted when none of its placements exist",
+			name: "user-defined resource (part-of label, not owned) is kept when none of its placements exist",
 			cmao: &addonapiv1beta1.ClusterManagementAddOn{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: cmaoName,
@@ -89,7 +89,90 @@ func TestCleanOrphanResources(t *testing.T) {
 				},
 			},
 			expectDeleted: map[string]bool{
-				"user-agent-orphan": true, // User-defined and none of its placements exist, should be deleted
+				"user-agent-orphan": false, // User-defined resource is not owned by CMAO, should be kept
+			},
+		},
+		{
+			name: "CMAO-owned resource modified by user (non-MCOA ManagedFields) is kept when none of its placements exist",
+			cmao: &addonapiv1beta1.ClusterManagementAddOn{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: cmaoName,
+				},
+				Spec: addonapiv1beta1.ClusterManagementAddOnSpec{
+					// No placements
+				},
+			},
+			cmaoOwnedResources: []*cooprometheusv1alpha1.PrometheusAgent{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "agent-user-modified",
+						Namespace: testNamespace,
+						Annotations: map[string]string{
+							addoncfg.PlacementAnnotationKey: placementNs + "/" + placementName,
+						},
+						ManagedFields: []metav1.ManagedFieldsEntry{
+							{
+								Manager:    addoncfg.Name,
+								Operation:  metav1.ManagedFieldsOperationApply,
+								APIVersion: cooprometheusv1alpha1.SchemeGroupVersion.String(),
+								FieldsType: "FieldsV1",
+								FieldsV1:   &metav1.FieldsV1{Raw: []byte(`{"f:metadata":{"f:annotations":{}}}`)},
+							},
+							{
+								Manager:    "kubectl-edit",
+								Operation:  metav1.ManagedFieldsOperationUpdate,
+								APIVersion: cooprometheusv1alpha1.SchemeGroupVersion.String(),
+								FieldsType: "FieldsV1",
+								FieldsV1:   &metav1.FieldsV1{Raw: []byte(`{"f:spec":{"f:replicas":{}}}`)},
+							},
+						},
+					},
+				},
+			},
+			expectDeleted: map[string]bool{
+				"agent-user-modified": false, // Partially owned by user, shouldn't be deleted
+			},
+		},
+		{
+			name: "CMAO-owned resource with status subresource ManagedFields is deleted when none of its placements exist",
+			cmao: &addonapiv1beta1.ClusterManagementAddOn{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: cmaoName,
+				},
+				Spec: addonapiv1beta1.ClusterManagementAddOnSpec{
+					// No placements
+				},
+			},
+			cmaoOwnedResources: []*cooprometheusv1alpha1.PrometheusAgent{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "agent-status-managed",
+						Namespace: testNamespace,
+						Annotations: map[string]string{
+							addoncfg.PlacementAnnotationKey: placementNs + "/" + placementName,
+						},
+						ManagedFields: []metav1.ManagedFieldsEntry{
+							{
+								Manager:    addoncfg.Name,
+								Operation:  metav1.ManagedFieldsOperationApply,
+								APIVersion: cooprometheusv1alpha1.SchemeGroupVersion.String(),
+								FieldsType: "FieldsV1",
+								FieldsV1:   &metav1.FieldsV1{Raw: []byte(`{"f:metadata":{"f:annotations":{}}}`)},
+							},
+							{
+								Manager:     "obo-prometheus-operator",
+								Operation:   metav1.ManagedFieldsOperationUpdate,
+								Subresource: "status",
+								APIVersion:  cooprometheusv1alpha1.SchemeGroupVersion.String(),
+								FieldsType:  "FieldsV1",
+								FieldsV1:    &metav1.FieldsV1{Raw: []byte(`{"f:status":{}}`)},
+							},
+						},
+					},
+				},
+			},
+			expectDeleted: map[string]bool{
+				"agent-status-managed": true, // Only spec/metadata field manager is MCOA, should be deleted
 			},
 		},
 		{
@@ -343,35 +426,6 @@ func TestCleanOrphanResources(t *testing.T) {
 			},
 		},
 		{
-			name: "resource referencing the dummy sentinel is never deleted, even with no placements",
-			cmao: &addonapiv1beta1.ClusterManagementAddOn{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: cmaoName,
-				},
-				Spec: addonapiv1beta1.ClusterManagementAddOnSpec{
-					// No placements
-				},
-			},
-			cmaoOwnedResources: []*cooprometheusv1alpha1.PrometheusAgent{
-				// The "dummy" sentinel never corresponds to a real placement by design, so it must
-				// never be treated as orphaned (otherwise CreateDefaultAgent and DeleteOrphanResources
-				// would thrash: create the dummy agent, immediately delete it, repeat).
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "agent-dummy",
-						Namespace: testNamespace,
-						Annotations: map[string]string{
-							addoncfg.PlacementAnnotationKey: testNamespace + "/dummy",
-						},
-						// Will be set as owned by CMAO in the test
-					},
-				},
-			},
-			expectDeleted: map[string]bool{
-				"agent-dummy": false, // dummy is a sentinel, never orphaned
-			},
-		},
-		{
 			name: "resource with no placement-ref annotation owned by CMAO is deleted",
 			cmao: &addonapiv1beta1.ClusterManagementAddOn{
 				ObjectMeta: metav1.ObjectMeta{
@@ -411,17 +465,12 @@ func TestCleanOrphanResources(t *testing.T) {
 			// Create a fresh fake client for each test case
 			existingResources := []client.Object{tc.cmao}
 			existingResources = append(existingResources, tc.extraResources...)
-			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(existingResources...).Build()
-
-			// Set up existing resources with ownership as needed
 			for _, agent := range tc.cmaoOwnedResources {
 				err := controllerutil.SetControllerReference(tc.cmao, agent, scheme)
 				require.NoError(t, err, "Failed to set controller reference")
-
-				// Create the resource in the fake client
-				err = fakeClient.Create(context.Background(), agent)
-				require.NoError(t, err, "Failed to create resource")
+				existingResources = append(existingResources, agent)
 			}
+			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithReturnManagedFields().WithObjects(existingResources...).Build()
 
 			// Run the function under test
 			err := DeleteOrphanResources(context.Background(), klog.Background(), fakeClient, tc.cmao, &cooprometheusv1alpha1.PrometheusAgentList{})
