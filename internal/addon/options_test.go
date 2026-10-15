@@ -305,6 +305,22 @@ func TestBuildOptions(t *testing.T) {
 			},
 		},
 		{
+			name: "valid instance size",
+			addOnDeploy: &addonapiv1beta1.AddOnDeploymentConfig{
+				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+					CustomizedVariables: []addonapiv1beta1.CustomizedVariable{
+						{Name: KeyInstanceSize, Value: "medium"},
+						{Name: KeyPlatformNamespaceRightSizing, Value: "disabled"},
+						{Name: KeyPlatformVirtualizationRightSizing, Value: "disabled"},
+					},
+				},
+			},
+			expectedOpts: Options{
+				InstanceSize: "medium",
+				Platform:     PlatformOptions{Enabled: true},
+			},
+		},
+		{
 			name: "valid resource requirements",
 			addOnDeploy: &addonapiv1beta1.AddOnDeploymentConfig{
 				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
