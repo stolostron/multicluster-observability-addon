@@ -336,7 +336,11 @@ func ApplyCommonThanosFields(fields *thanosv1alpha1.CommonFields, opts addon.Opt
 		fields.Tolerations = opts.Tolerations
 	}
 
-	fields.ResourceRequirements = defaultResources(containerID)
+	if sized := GetResourcesForSize(containerID, opts.InstanceSize); sized != nil {
+		fields.ResourceRequirements = sized
+	} else {
+		fields.ResourceRequirements = defaultResources(containerID)
+	}
 	for _, resReq := range opts.ResourceReqs {
 		if resReq.ContainerID == containerID {
 			fields.ResourceRequirements = &resReq.Resources

@@ -54,6 +54,7 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1beta1.Man
 	ret := Options{
 		IsHub:                     common.IsHubCluster(managedCluster),
 		InstallNamespace:          opts.InstallNamespace,
+		InstanceSize:              opts.InstanceSize,
 		NodeSelector:              opts.NodeSelector,
 		Tolerations:               opts.Tolerations,
 		ResourceReqs:              opts.ResourceReqs,
