@@ -50,11 +50,8 @@ func (d DefaultStackResources) Reconcile(ctx context.Context) ([]common.DefaultC
 	configs := []common.DefaultConfig{}
 
 	var mcoUID types.UID
-	for _, owner := range d.CMAO.OwnerReferences {
-		if owner.Controller != nil && *owner.Controller {
-			mcoUID = owner.UID
-			break
-		}
+	if controller := metav1.GetControllerOfNoCopy(d.CMAO); controller != nil {
+		mcoUID = controller.UID
 	}
 	// Migrate existing agents from placement labels to annotations
 	if err := d.migrateAgentPlacementLabels(ctx); err != nil {
@@ -133,11 +130,12 @@ func (d DefaultStackResources) reconcileScrapeConfigs(ctx context.Context, mcoUI
 		return nil, fmt.Errorf("failed to list scrapeConfigs: %w", err)
 	}
 
+	mco := &metav1.ObjectMeta{UID: mcoUID}
 	mcoManagedScrapeConfigs := []client.Object{}
 	userDefinedScrapeConfigs := []client.Object{}
 	for _, existingSC := range scrapeConfigsList.Items {
 		// Ensures that we only filter for MCO-managed scrape configs or user-defined scrape configs that have at least one of these labels along with the required annotation for user-defined scrape configs
-		if !hasControllerUID(existingSC.OwnerReferences, mcoUID) && existingSC.Labels[addoncfg.PartOfK8sLabelKey] != addoncfg.Name {
+		if !metav1.IsControlledBy(&existingSC, mco) && existingSC.Labels[addoncfg.PartOfK8sLabelKey] != addoncfg.Name {
 			continue
 		}
 
@@ -154,7 +152,7 @@ func (d DefaultStackResources) reconcileScrapeConfigs(ctx context.Context, mcoUI
 			}
 			d.Logger.Info("updated scrapeConfig with server-side apply", "namespace", desiredSC.Namespace, "name", desiredSC.Name)
 		}
-		if hasControllerUID(existingSC.OwnerReferences, mcoUID) {
+		if metav1.IsControlledBy(&existingSC, mco) {
 			mcoManagedScrapeConfigs = append(mcoManagedScrapeConfigs, desiredSC)
 		} else {
 			userDefinedScrapeConfigs = append(userDefinedScrapeConfigs, desiredSC)
@@ -166,7 +164,7 @@ func (d DefaultStackResources) reconcileScrapeConfigs(ctx context.Context, mcoUI
 	}
 	for _, userDefinedSC := range userDefinedScrapeConfigs {
 		placementAnnotations := userDefinedSC.(*cooprometheusv1alpha1.ScrapeConfig).Annotations[addoncfg.PlacementAnnotationKey]
-		placementRefs, err := d.generatePlacementRefs(placementAnnotations)
+		placementRefs, err := generatePlacementRefs(placementAnnotations)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate placement refs: %w", err)
 		}
@@ -219,14 +217,15 @@ func (d DefaultStackResources) getPrometheusRules(ctx context.Context, mcoUID ty
 		return nil, fmt.Errorf("failed to list prometheusRules: %w", err)
 	}
 
+	mco := &metav1.ObjectMeta{UID: mcoUID}
 	mcoManagedRules := []client.Object{}
 	userDefinedRules := []client.Object{}
 	for _, rule := range promRuleList.Items {
-		if !hasControllerUID(rule.OwnerReferences, mcoUID) && rule.Labels[addoncfg.PartOfK8sLabelKey] != addoncfg.Name {
+		if !metav1.IsControlledBy(&rule, mco) && rule.Labels[addoncfg.PartOfK8sLabelKey] != addoncfg.Name {
 			continue
 		}
 
-		if hasControllerUID(rule.OwnerReferences, mcoUID) {
+		if metav1.IsControlledBy(&rule, mco) {
 			mcoManagedRules = append(mcoManagedRules, &rule)
 		} else {
 			userDefinedRules = append(userDefinedRules, &rule)
@@ -240,7 +239,7 @@ func (d DefaultStackResources) getPrometheusRules(ctx context.Context, mcoUID ty
 
 	for _, userDefinedRule := range userDefinedRules {
 		placementAnnotations := userDefinedRule.(*prometheusv1.PrometheusRule).Annotations[addoncfg.PlacementAnnotationKey]
-		placementRefs, err := d.generatePlacementRefs(placementAnnotations)
+		placementRefs, err := generatePlacementRefs(placementAnnotations)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate placement refs: %w", err)
 		}
@@ -274,7 +273,7 @@ func (d DefaultStackResources) migrateAgentPlacementLabels(ctx context.Context) 
 	for i := range promAgents.Items {
 		agent := &promAgents.Items[i]
 		if migrateAgentPlacementLabelsToAnnotation(agent) {
-			if err := d.Client.Update(ctx, agent); err != nil {
+			if err := d.Client.Update(ctx, agent, client.FieldOwner(addoncfg.Name)); err != nil {
 				return fmt.Errorf("failed to update migrated agent %s/%s: %w", agent.Namespace, agent.Name, err)
 			}
 			d.Logger.Info("migrated agent placement labels to annotation", "name", agent.Name)
@@ -335,7 +334,7 @@ func (d DefaultStackResources) reconcileAgents(ctx context.Context, isUWL bool) 
 	for i := range promAgents.Items {
 		agent := &promAgents.Items[i]
 
-		if !isRecognizedAgent(agent, d.CMAO.UID) {
+		if !isRecognizedAgent(agent, d.CMAO) {
 			continue
 		}
 
@@ -350,13 +349,17 @@ func (d DefaultStackResources) reconcileAgents(ctx context.Context, isUWL bool) 
 
 		if !equality.Semantic.DeepDerivative(promSSA.Spec, agent.Spec) ||
 			common.SSAManagedFieldsAnnotation(promSSA) != common.SSAManagedFieldsAnnotation(agent) {
-			if err := common.ServerSideApply(ctx, d.Client, promSSA, d.CMAO); err != nil {
+			var owner client.Object
+			if metav1.IsControlledBy(agent, d.CMAO) {
+				owner = d.CMAO
+			}
+			if err := common.ServerSideApply(ctx, d.Client, promSSA, owner); err != nil {
 				return nil, fmt.Errorf("failed to server-side apply for %s/%s: %w", promSSA.Namespace, promSSA.Name, err)
 			}
 		}
 
 		placementAnnotation := agent.Annotations[addoncfg.PlacementAnnotationKey]
-		placementRefs, err := d.generatePlacementRefs(placementAnnotation)
+		placementRefs, err := generatePlacementRefs(placementAnnotation)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate placement refs for agent %s: %w", agent.Name, err)
 		}
@@ -376,105 +379,76 @@ func (d DefaultStackResources) reconcileAgents(ctx context.Context, isUWL bool) 
 	return configs, nil
 }
 
-func (d DefaultStackResources) CreateDefaultAgent(ctx context.Context, isUWL bool) (*cooprometheusv1alpha1.PrometheusAgent, error) {
-	promAgents := &cooprometheusv1alpha1.PrometheusAgentList{}
-	if err := d.Client.List(ctx, promAgents, &client.ListOptions{
-		Namespace:     config.HubInstallNamespace,
-		LabelSelector: labels.SelectorFromSet(labels.Set(makeComponentLabelSelector(isUWL))),
-	}); err != nil {
+func (d DefaultStackResources) CreateDefaultAgent(ctx context.Context, isUWL bool) ([]*cooprometheusv1alpha1.PrometheusAgent, error) {
+	allPromAgents := &cooprometheusv1alpha1.PrometheusAgentList{}
+	if err := d.Client.List(ctx, allPromAgents, client.InNamespace(config.HubInstallNamespace)); err != nil {
 		return nil, fmt.Errorf("failed to list existing prometheusAgents: %w", err)
 	}
-	// Look up the "global" placement's actual namespace directly from the CMAO instead of assuming
-	// it lives in config.HubInstallNamespace: OCM's "global" Placement conventionally lives in its
-	// own namespace (e.g. open-cluster-management-global-set), separate from where MCOA installs
-	// its own resources.
-	globalNamespace, globalExists := findPlacementNamespace(d.CMAO, "global")
 
-	appName := config.PlatformMetricsCollectorApp
-	if isUWL {
-		appName = config.UserWorkloadMetricsCollectorApp
+	idx, err := newAgentIndex(d.CMAO, allPromAgents.Items, isUWL)
+	if err != nil {
+		return nil, err
 	}
-	globalReferenced := false
-	defaultGlobalAgentName := makeAgentName(appName, "global") + "-default"
 
-	for _, agent := range promAgents.Items {
-		if !isRecognizedAgent(&agent, d.CMAO.UID) {
+	var createdAgents []*cooprometheusv1alpha1.PrometheusAgent
+	for _, placement := range d.CMAO.Spec.InstallStrategy.Placements {
+		cmaoAgents := idx.cmaoOwnedAgentsForPlacement(placement.PlacementRef)
+
+		if idx.isPlacementCoveredByUser(placement.PlacementRef) {
+			if err := d.deleteShadowedAgents(ctx, cmaoAgents, placement.Name); err != nil {
+				return nil, err
+			}
 			continue
 		}
-		if agentTargetsPlacement(&agent, config.HubInstallNamespace, "dummy") {
-			return nil, nil
+
+		if len(cmaoAgents) > 0 {
+			continue
 		}
-		if globalExists && agentTargetsPlacement(&agent, globalNamespace, "global") && agent.Name == defaultGlobalAgentName {
-			return nil, nil
+
+		agent, err := d.createDefaultAgentForPlacement(ctx, idx, placement.PlacementRef, isUWL)
+		if err != nil {
+			return nil, err
 		}
-		if globalExists && agentTargetsPlacement(&agent, globalNamespace, "global") {
-			globalReferenced = true
-		}
-	}
-	agent := &cooprometheusv1alpha1.PrometheusAgent{}
-	placementRefNamespace := config.HubInstallNamespace
-	placementRefName := "dummy"
-	// If there is no global placement reference, create a dummy Prometheus Agent that points at dummy
-	if !globalExists {
-		agent = NewDefaultPrometheusAgent(config.HubInstallNamespace, makeAgentName(appName, "dummy"), isUWL)
-	} else if globalReferenced {
-		// Global placement exists and an agent already covers it, create a dummy agent
-		agent = NewDefaultPrometheusAgent(config.HubInstallNamespace, makeAgentName(appName, "dummy"), isUWL)
-	} else {
-		// Global placement exists but no agent covers it, create a default agent for global
-		agent = NewDefaultPrometheusAgent(config.HubInstallNamespace, defaultGlobalAgentName, isUWL)
-		placementRefNamespace = globalNamespace
-		placementRefName = "global"
+		createdAgents = append(createdAgents, agent)
 	}
 
+	return createdAgents, nil
+}
+
+func (d DefaultStackResources) deleteShadowedAgents(ctx context.Context, cmaoAgents []*cooprometheusv1alpha1.PrometheusAgent, placementName string) error {
+	for _, cmaoAgent := range cmaoAgents {
+		if err := d.Client.Delete(ctx, cmaoAgent); client.IgnoreNotFound(err) != nil {
+			return fmt.Errorf("failed to delete shadowed default agent %s/%s: %w", cmaoAgent.Namespace, cmaoAgent.Name, err)
+		}
+		d.Logger.Info("deleted default prometheus agent shadowed by user agent", "agentNamespace", cmaoAgent.Namespace, "agentName", cmaoAgent.Name, "placementName", placementName)
+	}
+	return nil
+}
+
+func (d DefaultStackResources) createDefaultAgentForPlacement(ctx context.Context, idx agentIndex, placement addonv1beta1.PlacementRef, isUWL bool) (*cooprometheusv1alpha1.PrometheusAgent, error) {
+	defaultAgentName := makeAgentName(idx.appName, placement.Name)
+	if stale, ok := idx.cmaoOwnedAgentsByName[defaultAgentName]; ok {
+		if err := d.Client.Delete(ctx, stale); client.IgnoreNotFound(err) != nil {
+			return nil, fmt.Errorf("failed to delete stale default agent %s/%s: %w", stale.Namespace, stale.Name, err)
+		}
+	}
+
+	agent := NewDefaultPrometheusAgent(config.HubInstallNamespace, defaultAgentName, isUWL)
 	if agent.Annotations == nil {
 		agent.Annotations = map[string]string{}
 	}
-	agent.Annotations[addoncfg.PlacementAnnotationKey] = placementRefNamespace + "/" + placementRefName
+	agent.Annotations[addoncfg.PlacementAnnotationKey] = placement.Namespace + "/" + placement.Name
 
 	if err := controllerutil.SetControllerReference(d.CMAO, agent, d.Client.Scheme()); err != nil {
-		return nil, fmt.Errorf("failed to set owner reference on default agent for placement %q: %w", placementRefName, err)
+		return nil, fmt.Errorf("failed to set owner reference on default agent for placement %q: %w", placement.Name, err)
 	}
 
-	if err := d.Client.Create(ctx, agent); err != nil {
-		return nil, fmt.Errorf("failed to create the default agent for placement %q: %w", placementRefName, err)
+	if err := d.Client.Create(ctx, agent, client.FieldOwner(addoncfg.Name)); err != nil {
+		return nil, fmt.Errorf("failed to create the default agent for placement %q: %w", placement.Name, err)
 	}
-	d.Logger.Info("created default prometheus agent for placement", "agentNamespace", agent.Namespace, "agentName", agent.Name, "placementName", placementRefName)
+	d.Logger.Info("created default prometheus agent for placement", "agentNamespace", agent.Namespace, "agentName", agent.Name, "placementName", placement.Name)
 
-	// Re-fetch the agent to populate server-side fields and, critically, TypeMeta.
-	// The 'agent' object was mutated by Create() and its TypeMeta is now empty.
-	key := client.ObjectKeyFromObject(agent)
-	createdAgent := &cooprometheusv1alpha1.PrometheusAgent{}
-	if err := d.Client.Get(ctx, key, createdAgent); err != nil {
-		return nil, fmt.Errorf("failed to re-fetch created default agent %q: %w", key, err)
-	}
-
-	return createdAgent, nil
-}
-
-// findPlacementNamespace returns the namespace of the placement with the given name, as declared
-// in the CMAO's install strategy, and whether it was found.
-func findPlacementNamespace(cmao *addonv1beta1.ClusterManagementAddOn, name string) (string, bool) {
-	for _, p := range cmao.Spec.InstallStrategy.Placements {
-		if p.Name == name {
-			return p.Namespace, true
-		}
-	}
-	return "", false
-}
-
-func agentTargetsPlacement(agent *cooprometheusv1alpha1.PrometheusAgent, namespace, name string) bool {
-	annotation := agent.Annotations[addoncfg.PlacementAnnotationKey]
-	if annotation == "" {
-		return false
-	}
-	target := namespace + "/" + name
-	for ref := range strings.SplitSeq(annotation, ",") {
-		if strings.TrimSpace(ref) == target {
-			return true
-		}
-	}
-	return false
+	return agent, nil
 }
 
 func (d DefaultStackResources) generateConfigsForAllPlacements(object []client.Object) ([]common.DefaultConfig, error) {
@@ -501,7 +475,7 @@ func (d DefaultStackResources) generateConfigsForAllPlacements(object []client.O
 	return defaultConfigs, nil
 }
 
-func (d DefaultStackResources) generatePlacementRefs(placementAnnotations string) ([]addonv1beta1.PlacementRef, error) {
+func generatePlacementRefs(placementAnnotations string) ([]addonv1beta1.PlacementRef, error) {
 	if placementAnnotations == "" {
 		return nil, nil
 	}
@@ -563,20 +537,29 @@ func applyScrapeConfigSSAInvariants(sc *cooprometheusv1alpha1.ScrapeConfig, isUW
 	}
 }
 
-func hasControllerUID(ownerRefs []metav1.OwnerReference, uid types.UID) bool {
-	for _, owner := range ownerRefs {
-		if owner.Controller != nil && *owner.Controller && owner.UID == uid {
-			return true
+// isRecognizedAgent returns true if the agent is either owned by the CMAO (default agents),
+// has the part-of label indicating it's a user-defined agent that opts into MCOA management,
+// or is explicitly referenced in any placement's Configs on the CMAO.
+func isRecognizedAgent(agent *cooprometheusv1alpha1.PrometheusAgent, cmao *addonv1beta1.ClusterManagementAddOn) bool {
+	if cmao != nil && metav1.IsControlledBy(agent, cmao) {
+		return true
+	}
+	if agent.Labels[addoncfg.PartOfK8sLabelKey] == addoncfg.Name {
+		return true
+	}
+	return isReferencedInPlacements(agent, cmao)
+}
+
+func isReferencedInPlacements(agent *cooprometheusv1alpha1.PrometheusAgent, cmao *addonv1beta1.ClusterManagementAddOn) bool {
+	if cmao == nil {
+		return false
+	}
+	for _, placement := range cmao.Spec.InstallStrategy.Placements {
+		for _, cfg := range placement.Configs {
+			if isPrometheusAgentConfig(cfg) && cfg.Name == agent.Name && cfg.Namespace == agent.Namespace {
+				return true
+			}
 		}
 	}
 	return false
-}
-
-// isRecognizedAgent returns true if the agent is either owned by the CMAO (default agents)
-// or has the part-of label indicating it's a user-defined agent that opts into MCOA management.
-func isRecognizedAgent(agent *cooprometheusv1alpha1.PrometheusAgent, cmaoUID types.UID) bool {
-	if hasControllerUID(agent.OwnerReferences, cmaoUID) {
-		return true
-	}
-	return agent.Labels[addoncfg.PartOfK8sLabelKey] == addoncfg.Name
 }

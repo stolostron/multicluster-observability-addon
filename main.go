@@ -221,8 +221,11 @@ func runControllers(ctx context.Context, kubeConfig *rest.Config) error {
 }
 
 // getCacheOptions configures the in-memory cache for sharedMgr.
-// It applies TransformStripManagedFields to all cached objects to strip
-// metadata.managedFields, significantly reducing memory consumption in large fleets.
+// It applies TransformStripManagedFields by default to strip metadata.managedFields,
+// significantly reducing memory consumption in large fleets.
+// PrometheusAgent is exempted via an identity transform because MCOA inspects
+// metadata.managedFields to determine whether an agent is exclusively owned by MCOA
+// or partially owned by a user before deleting orphaned agents.
 // It also scopes AddOnDeploymentConfig to the install namespace and
 // ClusterManagementAddOn to the MCOA instance name to prevent unbounded cache growth.
 func getCacheOptions() cache.Options {
@@ -236,6 +239,14 @@ func getCacheOptions() cache.Options {
 			},
 			&addonv1beta1.ClusterManagementAddOn{}: {
 				Field: fields.SelectorFromSet(fields.Set{"metadata.name": addoncfg.Name}),
+			},
+			&cooprometheusv1alpha1.PrometheusAgent{}: {
+				Namespaces: map[string]cache.Config{
+					addoncfg.InstallNamespace: {},
+				},
+				Transform: func(in any) (any, error) {
+					return in, nil
+				},
 			},
 		},
 	}

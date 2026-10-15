@@ -41,7 +41,6 @@ var (
 	errUnsupportedAppName          = errors.New("unsupported app name")
 	errMissingDesiredConfig        = errors.New("missing desiredConfig in managedClusterAddon.Status.ConfigReferences")
 	errMissingRemoteWriteConfig    = errors.New("missing expected remote write spec in the prometheusAgent")
-	errMissingCMAOOwnership        = errors.New("object is not owned by the ClusterManagementAddOn")
 	errMissingRouteHost            = errors.New("MCOA obs-api route has no host")
 )
 
@@ -314,14 +313,6 @@ func (o *OptionsBuilder) buildPrometheusAgent(ctx context.Context, opts *Options
 		o.Logger.Info("Warning: invalid number of configuration resources", "error", fmt.Errorf("%w: for application %s, found %d agents with labels %+v", errInvalidConfigResourcesCount, appName, len(platformAgents), labelsMatcher))
 	}
 	agent := platformAgents[0].DeepCopy()
-
-	isOwned, err := common.HasCMAOOwnerReference(ctx, o.Client, agent)
-	if err != nil {
-		return fmt.Errorf("failed to check owner reference of the Prometheus Agent %s/%s: %w", agent.Namespace, agent.Name, err)
-	}
-	if !isOwned {
-		return fmt.Errorf("%w: kind %s %s/%s", errMissingCMAOOwnership, agent.Kind, agent.Namespace, agent.Name)
-	}
 
 	// ensure the expected remote write config exists
 	remoteWriteSpecIdx := slices.IndexFunc(agent.Spec.RemoteWrite, func(e cooprometheusv1.RemoteWriteSpec) bool {
