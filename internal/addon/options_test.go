@@ -309,7 +309,7 @@ func TestBuildOptions(t *testing.T) {
 			addOnDeploy: &addonapiv1beta1.AddOnDeploymentConfig{
 				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
 					CustomizedVariables: []addonapiv1beta1.CustomizedVariable{
-						{Name: KeyInstanceSize, Value: "medium"},
+						{Name: KeyMetricsStorageInstanceSize, Value: "medium"},
 						{Name: KeyPlatformNamespaceRightSizing, Value: "disabled"},
 						{Name: KeyPlatformVirtualizationRightSizing, Value: "disabled"},
 					},
