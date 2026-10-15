@@ -827,6 +827,26 @@ func TestBuildOptions(t *testing.T) {
 				}
 			},
 		},
+		"platform collection is enabled with user-defined PrometheusAgent without CMAO owner reference": {
+			addon:           platformManagedClusterAddOn,
+			platformEnabled: true,
+			resources: func() []client.Object {
+				res := createResources()
+				for i, r := range res {
+					if pa, ok := r.(*cooprometheusv1alpha1.PrometheusAgent); ok && pa.Name == platformAgent.Name {
+						pa.OwnerReferences = nil
+						res[i] = pa
+						break
+					}
+				}
+				return res
+			},
+			expects: func(t *testing.T, opts Options, err error) {
+				require.NoError(t, err)
+				require.NotNil(t, opts.Platform.PrometheusAgent)
+				assert.Equal(t, platformAgent.Spec.LogLevel, opts.Platform.PrometheusAgent.Spec.LogLevel)
+			},
+		},
 	}
 
 	// Run the test cases

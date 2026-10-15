@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -18,10 +19,11 @@ func TestGetCacheOptions_Structure(t *testing.T) {
 
 	require.NotNil(t, opts.DefaultTransform, "DefaultTransform must be configured")
 	require.NotNil(t, opts.ByObject, "ByObject must be configured")
-	assert.Len(t, opts.ByObject, 2, "ByObject should contain exactly 2 object types")
+	assert.Len(t, opts.ByObject, 3, "ByObject should contain exactly 3 object types")
 
 	var aodcByObj *cache.ByObject
 	var cmaoByObj *cache.ByObject
+	var promAgentByObj *cache.ByObject
 
 	for obj, cfg := range opts.ByObject {
 		switch obj.(type) {
@@ -31,6 +33,9 @@ func TestGetCacheOptions_Structure(t *testing.T) {
 		case *addonv1beta1.ClusterManagementAddOn:
 			cfgCopy := cfg
 			cmaoByObj = &cfgCopy
+		case *cooprometheusv1alpha1.PrometheusAgent:
+			cfgCopy := cfg
+			promAgentByObj = &cfgCopy
 		}
 	}
 
@@ -53,6 +58,28 @@ func TestGetCacheOptions_Structure(t *testing.T) {
 		"Field selector should not match different addon names")
 	assert.Empty(t, cmaoByObj.Namespaces,
 		"ClusterManagementAddOn is cluster-scoped and must not set Namespaces")
+
+	// Verify PrometheusAgent scoping and managedFields preservation via custom Transform
+	require.NotNil(t, promAgentByObj, "ByObject must contain PrometheusAgent")
+	require.NotNil(t, promAgentByObj.Namespaces, "PrometheusAgent should be namespace-scoped")
+	assert.Contains(t, promAgentByObj.Namespaces, addoncfg.InstallNamespace,
+		"PrometheusAgent cache should be restricted to %s", addoncfg.InstallNamespace)
+	assert.Len(t, promAgentByObj.Namespaces, 1,
+		"PrometheusAgent cache should only watch a single install namespace")
+	require.NotNil(t, promAgentByObj.Transform, "PrometheusAgent must have an identity Transform to preserve managedFields")
+	agent := &cooprometheusv1alpha1.PrometheusAgent{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-agent",
+			Namespace: addoncfg.InstallNamespace,
+			ManagedFields: []metav1.ManagedFieldsEntry{
+				{Manager: addoncfg.Name, Operation: metav1.ManagedFieldsOperationApply},
+			},
+		},
+	}
+	transformedAgent, err := promAgentByObj.Transform(agent)
+	require.NoError(t, err)
+	assert.Len(t, transformedAgent.(*cooprometheusv1alpha1.PrometheusAgent).GetManagedFields(), 1,
+		"PrometheusAgent Transform must preserve ManagedFields")
 }
 
 func TestTransformStripManagedFields(t *testing.T) {
