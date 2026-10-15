@@ -68,6 +68,11 @@ const (
 	DefaultCompactDownsampleConc = int32(4)
 	ThanosCompactContainerID     = "statefulsets:mcoa:thanos-compact"
 
+	// Memcached container IDs
+	MemcachedStoreContainerID         = "deployments:memcached-store:memcached"
+	MemcachedQueryFrontendContainerID = "deployments:memcached-query-frontend:memcached"
+	MemcachedExporterContainerID      = "deployments:memcached:exporter"
+
 	// Memcached defaults
 	DefaultMemcachedImage              = "quay.io/ocm-observability/memcached:1.6.3-alpine"
 	DefaultMemcachedExporterImage      = "quay.io/prometheus/memcached-exporter:v0.9.0"

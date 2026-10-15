@@ -19,7 +19,7 @@ const (
 	memcachedExporterPort = 9150
 )
 
-func (b *ObjectBuilder) buildMemcachedObjects(images config.ImageOverrides) []runtime.Object {
+func (b *ObjectBuilder) buildMemcachedObjects(instanceSize string, images config.ImageOverrides) []runtime.Object {
 	memcachedImage := config.DefaultMemcachedImage
 	if images.Memcached != "" {
 		memcachedImage = images.Memcached
@@ -29,7 +29,7 @@ func (b *ObjectBuilder) buildMemcachedObjects(images config.ImageOverrides) []ru
 		exporterImage = images.MemcachedExporter
 	}
 
-	storeDeployment := buildMemcachedDeployment(config.MemcachedStoreName, memcachedStoreLabels(), memcachedImage, exporterImage)
+	storeDeployment := buildMemcachedDeployment(config.MemcachedStoreName, memcachedStoreLabels(), memcachedImage, exporterImage, config.MemcachedStoreContainerID, instanceSize)
 	storeService := buildMemcachedService(config.MemcachedStoreName, memcachedStoreLabels())
 	storeCacheSecret := buildCacheConfigSecret(
 		config.StoreCacheConfigSecretName,
@@ -38,7 +38,7 @@ func (b *ObjectBuilder) buildMemcachedObjects(images config.ImageOverrides) []ru
 	)
 	storeServiceMonitor := buildMemcachedServiceMonitor(config.MemcachedStoreName, memcachedStoreLabels())
 
-	qfeDeployment := buildMemcachedDeployment(config.MemcachedQueryFrontendName, memcachedQueryFrontendLabels(), memcachedImage, exporterImage)
+	qfeDeployment := buildMemcachedDeployment(config.MemcachedQueryFrontendName, memcachedQueryFrontendLabels(), memcachedImage, exporterImage, config.MemcachedQueryFrontendContainerID, instanceSize)
 	qfeService := buildMemcachedService(config.MemcachedQueryFrontendName, memcachedQueryFrontendLabels())
 	qfeCacheSecret := buildCacheConfigSecret(
 		config.QueryFECacheConfigSecretName,
@@ -53,7 +53,7 @@ func (b *ObjectBuilder) buildMemcachedObjects(images config.ImageOverrides) []ru
 	}
 }
 
-func buildMemcachedDeployment(name string, labels map[string]string, memcachedImage, exporterImage string) *appsv1.Deployment {
+func buildMemcachedDeployment(name string, labels map[string]string, memcachedImage, exporterImage, containerID, instanceSize string) *appsv1.Deployment {
 	replicas := config.DefaultMemcachedReplicas
 	memoryLimitArg := fmt.Sprintf("-m %d", config.DefaultMemcachedMemoryLimitMB)
 	connLimitArg := fmt.Sprintf("-c %d", config.DefaultMemcachedConnectionLimit)
@@ -95,15 +95,7 @@ func buildMemcachedDeployment(name string, labels map[string]string, memcachedIm
 									Protocol:      corev1.ProtocolTCP,
 								},
 							},
-							Resources: corev1.ResourceRequirements{
-								Requests: corev1.ResourceList{
-									corev1.ResourceCPU:    resource.MustParse(config.DefaultMemcachedCPURequest),
-									corev1.ResourceMemory: resource.MustParse(config.DefaultMemcachedMemRequest),
-								},
-								Limits: corev1.ResourceList{
-									corev1.ResourceMemory: resource.MustParse(config.DefaultMemcachedMemLimit),
-								},
-							},
+							Resources: memcachedResources(containerID, instanceSize),
 							SecurityContext: &corev1.SecurityContext{
 								AllowPrivilegeEscalation: boolPtr(false),
 								Capabilities: &corev1.Capabilities{
@@ -260,6 +252,21 @@ func memcachedQueryFrontendLabels() map[string]string {
 	labels["app.kubernetes.io/component"] = "query-frontend-cache"
 	labels["app.kubernetes.io/name"] = "memcached"
 	return labels
+}
+
+func memcachedResources(containerID, instanceSize string) corev1.ResourceRequirements {
+	if sized := GetResourcesForSize(containerID, instanceSize); sized != nil {
+		return *sized
+	}
+	return corev1.ResourceRequirements{
+		Requests: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse(config.DefaultMemcachedCPURequest),
+			corev1.ResourceMemory: resource.MustParse(config.DefaultMemcachedMemRequest),
+		},
+		Limits: corev1.ResourceList{
+			corev1.ResourceMemory: resource.MustParse(config.DefaultMemcachedMemLimit),
+		},
+	}
 }
 
 func boolPtr(b bool) *bool {
