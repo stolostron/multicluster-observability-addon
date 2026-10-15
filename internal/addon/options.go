@@ -34,8 +34,8 @@ const (
 	KeyUserWorkloadInstrumentation   = "userWorkloadInstrumentation"
 	KeyUserWorkloadMetricsAlerts     = "userWorkloadMetricsAlerts"
 
-	KeyPlatformMetricsUI = "platformMetricsUI"
-	KeyInstanceSize      = "instanceSize"
+	KeyPlatformMetricsUI          = "platformMetricsUI"
+	KeyMetricsStorageInstanceSize = "metricsStorageInstanceSize"
 )
 
 type CollectionKind string
@@ -300,7 +300,7 @@ func BuildOptions(addOnDeployment *addonapiv1beta1.AddOnDeploymentConfig) (Optio
 			if keyvalue.Value == string(UIPluginV1alpha1) {
 				opts.Platform.Metrics.UI.Enabled = true
 			}
-		case KeyInstanceSize:
+		case KeyMetricsStorageInstanceSize:
 			opts.InstanceSize = keyvalue.Value
 		}
 	}
