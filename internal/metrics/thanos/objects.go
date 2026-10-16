@@ -51,7 +51,7 @@ func (b *ObjectBuilder) Build(ctx context.Context, cluster *clusterv1.ManagedClu
 	query := b.buildQuery(opts)
 	ruler := b.buildRuler(opts)
 	compact := b.buildCompact(opts)
-	memcachedObjects := b.buildMemcachedObjects(images)
+	memcachedObjects := b.buildMemcachedObjects(opts.InstanceSize, images)
 
 	objects := []runtime.Object{store, receive, query, ruler, compact}
 	objects = append(objects, memcachedObjects...)
@@ -336,7 +336,11 @@ func ApplyCommonThanosFields(fields *thanosv1alpha1.CommonFields, opts addon.Opt
 		fields.Tolerations = opts.Tolerations
 	}
 
-	fields.ResourceRequirements = defaultResources(containerID)
+	if sized := GetResourcesForSize(containerID, opts.InstanceSize); sized != nil {
+		fields.ResourceRequirements = sized
+	} else {
+		fields.ResourceRequirements = defaultResources(containerID)
+	}
 	for _, resReq := range opts.ResourceReqs {
 		if resReq.ContainerID == containerID {
 			fields.ResourceRequirements = &resReq.Resources

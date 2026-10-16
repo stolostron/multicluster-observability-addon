@@ -52,21 +52,26 @@ const (
 	DefaultRulerRetention       = "2h"
 	DefaultRulerEvalInterval    = "1m"
 	DefaultRulerStorageSize     = "1Gi"
-	DefaultRulerCPURequest      = "100m"
-	DefaultRulerMemRequest      = "256Mi"
+	DefaultRulerCPURequest      = "50m"
+	DefaultRulerMemRequest      = "512Mi"
 	DefaultRulerAlertmanagerURL = "http://alertmanager.open-cluster-management-observability.svc:9093"
 	ThanosRulerContainerID      = "statefulsets:mcoa:thanos-ruler"
 
 	// Thanos Compact defaults
 	DefaultCompactStorageSize    = "10Gi"
-	DefaultCompactCPURequest     = "100m"
-	DefaultCompactMemRequest     = "512Mi"
+	DefaultCompactCPURequest     = "500m"
+	DefaultCompactMemRequest     = "1Gi"
 	DefaultCompactRetentionRaw   = "365d"
 	DefaultCompactRetention5m    = "365d"
 	DefaultCompactRetention1h    = "365d"
 	DefaultCompactConcurrency    = int32(4)
 	DefaultCompactDownsampleConc = int32(4)
 	ThanosCompactContainerID     = "statefulsets:mcoa:thanos-compact"
+
+	// Memcached container IDs
+	MemcachedStoreContainerID         = "deployments:memcached-store:memcached"
+	MemcachedQueryFrontendContainerID = "deployments:memcached-query-frontend:memcached"
+	MemcachedExporterContainerID      = "deployments:memcached:exporter"
 
 	// Memcached defaults
 	DefaultMemcachedImage              = "quay.io/ocm-observability/memcached:1.6.3-alpine"

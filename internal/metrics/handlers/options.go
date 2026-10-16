@@ -24,6 +24,7 @@ type Options struct {
 	ClusterID                 string
 	IsOpenShiftVendor         bool
 	InstallNamespace          string
+	InstanceSize              string
 	Images                    mconfig.ImageOverrides
 	IsHub                     bool
 	COOInstalled              bool

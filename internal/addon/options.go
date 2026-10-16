@@ -34,7 +34,8 @@ const (
 	KeyUserWorkloadInstrumentation   = "userWorkloadInstrumentation"
 	KeyUserWorkloadMetricsAlerts     = "userWorkloadMetricsAlerts"
 
-	KeyPlatformMetricsUI = "platformMetricsUI"
+	KeyPlatformMetricsUI          = "platformMetricsUI"
+	KeyMetricsStorageInstanceSize = "metricsStorageInstanceSize"
 )
 
 type CollectionKind string
@@ -123,6 +124,7 @@ type Options struct {
 	Platform              PlatformOptions
 	UserWorkloads         UserWorkloadOptions
 	InstallNamespace      string
+	InstanceSize          string
 	Tolerations           []corev1.Toleration
 	NodeSelector          map[string]string
 	ResourceReqs          []addonapiv1beta1.ContainerResourceRequirements
@@ -298,6 +300,8 @@ func BuildOptions(addOnDeployment *addonapiv1beta1.AddOnDeploymentConfig) (Optio
 			if keyvalue.Value == string(UIPluginV1alpha1) {
 				opts.Platform.Metrics.UI.Enabled = true
 			}
+		case KeyMetricsStorageInstanceSize:
+			opts.InstanceSize = keyvalue.Value
 		}
 	}
 
