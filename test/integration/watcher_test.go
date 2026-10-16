@@ -165,16 +165,20 @@ func TestWatcherReconciler_SecretMutationTrigger(t *testing.T) {
 
 	addonMgr.reset()
 
-	// 4. Mutate upstream secret ONCE
-	var curSecret corev1.Secret
-	require.NoError(t, testEnv.K8sClient.Get(ctx, client.ObjectKeyFromObject(upstreamSecret), &curSecret))
-	curSecret.StringData = map[string]string{
-		"updated-at": time.Now().String(),
-	}
-	require.NoError(t, testEnv.K8sClient.Update(ctx, &curSecret))
-
-	// 5. Verify that Watcher controller detects the mutation and triggers addon reconciliation for spokeCluster.
+	// 4. Mutate upstream secret and verify that Watcher controller detects the mutation
+	// and triggers addon reconciliation for spokeCluster. Retrying inside Eventually
+	// avoids racing with the asynchronous ManifestWork CreateFunc callback.
 	assert.Eventually(t, func() bool {
+		var curSecret corev1.Secret
+		if err := testEnv.K8sClient.Get(ctx, client.ObjectKeyFromObject(upstreamSecret), &curSecret); err != nil {
+			return false
+		}
+		curSecret.StringData = map[string]string{
+			"updated-at": time.Now().Format(time.RFC3339Nano),
+		}
+		if err := testEnv.K8sClient.Update(ctx, &curSecret); err != nil {
+			return false
+		}
 		for _, tr := range addonMgr.getTriggers() {
 			if tr.ClusterName == spokeCluster && tr.AddonName == addoncfg.Name {
 				return true

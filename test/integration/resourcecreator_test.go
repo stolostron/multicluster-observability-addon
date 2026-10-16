@@ -401,6 +401,14 @@ func TestResourceCreator_TerminalErrorOnMalformedAODC(t *testing.T) {
 		Spec: addonv1beta1.ClusterManagementAddOnSpec{
 			InstallStrategy: addonv1beta1.InstallStrategy{
 				Type: "Placements",
+				Placements: []addonv1beta1.PlacementStrategy{
+					{
+						PlacementRef: addonv1beta1.PlacementRef{
+							Name:      "global",
+							Namespace: addoncfg.InstallNamespace,
+						},
+					},
+				},
 			},
 		},
 	}
@@ -418,6 +426,26 @@ func TestResourceCreator_TerminalErrorOnMalformedAODC(t *testing.T) {
 		err := testEnv.K8sClient.Get(ctx, promAgentKey, promAgent)
 		return err == nil
 	}, 2*time.Second, 100*time.Millisecond, "no PrometheusAgent should ever be created when configuration is invalid")
+
+	// Positive control: fix the AODC hostname and verify the PrometheusAgent is then created.
+	updatedAODC := &addonv1beta1.AddOnDeploymentConfig{}
+	require.NoError(t, testEnv.K8sClient.Get(ctx, client.ObjectKeyFromObject(aodc), updatedAODC))
+	updatedAODC.Spec.CustomizedVariables = []addonv1beta1.CustomizedVariable{
+		{
+			Name:  addon.KeyPlatformMetricsCollection,
+			Value: string(addon.PrometheusAgentV1alpha1),
+		},
+		{
+			Name:  addon.KeyMetricsHubHostname,
+			Value: "thanos.example.com",
+		},
+	}
+	require.NoError(t, testEnv.K8sClient.Update(ctx, updatedAODC))
+
+	require.Eventually(t, func() bool {
+		promAgent := &cooprometheusv1alpha1.PrometheusAgent{}
+		return testEnv.K8sClient.Get(ctx, promAgentKey, promAgent) == nil
+	}, 10*time.Second, 100*time.Millisecond, "expected PrometheusAgent to be created after fixing AODC hostname")
 }
 
 // TestResourceCreator_UserModifications_SSAFieldPreservation verifies the SSA co-ownership contract:

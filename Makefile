@@ -88,7 +88,7 @@ SETUP_ENVTEST ?= $(BIN_DIR)/setup-envtest
 $(SETUP_ENVTEST): prepare-bin
 	@if [ ! -f $(SETUP_ENVTEST) ]; then \
 		echo "Installing setup-envtest to $(BIN_DIR)..."; \
-		GOBIN=$(BIN_DIR) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest; \
+		GOBIN=$(BIN_DIR) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@release-0.23; \
 	fi
 
 .PHONY: envtest-bins
