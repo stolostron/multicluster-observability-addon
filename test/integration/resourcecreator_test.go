@@ -30,7 +30,7 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 )
 
-const defaultAgentName = "mcoa-default-platform-metrics-collector-global-default"
+const defaultAgentName = "mcoa-default-platform-metrics-collector-global"
 
 func setupTestNamespace(ctx context.Context, t *testing.T, k8sClient client.Client, name string) {
 	t.Helper()
@@ -49,6 +49,7 @@ func startResourceCreatorManager(ctx context.Context, t *testing.T, testEnv *Tes
 	disableNameValidation := true
 	mgr, err := ctrl.NewManager(testEnv.Cfg, ctrl.Options{
 		Scheme: testEnv.Scheme,
+		Cache:  addoncfg.GetCacheOptions(),
 		Metrics: metricsserver.Options{
 			BindAddress: "0",
 		},
@@ -711,8 +712,13 @@ func TestResourceCreator_UserDefinedScrapeConfig_SSAAndPlacementPropagation(t *t
 }
 
 // TestResourceCreator_MultiPlacementOrphanGarbageCollection verifies placement-based lifecycle and garbage collection:
-// removing a placement cascades deletion to single-placement orphans, retains multi-placement agents with surviving
-// references, ignores unmanaged CRs, and achieves steady-state quiescence without resurrection loops.
+//   - per-placement default PrometheusAgents are provisioned for every uncovered placement;
+//   - adding a user-defined agent shadows and deletes the untouched CMAO-owned default agent for that placement,
+//     while applying SSA invariants to the user-defined agent without adding a CMAO OwnerReference;
+//   - user-modified default agents (tracked via real kube-apiserver metadata.managedFields) are preserved both
+//     when shadowed by another user agent and when their placement is removed from CMAO;
+//   - removing a placement from CMAO garbage-collects untouched CMAO-owned default agents while preserving
+//     user-defined, user-modified, and unmanaged CRs, achieving steady-state quiescence without resurrection loops.
 func TestResourceCreator_MultiPlacementOrphanGarbageCollection(t *testing.T) {
 	testEnv := SetupTestEnv(t)
 	ctx := t.Context()
@@ -720,7 +726,7 @@ func TestResourceCreator_MultiPlacementOrphanGarbageCollection(t *testing.T) {
 	setupTestNamespace(ctx, t, testEnv.K8sClient, addoncfg.InstallNamespace)
 	startResourceCreatorManager(ctx, t, testEnv)
 
-	// 1. Initial provisioning via AODC and CMAO with three placements: "global", "regional", and "edge"
+	// 1. Initial provisioning via AODC and CMAO with four placements: "global", "regional", "edge", and "canary"
 	aodc := &addonv1beta1.AddOnDeploymentConfig{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      addoncfg.Name,
@@ -767,24 +773,58 @@ func TestResourceCreator_MultiPlacementOrphanGarbageCollection(t *testing.T) {
 							Namespace: addoncfg.InstallNamespace,
 						},
 					},
+					{
+						PlacementRef: addonv1beta1.PlacementRef{
+							Name:      "canary",
+							Namespace: addoncfg.InstallNamespace,
+						},
+					},
 				},
 			},
 		},
 	}
 	require.NoError(t, testEnv.K8sClient.Create(ctx, cmao))
 
-	// Wait for default global PrometheusAgent to be created
-	defaultAgentKey := types.NamespacedName{
+	defaultGlobalKey := types.NamespacedName{
 		Name:      defaultAgentName,
 		Namespace: addoncfg.InstallNamespace,
 	}
-	require.Eventually(t, func() bool {
-		return testEnv.K8sClient.Get(ctx, defaultAgentKey, &cooprometheusv1alpha1.PrometheusAgent{}) == nil
-	}, 10*time.Second, 100*time.Millisecond, "expected default global PrometheusAgent to be created")
+	defaultRegionalKey := types.NamespacedName{
+		Name:      "mcoa-default-platform-metrics-collector-regional",
+		Namespace: addoncfg.InstallNamespace,
+	}
+	defaultEdgeKey := types.NamespacedName{
+		Name:      "mcoa-default-platform-metrics-collector-edge",
+		Namespace: addoncfg.InstallNamespace,
+	}
+	defaultCanaryKey := types.NamespacedName{
+		Name:      "mcoa-default-platform-metrics-collector-canary",
+		Namespace: addoncfg.InstallNamespace,
+	}
 
-	// 2. Deploy user-defined and unmanaged PrometheusAgents:
-	//    - regionalAgent: MCOA-managed, single placement targeting "regional"
-	//    - multiAgent: MCOA-managed, multi-placement targeting "regional" AND "edge"
+	// Wait for all four per-placement default PrometheusAgents to be created and reconciled with CMAO ownership
+	for _, key := range []types.NamespacedName{defaultGlobalKey, defaultRegionalKey, defaultEdgeKey, defaultCanaryKey} {
+		require.Eventually(t, func() bool {
+			agent := &cooprometheusv1alpha1.PrometheusAgent{}
+			if err := testEnv.K8sClient.Get(ctx, key, agent); err != nil {
+				return false
+			}
+			return metav1.IsControlledBy(agent, cmao) &&
+				agent.Spec.ServiceAccountName == mconfig.PlatformMetricsCollectorApp
+		}, 10*time.Second, 100*time.Millisecond, "expected default PrometheusAgent %s to be created and reconciled", key.Name)
+	}
+
+	// 2. User customizes the "edge" default PrometheusAgent directly.
+	//    The kube-apiserver records the test client's field manager in metadata.managedFields alongside MCOA,
+	//    marking mcoa-default-platform-metrics-collector-edge as partially user-owned (!IsFullyOwnedByCMAO).
+	edgeDefaultAgent := &cooprometheusv1alpha1.PrometheusAgent{}
+	require.NoError(t, testEnv.K8sClient.Get(ctx, defaultEdgeKey, edgeDefaultAgent))
+	edgeDefaultAgent.Spec.LogLevel = "debug"
+	require.NoError(t, testEnv.K8sClient.Update(ctx, edgeDefaultAgent))
+
+	// 3. Deploy user-defined and unmanaged PrometheusAgents:
+	//    - regionalAgent: MCOA-managed user agent, single placement targeting "regional"
+	//    - multiAgent: MCOA-managed user agent, multi-placement targeting "regional" AND "edge"
 	//    - unmanagedAgent: third-party unmanaged agent targeting "regional" without MCOA part-of label
 	regionalAgentName := "user-regional-collector"
 	regionalAgent := &cooprometheusv1alpha1.PrometheusAgent{
@@ -848,7 +888,30 @@ func TestResourceCreator_MultiPlacementOrphanGarbageCollection(t *testing.T) {
 	}
 	require.NoError(t, testEnv.K8sClient.Create(ctx, unmanagedAgent))
 
-	// 3. Verify that the manager reconciles both managed agents into the CMAO placement configs
+	// 4. Verify shadowing behavior and CMAO placement config reconciliation:
+	//    - Untouched defaultRegionalKey is shadowed by user-regional-collector and deleted by deleteShadowedAgents.
+	//    - User-modified defaultEdgeKey is preserved despite user-multi-collector also targeting "edge".
+	//    - User-defined regionalAgent and multiAgent receive SSA invariants WITHOUT acquiring a CMAO OwnerReference.
+	require.Eventually(t, func() bool {
+		err := testEnv.K8sClient.Get(ctx, defaultRegionalKey, &cooprometheusv1alpha1.PrometheusAgent{})
+		return apierrors.IsNotFound(err)
+	}, 10*time.Second, 100*time.Millisecond, "expected untouched regional default agent to be deleted when shadowed by user agent")
+
+	regionalKey := types.NamespacedName{Name: regionalAgentName, Namespace: addoncfg.InstallNamespace}
+	multiKey := types.NamespacedName{Name: multiAgentName, Namespace: addoncfg.InstallNamespace}
+	unmanagedKey := types.NamespacedName{Name: unmanagedAgentName, Namespace: addoncfg.InstallNamespace}
+
+	for _, userKey := range []types.NamespacedName{regionalKey, multiKey} {
+		require.Eventually(t, func() bool {
+			agent := &cooprometheusv1alpha1.PrometheusAgent{}
+			if err := testEnv.K8sClient.Get(ctx, userKey, agent); err != nil {
+				return false
+			}
+			return agent.Spec.ServiceAccountName == mconfig.PlatformMetricsCollectorApp &&
+				len(agent.OwnerReferences) == 0
+		}, 10*time.Second, 100*time.Millisecond, "expected user-defined agent %s to be reconciled via SSA without CMAO OwnerReference", userKey.Name)
+	}
+
 	regionalAgentConfig := addonv1beta1.AddOnConfig{
 		ConfigGroupResource: addonv1beta1.ConfigGroupResource{
 			Group:    cooprometheusv1alpha1.SchemeGroupVersion.Group,
@@ -869,6 +932,26 @@ func TestResourceCreator_MultiPlacementOrphanGarbageCollection(t *testing.T) {
 			Name:      multiAgentName,
 		},
 	}
+	defaultRegionalConfig := addonv1beta1.AddOnConfig{
+		ConfigGroupResource: addonv1beta1.ConfigGroupResource{
+			Group:    cooprometheusv1alpha1.SchemeGroupVersion.Group,
+			Resource: cooprometheusv1alpha1.PrometheusAgentName,
+		},
+		ConfigReferent: addonv1beta1.ConfigReferent{
+			Namespace: addoncfg.InstallNamespace,
+			Name:      defaultRegionalKey.Name,
+		},
+	}
+	defaultEdgeConfig := addonv1beta1.AddOnConfig{
+		ConfigGroupResource: addonv1beta1.ConfigGroupResource{
+			Group:    cooprometheusv1alpha1.SchemeGroupVersion.Group,
+			Resource: cooprometheusv1alpha1.PrometheusAgentName,
+		},
+		ConfigReferent: addonv1beta1.ConfigReferent{
+			Namespace: addoncfg.InstallNamespace,
+			Name:      defaultEdgeKey.Name,
+		},
+	}
 
 	cmaoKey := types.NamespacedName{Name: addoncfg.Name}
 	currentCMAO := &addonv1beta1.ClusterManagementAddOn{}
@@ -876,82 +959,89 @@ func TestResourceCreator_MultiPlacementOrphanGarbageCollection(t *testing.T) {
 		if err := testEnv.K8sClient.Get(ctx, cmaoKey, currentCMAO); err != nil {
 			return false
 		}
-		var regionalHasBoth, edgeHasMulti bool
+		var regionalUpdated, edgeHasBoth bool
 		for _, p := range currentCMAO.Spec.InstallStrategy.Placements {
 			if p.Name == "regional" {
-				if slices.Contains(p.Configs, regionalAgentConfig) && slices.Contains(p.Configs, multiAgentConfig) {
-					regionalHasBoth = true
+				if slices.Contains(p.Configs, regionalAgentConfig) &&
+					slices.Contains(p.Configs, multiAgentConfig) &&
+					!slices.Contains(p.Configs, defaultRegionalConfig) {
+					regionalUpdated = true
 				}
 			}
 			if p.Name == "edge" {
-				if slices.Contains(p.Configs, multiAgentConfig) {
-					edgeHasMulti = true
+				if slices.Contains(p.Configs, defaultEdgeConfig) && slices.Contains(p.Configs, multiAgentConfig) {
+					edgeHasBoth = true
 				}
 			}
 		}
-		return regionalHasBoth && edgeHasMulti
-	}, 10*time.Second, 100*time.Millisecond, "expected CMAO placement configs to include user-defined regional and multi-placement agents")
+		return regionalUpdated && edgeHasBoth
+	}, 10*time.Second, 100*time.Millisecond, "expected CMAO placement configs to reflect shadowed regional deletion and preserved user-modified edge default agent")
 
-	// 4. Mutation 1: Remove "regional" placement from CMAO.
+	// 5. Mutation 1: Remove "canary" and "regional" placements from CMAO (leaving "global" and "edge").
 	//    Expected Garbage Collection cascade:
-	//    - regionalAgent: only targeted "regional" -> must be deleted by DeleteOrphanResources.
-	//    - multiAgent: targeted "regional" AND "edge", "edge" remains -> must be preserved.
-	//    - unmanagedAgent: targeted "regional", but unmanaged -> must be preserved.
-	//    - defaultAgent: targets "global" -> must be preserved.
+	//    - defaultCanaryKey: untouched CMAO-owned default agent targeting "canary" -> must be deleted by DeleteOrphanResources.
+	//    - regionalAgent: user-defined agent targeting "regional" -> must be preserved (not owned by CMAO).
+	//    - multiAgent: user-defined agent targeting "regional,edge" -> must be preserved and kept in "edge" configs.
+	//    - unmanagedAgent: unmanaged -> must be preserved.
+	//    - defaultEdgeKey & defaultGlobalKey: placements still active -> must be preserved.
 	require.Eventually(t, func() bool {
 		if err := testEnv.K8sClient.Get(ctx, cmaoKey, currentCMAO); err != nil {
 			return false
 		}
 		filtered := make([]addonv1beta1.PlacementStrategy, 0, len(currentCMAO.Spec.InstallStrategy.Placements))
 		for _, p := range currentCMAO.Spec.InstallStrategy.Placements {
-			if p.Name != "regional" {
+			if p.Name != "canary" && p.Name != "regional" {
 				filtered = append(filtered, p)
 			}
 		}
 		currentCMAO.Spec.InstallStrategy.Placements = filtered
 		return testEnv.K8sClient.Update(ctx, currentCMAO) == nil
-	}, 10*time.Second, 100*time.Millisecond, "failed to update CMAO to remove regional placement")
+	}, 10*time.Second, 100*time.Millisecond, "failed to update CMAO to remove canary and regional placements")
 
-	regionalKey := types.NamespacedName{Name: regionalAgentName, Namespace: addoncfg.InstallNamespace}
-	multiKey := types.NamespacedName{Name: multiAgentName, Namespace: addoncfg.InstallNamespace}
-	unmanagedKey := types.NamespacedName{Name: unmanagedAgentName, Namespace: addoncfg.InstallNamespace}
-
-	// Assert orphaned regional agent is deleted
+	// Assert orphaned untouched canary default agent is garbage collected
 	require.Eventually(t, func() bool {
-		err := testEnv.K8sClient.Get(ctx, regionalKey, &cooprometheusv1alpha1.PrometheusAgent{})
+		err := testEnv.K8sClient.Get(ctx, defaultCanaryKey, &cooprometheusv1alpha1.PrometheusAgent{})
 		return apierrors.IsNotFound(err)
-	}, 10*time.Second, 100*time.Millisecond, "expected orphaned regional agent to be garbage collected")
+	}, 10*time.Second, 100*time.Millisecond, "expected orphaned untouched canary default agent to be garbage collected")
 
-	// Assert multiAgent is preserved because edge placement still exists
+	// Assert user-defined regionalAgent is preserved despite its placement being removed
+	require.NoError(t, testEnv.K8sClient.Get(ctx, regionalKey, &cooprometheusv1alpha1.PrometheusAgent{}),
+		"expected user-defined regional agent to be preserved when placement is removed")
+
+	// Assert multiAgent is preserved
 	require.NoError(t, testEnv.K8sClient.Get(ctx, multiKey, &cooprometheusv1alpha1.PrometheusAgent{}),
-		"expected multi-placement agent to be preserved while edge placement remains")
+		"expected multi-placement user agent to be preserved")
 
 	// Assert unmanagedAgent is untouched
 	require.NoError(t, testEnv.K8sClient.Get(ctx, unmanagedKey, &cooprometheusv1alpha1.PrometheusAgent{}),
 		"expected unmanaged agent to never be touched by MCOA garbage collection")
 
-	// Assert default global agent is preserved
-	require.NoError(t, testEnv.K8sClient.Get(ctx, defaultAgentKey, &cooprometheusv1alpha1.PrometheusAgent{}),
+	// Assert default global and user-modified edge agents are preserved
+	require.NoError(t, testEnv.K8sClient.Get(ctx, defaultGlobalKey, &cooprometheusv1alpha1.PrometheusAgent{}),
 		"expected default global agent to be preserved")
+	require.NoError(t, testEnv.K8sClient.Get(ctx, defaultEdgeKey, &cooprometheusv1alpha1.PrometheusAgent{}),
+		"expected user-modified edge default agent to be preserved")
 
-	// Assert edge placement configs in CMAO retain multiAgent
+	// Assert edge placement configs in CMAO retain both defaultEdgeConfig and multiAgentConfig
 	require.Eventually(t, func() bool {
 		if err := testEnv.K8sClient.Get(ctx, cmaoKey, currentCMAO); err != nil {
 			return false
 		}
 		for _, p := range currentCMAO.Spec.InstallStrategy.Placements {
-			if p.Name == "edge" && slices.Contains(p.Configs, multiAgentConfig) {
+			if p.Name == "edge" && slices.Contains(p.Configs, multiAgentConfig) && slices.Contains(p.Configs, defaultEdgeConfig) {
 				return true
 			}
 		}
 		return false
-	}, 10*time.Second, 100*time.Millisecond, "expected edge placement configs to retain multi-placement agent")
+	}, 10*time.Second, 100*time.Millisecond, "expected edge placement configs to retain user-modified default agent and multi-placement agent")
 
-	// 5. Mutation 2: Remove "edge" placement from CMAO, leaving only "global".
+	// 6. Mutation 2: Remove "edge" placement from CMAO, leaving only "global".
 	//    Expected Garbage Collection cascade:
-	//    - multiAgent: now has no remaining active placements -> must be deleted by DeleteOrphanResources.
+	//    - defaultEdgeKey: CMAO default agent that was modified by the user (managedFields includes user manager)
+	//      -> must be preserved by DeleteOrphanResources (!IsFullyOwnedByCMAO).
+	//    - multiAgent: user-defined agent -> must be preserved.
 	//    - unmanagedAgent: still unmanaged -> must be preserved.
-	//    - defaultAgent: targets "global" -> must be preserved.
+	//    - defaultGlobalKey: targets "global" -> must be preserved.
 	require.Eventually(t, func() bool {
 		if err := testEnv.K8sClient.Get(ctx, cmaoKey, currentCMAO); err != nil {
 			return false
@@ -966,35 +1056,40 @@ func TestResourceCreator_MultiPlacementOrphanGarbageCollection(t *testing.T) {
 		return testEnv.K8sClient.Update(ctx, currentCMAO) == nil
 	}, 10*time.Second, 100*time.Millisecond, "failed to update CMAO to remove edge placement")
 
-	// Assert multiAgent is now garbage collected
-	require.Eventually(t, func() bool {
-		err := testEnv.K8sClient.Get(ctx, multiKey, &cooprometheusv1alpha1.PrometheusAgent{})
-		return apierrors.IsNotFound(err)
-	}, 10*time.Second, 100*time.Millisecond, "expected multi-placement agent to be garbage collected after edge placement removal")
-
-	// Assert unmanagedAgent remains intact
-	require.NoError(t, testEnv.K8sClient.Get(ctx, unmanagedKey, &cooprometheusv1alpha1.PrometheusAgent{}),
-		"expected unmanaged agent to remain intact after all referenced placements removed")
-
-	// Assert default global agent remains intact
-	require.NoError(t, testEnv.K8sClient.Get(ctx, defaultAgentKey, &cooprometheusv1alpha1.PrometheusAgent{}),
-		"expected default global agent to remain intact")
-
-	// Assert CMAO retains only global placement
+	// Assert CMAO retains only global placement with defaultGlobalKey config
 	require.Eventually(t, func() bool {
 		if err := testEnv.K8sClient.Get(ctx, cmaoKey, currentCMAO); err != nil {
 			return false
 		}
 		return len(currentCMAO.Spec.InstallStrategy.Placements) == 1 &&
-			currentCMAO.Spec.InstallStrategy.Placements[0].Name == "global"
-	}, 10*time.Second, 100*time.Millisecond, "expected CMAO to retain only global placement")
+			currentCMAO.Spec.InstallStrategy.Placements[0].Name == "global" &&
+			len(currentCMAO.Spec.InstallStrategy.Placements[0].Configs) == 1 &&
+			currentCMAO.Spec.InstallStrategy.Placements[0].Configs[0].Name == defaultGlobalKey.Name
+	}, 10*time.Second, 100*time.Millisecond, "expected CMAO to retain only global placement and its default config")
 
-	// 6. Assert Quiescence: Ensure no resurrection loops or churn over a steady-state observation period
+	// Assert user-modified edge default agent, user-defined agents, unmanagedAgent, and default global agent remain intact
+	require.NoError(t, testEnv.K8sClient.Get(ctx, defaultEdgeKey, edgeDefaultAgent),
+		"expected user-modified edge default agent to be preserved after edge placement removal")
+	assert.Equal(t, "debug", edgeDefaultAgent.Spec.LogLevel, "expected user customization on edge default agent to remain intact")
+	require.NoError(t, testEnv.K8sClient.Get(ctx, regionalKey, &cooprometheusv1alpha1.PrometheusAgent{}),
+		"expected user-defined regional agent to remain intact")
+	require.NoError(t, testEnv.K8sClient.Get(ctx, multiKey, &cooprometheusv1alpha1.PrometheusAgent{}),
+		"expected user-defined multi-placement agent to remain intact")
+	require.NoError(t, testEnv.K8sClient.Get(ctx, unmanagedKey, &cooprometheusv1alpha1.PrometheusAgent{}),
+		"expected unmanaged agent to remain intact")
+	require.NoError(t, testEnv.K8sClient.Get(ctx, defaultGlobalKey, &cooprometheusv1alpha1.PrometheusAgent{}),
+		"expected default global agent to remain intact")
+
+	// 7. Assert Quiescence: Ensure no resurrection loops or churn over a steady-state observation period
 	require.Never(t, func() bool {
-		recreatedRegional := testEnv.K8sClient.Get(ctx, regionalKey, &cooprometheusv1alpha1.PrometheusAgent{}) == nil
-		recreatedMulti := testEnv.K8sClient.Get(ctx, multiKey, &cooprometheusv1alpha1.PrometheusAgent{}) == nil
+		recreatedRegionalDefault := testEnv.K8sClient.Get(ctx, defaultRegionalKey, &cooprometheusv1alpha1.PrometheusAgent{}) == nil
+		recreatedCanaryDefault := testEnv.K8sClient.Get(ctx, defaultCanaryKey, &cooprometheusv1alpha1.PrometheusAgent{}) == nil
+		deletedEdgeModified := apierrors.IsNotFound(testEnv.K8sClient.Get(ctx, defaultEdgeKey, &cooprometheusv1alpha1.PrometheusAgent{}))
+		deletedUserRegional := apierrors.IsNotFound(testEnv.K8sClient.Get(ctx, regionalKey, &cooprometheusv1alpha1.PrometheusAgent{}))
+		deletedUserMulti := apierrors.IsNotFound(testEnv.K8sClient.Get(ctx, multiKey, &cooprometheusv1alpha1.PrometheusAgent{}))
 		deletedUnmanaged := apierrors.IsNotFound(testEnv.K8sClient.Get(ctx, unmanagedKey, &cooprometheusv1alpha1.PrometheusAgent{}))
-		deletedDefault := apierrors.IsNotFound(testEnv.K8sClient.Get(ctx, defaultAgentKey, &cooprometheusv1alpha1.PrometheusAgent{}))
-		return recreatedRegional || recreatedMulti || deletedUnmanaged || deletedDefault
-	}, 1*time.Second, 100*time.Millisecond, "expected system to achieve steady-state quiescence with no resurrection loops")
+		deletedGlobalDefault := apierrors.IsNotFound(testEnv.K8sClient.Get(ctx, defaultGlobalKey, &cooprometheusv1alpha1.PrometheusAgent{}))
+		return recreatedRegionalDefault || recreatedCanaryDefault ||
+			deletedEdgeModified || deletedUserRegional || deletedUserMulti || deletedUnmanaged || deletedGlobalDefault
+	}, 1*time.Second, 100*time.Millisecond, "expected system to achieve steady-state quiescence with no resurrection or unexpected deletion")
 }
