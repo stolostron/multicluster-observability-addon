@@ -338,6 +338,46 @@ func TestCreateDefaultAgent(t *testing.T) {
 			expectCreatedPlacements: []string{testGlobalNamespace + "/global"},
 			expectPresentNames:      []string{makeAgentName(config.PlatformMetricsCollectorApp, "global")},
 		},
+		{
+			name:  "disambiguates default agent names with namespace when two placements share a name across namespaces",
+			isUWL: false,
+			placements: []addonv1beta1.PlacementStrategy{
+				{PlacementRef: addonv1beta1.PlacementRef{Namespace: "ns-a", Name: "global"}},
+				{PlacementRef: addonv1beta1.PlacementRef{Namespace: "ns-b", Name: "global"}},
+			},
+			expectCreatedCount:      2,
+			expectCreatedPlacements: []string{"ns-a/global", "ns-b/global"},
+			expectPresentNames: []string{
+				makeAgentName(config.PlatformMetricsCollectorApp, "ns-a-global"),
+				makeAgentName(config.PlatformMetricsCollectorApp, "ns-b-global"),
+			},
+		},
+		{
+			name:  "preserves existing default agent and disambiguates newly added same-name placement in another namespace",
+			isUWL: false,
+			placements: []addonv1beta1.PlacementStrategy{
+				{PlacementRef: addonv1beta1.PlacementRef{Namespace: "ns-a", Name: "global"}},
+				{PlacementRef: addonv1beta1.PlacementRef{Namespace: "ns-b", Name: "global"}},
+			},
+			initObjs: []client.Object{
+				func() client.Object {
+					a := NewDefaultPrometheusAgent(config.HubInstallNamespace, makeAgentName(config.PlatformMetricsCollectorApp, "global"), false)
+					a.Annotations = map[string]string{
+						addoncfg.PlacementAnnotationKey: "ns-a/global",
+					}
+					a.OwnerReferences = []metav1.OwnerReference{
+						{UID: types.UID("test-cmao-uid"), Controller: ptr.To(true)},
+					}
+					return a
+				}(),
+			},
+			expectCreatedCount:      1,
+			expectCreatedPlacements: []string{"ns-b/global"},
+			expectPresentNames: []string{
+				makeAgentName(config.PlatformMetricsCollectorApp, "global"),
+				makeAgentName(config.PlatformMetricsCollectorApp, "ns-b-global"),
+			},
+		},
 	}
 
 	for _, tc := range testCases {
