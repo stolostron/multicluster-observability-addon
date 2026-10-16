@@ -132,11 +132,14 @@ func TestAgentIndex(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, config.PlatformMetricsCollectorApp, idx.appName)
-		assert.Contains(t, idx.cmaoOwnedAgentsByName, cmaoDefaultGlobal.Name)
+		assert.Contains(t, idx.staleCMAOAgentsByName, cmaoDefaultGlobal.Name)
+		assert.NotContains(t, idx.inUseAgentNames, cmaoDefaultGlobal.Name)
 		assert.Len(t, idx.cmaoOwnedAgentsForPlacement(globalRef), 1)
 		assert.False(t, idx.isPlacementCoveredByUser(globalRef))
 		assert.True(t, idx.isPlacementCoveredByUser(customRef))
-		assert.NotContains(t, idx.cmaoOwnedAgentsByName, unrelatedAgent.Name)
+		assert.NotContains(t, idx.staleCMAOAgentsByName, unrelatedAgent.Name)
+		assert.Contains(t, idx.inUseAgentNames, userModifiedDefault.Name)
+		assert.Contains(t, idx.inUseAgentNames, unrelatedAgent.Name)
 	})
 
 	t.Run("cmaoOwnedAgentsForPlacement indexes CMAO-owned agents only via placement annotation", func(t *testing.T) {
@@ -284,5 +287,34 @@ func TestAgentIndex(t *testing.T) {
 
 		_, err := newAgentIndex(newCMAOForIndex(), []cooprometheusv1alpha1.PrometheusAgent{malformedAgent}, false)
 		require.ErrorIs(t, err, errInvalidPlacementReference)
+	})
+
+	t.Run("defaultAgentName disambiguates colliding names and bounds long names to 63 chars", func(t *testing.T) {
+		nsAGlobal := addonv1beta1.PlacementRef{Namespace: "ns-a", Name: "global"}
+		nsBGlobal := addonv1beta1.PlacementRef{Namespace: "ns-b", Name: "global"}
+		longNsGlobal := addonv1beta1.PlacementRef{Namespace: "open-cluster-management-global-set", Name: "global"}
+		uniqueRef := addonv1beta1.PlacementRef{Namespace: "ns-a", Name: "regional"}
+
+		cmao := newCMAOForIndex(
+			addonv1beta1.PlacementStrategy{PlacementRef: nsAGlobal},
+			addonv1beta1.PlacementStrategy{PlacementRef: nsBGlobal},
+			addonv1beta1.PlacementStrategy{PlacementRef: longNsGlobal},
+			addonv1beta1.PlacementStrategy{PlacementRef: uniqueRef},
+		)
+
+		idx, err := newAgentIndex(cmao, nil, false)
+		require.NoError(t, err)
+
+		// Unique placement name keeps short mcoa-default-<app>-<name>
+		assert.Equal(t, "mcoa-default-platform-metrics-collector-regional", idx.defaultAgentName(uniqueRef))
+
+		// Colliding placement names with short namespaces include <namespace>-<name>
+		assert.Equal(t, "mcoa-default-platform-metrics-collector-ns-a-global", idx.defaultAgentName(nsAGlobal))
+		assert.Equal(t, "mcoa-default-platform-metrics-collector-ns-b-global", idx.defaultAgentName(nsBGlobal))
+
+		// Colliding placement name with long namespace is bounded to <= 63 chars with a deterministic hash suffix
+		longName := idx.defaultAgentName(longNsGlobal)
+		assert.LessOrEqual(t, len(longName), maxAgentNameLength)
+		assert.NotEqual(t, idx.defaultAgentName(nsAGlobal), longName)
 	})
 }
