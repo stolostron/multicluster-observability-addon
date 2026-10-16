@@ -3,9 +3,10 @@ package manifests
 import (
 	otelv1alpha1 "github.com/open-telemetry/opentelemetry-operator/apis/v1alpha1"
 	otelv1beta1 "github.com/open-telemetry/opentelemetry-operator/apis/v1beta1"
-	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	corev1 "k8s.io/api/core/v1"
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
+
+	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 )
 
 type Options struct {

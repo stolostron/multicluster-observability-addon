@@ -3,8 +3,9 @@ package manifests
 import (
 	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
 	operatorv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
-	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	corev1 "k8s.io/api/core/v1"
+
+	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 )
 
 type Options struct {

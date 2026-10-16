@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/pprof"
 	"os"
+	"time"
 
 	"github.com/ViaQ/logerr/v2/log"
 	"github.com/go-logr/logr"
@@ -29,12 +30,6 @@ import (
 	uiplugin "github.com/rhobs/observability-operator/pkg/apis/uiplugin/v1alpha1"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
-	addonctrl "github.com/stolostron/multicluster-observability-addon/internal/controllers/addon"
-	"github.com/stolostron/multicluster-observability-addon/internal/controllers/defaulthubstack"
-	"github.com/stolostron/multicluster-observability-addon/internal/controllers/resourcecreator"
-	"github.com/stolostron/multicluster-observability-addon/internal/controllers/watcher"
-	tlshelper "github.com/stolostron/multicluster-observability-addon/pkg/util"
 	thanosv1alpha1 "github.com/thanos-community/thanos-operator/api/v1alpha1"
 	crdClientSet "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -58,6 +53,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
+
+	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
+	addonctrl "github.com/stolostron/multicluster-observability-addon/internal/controllers/addon"
+	"github.com/stolostron/multicluster-observability-addon/internal/controllers/defaulthubstack"
+	"github.com/stolostron/multicluster-observability-addon/internal/controllers/resourcecreator"
+	"github.com/stolostron/multicluster-observability-addon/internal/controllers/watcher"
+	tlshelper "github.com/stolostron/multicluster-observability-addon/pkg/util"
 
 	_ "github.com/stolostron/multicluster-observability-addon/internal/addon/metrics"
 )
@@ -176,7 +178,9 @@ func runControllers(ctx context.Context, kubeConfig *rest.Config) error {
 		go func() {
 			<-ctx.Done()
 			logger.Info("shutting down pprof server")
-			if err := srv.Shutdown(context.Background()); err != nil {
+			shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+			defer cancel()
+			if err := srv.Shutdown(shutdownCtx); err != nil {
 				logger.Error(err, "failed to shutdown pprof server")
 			}
 		}()

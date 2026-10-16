@@ -3,9 +3,10 @@ package common
 import (
 	"testing"
 
-	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+
+	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 )
 
 func TestGetManagedClusterID(t *testing.T) {

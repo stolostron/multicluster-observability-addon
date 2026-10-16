@@ -7,12 +7,6 @@ import (
 	"github.com/go-logr/logr"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
-	"github.com/stolostron/multicluster-observability-addon/internal/addon"
-	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
-	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
-	rshandlers "github.com/stolostron/multicluster-observability-addon/internal/analytics/rightsizing/handlers"
-	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
-	mresources "github.com/stolostron/multicluster-observability-addon/internal/metrics/resource"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -30,6 +24,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
+	"github.com/stolostron/multicluster-observability-addon/internal/addon"
+	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
+	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
+	rshandlers "github.com/stolostron/multicluster-observability-addon/internal/analytics/rightsizing/handlers"
+	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
+	mresources "github.com/stolostron/multicluster-observability-addon/internal/metrics/resource"
 )
 
 func validateAODC(namespace, name string) bool {
@@ -102,7 +103,8 @@ type ResourceCreatorReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.11.0/pkg/reconcile
 func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	r.Log.V(2).Info("reconciliation triggered", "request", req.String())
+	log := ctrl.LoggerFrom(ctx)
+	log.V(2).Info("reconciliation triggered")
 
 	// Fetch the AddOnDeploymentConfig instance and transform it into the Options struct
 	key := client.ObjectKey{Namespace: req.Namespace, Name: req.Name}
@@ -123,7 +125,7 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 	// Reconcile metrics resources
 	objs := []common.DefaultConfig{}
-	images, err := mconfig.GetImageOverrides(ctx, r.Client, opts.Registries, r.Log)
+	images, err := mconfig.GetImageOverrides(ctx, r.Client, opts.Registries, log)
 	if err != nil && !errors.IsNotFound(err) {
 		return ctrl.Result{}, fmt.Errorf("failed to get image overrides: %w", err)
 	}
@@ -132,7 +134,7 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		Client:             r.Client,
 		CMAO:               cmao,
 		AddonOptions:       opts,
-		Logger:             r.Log,
+		Logger:             log,
 		KubeRBACProxyImage: images.KubeRBACProxy,
 		PrometheusImage:    images.Prometheus,
 	}
@@ -146,12 +148,12 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	// Reconcile right-sizing resources (hub-wide concern).
 	// ConfigMap resources are created/updated/deleted here, not per-cluster in handler.go,
 	// to avoid race conditions from concurrent Build() calls.
-	rsBuilder := &rshandlers.OptionsBuilder{Client: r.Client, Logger: r.Log.WithName("rightsizing")}
+	rsBuilder := &rshandlers.OptionsBuilder{Client: r.Client, Logger: log.WithName("rightsizing")}
 	if err := rsBuilder.ReconcileRSResources(ctx, opts); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to reconcile right-sizing resources: %w", err)
 	}
 
-	if err := common.EnsureAddonConfig(ctx, r.Log, r.Client, objs); err != nil {
+	if err := common.EnsureAddonConfig(ctx, log, r.Client, objs); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to patch default configs of the clustermanageraddon: %w", err)
 	}
 
@@ -163,7 +165,7 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	// Deletes owned PrometheusAgents whose placement-ref annotation no longer references any
 	// placement declared on the CMAO. Agents referencing multiple placements are kept as long as
 	// at least one of them still exists.
-	if err := common.DeleteOrphanResources(ctx, r.Log, r.Client, cmao, &cooprometheusv1alpha1.PrometheusAgentList{}); err != nil {
+	if err := common.DeleteOrphanResources(ctx, log, r.Client, cmao, &cooprometheusv1alpha1.PrometheusAgentList{}); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to clean orphan resources: %w", err)
 	}
 

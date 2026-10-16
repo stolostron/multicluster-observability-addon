@@ -8,13 +8,14 @@ import (
 
 	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
 	operatorv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"github.com/stolostron/multicluster-observability-addon/internal/logging/manifests"
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
-	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
