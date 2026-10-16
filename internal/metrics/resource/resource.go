@@ -426,11 +426,12 @@ func (d DefaultStackResources) deleteShadowedAgents(ctx context.Context, cmaoAge
 }
 
 func (d DefaultStackResources) createDefaultAgentForPlacement(ctx context.Context, idx agentIndex, placement addonv1beta1.PlacementRef, isUWL bool) (*cooprometheusv1alpha1.PrometheusAgent, error) {
-	defaultAgentName := makeAgentName(idx.appName, placement.Name)
-	if stale, ok := idx.cmaoOwnedAgentsByName[defaultAgentName]; ok {
+	defaultAgentName := idx.defaultAgentName(placement)
+	if stale, ok := idx.staleCMAOAgentsByName[defaultAgentName]; ok {
 		if err := d.Client.Delete(ctx, stale); client.IgnoreNotFound(err) != nil {
 			return nil, fmt.Errorf("failed to delete stale default agent %s/%s: %w", stale.Namespace, stale.Name, err)
 		}
+		delete(idx.staleCMAOAgentsByName, defaultAgentName)
 	}
 
 	agent := NewDefaultPrometheusAgent(config.HubInstallNamespace, defaultAgentName, isUWL)
@@ -446,6 +447,8 @@ func (d DefaultStackResources) createDefaultAgentForPlacement(ctx context.Contex
 	if err := d.Client.Create(ctx, agent, client.FieldOwner(addoncfg.Name)); err != nil {
 		return nil, fmt.Errorf("failed to create default PrometheusAgent %q for placement %q: %w", defaultAgentName, placement.Name, err)
 	}
+	idx.inUseAgentNames[defaultAgentName] = struct{}{}
+	idx.cmaoOwnedAgentsByPlacement[placement] = append(idx.cmaoOwnedAgentsByPlacement[placement], agent)
 	d.Logger.Info("created default prometheus agent for placement", "agentNamespace", agent.Namespace, "agentName", agent.Name, "placementName", placement.Name)
 
 	return agent, nil
