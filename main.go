@@ -39,7 +39,6 @@ import (
 	crdClientSet "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -53,7 +52,6 @@ import (
 	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 	workv1 "open-cluster-management.io/api/work/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
@@ -211,7 +209,7 @@ func runControllers(ctx context.Context, kubeConfig *rest.Config) error {
 	sharedMgr, err := ctrl.NewManager(kubeConfig, ctrl.Options{
 		Scheme: scheme,
 		Logger: logger.WithName("manager"),
-		Cache:  getCacheOptions(),
+		Cache:  addoncfg.GetCacheOptions(),
 		MapperProvider: func(c *rest.Config, hc *http.Client) (meta.RESTMapper, error) {
 			return mapper, nil
 		},
@@ -264,38 +262,6 @@ func runControllers(ctx context.Context, kubeConfig *rest.Config) error {
 	<-ctx.Done()
 
 	return nil
-}
-
-// getCacheOptions configures the in-memory cache for sharedMgr.
-// It applies TransformStripManagedFields by default to strip metadata.managedFields,
-// significantly reducing memory consumption in large fleets.
-// PrometheusAgent is exempted via an identity transform because MCOA inspects
-// metadata.managedFields to determine whether an agent is exclusively owned by MCOA
-// or partially owned by a user before deleting orphaned agents.
-// It also scopes AddOnDeploymentConfig to the install namespace and
-// ClusterManagementAddOn to the MCOA instance name to prevent unbounded cache growth.
-func getCacheOptions() cache.Options {
-	return cache.Options{
-		DefaultTransform: cache.TransformStripManagedFields(),
-		ByObject: map[client.Object]cache.ByObject{
-			&addonv1beta1.AddOnDeploymentConfig{}: {
-				Namespaces: map[string]cache.Config{
-					addoncfg.InstallNamespace: {},
-				},
-			},
-			&addonv1beta1.ClusterManagementAddOn{}: {
-				Field: fields.SelectorFromSet(fields.Set{"metadata.name": addoncfg.Name}),
-			},
-			&cooprometheusv1alpha1.PrometheusAgent{}: {
-				Namespaces: map[string]cache.Config{
-					addoncfg.InstallNamespace: {},
-				},
-				Transform: func(in any) (any, error) {
-					return in, nil
-				},
-			},
-		},
-	}
 }
 
 func setupSecurityProfileWatcher(ctx context.Context, kubeConfig *rest.Config, mgr ctrl.Manager, logger logr.Logger) error {
