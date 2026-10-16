@@ -11,6 +11,7 @@ import (
 
 	"github.com/go-logr/logr/testr"
 	ocinfrav1 "github.com/openshift/api/config/v1"
+	cooprometheusv1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1"
 	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	addon "github.com/stolostron/multicluster-observability-addon/internal/addon"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
@@ -21,6 +22,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
@@ -100,6 +102,7 @@ func startSubsystemManager(ctx context.Context, t *testing.T, testEnv *TestEnv) 
 	disableNameValidation := true
 	mgr, err := ctrl.NewManager(testEnv.Cfg, ctrl.Options{
 		Scheme: testEnv.Scheme,
+		Cache:  addoncfg.GetCacheOptions(),
 		Metrics: metricsserver.Options{
 			BindAddress: "0",
 		},
@@ -442,4 +445,73 @@ func TestSubsystem_PlatformMetricsDeploymentAndSecretRotation(t *testing.T) {
 	assert.Never(t, func() bool {
 		return addonSpy.count() > settled
 	}, 3*time.Second, 100*time.Millisecond, "expected no further triggers after convergence (runaway reconciliation)")
+
+	// 9. User-Defined PrometheusAgent Spoke Rendering:
+	// Create a user-defined PrometheusAgent (with part-of label and placement-ref annotation, but no CMAO OwnerReference).
+	// Verify that ResourceCreator deletes the shadowed default agent, reconciles the user-defined agent via SSA
+	// without adding a CMAO OwnerReference, and that the real AddonManager renders it into the spoke ManifestWork.
+	userAgentName := "user-custom-platform-agent"
+	userAgent := &cooprometheusv1alpha1.PrometheusAgent{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      userAgentName,
+			Namespace: addoncfg.InstallNamespace,
+			Labels: map[string]string{
+				addoncfg.ComponentK8sLabelKey: metricsconfig.PlatformMetricsCollectorApp,
+				addoncfg.PartOfK8sLabelKey:    addoncfg.Name,
+			},
+			Annotations: map[string]string{
+				addoncfg.PlacementAnnotationKey: fmt.Sprintf("%s/%s", addoncfg.InstallNamespace, "global"),
+			},
+		},
+		Spec: cooprometheusv1alpha1.PrometheusAgentSpec{
+			CommonPrometheusFields: cooprometheusv1.CommonPrometheusFields{
+				ScrapeInterval: "45s",
+			},
+		},
+	}
+	require.NoError(t, testEnv.K8sClient.Create(ctx, userAgent))
+
+	// Wait for ResourceCreator to delete the shadowed default agent and reconcile userAgent via SSA
+	var reconciledUserAgent cooprometheusv1alpha1.PrometheusAgent
+	require.Eventually(t, func() bool {
+		var defAgent cooprometheusv1alpha1.PrometheusAgent
+		err := testEnv.K8sClient.Get(ctx, types.NamespacedName{
+			Name:      defaultAgentName,
+			Namespace: addoncfg.InstallNamespace,
+		}, &defAgent)
+		if !apierrors.IsNotFound(err) {
+			return false
+		}
+		if err := testEnv.K8sClient.Get(ctx, client.ObjectKeyFromObject(userAgent), &reconciledUserAgent); err != nil {
+			return false
+		}
+		return len(reconciledUserAgent.Spec.RemoteWrite) > 0
+	}, 10*time.Second, 100*time.Millisecond, "expected shadowed default agent to be deleted and userAgent reconciled via SSA")
+	assert.Empty(t, reconciledUserAgent.OwnerReferences, "expected user-defined PrometheusAgent to not acquire a CMAO OwnerReference")
+
+	// Update ManagedClusterAddOn.Status.ConfigReferences to point to the user-defined PrometheusAgent
+	var curMCAddon addonv1beta1.ManagedClusterAddOn
+	require.NoError(t, testEnv.K8sClient.Get(ctx, client.ObjectKeyFromObject(mcAddon), &curMCAddon))
+	for i := range curMCAddon.Status.ConfigReferences {
+		if curMCAddon.Status.ConfigReferences[i].Resource == cooprometheusv1alpha1.PrometheusAgentName {
+			curMCAddon.Status.ConfigReferences[i].DesiredConfig.Name = userAgentName
+		}
+	}
+	require.NoError(t, testEnv.K8sClient.Status().Update(ctx, &curMCAddon))
+
+	// Verify real AddonManager renders the user-defined PrometheusAgent into the spoke ManifestWork
+	require.Eventually(t, func() bool {
+		if err := testEnv.K8sClient.Get(ctx, mwKey, &mw); err != nil {
+			return false
+		}
+		raw, found := extractManifestFromManifestWork(&mw, cooprometheusv1alpha1.PrometheusAgentsKind, metricsconfig.PlatformMetricsCollectorApp)
+		if !found {
+			return false
+		}
+		var agent cooprometheusv1alpha1.PrometheusAgent
+		if err := json.Unmarshal(raw, &agent); err != nil {
+			return false
+		}
+		return agent.Spec.ScrapeInterval == "45s" && slices.Contains(agent.Spec.Secrets, targetHubCAName)
+	}, 15*time.Second, 100*time.Millisecond, "expected real AddonManager to render user-defined PrometheusAgent (without CMAO OwnerReference) into spoke ManifestWork")
 }

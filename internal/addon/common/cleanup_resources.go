@@ -22,6 +22,10 @@ var errNotClientObjectType = errors.New("object is not a client.Object")
 // placement-ref annotation (comma-separated "namespace/name" entries, see
 // addoncfg.PlacementAnnotationKey) exist on the CMAO anymore. Resources that are user-defined or
 // partially owned by a user (as determined by IsFullyOwnedByCMAO) are left in place.
+//
+// Note: Because IsFullyOwnedByCMAO inspects metadata.managedFields, any resource type T read from
+// the controller-runtime cache must be exempted from TransformStripManagedFields in
+// addoncfg.GetCacheOptions().
 func DeleteOrphanResources[T client.ObjectList](ctx context.Context, logger logr.Logger, k8s client.Client, cmao *addonapiv1beta1.ClusterManagementAddOn, items T) error {
 	if err := k8s.List(ctx, items, client.InNamespace(addoncfg.InstallNamespace)); err != nil {
 		return fmt.Errorf("failed to list resources: %w", err)
@@ -68,6 +72,9 @@ func DeleteOrphanResources[T client.ObjectList](ctx context.Context, logger logr
 //   - it carries the user opt-in label (app.kubernetes.io/part-of: multicluster-observability-addon), or
 //   - any non-subresource entry in metadata.managedFields belongs to a manager other than MCOA
 //     (addoncfg.Name).
+//
+// Note: Callers inspecting cached objects must ensure the resource type is exempted from
+// TransformStripManagedFields in addoncfg.GetCacheOptions() so metadata.managedFields is retained.
 func IsFullyOwnedByCMAO(obj client.Object, cmao *addonapiv1beta1.ClusterManagementAddOn) bool {
 	if !hasCMAOOwnerReference(obj, cmao) {
 		return false
