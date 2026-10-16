@@ -1,0 +1,10 @@
+enabled: true
+
+# Expects json format
+lsSpec: {}
+
+# List of secrets referenced by clfSpec
+secrets:
+  - name: "secret-1"
+    # Expects json format
+    data: {}

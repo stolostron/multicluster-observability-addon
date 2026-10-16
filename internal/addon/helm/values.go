@@ -13,9 +13,9 @@ import (
 	cmanifests "github.com/stolostron/multicluster-observability-addon/internal/coo/manifests"
 	lhandlers "github.com/stolostron/multicluster-observability-addon/internal/logging/handlers"
 	lmanifests "github.com/stolostron/multicluster-observability-addon/internal/logging/manifests"
+	omanifests "github.com/stolostron/multicluster-observability-addon/internal/mcoagateway/manifests"
 	mhandlers "github.com/stolostron/multicluster-observability-addon/internal/metrics/handlers"
 	mmanifests "github.com/stolostron/multicluster-observability-addon/internal/metrics/manifests"
-	omanifests "github.com/stolostron/multicluster-observability-addon/internal/obsapi/manifests"
 	thandlers "github.com/stolostron/multicluster-observability-addon/internal/tracing/handlers"
 	tmanifests "github.com/stolostron/multicluster-observability-addon/internal/tracing/manifests"
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
@@ -37,7 +37,7 @@ type HelmChartValues struct {
 	Tracing     *tmanifests.TracingValues     `json:"tracing,omitempty"`
 	COO         *cmanifests.COOValues         `json:"coo,omitempty"`
 	RightSizing *rshandlers.RightSizingValues `json:"rightSizing,omitempty"`
-	ObsAPI      *omanifests.ObsAPIValues      `json:"obs-api,omitempty"`
+	MCOAGateway *omanifests.MCOAGatewayValues `json:"mcoa-gateway,omitempty"`
 }
 
 func GetValuesFunc(ctx context.Context, k8s client.Client, getter addonutils.AddOnDeploymentConfigGetter, logger logr.Logger) addonfactory.GetValuesFunc {
@@ -92,9 +92,9 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, getter addonutils.Add
 			return nil, fmt.Errorf("failed to get right-sizing values: %w", err)
 		}
 
-		// WIP: Temporary solution to enable obs-api and will require to delete the mcoa pod to take effect.
-		obsAPIEnabled := aodc.Annotations["mcoa-obs-api"] == "true"
-		userValues.ObsAPI = omanifests.BuildValues(common.IsHubCluster(cluster), obsAPIEnabled, opts.ThanosOperatorEnabled)
+		// WIP: Temporary solution to enable the mcoa-gateway and will require to delete the mcoa pod to take effect.
+		mcoaGatewayEnabled := aodc.Annotations["mcoa-obs-api"] == "true" || opts.Platform.Logs.DefaultStack || opts.ThanosOperatorEnabled
+		userValues.MCOAGateway = omanifests.BuildValues(common.IsHubCluster(cluster), mcoaGatewayEnabled, opts.ThanosOperatorEnabled, opts.Platform.Logs.DefaultStack)
 
 		// WIP: Temporary solution to enable thanos-operator and will require to delete the mcoa pod to take effect.
 		if userValues.Metrics != nil {
@@ -139,7 +139,7 @@ func getMonitoringValues(ctx context.Context, k8s client.Client, logger logr.Log
 }
 
 func getLoggingValues(ctx context.Context, k8s client.Client, cluster *clusterv1.ManagedCluster, mcAddon *addonapiv1beta1.ManagedClusterAddOn, opts addon.Options) (*lmanifests.LoggingValues, error) {
-	if !opts.Platform.Logs.CollectionEnabled && !opts.UserWorkloads.Logs.CollectionEnabled {
+	if !opts.Platform.Logs.CollectionEnabled && !opts.UserWorkloads.Logs.CollectionEnabled && !opts.Platform.Logs.DefaultStack {
 		return nil, nil
 	}
 
@@ -147,7 +147,7 @@ func getLoggingValues(ctx context.Context, k8s client.Client, cluster *clusterv1
 		return nil, nil
 	}
 
-	loggingOpts, err := lhandlers.BuildOptions(ctx, k8s, mcAddon, opts.Platform.Logs, opts.UserWorkloads.Logs, common.IsHubCluster(cluster))
+	loggingOpts, err := lhandlers.BuildOptions(ctx, k8s, mcAddon, opts.Platform.Logs, opts.UserWorkloads.Logs, common.IsHubCluster(cluster), opts.HubHostname)
 	if err != nil {
 		return nil, err
 	}
