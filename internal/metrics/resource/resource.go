@@ -444,7 +444,7 @@ func (d DefaultStackResources) createDefaultAgentForPlacement(ctx context.Contex
 	}
 
 	if err := d.Client.Create(ctx, agent, client.FieldOwner(addoncfg.Name)); err != nil {
-		return nil, fmt.Errorf("failed to create the default agent for placement %q: %w", placement.Name, err)
+		return nil, fmt.Errorf("failed to create default PrometheusAgent %q for placement %q: %w", defaultAgentName, placement.Name, err)
 	}
 	d.Logger.Info("created default prometheus agent for placement", "agentNamespace", agent.Namespace, "agentName", agent.Name, "placementName", placement.Name)
 

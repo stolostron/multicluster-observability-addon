@@ -3,6 +3,12 @@ package config
 import (
 	"errors"
 	"time"
+
+	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
+	"k8s.io/apimachinery/pkg/fields"
+	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -107,3 +113,35 @@ var (
 	ErrInvalidSubscriptionChannel = errors.New("current version of the cluster-observability-operator installed doesn't match the supported MCOA version")
 	ErrInvalidPort                = errors.New("invalid port")
 )
+
+// GetCacheOptions configures the in-memory cache for the controller-runtime Manager.
+// It applies TransformStripManagedFields by default to strip metadata.managedFields,
+// significantly reducing memory consumption in large fleets.
+// PrometheusAgent is exempted via an identity transform because MCOA inspects
+// metadata.managedFields to determine whether an agent is exclusively owned by MCOA
+// or partially owned by a user before deleting orphaned agents.
+// It also scopes AddOnDeploymentConfig to the install namespace and
+// ClusterManagementAddOn to the MCOA instance name to prevent unbounded cache growth.
+func GetCacheOptions() cache.Options {
+	return cache.Options{
+		DefaultTransform: cache.TransformStripManagedFields(),
+		ByObject: map[client.Object]cache.ByObject{
+			&addonv1beta1.AddOnDeploymentConfig{}: {
+				Namespaces: map[string]cache.Config{
+					InstallNamespace: {},
+				},
+			},
+			&addonv1beta1.ClusterManagementAddOn{}: {
+				Field: fields.SelectorFromSet(fields.Set{"metadata.name": Name}),
+			},
+			&cooprometheusv1alpha1.PrometheusAgent{}: {
+				Namespaces: map[string]cache.Config{
+					InstallNamespace: {},
+				},
+				Transform: func(in any) (any, error) {
+					return in, nil
+				},
+			},
+		},
+	}
+}
