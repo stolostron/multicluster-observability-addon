@@ -1,0 +1,65 @@
+name: addon e2e tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  e2e:
+    name: e2e (kind)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: '1.26'
+        id: go
+
+      - name: Install kind
+        run: |
+          if ! command -v kind >/dev/null 2>&1; then
+            echo "Installing KinD..."
+            curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.25.0/kind-linux-amd64
+            chmod +x ./kind
+            sudo mv ./kind /usr/local/bin/kind
+          fi
+          kind version
+
+      - name: Install clusteradm
+        run: |
+          curl -sSL https://raw.githubusercontent.com/open-cluster-management-io/clusteradm/main/install.sh | bash
+          clusteradm version
+
+      - name: Run E2E tests
+        run: |
+          make test-e2e
+
+      - name: Debug on failure
+        if: failure()
+        run: |
+          export KUBECONFIG=/tmp/mcoa-e2e.kubeconfig
+          echo "=== Pod Status ==="
+          kubectl get pods -A -o wide || true
+          echo "=== Non-Running / Failing Pod Diagnostics ==="
+          kubectl get pods -A --no-headers | grep -v 'Running\|Completed' | while read -r ns pod rest; do
+            echo "--------------------------------------------------"
+            echo "Pod: ${ns}/${pod}"
+            echo "--------------------------------------------------"
+            kubectl describe pod -n "${ns}" "${pod}" || true
+            echo "--- Container Logs for ${ns}/${pod} ---"
+            kubectl logs -n "${ns}" "${pod}" --all-containers=true --tail=100 || true
+          done || true
+          echo "=== Recent Events ==="
+          kubectl get events -A --sort-by='.metadata.creationTimestamp' | tail -n 50 || true
+          echo "=== MCOA Manager Logs ==="
+          kubectl logs -n open-cluster-management-observability deployment/multicluster-observability-addon-manager --tail=100 || true
+          echo "=== Prometheus Operator Logs ==="
+          kubectl logs -n open-cluster-management-addon-observability deployment/prometheus-operator -c prometheus-operator --tail=100 || true
+          echo "=== Prometheus Agent Logs ==="
+          kubectl logs -n open-cluster-management-addon-observability statefulset/prom-agent-platform-metrics-collector -c prometheus --tail=100 || true
+          echo "=== Hub Prometheus Logs ==="
+          kubectl logs -n open-cluster-management-observability deployment/hub-prometheus -c prometheus --tail=100 || true
