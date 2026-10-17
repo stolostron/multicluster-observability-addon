@@ -417,6 +417,70 @@ func TestNamespaceRuleCountConsistency(t *testing.T) {
 	}
 }
 
+func TestCustomEvaluationInterval(t *testing.T) {
+	configData := rightsizing.RSConfigMapData{
+		PrometheusRuleConfig: rightsizing.RSPrometheusRuleConfig{
+			NamespaceFilterCriteria: struct {
+				InclusionCriteria []string `json:"inclusionCriteria"`
+				ExclusionCriteria []string `json:"exclusionCriteria"`
+			}{ExclusionCriteria: []string{"openshift.*"}},
+			EvaluationInterval:   "10m",
+			EvaluationInterval1d: "15m",
+		},
+	}
+
+	rule, err := GeneratePrometheusRule(configData)
+	require.NoError(t, err)
+
+	interval10m := monitoringv1.Duration("10m")
+	interval15m := monitoringv1.Duration("15m")
+
+	// Rolling-window groups must use the configured 10m interval.
+	assert.Equal(t, &interval10m, rule.Spec.Groups[0].Interval, "namespace rolling group interval")
+	assert.Equal(t, &interval10m, rule.Spec.Groups[2].Interval, "cluster rolling group interval")
+
+	// Daily-aggregation groups must use evaluationInterval1d (15m here).
+	assert.Equal(t, &interval15m, rule.Spec.Groups[1].Interval, "namespace 1d group interval")
+	assert.Equal(t, &interval15m, rule.Spec.Groups[3].Interval, "cluster 1d group interval")
+
+	// PromQL subquery step in all rolling rules must be [10m:].
+	for _, r := range rule.Spec.Groups[0].Rules {
+		assert.Contains(t, r.Expr.String(), "[10m:]", "namespace rolling rule %q should use [10m:]", r.Record)
+		assert.NotContains(t, r.Expr.String(), "[5m:]", "namespace rolling rule %q should not contain old [5m:]", r.Record)
+	}
+	for _, r := range rule.Spec.Groups[2].Rules {
+		assert.Contains(t, r.Expr.String(), "[10m:]", "cluster rolling rule %q should use [10m:]", r.Record)
+		assert.NotContains(t, r.Expr.String(), "[5m:]", "cluster rolling rule %q should not contain old [5m:]", r.Record)
+	}
+}
+
+func TestCustomEvaluationInterval1d(t *testing.T) {
+	configData := rightsizing.RSConfigMapData{
+		PrometheusRuleConfig: rightsizing.RSPrometheusRuleConfig{
+			NamespaceFilterCriteria: struct {
+				InclusionCriteria []string `json:"inclusionCriteria"`
+				ExclusionCriteria []string `json:"exclusionCriteria"`
+			}{ExclusionCriteria: []string{"openshift.*"}},
+			EvaluationInterval1d: "30m",
+			// EvaluationInterval intentionally left empty → should default to Duration5m
+		},
+	}
+
+	rule, err := GeneratePrometheusRule(configData)
+	require.NoError(t, err)
+
+	interval5m := monitoringv1.Duration(rightsizing.DefaultEvaluationInterval)
+	interval30m := monitoringv1.Duration("30m")
+
+	// Rolling groups must fall back to the default 5m when EvaluationInterval is unset.
+	assert.Equal(t, &interval5m, rule.Spec.Groups[0].Interval, "namespace rolling group should default to 5m")
+	assert.Equal(t, &interval5m, rule.Spec.Groups[2].Interval, "cluster rolling group should default to 5m")
+
+	// Only the 1d groups should use the configured 30m.
+	assert.Equal(t, &interval30m, rule.Spec.Groups[1].Interval, "namespace 1d group interval")
+	assert.Equal(t, &interval30m, rule.Spec.Groups[3].Interval, "cluster 1d group interval")
+}
+
 func collectProfiles(rule monitoringv1.PrometheusRule, recordName string) []string {
 	seen := map[string]bool{}
 	var profiles []string

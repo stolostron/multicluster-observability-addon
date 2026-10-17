@@ -3,6 +3,7 @@ package rightsizing
 import (
 	"testing"
 
+	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -144,6 +145,179 @@ func TestGetDefaultRSPrometheusRuleConfig(t *testing.T) {
 	assert.Empty(t, config.NamespaceFilterCriteria.InclusionCriteria)
 	assert.Equal(t, DefaultCpuAggregator, config.CpuAggregator)
 	assert.Equal(t, DefaultMemoryAggregator, config.MemoryAggregator)
+	assert.Equal(t, DefaultEvaluationInterval, config.EvaluationInterval)
+	assert.Equal(t, DefaultEvaluationInterval1d, config.EvaluationInterval1d)
+}
+
+// malformedDurations are rejected by both interval validators regardless of bounds.
+var malformedDurations = []string{
+	"0m", "0s", "0h", "0d", // zero-value durations Prometheus rejects
+	"abc", "5minutes", "5 m", // wrong format
+	"-5m", "5", // missing unit / negative
+	"1h30m",                  // compound durations are unsupported
+	"999999999999999999999y", // numeric overflow must not panic or wrap
+	// Fits in an int, but in nanoseconds it is 1000 * 2^64 plus a minute: without the
+	// overflow guard the multiplication wraps to 1m0.448384s, which looks like a legal
+	// interval to both validators.
+	"18446744073770s",
+}
+
+func TestValidateEvaluationInterval(t *testing.T) {
+	valid := []string{
+		"10m", "15m", "30m", "600s", // ordinary settings
+		"5m", "300s", "1h", "60m", "3600s", // boundaries: exactly Min and exactly Max
+	}
+	for _, s := range valid {
+		assert.True(t, ValidateEvaluationInterval(s), "expected valid: %q", s)
+	}
+
+	// Empty string is accepted — treated as "use default" by callers.
+	assert.True(t, ValidateEvaluationInterval(""), "empty string should be accepted")
+
+	invalid := append([]string{
+		"1ms", "999ms", "59s", "1s", "1m", "60s", // far below MinEvaluationInterval
+		"4m", "299s", // just under MinEvaluationInterval (5m)
+		"61m", "2h", "24h", "1d", "2w", "1y", // above MaxEvaluationInterval (1h)
+	}, malformedDurations...)
+	for _, s := range invalid {
+		assert.False(t, ValidateEvaluationInterval(s), "expected invalid: %q", s)
+	}
+}
+
+func TestValidateEvaluationInterval1d(t *testing.T) {
+	// The 1d field has its own bounds: it only controls how often the daily rules re-run,
+	// so its floor is its own 15m default and values up to MaxEvaluationInterval1d (6h)
+	// are legitimate.
+	valid := []string{
+		"20m", "30m", "1h", "1800s", // ordinary settings
+		"15m", "900s", "6h", "360m", "21600s", // boundaries: exactly Min and exactly Max
+		"2h", // rejected for the rolling field, allowed here
+	}
+	for _, s := range valid {
+		assert.True(t, ValidateEvaluationInterval1d(s), "expected valid: %q", s)
+	}
+
+	assert.True(t, ValidateEvaluationInterval1d(""), "empty string should be accepted")
+
+	invalid := append([]string{
+		"1ms", "59s", "1m", "60s", // far below MinEvaluationInterval1d
+		"5m", "300s", "10m", // allowed for the rolling field, below the floor here
+		"14m", "899s", // just under MinEvaluationInterval1d (15m)
+		"361m", "21601s", "7h", "12h", // above MaxEvaluationInterval1d (6h)
+		"24h", "1d", "1440m", // a single run per aggregation window: too few hub samples
+		"25h", "2d", "2w", "1y",
+	}, malformedDurations...)
+	for _, s := range invalid {
+		assert.False(t, ValidateEvaluationInterval1d(s), "expected invalid: %q", s)
+	}
+}
+
+// TestEvaluationIntervalBoundsAreCoherent pins the relationships the bounds encode, so a
+// future edit to one constant cannot silently break the reasoning behind another.
+func TestEvaluationIntervalBoundsAreCoherent(t *testing.T) {
+	// The rolling ceiling must leave the daily rules enough samples to tell percentiles apart.
+	assert.Equal(t, MinSamplesPerAggregationWindow, int(AggregationWindow/MaxEvaluationInterval),
+		"MaxEvaluationInterval must yield exactly MinSamplesPerAggregationWindow samples per [1d]")
+	// The daily ceiling must leave the hub enough samples per shortest dashboard window,
+	// and must never exceed the aggregation window, which would leave gaps between runs.
+	assert.Equal(t, MinDailyRunsPerAggregationWindow, int(AggregationWindow/MaxEvaluationInterval1d),
+		"MaxEvaluationInterval1d must yield exactly MinDailyRunsPerAggregationWindow runs per [1d]")
+	assert.LessOrEqual(t, MaxEvaluationInterval1d, AggregationWindow,
+		"the daily ceiling must not exceed the aggregation window")
+	// The rolling field must never be allowed to be coarser than the daily field.
+	assert.LessOrEqual(t, MaxEvaluationInterval, MaxEvaluationInterval1d,
+		"rolling ceiling must not exceed the daily-aggregation ceiling")
+	assert.Less(t, MinEvaluationInterval, MaxEvaluationInterval,
+		"minimum must be below the rolling maximum")
+	assert.Less(t, MinEvaluationInterval1d, MaxEvaluationInterval1d,
+		"minimum must be below the daily-aggregation maximum")
+	// Each floor is its field's default, so the settings can only make the rules cheaper
+	// than the defaults, never more expensive.
+	defaultRolling, ok := parsePrometheusDuration(DefaultEvaluationInterval)
+	require.True(t, ok, "DefaultEvaluationInterval must parse")
+	assert.Equal(t, MinEvaluationInterval, defaultRolling,
+		"MinEvaluationInterval must equal DefaultEvaluationInterval")
+	defaultDaily, ok := parsePrometheusDuration(DefaultEvaluationInterval1d)
+	require.True(t, ok, "DefaultEvaluationInterval1d must parse")
+	assert.Equal(t, MinEvaluationInterval1d, defaultDaily,
+		"MinEvaluationInterval1d must equal DefaultEvaluationInterval1d")
+}
+
+func TestRedundantEvaluationFactor(t *testing.T) {
+	tests := []struct {
+		name         string
+		rolling      string
+		daily        string
+		expectFactor int
+		expectWarn   bool
+	}{
+		{"defaults are well ordered", "5m", "15m", 0, false},
+		{"both empty resolves to defaults", "", "", 0, false},
+		{"equal intervals are not redundant", "15m", "15m", 0, false},
+		{"rolling coarser than daily", "1h", "20m", 3, true},
+		{"rolling just past daily", "30m", "15m", 2, true},
+		// Uneven ratios must round up: truncating 20m/15m to 1 would report "no
+		// redundancy" alongside a warning that says the opposite.
+		{"uneven ratio rounds up", "20m", "15m", 2, true},
+		// The helper does not validate. Only a daily value below both floors can make the
+		// resolved 5m rolling default the coarser one, so this pair never passes validation,
+		// but it is the one way to observe that resolution.
+		{"empty rolling resolves to 5m default", "", "1m", 5, true},
+		{"empty daily resolves to 15m default", "1h", "", 4, true},
+		{"unparseable input never warns", "bogus", "15m", 0, false},
+		// Close to the time.Duration maximum: rounding up by adding the divisor first
+		// would overflow and report a negative factor.
+		{"huge rolling value does not overflow", "9223372036s", "15m", 10248192, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			factor, ok := RedundantEvaluationFactor(tt.rolling, tt.daily)
+			assert.Equal(t, tt.expectWarn, ok)
+			assert.Equal(t, tt.expectFactor, factor)
+		})
+	}
+}
+
+// TestDefaultsAreWithinValidRange guards against a default being changed to a value the
+// validator would immediately reject, which would make every ConfigMap look invalid.
+func TestDefaultsAreWithinValidRange(t *testing.T) {
+	assert.True(t, ValidateEvaluationInterval(DefaultEvaluationInterval),
+		"DefaultEvaluationInterval must satisfy its own validator")
+	assert.True(t, ValidateEvaluationInterval1d(DefaultEvaluationInterval1d),
+		"DefaultEvaluationInterval1d must satisfy its own validator")
+	assert.Equal(t, DefaultEvaluationInterval, string(Duration5m),
+		"Duration5m fallback must match the default written into the ConfigMap")
+	assert.Equal(t, DefaultEvaluationInterval1d, string(Duration1d),
+		"Duration1d fallback must match the default written into the ConfigMap")
+}
+
+func TestResolveEvaluationInterval(t *testing.T) {
+	t.Run("uses configured value when set", func(t *testing.T) {
+		cfg := RSPrometheusRuleConfig{EvaluationInterval: "10m"}
+		got := ResolveEvaluationInterval(cfg)
+		assert.Equal(t, monitoringv1.Duration("10m"), got)
+	})
+
+	t.Run("falls back to Duration5m when empty", func(t *testing.T) {
+		cfg := RSPrometheusRuleConfig{EvaluationInterval: ""}
+		got := ResolveEvaluationInterval(cfg)
+		assert.Equal(t, Duration5m, got)
+	})
+}
+
+func TestResolveEvaluationInterval1d(t *testing.T) {
+	t.Run("uses configured value when set", func(t *testing.T) {
+		cfg := RSPrometheusRuleConfig{EvaluationInterval1d: "30m"}
+		got := ResolveEvaluationInterval1d(cfg)
+		assert.Equal(t, monitoringv1.Duration("30m"), got)
+	})
+
+	t.Run("falls back to Duration1d when empty", func(t *testing.T) {
+		cfg := RSPrometheusRuleConfig{EvaluationInterval1d: ""}
+		got := ResolveEvaluationInterval1d(cfg)
+		assert.Equal(t, Duration1d, got)
+	})
 }
 
 func TestParseAggregatorNames(t *testing.T) {
