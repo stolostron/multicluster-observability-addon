@@ -28,6 +28,19 @@ func isNil(obj client.Object) bool {
 }
 
 // ServerSideApply applies the provided object using Kubernetes Server-Side Apply (SSA).
+//
+// Background & Rationale:
+// In controller-runtime, client.Patch with client.Apply is deprecated in favor of client.Client.Apply,
+// which requires a runtime.ApplyConfiguration. Generated typed ApplyConfigurations (applyconfigurations/*)
+// are primarily available for core Kubernetes APIs (k8s.io/client-go/applyconfigurations) and are not generated
+// by the external CRD APIs used in this codebase (e.g. PrometheusAgent, Perses, ClusterManagementAddOn).
+//
+// To support arbitrary client.Object types (both typed CRDs and unstructured) without requiring dedicated
+// apply-configuration code generation across all external CRD APIs, we convert the object into an
+// *unstructured.Unstructured and wrap it with client.ApplyConfigurationFromUnstructured.
+// Once applied, the updated server state (UID, resourceVersion, generation, and populated fields) is synced
+// back into the original object.
+//
 // If owner is non-nil, a controller reference is established before applying.
 func ServerSideApply(ctx context.Context, c client.Client, obj client.Object, owner client.Object) error {
 	if isNil(obj) {
@@ -57,6 +70,11 @@ func ServerSideApply(ctx context.Context, c client.Client, obj client.Object, ow
 	return nil
 }
 
+// toUnstructuredApply normalizes obj into an *unstructured.Unstructured suitable for SSA:
+// 1. Unstructured objects are deep-copied directly.
+// 2. Typed objects are converted via runtime.DefaultUnstructuredConverter, preserving json tags.
+// 3. GVK is populated from the client scheme if missing on the typed struct TypeMeta.
+// 4. managedFields are stripped defensively to avoid API server rejection during apply.
 func toUnstructuredApply(c client.Client, obj client.Object) (*unstructured.Unstructured, error) {
 	var u *unstructured.Unstructured
 	if unstr, ok := obj.(*unstructured.Unstructured); ok {
@@ -82,6 +100,9 @@ func toUnstructuredApply(c client.Client, obj client.Object) (*unstructured.Unst
 	return u, nil
 }
 
+// syncBackToObject reflects the post-apply server response from the unstructured representation
+// back into the caller's target object so in-memory pointers reflect updated metadata (UID, ResourceVersion,
+// Generation, CreationTimestamp, and GVK) as callers expect after a successful write.
 func syncBackToObject(u *unstructured.Unstructured, obj client.Object) error {
 	if unstr, ok := obj.(*unstructured.Unstructured); ok {
 		*unstr = *u
