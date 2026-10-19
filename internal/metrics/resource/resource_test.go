@@ -1657,17 +1657,6 @@ func ensureGVKIsSet(scheme *runtime.Scheme) interceptor.Funcs {
 			}
 			return nil
 		},
-		Patch: func(ctx context.Context, clientww client.WithWatch, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
-			gvk, _ := apiutil.GVKForObject(obj, scheme)
-			if !gvk.Empty() {
-				obj.GetObjectKind().SetGroupVersionKind(gvk)
-			}
-			err := clientww.Patch(ctx, obj, patch, opts...)
-			if err == nil && !gvk.Empty() {
-				obj.GetObjectKind().SetGroupVersionKind(gvk)
-			}
-			return err
-		},
 		List: func(ctx context.Context, clientww client.WithWatch, obj client.ObjectList, opts ...client.ListOption) error {
 			err := clientww.List(ctx, obj, opts...)
 			if err != nil {
