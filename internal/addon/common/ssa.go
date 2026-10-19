@@ -13,7 +13,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
@@ -40,14 +39,6 @@ func ServerSideApply(ctx context.Context, c client.Client, obj client.Object, ow
 		if err := controllerutil.SetControllerReference(owner, obj, c.Scheme()); err != nil {
 			return fmt.Errorf("failed to set controller reference: %w", err)
 		}
-	}
-
-	if obj.GetObjectKind().GroupVersionKind().Empty() {
-		gvk, err := apiutil.GVKForObject(obj, c.Scheme())
-		if err != nil {
-			return fmt.Errorf("failed to get GVK for object: %w", err)
-		}
-		obj.GetObjectKind().SetGroupVersionKind(gvk)
 	}
 
 	u, err := toUnstructuredApply(c, obj)

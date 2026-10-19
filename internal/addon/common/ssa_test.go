@@ -419,18 +419,14 @@ func TestServerSideApply_PopulatesGVKWhenEmpty(t *testing.T) {
 	scheme := runtime.NewScheme()
 	require.NoError(t, corev1.AddToScheme(scheme))
 
-	var appliedData []byte
-	var gvkDuringPatch schema.GroupVersionKind
+	var gvkDuringApply schema.GroupVersionKind
 
 	cl := fake.NewClientBuilder().WithScheme(scheme).WithInterceptorFuncs(interceptor.Funcs{
-		Patch: func(ctx context.Context, client client.WithWatch, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
-			gvkDuringPatch = obj.GetObjectKind().GroupVersionKind()
-			data, err := patch.Data(obj)
-			if err != nil {
-				return err
+		Apply: func(ctx context.Context, client client.WithWatch, obj runtime.ApplyConfiguration, opts ...client.ApplyOption) error {
+			if ro, ok := obj.(runtime.Object); ok {
+				gvkDuringApply = ro.GetObjectKind().GroupVersionKind()
 			}
-			appliedData = data
-			return client.Patch(ctx, obj, patch, opts...)
+			return client.Apply(ctx, obj, opts...)
 		},
 	}).Build()
 
@@ -445,7 +441,6 @@ func TestServerSideApply_PopulatesGVKWhenEmpty(t *testing.T) {
 	err := common.ServerSideApply(t.Context(), cl, cm, nil)
 	require.NoError(t, err)
 
-	assert.Equal(t, corev1.SchemeGroupVersion.WithKind("ConfigMap"), gvkDuringPatch)
-	assert.Contains(t, string(appliedData), `"kind":"ConfigMap"`)
-	assert.Contains(t, string(appliedData), `"apiVersion":"v1"`)
+	assert.Equal(t, corev1.SchemeGroupVersion.WithKind("ConfigMap"), gvkDuringApply)
+	assert.Equal(t, corev1.SchemeGroupVersion.WithKind("ConfigMap"), cm.GetObjectKind().GroupVersionKind())
 }
