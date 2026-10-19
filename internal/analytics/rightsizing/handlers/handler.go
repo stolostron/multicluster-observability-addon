@@ -304,9 +304,10 @@ func (o *OptionsBuilder) validateAndSanitizeConfig(configData *rightsizing.RSCon
 	// evaluationInterval1d defaults to 15m, rejecting this would undo a perfectly legal
 	// single-field edit such as evaluationInterval: 30m.
 	//
-	// Build runs once per managed cluster per reconcile and this configuration is never
-	// reverted, so the warning is emitted only when the interval pair changes; otherwise
-	// a single legal edit would log on every cluster on every reconcile indefinitely.
+	// Build runs for every managed cluster on every reconcile, and the addon framework
+	// calls it more than once per cluster and sync. This configuration is never reverted,
+	// so the warning is emitted only when the interval pair changes; otherwise a single
+	// legal edit would log on every call indefinitely.
 	//
 	// The pair is compared and logged as resolved values, so an empty field shows up as
 	// the default that actually runs rather than as "".

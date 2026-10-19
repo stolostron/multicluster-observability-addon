@@ -813,6 +813,77 @@ memoryAggregator:
 		"should not modify YAML ConfigMap when both aggregator keys already exist")
 }
 
+// TestBackfillAggregatorKeys_LeavesIntervalKeysAsTheyAre pins that the aggregator backfill
+// never adds, completes or drops an interval key. A missing interval key already means its
+// default, so only a missing aggregator key is a reason to write, and when the backfill
+// does write, the interval keys go back exactly as the user left them.
+func TestBackfillAggregatorKeys_LeavesIntervalKeysAsTheyAre(t *testing.T) {
+	for _, tc := range []struct {
+		name                   string
+		ruleConfig             string
+		wantWrite              bool
+		wantRolling, wantDaily string
+	}{
+		{
+			"both interval keys, no aggregator keys",
+			`{"recommendationPercentage":110,"evaluationInterval":"10m","evaluationInterval1d":"1h"}`,
+			true, "10m", "1h",
+		},
+		{
+			"both interval keys in YAML, no aggregator keys",
+			"recommendationPercentage: 110\nevaluationInterval: 10m\nevaluationInterval1d: 1h\n",
+			true, "10m", "1h",
+		},
+		{
+			"only evaluationInterval, no aggregator keys",
+			`{"recommendationPercentage":110,"evaluationInterval":"10m"}`,
+			true, "10m", "",
+		},
+		{
+			"only evaluationInterval1d, no aggregator keys",
+			`{"recommendationPercentage":110,"evaluationInterval1d":"1h"}`,
+			true, "", "1h",
+		},
+		{
+			"only evaluationInterval, aggregator keys present",
+			`{"recommendationPercentage":110,"cpuAggregator":["P90"],"memoryAggregator":["P99"],"evaluationInterval":"10m"}`,
+			false, "10m", "",
+		},
+		{
+			"only evaluationInterval1d, aggregator keys present",
+			`{"recommendationPercentage":110,"cpuAggregator":["P90"],"memoryAggregator":["P99"],"evaluationInterval1d":"1h"}`,
+			false, "", "1h",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			key := types.NamespacedName{Name: rightsizing.NamespaceConfigMapName, Namespace: addoncfg.InstallNamespace}
+			ob := newTestOptionsBuilder(t, &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{Name: key.Name, Namespace: key.Namespace},
+				Data:       map[string]string{"prometheusRuleConfig": tc.ruleConfig},
+			})
+			var cm corev1.ConfigMap
+			require.NoError(t, ob.Client.Get(t.Context(), key, &cm))
+			resourceVersion := cm.ResourceVersion
+
+			require.NoError(t, ob.backfillAggregatorKeys(t.Context(), &cm))
+
+			var updated corev1.ConfigMap
+			require.NoError(t, ob.Client.Get(t.Context(), key, &updated))
+			stored, err := rightsizing.ParseConfigMapData(updated.Data)
+			require.NoError(t, err)
+			if tc.wantWrite {
+				assert.Equal(t, rightsizing.DefaultCpuAggregator, stored.PrometheusRuleConfig.CpuAggregator)
+				assert.Equal(t, rightsizing.DefaultMemoryAggregator, stored.PrometheusRuleConfig.MemoryAggregator)
+			} else {
+				assert.Equal(t, resourceVersion, updated.ResourceVersion, "the ConfigMap was written")
+				assert.Equal(t, tc.ruleConfig, updated.Data["prometheusRuleConfig"])
+			}
+			assert.Equal(t, tc.wantRolling, stored.PrometheusRuleConfig.EvaluationInterval, "evaluationInterval")
+			assert.Equal(t, tc.wantDaily, stored.PrometheusRuleConfig.EvaluationInterval1d, "evaluationInterval1d")
+		})
+	}
+}
+
 func TestValidateAndSanitizeConfig_InvalidEvaluationIntervalFallsBackToDefault(t *testing.T) {
 	// Start with empty interval caches, like a freshly restarted operator.
 	resetIntervalState(t)
@@ -846,7 +917,12 @@ func TestValidateAndSanitizeConfig_InvalidEvaluationIntervalFallsBackToDefault(t
 		Name: rightsizing.NamespaceConfigMapName, Namespace: addoncfg.InstallNamespace,
 	}, &updated))
 	assert.NotContains(t, updated.Data["prometheusRuleConfig"], "badvalue")
-	assert.Contains(t, updated.Data["prometheusRuleConfig"], rightsizing.DefaultEvaluationInterval)
+	stored, err := rightsizing.ParseConfigMapData(updated.Data)
+	require.NoError(t, err)
+	assert.Equal(t, rightsizing.DefaultEvaluationInterval, stored.PrometheusRuleConfig.EvaluationInterval,
+		"the rejected evaluationInterval is written back as the default")
+	assert.Equal(t, "15m", stored.PrometheusRuleConfig.EvaluationInterval1d,
+		"the valid evaluationInterval1d is written back as it was")
 }
 
 func TestValidateAndSanitizeConfig_InvalidEvaluationIntervalRestoresCachedValue(t *testing.T) {
@@ -1142,6 +1218,79 @@ func TestValidateAndSanitizeConfig_InvalidIntervalRestoresItsOwnLastValidValue(t
 	}
 }
 
+// TestValidateAndSanitizeConfig_OneIntervalKeyMissing follows a ConfigMap in which one of
+// the two interval keys is missing, because the user set only the other one or removed it
+// again. The missing key must stay missing through validation, the cache and the
+// write-back, and an invalid edit must restore the last valid value of its own key, or
+// the default once that key has been removed.
+func TestValidateAndSanitizeConfig_OneIntervalKeyMissing(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		seen []intervalPair // valid configs reconciled before the edit, in order
+		edit intervalPair   // the invalid edit
+		want intervalPair   // the config the edit is replaced with
+	}{
+		{
+			"only evaluationInterval is set",
+			[]intervalPair{{"10m", ""}},
+			intervalPair{"2h", ""},
+			intervalPair{"10m", ""},
+		},
+		{
+			"only evaluationInterval1d is set",
+			[]intervalPair{{"", "1h"}},
+			intervalPair{"", "7h"},
+			intervalPair{"", "1h"},
+		},
+		{
+			"evaluationInterval was removed",
+			[]intervalPair{{"10m", "1h"}, {"", "1h"}},
+			intervalPair{"2h", "1h"},
+			intervalPair{rightsizing.DefaultEvaluationInterval, "1h"},
+		},
+		{
+			"evaluationInterval1d was removed",
+			[]intervalPair{{"10m", "1h"}, {"10m", ""}},
+			intervalPair{"10m", "7h"},
+			intervalPair{"10m", rightsizing.DefaultEvaluationInterval1d},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			resetIntervalState(t)
+			ob := newTestOptionsBuilder(t, newIntervalConfigMap(rightsizing.NamespaceConfigMapName, tc.edit.rolling, tc.edit.daily))
+
+			for _, seen := range tc.seen {
+				configData := newIntervalConfigData(seen.rolling, seen.daily)
+				require.False(t, ob.validateAndSanitizeConfig(&configData, rightsizing.NamespaceConfigMapName),
+					"pre-condition: %v is valid", seen)
+				assert.Equal(t, seen.rolling, configData.PrometheusRuleConfig.EvaluationInterval,
+					"a valid evaluationInterval is used as it is")
+				assert.Equal(t, seen.daily, configData.PrometheusRuleConfig.EvaluationInterval1d,
+					"a valid evaluationInterval1d is used as it is")
+			}
+
+			configData := newIntervalConfigData(tc.edit.rolling, tc.edit.daily)
+			require.True(t, ob.validateAndSanitizeConfig(&configData, rightsizing.NamespaceConfigMapName),
+				"the edit is invalid and must be rejected")
+			assert.Equal(t, tc.want.rolling, configData.PrometheusRuleConfig.EvaluationInterval)
+			assert.Equal(t, tc.want.daily, configData.PrometheusRuleConfig.EvaluationInterval1d)
+
+			// The write-back stores that pair as it is, so an empty key stays out.
+			ob.revertConfigMap(t.Context(), rightsizing.NamespaceConfigMapName, configData)
+			var updated corev1.ConfigMap
+			require.NoError(t, ob.Client.Get(t.Context(), types.NamespacedName{
+				Name: rightsizing.NamespaceConfigMapName, Namespace: addoncfg.InstallNamespace,
+			}, &updated))
+			stored, err := rightsizing.ParseConfigMapData(updated.Data)
+			require.NoError(t, err)
+			assert.Equal(t, tc.want.rolling, stored.PrometheusRuleConfig.EvaluationInterval,
+				"evaluationInterval written back")
+			assert.Equal(t, tc.want.daily, stored.PrometheusRuleConfig.EvaluationInterval1d,
+				"evaluationInterval1d written back")
+		})
+	}
+}
+
 // TestValidateAndSanitizeConfig_InvalidIntervalLogsReason checks that a rejected interval is
 // logged with the reason and the allowed range of its own field, on both fallback paths, so
 // a malformed value and an out-of-range one no longer produce the same line.
@@ -1421,6 +1570,63 @@ func TestBuild_EvaluationIntervals(t *testing.T) {
 		}
 	})
 
+	t.Run("a ConfigMap without the aggregator keys gets those and no interval keys", func(t *testing.T) {
+		resetIntervalState(t)
+		// Written before the aggregator keys existed, by MCOA as JSON and by MCO 2.17 as YAML.
+		ob := newTestOptionsBuilder(t,
+			&corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{Name: rightsizing.NamespaceConfigMapName, Namespace: addoncfg.InstallNamespace},
+				Data: map[string]string{
+					"prometheusRuleConfig": `{"namespaceFilterCriteria":{"exclusionCriteria":["openshift.*"]},"recommendationPercentage":110}`,
+				},
+			},
+			&corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{Name: rightsizing.VirtualizationConfigMapName, Namespace: addoncfg.InstallNamespace},
+				Data: map[string]string{
+					"prometheusRuleConfig": "namespaceFilterCriteria:\n  exclusionCriteria:\n  - openshift.*\nrecommendationPercentage: 110\n",
+				},
+			},
+		)
+
+		// The first reconcile adds the aggregator keys; the second finds nothing to write.
+		resourceVersions := map[string]string{}
+		for reconcile := range 2 {
+			opts, err := ob.Build(t.Context(), cluster, newPlatformOpts(true, true))
+			require.NoError(t, err)
+
+			for _, feature := range []struct {
+				configMapName string
+				component     ComponentOptions
+			}{
+				{rightsizing.NamespaceConfigMapName, opts.NamespaceRightSizing},
+				{rightsizing.VirtualizationConfigMapName, opts.VirtualizationRightSizing},
+			} {
+				require.Len(t, feature.component.PrometheusRules, 1, "rules of %s", feature.configMapName)
+				assertGroupIntervals(t, feature.component.PrometheusRules[0], defaults.rolling, defaults.daily)
+
+				var cm corev1.ConfigMap
+				require.NoError(t, ob.Client.Get(t.Context(), types.NamespacedName{
+					Name: feature.configMapName, Namespace: addoncfg.InstallNamespace,
+				}, &cm))
+				stored, err := rightsizing.ParseConfigMapData(cm.Data)
+				require.NoError(t, err)
+				assert.Equal(t, rightsizing.DefaultCpuAggregator, stored.PrometheusRuleConfig.CpuAggregator,
+					"cpuAggregator stored in %s", feature.configMapName)
+				assert.Equal(t, rightsizing.DefaultMemoryAggregator, stored.PrometheusRuleConfig.MemoryAggregator,
+					"memoryAggregator stored in %s", feature.configMapName)
+				assert.NotContains(t, cm.Data["prometheusRuleConfig"], "evaluationInterval",
+					"interval keys written to %s", feature.configMapName)
+
+				if reconcile == 0 {
+					resourceVersions[feature.configMapName] = cm.ResourceVersion
+				} else {
+					assert.Equal(t, resourceVersions[feature.configMapName], cm.ResourceVersion,
+						"%s was written again", feature.configMapName)
+				}
+			}
+		}
+	})
+
 	t.Run("custom intervals are used as they are", func(t *testing.T) {
 		resetIntervalState(t)
 		ob := newTestOptionsBuilder(t)
@@ -1541,6 +1747,40 @@ evaluationInterval1d: 30m
 	want := before.PrometheusRuleConfig
 	want.EvaluationInterval = rightsizing.DefaultEvaluationInterval
 	assert.Equal(t, want, after.PrometheusRuleConfig)
+}
+
+// TestRevertConfigMap_AggregatorRevertAddsNoIntervalKeys covers the write-back most users
+// trigger, for a mistyped aggregator, on a ConfigMap without the interval keys. Like the
+// backfill, the write-back must not add them: a missing key already means its default.
+func TestRevertConfigMap_AggregatorRevertAddsNoIntervalKeys(t *testing.T) {
+	resetIntervalState(t)
+
+	cm := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      rightsizing.NamespaceConfigMapName,
+			Namespace: addoncfg.InstallNamespace,
+			Labels:    rightsizing.RSLabels(),
+		},
+		Data: map[string]string{
+			"prometheusRuleConfig": `{"recommendationPercentage":110,"cpuAggregator":["M80"],"memoryAggregator":["Max OverAll"]}`,
+		},
+	}
+	ob := newTestOptionsBuilder(t, cm)
+	ctx := t.Context()
+
+	configData, err := rightsizing.ParseConfigMapData(cm.Data)
+	require.NoError(t, err)
+	require.True(t, ob.validateAndSanitizeConfig(&configData, rightsizing.NamespaceConfigMapName),
+		"M80 is not an aggregator and must be rejected")
+	ob.revertConfigMap(ctx, rightsizing.NamespaceConfigMapName, configData)
+
+	var updated corev1.ConfigMap
+	require.NoError(t, ob.Client.Get(ctx, types.NamespacedName{
+		Name: rightsizing.NamespaceConfigMapName, Namespace: addoncfg.InstallNamespace,
+	}, &updated))
+	assert.NotContains(t, updated.Data["prometheusRuleConfig"], "M80")
+	assert.NotContains(t, updated.Data["prometheusRuleConfig"], "evaluationInterval",
+		"the write-back must not add the interval keys")
 }
 
 // TestValidateAndSanitizeConfig_YAMLNumberIntervalIsRejected covers a user who writes an

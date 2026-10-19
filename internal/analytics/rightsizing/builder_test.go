@@ -2,6 +2,7 @@ package rightsizing
 
 import (
 	"testing"
+	"time"
 
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"github.com/stretchr/testify/assert"
@@ -245,6 +246,23 @@ func TestValidateEvaluationIntervalReasons(t *testing.T) {
 			require.ErrorIs(t, err, tc.wantErr)
 			assert.EqualError(t, err, tc.wantText)
 		})
+	}
+}
+
+// TestFormatInterval pins how the allowed range is spelled in validation errors. The
+// current bounds are whole minutes and hours, so the seconds and milliseconds branches
+// are covered here for a bound changed later.
+func TestFormatInterval(t *testing.T) {
+	for _, tc := range []struct {
+		d    time.Duration
+		want string
+	}{
+		{6 * time.Hour, "6h"},
+		{90 * time.Minute, "90m"},
+		{90 * time.Second, "90s"},
+		{1500 * time.Millisecond, "1500ms"},
+	} {
+		assert.Equal(t, tc.want, formatInterval(tc.d), "formatInterval(%s)", tc.d)
 	}
 }
 
