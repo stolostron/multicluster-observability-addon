@@ -151,28 +151,31 @@ func TestGetDefaultRSPrometheusRuleConfig(t *testing.T) {
 
 // malformedDurations are rejected by both interval validators regardless of bounds.
 var malformedDurations = []string{
-	"0m", "0s", "0h", "0d", // zero-value durations Prometheus rejects
+	"0m", "0s", "0h", "0d", // zero: PromQL rejects a zero subquery range
 	"abc", "5minutes", "5 m", // wrong format
 	"-5m", "5", // missing unit / negative
 	"1h30m",                  // compound durations are unsupported
 	"999999999999999999999y", // numeric overflow must not panic or wrap
-	// Fits in an int, but in nanoseconds it is 1000 * 2^64 plus a minute: without the
-	// overflow guard the multiplication wraps to 1m0.448384s, which looks like a legal
-	// interval to both validators.
+	// Each fits in an int, but in nanoseconds it is 1000 * 2^64 plus a few minutes, so
+	// without the overflow guard the multiplication wraps to a small duration:
+	// 1m0.448384s, below both floors; 6m0.448384s, inside the rolling range only; and
+	// 16m0.448384s, inside both ranges. Only the guard rejects the last two.
 	"18446744073770s",
+	"18446744074070s",
+	"18446744074670s",
 }
 
 func TestValidateEvaluationInterval(t *testing.T) {
 	valid := []string{
 		"10m", "15m", "30m", "600s", // ordinary settings
-		"5m", "300s", "1h", "60m", "3600s", // boundaries: exactly Min and exactly Max
+		"5m", "300s", "300000ms", "1h", "60m", "3600s", // boundaries: exactly Min and exactly Max
 	}
 	for _, s := range valid {
-		assert.True(t, ValidateEvaluationInterval(s), "expected valid: %q", s)
+		require.NoError(t, ValidateEvaluationInterval(s), "expected valid: %q", s)
 	}
 
 	// Empty string is accepted — treated as "use default" by callers.
-	assert.True(t, ValidateEvaluationInterval(""), "empty string should be accepted")
+	require.NoError(t, ValidateEvaluationInterval(""), "empty string should be accepted")
 
 	invalid := append([]string{
 		"1ms", "999ms", "59s", "1s", "1m", "60s", // far below MinEvaluationInterval
@@ -180,7 +183,7 @@ func TestValidateEvaluationInterval(t *testing.T) {
 		"61m", "2h", "24h", "1d", "2w", "1y", // above MaxEvaluationInterval (1h)
 	}, malformedDurations...)
 	for _, s := range invalid {
-		assert.False(t, ValidateEvaluationInterval(s), "expected invalid: %q", s)
+		assert.Error(t, ValidateEvaluationInterval(s), "expected invalid: %q", s)
 	}
 }
 
@@ -190,14 +193,14 @@ func TestValidateEvaluationInterval1d(t *testing.T) {
 	// are legitimate.
 	valid := []string{
 		"20m", "30m", "1h", "1800s", // ordinary settings
-		"15m", "900s", "6h", "360m", "21600s", // boundaries: exactly Min and exactly Max
+		"15m", "900s", "900000ms", "6h", "360m", "21600s", // boundaries: exactly Min and exactly Max
 		"2h", // rejected for the rolling field, allowed here
 	}
 	for _, s := range valid {
-		assert.True(t, ValidateEvaluationInterval1d(s), "expected valid: %q", s)
+		require.NoError(t, ValidateEvaluationInterval1d(s), "expected valid: %q", s)
 	}
 
-	assert.True(t, ValidateEvaluationInterval1d(""), "empty string should be accepted")
+	require.NoError(t, ValidateEvaluationInterval1d(""), "empty string should be accepted")
 
 	invalid := append([]string{
 		"1ms", "59s", "1m", "60s", // far below MinEvaluationInterval1d
@@ -208,7 +211,40 @@ func TestValidateEvaluationInterval1d(t *testing.T) {
 		"25h", "2d", "2w", "1y",
 	}, malformedDurations...)
 	for _, s := range invalid {
-		assert.False(t, ValidateEvaluationInterval1d(s), "expected invalid: %q", s)
+		assert.Error(t, ValidateEvaluationInterval1d(s), "expected invalid: %q", s)
+	}
+}
+
+// TestValidateEvaluationIntervalReasons pins the two reasons a value is rejected for. The
+// handler logs them, so a malformed value and an out-of-range one must not read the same,
+// and both must name the allowed range of their own field.
+func TestValidateEvaluationIntervalReasons(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		validate func(string) error
+		value    string
+		wantErr  error
+		wantText string
+	}{
+		{
+			"compound duration", ValidateEvaluationInterval, "1h30m", errIntervalNotSingleUnit,
+			"not a single-unit Prometheus duration such as 30m; allowed range 5m to 1h",
+		},
+		{
+			"bare YAML number", ValidateEvaluationInterval1d, "5", errIntervalNotSingleUnit,
+			"not a single-unit Prometheus duration such as 30m; allowed range 15m to 6h",
+		},
+		{"above the rolling ceiling", ValidateEvaluationInterval, "7h", errIntervalOutOfRange, "outside the allowed range 5m to 1h"},
+		{"above the daily ceiling", ValidateEvaluationInterval1d, "7h", errIntervalOutOfRange, "outside the allowed range 15m to 6h"},
+		{"below the daily floor", ValidateEvaluationInterval1d, "300s", errIntervalOutOfRange, "outside the allowed range 15m to 6h"},
+		{"zero", ValidateEvaluationInterval, "0m", errIntervalOutOfRange, "outside the allowed range 5m to 1h"},
+		{"too large to represent", ValidateEvaluationInterval1d, "18446744074670s", errIntervalOutOfRange, "outside the allowed range 15m to 6h"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := tc.validate(tc.value)
+			require.ErrorIs(t, err, tc.wantErr)
+			assert.EqualError(t, err, tc.wantText)
+		})
 	}
 }
 
@@ -265,6 +301,9 @@ func TestRedundantEvaluationFactor(t *testing.T) {
 		{"empty rolling resolves to 5m default", "", "1m", 5, true},
 		{"empty daily resolves to 15m default", "1h", "", 4, true},
 		{"unparseable input never warns", "bogus", "15m", 0, false},
+		// Zero must never reach the division.
+		{"zero daily never warns", "5m", "0m", 0, false},
+		{"zero rolling never warns", "0m", "15m", 0, false},
 		// Close to the time.Duration maximum: rounding up by adding the divisor first
 		// would overflow and report a negative factor.
 		{"huge rolling value does not overflow", "9223372036s", "15m", 10248192, true},
@@ -282,9 +321,9 @@ func TestRedundantEvaluationFactor(t *testing.T) {
 // TestDefaultsAreWithinValidRange guards against a default being changed to a value the
 // validator would immediately reject, which would make every ConfigMap look invalid.
 func TestDefaultsAreWithinValidRange(t *testing.T) {
-	assert.True(t, ValidateEvaluationInterval(DefaultEvaluationInterval),
+	require.NoError(t, ValidateEvaluationInterval(DefaultEvaluationInterval),
 		"DefaultEvaluationInterval must satisfy its own validator")
-	assert.True(t, ValidateEvaluationInterval1d(DefaultEvaluationInterval1d),
+	require.NoError(t, ValidateEvaluationInterval1d(DefaultEvaluationInterval1d),
 		"DefaultEvaluationInterval1d must satisfy its own validator")
 	assert.Equal(t, DefaultEvaluationInterval, string(Duration5m),
 		"Duration5m fallback must match the default written into the ConfigMap")

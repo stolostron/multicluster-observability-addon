@@ -63,8 +63,10 @@ type RSPrometheusRuleConfig struct {
 	MemoryAggregator         []string        `json:"memoryAggregator"`
 	// EvaluationInterval controls how often the raw rolling-window PrometheusRule groups
 	// are evaluated, and doubles as the lookback window of the PromQL subqueries inside
-	// them (e.g. [5m:]). Raising it reduces both evaluation cost and the number of
-	// samples stored per recorded series. Defaults to "5m".
+	// them (e.g. [5m:]). Raising it reduces the evaluation cost per hour and the number of
+	// samples stored per recorded series. Each run gets heavier, though: its subqueries
+	// cover a longer window, so at 1h a run holds about 12 times as many points in memory
+	// as at 5m. Defaults to "5m".
 	//
 	// The one window it does not drive is the rate() that turns the VM CPU counter into
 	// cores: that stays at 5m, so usage peaks keep the same meaning at every interval.
@@ -77,8 +79,16 @@ type RSPrometheusRuleConfig struct {
 	// affected. Percentile recommendations are only comparable between clusters and
 	// periods that used the same interval.
 	//
+	// Changing it can lose some usage once. Prometheus moves a rule group to new run times
+	// when its interval changes, and each run looks back only one interval, so the stretch
+	// between the last run at the old interval and the first run at the new one can be
+	// covered by no run at all. Lowering 1h to 5m can skip up to 55m this way, and a usage
+	// peak inside that stretch can be missed by every profile; raising the interval to a
+	// multiple of the old one skips nothing. After any change the percentile profiles take
+	// about a day to settle, while the 1d window still mixes samples taken at both intervals.
+	//
 	// Must be a single-unit Prometheus duration between 5m and 1h: e.g. "5m", "10m", "30m", "1h".
-	// The 5m floor is the default, so this setting can only make the rolling rules cheaper.
+	// The 5m floor is the default, so this setting can only make the rolling rules cheaper per hour.
 	// Below it every managed cluster would evaluate them and store their samples more often,
 	// and the daily rules would read more samples per run, while only the percentile
 	// profiles would change.

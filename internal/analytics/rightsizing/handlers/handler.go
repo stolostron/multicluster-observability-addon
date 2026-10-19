@@ -77,10 +77,9 @@ func cacheValidInterval(configMapName, field, value string) {
 		// hardcoded default (via the "no previous config cached" path) rather than
 		// resurrecting the stale custom value.
 		//
-		// Deleting (rather than storing "") avoids both the misleading log
-		// ("keeping previous valid config: ") and the 2-reconcile convergence cycle
-		// that storing "" would cause: a cache miss writes the hardcoded default,
-		// which backfill would not need to touch.
+		// Deleting (rather than storing "") also avoids a misleading log
+		// ("keeping previous valid config: ") and a write-back that drops the key
+		// instead of spelling out the default.
 		delete(lastValidIntervals, cacheKey(configMapName, field))
 		return
 	}
@@ -317,11 +316,13 @@ func (o *OptionsBuilder) validateAndSanitizeConfig(configData *rightsizing.RSCon
 	if changed := recordOrderingState(configMapName, rolling, daily); wasteful && changed {
 		o.Logger.Info("evaluationInterval is coarser than evaluationInterval1d, so the daily "+
 			"aggregation rules recompute over unchanged input and append duplicate samples to the "+
-			"recommendation series; raise evaluationInterval1d to match to avoid the overhead",
+			"recommendation series; lowering evaluationInterval or raising evaluationInterval1d to "+
+			"match avoids that, but a higher evaluationInterval1d also leaves the hub fewer samples "+
+			"for the dashboard graphs",
 			"configMap", configMapName,
 			"evaluationInterval", rolling,
 			"evaluationInterval1d", daily,
-			"redundantEvaluationsPerSample", factor)
+			"dailyRunsPerRollingSample", factor)
 	}
 
 	return reverted
@@ -330,10 +331,11 @@ func (o *OptionsBuilder) validateAndSanitizeConfig(configData *rightsizing.RSCon
 // sanitizeInterval validates one evaluation-interval field in place. field is the
 // ConfigMap key, which also names the cache entry and the log lines. A valid value is
 // cached. An invalid one is replaced by the previous valid value (from cache), or by
-// defaultValue when nothing is cached.
+// defaultValue when nothing is cached, and the reason validate gives is logged with it.
 // Returns true if the value was replaced.
-func (o *OptionsBuilder) sanitizeInterval(configMapName, field string, value *string, isValid func(string) bool, defaultValue string) bool {
-	if isValid(*value) {
+func (o *OptionsBuilder) sanitizeInterval(configMapName, field string, value *string, validate func(string) error, defaultValue string) bool {
+	err := validate(*value)
+	if err == nil {
 		cacheValidInterval(configMapName, field, *value)
 		return false
 	}
@@ -342,6 +344,7 @@ func (o *OptionsBuilder) sanitizeInterval(configMapName, field string, value *st
 		o.Logger.Info("Invalid "+field+" in ConfigMap, rejecting edit and keeping previous valid config",
 			"configMap", configMapName,
 			"invalidValue", *value,
+			"reason", err.Error(),
 			"restoredConfig", cached)
 		*value = cached
 		return true
@@ -350,6 +353,7 @@ func (o *OptionsBuilder) sanitizeInterval(configMapName, field string, value *st
 	o.Logger.Info("Invalid "+field+" in ConfigMap, no previous config cached, falling back to default",
 		"configMap", configMapName,
 		"invalidValue", *value,
+		"reason", err.Error(),
 		"default", defaultValue)
 	*value = defaultValue
 	return true
@@ -395,7 +399,7 @@ func (o *OptionsBuilder) ensureNamespaceConfigMap(ctx context.Context) error {
 		}
 		return err
 	}
-	return o.backfillConfigKeys(ctx, cm)
+	return o.backfillAggregatorKeys(ctx, cm)
 }
 
 // ensureVirtualizationConfigMap ensures the virtualization right-sizing ConfigMap exists on the hub.
@@ -411,7 +415,7 @@ func (o *OptionsBuilder) ensureVirtualizationConfigMap(ctx context.Context) erro
 		}
 		return err
 	}
-	return o.backfillConfigKeys(ctx, cm)
+	return o.backfillAggregatorKeys(ctx, cm)
 }
 
 // createDefaultConfigMap creates a ConfigMap with the provided data.
@@ -434,12 +438,16 @@ func (o *OptionsBuilder) createDefaultConfigMap(ctx context.Context, name string
 	return nil
 }
 
-// backfillConfigKeys patches an existing ConfigMap to add cpuAggregator,
-// memoryAggregator, evaluationInterval, and evaluationInterval1d with default values
-// when they are absent. This covers upgraded clusters where the ConfigMap was created
-// before these keys existed. Only missing keys are added — existing user
-// customizations are never overwritten.
-func (o *OptionsBuilder) backfillConfigKeys(ctx context.Context, cm *corev1.ConfigMap) error {
+// backfillAggregatorKeys patches an existing ConfigMap to add cpuAggregator and
+// memoryAggregator with default values when they are absent. This covers upgraded
+// clusters where the ConfigMap was created before these keys existed.
+// Only missing keys are added — existing user customizations are never overwritten.
+//
+// evaluationInterval and evaluationInterval1d are not backfilled on purpose. A missing
+// interval key already means its default, so writing it would change nothing on its
+// own, while every write here re-renders the addon for all managed clusters and starts
+// a write loop with any GitOps or policy owner that pins its own copy of the ConfigMap.
+func (o *OptionsBuilder) backfillAggregatorKeys(ctx context.Context, cm *corev1.ConfigMap) error {
 	raw, ok := cm.Data["prometheusRuleConfig"]
 	if !ok {
 		return nil
@@ -450,15 +458,13 @@ func (o *OptionsBuilder) backfillConfigKeys(ctx context.Context, cm *corev1.Conf
 	// upgraded clusters without visible aggregator keys.
 	var config map[string]any
 	if err := sigYaml.Unmarshal([]byte(raw), &config); err != nil {
-		o.Logger.Error(err, "Cannot parse prometheusRuleConfig, skipping backfill", "name", cm.Name)
+		o.Logger.Error(err, "Cannot parse prometheusRuleConfig, skipping aggregator backfill", "name", cm.Name)
 		return nil
 	}
 
 	_, hasCpu := config["cpuAggregator"]
 	_, hasMem := config["memoryAggregator"]
-	_, hasEvalInterval := config["evaluationInterval"]
-	_, hasEvalInterval1d := config["evaluationInterval1d"]
-	if hasCpu && hasMem && hasEvalInterval && hasEvalInterval1d {
+	if hasCpu && hasMem {
 		return nil
 	}
 
@@ -467,12 +473,6 @@ func (o *OptionsBuilder) backfillConfigKeys(ctx context.Context, cm *corev1.Conf
 	}
 	if !hasMem {
 		config["memoryAggregator"] = rightsizing.DefaultMemoryAggregator
-	}
-	if !hasEvalInterval {
-		config["evaluationInterval"] = rightsizing.DefaultEvaluationInterval
-	}
-	if !hasEvalInterval1d {
-		config["evaluationInterval1d"] = rightsizing.DefaultEvaluationInterval1d
 	}
 
 	// Detect whether the original data was YAML (from MCO 2.17) or JSON (from MCOA)
@@ -490,14 +490,11 @@ func (o *OptionsBuilder) backfillConfigKeys(ctx context.Context, cm *corev1.Conf
 
 	cm.Data["prometheusRuleConfig"] = string(updated)
 	if err := o.Client.Update(ctx, cm); err != nil {
-		return fmt.Errorf("failed to backfill keys in ConfigMap %s: %w", cm.Name, err)
+		return fmt.Errorf("failed to backfill aggregator keys in ConfigMap %s: %w", cm.Name, err)
 	}
 
-	o.Logger.Info("Backfilled missing keys in ConfigMap",
-		"name", cm.Name,
-		"addedCpu", !hasCpu, "addedMem", !hasMem,
-		"addedEvaluationInterval", !hasEvalInterval,
-		"addedEvaluationInterval1d", !hasEvalInterval1d)
+	o.Logger.Info("Backfilled missing aggregator keys in ConfigMap",
+		"name", cm.Name, "addedCpu", !hasCpu, "addedMem", !hasMem)
 	return nil
 }
 

@@ -1,6 +1,7 @@
 package rightsizing
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"regexp"
@@ -45,11 +46,12 @@ const (
 	MinSamplesPerAggregationWindow = 24
 
 	// MinEvaluationInterval is the floor of the rolling field. It is the default, so the
-	// setting can only make the rolling rules cheaper. A 1m interval would evaluate them and
-	// store their samples five times as often on every managed cluster, and every daily run
-	// would read five times as many samples, while changing nothing but the percentile
-	// profiles, which would then be taken over shorter peaks. Max OverAll would not move,
-	// and the VM CPU rate() window stays at 5m at every interval.
+	// setting can only make the rolling rules cheaper per hour; each run still gets heavier
+	// as the interval grows, since its subqueries read a longer window. A 1m interval would
+	// evaluate them and store their samples five times as often on every managed cluster,
+	// and every daily run would read five times as many samples, while changing nothing but
+	// the percentile profiles, which would then be taken over shorter peaks. Max OverAll
+	// would not move, and the VM CPU rate() window stays at 5m at every interval.
 	MinEvaluationInterval = 5 * time.Minute
 
 	// MaxEvaluationInterval caps the rolling-window interval so the daily rules always see
@@ -85,8 +87,10 @@ const (
 )
 
 // parsePrometheusDuration converts a single-unit Prometheus duration into a time.Duration.
-// It reports false for malformed input, a zero numeric part (Prometheus rejects zero-value
-// intervals and subquery ranges), or a value so large it would overflow time.Duration.
+// It reports false for malformed input, a zero numeric part, or a value so large it would
+// overflow time.Duration. Zero is refused because PromQL rejects a zero subquery range,
+// Prometheus would run a group with a zero interval at its global evaluation interval,
+// and RedundantEvaluationFactor divides by the result.
 func parsePrometheusDuration(s string) (time.Duration, bool) {
 	m := prometheusDurationPattern.FindStringSubmatch(s)
 	if m == nil {
@@ -104,34 +108,64 @@ func parsePrometheusDuration(s string) (time.Duration, bool) {
 	return time.Duration(n) * unit, true
 }
 
-// validateInterval reports whether s is a single-unit Prometheus duration (e.g. "5m",
-// "1h", "300s") with a non-zero value inside [minAllowed, maxAllowed].
+// The two reasons an evaluation interval is rejected for. validateInterval wraps them with
+// the allowed range, so the handler can log why a value was refused.
+var (
+	errIntervalNotSingleUnit = errors.New("not a single-unit Prometheus duration such as 30m")
+	errIntervalOutOfRange    = errors.New("outside the allowed range")
+)
+
+// validateInterval returns nil when s is a single-unit Prometheus duration (e.g. "5m",
+// "1h", "300s") inside [minAllowed, maxAllowed], and otherwise an error that says which of
+// the two s breaks and names the allowed range.
 // Empty strings are accepted and treated as "use default" by the callers.
-func validateInterval(s string, minAllowed, maxAllowed time.Duration) bool {
+func validateInterval(s string, minAllowed, maxAllowed time.Duration) error {
 	if s == "" {
-		return true
+		return nil
 	}
-	d, ok := parsePrometheusDuration(s)
-	if !ok {
-		return false
+	if !prometheusDurationPattern.MatchString(s) {
+		return fmt.Errorf("%w; allowed range %s to %s",
+			errIntervalNotSingleUnit, formatInterval(minAllowed), formatInterval(maxAllowed))
 	}
-	return d >= minAllowed && d <= maxAllowed
+	// The pattern matched, so a failed parse means a zero or a value too large to
+	// represent, and both lie outside every allowed range.
+	if d, ok := parsePrometheusDuration(s); !ok || d < minAllowed || d > maxAllowed {
+		return fmt.Errorf("%w %s to %s",
+			errIntervalOutOfRange, formatInterval(minAllowed), formatInterval(maxAllowed))
+	}
+	return nil
 }
 
-// ValidateEvaluationInterval reports whether s is usable as the rolling-window evaluation
-// interval. Below MinEvaluationInterval the rolling rules would cost more than they do at
-// the default. Beyond MaxEvaluationInterval the daily aggregation rules no longer see
-// enough samples for the percentile profiles to say more than the maximum does.
-func ValidateEvaluationInterval(s string) bool {
+// formatInterval spells d the way a ConfigMap would, in the largest unit that divides it
+// (e.g. "5m", "1h"), for the allowed range named in validation errors.
+func formatInterval(d time.Duration) string {
+	switch {
+	case d%time.Hour == 0:
+		return fmt.Sprintf("%dh", d/time.Hour)
+	case d%time.Minute == 0:
+		return fmt.Sprintf("%dm", d/time.Minute)
+	case d%time.Second == 0:
+		return fmt.Sprintf("%ds", d/time.Second)
+	default:
+		return fmt.Sprintf("%dms", d/time.Millisecond)
+	}
+}
+
+// ValidateEvaluationInterval returns nil when s is usable as the rolling-window evaluation
+// interval, and otherwise why it is not. Below MinEvaluationInterval the rolling rules
+// would cost more per hour than they do at the default. Beyond MaxEvaluationInterval the
+// daily aggregation rules no longer see enough samples for the percentile profiles to say
+// more than the maximum does.
+func ValidateEvaluationInterval(s string) error {
 	return validateInterval(s, MinEvaluationInterval, MaxEvaluationInterval)
 }
 
-// ValidateEvaluationInterval1d reports whether s is usable as the daily-aggregation
-// evaluation interval. Below MinEvaluationInterval1d the daily rules would cost more than
-// they do at the default. Beyond MaxEvaluationInterval1d some 1d windows hold fewer than
-// MinDailyRunsPerAggregationWindow hub samples, which leaves the shortest dashboard window
-// too little margin for lost samples.
-func ValidateEvaluationInterval1d(s string) bool {
+// ValidateEvaluationInterval1d returns nil when s is usable as the daily-aggregation
+// evaluation interval, and otherwise why it is not. Below MinEvaluationInterval1d the
+// daily rules would cost more than they do at the default. Beyond MaxEvaluationInterval1d
+// some 1d windows hold fewer than MinDailyRunsPerAggregationWindow hub samples, which
+// leaves the shortest dashboard window too little margin for lost samples.
+func ValidateEvaluationInterval1d(s string) error {
 	return validateInterval(s, MinEvaluationInterval1d, MaxEvaluationInterval1d)
 }
 

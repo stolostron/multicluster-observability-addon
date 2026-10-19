@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	"github.com/prometheus/prometheus/promql/parser"
 	"github.com/stolostron/multicluster-observability-addon/internal/analytics/rightsizing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -415,6 +416,7 @@ func TestCustomEvaluationInterval(t *testing.T) {
 
 	rule, err := GeneratePrometheusRule(configData)
 	require.NoError(t, err)
+	require.Len(t, rule.Spec.Groups, 4)
 
 	interval10m := monitoringv1.Duration("10m")
 	interval15m := monitoringv1.Duration("15m")
@@ -456,6 +458,7 @@ func TestCPUUsageRateWindowIgnoresEvaluationInterval(t *testing.T) {
 				PrometheusRuleConfig: rightsizing.RSPrometheusRuleConfig{EvaluationInterval: interval},
 			})
 			require.NoError(t, err)
+			require.Len(t, rule.Spec.Groups, 4)
 
 			// rate(kubevirt_vmi_cpu_usage_seconds_total{...}[5m:]) closes on "}[5m:])",
 			// max_over_time(sum (...) by (...)[<interval>:]) closes on ")[<interval>:])".
@@ -494,6 +497,7 @@ func TestCustomEvaluationInterval1d(t *testing.T) {
 
 	rule, err := GeneratePrometheusRule(configData)
 	require.NoError(t, err)
+	require.Len(t, rule.Spec.Groups, 4)
 
 	interval5m := monitoringv1.Duration(rightsizing.DefaultEvaluationInterval)
 	interval30m := monitoringv1.Duration("30m")
@@ -509,4 +513,88 @@ func TestCustomEvaluationInterval1d(t *testing.T) {
 
 func containsPrefix(s, prefix string) bool {
 	return len(s) >= len(prefix) && s[:len(prefix)] == prefix
+}
+
+// TestRecordNamesIgnoreEvaluationIntervals pins every recorded series to the name it has at
+// the default intervals. The daily rules and the dashboards select these series by name,
+// the ":5m" suffix included, so a name that followed the configured interval would leave
+// them reading nothing. The daily expressions must not change either: the intervals may
+// only move the group intervals and the rolling subquery ranges.
+func TestRecordNamesIgnoreEvaluationIntervals(t *testing.T) {
+	defaultRule, err := GeneratePrometheusRule(rightsizing.RSConfigMapData{
+		PrometheusRuleConfig: rightsizing.GetDefaultRSPrometheusRuleConfig(),
+	})
+	require.NoError(t, err)
+
+	for _, intervals := range []struct{ rolling, daily string }{
+		{"10m", "1h"}, {"1h", "6h"}, {"300000ms", "900000ms"},
+	} {
+		t.Run(intervals.rolling+"/"+intervals.daily, func(t *testing.T) {
+			config := rightsizing.GetDefaultRSPrometheusRuleConfig()
+			config.EvaluationInterval = intervals.rolling
+			config.EvaluationInterval1d = intervals.daily
+			rule, err := GeneratePrometheusRule(rightsizing.RSConfigMapData{PrometheusRuleConfig: config})
+			require.NoError(t, err)
+
+			require.Len(t, rule.Spec.Groups, len(defaultRule.Spec.Groups))
+			for i, group := range rule.Spec.Groups {
+				want := defaultRule.Spec.Groups[i]
+				require.Equal(t, want.Name, group.Name)
+				require.Len(t, group.Rules, len(want.Rules), "rules in %s", group.Name)
+				for j, r := range group.Rules {
+					assert.Equal(t, want.Rules[j].Record, r.Record, "rule %d in %s", j, group.Name)
+					if strings.Contains(group.Name, "-1d.rule") {
+						assert.Equal(t, want.Rules[j].Expr, r.Expr, "expression of %s in %s", r.Record, group.Name)
+					}
+				}
+			}
+		})
+	}
+}
+
+// TestGeneratedExpressionsParse runs every generated expression through the PromQL parser.
+// The configs between them reach each builder branch that changes an expression: namespace
+// inclusion and exclusion, the label_env join with inclusion and with exclusion, custom
+// percentile profiles, and custom intervals, including millisecond spellings. A broken
+// expression would otherwise only show up on the spoke, where the rules are rejected.
+func TestGeneratedExpressionsParse(t *testing.T) {
+	withIntervals := func(rolling, daily string) rightsizing.RSPrometheusRuleConfig {
+		config := rightsizing.GetDefaultRSPrometheusRuleConfig()
+		config.EvaluationInterval = rolling
+		config.EvaluationInterval1d = daily
+		return config
+	}
+
+	included := withIntervals("10m", "1h")
+	included.NamespaceFilterCriteria.ExclusionCriteria = nil
+	included.NamespaceFilterCriteria.InclusionCriteria = []string{"team-.*", "prod"}
+	included.LabelFilterCriteria = []rightsizing.RSLabelFilter{{LabelName: "label_env", InclusionCriteria: []string{"prod"}}}
+	included.CpuAggregator = []string{"Max OverAll", "P90", "p50"}
+	included.MemoryAggregator = []string{"P99"}
+
+	excluded := withIntervals("1h", "6h")
+	excluded.LabelFilterCriteria = []rightsizing.RSLabelFilter{{LabelName: "label_env", ExclusionCriteria: []string{"dev"}}}
+
+	for _, tc := range []struct {
+		name   string
+		config rightsizing.RSPrometheusRuleConfig
+	}{
+		{"defaults", rightsizing.GetDefaultRSPrometheusRuleConfig()},
+		{"floors in milliseconds", withIntervals("300000ms", "900000ms")},
+		{"inclusion filters and custom profiles", included},
+		{"label exclusion at the ceilings", excluded},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			rule, err := GeneratePrometheusRule(rightsizing.RSConfigMapData{PrometheusRuleConfig: tc.config})
+			require.NoError(t, err)
+			require.NotEmpty(t, rule.Spec.Groups)
+			for _, group := range rule.Spec.Groups {
+				require.NotEmpty(t, group.Rules, "rules in %s", group.Name)
+				for _, r := range group.Rules {
+					_, parseErr := parser.ParseExpr(r.Expr.String())
+					assert.NoError(t, parseErr, "%s in %s: %s", r.Record, group.Name, r.Expr.String())
+				}
+			}
+		})
+	}
 }
