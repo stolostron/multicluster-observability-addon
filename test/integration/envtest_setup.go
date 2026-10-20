@@ -9,21 +9,11 @@ import (
 	"testing"
 
 	"github.com/go-logr/logr"
-	ocinfrav1 "github.com/openshift/api/config/v1"
-	hyperv1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
-	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
-	cooprometheusv1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1"
-	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
+	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/runtime"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
-	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
-	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
-	clusterv1 "open-cluster-management.io/api/cluster/v1"
-	workv1 "open-cluster-management.io/api/work/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -33,18 +23,7 @@ var setLoggerOnce sync.Once
 
 // NewTestScheme returns a complete runtime.Scheme populated with all types needed for MCOA integration testing.
 func NewTestScheme() *runtime.Scheme {
-	s := runtime.NewScheme()
-	utilruntime.Must(clientgoscheme.AddToScheme(s))
-	utilruntime.Must(workv1.Install(s))
-	utilruntime.Must(clusterv1.Install(s))
-	utilruntime.Must(addonv1alpha1.Install(s))
-	utilruntime.Must(addonv1beta1.Install(s))
-	utilruntime.Must(cooprometheusv1.AddToScheme(s))
-	utilruntime.Must(cooprometheusv1alpha1.AddToScheme(s))
-	utilruntime.Must(prometheusv1.AddToScheme(s))
-	utilruntime.Must(hyperv1.AddToScheme(s))
-	utilruntime.Must(ocinfrav1.Install(s))
-	return s
+	return addoncfg.NewScheme()
 }
 
 // FindRepoRoot traverses directory parents to locate the repository root containing go.mod.
