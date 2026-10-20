@@ -203,6 +203,55 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				assert.Contains(t, job[0].Spec.Template.Spec.Tolerations, corev1.Toleration{Operator: corev1.TolerationOpExists})
 			},
 		},
+		"no metrics, is non ocp": {
+			// Simulates a non-OCP cluster (e.g., AKS, EKS) where metrics collection is disabled,
+			// such as when Right-Sizing is enabled.
+			// endpoint-monitoring-operator must be deployed without OpenShift-specific components:
+			// no kube-rbac-proxy sidecar, no OpenShift service-ca TLS secret volume, and no
+			// OpenShift-specific Service/ServiceMonitor/RBAC resources.
+			PlatformMetrics: false,
+			UserMetrics:     false,
+			IsOCP:           false,
+			Expects: func(t *testing.T, objects []client.Object) {
+				// 4 endpoint-monitoring-operator resources (SA, CR, CRB, Deployment)
+				// + 4 pre-delete cleanup hook resources (SA, CR, CRB, Job) = 8 total.
+				assert.Len(t, objects, 8)
+				deployments := common.FilterResourcesByLabelSelector[*appsv1.Deployment](objects, nil)
+				require.Len(t, deployments, 1)
+				emoDeployment := deployments[0]
+				assert.Equal(t, "endpoint-monitoring-operator", emoDeployment.GetName())
+
+				// endpoint-monitoring-operator container checks: non-OCP deployment must NOT have kube-rbac-proxy sidecar
+				require.Len(t, emoDeployment.Spec.Template.Spec.Containers, 1, "non-OCP deployment must NOT have kube-rbac-proxy sidecar")
+				emoContainer := emoDeployment.Spec.Template.Spec.Containers[0]
+				assert.Equal(t, "endpoint-monitoring-operator", emoContainer.Name)
+
+				// Metrics bind address must bind to 0.0.0.0:8080 directly for non-OCP
+				assert.Contains(t, emoContainer.Args, "--metrics-bind-address=0.0.0.0:8080")
+
+				// Direct metrics port must be exposed on container
+				require.Len(t, emoContainer.Ports, 1)
+				assert.Equal(t, int32(8080), emoContainer.Ports[0].ContainerPort)
+				assert.Equal(t, "metrics", emoContainer.Ports[0].Name)
+
+				// Ensure no OpenShift service-ca TLS volume is mounted or defined
+				for _, vol := range emoDeployment.Spec.Template.Spec.Volumes {
+					assert.NotEqual(t, "kube-rbac-proxy-tls", vol.Name, "kube-rbac-proxy-tls volume must not exist on non-OCP")
+				}
+
+				// No endpoint-monitoring-operator-metrics Service or ServiceMonitor on non-OCP
+				services := common.FilterResourcesByLabelSelector[*corev1.Service](objects, nil)
+				assert.Empty(t, services, "no metrics service should be deployed for endpoint-monitoring-operator on non-OCP")
+
+				serviceMonitors := common.FilterResourcesByLabelSelector[*prometheusv1.ServiceMonitor](objects, nil)
+				assert.Empty(t, serviceMonitors, "no metrics service monitor should be deployed for endpoint-monitoring-operator on non-OCP")
+
+				// Ensure pre-delete cleanup job is still present
+				job := common.FilterResourcesByLabelSelector[*batchv1.Job](objects, nil)
+				require.Len(t, job, 1)
+				assert.Equal(t, "observability-monitoring-cleanup", job[0].GetName())
+			},
+		},
 		"platform metrics enabled but agent missing": {
 			// This test case simulates the ClusterManagementAddOn deletion state where platform metrics
 			// are enabled but its child PrometheusAgent custom resource is already garbage collected.
