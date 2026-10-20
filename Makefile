@@ -10,6 +10,7 @@ default: all
 VERSION ?= v0.0.1
 
 CRD_DIR := $(shell pwd)/deploy/crds
+TEST_CRD_DIR := $(CURDIR)/test/integration/crds
 BIN_DIR := $(CURDIR)/bin
 CONTAINER_ENGINE ?= $(shell which podman 2>/dev/null || which docker 2>/dev/null)
 
@@ -56,8 +57,25 @@ $(CRD_DIR)/core.observatorium.io_observatoria.yaml:
 	@mkdir -p $(CRD_DIR)
 	@curl https://raw.githubusercontent.com/stolostron/observatorium-operator/blob/main/manifests/crds/core.observatorium.io_observatoria.yaml  > $(CRD_DIR)/core.observatorium.io_observatoria.yaml
 
+# CRDs synchronized from deploy/crds into test/integration/crds for envtest
+SHARED_INTEGRATION_CRDS := \
+	observability.openshift.io_clusterlogforwarders.yaml \
+	opentelemetry.io_opentelemetrycollectors.yaml \
+	opentelemetry.io_instrumentations.yaml \
+	monitoring.rhobs_prometheusagents.yaml \
+	monitoring.rhobs_scrapeconfigs.yaml \
+	monitoring.rhobs_prometheusrules.yaml
+
+.PHONY: sync-integration-crds
+sync-integration-crds: ## Sync shared operand CRDs from deploy/crds to test/integration/crds
+	@mkdir -p $(TEST_CRD_DIR)
+	@for crd in $(SHARED_INTEGRATION_CRDS); do \
+		cp $(CRD_DIR)/$$crd $(TEST_CRD_DIR)/$$crd; \
+	done
+
 .PHONY: download-crds
 download-crds: $(CRD_DIR)/observability.openshift.io_clusterlogforwarders.yaml $(CRD_DIR)/opentelemetry.io_opentelemetrycollectors.yaml $(CRD_DIR)/opentelemetry.io_instrumentations.yaml $(CRD_DIR)/monitoring.coreos.com_prometheusagents.yaml $(CRD_DIR)/monitoring.coreos.com_scrapeconfigs.yaml $(CRD_DIR)/monitoring.rhobs_prometheusrules.yaml $(CRD_DIR)/core.observatorium.io_observatoria.yaml
+	@$(MAKE) sync-integration-crds
 
 .PHONY: verify-dockerfile-labels
 verify-dockerfile-labels: ## Verify Dockerfile.Konflux RHEL version consistency
