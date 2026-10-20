@@ -209,6 +209,29 @@ func TestBuildValues(t *testing.T) {
 			},
 			Expect: func(t *testing.T, values *manifests.MetricsValues) {
 				assert.True(t, values.DeployNonOCPStack)
+				assert.False(t, values.IsOpenShiftVendor)
+			},
+		},
+		"with is openshift vendor true": {
+			Options: handlers.Options{
+				IsOpenShiftVendor: true,
+			},
+			Expect: func(t *testing.T, values *manifests.MetricsValues) {
+				assert.True(t, values.IsOpenShiftVendor)
+				assert.False(t, values.DeployNonOCPStack)
+			},
+		},
+		"with is openshift vendor false without metrics": {
+			// Simulates a non-OCP cluster with metrics disabled (e.g., when Right-Sizing is enabled).
+			// DeployNonOCPStack must be false because no Prometheus stack is deployed,
+			// but IsOpenShiftVendor must accurately reflect false so endpoint-monitoring-operator
+			// does not inject OpenShift-only resources like kube-rbac-proxy or service-ca TLS secrets.
+			Options: handlers.Options{
+				IsOpenShiftVendor: false,
+			},
+			Expect: func(t *testing.T, values *manifests.MetricsValues) {
+				assert.False(t, values.IsOpenShiftVendor)
+				assert.False(t, values.DeployNonOCPStack)
 			},
 		},
 		"with deploy coo resources": {

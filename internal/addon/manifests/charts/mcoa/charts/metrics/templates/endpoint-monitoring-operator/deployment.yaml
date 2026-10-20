@@ -37,7 +37,7 @@ spec:
         args:
         - mcoa
         - --namespace={{ .Release.Namespace }}
-        - --metrics-bind-address={{ if .Values.deployNonOCPStack }}0.0.0.0:8080{{ else }}127.0.0.1:8080{{ end }}
+        - --metrics-bind-address={{ if .Values.isOpenShiftVendor }}127.0.0.1:8080{{ else }}0.0.0.0:8080{{ end }}
         - --cluster-id={{ .Values.clusterID }}
         - --cluster-name={{ .Values.clusterName }}
         - --enable-platform-alert-forwarding={{ and .Values.platformEnabled .Values.platformAlertsEnabled }}
@@ -48,7 +48,7 @@ spec:
         - --hub-alertmanager-cert-secret={{ .Values.clientCertSecretName }}
         - --hub-alertmanager-accessor-secret={{ .Values.alertmanagerAccessorSecretName }}
         - --hub-alertmanager-ca-secret={{ .Values.alertmanagerRouterCASecretName }}
-        {{- if .Values.deployNonOCPStack }}
+        {{- if not .Values.isOpenShiftVendor }}
         ports:
         - name: metrics
           containerPort: 8080
@@ -80,7 +80,7 @@ spec:
           privileged: false
           runAsNonRoot: true
           readOnlyRootFilesystem: true
-      {{- if not .Values.deployNonOCPStack }}
+      {{- if .Values.isOpenShiftVendor }}
       - name: kube-rbac-proxy
         image: {{ .Values.images.rbacProxyImage }}
         imagePullPolicy: IfNotPresent
@@ -132,7 +132,7 @@ spec:
           mountPath: /etc/tls/private
           readOnly: true
       {{- end }}
-      {{- if not .Values.deployNonOCPStack }}
+      {{- if .Values.isOpenShiftVendor }}
       volumes:
       - name: kube-rbac-proxy-tls
         secret:

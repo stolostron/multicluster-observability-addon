@@ -15,38 +15,43 @@ import (
 )
 
 type MetricsValues struct {
-	PlatformEnabled                bool                              `json:"platformEnabled"`
-	UserWorkloadsEnabled           bool                              `json:"userWorkloadsEnabled"`
-	Secrets                        []ConfigValue                     `json:"secrets"`
-	ConfigMaps                     []ConfigValue                     `json:"configMaps"`
-	Images                         ImagesValues                      `json:"images"`
-	PrometheusControllerID         string                            `json:"prometheusControllerID"`
-	PrometheusCAConfigMapName      string                            `json:"prometheusCAConfigMapName"`
-	PrometheusServerName           string                            `json:"prometheusServerName"`
-	AlertmanagerRouterCASecretName string                            `json:"alertmanagerRouterCASecretName"`
-	AlertmanagerAccessorSecretName string                            `json:"alertmanagerAccessorSecretName"`
-	ClientCertSecretName           string                            `json:"clientCertSecretName"`
-	HubClusterID                   string                            `json:"hubClusterID"`
-	ClusterID                      string                            `json:"clusterID"`
-	ClusterName                    string                            `json:"clusterName"`
-	PlatformAlertsEnabled          bool                              `json:"platformAlertsEnabled"`
-	UserWorkloadAlertsEnabled      bool                              `json:"userWorkloadAlertsEnabled"`
-	Platform                       Collector                         `json:"platform"`
-	UserWorkload                   Collector                         `json:"userWorkload"`
-	DeployNonOCPStack              bool                              `json:"deployNonOCPStack"`
-	DeployCOOResources             bool                              `json:"deployCOOResources"`
-	IsHub                          bool                              `json:"isHub"`
-	PrometheusOperatorAnnotations  string                            `json:"prometheusOperatorAnnotations,omitempty"`
-	HubEndpoint                    string                            `json:"hubEndpoint,omitempty"`
-	Tolerations                    []corev1.Toleration               `json:"tolerations"`
-	NodeSelector                   map[string]string                 `json:"nodeSelector"`
-	NodeExporter                   NodeExporterValues                `json:"nodeExporter"`
-	ThanosOperator                 ThanosOperatorValues              `json:"thanosOperator"`
-	TLSProfileEnabled              bool                              `json:"tlsProfileEnabled"`
-	TLSMinVersion                  string                            `json:"tlsMinVersion,omitempty"`
-	TLSCipherSuites                string                            `json:"tlsCipherSuites,omitempty"`
-	MonitoringStackPatches         []MonitoringStackPatchValues      `json:"monitoringStackPatches"`
-	PrometheusServerRemoteWrite    []cooprometheusv1.RemoteWriteSpec `json:"prometheusServerRemoteWrite,omitempty"`
+	PlatformEnabled                bool          `json:"platformEnabled"`
+	UserWorkloadsEnabled           bool          `json:"userWorkloadsEnabled"`
+	Secrets                        []ConfigValue `json:"secrets"`
+	ConfigMaps                     []ConfigValue `json:"configMaps"`
+	Images                         ImagesValues  `json:"images"`
+	PrometheusControllerID         string        `json:"prometheusControllerID"`
+	PrometheusCAConfigMapName      string        `json:"prometheusCAConfigMapName"`
+	PrometheusServerName           string        `json:"prometheusServerName"`
+	AlertmanagerRouterCASecretName string        `json:"alertmanagerRouterCASecretName"`
+	AlertmanagerAccessorSecretName string        `json:"alertmanagerAccessorSecretName"`
+	ClientCertSecretName           string        `json:"clientCertSecretName"`
+	HubClusterID                   string        `json:"hubClusterID"`
+	ClusterID                      string        `json:"clusterID"`
+	ClusterName                    string        `json:"clusterName"`
+	PlatformAlertsEnabled          bool          `json:"platformAlertsEnabled"`
+	UserWorkloadAlertsEnabled      bool          `json:"userWorkloadAlertsEnabled"`
+	Platform                       Collector     `json:"platform"`
+	UserWorkload                   Collector     `json:"userWorkload"`
+	DeployNonOCPStack              bool          `json:"deployNonOCPStack"`
+	DeployCOOResources             bool          `json:"deployCOOResources"`
+	// IsOpenShiftVendor explicitly tracks whether the target cluster is an OpenShift cluster.
+	// This is decoupled from DeployNonOCPStack because DeployNonOCPStack is only true when
+	// metrics collection is enabled, whereas endpoint-monitoring-operator may still be deployed
+	// on non-OCP clusters even with metrics disabled (e.g., when Right-Sizing is enabled).
+	IsOpenShiftVendor             bool                              `json:"isOpenShiftVendor"`
+	IsHub                         bool                              `json:"isHub"`
+	PrometheusOperatorAnnotations string                            `json:"prometheusOperatorAnnotations,omitempty"`
+	HubEndpoint                   string                            `json:"hubEndpoint,omitempty"`
+	Tolerations                   []corev1.Toleration               `json:"tolerations"`
+	NodeSelector                  map[string]string                 `json:"nodeSelector"`
+	NodeExporter                  NodeExporterValues                `json:"nodeExporter"`
+	ThanosOperator                ThanosOperatorValues              `json:"thanosOperator"`
+	TLSProfileEnabled             bool                              `json:"tlsProfileEnabled"`
+	TLSMinVersion                 string                            `json:"tlsMinVersion,omitempty"`
+	TLSCipherSuites               string                            `json:"tlsCipherSuites,omitempty"`
+	MonitoringStackPatches        []MonitoringStackPatchValues      `json:"monitoringStackPatches"`
+	PrometheusServerRemoteWrite   []cooprometheusv1.RemoteWriteSpec `json:"prometheusServerRemoteWrite,omitempty"`
 }
 
 type MonitoringStackPatchValues struct {
@@ -320,6 +325,7 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 	ret.UserWorkloadsEnabled = opts.IsUserWorkloadsEnabled()
 	ret.DeployNonOCPStack = !opts.IsOpenShiftVendor && (ret.PlatformEnabled || ret.UserWorkloadsEnabled)
 	ret.DeployCOOResources = (ret.PlatformEnabled || ret.UserWorkloadsEnabled) && !opts.COOInstalled
+	ret.IsOpenShiftVendor = opts.IsOpenShiftVendor
 	ret.PrometheusOperatorAnnotations = opts.CRDEstablishedAnnotation
 
 	// Set images
