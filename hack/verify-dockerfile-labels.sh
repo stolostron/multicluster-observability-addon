@@ -57,7 +57,8 @@ if [ "$from_rhel" != "$name_rhel" ] || [ "$from_rhel" != "$cpe_rhel" ]; then
 fi
 
 # Verify name label format (must not use $IMAGE_NAME variable)
-if grep -q 'name="\$IMAGE_NAME"' "$DOCKERFILE"; then
+# shellcheck disable=SC2016
+if grep -qF 'name="$IMAGE_NAME"' "$DOCKERFILE"; then
   echo "❌ ERROR: name label uses \$IMAGE_NAME variable instead of hardcoded value"
   exit 1
 fi
