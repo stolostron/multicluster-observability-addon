@@ -4,27 +4,31 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/go-logr/logr"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 var errNotClientObjectType = errors.New("object is not a client.Object")
 
-// DeleteOrphanResources lists resources of type T that are either owned by the CMAO (default
-// resources) or opted into MCOA management via the part-of label (user-defined resources), and
-// removes the ones for which none of the placements referenced in their placement-ref annotation
-// (comma-separated "namespace/name" entries, see addoncfg.PlacementAnnotationKey) exist on the
-// CMAO anymore. A resource referencing multiple placements is only deleted once all of them are
-// gone.
+// DeleteOrphanResources lists resources of type T in the install namespace and removes the ones
+// that are fully owned by the CMAO and for which none of the placements referenced in their
+// placement-ref annotation (comma-separated "namespace/name" entries, see
+// addoncfg.PlacementAnnotationKey) exist on the CMAO anymore. Resources that are user-defined or
+// partially owned by a user (as determined by IsFullyOwnedByCMAO) are left in place.
+//
+// Note: Because IsFullyOwnedByCMAO inspects metadata.managedFields, any resource type T read from
+// the controller-runtime cache must be exempted from TransformStripManagedFields in
+// addoncfg.GetCacheOptions().
 func DeleteOrphanResources[T client.ObjectList](ctx context.Context, logger logr.Logger, k8s client.Client, cmao *addonapiv1beta1.ClusterManagementAddOn, items T) error {
 	if err := k8s.List(ctx, items, client.InNamespace(addoncfg.InstallNamespace)); err != nil {
-		return fmt.Errorf("failed to list PrometheusAgents: %w", err)
+		return fmt.Errorf("failed to list resources: %w", err)
 	}
 
 	placementsDict := map[string]struct{}{}
@@ -44,14 +48,7 @@ func DeleteOrphanResources[T client.ObjectList](ctx context.Context, logger logr
 			return errNotClientObjectType
 		}
 
-		hasOwnerRef, err := controllerutil.HasOwnerReference(obj.GetOwnerReferences(), cmao, k8s.Scheme())
-		if err != nil {
-			return fmt.Errorf("failed to check owner references: %w", err)
-		}
-
-		isUserDefined := obj.GetLabels()[addoncfg.PartOfK8sLabelKey] == addoncfg.Name
-
-		if !hasOwnerRef && !isUserDefined {
+		if !IsFullyOwnedByCMAO(obj, cmao) {
 			continue
 		}
 
@@ -60,7 +57,7 @@ func DeleteOrphanResources[T client.ObjectList](ctx context.Context, logger logr
 		}
 
 		if err := k8s.Delete(ctx, obj); err != nil {
-			return fmt.Errorf("failed to delete owned agent: %w", err)
+			return fmt.Errorf("failed to delete orphan resource: %w", err)
 		}
 		logger.Info("default configuration deleted", "name", obj.GetName(), "namespace", obj.GetNamespace(), "kind", obj.GetObjectKind().GroupVersionKind().Kind)
 	}
@@ -68,9 +65,50 @@ func DeleteOrphanResources[T client.ObjectList](ctx context.Context, logger logr
 	return nil
 }
 
+// IsFullyOwnedByCMAO returns true if obj is owned by cmao (via OwnerReferences) and has not been
+// created or partially modified by a user.
+// A resource is considered user-owned or partially user-owned if:
+//   - it does not have cmao in its OwnerReferences,
+//   - it carries the user opt-in label (app.kubernetes.io/part-of: multicluster-observability-addon), or
+//   - any non-subresource entry in metadata.managedFields belongs to a manager other than MCOA
+//     (addoncfg.Name).
+//
+// Note: Callers inspecting cached objects must ensure the resource type is exempted from
+// TransformStripManagedFields in addoncfg.GetCacheOptions() so metadata.managedFields is retained.
+func IsFullyOwnedByCMAO(obj client.Object, cmao *addonapiv1beta1.ClusterManagementAddOn) bool {
+	if !hasCMAOOwnerReference(obj, cmao) {
+		return false
+	}
+
+	if obj.GetLabels()[addoncfg.PartOfK8sLabelKey] == addoncfg.Name {
+		return false
+	}
+
+	for _, entry := range obj.GetManagedFields() {
+		if entry.Subresource != "" {
+			continue
+		}
+		if entry.Manager != addoncfg.Name {
+			return false
+		}
+	}
+
+	return true
+}
+
+func hasCMAOOwnerReference(obj client.Object, cmao *addonapiv1beta1.ClusterManagementAddOn) bool {
+	if cmao.GetUID() != "" && metav1.IsControlledBy(obj, cmao) {
+		return true
+	}
+	return slices.ContainsFunc(obj.GetOwnerReferences(), func(owner metav1.OwnerReference) bool {
+		return owner.Kind == "ClusterManagementAddOn" &&
+			owner.Name == cmao.GetName() &&
+			strings.HasPrefix(owner.APIVersion, addonapiv1beta1.GroupName+"/")
+	})
+}
+
 // hasExistingPlacementRef returns true if at least one of the "namespace/name" entries in the
-// object's placement-ref annotation is still present in placementsDict, or refers to the internal
-// "dummy" placement sentinel.
+// object's placement-ref annotation is still present in placementsDict.
 func hasExistingPlacementRef(obj client.Object, placementsDict map[string]struct{}) bool {
 	annotation := obj.GetAnnotations()[addoncfg.PlacementAnnotationKey]
 	if annotation == "" {
@@ -79,21 +117,10 @@ func hasExistingPlacementRef(obj client.Object, placementsDict map[string]struct
 
 	for ref := range strings.SplitSeq(annotation, ",") {
 		ref = strings.TrimSpace(ref)
-		if isDummyPlacementRef(ref) {
-			return true
-		}
 		if _, ok := placementsDict[ref]; ok {
 			return true
 		}
 	}
 
 	return false
-}
-
-// isDummyPlacementRef returns true if ref refers to the internal "dummy" placement sentinel used by
-// CreateDefaultAgent as a placeholder when no default agent is otherwise needed. It never
-// corresponds to a real Placement, so it must never be treated as orphaned.
-func isDummyPlacementRef(ref string) bool {
-	_, name, ok := strings.Cut(ref, "/")
-	return ok && name == "dummy"
 }
