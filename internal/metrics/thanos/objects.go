@@ -51,7 +51,7 @@ func (b *ObjectBuilder) Build(ctx context.Context, cluster *clusterv1.ManagedClu
 	query := b.buildQuery(opts)
 	ruler := b.buildRuler(opts)
 	compact := b.buildCompact(opts)
-	memcachedObjects := b.buildMemcachedObjects(opts.InstanceSize, images)
+	memcachedObjects := b.buildMemcachedObjects(opts, images)
 
 	objects := []runtime.Object{store, receive, query, ruler, compact}
 	objects = append(objects, memcachedObjects...)

@@ -5,6 +5,7 @@ import (
 	"maps"
 
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -19,7 +20,7 @@ const (
 	memcachedExporterPort = 9150
 )
 
-func (b *ObjectBuilder) buildMemcachedObjects(instanceSize string, images config.ImageOverrides) []runtime.Object {
+func (b *ObjectBuilder) buildMemcachedObjects(opts addon.Options, images config.ImageOverrides) []runtime.Object {
 	memcachedImage := config.DefaultMemcachedImage
 	if images.Memcached != "" {
 		memcachedImage = images.Memcached
@@ -29,7 +30,7 @@ func (b *ObjectBuilder) buildMemcachedObjects(instanceSize string, images config
 		exporterImage = images.MemcachedExporter
 	}
 
-	storeDeployment := buildMemcachedDeployment(config.MemcachedStoreName, memcachedStoreLabels(), memcachedImage, exporterImage, config.MemcachedStoreContainerID, instanceSize)
+	storeDeployment := buildMemcachedDeployment(config.MemcachedStoreName, memcachedStoreLabels(), memcachedImage, exporterImage, config.MemcachedStoreContainerID, opts)
 	storeService := buildMemcachedService(config.MemcachedStoreName, memcachedStoreLabels())
 	storeCacheSecret := buildCacheConfigSecret(
 		config.StoreCacheConfigSecretName,
@@ -38,7 +39,7 @@ func (b *ObjectBuilder) buildMemcachedObjects(instanceSize string, images config
 	)
 	storeServiceMonitor := buildMemcachedServiceMonitor(config.MemcachedStoreName, memcachedStoreLabels())
 
-	qfeDeployment := buildMemcachedDeployment(config.MemcachedQueryFrontendName, memcachedQueryFrontendLabels(), memcachedImage, exporterImage, config.MemcachedQueryFrontendContainerID, instanceSize)
+	qfeDeployment := buildMemcachedDeployment(config.MemcachedQueryFrontendName, memcachedQueryFrontendLabels(), memcachedImage, exporterImage, config.MemcachedQueryFrontendContainerID, opts)
 	qfeService := buildMemcachedService(config.MemcachedQueryFrontendName, memcachedQueryFrontendLabels())
 	qfeCacheSecret := buildCacheConfigSecret(
 		config.QueryFECacheConfigSecretName,
@@ -53,7 +54,7 @@ func (b *ObjectBuilder) buildMemcachedObjects(instanceSize string, images config
 	}
 }
 
-func buildMemcachedDeployment(name string, labels map[string]string, memcachedImage, exporterImage, containerID, instanceSize string) *appsv1.Deployment {
+func buildMemcachedDeployment(name string, labels map[string]string, memcachedImage, exporterImage, containerID string, opts addon.Options) *appsv1.Deployment {
 	replicas := config.DefaultMemcachedReplicas
 	memoryLimitArg := fmt.Sprintf("-m %d", config.DefaultMemcachedMemoryLimitMB)
 	connLimitArg := fmt.Sprintf("-c %d", config.DefaultMemcachedConnectionLimit)
@@ -79,7 +80,8 @@ func buildMemcachedDeployment(name string, labels map[string]string, memcachedIm
 					Labels: labels,
 				},
 				Spec: corev1.PodSpec{
-					NodeSelector: map[string]string{"kubernetes.io/os": "linux"},
+					NodeSelector: memcachedNodeSelector(opts),
+					Tolerations:  opts.Tolerations,
 					SecurityContext: &corev1.PodSecurityContext{
 						RunAsNonRoot: boolPtr(true),
 					},
@@ -95,7 +97,7 @@ func buildMemcachedDeployment(name string, labels map[string]string, memcachedIm
 									Protocol:      corev1.ProtocolTCP,
 								},
 							},
-							Resources: memcachedResources(containerID, instanceSize),
+							Resources: memcachedResources(containerID, opts),
 							SecurityContext: &corev1.SecurityContext{
 								AllowPrivilegeEscalation: boolPtr(false),
 								Capabilities: &corev1.Capabilities{
@@ -254,11 +256,8 @@ func memcachedQueryFrontendLabels() map[string]string {
 	return labels
 }
 
-func memcachedResources(containerID, instanceSize string) corev1.ResourceRequirements {
-	if sized := GetResourcesForSize(containerID, instanceSize); sized != nil {
-		return *sized
-	}
-	return corev1.ResourceRequirements{
+func memcachedResources(containerID string, opts addon.Options) corev1.ResourceRequirements {
+	res := corev1.ResourceRequirements{
 		Requests: corev1.ResourceList{
 			corev1.ResourceCPU:    resource.MustParse(config.DefaultMemcachedCPURequest),
 			corev1.ResourceMemory: resource.MustParse(config.DefaultMemcachedMemRequest),
@@ -267,6 +266,22 @@ func memcachedResources(containerID, instanceSize string) corev1.ResourceRequire
 			corev1.ResourceMemory: resource.MustParse(config.DefaultMemcachedMemLimit),
 		},
 	}
+	if sized := GetResourcesForSize(containerID, opts.InstanceSize); sized != nil {
+		res = *sized
+	}
+	for _, resReq := range opts.ResourceReqs {
+		if resReq.ContainerID == containerID {
+			return resReq.Resources
+		}
+	}
+	return res
+}
+
+func memcachedNodeSelector(opts addon.Options) map[string]string {
+	if len(opts.NodeSelector) > 0 {
+		return opts.NodeSelector
+	}
+	return map[string]string{"kubernetes.io/os": "linux"}
 }
 
 func boolPtr(b bool) *bool {
