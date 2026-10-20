@@ -11,22 +11,8 @@ import (
 
 	"github.com/ViaQ/logerr/v2/log"
 	"github.com/go-logr/logr"
-	otelv1alpha1 "github.com/open-telemetry/opentelemetry-operator/apis/v1alpha1"
-	otelv1beta1 "github.com/open-telemetry/opentelemetry-operator/apis/v1beta1"
 	configv1 "github.com/openshift/api/config/v1"
-	operatorv1 "github.com/openshift/api/operator/v1"
-	routev1 "github.com/openshift/api/route/v1"
-	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
 	tlsutil "github.com/openshift/controller-runtime-common/pkg/tls"
-	hyperv1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
-	operatorsv1 "github.com/operator-framework/api/pkg/operators/v1"
-	operatorsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
-	persesv1 "github.com/perses/perses-operator/api/v1alpha1"
-	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
-	cooprometheusv1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1"
-	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
-	monitoringv1alpha1 "github.com/rhobs/observability-operator/pkg/apis/monitoring/v1alpha1"
-	uiplugin "github.com/rhobs/observability-operator/pkg/apis/uiplugin/v1alpha1"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
@@ -35,23 +21,16 @@ import (
 	"github.com/stolostron/multicluster-observability-addon/internal/controllers/resourcecreator"
 	"github.com/stolostron/multicluster-observability-addon/internal/controllers/watcher"
 	tlshelper "github.com/stolostron/multicluster-observability-addon/pkg/util"
-	thanosv1alpha1 "github.com/thanos-community/thanos-operator/api/v1alpha1"
 	crdClientSet "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/runtime"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	utilflag "k8s.io/component-base/cli/flag"
 	logs "k8s.io/component-base/logs/api/v1"
 	cmdfactory "open-cluster-management.io/addon-framework/pkg/cmd/factory"
 	"open-cluster-management.io/addon-framework/pkg/version"
 	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
-	clusterv1 "open-cluster-management.io/api/cluster/v1"
-	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
-	workv1 "open-cluster-management.io/api/work/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -62,32 +41,7 @@ import (
 	_ "github.com/stolostron/multicluster-observability-addon/internal/addon/metrics"
 )
 
-var scheme = runtime.NewScheme()
-
-func init() {
-	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-	utilruntime.Must(workv1.Install(scheme))
-	utilruntime.Must(loggingv1.AddToScheme(scheme))
-	utilruntime.Must(otelv1beta1.AddToScheme(scheme))
-	utilruntime.Must(otelv1alpha1.AddToScheme(scheme))
-	utilruntime.Must(operatorsv1.AddToScheme(scheme))
-	utilruntime.Must(operatorsv1alpha1.AddToScheme(scheme))
-	utilruntime.Must(clusterv1.Install(scheme))
-	utilruntime.Must(clusterv1beta1.Install(scheme))
-	utilruntime.Must(operatorv1.AddToScheme(scheme))
-	utilruntime.Must(cooprometheusv1.AddToScheme(scheme))
-	utilruntime.Must(cooprometheusv1alpha1.AddToScheme(scheme)) // Adds prometheusAgent and scrapeConfig
-	utilruntime.Must(monitoringv1alpha1.AddToScheme(scheme))    // Adds monitoringstack
-	utilruntime.Must(prometheusv1.AddToScheme(scheme))          // Adds prometheusRule
-	utilruntime.Must(uiplugin.AddToScheme(scheme))
-	utilruntime.Must(hyperv1.AddToScheme(scheme))
-	utilruntime.Must(persesv1.AddToScheme(scheme))
-	utilruntime.Must(routev1.AddToScheme(scheme))
-	utilruntime.Must(addonv1beta1.Install(scheme))
-	utilruntime.Must(thanosv1alpha1.AddToScheme(scheme))
-	utilruntime.Must(configv1.AddToScheme(scheme))
-	// +kubebuilder:scaffold:scheme
-}
+var scheme = addoncfg.NewScheme()
 
 var (
 	logVerbosity int
