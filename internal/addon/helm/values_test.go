@@ -1,6 +1,7 @@
 package helm
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/go-logr/logr"
@@ -16,6 +17,7 @@ import (
 	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -394,4 +396,77 @@ func TestRSOnlyMetricsCollectionMissing_NoMonitoringStack(t *testing.T) {
 			t.Errorf("unexpected ScrapeConfig %s rendered when metrics collection is missing", name)
 		}
 	}
+}
+
+// TestKlusterletWorkAgentClusterRole verifies that the aggregated klusterlet-work:agent
+// ClusterRole is rendered with the deletion-orphan annotation (to prevent premature
+// deletion during ManifestWork teardown) and includes full verbs on namespaces (allowing
+// klusterlet-work-sa to delete namespaces such as Namespace/observability-analytics).
+func TestKlusterletWorkAgentClusterRole(t *testing.T) {
+	managedCluster := addontesting.NewManagedCluster("cluster-1")
+	managedCluster.Labels = map[string]string{"vendor": "OpenShift"}
+
+	managedClusterAddOn := addontesting.NewAddon("test", "cluster-1")
+	managedClusterAddOn.Status.ConfigReferences = []addonapiv1beta1.ConfigReference{
+		{
+			ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
+				Group:    "addon.open-cluster-management.io",
+				Resource: "addondeploymentconfigs",
+			},
+			DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+				ConfigReferent: addonapiv1beta1.ConfigReferent{
+					Name:      "multicluster-observability-addon",
+					Namespace: "open-cluster-management-observability",
+				},
+			},
+		},
+	}
+
+	addOnDeploymentConfig := &addonapiv1beta1.AddOnDeploymentConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "multicluster-observability-addon",
+			Namespace: "open-cluster-management-observability",
+		},
+	}
+
+	fakeKubeClient := fake.NewClientBuilder().
+		WithScheme(scheme.Scheme).
+		WithObjects(addOnDeploymentConfig, newImagesConfigMap(), newClusterVersion()).
+		Build()
+
+	agentAddon, err := addonfactory.NewAgentAddonFactory(addoncfg.Name, addon.FS, addoncfg.McoaChartDir).
+		WithGetValuesFuncs(GetValuesFunc(t.Context(), fakeKubeClient, newTestGetter(addOnDeploymentConfig), logr.Discard())).
+		WithAgentRegistrationOption(&agent.RegistrationOption{}).
+		WithScheme(scheme.Scheme).
+		BuildHelmAgentAddon()
+	require.NoError(t, err)
+
+	objects, err := agentAddon.Manifests(t.Context(), managedCluster, managedClusterAddOn)
+	require.NoError(t, err)
+	require.NotEmpty(t, objects)
+
+	var klusterletWorkCR *rbacv1.ClusterRole
+	for _, obj := range objects {
+		if cr, ok := obj.(*rbacv1.ClusterRole); ok && cr.Name == "open-cluster-management:multicluster-observability-addon:klusterlet-work:agent" {
+			klusterletWorkCR = cr
+			break
+		}
+	}
+
+	require.NotNil(t, klusterletWorkCR, "klusterlet-work:agent ClusterRole must be rendered")
+	require.Contains(t, klusterletWorkCR.Annotations, "addon.open-cluster-management.io/deletion-orphan",
+		"ClusterRole must contain deletion-orphan annotation")
+	require.Empty(t, klusterletWorkCR.Annotations["addon.open-cluster-management.io/deletion-orphan"])
+
+	var hasNamespaceRule bool
+	for _, rule := range klusterletWorkCR.Rules {
+		if slices.Contains(rule.Resources, "namespaces") && slices.Contains(rule.APIGroups, "") {
+			hasNamespaceRule = true
+			expectedVerbs := []string{"get", "list", "watch", "create", "update", "delete", "patch"}
+			for _, verb := range expectedVerbs {
+				require.Contains(t, rule.Verbs, verb, "namespaces rule should contain verb %s", verb)
+			}
+		}
+	}
+	require.True(t, hasNamespaceRule, "ClusterRole must have a rule for namespaces with full verbs")
 }
