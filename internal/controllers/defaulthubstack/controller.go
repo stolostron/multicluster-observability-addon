@@ -132,17 +132,22 @@ func (r *DefaultHubStackReconciler) Reconcile(ctx context.Context, _ ctrl.Reques
 		return ctrl.Result{}, fmt.Errorf("failed to check COO installation: %w", err)
 	}
 
+	features := cooresource.EvaluateHubStackFeatures(opts)
+	// Register dynamic watches for any CRDs currently available on the hub so their
+	// informers are synced in the cache before HubResourceReconciler executes.
+	_ = r.registerDynamicWatches(ctx, features)
+
 	hubReconciler := &cooresource.HubResourceReconciler{
-		Client: r.Client,
-		Logger: r.Log,
-		Opts:   opts,
+		Client:    r.Client,
+		APIReader: reader,
+		Logger:    r.Log,
+		Opts:      opts,
 	}
 	if err := hubReconciler.Reconcile(ctx, hasCardinalityRules, canManageCOO); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to reconcile COO hub resources: %w", err)
 	}
 
-	features := cooresource.EvaluateHubStackFeatures(opts)
-	allWatchesBound := r.registerDynamicWatches(features)
+	allWatchesBound := r.registerDynamicWatches(ctx, features)
 	if !allWatchesBound {
 		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 	}
@@ -150,7 +155,7 @@ func (r *DefaultHubStackReconciler) Reconcile(ctx context.Context, _ ctrl.Reques
 	return ctrl.Result{}, nil
 }
 
-func (r *DefaultHubStackReconciler) registerDynamicWatches(features cooresource.HubStackFeatures) bool {
+func (r *DefaultHubStackReconciler) registerDynamicWatches(ctx context.Context, features cooresource.HubStackFeatures) bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -208,6 +213,19 @@ func (r *DefaultHubStackReconciler) registerDynamicWatches(features cooresource.
 		}
 
 		if r.ctrl == nil || r.cache == nil {
+			if w.required {
+				allBound = false
+			}
+			continue
+		}
+
+		// Ensure the informer is registered and synced in the cache before
+		// HubResourceReconciler reads this GVK via the cached Client.
+		informerCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+		_, err := r.cache.GetInformer(informerCtx, w.obj)
+		cancel()
+		if err != nil {
+			r.Log.Error(err, "failed to get informer for dynamic watch", "kind", w.gvk.Kind)
 			if w.required {
 				allBound = false
 			}
