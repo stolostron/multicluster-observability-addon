@@ -100,6 +100,7 @@ func startSubsystemManager(ctx context.Context, t *testing.T, testEnv *TestEnv) 
 	disableNameValidation := true
 	mgr, err := ctrl.NewManager(testEnv.Cfg, ctrl.Options{
 		Scheme: testEnv.Scheme,
+		Cache:  NewTestCacheOptions(),
 		Metrics: metricsserver.Options{
 			BindAddress: "0",
 		},
