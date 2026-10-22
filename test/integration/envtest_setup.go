@@ -14,12 +14,22 @@ import (
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 var setLoggerOnce sync.Once
+
+// NewTestCacheOptions returns controller-runtime cache.Options for integration tests.
+// It mirrors production cache scoping/transforms and enables ReaderFailOnMissingInformer
+// as a CI guardrail to fail fast on any unmonitored cached client reads.
+func NewTestCacheOptions() cache.Options {
+	ret := addoncfg.GetCacheOptions()
+	ret.ReaderFailOnMissingInformer = true
+	return ret
+}
 
 // NewTestScheme returns a complete runtime.Scheme populated with all types needed for MCOA integration testing.
 func NewTestScheme() *runtime.Scheme {
