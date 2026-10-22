@@ -124,13 +124,38 @@ func Test_IncidentDetection_AllConfigsTogether_AllResources(t *testing.T) {
 			expectedFunc: func(t *testing.T, objects []runtime.Object) {
 				require.GreaterOrEqual(t, len(objects), 3, "expected at least namespace + datasource + dashboards")
 
+				// Right-sizing enables Perses without enabling the metrics UI, so
+				// the ACM block must still be rendered for fleet alerting to work.
+				expectedUIPluginSpec := uiplugin.UIPluginSpec{
+					Type: "Monitoring",
+					Monitoring: &uiplugin.MonitoringConfig{
+						ACM: &uiplugin.AdvancedClusterManagementReference{
+							Enabled: true,
+							Alertmanager: uiplugin.AlertmanagerReference{
+								Url: "https://alertmanager.open-cluster-management-observability.svc:9095",
+							},
+							ThanosQuerier: uiplugin.ThanosQuerierReference{
+								Url: "https://rbac-query-proxy.open-cluster-management-observability.svc:8443",
+							},
+						},
+						Perses: &uiplugin.PersesReference{
+							Enabled: true,
+						},
+					},
+				}
+
 				var analyticsNS bool
 				var analyticsDatasource bool
 				var analyticsDashboards []string
 				var obsDashboards []string
+				var uiPluginCount int
 
 				for _, o := range objects {
 					switch obj := o.(type) {
+					case *uiplugin.UIPlugin:
+						uiPluginCount++
+						require.Equal(t, "monitoring", obj.Name)
+						require.Equal(t, expectedUIPluginSpec, obj.Spec)
 					case *corev1.Namespace:
 						if obj.Name == addoncfg.AnalyticsNamespace {
 							analyticsNS = true
@@ -149,6 +174,7 @@ func Test_IncidentDetection_AllConfigsTogether_AllResources(t *testing.T) {
 					}
 				}
 
+				require.Equal(t, 1, uiPluginCount, "UIPlugin should render on the hub for right-sizing")
 				require.True(t, analyticsNS, "observability-analytics namespace should be created")
 				require.True(t, analyticsDatasource, "datasource should exist in observability-analytics")
 				require.GreaterOrEqual(t, len(analyticsDashboards), 2, "expected at least 2 RS dashboards in observability-analytics")
@@ -248,11 +274,20 @@ func Test_IncidentDetection_AllConfigsTogether_AllResources(t *testing.T) {
 			isHub: true,
 			expectedFunc: func(t *testing.T, objects []runtime.Object) {
 				require.GreaterOrEqual(t, len(objects), 4)
-				// ACM block is only rendered when metrics are enabled;
-				// this test only enables incident detection.
+				// The ACM block is rendered whenever Perses is enabled, which
+				// includes analytics-only configurations such as incident detection.
 				expectedUIPluginSpec := uiplugin.UIPluginSpec{
 					Type: "Monitoring",
 					Monitoring: &uiplugin.MonitoringConfig{
+						ACM: &uiplugin.AdvancedClusterManagementReference{
+							Enabled: true,
+							Alertmanager: uiplugin.AlertmanagerReference{
+								Url: "https://alertmanager.open-cluster-management-observability.svc:9095",
+							},
+							ThanosQuerier: uiplugin.ThanosQuerierReference{
+								Url: "https://rbac-query-proxy.open-cluster-management-observability.svc:8443",
+							},
+						},
 						Perses: &uiplugin.PersesReference{
 							Enabled: true,
 						},
@@ -264,10 +299,12 @@ func Test_IncidentDetection_AllConfigsTogether_AllResources(t *testing.T) {
 
 				var analyticsNS bool
 				var analyticsDashboards int
+				var uiPluginCount int
 
 				for _, o := range objects {
 					switch obj := o.(type) {
 					case *uiplugin.UIPlugin:
+						uiPluginCount++
 						require.Equal(t, "monitoring", obj.Name)
 						require.Equal(t, expectedUIPluginSpec, obj.Spec)
 					case *corev1.Namespace:
@@ -280,6 +317,7 @@ func Test_IncidentDetection_AllConfigsTogether_AllResources(t *testing.T) {
 					}
 				}
 
+				require.Equal(t, 1, uiPluginCount, "UIPlugin should render on the hub for incident detection")
 				require.True(t, analyticsNS, "observability-analytics namespace should be created")
 				require.GreaterOrEqual(t, analyticsDashboards, 1, "expected at least 1 incident detection dashboard in analytics namespace")
 			},
