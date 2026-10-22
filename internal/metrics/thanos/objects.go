@@ -46,6 +46,11 @@ func (b *ObjectBuilder) Build(ctx context.Context, cluster *clusterv1.ManagedClu
 		}
 	}
 
+	// Apply per-cluster registry overrides from ManagedCluster annotation
+	if clusterRegs := config.ParseClusterImageRegistries(cluster); clusterRegs != nil {
+		images.ApplyClusterRegistryOverrides(clusterRegs.Registries)
+	}
+
 	store := b.buildStore(opts, images.ThanosStore)
 	receive := b.buildReceive(opts)
 	query := b.buildQuery(opts)
