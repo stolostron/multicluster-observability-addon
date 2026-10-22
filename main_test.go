@@ -16,6 +16,7 @@ import (
 func TestGetCacheOptions_Structure(t *testing.T) {
 	opts := getCacheOptions()
 
+	assert.False(t, opts.ReaderFailOnMissingInformer, "Production cache must keep ReaderFailOnMissingInformer disabled for runtime resilience")
 	require.NotNil(t, opts.DefaultTransform, "DefaultTransform must be configured")
 	require.NotNil(t, opts.ByObject, "ByObject must be configured")
 	assert.Len(t, opts.ByObject, 2, "ByObject should contain exactly 2 object types")

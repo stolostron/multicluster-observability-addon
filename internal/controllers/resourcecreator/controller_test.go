@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/go-logr/logr"
+	hyperv1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
@@ -609,4 +610,18 @@ func TestResourceCreatorReconciler_Reconcile_TerminalError(t *testing.T) {
 	require.Error(t, err)
 	require.ErrorIs(t, err, reconcile.TerminalError(nil))
 	require.ErrorIs(t, err, addoncfg.ErrInvalidProxyURL)
+}
+
+func TestHostedClusterPredicate(t *testing.T) {
+	hc := &hyperv1.HostedCluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-hc",
+			Namespace: "clusters",
+		},
+	}
+
+	assert.True(t, hostedClusterPredicate.Create(event.CreateEvent{Object: hc}), "HostedCluster creation should trigger reconciliation")
+	assert.False(t, hostedClusterPredicate.Update(event.UpdateEvent{ObjectOld: hc, ObjectNew: hc}), "HostedCluster updates should not trigger reconciliation")
+	assert.True(t, hostedClusterPredicate.Delete(event.DeleteEvent{Object: hc}), "HostedCluster deletion should trigger reconciliation")
+	assert.False(t, hostedClusterPredicate.Generic(event.GenericEvent{Object: hc}), "HostedCluster generic events should not trigger reconciliation")
 }

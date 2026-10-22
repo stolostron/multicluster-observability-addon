@@ -95,9 +95,32 @@ func EvaluateHubStackFeatures(opts addon.Options) HubStackFeatures {
 // PersesDatasources, UIPlugin, analytics namespace) directly on the hub,
 // independent of the ManifestWork lifecycle.
 type HubResourceReconciler struct {
-	Client client.Client
-	Logger logr.Logger
-	Opts   addon.Options
+	Client    client.Client
+	APIReader client.Reader
+	Logger    logr.Logger
+	Opts      addon.Options
+}
+
+// reader returns APIReader when configured so reads on unwatched hub resources
+// (Namespace, OperatorGroup) bypass the informer cache. Falls back to Client
+// for unit tests that only wire a fake client.
+func (r *HubResourceReconciler) reader() client.Reader {
+	if r.APIReader != nil {
+		return r.APIReader
+	}
+	return r.Client
+}
+
+// readerFor returns APIReader for unwatched hub resource types (Namespace,
+// OperatorGroup) and the cached Client for watched types (Subscription,
+// PersesDashboard, PersesDatasource, UIPlugin).
+func (r *HubResourceReconciler) readerFor(obj client.Object) client.Reader {
+	switch obj.(type) {
+	case *corev1.Namespace, *operatorsv1.OperatorGroup:
+		return r.reader()
+	default:
+		return r.Client
+	}
 }
 
 func (r *HubResourceReconciler) Reconcile(ctx context.Context, hasCardinalityRules, canManageCOO bool) error {
@@ -248,7 +271,7 @@ func (r *HubResourceReconciler) ensureAnalyticsNamespace(ctx context.Context) er
 		},
 	}
 	existing := &corev1.Namespace{}
-	if err := r.Client.Get(ctx, client.ObjectKeyFromObject(ns), existing); err != nil {
+	if err := r.reader().Get(ctx, client.ObjectKeyFromObject(ns), existing); err != nil {
 		if !errors.IsNotFound(err) {
 			return fmt.Errorf("failed to get namespace %s: %w", ns.Name, err)
 		}
@@ -433,7 +456,7 @@ func (r *HubResourceReconciler) applyResource(ctx context.Context, obj client.Ob
 
 func (r *HubResourceReconciler) deleteIfManaged(ctx context.Context, obj client.Object) error {
 	existing := obj.DeepCopyObject().(client.Object)
-	if err := r.Client.Get(ctx, client.ObjectKeyFromObject(obj), existing); err != nil {
+	if err := r.readerFor(obj).Get(ctx, client.ObjectKeyFromObject(obj), existing); err != nil {
 		if errors.IsNotFound(err) || meta.IsNoMatchError(err) {
 			return nil
 		}

@@ -11,11 +11,17 @@ import (
 	"github.com/go-logr/logr"
 	ocinfrav1 "github.com/openshift/api/config/v1"
 	hyperv1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
+	operatorsv1 "github.com/operator-framework/api/pkg/operators/v1"
+	operatorsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
+	persesv1 "github.com/perses/perses-operator/api/v1alpha1"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	cooprometheusv1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1"
 	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
+	uiplugin "github.com/rhobs/observability-operator/pkg/apis/uiplugin/v1alpha1"
+	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -24,12 +30,33 @@ import (
 	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	workv1 "open-cluster-management.io/api/work/v1"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 var setLoggerOnce sync.Once
+
+// NewTestCacheOptions returns controller-runtime cache.Options for integration tests.
+// It mirrors production cache scoping/transforms and enables ReaderFailOnMissingInformer
+// as a CI guardrail to fail fast on any unmonitored cached client reads.
+func NewTestCacheOptions() cache.Options {
+	return cache.Options{
+		ReaderFailOnMissingInformer: true,
+		DefaultTransform:            cache.TransformStripManagedFields(),
+		ByObject: map[client.Object]cache.ByObject{
+			&addonv1beta1.AddOnDeploymentConfig{}: {
+				Namespaces: map[string]cache.Config{
+					addoncfg.InstallNamespace: {},
+				},
+			},
+			&addonv1beta1.ClusterManagementAddOn{}: {
+				Field: fields.SelectorFromSet(fields.Set{"metadata.name": addoncfg.Name}),
+			},
+		},
+	}
+}
 
 // NewTestScheme returns a complete runtime.Scheme populated with all types needed for MCOA integration testing.
 func NewTestScheme() *runtime.Scheme {
@@ -44,6 +71,10 @@ func NewTestScheme() *runtime.Scheme {
 	utilruntime.Must(prometheusv1.AddToScheme(s))
 	utilruntime.Must(hyperv1.AddToScheme(s))
 	utilruntime.Must(ocinfrav1.Install(s))
+	utilruntime.Must(operatorsv1.AddToScheme(s))
+	utilruntime.Must(operatorsv1alpha1.AddToScheme(s))
+	utilruntime.Must(persesv1.AddToScheme(s))
+	utilruntime.Must(uiplugin.AddToScheme(s))
 	return s
 }
 
