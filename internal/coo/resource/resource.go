@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 
+	certmanagerv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	"github.com/go-logr/logr"
 	operatorsv1 "github.com/operator-framework/api/pkg/operators/v1"
 	operatorsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
@@ -323,12 +324,31 @@ func (r *HubResourceReconciler) reconcileDatasources(ctx context.Context, hasDas
 	}
 
 	if hasLokiDatasource {
+		cert, err := mcoagateway.BuildPersesLokiClientCertificate()
+		if err != nil {
+			return fmt.Errorf("failed to build Perses Loki client certificate: %w", err)
+		}
+		cert.Labels = managedResourceLabels
+		cert.Spec.SecretTemplate = &certmanagerv1.CertificateSecretTemplate{Labels: managedResourceLabels}
+		if err := r.applyResource(ctx, cert); err != nil {
+			return fmt.Errorf("failed to apply Perses Loki client certificate: %w", err)
+		}
 		if err := r.applyResource(ctx, buildLokiDatasource(addoncfg.InstallNamespace)); err != nil {
 			return fmt.Errorf("failed to apply loki datasource: %w", err)
 		}
 	} else {
 		if err := r.deleteIfManaged(ctx, &persesv1.PersesDatasource{
 			ObjectMeta: metav1.ObjectMeta{Name: dsLoki, Namespace: addoncfg.InstallNamespace},
+		}); err != nil {
+			return err
+		}
+		if err := r.deleteIfManaged(ctx, &certmanagerv1.Certificate{
+			ObjectMeta: metav1.ObjectMeta{Name: mcoagateway.DefaultPersesLokiClientMTLSSecretName, Namespace: addoncfg.InstallNamespace},
+		}); err != nil {
+			return err
+		}
+		if err := r.deleteIfManaged(ctx, &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{Name: mcoagateway.DefaultPersesLokiClientMTLSSecretName, Namespace: addoncfg.InstallNamespace},
 		}); err != nil {
 			return err
 		}
@@ -434,6 +454,14 @@ func buildLokiDatasource(namespace string) *persesv1.PersesDatasource {
 							Name: mcoagateway.DefaultStorageMTLSSecretName,
 						},
 						CertPath: "ca.crt",
+					},
+					UserCert: &persesv1.Certificate{
+						SecretSource: persesv1.SecretSource{
+							Type: persesv1.SecretSourceTypeSecret,
+							Name: mcoagateway.DefaultPersesLokiClientMTLSSecretName,
+						},
+						CertPath:       "tls.crt",
+						PrivateKeyPath: "tls.key",
 					},
 				},
 			},
