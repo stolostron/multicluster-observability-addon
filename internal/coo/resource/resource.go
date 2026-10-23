@@ -21,6 +21,7 @@ import (
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	imanifests "github.com/stolostron/multicluster-observability-addon/internal/analytics/incident-detection/manifests"
 	cmanifests "github.com/stolostron/multicluster-observability-addon/internal/coo/manifests"
+	"github.com/stolostron/multicluster-observability-addon/internal/mcoagateway"
 	rsperses "github.com/stolostron/multicluster-observability-addon/internal/perses/dashboards/rightsizing"
 	"github.com/stolostron/multicluster-observability-addon/pkg/perses/dashboards/acm"
 	hcp "github.com/stolostron/multicluster-observability-addon/pkg/perses/dashboards/acm/hosted-control-plane"
@@ -41,6 +42,7 @@ import (
 const (
 	dsThanos             = "rbac-query-proxy-datasource"
 	dsPlatformPrometheus = "platform-prometheus-datasource"
+	dsLoki               = "loki-datasource"
 	clusterLabelName     = ""
 
 	ManagedByLabelValue = "mcoa-hub-resource-reconciler"
@@ -82,6 +84,7 @@ func (r *HubResourceReconciler) Reconcile(ctx context.Context, hasCardinalityRul
 				r.Opts.Platform.AnalyticsOptions.RightSizing.VirtualizationEnabled))
 
 	persesEnabled := hasDashboards || hasAnalyticsDashboards
+	hasLokiDatasource := persesEnabled && r.Opts.Platform.Logs.DefaultStack
 	cooNeeded := persesEnabled && installCOO
 
 	// Install COO first — Perses CRD conversion webhooks must be available
@@ -102,7 +105,7 @@ func (r *HubResourceReconciler) Reconcile(ctx context.Context, hasCardinalityRul
 		return fmt.Errorf("failed to reconcile dashboards: %w", err)
 	}
 
-	if err := r.reconcileDatasources(ctx, hasDashboards, hasAnalyticsDashboards); err != nil {
+	if err := r.reconcileDatasources(ctx, hasDashboards, hasAnalyticsDashboards, hasLokiDatasource); err != nil {
 		return fmt.Errorf("failed to reconcile datasources: %w", err)
 	}
 
@@ -289,7 +292,7 @@ func (r *HubResourceReconciler) reconcileUIPlugin(ctx context.Context, persesEna
 
 // --- Datasources ---
 
-func (r *HubResourceReconciler) reconcileDatasources(ctx context.Context, hasDashboards, hasAnalyticsDashboards bool) error {
+func (r *HubResourceReconciler) reconcileDatasources(ctx context.Context, hasDashboards, hasAnalyticsDashboards, hasLokiDatasource bool) error {
 	if hasDashboards {
 		if err := r.applyResource(ctx, buildRBACQueryProxyDatasource(addoncfg.InstallNamespace)); err != nil {
 			return fmt.Errorf("failed to apply rbac-query-proxy datasource: %w", err)
@@ -314,6 +317,18 @@ func (r *HubResourceReconciler) reconcileDatasources(ctx context.Context, hasDas
 	} else {
 		if err := r.deleteIfManaged(ctx, &persesv1.PersesDatasource{
 			ObjectMeta: metav1.ObjectMeta{Name: dsThanos, Namespace: addoncfg.AnalyticsNamespace},
+		}); err != nil {
+			return err
+		}
+	}
+
+	if hasLokiDatasource {
+		if err := r.applyResource(ctx, buildLokiDatasource(addoncfg.InstallNamespace)); err != nil {
+			return fmt.Errorf("failed to apply loki datasource: %w", err)
+		}
+	} else {
+		if err := r.deleteIfManaged(ctx, &persesv1.PersesDatasource{
+			ObjectMeta: metav1.ObjectMeta{Name: dsLoki, Namespace: addoncfg.InstallNamespace},
 		}); err != nil {
 			return err
 		}
@@ -393,6 +408,48 @@ func buildPlatformPrometheusDatasource(namespace string) *persesv1.PersesDatasou
 								},
 							},
 							"scrapeInterval": "5m",
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func buildLokiDatasource(namespace string) *persesv1.PersesDatasource {
+	return &persesv1.PersesDatasource{
+		TypeMeta: metav1.TypeMeta{APIVersion: "perses.dev/v1alpha1", Kind: "PersesDatasource"},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      dsLoki,
+			Namespace: namespace,
+			Labels:    managedResourceLabels,
+		},
+		Spec: persesv1.DatasourceSpec{
+			Client: &persesv1.Client{
+				TLS: &persesv1.TLS{
+					Enable: true,
+					CaCert: &persesv1.Certificate{
+						SecretSource: persesv1.SecretSource{
+							Type: persesv1.SecretSourceTypeSecret,
+							Name: mcoagateway.DefaultStorageMTLSSecretName,
+						},
+						CertPath: "ca.crt",
+					},
+				},
+			},
+			Config: persesv1.Datasource{
+				DatasourceSpec: persesmodelv1.DatasourceSpec{
+					Default: false,
+					Plugin: persescommon.Plugin{
+						Kind: "LokiDatasource",
+						Spec: map[string]any{
+							"proxy": map[string]any{
+								"kind": "HTTPProxy",
+								"spec": map[string]any{
+									"url":    "https://mcoa-observability-observatorium-api." + addoncfg.InstallNamespace + ".svc:8080/api/logs/v1",
+									"secret": dsLoki + "-secret",
+								},
+							},
 						},
 					},
 				},
