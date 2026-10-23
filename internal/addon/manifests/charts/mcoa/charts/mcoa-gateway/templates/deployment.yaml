@@ -101,18 +101,13 @@ spec:
               readOnly: true
               mountPath: /etc/observatorium/tenants.yaml
               subPath: tenants.yaml
+            # Mounted as a whole secret rather than with subPath: subPath
+            # mounts are snapshotted at pod start and never updated, so the
+            # kubelet would not surface the reissued certificate that adds the
+            # Route host to the SANs and --tls.reload-interval would be a no-op.
             - name: tls-secret
               readOnly: true
-              mountPath: /var/run/tls/tls.crt
-              subPath: tls.crt
-            - name: tls-secret
-              readOnly: true
-              mountPath: /var/run/tls/tls.key
-              subPath: tls.key
-            - name: tls-secret
-              readOnly: true
-              mountPath: /var/run/tls/ca.crt
-              subPath: ca.crt
+              mountPath: /var/run/tls
             {{- if .Values.logsEnabled }}
             - name: loki-client-tls
               readOnly: true
@@ -122,13 +117,18 @@ spec:
               readOnly: true
               mountPath: /var/run/loki-client-tls/tls.key
               subPath: tls.key
+            {{- end }}
+            {{- if .Values.alertmanagerEndpoints }}
+            - name: alertmanager-accessor
+              readOnly: true
+              mountPath: /var/run/alertmanager-accessor
+            {{- end }}
             - name: openshift-service-ca
               readOnly: true
-              mountPath: /var/run/loki-client-tls/service-ca.crt
+              mountPath: /var/run/openshift-service-ca/service-ca.crt
               subPath: service-ca.crt
-            {{- end }}
           terminationMessagePolicy: File
-          image: 'quay.io/rh-ee-gaeillo/mcoa-gateway:mtlshealthcheck' # TODO replace stolostron image when we get one
+          image: 'quay.io/rh-ee-dbuchana/mcoa-gateway:add-alert-fanout-2026-10-21-v0.1.2-726-g9ba5291' # TODO replace stolostron image when we get one
           args:
             - '--web.listen=0.0.0.0:8080'
             - '--web.internal.listen=0.0.0.0:8081'
@@ -141,6 +141,7 @@ spec:
             - '--tls.server.cert-file=/var/run/tls/tls.crt'
             - '--tls.server.key-file=/var/run/tls/tls.key'
             - '--tls.client-ca-file=/var/run/tls/ca.crt'
+            - '--tls.reload-interval=1m'
             - '--tls.healthchecks.server-ca-file=/var/run/tls/ca.crt'
             - '--tls.healthchecks.server-name=mcoa-observability-observatorium-api.open-cluster-management-observability.svc'
             - '--tls.healthchecks.client-cert-file=/var/run/tls/tls.crt'
@@ -152,8 +153,14 @@ spec:
             - '--logs.read.endpoint={{ .Values.logsReadEndpoint }}'
             - '--logs.tls.cert-file=/var/run/loki-client-tls/tls.crt'
             - '--logs.tls.key-file=/var/run/loki-client-tls/tls.key'
-            - '--logs.tls.ca-file=/var/run/loki-client-tls/service-ca.crt'
+            - '--logs.tls.ca-file=/var/run/openshift-service-ca/service-ca.crt'
             {{- end }}
+            {{- range .Values.alertmanagerEndpoints }}
+            - '--alertmanager.endpoint={{ . }}'
+            {{- end }}
+            - '--alertmanager.upstream-server-name=alertmanager.open-cluster-management-observability.svc'
+            - '--alertmanager.upstream-ca-file=/var/run/openshift-service-ca/service-ca.crt'
+            - '--alertmanager.accessor-token-file=/var/run/alertmanager-accessor/token'
       serviceAccount: observability-observatorium-api
       volumes:
         - name: tenants
@@ -169,11 +176,18 @@ spec:
           secret:
             secretName: mcoa-gateway-loki-client-tls
             defaultMode: 420
+        {{- end }}
         - name: openshift-service-ca
           configMap:
             name: openshift-service-ca.crt
             defaultMode: 420
-        {{- end }}
+            items:
+              - key: service-ca.crt
+                path: service-ca.crt
+        - name: alertmanager-accessor
+          secret:
+            secretName: observability-alertmanager-accessor
+            defaultMode: 420
       dnsPolicy: ClusterFirst
   strategy:
     type: RollingUpdate

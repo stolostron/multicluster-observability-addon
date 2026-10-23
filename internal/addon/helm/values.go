@@ -13,6 +13,7 @@ import (
 	cmanifests "github.com/stolostron/multicluster-observability-addon/internal/coo/manifests"
 	lhandlers "github.com/stolostron/multicluster-observability-addon/internal/logging/handlers"
 	lmanifests "github.com/stolostron/multicluster-observability-addon/internal/logging/manifests"
+	mcoagatewayhandlers "github.com/stolostron/multicluster-observability-addon/internal/mcoagateway/handlers"
 	omanifests "github.com/stolostron/multicluster-observability-addon/internal/mcoagateway/manifests"
 	mhandlers "github.com/stolostron/multicluster-observability-addon/internal/metrics/handlers"
 	mmanifests "github.com/stolostron/multicluster-observability-addon/internal/metrics/manifests"
@@ -56,11 +57,12 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, getter addonutils.Add
 		if err != nil {
 			return nil, fmt.Errorf("failed to build addon options: %w", err)
 		}
-
 		if !opts.Platform.Enabled && !opts.UserWorkloads.Enabled {
 			logger.V(2).Info("both platform and userWorkloads are disabled, ignoring cluster")
 			return addonfactory.JsonStructToValues(HelmChartValues{})
 		}
+
+		mcoaGatewayEnabled := aodc.Annotations["mcoa-obs-api"] == "true" || opts.Platform.Logs.DefaultStack || opts.ThanosOperatorEnabled
 
 		userValues := HelmChartValues{
 			Enabled: true,
@@ -93,8 +95,16 @@ func GetValuesFunc(ctx context.Context, k8s client.Client, getter addonutils.Add
 		}
 
 		// WIP: Temporary solution to enable the mcoa-gateway and will require to delete the mcoa pod to take effect.
-		mcoaGatewayEnabled := aodc.Annotations["mcoa-obs-api"] == "true" || opts.Platform.Logs.DefaultStack || opts.ThanosOperatorEnabled
-		userValues.MCOAGateway = omanifests.BuildValues(common.IsHubCluster(cluster), mcoaGatewayEnabled, opts.ThanosOperatorEnabled, opts.Platform.Logs.DefaultStack)
+		gatewayValues := omanifests.BuildValues(common.IsHubCluster(cluster), mcoaGatewayEnabled, opts.ThanosOperatorEnabled, opts.Platform.Logs.DefaultStack)
+		if gatewayValues != nil {
+			if common.IsHubCluster(cluster) {
+				gatewayValues.AlertmanagerEndpoints, err = mcoagatewayhandlers.BuildAlertmanagerEndpoints(ctx, k8s)
+				if err != nil {
+					return nil, fmt.Errorf("failed to get Alertmanager endpoints for mcoa-gateway: %w", err)
+				}
+			}
+		}
+		userValues.MCOAGateway = gatewayValues
 
 		// WIP: Temporary solution to enable thanos-operator and will require to delete the mcoa pod to take effect.
 		if userValues.Metrics != nil {

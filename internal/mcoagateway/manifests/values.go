@@ -15,17 +15,21 @@ const (
 )
 
 type MCOAGatewayValues struct {
-	Enabled              bool   `json:"enabled"`
-	MetricsWriteEndpoint string `json:"metricsWriteEndpoint"`
-	MetricsReadEndpoint  string `json:"metricsReadEndpoint"`
-	LogsEnabled          bool   `json:"logsEnabled"`
-	LogsWriteEndpoint    string `json:"logsWriteEndpoint"`
-	LogsReadEndpoint     string `json:"logsReadEndpoint"`
+	Enabled               bool     `json:"enabled"`
+	MetricsWriteEndpoint  string   `json:"metricsWriteEndpoint"`
+	MetricsReadEndpoint   string   `json:"metricsReadEndpoint"`
+	LogsEnabled           bool     `json:"logsEnabled"`
+	LogsWriteEndpoint     string   `json:"logsWriteEndpoint"`
+	LogsReadEndpoint      string   `json:"logsReadEndpoint"`
+	AlertmanagerEndpoints []string `json:"alertmanagerEndpoints,omitempty"`
 }
 
 func BuildValues(isHubCluster, mcoaGatewayEnabled, thanosOperatorEnabled bool, logsEnabled bool) *MCOAGatewayValues {
 	if !isHubCluster || !mcoaGatewayEnabled {
 		return nil
+	}
+	if !isHubCluster {
+		return &MCOAGatewayValues{}
 	}
 
 	writeEndpoint := legacyReceiveEndpoint
