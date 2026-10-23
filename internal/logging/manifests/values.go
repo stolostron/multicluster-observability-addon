@@ -13,6 +13,8 @@ type LoggingValues struct {
 	OpenshiftLoggingChannel string          `json:"openshiftLoggingChannel"`
 	Secrets                 []ResourceValue `json:"secrets"`
 	ConfigMaps              []ResourceValue `json:"configmaps"`
+	CatalogSource           string          `json:"catalogSource"`
+	CatalogSourceNamespace  string          `json:"catalogSourceNamespace"`
 }
 type ResourceValue struct {
 	Name string `json:"name"`
