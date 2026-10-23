@@ -27,8 +27,11 @@ const (
 
 	CooStatusClaimName = "coo.observability.open-cluster-management.io"
 
-	PaProbeKey  = "isAvailable"
-	PaProbePath = ".status.conditions[?(@.type==\"Available\")].status"
+	PaProbeKey                           = "isAvailable"
+	PaProbePath                          = ".status.conditions[?(@.type==\"Available\")].status"
+	EndpointMonitoringOperatorDeployment = "endpoint-monitoring-operator"
+	EndpointMonitoringOperatorProbeKey   = "availableReplicas"
+	EndpointMonitoringOperatorProbePath  = ".status.availableReplicas"
 
 	ClusterLogForwardersResource = "clusterlogforwarders"
 	SpokeCLFName                 = "mcoa-instance"
