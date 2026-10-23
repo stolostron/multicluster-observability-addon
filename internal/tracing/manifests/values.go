@@ -10,6 +10,8 @@ type TracingValues struct {
 	OTELColSpec            string        `json:"otelColSpec"`
 	InstrumenationSpec     string        `json:"instrumentationSpec"`
 	Secrets                []SecretValue `json:"secrets"`
+	CatalogSource          string        `json:"catalogSource"`
+	CatalogSourceNamespace string        `json:"catalogSourceNamespace"`
 }
 
 type SecretValue struct {

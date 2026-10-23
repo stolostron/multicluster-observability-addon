@@ -33,6 +33,10 @@ var (
 )
 
 func fakeGetValues(k8s client.Client) addonfactory.GetValuesFunc {
+	return fakeGetValuesWithCatalog(k8s, "", "")
+}
+
+func fakeGetValuesWithCatalog(k8s client.Client, catalogSource, catalogSourceNamespace string) addonfactory.GetValuesFunc {
 	return func(
 		cluster *clusterv1.ManagedCluster,
 		mcAddon *addonapiv1beta1.ManagedClusterAddOn,
@@ -45,6 +49,13 @@ func fakeGetValues(k8s client.Client) addonfactory.GetValuesFunc {
 		tracing, err := manifests.BuildValues(opts)
 		if err != nil {
 			return nil, err
+		}
+
+		if catalogSource != "" {
+			tracing.CatalogSource = catalogSource
+		}
+		if catalogSourceNamespace != "" {
+			tracing.CatalogSourceNamespace = catalogSourceNamespace
 		}
 
 		return addonfactory.JsonStructToValues(tracing)
@@ -214,6 +225,7 @@ func Test_Tracing_AllConfigsTogether_AllResources(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, objects, 6)
 
+	var foundSubscription bool
 	for _, obj := range objects {
 		switch obj := obj.(type) {
 		case *otelv1beta1.OpenTelemetryCollector:
@@ -229,8 +241,13 @@ func Test_Tracing_AllConfigsTogether_AllResources(t *testing.T) {
 			if obj.Name == "tracing-otlphttp-auth" {
 				require.Equal(t, generatedSecret.Data, obj.Data)
 			}
+		case *operatorsv1alpha1.Subscription:
+			foundSubscription = true
+			require.Equal(t, addoncfg.DefaultCooCatalogSource, obj.Spec.CatalogSource)
+			require.Equal(t, addoncfg.DefaultCooCatalogSourceNamespace, obj.Spec.CatalogSourceNamespace)
 		}
 	}
+	require.True(t, foundSubscription, "expected an OTel operator Subscription in rendered objects")
 }
 
 type mockAODCGetter struct {

@@ -330,6 +330,8 @@ func Test_Logging_Unmanaged_CLF(t *testing.T) {
 		switch obj := obj.(type) {
 		case *operatorsv1alpha1.Subscription:
 			require.Equal(t, "latest-version", obj.Spec.Channel)
+			require.Equal(t, addoncfg.DefaultCooCatalogSource, obj.Spec.CatalogSource)
+			require.Equal(t, addoncfg.DefaultCooCatalogSourceNamespace, obj.Spec.CatalogSourceNamespace)
 		case *loggingv1.ClusterLogForwarder:
 			require.Equal(t, "true", obj.GetAnnotations()["observability.openshift.io/tech-preview-otlp-output"])
 			require.Equal(t, ".spec.managementState", obj.GetAnnotations()[addoncfg.SSAManagedFieldsAnnotationKey])
