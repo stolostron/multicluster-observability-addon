@@ -64,6 +64,18 @@ func TestBuildLokiClientCertificate(t *testing.T) {
 	assert.NotContains(t, cert.Spec.Usages, certmanagerv1.UsageServerAuth)
 }
 
+func TestBuildPersesLokiClientCertificate(t *testing.T) {
+	cert, err := BuildPersesLokiClientCertificate()
+	require.NoError(t, err)
+	assert.Equal(t, DefaultPersesLokiClientMTLSSecretName, cert.Name)
+	assert.Equal(t, DefaultPersesLokiClientMTLSSecretName, cert.Spec.SecretName)
+	assert.Equal(t, addoncfg.InstallNamespace, cert.Namespace)
+	assert.Equal(t, certmanagerv1.ClusterIssuerKind, cert.Spec.IssuerRef.Kind)
+	assert.Equal(t, "mcoa-root-issuer", cert.Spec.IssuerRef.Name)
+	assert.Contains(t, cert.Spec.Usages, certmanagerv1.UsageClientAuth)
+	assert.NotContains(t, cert.Spec.Usages, certmanagerv1.UsageServerAuth)
+}
+
 func TestServerCertIncludesHost(t *testing.T) {
 	scheme := runtime.NewScheme()
 	require.NoError(t, corev1.AddToScheme(scheme))
