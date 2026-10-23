@@ -14,6 +14,7 @@ import (
 	"github.com/stolostron/multicluster-observability-addon/internal/analytics/rightsizing"
 	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	"github.com/stretchr/testify/require"
+	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
@@ -453,19 +454,22 @@ func Test_AgentHealthProber_MissingResources(t *testing.T) {
 	})
 
 	t.Run("right-sizing enabled but missing prometheus rules", func(t *testing.T) {
+		ocpCluster := addontesting.NewManagedCluster("cluster-1")
+		ocpCluster.Labels = map[string]string{"vendor": "OpenShift"}
 		aodc := newAddonDeploymentConfig()
 		addRightSizingCustomizedVariables(aodc)
 		addAODCConfigReference(managedClusterAddOn, aodc)
 		healthProber := HealthProber(newTestGetter(aodc), logr.Discard())
 		err := healthProber.WorkProber.HealthChecker(
 			[]agent.FieldResult{scrapeConfigFieldResult()},
-			managedCluster, managedClusterAddOn)
+			ocpCluster, managedClusterAddOn)
 		require.ErrorIs(t, err, errMissingFields)
 	})
 }
 
 func Test_AgentHealthProber_RightSizing(t *testing.T) {
 	managedCluster := addontesting.NewManagedCluster("cluster-1")
+	managedCluster.Labels = map[string]string{"vendor": "OpenShift"}
 	managedClusterAddOn := addontesting.NewAddon("test", "cluster-1")
 	aodc := newAddonDeploymentConfig()
 	addRightSizingCustomizedVariables(aodc)
@@ -508,6 +512,66 @@ func Test_AgentHealthProber_RightSizing(t *testing.T) {
 			}, managedCluster, managedClusterAddOn)
 		require.ErrorIs(t, err, errMissingFeedbackValues)
 	})
+}
+
+func Test_AgentHealthProber_RightSizingNonOpenShift(t *testing.T) {
+	managedCluster := addontesting.NewManagedCluster("cluster-1")
+	managedCluster.Labels = map[string]string{"vendor": "GKE"}
+	managedClusterAddOn := addontesting.NewAddon("test", "cluster-1")
+	aodc := newAddonDeploymentConfig()
+	addRightSizingCustomizedVariables(aodc)
+	addAODCConfigReference(managedClusterAddOn, aodc)
+	healthProber := HealthProber(newTestGetter(aodc), logr.Discard())
+
+	var deploymentProbe *agent.ProbeField
+	for i := range healthProber.WorkProber.ProbeFields {
+		probe := &healthProber.WorkProber.ProbeFields[i]
+		if probe.ResourceIdentifier.Group == appsv1.GroupName &&
+			probe.ResourceIdentifier.Resource == "deployments" &&
+			probe.ResourceIdentifier.Name == addoncfg.EndpointMonitoringOperatorDeployment {
+			deploymentProbe = probe
+			break
+		}
+	}
+	require.NotNil(t, deploymentProbe, "the framework needs a deployment probe to avoid NoProbeResult")
+	require.Equal(t, "*", deploymentProbe.ResourceIdentifier.Namespace)
+	require.Equal(t, addoncfg.EndpointMonitoringOperatorProbePath, deploymentProbe.ProbeRules[0].JsonPaths[0].Path)
+
+	t.Run("ready endpoint operator", func(t *testing.T) {
+		err := healthProber.WorkProber.HealthChecker(
+			[]agent.FieldResult{endpointMonitoringOperatorFieldResult(1)}, managedCluster, managedClusterAddOn)
+		require.NoError(t, err)
+	})
+	t.Run("unready endpoint operator", func(t *testing.T) {
+		err := healthProber.WorkProber.HealthChecker(
+			[]agent.FieldResult{endpointMonitoringOperatorFieldResult(0)}, managedCluster, managedClusterAddOn)
+		require.ErrorIs(t, err, errProbeConditionNotSatisfied)
+	})
+	t.Run("missing endpoint operator feedback", func(t *testing.T) {
+		err := healthProber.WorkProber.HealthChecker(
+			[]agent.FieldResult{scrapeConfigFieldResult()}, managedCluster, managedClusterAddOn)
+		require.ErrorIs(t, err, errMissingFields)
+	})
+}
+
+func endpointMonitoringOperatorFieldResult(availableReplicas int64) agent.FieldResult {
+	return agent.FieldResult{
+		ResourceIdentifier: workv1.ResourceIdentifier{
+			Group:     appsv1.GroupName,
+			Resource:  "deployments",
+			Name:      addoncfg.EndpointMonitoringOperatorDeployment,
+			Namespace: addoncfg.InstallNamespace,
+		},
+		FeedbackResult: workv1.StatusFeedbackResult{
+			Values: []workv1.FeedbackValue{{
+				Name: addoncfg.EndpointMonitoringOperatorProbeKey,
+				Value: workv1.FieldValue{
+					Type:    workv1.Integer,
+					Integer: &availableReplicas,
+				},
+			}},
+		},
+	}
 }
 
 func scrapeConfigFieldResult() agent.FieldResult {
