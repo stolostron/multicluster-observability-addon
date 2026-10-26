@@ -1,11 +1,13 @@
 package resource
 
 import (
+	"encoding/json"
 	"testing"
 
 	certmanagerv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	"github.com/go-logr/logr"
 	persesv1 "github.com/perses/perses-operator/api/v1alpha1"
+	uiplugin "github.com/rhobs/observability-operator/pkg/apis/uiplugin/v1alpha1"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"github.com/stolostron/multicluster-observability-addon/internal/mcoagateway"
@@ -24,6 +26,7 @@ func newTestScheme() *runtime.Scheme {
 	_ = certmanagerv1.AddToScheme(scheme)
 	_ = corev1.AddToScheme(scheme)
 	_ = persesv1.AddToScheme(scheme)
+	_ = uiplugin.AddToScheme(scheme)
 	return scheme
 }
 
@@ -170,6 +173,7 @@ func TestCleanupOrphanDashboards(t *testing.T) {
 func TestAllPossibleDashboardNames(t *testing.T) {
 	names := allPossibleDashboardNames()
 	assert.NotEmpty(t, names)
+	assert.Contains(t, names, "acm-logs")
 
 	second := allPossibleDashboardNames()
 	assert.Equal(t, names, second, "should return the same set on subsequent calls")
@@ -177,6 +181,58 @@ func TestAllPossibleDashboardNames(t *testing.T) {
 	for _, name := range virtualizationDashboardNames {
 		assert.Contains(t, names, name)
 	}
+}
+
+func TestBuildLokiPersesDashboards(t *testing.T) {
+	dashboards, err := buildLokiPersesDashboards()
+	require.NoError(t, err)
+	require.Len(t, dashboards, 1)
+
+	db := dashboards[0]
+	assert.Equal(t, "acm-logs", db.Name)
+	assert.Equal(t, addoncfg.InstallNamespace, db.Namespace)
+	assert.Equal(t, ManagedByLabelValue, db.Labels[addoncfg.ManagedByK8sLabelKey])
+	require.Len(t, db.Spec.Panels, 1)
+	panel := db.Spec.Panels["0_0"]
+	require.NotNil(t, panel)
+	assert.Equal(t, "LogsTable", panel.Spec.Plugin.Kind)
+	require.Len(t, panel.Spec.Queries, 1)
+	query := panel.Spec.Queries[0]
+	assert.Equal(t, "LogQuery", query.Kind)
+	assert.Equal(t, "LokiLogQuery", query.Spec.Plugin.Kind)
+
+	querySpec, err := json.Marshal(query.Spec.Plugin.Spec)
+	require.NoError(t, err)
+	assert.JSONEq(t, `{"query":"{k8s_namespace_name=~\".+\"}","datasource":{"kind":"LokiDatasource","name":"loki-datasource"}}`, string(querySpec))
+}
+
+func TestBuildDesiredDashboardsIncludesLokiOnlyWithDefaultStack(t *testing.T) {
+	reconciler := &HubResourceReconciler{
+		Logger: logr.Discard(),
+		Opts: addon.Options{Platform: addon.PlatformOptions{
+			Logs: addon.LogsOptions{DefaultStack: true},
+		}},
+	}
+
+	dashboards := reconciler.buildDesiredDashboards(false, false)
+	require.Len(t, dashboards, 1)
+	assert.Equal(t, "acm-logs", dashboards[0].Name)
+
+	reconciler.Opts.Platform.Logs.DefaultStack = false
+	assert.Empty(t, reconciler.buildDesiredDashboards(false, false))
+}
+
+func TestReconcileUIPluginWithLogsOnly(t *testing.T) {
+	k8s := fake.NewClientBuilder().WithScheme(newTestScheme()).Build()
+	r := &HubResourceReconciler{Client: k8s, Logger: logr.Discard()}
+	require.NoError(t, r.reconcileUIPlugin(t.Context(), true, false, false))
+
+	plugin := &uiplugin.UIPlugin{}
+	require.NoError(t, k8s.Get(t.Context(), client.ObjectKey{Name: uiPluginName}, plugin))
+	require.NotNil(t, plugin.Spec.Monitoring)
+	require.NotNil(t, plugin.Spec.Monitoring.Perses)
+	assert.True(t, plugin.Spec.Monitoring.Perses.Enabled)
+	assert.Nil(t, plugin.Spec.Monitoring.ACM)
 }
 
 var virtualizationDashboardNames = []string{
