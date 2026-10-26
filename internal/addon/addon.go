@@ -17,6 +17,7 @@ import (
 	addonmetrics "github.com/stolostron/multicluster-observability-addon/internal/addon/metrics"
 	"github.com/stolostron/multicluster-observability-addon/internal/analytics/rightsizing"
 	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
+	appsv1 "k8s.io/api/apps/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	addonutils "open-cluster-management.io/addon-framework/pkg/utils"
@@ -52,6 +53,7 @@ func NewRegistrationOption(agentName string) *agent.RegistrationOption {
 func HealthProber(getter addonutils.AddOnDeploymentConfigGetter, logger logr.Logger) *agent.HealthProber {
 	probeFields := []agent.ProbeField{}
 	probeFields = append(probeFields, getMetricsProbeFields()...)
+	probeFields = append(probeFields, getEndpointMonitoringOperatorProbeFields()...)
 	probeFields = append(probeFields, getLogsProbeFields()...)
 	probeFields = append(probeFields, getTracesProbeFields()...)
 	probeFields = append(probeFields, getThanosProbeFields()...)
@@ -72,6 +74,27 @@ func HealthProber(getter addonutils.AddOnDeploymentConfigGetter, logger logr.Log
 			},
 		},
 	}
+}
+
+// The endpoint operator is rendered on non-OpenShift clusters even when metrics
+// collection is off. Its feedback lets the framework evaluate RS-only addons,
+// which otherwise stay Unknown because none of the rule probes return results.
+func getEndpointMonitoringOperatorProbeFields() []agent.ProbeField {
+	return []agent.ProbeField{{
+		ResourceIdentifier: workv1.ResourceIdentifier{
+			Group:     appsv1.GroupName,
+			Resource:  "deployments",
+			Name:      addoncfg.EndpointMonitoringOperatorDeployment,
+			Namespace: "*",
+		},
+		ProbeRules: []workv1.FeedbackRule{{
+			Type: workv1.JSONPathsType,
+			JsonPaths: []workv1.JsonPath{{
+				Name: addoncfg.EndpointMonitoringOperatorProbeKey,
+				Path: addoncfg.EndpointMonitoringOperatorProbePath,
+			}},
+		}},
+	}}
 }
 
 func getMetricsProbeFields() []agent.ProbeField {
@@ -499,7 +522,7 @@ func healthChecker(getter addonutils.AddOnDeploymentConfigGetter, fields []agent
 		addonmetrics.HealthCheckFailures.WithLabelValues(addonmetrics.SubsystemRightSizing).Inc()
 		return err
 	}
-	if isOpenShiftVendor && opts.Platform.AnalyticsOptions.RightSizing.Delegated {
+	if opts.Platform.AnalyticsOptions.RightSizing.Delegated {
 		addonmetrics.HealthCheckStatus.WithLabelValues(mc.Name, addonmetrics.SubsystemRightSizing).Set(1)
 	}
 	return nil
@@ -633,13 +656,15 @@ func checkTracing(fields []agent.FieldResult, opts Options) error {
 }
 
 func checkRightSizing(fields []agent.FieldResult, opts Options, isOpenShiftVendor bool) error {
-	if !isOpenShiftVendor {
-		return nil
-	}
-
 	rs := opts.Platform.AnalyticsOptions.RightSizing
 	if !rs.Delegated {
 		return nil
+	}
+	if !rs.NamespaceEnabled && !rs.VirtualizationEnabled {
+		return nil
+	}
+	if !isOpenShiftVendor {
+		return checkEndpointMonitoringOperator(fields)
 	}
 
 	expectedNames := map[string]bool{}
@@ -649,10 +674,6 @@ func checkRightSizing(fields []agent.FieldResult, opts Options, isOpenShiftVendo
 	if rs.VirtualizationEnabled {
 		expectedNames[rightsizing.VirtualizationPrometheusRuleName] = false
 	}
-	if len(expectedNames) == 0 {
-		return nil
-	}
-
 	for _, field := range fields {
 		id := field.ResourceIdentifier
 		if id.Resource != addoncfg.PrometheusRulesResource {
@@ -682,6 +703,33 @@ func checkRightSizing(fields []agent.FieldResult, opts Options, isOpenShiftVendo
 	}
 
 	return nil
+}
+
+// On non-OpenShift clusters right-sizing creates no rules. The endpoint operator
+// remains deployed for cleanup, so its readiness supplies a real probe result.
+func checkEndpointMonitoringOperator(fields []agent.FieldResult) error {
+	for _, field := range fields {
+		id := field.ResourceIdentifier
+		if id.Group != appsv1.GroupName || id.Resource != "deployments" || id.Name != addoncfg.EndpointMonitoringOperatorDeployment {
+			continue
+		}
+		if len(field.FeedbackResult.Values) == 0 {
+			return fmt.Errorf("%w: deployment %s", errMissingFeedbackValues, id.Name)
+		}
+		for _, value := range field.FeedbackResult.Values {
+			if value.Name != addoncfg.EndpointMonitoringOperatorProbeKey {
+				return fmt.Errorf("%w: deployment %s unknown probe key %s", errUnknownProbeKey, id.Name, value.Name)
+			}
+			if value.Value.Integer == nil {
+				return fmt.Errorf("%w: deployment %s", errProbeValueIsNil, id.Name)
+			}
+			if *value.Value.Integer < 1 {
+				return fmt.Errorf("%w: deployment %s has %d available replicas", errProbeConditionNotSatisfied, id.Name, *value.Value.Integer)
+			}
+		}
+		return nil
+	}
+	return fmt.Errorf("%w: deployment %s", errMissingFields, addoncfg.EndpointMonitoringOperatorDeployment)
 }
 
 func checkThanos(fields []agent.FieldResult, opts Options) error {
