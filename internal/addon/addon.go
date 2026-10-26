@@ -605,19 +605,15 @@ func checkRightSizing(fields []agent.FieldResult, opts Options, isOpenShiftVendo
 		return checkEndpointMonitoringOperator(fields)
 	}
 
-	expectedNames := map[string]bool{}
-	if rs.NamespaceEnabled {
-		expectedNames[rightsizing.NamespacePrometheusRuleName] = false
-	}
-	if rs.VirtualizationEnabled {
-		expectedNames[rightsizing.VirtualizationPrometheusRuleName] = false
+	// Only the rules that report are checked. The rs-namespace-config and rs-virt-config
+	// placements can leave this cluster out, and then its rule is not rendered at all.
+	enabledNames := map[string]bool{
+		rightsizing.NamespacePrometheusRuleName:      rs.NamespaceEnabled,
+		rightsizing.VirtualizationPrometheusRuleName: rs.VirtualizationEnabled,
 	}
 	for _, field := range fields {
 		id := field.ResourceIdentifier
-		if id.Resource != addoncfg.PrometheusRulesResource {
-			continue
-		}
-		if _, ok := expectedNames[id.Name]; !ok {
+		if id.Resource != addoncfg.PrometheusRulesResource || !enabledNames[id.Name] {
 			continue
 		}
 		if len(field.FeedbackResult.Values) == 0 {
@@ -630,13 +626,6 @@ func checkRightSizing(fields []agent.FieldResult, opts Options, isOpenShiftVendo
 			if value.Value.String == nil {
 				return fmt.Errorf("%w: %s with key %s/%s", errProbeValueIsNil, id.Resource, id.Namespace, id.Name)
 			}
-		}
-		expectedNames[id.Name] = true
-	}
-
-	for name, found := range expectedNames {
-		if !found {
-			return fmt.Errorf("%w: %s with name %s", errMissingFields, addoncfg.PrometheusRulesResource, name)
 		}
 	}
 
