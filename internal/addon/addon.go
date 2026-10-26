@@ -410,10 +410,10 @@ func healthChecker(getter addonutils.AddOnDeploymentConfigGetter, fields []agent
 	if err := checkMetrics(fields, opts, isOpenShiftVendor); err != nil {
 		return err
 	}
-	if err := checkLogging(fields, opts); err != nil {
+	if err := checkLogging(fields, opts, isOpenShiftVendor); err != nil {
 		return err
 	}
-	if err := checkTracing(fields, opts); err != nil {
+	if err := checkTracing(fields, opts, isOpenShiftVendor); err != nil {
 		return err
 	}
 	if common.IsHubCluster(mc) {
@@ -479,8 +479,12 @@ func checkMetrics(fields []agent.FieldResult, opts Options, isOCP bool) error {
 	return nil
 }
 
-func checkLogging(fields []agent.FieldResult, opts Options) error {
+func checkLogging(fields []agent.FieldResult, opts Options, isOCP bool) error {
 	if !opts.Platform.Logs.CollectionEnabled && !opts.UserWorkloads.Logs.CollectionEnabled {
+		return nil
+	}
+	// No ClusterLogForwarder is rendered on non-OpenShift clusters.
+	if !isOCP {
 		return nil
 	}
 
@@ -517,8 +521,12 @@ func checkLogging(fields []agent.FieldResult, opts Options) error {
 	return nil
 }
 
-func checkTracing(fields []agent.FieldResult, opts Options) error {
+func checkTracing(fields []agent.FieldResult, opts Options, isOCP bool) error {
 	if !opts.UserWorkloads.Traces.CollectionEnabled {
+		return nil
+	}
+	// No OpenTelemetryCollector is rendered on non-OpenShift clusters.
+	if !isOCP {
 		return nil
 	}
 

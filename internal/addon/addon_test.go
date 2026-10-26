@@ -167,6 +167,7 @@ func Test_AgentHealthProber_PPA_UserWorkload(t *testing.T) {
 
 func Test_AgentHealthProber_CLF(t *testing.T) {
 	managedCluster := addontesting.NewManagedCluster("cluster-1")
+	managedCluster.Labels = map[string]string{"vendor": "OpenShift"}
 	managedClusterAddOn := addontesting.NewAddon("test", "cluster-1")
 	aodc := newAddonDeploymentConfig()
 	addLoggingCustomizedVariables(aodc)
@@ -224,6 +225,7 @@ func Test_AgentHealthProber_CLF(t *testing.T) {
 
 func Test_AgentHealthProber_OTELCol(t *testing.T) {
 	managedCluster := addontesting.NewManagedCluster("cluster-1")
+	managedCluster.Labels = map[string]string{"vendor": "OpenShift"}
 	managedClusterAddOn := addontesting.NewAddon("test", "cluster-1")
 	aodc := newAddonDeploymentConfig()
 	addTracingCustomizedVariables(aodc)
@@ -388,6 +390,8 @@ func Test_AgentHealthProber_MissingResources(t *testing.T) {
 	})
 
 	t.Run("logging enabled but missing clf", func(t *testing.T) {
+		ocpCluster := addontesting.NewManagedCluster("cluster-1")
+		ocpCluster.Labels = map[string]string{"vendor": "OpenShift"}
 		aodc := newAddonDeploymentConfig()
 		addLoggingCustomizedVariables(aodc)
 		addAODCConfigReference(managedClusterAddOn, aodc)
@@ -397,11 +401,27 @@ func Test_AgentHealthProber_MissingResources(t *testing.T) {
 			// We pass an unrelated field to bypass the initial check for empty fields
 			// in the healthChecker function.
 			[]agent.FieldResult{scrapeConfigFieldResult()}, // unrelated field to bypass empty check
-			managedCluster, managedClusterAddOn)
+			ocpCluster, managedClusterAddOn)
 		require.ErrorIs(t, err, errMissingFields)
 	})
 
+	t.Run("logging enabled on a non-OpenShift cluster", func(t *testing.T) {
+		gkeCluster := addontesting.NewManagedCluster("cluster-1")
+		gkeCluster.Labels = map[string]string{"vendor": "GKE"}
+		aodc := newAddonDeploymentConfig()
+		addLoggingCustomizedVariables(aodc)
+		addAODCConfigReference(managedClusterAddOn, aodc)
+
+		healthProber := HealthProber(newTestGetter(aodc), logr.Discard())
+		err := healthProber.WorkProber.HealthChecker(
+			[]agent.FieldResult{endpointMonitoringOperatorFieldResult(1)},
+			gkeCluster, managedClusterAddOn)
+		require.NoError(t, err)
+	})
+
 	t.Run("tracing enabled but missing otel collector", func(t *testing.T) {
+		ocpCluster := addontesting.NewManagedCluster("cluster-1")
+		ocpCluster.Labels = map[string]string{"vendor": "OpenShift"}
 		aodc := newAddonDeploymentConfig()
 		addTracingCustomizedVariables(aodc)
 		addAODCConfigReference(managedClusterAddOn, aodc)
@@ -411,8 +431,22 @@ func Test_AgentHealthProber_MissingResources(t *testing.T) {
 			// We pass an unrelated field to bypass the initial check for empty fields
 			// in the healthChecker function.
 			[]agent.FieldResult{scrapeConfigFieldResult()}, // unrelated field
-			managedCluster, managedClusterAddOn)
+			ocpCluster, managedClusterAddOn)
 		require.ErrorIs(t, err, errMissingFields)
+	})
+
+	t.Run("tracing enabled on a non-OpenShift cluster", func(t *testing.T) {
+		gkeCluster := addontesting.NewManagedCluster("cluster-1")
+		gkeCluster.Labels = map[string]string{"vendor": "GKE"}
+		aodc := newAddonDeploymentConfig()
+		addTracingCustomizedVariables(aodc)
+		addAODCConfigReference(managedClusterAddOn, aodc)
+
+		healthProber := HealthProber(newTestGetter(aodc), logr.Discard())
+		err := healthProber.WorkProber.HealthChecker(
+			[]agent.FieldResult{endpointMonitoringOperatorFieldResult(1)},
+			gkeCluster, managedClusterAddOn)
+		require.NoError(t, err)
 	})
 
 	t.Run("ui plugin enabled on hub but missing resource", func(t *testing.T) {
