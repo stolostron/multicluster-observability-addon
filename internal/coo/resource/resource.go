@@ -273,6 +273,8 @@ func (r *HubResourceReconciler) reconcileUIPlugin(ctx context.Context, persesEna
 		},
 	}
 
+	// Logging or analytics can enable Perses without the metrics UI. Configure
+	// ACM's Alertmanager and Thanos integration only when metrics UI is enabled.
 	if metricsUIEnabled {
 		desired.Spec.Monitoring.ACM = &uiplugin.AdvancedClusterManagementReference{
 			Enabled: true,
