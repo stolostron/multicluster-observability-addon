@@ -15,6 +15,7 @@ import (
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	"github.com/stretchr/testify/require"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -394,4 +395,67 @@ func TestRSOnlyMetricsCollectionMissing_NoMonitoringStack(t *testing.T) {
 			t.Errorf("unexpected ScrapeConfig %s rendered when metrics collection is missing", name)
 		}
 	}
+}
+
+func TestRSOnlyNonOpenShiftRendersEndpointOperatorForHealthProbe(t *testing.T) {
+	managedCluster := addontesting.NewManagedCluster("cluster-1")
+	managedCluster.Labels = map[string]string{"vendor": "GKE"}
+
+	managedClusterAddOn := addontesting.NewAddon("test", "cluster-1")
+	managedClusterAddOn.Status.ConfigReferences = []addonapiv1beta1.ConfigReference{{
+		ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
+			Group:    "addon.open-cluster-management.io",
+			Resource: "addondeploymentconfigs",
+		},
+		DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+			ConfigReferent: addonapiv1beta1.ConfigReferent{
+				Name:      "multicluster-observability-addon",
+				Namespace: "open-cluster-management-observability",
+			},
+		},
+	}}
+
+	addOnDeploymentConfig := &addonapiv1beta1.AddOnDeploymentConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "multicluster-observability-addon",
+			Namespace: "open-cluster-management-observability",
+		},
+		Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+			CustomizedVariables: []addonapiv1beta1.CustomizedVariable{
+				{Name: addon.KeyRightSizingDelegated, Value: "true"},
+				{Name: addon.KeyPlatformNamespaceRightSizing, Value: "enabled"},
+				{Name: addon.KeyPlatformVirtualizationRightSizing, Value: "enabled"},
+			},
+		},
+	}
+
+	fakeKubeClient := fake.NewClientBuilder().
+		WithScheme(scheme.Scheme).
+		WithObjects(addOnDeploymentConfig, newImagesConfigMap(), newClusterVersion()).
+		Build()
+
+	agentAddon, err := addonfactory.NewAgentAddonFactory(addoncfg.Name, addon.FS, addoncfg.McoaChartDir).
+		WithGetValuesFuncs(GetValuesFunc(t.Context(), fakeKubeClient, newTestGetter(addOnDeploymentConfig), logr.Discard())).
+		WithAgentRegistrationOption(&agent.RegistrationOption{}).
+		WithScheme(scheme.Scheme).
+		BuildHelmAgentAddon()
+	require.NoError(t, err)
+
+	objects, err := agentAddon.Manifests(t.Context(), managedCluster, managedClusterAddOn)
+	require.NoError(t, err)
+
+	foundEndpointOperator := false
+	for _, obj := range objects {
+		switch typed := obj.(type) {
+		case *appsv1.Deployment:
+			if typed.Name == addoncfg.EndpointMonitoringOperatorDeployment {
+				foundEndpointOperator = true
+			}
+		case *prometheusv1.PrometheusRule:
+			t.Errorf("unexpected right-sizing PrometheusRule on GKE: %s", typed.Name)
+		case *cooprometheusv1alpha1.PrometheusAgent:
+			t.Errorf("unexpected PrometheusAgent with metrics collection disabled: %s", typed.Name)
+		}
+	}
+	require.True(t, foundEndpointOperator, "the endpoint operator deployment must supply health feedback")
 }
