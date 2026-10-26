@@ -328,20 +328,6 @@ func Test_AgentHealthProber_MissingResources(t *testing.T) {
 			managedCluster, managedClusterAddOn)
 		require.ErrorIs(t, err, errMissingFields)
 	})
-
-	t.Run("right-sizing enabled but missing prometheus rules", func(t *testing.T) {
-		ocpCluster := addontesting.NewManagedCluster("cluster-1")
-		ocpCluster.Labels = map[string]string{"vendor": "OpenShift"}
-		aodc := newAddonDeploymentConfig()
-		addRightSizingCustomizedVariables(aodc)
-		addAODCConfigReference(managedClusterAddOn, aodc)
-
-		healthProber := HealthProber(newTestGetter(aodc), logr.Discard())
-		err := healthProber.WorkProber.HealthChecker(
-			[]agent.FieldResult{scrapeConfigFieldResult()},
-			ocpCluster, managedClusterAddOn)
-		require.ErrorIs(t, err, errMissingFields)
-	})
 }
 
 func Test_AgentHealthProber_RightSizing(t *testing.T) {
@@ -367,13 +353,25 @@ func Test_AgentHealthProber_RightSizing(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	t.Run("missing namespace rule", func(t *testing.T) {
+	t.Run("namespace rule not rendered for this cluster", func(t *testing.T) {
+		// The rs-namespace-config placement can leave the cluster out.
 		healthProber := HealthProber(newTestGetter(aodc), logr.Discard())
 		err := healthProber.WorkProber.HealthChecker(
 			[]agent.FieldResult{
 				rsFieldResult(virtRuleName),
 			}, managedCluster, managedClusterAddOn)
-		require.ErrorIs(t, err, errMissingFields)
+		require.NoError(t, err)
+	})
+
+	t.Run("no rule rendered for this cluster", func(t *testing.T) {
+		// Both placements can leave the cluster out. Another probe, here the endpoint
+		// operator, still returns feedback, so the checker runs.
+		healthProber := HealthProber(newTestGetter(aodc), logr.Discard())
+		err := healthProber.WorkProber.HealthChecker(
+			[]agent.FieldResult{
+				endpointMonitoringOperatorFieldResult(1),
+			}, managedCluster, managedClusterAddOn)
+		require.NoError(t, err)
 	})
 
 	t.Run("missing feedback values", func(t *testing.T) {
