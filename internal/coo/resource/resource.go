@@ -30,6 +30,7 @@ import (
 	networking "github.com/stolostron/multicluster-observability-addon/pkg/perses/dashboards/acm/k8s/networking"
 	slo "github.com/stolostron/multicluster-observability-addon/pkg/perses/dashboards/acm/k8s/slo"
 	incident_management "github.com/stolostron/multicluster-observability-addon/pkg/perses/dashboards/incident-management"
+	"github.com/stolostron/multicluster-observability-addon/pkg/perses/dashboards/logging"
 	"github.com/stolostron/multicluster-observability-addon/pkg/perses/dashboards/thanos"
 	virt "github.com/stolostron/multicluster-observability-addon/pkg/perses/dashboards/virtualization"
 	corev1 "k8s.io/api/core/v1"
@@ -84,8 +85,8 @@ func (r *HubResourceReconciler) Reconcile(ctx context.Context, hasCardinalityRul
 			(r.Opts.Platform.AnalyticsOptions.RightSizing.NamespaceEnabled ||
 				r.Opts.Platform.AnalyticsOptions.RightSizing.VirtualizationEnabled))
 
-	persesEnabled := hasDashboards || hasAnalyticsDashboards
-	hasLokiDatasource := persesEnabled && r.Opts.Platform.Logs.DefaultStack
+	persesEnabled := hasDashboards || hasAnalyticsDashboards || r.Opts.Platform.Logs.DefaultStack
+	hasLokiDatasource := r.Opts.Platform.Logs.DefaultStack
 	cooNeeded := persesEnabled && installCOO
 
 	// Install COO first — Perses CRD conversion webhooks must be available
@@ -110,7 +111,7 @@ func (r *HubResourceReconciler) Reconcile(ctx context.Context, hasCardinalityRul
 		return fmt.Errorf("failed to reconcile datasources: %w", err)
 	}
 
-	if err := r.reconcileUIPlugin(ctx, persesEnabled, incidentDetectionEnabled); err != nil {
+	if err := r.reconcileUIPlugin(ctx, persesEnabled, hasDashboards, incidentDetectionEnabled); err != nil {
 		return fmt.Errorf("failed to reconcile UIPlugin: %w", err)
 	}
 
@@ -246,7 +247,7 @@ func (r *HubResourceReconciler) ensureAnalyticsNamespace(ctx context.Context) er
 
 // --- UIPlugin ---
 
-func (r *HubResourceReconciler) reconcileUIPlugin(ctx context.Context, persesEnabled, incidentDetectionEnabled bool) error {
+func (r *HubResourceReconciler) reconcileUIPlugin(ctx context.Context, persesEnabled, metricsUIEnabled, incidentDetectionEnabled bool) error {
 	monitoringUINeeded := persesEnabled || incidentDetectionEnabled
 
 	if !monitoringUINeeded {
@@ -272,7 +273,7 @@ func (r *HubResourceReconciler) reconcileUIPlugin(ctx context.Context, persesEna
 		},
 	}
 
-	if persesEnabled {
+	if metricsUIEnabled {
 		desired.Spec.Monitoring.ACM = &uiplugin.AdvancedClusterManagementReference{
 			Enabled: true,
 			Alertmanager: uiplugin.AlertmanagerReference{
@@ -578,6 +579,7 @@ func allPossibleDashboardNames() map[string]struct{} {
 			buildACMPersesDashboards,
 			buildK8sPersesDashboards,
 			buildThanosPersesDashboards,
+			buildLokiPersesDashboards,
 			buildCardinalityPersesDashboards,
 			buildIncidentDetectionPersesDashboards,
 			buildNamespaceRSPersesDashboards,
@@ -615,6 +617,9 @@ func (r *HubResourceReconciler) buildDesiredDashboards(hasCardinalityRules, inci
 
 	if incidentDetectionEnabled {
 		dashboards = r.appendDashboards(dashboards, "incident-detection", buildIncidentDetectionPersesDashboards)
+	}
+	if r.Opts.Platform.Logs.DefaultStack {
+		dashboards = r.appendDashboards(dashboards, "Loki", buildLokiPersesDashboards)
 	}
 
 	if r.Opts.Platform.AnalyticsOptions.RightSizing.Delegated {
@@ -778,6 +783,12 @@ func buildCardinalityPersesDashboards() ([]persesv1.PersesDashboard, error) {
 		acm.BuildACMMetricsCardinalityCluster,
 		acm.BuildACMMetricsCardinalityName,
 	}, dsThanos, addoncfg.InstallNamespace)
+}
+
+func buildLokiPersesDashboards() ([]persesv1.PersesDashboard, error) {
+	return buildFromBuilders([]dashboardBuilderFunc{
+		logging.BuildACMLogs,
+	}, dsLoki, addoncfg.InstallNamespace)
 }
 
 func buildIncidentDetectionPersesDashboards() ([]persesv1.PersesDashboard, error) {
