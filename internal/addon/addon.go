@@ -488,21 +488,21 @@ func healthChecker(getter addonutils.AddOnDeploymentConfigGetter, fields []agent
 		addonmetrics.HealthCheckStatus.WithLabelValues(mc.Name, addonmetrics.SubsystemMetrics).Set(1)
 	}
 
-	if err := checkLogging(fields, opts); err != nil {
+	if err := checkLogging(fields, opts, isOpenShiftVendor); err != nil {
 		addonmetrics.HealthCheckStatus.WithLabelValues(mc.Name, addonmetrics.SubsystemLogs).Set(0)
 		addonmetrics.HealthCheckFailures.WithLabelValues(addonmetrics.SubsystemLogs).Inc()
 		return err
 	}
-	if opts.Platform.Logs.CollectionEnabled || opts.UserWorkloads.Logs.CollectionEnabled {
+	if isOpenShiftVendor && (opts.Platform.Logs.CollectionEnabled || opts.UserWorkloads.Logs.CollectionEnabled) {
 		addonmetrics.HealthCheckStatus.WithLabelValues(mc.Name, addonmetrics.SubsystemLogs).Set(1)
 	}
 
-	if err := checkTracing(fields, opts); err != nil {
+	if err := checkTracing(fields, opts, isOpenShiftVendor); err != nil {
 		addonmetrics.HealthCheckStatus.WithLabelValues(mc.Name, addonmetrics.SubsystemTraces).Set(0)
 		addonmetrics.HealthCheckFailures.WithLabelValues(addonmetrics.SubsystemTraces).Inc()
 		return err
 	}
-	if opts.UserWorkloads.Traces.CollectionEnabled {
+	if isOpenShiftVendor && opts.UserWorkloads.Traces.CollectionEnabled {
 		addonmetrics.HealthCheckStatus.WithLabelValues(mc.Name, addonmetrics.SubsystemTraces).Set(1)
 	}
 
@@ -579,8 +579,12 @@ func checkMetrics(fields []agent.FieldResult, opts Options, isOCP bool) error {
 	return nil
 }
 
-func checkLogging(fields []agent.FieldResult, opts Options) error {
+func checkLogging(fields []agent.FieldResult, opts Options, isOCP bool) error {
 	if !opts.Platform.Logs.CollectionEnabled && !opts.UserWorkloads.Logs.CollectionEnabled {
+		return nil
+	}
+	// No ClusterLogForwarder is rendered on non-OpenShift clusters.
+	if !isOCP {
 		return nil
 	}
 
@@ -617,8 +621,12 @@ func checkLogging(fields []agent.FieldResult, opts Options) error {
 	return nil
 }
 
-func checkTracing(fields []agent.FieldResult, opts Options) error {
+func checkTracing(fields []agent.FieldResult, opts Options, isOCP bool) error {
 	if !opts.UserWorkloads.Traces.CollectionEnabled {
+		return nil
+	}
+	// No OpenTelemetryCollector is rendered on non-OpenShift clusters.
+	if !isOCP {
 		return nil
 	}
 
