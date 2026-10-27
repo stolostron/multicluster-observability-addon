@@ -78,7 +78,8 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1beta1.Man
 	}
 
 	// Apply per-cluster registry overrides from ManagedCluster annotation
-	if clusterRegs := config.ParseClusterImageRegistries(managedCluster); clusterRegs != nil {
+	clusterRegs := config.ParseClusterImageRegistries(managedCluster)
+	if clusterRegs != nil {
 		ret.Images.ApplyClusterRegistryOverrides(clusterRegs.Registries)
 		if clusterRegs.PullSecret != "" {
 			if psErr := o.addClusterPullSecret(ctx, &ret.Secrets, clusterRegs.PullSecret); psErr != nil {
@@ -140,6 +141,11 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1beta1.Man
 			o.Logger.V(2).Info("No rules found for user workloads")
 		}
 	}
+
+	// The agents are copied from the hub-wide default agents, whose images are set once
+	// for all clusters, so the per-cluster overrides above do not reach them.
+	applyClusterRegistriesToAgent(ret.Platform.PrometheusAgent, clusterRegs)
+	applyClusterRegistriesToAgent(ret.UserWorkloads.PrometheusAgent, clusterRegs)
 
 	if isHypershiftCluster {
 		if opts.UserWorkloads.Metrics.CollectionEnabled {
@@ -282,6 +288,24 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1beta1.Man
 	}
 
 	return ret, nil
+}
+
+// applyClusterRegistriesToAgent applies the cluster's registry prefix overrides to
+// the images of the agent: the Prometheus image and the extra containers, such as
+// the kube-rbac-proxy sidecar.
+func applyClusterRegistriesToAgent(agent *cooprometheusv1alpha1.PrometheusAgent, clusterRegs *config.ClusterImageRegistries) {
+	if agent == nil || clusterRegs == nil || len(clusterRegs.Registries) == 0 {
+		return
+	}
+	if agent.Spec.Image != nil {
+		agent.Spec.Image = ptr.To(clusterRegs.OverrideImage(*agent.Spec.Image))
+	}
+	for i := range agent.Spec.Containers {
+		agent.Spec.Containers[i].Image = clusterRegs.OverrideImage(agent.Spec.Containers[i].Image)
+	}
+	for i := range agent.Spec.InitContainers {
+		agent.Spec.InitContainers[i].Image = clusterRegs.OverrideImage(agent.Spec.InitContainers[i].Image)
+	}
 }
 
 // buildPrometheusAgent abstracts the logic of building a Prometheus agent for platform or user workloads

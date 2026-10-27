@@ -360,3 +360,49 @@ func TestRegistryPrefixReplace(t *testing.T) {
 		})
 	}
 }
+
+func TestClusterImageRegistriesOverrideImage(t *testing.T) {
+	regs := &ClusterImageRegistries{
+		Registries: []addonapiv1beta1.ImageMirror{
+			{Source: "registry.redhat.io/rhacm2", Mirror: "registry.stage.redhat.io/rhacm2"},
+		},
+	}
+
+	tests := []struct {
+		name     string
+		regs     *ClusterImageRegistries
+		image    string
+		expected string
+	}{
+		{
+			name:     "matching source uses the mirror",
+			regs:     regs,
+			image:    "registry.redhat.io/rhacm2/prometheus-rhel9@sha256:abc123",
+			expected: "registry.stage.redhat.io/rhacm2/prometheus-rhel9@sha256:abc123",
+		},
+		{
+			name:     "other registry is unchanged",
+			regs:     regs,
+			image:    "quay.io/prometheus/prometheus:v2.0.0",
+			expected: "quay.io/prometheus/prometheus:v2.0.0",
+		},
+		{
+			name:     "empty image stays empty",
+			regs:     regs,
+			image:    "",
+			expected: "",
+		},
+		{
+			name:     "nil registries is a no-op",
+			regs:     nil,
+			image:    "registry.redhat.io/rhacm2/prometheus-rhel9@sha256:abc123",
+			expected: "registry.redhat.io/rhacm2/prometheus-rhel9@sha256:abc123",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, tt.regs.OverrideImage(tt.image))
+		})
+	}
+}
