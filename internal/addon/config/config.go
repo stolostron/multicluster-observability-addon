@@ -27,8 +27,11 @@ const (
 
 	CooStatusClaimName = "coo.observability.open-cluster-management.io"
 
-	PaProbeKey  = "isAvailable"
-	PaProbePath = ".status.conditions[?(@.type==\"Available\")].status"
+	PaProbeKey                           = "isAvailable"
+	PaProbePath                          = ".status.conditions[?(@.type==\"Available\")].status"
+	EndpointMonitoringOperatorDeployment = "endpoint-monitoring-operator"
+	EndpointMonitoringOperatorProbeKey   = "availableReplicas"
+	EndpointMonitoringOperatorProbePath  = ".status.availableReplicas"
 
 	ClusterLogForwardersResource = "clusterlogforwarders"
 	SpokeCLFName                 = "mcoa-instance"
@@ -81,6 +84,10 @@ const (
 	TLSCipherSuitesFeedbackName  = "cipherSuites"
 	TLSCipherSuitesFeedbackPath  = ".data.cipherSuites"
 	TLSDefaultMinVersion         = "VersionTLS12"
+
+	PrometheusRulesResource = "prometheusrules"
+	RsProbeKey              = "ruleName"
+	RsProbePath             = ".metadata.name"
 
 	VendorOverrideAnnotationKey = "mcoa-override-vendor"
 	AnnotationOriginalResource  = "mcoa.openshift.io/original-resource"

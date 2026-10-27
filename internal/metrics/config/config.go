@@ -13,6 +13,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -210,6 +211,105 @@ func GetTrimmedClusterID(clusterID string) string {
 
 func GetAlertmanagerAccessorSecretName(trimmedClusterID string) string {
 	return fmt.Sprintf("%s-%s", AlertmanagerAccessorSecretName, trimmedClusterID)
+}
+
+// ClusterImageRegistries holds parsed image registry overrides from the
+// ManagedCluster's open-cluster-management.io/image-registries annotation.
+type ClusterImageRegistries struct {
+	// PullSecret references a hub secret in "namespace.name" format.
+	PullSecret string
+	Registries []addonapiv1beta1.ImageMirror
+}
+
+// ParseClusterImageRegistries extracts image registry mirrors and an optional
+// pull secret reference from the ManagedCluster annotation.
+func ParseClusterImageRegistries(cluster *clusterv1.ManagedCluster) *ClusterImageRegistries {
+	if cluster == nil {
+		return nil
+	}
+	annotations := cluster.GetAnnotations()
+	if len(annotations) == 0 {
+		return nil
+	}
+	raw := annotations[clusterv1.ClusterImageRegistriesAnnotationKey]
+	if raw == "" {
+		return nil
+	}
+	type imageRegistries struct {
+		PullSecret string                        `json:"pullSecret"`
+		Registries []addonapiv1beta1.ImageMirror `json:"registries"`
+	}
+	var parsed imageRegistries
+	if err := json.Unmarshal([]byte(raw), &parsed); err != nil {
+		return nil
+	}
+	if len(parsed.Registries) == 0 && parsed.PullSecret == "" {
+		return nil
+	}
+	return &ClusterImageRegistries{
+		PullSecret: parsed.PullSecret,
+		Registries: parsed.Registries,
+	}
+}
+
+// OverrideImage applies the cluster's registry prefix overrides to a single
+// image, the same way ApplyClusterRegistryOverrides does for the images list.
+func (c *ClusterImageRegistries) OverrideImage(image string) string {
+	if c == nil {
+		return image
+	}
+	return overrideImageByRegistry(image, c.Registries)
+}
+
+// ApplyClusterRegistryOverrides applies registry-level prefix overrides
+// (from the ManagedCluster annotation) to all images. Unlike the AODC
+// overrideImage (which only matches at image-name boundaries), this uses
+// prefix-based registry/org replacement — matching how MCO and the addon
+// framework handle the same annotation.
+func (o *ImageOverrides) ApplyClusterRegistryOverrides(registries []addonapiv1beta1.ImageMirror) {
+	if len(registries) == 0 {
+		return
+	}
+	o.PrometheusConfigReloader = overrideImageByRegistry(o.PrometheusConfigReloader, registries)
+	o.KubeRBACProxy = overrideImageByRegistry(o.KubeRBACProxy, registries)
+	o.CooPrometheusOperatorImage = overrideImageByRegistry(o.CooPrometheusOperatorImage, registries)
+	o.KubeStateMetrics = overrideImageByRegistry(o.KubeStateMetrics, registries)
+	o.NodeExporter = overrideImageByRegistry(o.NodeExporter, registries)
+	o.Prometheus = overrideImageByRegistry(o.Prometheus, registries)
+	o.EndpointMonitoringOperator = overrideImageByRegistry(o.EndpointMonitoringOperator, registries)
+	if o.ThanosOperator != "" {
+		o.ThanosOperator = overrideImageByRegistry(o.ThanosOperator, registries)
+	}
+}
+
+func overrideImageByRegistry(image string, registries []addonapiv1beta1.ImageMirror) string {
+	if image == "" {
+		return image
+	}
+	overridden := image
+	for _, reg := range registries {
+		if name := registryPrefixReplace(reg.Source, reg.Mirror, image); name != image {
+			overridden = name
+		}
+	}
+	return overridden
+}
+
+func registryPrefixReplace(source, mirror, imageName string) string {
+	source = strings.TrimSuffix(source, "/")
+	mirror = strings.TrimSuffix(mirror, "/")
+	segments := strings.Split(imageName, "/")
+	nameTag := segments[len(segments)-1]
+	if source == "" {
+		if mirror == "" {
+			return nameTag
+		}
+		return fmt.Sprintf("%s/%s", mirror, nameTag)
+	}
+	if !strings.HasPrefix(imageName, source) {
+		return imageName
+	}
+	return fmt.Sprintf("%s%s", mirror, strings.TrimPrefix(imageName, source))
 }
 
 func GetHubMtlsCASecretName(trimmedClusterID string) string {
