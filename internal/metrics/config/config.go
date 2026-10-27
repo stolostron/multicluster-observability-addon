@@ -252,6 +252,15 @@ func ParseClusterImageRegistries(cluster *clusterv1.ManagedCluster) *ClusterImag
 	}
 }
 
+// OverrideImage applies the cluster's registry prefix overrides to a single
+// image, the same way ApplyClusterRegistryOverrides does for the images list.
+func (c *ClusterImageRegistries) OverrideImage(image string) string {
+	if c == nil {
+		return image
+	}
+	return overrideImageByRegistry(image, c.Registries)
+}
+
 // ApplyClusterRegistryOverrides applies registry-level prefix overrides
 // (from the ManagedCluster annotation) to all images. Unlike the AODC
 // overrideImage (which only matches at image-name boundaries), this uses
