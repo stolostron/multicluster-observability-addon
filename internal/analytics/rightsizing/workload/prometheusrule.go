@@ -203,11 +203,11 @@ func usage5mExpr(metric, nsFilter, byLabels, mappingMetric string) string {
 }
 
 func podResource5m(metric, resource, nsFilter, byLabels string) string {
-	return resource5mExpr(metric, resource, nsFilter, byLabels, "acm_rs:pod_workload:relabel:5m")
+	return resource5mExpr(metric, resource, nsFilter, byLabels, "acm_rs:pod:info")
 }
 
 func podUsage5m(metric, nsFilter, byLabels string) string {
-	return usage5mExpr(metric, nsFilter, byLabels, "acm_rs:pod_workload:relabel:5m")
+	return usage5mExpr(metric, nsFilter, byLabels, "acm_rs:pod:info")
 }
 
 func workloadResource5m(metric, resource, nsFilter, byLabels string) string {
