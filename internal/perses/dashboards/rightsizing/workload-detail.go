@@ -38,8 +38,8 @@ func BuildWorkloadDetailForFeatures(project string, datasource string, clusterLa
 			panels.WorkloadDetailCPURecommendationStatPanel(datasource),
 			panels.WorkloadDetailCPUUsageStatPanel(datasource),
 			panels.WorkloadDetailCPURequestStatPanel(datasource),
-			panels.WorkloadDetailCPULimitStatPanel(datasource),
 			panels.WorkloadDetailCPUUtilizationStatPanel(datasource),
+			panels.WorkloadDetailCPULimitStatPanel(datasource),
 			panels.WorkloadDetailCPUTimeSeriesPanel(datasource),
 		}
 		if includePods {
@@ -62,8 +62,8 @@ func BuildWorkloadDetailForFeatures(project string, datasource string, clusterLa
 			panels.WorkloadDetailMemRecommendationStatPanel(datasource),
 			panels.WorkloadDetailMemUsageStatPanel(datasource),
 			panels.WorkloadDetailMemRequestStatPanel(datasource),
-			panels.WorkloadDetailMemLimitStatPanel(datasource),
 			panels.WorkloadDetailMemUtilizationStatPanel(datasource),
+			panels.WorkloadDetailMemLimitStatPanel(datasource),
 			panels.WorkloadDetailMemTimeSeriesPanel(datasource),
 		}
 		if includePods {
