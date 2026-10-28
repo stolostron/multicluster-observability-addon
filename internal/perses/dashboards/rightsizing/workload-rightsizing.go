@@ -31,8 +31,8 @@ func withWorkloadCPUSection(datasource string, project string) dashboard.Option 
 		panels.WorkloadCPURecommendationPanel(datasource),
 		panels.WorkloadCPUUsagePanel(datasource),
 		panels.WorkloadCPURequestPanel(datasource),
-		panels.WorkloadCPULimitPanel(datasource),
 		panels.WorkloadCPUUtilizationPanel(datasource),
+		panels.WorkloadCPULimitPanel(datasource),
 		panels.WorkloadCPUTopWorkloadsPanel(datasource),
 		panels.WorkloadCPUTablePanel(datasource, project),
 	)
@@ -52,8 +52,8 @@ func withWorkloadMemSection(datasource string, project string) dashboard.Option 
 		panels.WorkloadMemRecommendationPanel(datasource),
 		panels.WorkloadMemUsagePanel(datasource),
 		panels.WorkloadMemRequestPanel(datasource),
-		panels.WorkloadMemLimitPanel(datasource),
 		panels.WorkloadMemUtilizationPanel(datasource),
+		panels.WorkloadMemLimitPanel(datasource),
 		panels.WorkloadMemTopWorkloadsPanel(datasource),
 		panels.WorkloadMemTablePanel(datasource, project),
 	)

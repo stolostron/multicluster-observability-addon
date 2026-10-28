@@ -43,8 +43,8 @@ func BuildPodDetail(project string, datasource string, _ string) (dashboard.Buil
 			panels.PodDetailCPURecommendationStatPanel(datasource),
 			panels.PodDetailCPUUsageStatPanel(datasource),
 			panels.PodDetailCPURequestStatPanel(datasource),
-			panels.PodDetailCPULimitStatPanel(datasource),
 			panels.PodDetailCPUUtilizationStatPanel(datasource),
+			panels.PodDetailCPULimitStatPanel(datasource),
 			panels.PodDetailCPUTimeSeriesPanel(datasource),
 		),
 
@@ -60,8 +60,8 @@ func BuildPodDetail(project string, datasource string, _ string) (dashboard.Buil
 			panels.PodDetailMemRecommendationStatPanel(datasource),
 			panels.PodDetailMemUsageStatPanel(datasource),
 			panels.PodDetailMemRequestStatPanel(datasource),
-			panels.PodDetailMemLimitStatPanel(datasource),
 			panels.PodDetailMemUtilizationStatPanel(datasource),
+			panels.PodDetailMemLimitStatPanel(datasource),
 			panels.PodDetailMemTimeSeriesPanel(datasource),
 		),
 	)
