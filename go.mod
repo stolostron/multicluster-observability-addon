@@ -60,6 +60,8 @@ require (
 	github.com/goccy/go-yaml v1.19.2 // indirect
 	github.com/golang-jwt/jwt/v5 v5.3.1 // indirect
 	github.com/perses/plugins/barchart v0.11.1 // indirect
+	github.com/perses/plugins/logstable v0.2.1 // indirect
+	github.com/perses/plugins/loki v0.5.1 // indirect
 	github.com/perses/plugins/piechart v0.13.2-0.20260326134814-37e86f6b1c58 // indirect
 	github.com/prometheus/otlptranslator v1.0.0 // indirect
 	golang.org/x/text v0.41.0 // indirect
