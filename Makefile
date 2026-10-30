@@ -12,6 +12,9 @@ VERSION ?= v0.0.1
 CRD_DIR := $(shell pwd)/deploy/crds
 TEST_CRD_DIR := $(CURDIR)/test/integration/crds
 BIN_DIR := $(CURDIR)/bin
+# Match the Prometheus v0.310.0 Go module without importing its test harness.
+PROMTOOL_VERSION ?= 3.10.0
+PROMTOOL := $(BIN_DIR)/promtool-$(PROMTOOL_VERSION)
 CONTAINER_ENGINE ?= $(shell which podman 2>/dev/null || which docker 2>/dev/null)
 
 # REGISTRY_BASE
@@ -96,6 +99,13 @@ fmt: lint-fix
 .PHONY: test
 test:
 	go test ./internal/...
+
+$(PROMTOOL):
+	bash ./hack/install-promtool.sh "$(PROMTOOL_VERSION)" "$@"
+
+.PHONY: test-promql
+test-promql: $(PROMTOOL) ## Evaluate generated pod mappings with a pinned promtool binary.
+	PROMTOOL="$(PROMTOOL)" go test -tags=promql -run '^TestPodMappingWithPromtool$$' -count=1 ./internal/analytics/rightsizing/workload
 
 .PHONY: bench
 bench: ## Run Go performance benchmarks with memory allocation profiling
