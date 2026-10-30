@@ -20,8 +20,8 @@ func TestACMCommonPanelQueriesCPUHaveClusterFilter(t *testing.T) {
 			require.True(t, ok, "ACMCommonPanelQueries[%q] not found", key)
 
 			promql := expr.Pretty(0)
-			assert.True(t, strings.Contains(promql, `cluster="$cluster"`),
-				"ACMCommonPanelQueries[%q] is missing cluster=\"$cluster\" label matcher; got: %s", key, promql)
+			assert.True(t, strings.Contains(promql, `node_cpu_seconds_total:mode_idle:avg_rate5m{cluster="$cluster"}`),
+				"ACMCommonPanelQueries[%q] idle CPU metric is missing cluster=\"$cluster\" label matcher; got: %s", key, promql)
 		})
 	}
 }
