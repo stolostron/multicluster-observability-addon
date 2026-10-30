@@ -43,15 +43,15 @@ $(CRD_DIR)/opentelemetry.io_instrumentations.yaml:
 
 $(CRD_DIR)/monitoring.rhobs_prometheusagents.yaml:
 	@mkdir -p $(CRD_DIR)
-	@curl -s -L https://raw.githubusercontent.com/rhobs/obo-prometheus-operator/refs/tags/v0.83.0-rhobs1/example/prometheus-operator-crd/monitoring.rhobs_prometheusagents.yaml > $(CRD_DIR)/monitoring.rhobs_prometheusagents.yaml
+	@curl -s -L https://raw.githubusercontent.com/rhobs/obo-prometheus-operator/refs/tags/v0.90.1-rhobs1/example/prometheus-operator-crd/monitoring.rhobs_prometheusagents.yaml > $(CRD_DIR)/monitoring.rhobs_prometheusagents.yaml
 
 $(CRD_DIR)/monitoring.rhobs_scrapeconfigs.yaml:
 	@mkdir -p $(CRD_DIR)
-	@curl -s -L https://raw.githubusercontent.com/rhobs/obo-prometheus-operator/refs/tags/v0.83.0-rhobs1/example/prometheus-operator-crd/monitoring.rhobs_scrapeconfigs.yaml > $(CRD_DIR)/monitoring.rhobs_scrapeconfigs.yaml
+	@curl -s -L https://raw.githubusercontent.com/rhobs/obo-prometheus-operator/refs/tags/v0.90.1-rhobs1/example/prometheus-operator-crd/monitoring.rhobs_scrapeconfigs.yaml > $(CRD_DIR)/monitoring.rhobs_scrapeconfigs.yaml
 
 $(CRD_DIR)/monitoring.rhobs_prometheusrules.yaml:
 	@mkdir -p $(CRD_DIR)
-	@curl -s -L https://raw.githubusercontent.com/rhobs/obo-prometheus-operator/refs/tags/v0.83.0-rhobs1/example/prometheus-operator-crd/monitoring.rhobs_prometheusrules.yaml > $(CRD_DIR)/monitoring.rhobs_prometheusrules.yaml
+	@curl -s -L https://raw.githubusercontent.com/rhobs/obo-prometheus-operator/refs/tags/v0.90.1-rhobs1/example/prometheus-operator-crd/monitoring.rhobs_prometheusrules.yaml > $(CRD_DIR)/monitoring.rhobs_prometheusrules.yaml
 
 $(CRD_DIR)/core.observatorium.io_observatoria.yaml:
 	@mkdir -p $(CRD_DIR)
@@ -59,6 +59,10 @@ $(CRD_DIR)/core.observatorium.io_observatoria.yaml:
 
 .PHONY: download-crds
 download-crds: $(CRD_DIR)/observability.openshift.io_clusterlogforwarders.yaml $(CRD_DIR)/opentelemetry.io_opentelemetrycollectors.yaml $(CRD_DIR)/opentelemetry.io_instrumentations.yaml $(CRD_DIR)/monitoring.rhobs_prometheusagents.yaml $(CRD_DIR)/monitoring.rhobs_scrapeconfigs.yaml $(CRD_DIR)/monitoring.rhobs_prometheusrules.yaml $(CRD_DIR)/core.observatorium.io_observatoria.yaml
+
+.PHONY: update-test-crds
+update-test-crds: ## Update test CRDs from pinned upstream releases and Go modules
+	./hack/update-test-crds.sh
 
 SHELLCHECK ?= $(shell which shellcheck 2>/dev/null)
 SHELL_SCRIPTS := $(shell find . -name "*.sh" -not -path "*/.*" -not -path "*/vendor/*")
