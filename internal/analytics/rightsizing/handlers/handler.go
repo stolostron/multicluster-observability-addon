@@ -16,6 +16,7 @@ import (
 	"github.com/stolostron/multicluster-observability-addon/internal/analytics/rightsizing"
 	rsnamespace "github.com/stolostron/multicluster-observability-addon/internal/analytics/rightsizing/namespace"
 	rsvirtualization "github.com/stolostron/multicluster-observability-addon/internal/analytics/rightsizing/virtualization"
+	rsworkload "github.com/stolostron/multicluster-observability-addon/internal/analytics/rightsizing/workload"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -135,9 +136,13 @@ func (o *OptionsBuilder) Build(ctx context.Context, cluster *clusterv1.ManagedCl
 
 	namespaceEnabled := opts.Platform.AnalyticsOptions.RightSizing.NamespaceEnabled
 	virtualizationEnabled := opts.Platform.AnalyticsOptions.RightSizing.VirtualizationEnabled
+	workloadEnabled := opts.Platform.AnalyticsOptions.RightSizing.WorkloadEnabled
+	podEnabled := opts.Platform.AnalyticsOptions.RightSizing.PodEnabled
 
 	nsMatched := false
 	virtMatched := false
+	wlMatched := false
+	podMatched := false
 
 	// Build namespace right-sizing options
 	if namespaceEnabled {
@@ -205,8 +210,67 @@ func (o *OptionsBuilder) Build(ctx context.Context, cluster *clusterv1.ManagedCl
 		}
 	}
 
+	if workloadEnabled {
+		if err := o.ensureWorkloadConfigMap(ctx); err != nil {
+			o.Logger.Error(err, "Failed to ensure workload ConfigMap exists, continuing with defaults")
+		}
+
+		wlConfigData, err := o.getConfigData(ctx, rightsizing.WorkloadConfigMapName)
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				wlConfigData = rightsizing.RSConfigMapData{
+					PrometheusRuleConfig:   rightsizing.GetDefaultWorkloadPrometheusRuleConfig(),
+					PlacementConfiguration: rightsizing.GetDefaultRSPlacement(),
+				}
+			} else {
+				return ret, fmt.Errorf("failed to get workload config: %w", err)
+			}
+		}
+		if reverted := o.validateAndSanitizeConfig(&wlConfigData, rightsizing.WorkloadConfigMapName); reverted {
+			o.revertConfigMap(ctx, rightsizing.WorkloadConfigMapName, wlConfigData)
+		}
+
+		if clusterMatchesPlacement(cluster, wlConfigData.PlacementConfiguration) {
+			wlOpts, err := o.buildWorkloadOptionsFromConfig(wlConfigData)
+			if err != nil {
+				return ret, fmt.Errorf("failed to build workload right-sizing options: %w", err)
+			}
+			ret.WorkloadRightSizing = wlOpts
+			wlMatched = true
+		} else {
+			o.Logger.V(1).Info("Cluster not selected for workload right-sizing", "cluster", cluster.Name)
+		}
+	}
+
+	if podEnabled {
+		if err := o.ensurePodConfigMap(ctx); err != nil {
+			o.Logger.Error(err, "Failed to ensure pod ConfigMap exists, continuing with defaults")
+		}
+		podConfigData, podErr := o.getConfigData(ctx, rightsizing.PodConfigMapName)
+		if podErr != nil {
+			if apierrors.IsNotFound(podErr) {
+				podConfigData = rightsizing.RSConfigMapData{PrometheusRuleConfig: rightsizing.GetDefaultWorkloadPrometheusRuleConfig(), PlacementConfiguration: rightsizing.GetDefaultRSPlacement()}
+			} else {
+				return ret, fmt.Errorf("failed to get pod config: %w", podErr)
+			}
+		}
+		if reverted := o.validateAndSanitizeConfig(&podConfigData, rightsizing.PodConfigMapName); reverted {
+			o.revertConfigMap(ctx, rightsizing.PodConfigMapName, podConfigData)
+		}
+		if clusterMatchesPlacement(cluster, podConfigData.PlacementConfiguration) {
+			podOpts, podErr := o.buildPodOptionsFromConfig(podConfigData)
+			if podErr != nil {
+				return ret, fmt.Errorf("failed to build pod right-sizing options: %w", podErr)
+			}
+			ret.PodRightSizing = podOpts
+			podMatched = true
+		} else {
+			o.Logger.V(1).Info("Cluster not selected for pod right-sizing", "cluster", cluster.Name)
+		}
+	}
+
 	if opts.Platform.Metrics.CollectionEnabled {
-		ret.ScrapeConfig = rightsizing.GenerateScrapeConfig(nsMatched, virtMatched)
+		ret.ScrapeConfig = rightsizing.GenerateScrapeConfigForFeatures(nsMatched, virtMatched, wlMatched, podMatched)
 	}
 
 	return ret, nil
@@ -227,6 +291,26 @@ func (o *OptionsBuilder) buildVirtualizationOptionsFromConfig(configData rightsi
 	rule, err := rsvirtualization.GeneratePrometheusRule(configData)
 	if err != nil {
 		return opts, fmt.Errorf("failed to generate virtualization PrometheusRule: %w", err)
+	}
+	opts.PrometheusRules = []*monitoringv1.PrometheusRule{&rule}
+	return opts, nil
+}
+
+func (o *OptionsBuilder) buildWorkloadOptionsFromConfig(configData rightsizing.RSConfigMapData) (ComponentOptions, error) {
+	opts := ComponentOptions{Enabled: true}
+	rule, err := rsworkload.GenerateWorkloadPrometheusRule(configData)
+	if err != nil {
+		return opts, fmt.Errorf("failed to generate workload PrometheusRule: %w", err)
+	}
+	opts.PrometheusRules = []*monitoringv1.PrometheusRule{&rule}
+	return opts, nil
+}
+
+func (o *OptionsBuilder) buildPodOptionsFromConfig(configData rightsizing.RSConfigMapData) (ComponentOptions, error) {
+	opts := ComponentOptions{Enabled: true}
+	rule, err := rsworkload.GeneratePodPrometheusRule(configData)
+	if err != nil {
+		return opts, fmt.Errorf("failed to generate pod PrometheusRule: %w", err)
 	}
 	opts.PrometheusRules = []*monitoringv1.PrometheusRule{&rule}
 	return opts, nil
@@ -413,6 +497,34 @@ func (o *OptionsBuilder) ensureVirtualizationConfigMap(ctx context.Context) erro
 				"name", rightsizing.VirtualizationConfigMapName,
 				"namespace", addoncfg.InstallNamespace)
 			return o.createDefaultConfigMap(ctx, rightsizing.VirtualizationConfigMapName, rightsizing.GetDefaultVirtualizationConfigData())
+		}
+		return err
+	}
+	return o.backfillAggregatorKeys(ctx, cm)
+}
+
+func (o *OptionsBuilder) ensureWorkloadConfigMap(ctx context.Context) error {
+	cm, err := common.GetConfigMap(ctx, o.Client, addoncfg.InstallNamespace, rightsizing.WorkloadConfigMapName)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			o.Logger.Info("Creating workload right-sizing ConfigMap with defaults",
+				"name", rightsizing.WorkloadConfigMapName,
+				"namespace", addoncfg.InstallNamespace)
+			return o.createDefaultConfigMap(ctx, rightsizing.WorkloadConfigMapName, rightsizing.GetDefaultWorkloadConfigData())
+		}
+		return err
+	}
+	return o.backfillAggregatorKeys(ctx, cm)
+}
+
+func (o *OptionsBuilder) ensurePodConfigMap(ctx context.Context) error {
+	cm, err := common.GetConfigMap(ctx, o.Client, addoncfg.InstallNamespace, rightsizing.PodConfigMapName)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			o.Logger.Info("Creating pod right-sizing ConfigMap with defaults",
+				"name", rightsizing.PodConfigMapName,
+				"namespace", addoncfg.InstallNamespace)
+			return o.createDefaultConfigMap(ctx, rightsizing.PodConfigMapName, rightsizing.GetDefaultWorkloadConfigData())
 		}
 		return err
 	}

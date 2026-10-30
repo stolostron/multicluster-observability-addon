@@ -258,7 +258,7 @@ func NewRuleBuilder(labelJoin string) *RuleBuilder {
 func (rb *RuleBuilder) Rule(record, metricExpr string) monitoringv1.Rule {
 	expr := metricExpr
 	if rb.LabelJoin != "" {
-		expr = fmt.Sprintf("%s %s", metricExpr, rb.LabelJoin)
+		expr = fmt.Sprintf("(%s) %s", metricExpr, rb.LabelJoin)
 	}
 	return monitoringv1.Rule{
 		Record: record,

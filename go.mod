@@ -41,7 +41,6 @@ require (
 	github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring v0.90.1-rhobs1
 	github.com/rhobs/observability-operator/pkg/apis v0.0.0-20250902133632-f98bd8a20a80
 	github.com/thanos-community/thanos-operator v0.0.0-20260313095634-17889a0e1c1a
-	golang.org/x/text v0.41.0
 )
 
 require (
@@ -62,6 +61,7 @@ require (
 	github.com/perses/plugins/barchart v0.11.1 // indirect
 	github.com/perses/plugins/piechart v0.13.2-0.20260326134814-37e86f6b1c58 // indirect
 	github.com/prometheus/otlptranslator v1.0.0 // indirect
+	golang.org/x/text v0.41.0 // indirect
 )
 
 require (
@@ -132,7 +132,7 @@ require (
 	github.com/perses/promql-builder v0.2.1-0.20260106092606-e4909fea9c57
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
-	github.com/prometheus/client_golang v1.23.2 // indirect
+	github.com/prometheus/client_golang v1.23.2
 	github.com/prometheus/client_model v0.6.2 // indirect
 	github.com/prometheus/common v0.67.5
 	github.com/prometheus/procfs v0.20.1 // indirect

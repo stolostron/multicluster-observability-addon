@@ -22,7 +22,7 @@ jobs:
       uses: golangci/golangci-lint-action@v9
       with:
         version: v2.11.4
-        args: --timeout=4m
+        args: --timeout=4m --build-tags=promql
 
   test:
     name: test
@@ -38,6 +38,13 @@ jobs:
       id: go
     - name: Run tests
       run: go test -coverprofile=profile.cov ./internal/...
+    - name: Cache promtool
+      uses: actions/cache@v4
+      with:
+        path: bin/promtool-*
+        key: ${{ runner.os }}-${{ runner.arch }}-promtool-${{ hashFiles('Makefile', 'hack/install-promtool.sh') }}
+    - name: Test generated PromQL mappings
+      run: make test-promql
     - name: Send coverage
       uses: shogo82148/actions-goveralls@v1
       with:
