@@ -1,6 +1,9 @@
 package addon
 
 import (
+	"bytes"
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"net/url"
 	"strconv"
@@ -116,8 +119,74 @@ type MetricsUIOptions struct {
 }
 
 type ProxyConfig struct {
-	ProxyURL *url.URL
-	NoProxy  string
+	HTTPProxy  *url.URL
+	HTTPSProxy *url.URL
+	CABundle   []byte
+	NoProxy    string
+}
+
+// ProxyURLForTarget returns the appropriate proxy URL (*url.URL) for a given target URL string.
+// If the target URL scheme is explicitly "http" (case-insensitive), it returns p.HTTPProxy (falling back to p.HTTPSProxy).
+// Otherwise (for "https" or default/empty target scheme), it returns p.HTTPSProxy (falling back to p.HTTPProxy).
+func (p ProxyConfig) ProxyURLForTarget(targetURL string) *url.URL {
+	var scheme string
+	if targetURL != "" {
+		if u, err := url.Parse(targetURL); err == nil && u.Scheme != "" {
+			scheme = strings.ToLower(u.Scheme)
+		}
+	}
+
+	if scheme == "http" {
+		if p.HTTPProxy != nil {
+			return p.HTTPProxy
+		}
+		return p.HTTPSProxy
+	}
+
+	if p.HTTPSProxy != nil {
+		return p.HTTPSProxy
+	}
+	return p.HTTPProxy
+}
+
+func parseProxyURL(rawURL string) (*url.URL, error) {
+	if rawURL == "" {
+		return nil, nil
+	}
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %s", addoncfg.ErrInvalidProxyURL, err.Error())
+	}
+	if u.Scheme == "" || u.Host == "" {
+		return nil, fmt.Errorf("%w: missing scheme or host in proxy URL %q", addoncfg.ErrInvalidProxyURL, rawURL)
+	}
+	return u, nil
+}
+
+func validateCABundle(bundle []byte) error {
+	var certCount int
+	rest := bundle
+	for {
+		var block *pem.Block
+		block, rest = pem.Decode(rest)
+		if block == nil {
+			break
+		}
+		if block.Type != "CERTIFICATE" {
+			return fmt.Errorf("%w: expected CERTIFICATE block, got %s", addoncfg.ErrInvalidProxyCABundle, block.Type)
+		}
+		if _, err := x509.ParseCertificate(block.Bytes); err != nil {
+			return fmt.Errorf("%w: %s", addoncfg.ErrInvalidProxyCABundle, err.Error())
+		}
+		certCount++
+	}
+	if certCount == 0 {
+		return fmt.Errorf("%w: no certificates found in CA bundle", addoncfg.ErrInvalidProxyCABundle)
+	}
+	if len(bytes.TrimSpace(rest)) > 0 {
+		return fmt.Errorf("%w: trailing unparsed data in CA bundle", addoncfg.ErrInvalidProxyCABundle)
+	}
+	return nil
 }
 
 type Options struct {
@@ -170,12 +239,22 @@ func BuildOptions(addOnDeployment *addonapiv1beta1.AddOnDeploymentConfig) (Optio
 		opts.ResourceReqs = addOnDeployment.Spec.ResourceRequirements
 	}
 
-	if addOnDeployment.Spec.ProxyConfig.HTTPProxy != "" {
-		proxyURL, err := url.Parse(addOnDeployment.Spec.ProxyConfig.HTTPProxy)
-		if err != nil {
-			return opts, fmt.Errorf("%w: %s", addoncfg.ErrInvalidProxyURL, err.Error())
+	var err error
+	opts.ProxyConfig.HTTPProxy, err = parseProxyURL(addOnDeployment.Spec.ProxyConfig.HTTPProxy)
+	if err != nil {
+		return opts, err
+	}
+
+	opts.ProxyConfig.HTTPSProxy, err = parseProxyURL(addOnDeployment.Spec.ProxyConfig.HTTPSProxy)
+	if err != nil {
+		return opts, err
+	}
+
+	if len(addOnDeployment.Spec.ProxyConfig.CABundle) > 0 {
+		if err := validateCABundle(addOnDeployment.Spec.ProxyConfig.CABundle); err != nil {
+			return opts, err
 		}
-		opts.ProxyConfig.ProxyURL = proxyURL
+		opts.ProxyConfig.CABundle = bytes.Clone(addOnDeployment.Spec.ProxyConfig.CABundle)
 	}
 
 	opts.ProxyConfig.NoProxy = addOnDeployment.Spec.ProxyConfig.NoProxy

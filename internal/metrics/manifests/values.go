@@ -52,6 +52,8 @@ type MetricsValues struct {
 	TLSCipherSuites               string                            `json:"tlsCipherSuites,omitempty"`
 	MonitoringStackPatches        []MonitoringStackPatchValues      `json:"monitoringStackPatches"`
 	PrometheusServerRemoteWrite   []cooprometheusv1.RemoteWriteSpec `json:"prometheusServerRemoteWrite,omitempty"`
+	AlertmanagerProxyURL          string                            `json:"alertmanagerProxyURL,omitempty"`
+	AlertmanagerNoProxy           string                            `json:"alertmanagerNoProxy,omitempty"`
 }
 
 type MonitoringStackPatchValues struct {
@@ -140,6 +142,13 @@ func BuildValues(opts handlers.Options) (*MetricsValues, error) {
 		TLSProfileEnabled: opts.TLSProfileEnabled,
 		TLSMinVersion:     opts.TLSMinVersion,
 		TLSCipherSuites:   opts.TLSCipherSuites,
+	}
+
+	if opts.HubEndpoint != "" {
+		if proxyURL := opts.ProxyConfig.ProxyURLForTarget("https://" + opts.HubEndpoint); proxyURL != nil {
+			ret.AlertmanagerProxyURL = proxyURL.String()
+			ret.AlertmanagerNoProxy = opts.ProxyConfig.NoProxy
+		}
 	}
 
 	if opts.IsOpenShiftVendor {

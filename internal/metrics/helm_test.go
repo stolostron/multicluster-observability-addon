@@ -51,6 +51,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	fakeclient "sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
+	"sigs.k8s.io/yaml"
 )
 
 const (
@@ -99,6 +100,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 		AgentMissing        bool
 		AlertsEnabled       bool
 		WithRawScrapeConfig bool
+		ProxyConfig         *addon.ProxyConfig
 		Expects             func(*testing.T, []client.Object)
 	}{
 		"no metrics": {
@@ -802,6 +804,44 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				verifyClusterScopedResourcesPrefix(t, objects)
 			},
 		},
+		"non-ocp with proxy config renders alertmanager proxy settings": {
+			PlatformMetrics: true,
+			UserMetrics:     false,
+			COOIsInstalled:  false,
+			IsOCP:           false,
+			ProxyConfig: &addon.ProxyConfig{
+				HTTPSProxy: func() *url.URL {
+					u, _ := url.Parse("https://secure-proxy.example.com:8443")
+					return u
+				}(),
+				NoProxy: "*.example.com",
+			},
+			Expects: func(t *testing.T, objects []client.Object) {
+				secrets := common.FilterResourcesByLabelSelector[*corev1.Secret](objects, nil)
+				var alertmanagerSecret *corev1.Secret
+				for _, s := range secrets {
+					if s.GetName() == "prometheus-alertmanager" {
+						alertmanagerSecret = s
+						break
+					}
+				}
+				require.NotNil(t, alertmanagerSecret, "prometheus-alertmanager secret not found")
+				data, ok := alertmanagerSecret.Data["alertmanager.yaml"]
+				if !ok {
+					data = []byte(alertmanagerSecret.StringData["alertmanager.yaml"])
+				}
+				yamlStr := string(data)
+				assert.Contains(t, yamlStr, `proxy_url: "https://secure-proxy.example.com:8443"`)
+				assert.Contains(t, yamlStr, `no_proxy: "*.example.com"`)
+
+				// Verify the alertmanager.yaml is valid YAML and parses correctly (validating that reserved alias tokens like leading * in no_proxy are quoted)
+				var parsed []map[string]any
+				require.NoError(t, yaml.Unmarshal(data, &parsed), "failed to parse alertmanager.yaml as valid YAML")
+				require.NotEmpty(t, parsed)
+				assert.Equal(t, "https://secure-proxy.example.com:8443", parsed[0]["proxy_url"])
+				assert.Equal(t, "*.example.com", parsed[0]["no_proxy"])
+			},
+		},
 		"resource requests and limits": {
 			PlatformMetrics: true,
 			UserMetrics:     false,
@@ -1175,7 +1215,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 
 			// Wire everything together to a fake addon instance
 			agentAddon, err := addonfactory.NewAgentAddonFactory(addoncfg.Name, addon.FS, addoncfg.MetricsChartDir).
-				WithGetValuesFuncs(addonConfigValuesFn, fakeGetValues(client, tc.PlatformMetrics, tc.UserMetrics, tc.InstallNamespace, aodc.Spec.ResourceRequirements, tc.Registries, tc.NodeExporterOpts, tc.AlertsEnabled)).
+				WithGetValuesFuncs(addonConfigValuesFn, fakeGetValues(client, tc.PlatformMetrics, tc.UserMetrics, tc.InstallNamespace, aodc.Spec.ResourceRequirements, tc.Registries, tc.NodeExporterOpts, tc.AlertsEnabled, tc.ProxyConfig)).
 				WithAgentRegistrationOption(&agent.RegistrationOption{}).
 				WithAgentInstallNamespace(
 					// Set agent install namespace from addon deployment config if it exists
@@ -1474,7 +1514,7 @@ func TestHelmBuild_Metrics_HCP(t *testing.T) {
 
 	// Wire everything together to a fake addon instance
 	agentAddon, err := addonfactory.NewAgentAddonFactory(addoncfg.Name, addon.FS, addoncfg.MetricsChartDir).
-		WithGetValuesFuncs(addonConfigValuesFn, fakeGetValues(client, false, true, "", nil, nil, addon.NodeExporterOptions{}, false)).
+		WithGetValuesFuncs(addonConfigValuesFn, fakeGetValues(client, false, true, "", nil, nil, addon.NodeExporterOptions{}, false, nil)).
 		WithAgentRegistrationOption(&agent.RegistrationOption{}).
 		WithScheme(scheme).
 		BuildHelmAgentAddon()
@@ -1534,7 +1574,7 @@ func newSecret(name, ns string) *corev1.Secret {
 	}
 }
 
-func fakeGetValues(k8s client.Client, platformMetrics, userWorkloadMetrics bool, installNs string, resReqs []addonapiv1beta1.ContainerResourceRequirements, registries []addonapiv1beta1.ImageMirror, nodeExporterOpts addon.NodeExporterOptions, alertsEnabled bool) addonfactory.GetValuesFunc {
+func fakeGetValues(k8s client.Client, platformMetrics, userWorkloadMetrics bool, installNs string, resReqs []addonapiv1beta1.ContainerResourceRequirements, registries []addonapiv1beta1.ImageMirror, nodeExporterOpts addon.NodeExporterOptions, alertsEnabled bool, proxyConfig *addon.ProxyConfig) addonfactory.GetValuesFunc {
 	return func(
 		cluster *clusterv1.ManagedCluster,
 		mcAddon *addonapiv1beta1.ManagedClusterAddOn,
@@ -1561,6 +1601,10 @@ func fakeGetValues(k8s client.Client, platformMetrics, userWorkloadMetrics bool,
 				},
 			},
 			Registries: registries,
+		}
+
+		if proxyConfig != nil {
+			addonOpts.ProxyConfig = *proxyConfig
 		}
 
 		if installNs != "" {
