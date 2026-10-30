@@ -4,18 +4,16 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.19.0
-    operator.prometheus.io/version: 0.87.0
-  name: prometheusrules.monitoring.coreos.com
+    operator.prometheus.io/version: 0.90.1-rhobs1
+  name: prometheusrules.monitoring.rhobs
 spec:
-  group: monitoring.coreos.com
+  group: monitoring.rhobs
   names:
     categories:
-    - prometheus-operator
+    - rhobs-prometheus-operator
     kind: PrometheusRule
     listKind: PrometheusRuleList
     plural: prometheusrules
-    shortNames:
-    - promrule
     singular: prometheusrule
   scope: Namespaced
   versions:
@@ -223,7 +221,7 @@ spec:
                     group:
                       description: group defines the group of the referenced resource.
                       enum:
-                      - monitoring.coreos.com
+                      - monitoring.rhobs
                       type: string
                     name:
                       description: name defines the name of the referenced object.

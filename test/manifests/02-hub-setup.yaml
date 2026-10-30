@@ -1,0 +1,192 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: open-cluster-management-observability
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: open-cluster-management-global-set
+---
+apiVersion: cluster.open-cluster-management.io/v1beta2
+kind: ManagedClusterSetBinding
+metadata:
+  name: global
+  namespace: open-cluster-management-global-set
+spec:
+  clusterSet: global
+---
+apiVersion: cluster.open-cluster-management.io/v1beta1
+kind: Placement
+metadata:
+  name: global
+  namespace: open-cluster-management-global-set
+spec:
+  clusterSets:
+    - global
+---
+apiVersion: config.openshift.io/v1
+kind: ClusterVersion
+metadata:
+  name: version
+spec:
+  channel: stable-4.20
+  clusterID: 1a9af6dc-0801-433c-b28a-200af81e8eef
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: images-list
+  namespace: open-cluster-management-observability
+data:
+  obo_prometheus_rhel9_operator: "localhost/obo-prometheus-operator:v4.18"
+  prometheus_config_reloader: "localhost/prometheus-config-reloader:v4.18"
+  kube_rbac_proxy: "quay.io/brancz/kube-rbac-proxy:v0.15.0"
+  kube_state_metrics: "registry.k8s.io/kube-state-metrics/kube-state-metrics:v2.12.0"
+  prometheus: "localhost/prometheus:v3.0.0"
+  node_exporter: "quay.io/prometheus/node-exporter:v1.8.1"
+  endpoint_monitoring_operator: "localhost/endpoint-monitoring-operator:kind-e2e"
+---
+---
+apiVersion: monitoring.rhobs/v1alpha1
+kind: ScrapeConfig
+metadata:
+  name: platform-metrics
+  namespace: open-cluster-management-observability
+  labels:
+    app.kubernetes.io/component: platform-metrics-collector
+    app.kubernetes.io/managed-by: multicluster-observability-operator
+    app.kubernetes.io/part-of: multicluster-observability-addon
+  ownerReferences:
+  - apiVersion: observability.open-cluster-management.io/v1beta2
+    controller: true
+    kind: MultiClusterObservability
+    name: observability
+    uid: e2e-mco-uid
+spec:
+  scrapeInterval: 10s
+  jobName: platform
+  metricsPath: /federate
+  params:
+    match[]:
+    - '{__name__="up"}'
+  scheme: HTTPS
+  scrapeClass: not-configurable
+  staticConfigs:
+  - targets:
+    - prometheus-k8s.openshift-monitoring.svc:9091
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hub-prometheus-nginx-conf
+  namespace: open-cluster-management-observability
+data:
+  nginx.conf: |
+    events {
+        worker_connections 1024;
+    }
+    http {
+        server {
+            listen 9090;
+
+            # Reverse proxy MCOA remote write URL to Prometheus receiver
+            location /api/metrics/v1/default/api/v1/receive {
+                proxy_pass http://127.0.0.1:9091/api/v1/write;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+            }
+
+            # Forward standard queries and web dashboard
+            location / {
+                proxy_pass http://127.0.0.1:9091/;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+            }
+        }
+    }
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hub-prometheus-config
+  namespace: open-cluster-management-observability
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 15s
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hub-prometheus
+  namespace: open-cluster-management-observability
+  labels:
+    app: hub-prometheus
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hub-prometheus
+  template:
+    metadata:
+      labels:
+        app: hub-prometheus
+    spec:
+      containers:
+      - name: prometheus
+        image: quay.io/prometheus/prometheus:v2.53.0
+        imagePullPolicy: IfNotPresent
+        command:
+        - /bin/prometheus
+        args:
+        - --config.file=/etc/prometheus/prometheus.yml
+        - --storage.tsdb.path=/prometheus
+        - --storage.tsdb.retention.time=2h
+        - --web.enable-remote-write-receiver
+        - --web.listen-address=0.0.0.0:9091
+        ports:
+        - containerPort: 9091
+          name: prom-internal
+        volumeMounts:
+        - name: prometheus-config
+          mountPath: /etc/prometheus
+        - name: tsdb-data
+          mountPath: /prometheus
+      - name: nginx
+        image: docker.io/library/nginx:alpine
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 9090
+          name: http
+        volumeMounts:
+        - name: nginx-conf
+          mountPath: /etc/nginx/nginx.conf
+          subPath: nginx.conf
+      volumes:
+      - name: prometheus-config
+        configMap:
+          name: hub-prometheus-config
+      - name: nginx-conf
+        configMap:
+          name: hub-prometheus-nginx-conf
+      - name: tsdb-data
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hub-prometheus
+  namespace: open-cluster-management-observability
+  labels:
+    app: hub-prometheus
+spec:
+  type: NodePort
+  ports:
+  - name: http
+    port: 9090
+    targetPort: 9090
+    nodePort: 30090
+  selector:
+    app: hub-prometheus

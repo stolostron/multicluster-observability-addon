@@ -23,6 +23,8 @@ jobs:
       with:
         version: v2.11.4
         args: --timeout=4m
+    - name: Run shellcheck
+      run: make lint-scripts
 
   test:
     name: test
