@@ -81,3 +81,105 @@ func TestIndependentWorkloadPodLifecycle(t *testing.T) {
 		}
 	}
 }
+
+func TestBuildWorkloadPodEvaluationIntervals(t *testing.T) {
+	defaults := intervalPair{"5m", "15m"}
+	cluster := &clusterv1.ManagedCluster{ObjectMeta: metav1.ObjectMeta{
+		Name: "cluster-1", Labels: map[string]string{"vendor": "OpenShift"},
+	}}
+	opts := newPlatformOpts(false, false)
+	opts.Platform.AnalyticsOptions.RightSizing.WorkloadEnabled = true
+	opts.Platform.AnalyticsOptions.RightSizing.PodEnabled = true
+
+	assertBuild := func(t *testing.T, builder *OptionsBuilder, workload, pod intervalPair) {
+		t.Helper()
+		got, err := builder.Build(t.Context(), cluster, opts)
+		require.NoError(t, err)
+		for _, feature := range []struct {
+			name      string
+			component ComponentOptions
+			want      intervalPair
+		}{
+			{rightsizing.WorkloadConfigMapName, got.WorkloadRightSizing, workload},
+			{rightsizing.PodConfigMapName, got.PodRightSizing, pod},
+		} {
+			require.True(t, feature.component.Enabled)
+			require.Len(t, feature.component.PrometheusRules, 1)
+			groups := feature.component.PrometheusRules[0].Spec.Groups
+			require.Len(t, groups, 2)
+			require.NotNil(t, groups[0].Interval)
+			require.NotNil(t, groups[1].Interval)
+			require.Len(t, groups[0].Rules, 7)
+			rolling, daily := feature.want.rolling, feature.want.daily
+			if rolling == "" {
+				rolling = defaults.rolling
+			}
+			if daily == "" {
+				daily = defaults.daily
+			}
+			require.Equal(t, rolling, string(*groups[0].Interval), feature.name)
+			require.Equal(t, daily, string(*groups[1].Interval), feature.name)
+			for _, rule := range groups[0].Rules[1:] {
+				require.Contains(t, rule.Expr.String(), "["+rolling+":]", rule.Record)
+			}
+			var cm corev1.ConfigMap
+			require.NoError(t, builder.Client.Get(t.Context(), types.NamespacedName{
+				Name: feature.name, Namespace: addoncfg.InstallNamespace,
+			}, &cm))
+			stored, err := rightsizing.ParseConfigMapData(cm.Data)
+			require.NoError(t, err)
+			require.Equal(t, feature.want.rolling, stored.PrometheusRuleConfig.EvaluationInterval, feature.name)
+			require.Equal(t, feature.want.daily, stored.PrometheusRuleConfig.EvaluationInterval1d, feature.name)
+		}
+	}
+
+	t.Run("new ConfigMaps expose the shared defaults", func(t *testing.T) {
+		resetIntervalState(t)
+		assertBuild(t, newTestOptionsBuilder(t), defaults, defaults)
+	})
+
+	t.Run("existing ConfigMaps without keys are not rewritten", func(t *testing.T) {
+		resetIntervalState(t)
+		builder := newTestOptionsBuilder(t,
+			newIntervalConfigMap(rightsizing.WorkloadConfigMapName, "", ""),
+			newIntervalConfigMap(rightsizing.PodConfigMapName, "", ""))
+		for _, name := range []string{rightsizing.WorkloadConfigMapName, rightsizing.PodConfigMapName} {
+			var before, after corev1.ConfigMap
+			key := types.NamespacedName{Name: name, Namespace: addoncfg.InstallNamespace}
+			require.NoError(t, builder.Client.Get(t.Context(), key, &before))
+			assertBuild(t, builder, intervalPair{}, intervalPair{})
+			require.NoError(t, builder.Client.Get(t.Context(), key, &after))
+			require.Equal(t, before, after)
+		}
+	})
+
+	t.Run("edits and invalid values are handled independently", func(t *testing.T) {
+		resetIntervalState(t)
+		builder := newTestOptionsBuilder(t,
+			newIntervalConfigMap(rightsizing.WorkloadConfigMapName, "", ""),
+			newIntervalConfigMap(rightsizing.PodConfigMapName, "", ""))
+		for _, step := range []struct {
+			name                                 string
+			workload, pod, wantWorkload, wantPod intervalPair
+		}{
+			{"custom intervals", intervalPair{"10m", "1h"}, intervalPair{"20m", "2h"}, intervalPair{"10m", "1h"}, intervalPair{"20m", "2h"}},
+			{"reject malformed and excessive intervals", intervalPair{"bad", "7h"}, intervalPair{"2h", "0m"}, intervalPair{"10m", "1h"}, intervalPair{"20m", "2h"}},
+			{"keep valid fields when the other is below its floor", intervalPair{"4m", "3h"}, intervalPair{"30m", "10m"}, intervalPair{"10m", "3h"}, intervalPair{"30m", "2h"}},
+			{"remove keys", intervalPair{}, intervalPair{}, intervalPair{}, intervalPair{}},
+			{"invalid edits after removal use defaults", intervalPair{"0m", "bad"}, intervalPair{"2h", "7h"}, defaults, defaults},
+		} {
+			t.Run(step.name, func(t *testing.T) {
+				for name, pair := range map[string]intervalPair{
+					rightsizing.WorkloadConfigMapName: step.workload,
+					rightsizing.PodConfigMapName:      step.pod,
+				} {
+					var cm corev1.ConfigMap
+					require.NoError(t, builder.Client.Get(t.Context(), types.NamespacedName{Name: name, Namespace: addoncfg.InstallNamespace}, &cm))
+					cm.Data = newIntervalConfigMap(name, pair.rolling, pair.daily).Data
+					require.NoError(t, builder.Client.Update(t.Context(), &cm))
+				}
+				assertBuild(t, builder, step.wantWorkload, step.wantPod)
+			})
+		}
+	})
+}

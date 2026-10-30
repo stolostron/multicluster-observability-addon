@@ -30,6 +30,9 @@ func generatePrometheusRule(configData rightsizing.RSConfigMapData, level string
 	}
 
 	rb := rightsizing.NewRuleBuilder(labelJoin)
+	evalInterval := rightsizing.ResolveEvaluationInterval(configData.PrometheusRuleConfig)
+	eval1dInterval := rightsizing.ResolveEvaluationInterval1d(configData.PrometheusRuleConfig)
+	intervalStr := string(evalInterval)
 
 	ruleName := rightsizing.WorkloadPrometheusRuleName
 	if level == "pod" {
@@ -39,13 +42,13 @@ func generatePrometheusRule(configData rightsizing.RSConfigMapData, level string
 	switch level {
 	case "pod":
 		groups = append(groups,
-			monitoringv1.RuleGroup{Name: "acm-right-sizing-pod-5m.rules", Interval: &rightsizing.Duration5m, Rules: buildPodRules5m(nsFilter, rb)},
-			monitoringv1.RuleGroup{Name: "acm-right-sizing-pod-1d.rules", Interval: &rightsizing.Duration1d, Rules: buildPodRules1d(configData, rb)},
+			monitoringv1.RuleGroup{Name: "acm-right-sizing-pod-5m.rules", Interval: &evalInterval, Rules: buildPodRulesRolling(nsFilter, rb, intervalStr)},
+			monitoringv1.RuleGroup{Name: "acm-right-sizing-pod-1d.rules", Interval: &eval1dInterval, Rules: buildPodRules1d(configData, rb)},
 		)
 	default:
 		groups = append(groups,
-			monitoringv1.RuleGroup{Name: "acm-right-sizing-workload-5m.rules", Interval: &rightsizing.Duration5m, Rules: buildWorkloadOnlyRules5m(nsFilter, rb)},
-			monitoringv1.RuleGroup{Name: "acm-right-sizing-workload-1d.rules", Interval: &rightsizing.Duration1d, Rules: buildWorkloadOnlyRules1d(configData, rb)},
+			monitoringv1.RuleGroup{Name: "acm-right-sizing-workload-5m.rules", Interval: &evalInterval, Rules: buildWorkloadOnlyRulesRolling(nsFilter, rb, intervalStr)},
+			monitoringv1.RuleGroup{Name: "acm-right-sizing-workload-1d.rules", Interval: &eval1dInterval, Rules: buildWorkloadOnlyRules1d(configData, rb)},
 		)
 	}
 
@@ -182,65 +185,70 @@ func podWorkloadRelabelExpr(nsFilter string) string {
 	)
 }
 
-func resource5mExpr(metric, resource, nsFilter, byLabels, mappingMetric string) string {
+// Rolling subqueries cover the configured evaluation interval so less frequent
+// evaluations still include peaks between runs. The :5m record names stay stable
+// because the daily rules and dashboards refer to them independently of cadence.
+// Mappings use the same cadence, so last_over_time keeps their samples available
+// between evaluations even when the interval exceeds Prometheus's lookback delta.
+func resourceRollingExpr(metric, resource, nsFilter, byLabels, mappingMetric, interval string) string {
 	return fmt.Sprintf(
 		`max_over_time(sum by (%s) (
 		  max by (namespace, pod, container) (%s{%s, resource="%s", container!=""})
 		  * on (namespace, pod) group_left()
 		    (max by (namespace, pod) (kube_pod_status_phase{phase="Running"}) == 1)
 		  * on (namespace, pod) group_left(workload, workload_type)
-		    %s
-		)[5m:])`, byLabels, metric, nsFilter, resource, mappingMetric)
+		    last_over_time(%s[%s])
+		)[%s:])`, byLabels, metric, nsFilter, resource, mappingMetric, interval, interval)
 }
 
-func usage5mExpr(metric, nsFilter, byLabels, mappingMetric string) string {
+func usageRollingExpr(metric, nsFilter, byLabels, mappingMetric, interval string) string {
 	return fmt.Sprintf(
 		`max_over_time(sum by (%s) (
 		  %s{%s, container!=""}
 		  * on (namespace, pod) group_left(workload, workload_type)
-		    %s
-		)[5m:])`, byLabels, metric, nsFilter, mappingMetric)
+		    last_over_time(%s[%s])
+		)[%s:])`, byLabels, metric, nsFilter, mappingMetric, interval, interval)
 }
 
-func podResource5m(metric, resource, nsFilter, byLabels string) string {
-	return resource5mExpr(metric, resource, nsFilter, byLabels, "acm_rs:pod:info")
+func podResourceRolling(metric, resource, nsFilter, byLabels, interval string) string {
+	return resourceRollingExpr(metric, resource, nsFilter, byLabels, "acm_rs:pod:info", interval)
 }
 
-func podUsage5m(metric, nsFilter, byLabels string) string {
-	return usage5mExpr(metric, nsFilter, byLabels, "acm_rs:pod:info")
+func podUsageRolling(metric, nsFilter, byLabels, interval string) string {
+	return usageRollingExpr(metric, nsFilter, byLabels, "acm_rs:pod:info", interval)
 }
 
-func workloadResource5m(metric, resource, nsFilter, byLabels string) string {
-	return resource5mExpr(metric, resource, nsFilter, byLabels, "acm_rs:workload:pod_workload:relabel:5m{workload=~\".+\"}")
+func workloadResourceRolling(metric, resource, nsFilter, byLabels, interval string) string {
+	return resourceRollingExpr(metric, resource, nsFilter, byLabels, "acm_rs:workload:pod_workload:relabel:5m{workload=~\".+\"}", interval)
 }
 
-func workloadUsage5m(metric, nsFilter, byLabels string) string {
-	return usage5mExpr(metric, nsFilter, byLabels, "acm_rs:workload:pod_workload:relabel:5m{workload=~\".+\"}")
+func workloadUsageRolling(metric, nsFilter, byLabels, interval string) string {
+	return usageRollingExpr(metric, nsFilter, byLabels, "acm_rs:workload:pod_workload:relabel:5m{workload=~\".+\"}", interval)
 }
 
-func buildPodRules5m(nsFilter string, rb *rightsizing.RuleBuilder) []monitoringv1.Rule {
+func buildPodRulesRolling(nsFilter string, rb *rightsizing.RuleBuilder, interval string) []monitoringv1.Rule {
 	by := "namespace, pod, workload, workload_type"
 	return []monitoringv1.Rule{
 		rb.Rule("acm_rs:pod:info", podWorkloadRelabelExpr(nsFilter)),
-		rb.Rule("acm_rs:pod:cpu_request:5m", podResource5m("kube_pod_container_resource_requests", "cpu", nsFilter, by)),
-		rb.Rule("acm_rs:pod:cpu_limit:5m", podResource5m("kube_pod_container_resource_limits", "cpu", nsFilter, by)),
-		rb.Rule("acm_rs:pod:cpu_usage:5m", podUsage5m("node_namespace_pod_container:container_cpu_usage_seconds_total:sum_irate", nsFilter, by)),
-		rb.Rule("acm_rs:pod:memory_request:5m", podResource5m("kube_pod_container_resource_requests", "memory", nsFilter, by)),
-		rb.Rule("acm_rs:pod:memory_limit:5m", podResource5m("kube_pod_container_resource_limits", "memory", nsFilter, by)),
-		rb.Rule("acm_rs:pod:memory_usage:5m", podUsage5m("container_memory_working_set_bytes", nsFilter, by)),
+		rb.Rule("acm_rs:pod:cpu_request:5m", podResourceRolling("kube_pod_container_resource_requests", "cpu", nsFilter, by, interval)),
+		rb.Rule("acm_rs:pod:cpu_limit:5m", podResourceRolling("kube_pod_container_resource_limits", "cpu", nsFilter, by, interval)),
+		rb.Rule("acm_rs:pod:cpu_usage:5m", podUsageRolling("node_namespace_pod_container:container_cpu_usage_seconds_total:sum_irate", nsFilter, by, interval)),
+		rb.Rule("acm_rs:pod:memory_request:5m", podResourceRolling("kube_pod_container_resource_requests", "memory", nsFilter, by, interval)),
+		rb.Rule("acm_rs:pod:memory_limit:5m", podResourceRolling("kube_pod_container_resource_limits", "memory", nsFilter, by, interval)),
+		rb.Rule("acm_rs:pod:memory_usage:5m", podUsageRolling("container_memory_working_set_bytes", nsFilter, by, interval)),
 	}
 }
 
-func buildWorkloadOnlyRules5m(nsFilter string, rb *rightsizing.RuleBuilder) []monitoringv1.Rule {
+func buildWorkloadOnlyRulesRolling(nsFilter string, rb *rightsizing.RuleBuilder, interval string) []monitoringv1.Rule {
 	by := "namespace, workload, workload_type"
 	return []monitoringv1.Rule{
 		rb.Rule("acm_rs:workload:pod_workload:relabel:5m", podWorkloadRelabelExpr(nsFilter)),
-		rb.Rule("acm_rs:workload:cpu_request:5m", workloadResource5m("kube_pod_container_resource_requests", "cpu", nsFilter, by)),
-		rb.Rule("acm_rs:workload:cpu_limit:5m", workloadResource5m("kube_pod_container_resource_limits", "cpu", nsFilter, by)),
-		rb.Rule("acm_rs:workload:cpu_usage:5m", workloadUsage5m("node_namespace_pod_container:container_cpu_usage_seconds_total:sum_irate", nsFilter, by)),
-		rb.Rule("acm_rs:workload:memory_request:5m", workloadResource5m("kube_pod_container_resource_requests", "memory", nsFilter, by)),
-		rb.Rule("acm_rs:workload:memory_limit:5m", workloadResource5m("kube_pod_container_resource_limits", "memory", nsFilter, by)),
-		rb.Rule("acm_rs:workload:memory_usage:5m", workloadUsage5m("container_memory_working_set_bytes", nsFilter, by)),
+		rb.Rule("acm_rs:workload:cpu_request:5m", workloadResourceRolling("kube_pod_container_resource_requests", "cpu", nsFilter, by, interval)),
+		rb.Rule("acm_rs:workload:cpu_limit:5m", workloadResourceRolling("kube_pod_container_resource_limits", "cpu", nsFilter, by, interval)),
+		rb.Rule("acm_rs:workload:cpu_usage:5m", workloadUsageRolling("node_namespace_pod_container:container_cpu_usage_seconds_total:sum_irate", nsFilter, by, interval)),
+		rb.Rule("acm_rs:workload:memory_request:5m", workloadResourceRolling("kube_pod_container_resource_requests", "memory", nsFilter, by, interval)),
+		rb.Rule("acm_rs:workload:memory_limit:5m", workloadResourceRolling("kube_pod_container_resource_limits", "memory", nsFilter, by, interval)),
+		rb.Rule("acm_rs:workload:memory_usage:5m", workloadUsageRolling("container_memory_working_set_bytes", nsFilter, by, interval)),
 	}
 }
 

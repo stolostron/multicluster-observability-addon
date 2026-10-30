@@ -104,8 +104,8 @@ $(PROMTOOL):
 	bash ./hack/install-promtool.sh "$(PROMTOOL_VERSION)" "$@"
 
 .PHONY: test-promql
-test-promql: $(PROMTOOL) ## Evaluate generated pod mappings with a pinned promtool binary.
-	PROMTOOL="$(PROMTOOL)" go test -tags=promql -run '^TestPodMappingWithPromtool$$' -count=1 ./internal/analytics/rightsizing/workload
+test-promql: $(PROMTOOL) ## Evaluate generated right-sizing queries with a pinned promtool binary.
+	PROMTOOL="$(PROMTOOL)" go test -tags=promql -run 'WithPromtool$$' -count=1 ./internal/analytics/rightsizing/workload
 
 .PHONY: bench
 bench: ## Run Go performance benchmarks with memory allocation profiling
