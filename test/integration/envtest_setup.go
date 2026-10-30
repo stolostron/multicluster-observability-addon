@@ -124,7 +124,7 @@ func SetupTestEnv(t *testing.T) *TestEnv {
 	})
 
 	assetsDir := ResolveEnvtestAssetsDir()
-	crdDir := filepath.Join(FindRepoRoot(), "test", "integration", "crds")
+	crdDir := filepath.Join(FindRepoRoot(), "test", "crds")
 
 	testEnv := &envtest.Environment{
 		CRDDirectoryPaths:     []string{crdDir},

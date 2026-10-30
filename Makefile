@@ -10,7 +10,6 @@ default: all
 VERSION ?= v0.0.1
 
 CRD_DIR := $(shell pwd)/deploy/crds
-TEST_CRD_DIR := $(CURDIR)/test/integration/crds
 BIN_DIR := $(CURDIR)/bin
 CONTAINER_ENGINE ?= $(shell which podman 2>/dev/null || which docker 2>/dev/null)
 KUBECONFIG ?= /tmp/mcoa-e2e.kubeconfig
@@ -42,41 +41,24 @@ $(CRD_DIR)/opentelemetry.io_instrumentations.yaml:
 	@mkdir -p $(CRD_DIR)
 	@curl -s -L https://raw.githubusercontent.com/open-telemetry/opentelemetry-operator/v0.100.1/bundle/manifests/opentelemetry.io_instrumentations.yaml > $(CRD_DIR)/opentelemetry.io_instrumentations.yaml
 
-$(CRD_DIR)/monitoring.coreos.com_prometheusagents.yaml:
+$(CRD_DIR)/monitoring.rhobs_prometheusagents.yaml:
 	@mkdir -p $(CRD_DIR)
-	@curl -s -L https://raw.githubusercontent.com/rhobs/obo-prometheus-operator/refs/tags/v0.83.0-rhobs1/example/prometheus-operator-crd/monitoring.rhobs_prometheusagents.yaml  > $(CRD_DIR)/monitoring.coreos.com_prometheusagents.yaml
+	@curl -s -L https://raw.githubusercontent.com/rhobs/obo-prometheus-operator/refs/tags/v0.83.0-rhobs1/example/prometheus-operator-crd/monitoring.rhobs_prometheusagents.yaml > $(CRD_DIR)/monitoring.rhobs_prometheusagents.yaml
 
-$(CRD_DIR)/monitoring.coreos.com_scrapeconfigs.yaml:
+$(CRD_DIR)/monitoring.rhobs_scrapeconfigs.yaml:
 	@mkdir -p $(CRD_DIR)
-	@curl -s -L https://raw.githubusercontent.com/rhobs/obo-prometheus-operator/refs/tags/v0.83.0-rhobs1/example/prometheus-operator-crd/monitoring.rhobs_scrapeconfigs.yaml  > $(CRD_DIR)/monitoring.coreos.com_scrapeconfigs.yaml
+	@curl -s -L https://raw.githubusercontent.com/rhobs/obo-prometheus-operator/refs/tags/v0.83.0-rhobs1/example/prometheus-operator-crd/monitoring.rhobs_scrapeconfigs.yaml > $(CRD_DIR)/monitoring.rhobs_scrapeconfigs.yaml
 
 $(CRD_DIR)/monitoring.rhobs_prometheusrules.yaml:
 	@mkdir -p $(CRD_DIR)
-	@curl -s -L https://raw.githubusercontent.com/rhobs/obo-prometheus-operator/refs/tags/v0.83.0-rhobs1/example/prometheus-operator-crd/monitoring.rhobs_prometheusrules.yaml  > $(CRD_DIR)/monitoring.rhobs_prometheusrules.yaml
+	@curl -s -L https://raw.githubusercontent.com/rhobs/obo-prometheus-operator/refs/tags/v0.83.0-rhobs1/example/prometheus-operator-crd/monitoring.rhobs_prometheusrules.yaml > $(CRD_DIR)/monitoring.rhobs_prometheusrules.yaml
 
 $(CRD_DIR)/core.observatorium.io_observatoria.yaml:
 	@mkdir -p $(CRD_DIR)
 	@curl -s -L https://raw.githubusercontent.com/stolostron/observatorium-operator/main/manifests/crds/core.observatorium.io_observatoria.yaml > $(CRD_DIR)/core.observatorium.io_observatoria.yaml
 
-# CRDs synchronized from deploy/crds into test/integration/crds for envtest
-SHARED_INTEGRATION_CRDS := \
-	observability.openshift.io_clusterlogforwarders.yaml \
-	opentelemetry.io_opentelemetrycollectors.yaml \
-	opentelemetry.io_instrumentations.yaml \
-	monitoring.rhobs_prometheusagents.yaml \
-	monitoring.rhobs_scrapeconfigs.yaml \
-	monitoring.rhobs_prometheusrules.yaml
-
-.PHONY: sync-integration-crds
-sync-integration-crds: ## Sync shared operand CRDs from deploy/crds to test/integration/crds
-	@mkdir -p $(TEST_CRD_DIR)
-	@for crd in $(SHARED_INTEGRATION_CRDS); do \
-		cp $(CRD_DIR)/$$crd $(TEST_CRD_DIR)/$$crd; \
-	done
-
 .PHONY: download-crds
-download-crds: $(CRD_DIR)/observability.openshift.io_clusterlogforwarders.yaml $(CRD_DIR)/opentelemetry.io_opentelemetrycollectors.yaml $(CRD_DIR)/opentelemetry.io_instrumentations.yaml $(CRD_DIR)/monitoring.coreos.com_prometheusagents.yaml $(CRD_DIR)/monitoring.coreos.com_scrapeconfigs.yaml $(CRD_DIR)/monitoring.rhobs_prometheusrules.yaml $(CRD_DIR)/core.observatorium.io_observatoria.yaml
-	@$(MAKE) sync-integration-crds
+download-crds: $(CRD_DIR)/observability.openshift.io_clusterlogforwarders.yaml $(CRD_DIR)/opentelemetry.io_opentelemetrycollectors.yaml $(CRD_DIR)/opentelemetry.io_instrumentations.yaml $(CRD_DIR)/monitoring.rhobs_prometheusagents.yaml $(CRD_DIR)/monitoring.rhobs_scrapeconfigs.yaml $(CRD_DIR)/monitoring.rhobs_prometheusrules.yaml $(CRD_DIR)/core.observatorium.io_observatoria.yaml
 
 SHELLCHECK ?= $(shell which shellcheck 2>/dev/null)
 SHELL_SCRIPTS := $(shell find . -name "*.sh" -not -path "*/.*" -not -path "*/vendor/*")
@@ -167,7 +149,7 @@ addon-undeploy: download-crds
 	$(KUSTOMIZE) build ./deploy | kubectl delete -f -
 
 .PHONY: test-e2e-setup
-test-e2e-setup: download-crds ## Setup KinD cluster and dependencies for E2E tests
+test-e2e-setup: ## Setup KinD cluster and dependencies for E2E tests
 	./test/scripts/setup-kind.sh
 
 .PHONY: test-e2e-run
