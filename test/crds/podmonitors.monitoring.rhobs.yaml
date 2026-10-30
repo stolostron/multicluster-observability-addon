@@ -3,8 +3,8 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.21.0
-    operator.prometheus.io/version: 0.93.1-rhobs1
+    controller-gen.kubebuilder.io/version: v0.19.0
+    operator.prometheus.io/version: 0.90.1-rhobs1
   name: podmonitors.monitoring.rhobs
 spec:
   group: monitoring.rhobs
@@ -65,10 +65,6 @@ spec:
 
                       The Prometheus service account must have the `list` and `watch`
                       permissions on the `Nodes` objects.
-
-                      Node metadata labels are not automatically added to scraped metrics. They are
-                      exposed as `__meta_kubernetes_node_*` labels and can be copied to timeseries
-                      with relabeling configuration.
                     type: boolean
                 type: object
               bodySizeLimit:
@@ -116,7 +112,6 @@ spec:
 
                   It requires Prometheus >= v2.47.0.
                 format: int64
-                minimum: 0
                 type: integer
               labelLimit:
                 description: |-
@@ -124,7 +119,6 @@ spec:
 
                   It requires Prometheus >= v2.27.0.
                 format: int64
-                minimum: 0
                 type: integer
               labelNameLengthLimit:
                 description: |-
@@ -132,7 +126,6 @@ spec:
 
                   It requires Prometheus >= v2.27.0.
                 format: int64
-                minimum: 0
                 type: integer
               labelValueLengthLimit:
                 description: |-
@@ -140,7 +133,6 @@ spec:
 
                   It requires Prometheus >= v2.27.0.
                 format: int64
-                minimum: 0
                 type: integer
               namespaceSelector:
                 description: |-
@@ -165,7 +157,6 @@ spec:
                   buckets will be merged to stay within the limit.
                   It requires Prometheus >= v2.45.0.
                 format: int64
-                minimum: 0
                 type: integer
               nativeHistogramMinBucketFactor:
                 anyOf:
@@ -402,7 +393,6 @@ spec:
 
                               Only applicable when the action is `HashMod`.
                             format: int64
-                            minimum: 0
                             type: integer
                           regex:
                             description: regex defines the regular expression against
@@ -776,7 +766,7 @@ spec:
                         tokenUrl:
                           description: tokenUrl defines the URL to fetch the token
                             from.
-                          pattern: ^(http|https)://.+$
+                          minLength: 1
                           type: string
                       required:
                       - clientId
@@ -927,7 +917,6 @@ spec:
 
                               Only applicable when the action is `HashMod`.
                             format: int64
-                            minimum: 0
                             type: integer
                           regex:
                             description: regex defines the regular expression against
@@ -1184,7 +1173,6 @@ spec:
                   sampleLimit defines a per-scrape limit on the number of scraped samples
                   that will be accepted.
                 format: int64
-                minimum: 0
                 type: integer
               scrapeClass:
                 description: scrapeClass defines the scrape class to apply.
@@ -1292,7 +1280,6 @@ spec:
                   targetLimit defines a limit on the number of scraped targets that will
                   be accepted.
                 format: int64
-                minimum: 0
                 type: integer
             required:
             - selector
