@@ -50,7 +50,9 @@ func podDataLink(project, title string) *DataLink {
 
 // wlStatWindow builds a cluster-level subquery for overview stat panels.
 // Stats sum across all workloads/pods in the cluster, so a subquery is needed.
-// Pinned with @ end() so the dashboard evaluates it once per step.
+// Pinned with @ end() so every step of the StatChart range query evaluates at the
+// range end, like the instant queries of the Table panels, and the stat totals
+// match the table rows (see runningVMFilterAtEnd in vm-panels.go).
 func wlStatWindow(metric, selector string) string {
 	return fmt.Sprintf(`max_over_time(sum by (cluster)(%s{%s})[$days:] @ end())`, metric, selector)
 }

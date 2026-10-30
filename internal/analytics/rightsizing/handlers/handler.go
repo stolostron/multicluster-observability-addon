@@ -371,16 +371,21 @@ func (o *OptionsBuilder) validateAndSanitizeConfig(configData *rightsizing.RSCon
 		cacheValidAggregator(configMapName, "memory", configData.PrometheusRuleConfig.MemoryAggregator)
 	}
 
-	if o.sanitizeInterval(configMapName, "evaluationInterval",
-		&configData.PrometheusRuleConfig.EvaluationInterval,
-		rightsizing.ValidateEvaluationInterval, rightsizing.DefaultEvaluationInterval) {
-		reverted = true
-	}
+	// Workload and pod rule groups use fixed intervals and do not honor the
+	// ConfigMap evaluation-interval keys, so skip validation and the wasteful-
+	// ordering warning for those ConfigMaps.
+	if configMapName != rightsizing.WorkloadConfigMapName && configMapName != rightsizing.PodConfigMapName {
+		if o.sanitizeInterval(configMapName, "evaluationInterval",
+			&configData.PrometheusRuleConfig.EvaluationInterval,
+			rightsizing.ValidateEvaluationInterval, rightsizing.DefaultEvaluationInterval) {
+			reverted = true
+		}
 
-	if o.sanitizeInterval(configMapName, "evaluationInterval1d",
-		&configData.PrometheusRuleConfig.EvaluationInterval1d,
-		rightsizing.ValidateEvaluationInterval1d, rightsizing.DefaultEvaluationInterval1d) {
-		reverted = true
+		if o.sanitizeInterval(configMapName, "evaluationInterval1d",
+			&configData.PrometheusRuleConfig.EvaluationInterval1d,
+			rightsizing.ValidateEvaluationInterval1d, rightsizing.DefaultEvaluationInterval1d) {
+			reverted = true
+		}
 	}
 
 	// Both fields are individually valid at this point, but they can still be ordered in a
