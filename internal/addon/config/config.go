@@ -110,6 +110,7 @@ const (
 var (
 	ErrInvalidMetricsHubHostname  = errors.New("invalid metrics hub hostname")
 	ErrInvalidProxyURL            = errors.New("invalid proxy URL")
+	ErrInvalidProxyCABundle       = errors.New("invalid proxy CA bundle")
 	ErrInvalidSubscriptionChannel = errors.New("current version of the cluster-observability-operator installed doesn't match the supported MCOA version")
 	ErrInvalidPort                = errors.New("invalid port")
 )
