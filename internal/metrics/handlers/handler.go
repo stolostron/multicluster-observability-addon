@@ -17,6 +17,7 @@ import (
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
+	"github.com/stolostron/multicluster-observability-addon/internal/mcoagateway"
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/remotewrite"
 	corev1 "k8s.io/api/core/v1"
@@ -32,8 +33,8 @@ import (
 
 const (
 	crdResourceName       = "customresourcedefinitions"
-	mcoaObsAPIRouteName   = "mcoa-observatorium-api"
-	remoteWritePathSuffix = "/api/metrics/v1/default/api/v1/receive"
+	mcoagatewayRouteName  = "mcoa-observatorium-api"
+	remoteWritePathSuffix = "/api/metrics/v1/api/v1/receive"
 )
 
 var (
@@ -41,7 +42,8 @@ var (
 	errUnsupportedAppName          = errors.New("unsupported app name")
 	errMissingDesiredConfig        = errors.New("missing desiredConfig in managedClusterAddon.Status.ConfigReferences")
 	errMissingRemoteWriteConfig    = errors.New("missing expected remote write spec in the prometheusAgent")
-	errMissingRouteHost            = errors.New("MCOA obs-api route has no host")
+	errMissingCMAOOwnership        = errors.New("object is not owned by the ClusterManagementAddOn")
+	errMissingRouteHost            = errors.New("MCOA gateway route has no host")
 )
 
 type OptionsBuilder struct {
@@ -93,7 +95,7 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1beta1.Man
 	}
 	ret.HubClusterID = hubId
 
-	if err = o.addAlertmanagerMtlsSecrets(ctx, &ret.Secrets, config.GetTrimmedClusterID(hubId), opts, isOpenShiftVendor); err != nil {
+	if err = o.addAlertmanagerMtlsSecrets(ctx, &ret.Secrets, config.GetTrimmedClusterID(hubId), opts, isOpenShiftVendor, managedCluster.Name); err != nil {
 		return ret, fmt.Errorf("failed to add alertmanager secrets: %w", err)
 	}
 
@@ -282,10 +284,9 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1beta1.Man
 		}
 	}
 
-	// Override remote write URL to point to MCOA obs-api when thanos-operator is enabled
 	if opts.ThanosOperatorEnabled {
 		if err = o.overrideRemoteWriteEndpoint(ctx, &ret); err != nil {
-			o.Logger.Error(err, "failed to override remote write endpoint, keeping original")
+			o.Logger.Error(err, "failed to override MCOA gateway endpoints, keeping original")
 		}
 	}
 
@@ -385,6 +386,10 @@ func (o *OptionsBuilder) buildPrometheusAgent(ctx context.Context, opts *Options
 		mainRw.TLSConfig.KeyFile = fmt.Sprintf("/etc/prometheus/secrets/%s/%s", certTargetName, config.MTLSCertKeySecretKey)
 	}
 
+	if opts.ThanosOperatorEnabled && !slices.Contains(agent.Spec.Secrets, mcoagateway.DefaultCollectionMTLSSecretName) {
+		agent.Spec.Secrets = append(agent.Spec.Secrets, mcoagateway.DefaultCollectionMTLSSecretName)
+	}
+
 	// Fetch related secrets
 	for _, secretName := range agent.Spec.Secrets {
 		var sourceName string
@@ -398,6 +403,12 @@ func (o *OptionsBuilder) buildPrometheusAgent(ctx context.Context, opts *Options
 		} else if secretName == config.GetAlertmanagerAccessorSecretName(trimmedClusterID) {
 			sourceName = config.AlertmanagerAccessorSecretName
 			sourceNamespace = config.HubInstallNamespace
+		} else if secretName == mcoagateway.DefaultCollectionMTLSSecretName {
+			// The gateway's client mTLS secret lives in the managed cluster's namespace on
+			// the hub (same source used by addAlertmanagerMtlsSecrets), not the agent's own
+			// namespace.
+			sourceName = mcoagateway.DefaultCollectionMTLSSecretName
+			sourceNamespace = opts.ClusterName
 		} else {
 			sourceName = secretName
 		}
@@ -636,7 +647,7 @@ func createWriteRelabelConfigs(clusterName, clusterID string, isHypershiftLocalC
 		})
 }
 
-func (o *OptionsBuilder) addAlertmanagerMtlsSecrets(ctx context.Context, secrets *[]*corev1.Secret, trimmedClusterID string, opts addon.Options, isOCP bool) error {
+func (o *OptionsBuilder) addAlertmanagerMtlsSecrets(ctx context.Context, secrets *[]*corev1.Secret, trimmedClusterID string, opts addon.Options, isOCP bool, clusterNamespace string) error {
 	// Add secrets based on enabled metric collection
 	if opts.Platform.Metrics.CollectionEnabled {
 		targetNamespace := config.AlertmanagerPlatformNamespace
@@ -682,6 +693,26 @@ func (o *OptionsBuilder) addAlertmanagerMtlsSecrets(ctx context.Context, secrets
 		accessorTargetName := config.GetAlertmanagerAccessorSecretName(trimmedClusterID)
 		if err := o.addSecret(ctx, secrets, config.AlertmanagerAccessorSecretName, config.HubInstallNamespace, accessorTargetName, targetNamespace); err != nil {
 			return fmt.Errorf("failed to add uwl accessor secret: %w", err)
+		}
+	}
+
+	if opts.ThanosOperatorEnabled {
+		if opts.Platform.Metrics.CollectionEnabled {
+			targetNamespace := config.AlertmanagerPlatformNamespace
+			if !isOCP {
+				targetNamespace = "" // This is replaced by the default value in the help template that is the installation namespace
+			}
+
+			if err := o.addSecret(ctx, secrets, mcoagateway.DefaultCollectionMTLSSecretName, clusterNamespace, mcoagateway.DefaultCollectionMTLSSecretName, targetNamespace); err != nil {
+				return fmt.Errorf("failed to add platform MCOA gateway client certificate secret: %w", err)
+			}
+		}
+
+		if isOCP && opts.UserWorkloads.Metrics.CollectionEnabled {
+			targetNamespace := config.AlertmanagerUWLNamespace
+			if err := o.addSecret(ctx, secrets, mcoagateway.DefaultCollectionMTLSSecretName, clusterNamespace, mcoagateway.DefaultCollectionMTLSSecretName, targetNamespace); err != nil {
+				return fmt.Errorf("failed to add user workload MCOA gateway client certificate secret: %w", err)
+			}
 		}
 	}
 
@@ -952,14 +983,14 @@ func (o *OptionsBuilder) buildThanosComponents(ctx context.Context, opts *Option
 func (o *OptionsBuilder) overrideRemoteWriteEndpoint(ctx context.Context, opts *Options) error {
 	route := &routev1.Route{}
 	if err := o.Client.Get(ctx, types.NamespacedName{
-		Name:      mcoaObsAPIRouteName,
+		Name:      mcoagatewayRouteName,
 		Namespace: config.HubInstallNamespace,
 	}, route); err != nil {
-		return fmt.Errorf("failed to get MCOA obs-api route: %w", err)
+		return fmt.Errorf("failed to get MCOA gateway route: %w", err)
 	}
 
 	if route.Spec.Host == "" {
-		return fmt.Errorf("%w: %s", errMissingRouteHost, mcoaObsAPIRouteName)
+		return fmt.Errorf("%w: %s", errMissingRouteHost, mcoagatewayRouteName)
 	}
 
 	endpoint := "https://" + route.Spec.Host + remoteWritePathSuffix
@@ -968,12 +999,22 @@ func (o *OptionsBuilder) overrideRemoteWriteEndpoint(ctx context.Context, opts *
 		if agent == nil {
 			continue
 		}
+
+		gatewayTLSSecret := mcoagateway.DefaultCollectionMTLSSecretName
+
 		for i := range agent.Spec.RemoteWrite {
 			if agent.Spec.RemoteWrite[i].Name != nil && *agent.Spec.RemoteWrite[i].Name == config.RemoteWriteCfgName {
 				agent.Spec.RemoteWrite[i].URL = cooprometheusv1.URL(endpoint)
+				if agent.Spec.RemoteWrite[i].TLSConfig != nil {
+					agent.Spec.RemoteWrite[i].TLSConfig.CAFile = fmt.Sprintf("/etc/prometheus/secrets/%s/%s", gatewayTLSSecret, config.MTLSCASecretKey)
+					agent.Spec.RemoteWrite[i].TLSConfig.CertFile = fmt.Sprintf("/etc/prometheus/secrets/%s/%s", gatewayTLSSecret, config.MTLSCertSecretKey)
+					agent.Spec.RemoteWrite[i].TLSConfig.KeyFile = fmt.Sprintf("/etc/prometheus/secrets/%s/%s", gatewayTLSSecret, config.MTLSCertKeySecretKey)
+				}
 			}
 		}
 	}
+
+	opts.AlertmanagerGatewayHost = route.Spec.Host
 
 	return nil
 }

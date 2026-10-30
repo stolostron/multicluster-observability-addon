@@ -2,9 +2,13 @@ package resourcecreator
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/go-logr/logr"
+	lokiv1 "github.com/grafana/loki/operator/api/loki/v1"
+	routev1 "github.com/openshift/api/route/v1"
+	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
 	hyperv1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
@@ -12,11 +16,13 @@ import (
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	rshandlers "github.com/stolostron/multicluster-observability-addon/internal/analytics/rightsizing/handlers"
+	lhandlers "github.com/stolostron/multicluster-observability-addon/internal/logging/handlers"
+	"github.com/stolostron/multicluster-observability-addon/internal/mcoagateway"
 	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	mresources "github.com/stolostron/multicluster-observability-addon/internal/metrics/resource"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -25,12 +31,15 @@ import (
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
 func validateAODC(namespace, name string) bool {
@@ -71,9 +80,52 @@ var hostedClusterPredicate = predicate.Funcs{
 	GenericFunc: func(e event.GenericEvent) bool { return false },
 }
 
+// isGatewayRoute matches the single Route rendered by the mcoa-gateway Helm
+// chart. It isn't MCOA-owned (no controller ref, no part-of label - it's
+// applied via the addon-framework's Helm rendering, not SSA'd by this
+// controller), so it needs its own targeted predicate rather than
+// enqueueForMCOAOwnedResources.
+func isGatewayRoute(namespace, name string) bool {
+	return namespace == addoncfg.InstallNamespace && name == mcoagateway.GatewayRouteName
+}
+
+var mcoaGatewayRoutePredicate = builder.WithPredicates(predicate.Funcs{
+	CreateFunc: func(e event.CreateEvent) bool { return isGatewayRoute(e.Object.GetNamespace(), e.Object.GetName()) },
+	UpdateFunc: func(e event.UpdateEvent) bool {
+		return isGatewayRoute(e.ObjectNew.GetNamespace(), e.ObjectNew.GetName())
+	},
+	DeleteFunc:  func(e event.DeleteEvent) bool { return false },
+	GenericFunc: func(e event.GenericEvent) bool { return false },
+})
+
 var partOfMCOALabelSelector = labels.SelectorFromSet(labels.Set{
 	addoncfg.PartOfK8sLabelKey: addoncfg.Name,
 })
+
+var (
+	lokiStackGVK           = lokiv1.GroupVersion.WithKind("LokiStack")
+	clusterLogForwarderGVK = loggingv1.GroupVersion.WithKind("ClusterLogForwarder")
+)
+
+// errLokiStackCRDMissing is returned when the default logging stack is turned
+// on but nothing on the hub serves LokiStack. This is a user-visible
+// misconfiguration, not something MCOA can wait out, so it is surfaced instead
+// of being silently skipped like the logging-disabled case.
+var errLokiStackCRDMissing = errors.New("the default logging stack is enabled but the LokiStack CRD is not served by the hub: install the Loki Operator, or disable platformLogsDefault")
+
+// loggingWatchTargets are served by operators that are optional on the hub (the
+// Loki Operator for LokiStack, the Cluster Logging Operator for
+// ClusterLogForwarder). They are watched dynamically instead of through a static
+// Watches() call: a static watch on a kind the API server does not serve never
+// syncs, and after the controller's CacheSyncTimeout it fails the whole shared
+// manager, taking the metrics, right-sizing and COO controllers down with it.
+var loggingWatchTargets = []struct {
+	obj client.Object
+	gvk schema.GroupVersionKind
+}{
+	{&lokiv1.LokiStack{}, lokiStackGVK},
+	{&loggingv1.ClusterLogForwarder{}, clusterLogForwarderGVK},
+}
 
 // SetupWithManager sets up the controller with the Manager.
 func SetupWithManager(mgr ctrl.Manager, logger logr.Logger) error {
@@ -83,9 +135,10 @@ func SetupWithManager(mgr ctrl.Manager, logger logr.Logger) error {
 		Client: mgr.GetClient(),
 		Log:    l.WithName("controller"),
 		Scheme: mgr.GetScheme(),
+		cache:  mgr.GetCache(),
 	}
 
-	return ctrl.NewControllerManagedBy(mgr).
+	c, err := ctrl.NewControllerManagedBy(mgr).
 		For(&addonv1beta1.AddOnDeploymentConfig{}, builder.WithPredicates(mcoaAODCPredicate)).
 		// Trigger reconciliations due to changes in Placements
 		Watches(&addonv1beta1.ClusterManagementAddOn{}, r.enqueueAODC(), cmaoPredicate).
@@ -99,7 +152,18 @@ func SetupWithManager(mgr ctrl.Manager, logger logr.Logger) error {
 		Watches(&prometheusv1.PrometheusRule{}, r.enqueueForMCOControlledResources()).
 		// Trigger reconciliations if right-sizing ConfigMaps change
 		Watches(&corev1.ConfigMap{}, r.enqueueAODC(), rsConfigMapPredicate).
-		Complete(r)
+		// Trigger reconciliations once the mcoa-gateway Route is admitted (or its
+		// host changes), so the gateway server certificate's SAN can be updated
+		// to match without waiting for an unrelated reconcile trigger.
+		Watches(&routev1.Route{}, r.enqueueAODC(), mcoaGatewayRoutePredicate).
+		Build(r)
+	if err != nil {
+		return err
+	}
+	r.ctrl = c
+
+	// Logging resources are watched dynamically, see loggingWatchTargets.
+	return nil
 }
 
 // ResourceCreatorReconciler creates resources for default mode according to user configuration
@@ -107,12 +171,52 @@ type ResourceCreatorReconciler struct {
 	client.Client
 	Log    logr.Logger
 	Scheme *runtime.Scheme
+
+	ctrl        controller.Controller
+	cache       cache.Cache
+	watchedGVKs map[schema.GroupVersionKind]bool
+}
+
+// hasCRD reports whether the API server currently serves the given kind. The
+// client's REST mapper is the dynamic one built in main.go, so it picks up CRDs
+// that are installed after the controller started.
+func (r *ResourceCreatorReconciler) hasCRD(gvk schema.GroupVersionKind) bool {
+	_, err := r.RESTMapper().RESTMapping(gvk.GroupKind(), gvk.Version)
+	return err == nil
+}
+
+// registerLoggingWatches registers a watch for every logging CRD that is now
+// available and not watched yet. Called on every reconciliation so that CRDs
+// installed after startup are picked up: enabling the default stack always goes
+// through an AddOnDeploymentConfig update, which triggers a reconciliation.
+func (r *ResourceCreatorReconciler) registerLoggingWatches() {
+	if r.watchedGVKs == nil {
+		r.watchedGVKs = make(map[schema.GroupVersionKind]bool, len(loggingWatchTargets))
+	}
+
+	for _, w := range loggingWatchTargets {
+		if r.watchedGVKs[w.gvk] || !r.hasCRD(w.gvk) {
+			continue
+		}
+
+		if err := r.ctrl.Watch(source.Kind(r.cache, w.obj, r.enqueueForMCOAOwnedResources())); err != nil {
+			r.Log.Error(err, "failed to register logging watch", "kind", w.gvk.Kind)
+			continue
+		}
+
+		r.watchedGVKs[w.gvk] = true
+		r.Log.Info("registered logging watch", "kind", w.gvk.Kind)
+	}
 }
 
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.11.0/pkg/reconcile
 func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	r.Log.V(2).Info("reconciliation triggered", "request", req.String())
+
+	// Pick up the logging CRDs as soon as their operators are installed. Done
+	// first so the watches are registered even if a later step fails.
+	r.registerLoggingWatches()
 
 	// Fetch the AddOnDeploymentConfig instance and transform it into the Options struct
 	key := client.ObjectKey{Namespace: req.Namespace, Name: req.Name}
@@ -134,7 +238,7 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	// Reconcile metrics resources
 	objs := []common.DefaultConfig{}
 	images, err := mconfig.GetImageOverrides(ctx, r.Client, opts.Registries, r.Log)
-	if err != nil && !errors.IsNotFound(err) {
+	if err != nil && !apierrors.IsNotFound(err) {
 		return ctrl.Result{}, fmt.Errorf("failed to get image overrides: %w", err)
 	}
 
@@ -157,8 +261,99 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	// ConfigMap resources are created/updated/deleted here, not per-cluster in handler.go,
 	// to avoid race conditions from concurrent Build() calls.
 	rsBuilder := &rshandlers.OptionsBuilder{Client: r.Client, Logger: r.Log.WithName("rightsizing")}
-	if err := rsBuilder.ReconcileRSResources(ctx, opts); err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to reconcile right-sizing resources: %w", err)
+	if rsErr := rsBuilder.ReconcileRSResources(ctx, opts); rsErr != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to reconcile right-sizing resources: %w", rsErr)
+	}
+
+	if opts.Platform.Logs.DefaultStack || opts.ThanosOperatorEnabled {
+		gatewayHost, err := mcoagateway.GetGatewayRouteHost(ctx, r.Client)
+		if err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to get MCOA gateway route host: %w", err)
+		}
+
+		certObjs := []client.Object{}
+		// The Route host is only one of the server cert SANs, and the Route is
+		// created by the addon-framework alongside the gateway Deployment, so on
+		// a fresh install it does not exist yet. Issue the cert right away with
+		// the in-cluster SANs only - otherwise the Deployment comes up with no
+		// mcoa-gateway-server-tls secret to mount and crash-loops until the
+		// Route shows up. Once the Route is admitted this reconciles again (see
+		// mcoaGatewayRoutePredicate), cert-manager reissues with the host added,
+		// and the gateway picks the new cert up via --tls.reload-interval.
+		serverCert, err := mcoagateway.BuildServerCertificate(gatewayHost)
+		if err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to build MCOA gateway server certificate: %w", err)
+		}
+		certObjs = append(certObjs, serverCert)
+
+		if opts.Platform.Logs.DefaultStack {
+			lokiClientCert, err := mcoagateway.BuildLokiClientCertificate()
+			if err != nil {
+				return ctrl.Result{}, fmt.Errorf("failed to build MCOA gateway Loki client certificate: %w", err)
+			}
+			certObjs = append(certObjs, lokiClientCert)
+		}
+
+		managedClusters := &clusterv1.ManagedClusterList{}
+		if err := r.List(ctx, managedClusters, &client.ListOptions{}); err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to get managed cluster list: %w", err)
+		}
+		// One collector client cert per cluster; secret data is copied to the
+		// spoke via ManifestWork. OU is the cluster name so the gateway can set
+		// X-Scope-OrgID from the client certificate.
+		for _, cluster := range managedClusters.Items {
+			clientCert, err := mcoagateway.BuildCollectionCertificate(cluster.Name)
+			if err != nil {
+				return ctrl.Result{}, fmt.Errorf("failed to build MCOA gateway collection certificate for %s: %w", cluster.Name, err)
+			}
+			certObjs = append(certObjs, clientCert)
+		}
+
+		for _, obj := range certObjs {
+			if err := common.ServerSideApply(ctx, r.Client, obj, cmao); err != nil {
+				return ctrl.Result{}, fmt.Errorf("failed to apply certificate %s/%s: %w", obj.GetNamespace(), obj.GetName(), err)
+			}
+		}
+	}
+
+	// Reconcile logging CLFs and LokiStack separately so CLFs aren't blocking LokiStack install
+	lCLFObjs, lCLFDefaultConfig, clfErr := lhandlers.BuildCLFResources(ctx, r.Client, cmao, opts.Platform.Logs, opts.UserWorkloads.Logs, opts.HubHostname)
+	if clfErr != nil {
+		r.Log.Error(clfErr, "failed to build CLF resources, will requeue and continue to LokiStack")
+	} else {
+		var clfSSAErrs []error
+		for _, obj := range lCLFObjs {
+			if err := common.ServerSideApply(ctx, r.Client, obj, cmao); err != nil {
+				r.Log.V(1).Info("CLF SSA failed", "namespace", obj.GetNamespace(), "name", obj.GetName(), "err", err)
+				clfSSAErrs = append(clfSSAErrs, fmt.Errorf("%s/%s: %w", obj.GetNamespace(), obj.GetName(), err))
+			}
+		}
+		if len(clfSSAErrs) > 0 {
+			clfErr = errors.Join(clfSSAErrs...)
+		}
+		objs = append(objs, lCLFDefaultConfig...)
+	}
+
+	// The default stack cannot be built without the Loki Operator. Fail loudly
+	// here rather than letting the LokiStack Get below surface an opaque
+	// "no matches for kind" error.
+	if opts.Platform.Logs.DefaultStack && !r.hasCRD(lokiStackGVK) {
+		return ctrl.Result{}, errLokiStackCRDMissing
+	}
+
+	lsObjs, lsDefaultConfig, lsErr := lhandlers.BuildLokiStackResources(ctx, r.Client, opts.Platform.Logs, opts.UserWorkloads.Logs, opts.HubHostname)
+	if lsErr != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to build LokiStack resources: %w", lsErr)
+	}
+	for _, obj := range lsObjs {
+		if err := common.ServerSideApply(ctx, r.Client, obj, cmao); err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to apply LokiStack resource %s/%s: %w", obj.GetNamespace(), obj.GetName(), err)
+		}
+	}
+	objs = append(objs, lsDefaultConfig...)
+	// If CLF had errors, requeue after LokiStack is applied
+	if clfErr != nil {
+		return ctrl.Result{}, clfErr
 	}
 
 	if err := common.EnsureAddonConfig(ctx, r.Log, r.Client, objs); err != nil {
@@ -175,6 +370,19 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	// at least one of them still exists.
 	if err := common.DeleteOrphanResources(ctx, r.Log, r.Client, cmao, &cooprometheusv1alpha1.PrometheusAgentList{}); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to clean orphan resources: %w", err)
+	}
+	// Only list logging resources when their operator is installed: without the
+	// CRD the List fails with a no-matching-kind error on every reconciliation,
+	// which would also abort the metrics and right-sizing work above.
+	if r.hasCRD(lokiStackGVK) {
+		if err := common.DeleteOrphanResources(ctx, r.Log, r.Client, cmao, &lokiv1.LokiStackList{}); err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to clean orphan logging storage resources: %w", err)
+		}
+	}
+	if r.hasCRD(clusterLogForwarderGVK) {
+		if err := common.DeleteOrphanResources(ctx, r.Log, r.Client, cmao, &loggingv1.ClusterLogForwarderList{}); err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to clean orphan logging collection resources: %w", err)
+		}
 	}
 
 	return ctrl.Result{}, nil

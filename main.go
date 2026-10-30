@@ -10,7 +10,11 @@ import (
 	"os"
 
 	"github.com/ViaQ/logerr/v2/log"
+	certmanagerv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	"github.com/go-logr/logr"
+	lokiv1 "github.com/grafana/loki/operator/api/loki/v1"
+	otelv1alpha1 "github.com/open-telemetry/opentelemetry-operator/apis/v1alpha1"
+	otelv1beta1 "github.com/open-telemetry/opentelemetry-operator/apis/v1beta1"
 	configv1 "github.com/openshift/api/config/v1"
 	tlsutil "github.com/openshift/controller-runtime-common/pkg/tls"
 	"github.com/spf13/cobra"
@@ -20,16 +24,21 @@ import (
 	"github.com/stolostron/multicluster-observability-addon/internal/controllers/defaulthubstack"
 	"github.com/stolostron/multicluster-observability-addon/internal/controllers/resourcecreator"
 	"github.com/stolostron/multicluster-observability-addon/internal/controllers/watcher"
+	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	tlshelper "github.com/stolostron/multicluster-observability-addon/pkg/util"
+	thanosv1alpha1 "github.com/thanos-community/thanos-operator/api/v1alpha1"
+	appsv1 "k8s.io/api/apps/v1"
 	crdClientSet "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
 	utilflag "k8s.io/component-base/cli/flag"
 	logs "k8s.io/component-base/logs/api/v1"
 	cmdfactory "open-cluster-management.io/addon-framework/pkg/cmd/factory"
 	"open-cluster-management.io/addon-framework/pkg/version"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
@@ -38,7 +47,34 @@ import (
 	_ "github.com/stolostron/multicluster-observability-addon/internal/addon/metrics"
 )
 
-var scheme = addoncfg.NewScheme()
+var scheme = runtime.NewScheme()
+
+func init() {
+	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+	utilruntime.Must(workv1.Install(scheme))
+	utilruntime.Must(loggingv1.AddToScheme(scheme))
+	utilruntime.Must(otelv1beta1.AddToScheme(scheme))
+	utilruntime.Must(otelv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(operatorsv1.AddToScheme(scheme))
+	utilruntime.Must(operatorsv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(clusterv1.Install(scheme))
+	utilruntime.Must(clusterv1beta1.Install(scheme))
+	utilruntime.Must(operatorv1.AddToScheme(scheme))
+	utilruntime.Must(cooprometheusv1.AddToScheme(scheme))
+	utilruntime.Must(cooprometheusv1alpha1.AddToScheme(scheme)) // Adds prometheusAgent and scrapeConfig
+	utilruntime.Must(monitoringv1alpha1.AddToScheme(scheme))    // Adds monitoringstack
+	utilruntime.Must(prometheusv1.AddToScheme(scheme))          // Adds prometheusRule
+	utilruntime.Must(uiplugin.AddToScheme(scheme))
+	utilruntime.Must(hyperv1.AddToScheme(scheme))
+	utilruntime.Must(persesv1.AddToScheme(scheme))
+	utilruntime.Must(routev1.AddToScheme(scheme))
+	utilruntime.Must(addonv1beta1.Install(scheme))
+	utilruntime.Must(thanosv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(configv1.AddToScheme(scheme))
+	utilruntime.Must(certmanagerv1.AddToScheme(scheme))
+	utilruntime.Must(lokiv1.AddToScheme(scheme))
+	// +kubebuilder:scaffold:scheme
+}
 
 var (
 	logVerbosity int
@@ -165,6 +201,15 @@ func runControllers(ctx context.Context, kubeConfig *rest.Config) error {
 		Cache:  addoncfg.GetCacheOptions(),
 		MapperProvider: func(c *rest.Config, hc *http.Client) (meta.RESTMapper, error) {
 			return mapper, nil
+		},
+		Cache: cache.Options{
+			ByObject: map[client.Object]cache.ByObject{
+				&appsv1.StatefulSet{}: {
+					Namespaces: map[string]cache.Config{
+						mconfig.HubInstallNamespace: {},
+					},
+				},
+			},
 		},
 		Client: client.Options{
 			HTTPClient: httpClient,

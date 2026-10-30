@@ -1,0 +1,17 @@
+{{- if and .Values.enabled .Values.installCLO }}
+apiVersion: operators.coreos.com/v1
+kind: OperatorGroup
+metadata:
+  name: cluster-logging
+  namespace: openshift-logging
+  annotations:
+    olm.providedAPIs: ClusterLogForwarder.v1.observability.openshift.io,ClusterLogging.v1.observability.openshift.io
+  labels:
+    app: {{ template "logginghelm.name" . }}
+    chart: {{ template "logginghelm.chart" . }}
+    release: {{ .Release.Name }}
+spec:
+  targetNamespaces:
+  - openshift-logging
+  upgradeStrategy: Default
+{{- end }}
