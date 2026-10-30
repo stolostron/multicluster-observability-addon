@@ -208,12 +208,7 @@ kubectl label managedcluster local-cluster \
     --overwrite
 
 echo "=== 9. Installing CRDs ==="
-if [ ! -d "${REPO_ROOT}/deploy/crds" ] || [ -z "$(ls -A "${REPO_ROOT}/deploy/crds" 2>/dev/null)" ]; then
-    echo "Downloading CRDs..."
-    make -C "${REPO_ROOT}" download-crds
-fi
-kubectl apply --server-side --force-conflicts -f "${REPO_ROOT}/deploy/crds/"
-kubectl apply --server-side --force-conflicts -f "${SCRIPT_DIR}/../manifests/crds/"
+kubectl apply --server-side --force-conflicts -f "${REPO_ROOT}/test/crds/"
 kubectl wait --for condition=established --timeout=30s \
     crd/clusterversions.config.openshift.io \
     crd/servicecas.operator.openshift.io \
