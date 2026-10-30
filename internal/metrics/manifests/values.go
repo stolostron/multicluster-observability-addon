@@ -40,19 +40,21 @@ type MetricsValues struct {
 	// This is decoupled from DeployNonOCPStack because DeployNonOCPStack is only true when
 	// metrics collection is enabled, whereas endpoint-monitoring-operator may still be deployed
 	// on non-OCP clusters even with metrics disabled (e.g., when Right-Sizing is enabled).
-	IsOpenShiftVendor             bool                              `json:"isOpenShiftVendor"`
-	IsHub                         bool                              `json:"isHub"`
-	PrometheusOperatorAnnotations string                            `json:"prometheusOperatorAnnotations,omitempty"`
-	HubEndpoint                   string                            `json:"hubEndpoint,omitempty"`
-	Tolerations                   []corev1.Toleration               `json:"tolerations"`
-	NodeSelector                  map[string]string                 `json:"nodeSelector"`
-	NodeExporter                  NodeExporterValues                `json:"nodeExporter"`
-	ThanosOperator                ThanosOperatorValues              `json:"thanosOperator"`
-	TLSProfileEnabled             bool                              `json:"tlsProfileEnabled"`
-	TLSMinVersion                 string                            `json:"tlsMinVersion,omitempty"`
-	TLSCipherSuites               string                            `json:"tlsCipherSuites,omitempty"`
-	MonitoringStackPatches        []MonitoringStackPatchValues      `json:"monitoringStackPatches"`
-	PrometheusServerRemoteWrite   []cooprometheusv1.RemoteWriteSpec `json:"prometheusServerRemoteWrite,omitempty"`
+	IsOpenShiftVendor                bool                              `json:"isOpenShiftVendor"`
+	IsHub                            bool                              `json:"isHub"`
+	PrometheusOperatorAnnotations    string                            `json:"prometheusOperatorAnnotations,omitempty"`
+	HubEndpoint                      string                            `json:"hubEndpoint,omitempty"`
+	Tolerations                      []corev1.Toleration               `json:"tolerations"`
+	NodeSelector                     map[string]string                 `json:"nodeSelector"`
+	NodeExporter                     NodeExporterValues                `json:"nodeExporter"`
+	ThanosOperator                   ThanosOperatorValues              `json:"thanosOperator"`
+	TLSProfileEnabled                bool                              `json:"tlsProfileEnabled"`
+	TLSMinVersion                    string                            `json:"tlsMinVersion,omitempty"`
+	TLSCipherSuites                  string                            `json:"tlsCipherSuites,omitempty"`
+	MonitoringStackPatches           []MonitoringStackPatchValues      `json:"monitoringStackPatches"`
+	PrometheusServerRemoteWrite      []cooprometheusv1.RemoteWriteSpec `json:"prometheusServerRemoteWrite,omitempty"`
+	AlertmanagerGatewayHost          string                            `json:"alertmanagerGatewayHost,omitempty"`
+	AlertmanagerGatewayTLSSecretName string                            `json:"alertmanagerGatewayTLSSecretName,omitempty"`
 }
 
 type MonitoringStackPatchValues struct {
