@@ -730,7 +730,7 @@ func TestBuildOptions(t *testing.T) {
 			addon:           platformManagedClusterAddOn,
 			platformEnabled: true,
 			proxyConfig: &addon.ProxyConfig{
-				ProxyURL: func() *url.URL {
+				HTTPProxy: func() *url.URL {
 					u, _ := url.Parse("http://proxy.example.com:8080")
 					return u
 				}(),
@@ -768,6 +768,97 @@ func TestBuildOptions(t *testing.T) {
 					},
 				}, opts.Platform.PrometheusAgent.Spec.Tolerations)
 				assert.Equal(t, map[string]string{"node-role.kubernetes.io/infra": ""}, opts.Platform.PrometheusAgent.Spec.NodeSelector)
+			},
+		},
+		"proxy configuration with https proxy and ca bundle": {
+			addon:           platformManagedClusterAddOn,
+			platformEnabled: true,
+			proxyConfig: &addon.ProxyConfig{
+				HTTPSProxy: func() *url.URL {
+					u, _ := url.Parse("https://secure-proxy.example.com:8443")
+					return u
+				}(),
+				HTTPProxy: func() *url.URL {
+					u, _ := url.Parse("http://proxy.example.com:8080")
+					return u
+				}(),
+				NoProxy:  "*.example.com",
+				CABundle: []byte("-----BEGIN CERTIFICATE-----\ntest-proxy-ca\n-----END CERTIFICATE-----"),
+			},
+			resources: createResources,
+			expects: func(t *testing.T, opts Options, err error) {
+				require.NoError(t, err)
+				require.NotNil(t, opts.Platform.PrometheusAgent)
+				require.NotEmpty(t, opts.Platform.PrometheusAgent.Spec.RemoteWrite)
+
+				expectedProxyURL := "https://secure-proxy.example.com:8443"
+				expectedNoProxy := "*.example.com"
+
+				for _, rw := range opts.Platform.PrometheusAgent.Spec.RemoteWrite {
+					require.NotNil(t, rw.ProxyURL)
+					assert.Equal(t, expectedProxyURL, *rw.ProxyURL)
+					require.NotNil(t, rw.NoProxy)
+					assert.Equal(t, expectedNoProxy, *rw.NoProxy)
+				}
+
+				// Verify CA bundle was merged into hub-mtls-ca secret
+				trimmedID := config.GetTrimmedClusterID(opts.HubClusterID)
+				expectedCASecretName := config.GetHubMtlsCASecretName(trimmedID)
+				var caSecret *corev1.Secret
+				for _, s := range opts.Secrets {
+					if s.Name == expectedCASecretName {
+						caSecret = s
+						break
+					}
+				}
+				require.NotNil(t, caSecret, "hub-mtls-ca secret not found in opts.Secrets")
+				caCert := string(caSecret.Data["ca.crt"])
+				assert.Contains(t, caCert, "test-ca")
+				assert.Contains(t, caCert, "test-proxy-ca")
+				assert.Equal(t, "test-ca\n-----BEGIN CERTIFICATE-----\ntest-proxy-ca\n-----END CERTIFICATE-----\n", caCert)
+			},
+		},
+		"proxy configuration routes by remote write target scheme": {
+			addon:           platformManagedClusterAddOn,
+			platformEnabled: true,
+			proxyConfig: &addon.ProxyConfig{
+				HTTPProxy: func() *url.URL {
+					u, _ := url.Parse("http://insecure-proxy.example.com:8080")
+					return u
+				}(),
+				HTTPSProxy: func() *url.URL {
+					u, _ := url.Parse("https://secure-proxy.example.com:8443")
+					return u
+				}(),
+			},
+			resources: func() []client.Object {
+				res := createResources()
+				for _, obj := range res {
+					if agent, ok := obj.(*cooprometheusv1alpha1.PrometheusAgent); ok && agent.Name == "test-prometheus-agent" {
+						agent.Spec.RemoteWrite = []cooprometheusv1.RemoteWriteSpec{
+							{
+								Name: ptr.To(config.RemoteWriteCfgName),
+								URL:  "http://remote-write.example.com/api/v1/write",
+							},
+							{
+								Name: ptr.To("secondary-remote-write"),
+								URL:  "https://remote-write.example.com/api/v1/write",
+							},
+						}
+					}
+				}
+				return res
+			},
+			expects: func(t *testing.T, opts Options, err error) {
+				require.NoError(t, err)
+				require.NotNil(t, opts.Platform.PrometheusAgent)
+				require.Len(t, opts.Platform.PrometheusAgent.Spec.RemoteWrite, 2)
+
+				require.NotNil(t, opts.Platform.PrometheusAgent.Spec.RemoteWrite[0].ProxyURL)
+				assert.Equal(t, "http://insecure-proxy.example.com:8080", *opts.Platform.PrometheusAgent.Spec.RemoteWrite[0].ProxyURL)
+
+				require.NotNil(t, opts.Platform.PrometheusAgent.Spec.RemoteWrite[1].ProxyURL)
+				assert.Equal(t, "https://secure-proxy.example.com:8443", *opts.Platform.PrometheusAgent.Spec.RemoteWrite[1].ProxyURL)
 			},
 		},
 		"platform collection is enabled with existing relabel configs": {
