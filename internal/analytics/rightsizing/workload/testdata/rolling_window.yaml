@@ -1,0 +1,21 @@
+evaluation_interval: 1m
+tests:
+  - name: retain peaks between ten-minute mapping evaluations
+    interval: 1m
+    input_series:
+      - series: 'acm_rs:pod:info{namespace="test",pod="pod-1",workload="app",workload_type="Deployment"}'
+        values: '1 _x9 1'
+      - series: 'acm_rs:workload:pod_workload:relabel:5m{namespace="test",pod="pod-1",workload="app",workload_type="Deployment"}'
+        values: '1 _x9 1'
+      - series: 'kube_pod_status_phase{namespace="test",pod="pod-1",phase="Running"}'
+        values: '1+0x10'
+      - series: 'kube_pod_container_resource_requests{namespace="test",pod="pod-1",container="app",resource="cpu"}'
+        values: '1+0x6 10 1+0x2'
+      - series: 'container_memory_working_set_bytes{namespace="test",pod="pod-1",container="app"}'
+        values: '1+0x6 10 1+0x2'
+    promql_expr_test:
+      - expr: PROMQL_EXPRESSION
+        eval_time: 10m
+        exp_samples:
+          - labels: '{}'
+            value: 10

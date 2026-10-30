@@ -382,9 +382,13 @@ func TestWorkloadAndPodDefaultsIncludeAllNamespaces(t *testing.T) {
 	assert.Empty(t, config.NamespaceFilterCriteria.ExclusionCriteria)
 	assert.Empty(t, config.NamespaceFilterCriteria.InclusionCriteria)
 	assert.Equal(t, DefaultRecommendationPercentage, config.RecommendationPercentage)
+	assert.Equal(t, DefaultEvaluationInterval, config.EvaluationInterval)
+	assert.Equal(t, DefaultEvaluationInterval1d, config.EvaluationInterval1d)
 	data, err := ParseConfigMapData(GetDefaultWorkloadConfigData())
 	require.NoError(t, err)
 	assert.Empty(t, data.PrometheusRuleConfig.NamespaceFilterCriteria.ExclusionCriteria)
+	assert.Equal(t, DefaultEvaluationInterval, data.PrometheusRuleConfig.EvaluationInterval)
+	assert.Equal(t, DefaultEvaluationInterval1d, data.PrometheusRuleConfig.EvaluationInterval1d)
 }
 
 func TestParseAggregatorNames(t *testing.T) {
