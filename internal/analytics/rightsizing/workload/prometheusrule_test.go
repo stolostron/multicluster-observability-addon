@@ -309,6 +309,8 @@ func TestPhaseFilterExcludesNonRunningPods(t *testing.T) {
 				if strings.Contains(expr, "kube_pod_container_resource_requests") || strings.Contains(expr, "kube_pod_container_resource_limits") {
 					assert.Contains(t, expr, `kube_pod_status_phase{phase="Running"}`,
 						"rule %s should filter on Running phase to exclude completed pods", r.Record)
+					assert.Contains(t, expr, `== 1`,
+						"rule %s should use == 1 to drop non-running pods instead of zeroing them", r.Record)
 				}
 			}
 		})

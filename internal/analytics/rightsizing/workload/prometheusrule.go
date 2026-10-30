@@ -185,9 +185,9 @@ func podWorkloadRelabelExpr(nsFilter string) string {
 func resource5mExpr(metric, resource, nsFilter, byLabels, mappingMetric string) string {
 	return fmt.Sprintf(
 		`max_over_time(sum by (%s) (
-		  %s{%s, resource="%s", container!=""}
+		  max by (namespace, pod, container) (%s{%s, resource="%s", container!=""})
 		  * on (namespace, pod) group_left()
-		    kube_pod_status_phase{phase="Running"}
+		    (max by (namespace, pod) (kube_pod_status_phase{phase="Running"}) == 1)
 		  * on (namespace, pod) group_left(workload, workload_type)
 		    %s
 		)[5m:])`, byLabels, metric, nsFilter, resource, mappingMetric)
