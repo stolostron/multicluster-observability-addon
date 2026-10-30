@@ -5,10 +5,71 @@ import (
 	"testing"
 
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	"github.com/prometheus/prometheus/promql/parser"
 	"github.com/stolostron/multicluster-observability-addon/internal/analytics/rightsizing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestEvaluationIntervals(t *testing.T) {
+	for _, gen := range []struct {
+		name string
+		fn   func(rightsizing.RSConfigMapData) (monitoringv1.PrometheusRule, error)
+	}{
+		{"workload", GenerateWorkloadPrometheusRule},
+		{"pod", GeneratePodPrometheusRule},
+	} {
+		t.Run(gen.name, func(t *testing.T) {
+			config := rightsizing.GetDefaultWorkloadPrometheusRuleConfig()
+			baseline, err := gen.fn(rightsizing.RSConfigMapData{PrometheusRuleConfig: config})
+			require.NoError(t, err)
+			require.Len(t, baseline.Spec.Groups, 2)
+
+			for _, tc := range []struct {
+				name, rolling, daily, wantRolling, wantDaily string
+			}{
+				{"missing keys", "", "", "5m", "15m"},
+				{"only rolling", "10m", "", "10m", "15m"},
+				{"only daily", "", "1h", "5m", "1h"},
+				{"custom intervals", "10m", "30m", "10m", "30m"},
+				{"ceilings", "1h", "6h", "1h", "6h"},
+				{"floors in milliseconds", "300000ms", "900000ms", "300000ms", "900000ms"},
+				{"rolling coarser than daily", "30m", "15m", "30m", "15m"},
+			} {
+				t.Run(tc.name, func(t *testing.T) {
+					cfg := config
+					cfg.EvaluationInterval = tc.rolling
+					cfg.EvaluationInterval1d = tc.daily
+					rule, err := gen.fn(rightsizing.RSConfigMapData{PrometheusRuleConfig: cfg})
+					require.NoError(t, err)
+					require.Len(t, rule.Spec.Groups, 2)
+					require.NotNil(t, rule.Spec.Groups[0].Interval)
+					require.NotNil(t, rule.Spec.Groups[1].Interval)
+					require.NotEmpty(t, rule.Spec.Groups[0].Rules)
+					assert.Equal(t, monitoringv1.Duration(tc.wantRolling), *rule.Spec.Groups[0].Interval)
+					assert.Equal(t, monitoringv1.Duration(tc.wantDaily), *rule.Spec.Groups[1].Interval)
+
+					// Inventory and daily aggregation keep their expressions and identities.
+					// The daily rules still aggregate a full day of the stable :5m series.
+					assert.Equal(t, baseline.Spec.Groups[0].Rules[0], rule.Spec.Groups[0].Rules[0])
+					assert.Equal(t, baseline.Spec.Groups[1].Rules, rule.Spec.Groups[1].Rules)
+					for i, group := range rule.Spec.Groups {
+						assert.Equal(t, baseline.Spec.Groups[i].Name, group.Name)
+						require.Len(t, group.Rules, len(baseline.Spec.Groups[i].Rules))
+						for j, r := range group.Rules {
+							assert.Equal(t, baseline.Spec.Groups[i].Rules[j].Record, r.Record)
+							_, parseErr := parser.ParseExpr(r.Expr.String())
+							require.NoError(t, parseErr, "expression of %s", r.Record)
+							if i == 0 && j > 0 {
+								assert.Contains(t, r.Expr.String(), "["+tc.wantRolling+":]", "lookback of %s", r.Record)
+							}
+						}
+					}
+				})
+			}
+		})
+	}
+}
 
 func TestSeparateRulesKeepOwnerlessPodsAndWorkloadIdentity(t *testing.T) {
 	config := rightsizing.RSConfigMapData{PrometheusRuleConfig: rightsizing.GetDefaultRSPrometheusRuleConfig()}

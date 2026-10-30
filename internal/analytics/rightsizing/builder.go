@@ -174,14 +174,9 @@ func GetDefaultVirtualizationConfigData() map[string]string {
 
 // GetDefaultWorkloadPrometheusRuleConfig includes all namespaces for workload and
 // pod right-sizing. Namespace and virtualization defaults remain unchanged.
-// Evaluation interval keys are omitted: workload and pod rule groups use fixed
-// intervals (5m rolling, 15m daily) and do not honor the ConfigMap settings.
-// This avoids user confusion when changing the keys has no effect.
 func GetDefaultWorkloadPrometheusRuleConfig() RSPrometheusRuleConfig {
 	ruleConfig := GetDefaultRSPrometheusRuleConfig()
 	ruleConfig.NamespaceFilterCriteria.ExclusionCriteria = nil
-	ruleConfig.EvaluationInterval = ""
-	ruleConfig.EvaluationInterval1d = ""
 	return ruleConfig
 }
 
