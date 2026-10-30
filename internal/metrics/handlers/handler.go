@@ -22,6 +22,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
@@ -289,7 +290,66 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1beta1.Man
 		}
 	}
 
+	if err := o.addGlobalHubSecret(ctx, managedCluster, opts.Platform.Metrics.HubEndpoint.Host, &ret.Secrets); err != nil {
+		o.Logger.V(1).Info("Global Hub secret not added", "reason", err)
+	}
+
 	return ret, nil
+}
+
+// addGlobalHubSecret checks if this hub is a Global Hub and the managed cluster
+// is a hub with MCO. If both conditions are met, it assembles a secret from the
+// hub's observability certs and ships it to the managed hub's
+// open-cluster-management-observability namespace, enabling dual remote-write.
+func (o *OptionsBuilder) addGlobalHubSecret(ctx context.Context, managedCluster *clusterv1.ManagedCluster, hubHostname string, secrets *[]*corev1.Secret) error {
+	if !common.IsMCOHub(managedCluster) {
+		return fmt.Errorf("cluster %s is not an MCO hub", managedCluster.Name)
+	}
+
+	if !o.isGlobalHub(ctx) {
+		return fmt.Errorf("this hub is not a Global Hub")
+	}
+
+	hubCACert := &corev1.Secret{}
+	if err := o.Client.Get(ctx, types.NamespacedName{
+		Name:      config.HubCASecretName,
+		Namespace: config.HubInstallNamespace,
+	}, hubCACert); err != nil {
+		return fmt.Errorf("failed to get hub CA secret: %w", err)
+	}
+
+	clientCert := &corev1.Secret{}
+	if err := o.Client.Get(ctx, types.NamespacedName{
+		Name:      config.ClientCertSecretName,
+		Namespace: config.HubInstallNamespace,
+	}, clientCert); err != nil {
+		return fmt.Errorf("failed to get client cert secret: %w", err)
+	}
+
+	globalHubSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      config.GlobalHubObservabilitySecretName,
+			Namespace: config.HubInstallNamespace,
+		},
+		Data: map[string][]byte{
+			"ca.crt":            hubCACert.Data["ca.crt"],
+			"tls.crt":           clientCert.Data["tls.crt"],
+			"tls.key":           clientCert.Data["tls.key"],
+			"observatorium.url": []byte(hubHostname),
+			"managed-hub-name":  []byte(managedCluster.Name),
+		},
+	}
+
+	*secrets = append(*secrets, globalHubSecret)
+	return nil
+}
+
+func (o *OptionsBuilder) isGlobalHub(ctx context.Context) bool {
+	crd := &apiextensionsv1.CustomResourceDefinition{}
+	if err := o.Client.Get(ctx, types.NamespacedName{Name: addoncfg.MCGHCrdName}, crd); err != nil {
+		return false
+	}
+	return true
 }
 
 // buildPrometheusAgent abstracts the logic of building a Prometheus agent for platform or user workloads

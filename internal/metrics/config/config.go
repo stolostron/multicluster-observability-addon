@@ -41,6 +41,7 @@ const (
 	ClusterIDMetricLabel             = "clusterID"
 	ManagementClusterNameMetricLabel = "managementcluster"
 	ManagementClusterIDMetricLabel   = "managementclusterID"
+	ManagedByMetricLabel             = "managed_by"
 
 	TargetNamespaceAnnotation = "observability.open-cluster-management.io/target-namespace"
 
@@ -76,6 +77,9 @@ const (
 	MTLSCASecretKey      = "ca.crt"
 	MTLSCertSecretKey    = "tls.crt"
 	MTLSCertKeySecretKey = "tls.key"
+
+	GlobalHubObservabilitySecretName = "global-hub-observability-secret"
+	GlobalHubRemoteWriteCfgName      = "global-hub-observability"
 )
 
 var (

@@ -79,7 +79,10 @@ const (
 	SSAManagedFieldsAnnotationKey = "observability.open-cluster-management.io/ssa-managed-fields"
 
 	ClusterClaimClusterID        = "id.k8s.io"
+	ClusterClaimMCOHub           = "hub.observability.open-cluster-management.io"
 	ManagedClusterLabelClusterID = "clusterID"
+
+	MCGHCrdName = "multiclusterglobalhubs.operator.open-cluster-management.io"
 
 	// Feedback rule names
 	IsEstablishedFeedbackName             = "isEstablished"
