@@ -478,8 +478,13 @@ var ACMCommonPanelQueries = map[string]parser.Expr{
 			),
 			promqlbuilder.NewNumber(1),
 		),
-		vector.New(
-			vector.WithMetricName("node_cpu_seconds_total:mode_idle:avg_rate5m"),
+		promqlbuilder.Avg(
+			vector.New(
+				vector.WithMetricName("node_cpu_seconds_total:mode_idle:avg_rate5m"),
+				vector.WithLabelMatchers(
+					label.New("cluster").Equal("$cluster"),
+				),
+			),
 		),
 	),
 	"CPUUsageNodeNamespacePod": vector.New(
@@ -519,6 +524,9 @@ var ACMCommonPanelQueries = map[string]parser.Expr{
 		promqlbuilder.NewNumber(1),
 		vector.New(
 			vector.WithMetricName("node_cpu_seconds_total:mode_idle:avg_rate5m"),
+			vector.WithLabelMatchers(
+				label.New("cluster").Equal("$cluster"),
+			),
 		),
 	),
 	"CPURequestsByNamespace": promqlbuilder.Div(
