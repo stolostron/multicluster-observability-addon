@@ -23,3 +23,6 @@ configmaps:
     data: {}
 
 openshiftLoggingChannel: channelName
+
+catalogSource: redhat-operators
+catalogSourceNamespace: openshift-marketplace

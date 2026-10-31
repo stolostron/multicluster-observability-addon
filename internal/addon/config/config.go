@@ -33,6 +33,9 @@ const (
 
 	CooStatusClaimName = "coo.observability.open-cluster-management.io"
 
+	DefaultCooCatalogSource          = "redhat-operators"
+	DefaultCooCatalogSourceNamespace = "openshift-marketplace"
+
 	PaProbeKey                           = "isAvailable"
 	PaProbePath                          = ".status.conditions[?(@.type==\"Available\")].status"
 	EndpointMonitoringOperatorDeployment = "endpoint-monitoring-operator"

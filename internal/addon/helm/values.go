@@ -8,6 +8,7 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
+	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"github.com/stolostron/multicluster-observability-addon/internal/analytics/rightsizing"
 	rshandlers "github.com/stolostron/multicluster-observability-addon/internal/analytics/rightsizing/handlers"
 	cmanifests "github.com/stolostron/multicluster-observability-addon/internal/coo/manifests"
@@ -152,7 +153,15 @@ func getLoggingValues(ctx context.Context, k8s client.Client, cluster *clusterv1
 		return nil, err
 	}
 
-	return lmanifests.BuildValues(loggingOpts)
+	values, err := lmanifests.BuildValues(loggingOpts)
+	if err != nil {
+		return nil, err
+	}
+	if values != nil {
+		values.CatalogSource = catalogSourceOrDefault(opts.COO.CatalogSource)
+		values.CatalogSourceNamespace = catalogSourceNamespaceOrDefault(opts.COO.CatalogSourceNamespace)
+	}
+	return values, nil
 }
 
 func getTracingValues(ctx context.Context, k8s client.Client, cluster *clusterv1.ManagedCluster, mcAddon *addonapiv1beta1.ManagedClusterAddOn, opts addon.Options) (*tmanifests.TracingValues, error) {
@@ -173,6 +182,9 @@ func getTracingValues(ctx context.Context, k8s client.Client, cluster *clusterv1
 	if err != nil {
 		return nil, err
 	}
+
+	tracing.CatalogSource = catalogSourceOrDefault(opts.COO.CatalogSource)
+	tracing.CatalogSourceNamespace = catalogSourceNamespaceOrDefault(opts.COO.CatalogSourceNamespace)
 
 	return &tracing, nil
 }
@@ -196,4 +208,18 @@ func getRightSizingValues(ctx context.Context, k8s client.Client, logger logr.Lo
 	}
 
 	return rshandlers.BuildValues(rsOpts)
+}
+
+func catalogSourceOrDefault(name string) string {
+	if name != "" {
+		return name
+	}
+	return addoncfg.DefaultCooCatalogSource
+}
+
+func catalogSourceNamespaceOrDefault(namespace string) string {
+	if namespace != "" {
+		return namespace
+	}
+	return addoncfg.DefaultCooCatalogSourceNamespace
 }
