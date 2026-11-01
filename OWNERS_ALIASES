@@ -9,6 +9,10 @@ aliases:
     - jacobbaungardrh
     - thibaultmg
     - coleenquadros
+    - guidonguido
+    - dbuchanaRH
+    - GeorgeFrankAeillo
+    - sripragnabitra
   team-logging:
     # - alanconway
     # Collection team members
@@ -26,5 +30,7 @@ aliases:
   #   - frzifus
   #   - rubenvp8510
   #   - andreasgerstmayr
+  cnv-observability:
+    - sradco
   observability-intelligence:
     - tremes 
