@@ -5,6 +5,7 @@ import (
 	"time"
 
 	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
+	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
@@ -42,6 +43,8 @@ const (
 	ClusterLogForwardersResource = "clusterlogforwarders"
 	SpokeCLFName                 = "mcoa-instance"
 	SpokeCLFNamespace            = "openshift-logging"
+	LokiStacksResource           = "lokistacks"
+	HubNamespace                 = "local-cluster"
 	ClfProbeKey                  = "isReady"
 	ClfProbePath                 = ".status.conditions[?(@.type==\"Ready\")].status"
 
@@ -104,8 +107,17 @@ const (
 	RsProbePath             = ".metadata.name"
 
 	VendorOverrideAnnotationKey = "mcoa-override-vendor"
+	ThanosOperatorAnnotationKey = "mcoa-thanos-operator"
 	AnnotationOriginalResource  = "mcoa.openshift.io/original-resource"
+
+	GlobalPlacementName      = "global"
+	GlobalPlacementNamespace = "open-cluster-management-global-set"
 )
+
+var GlobalPlacementRef = addonv1beta1.PlacementRef{
+	Name:      GlobalPlacementName,
+	Namespace: GlobalPlacementNamespace,
+}
 
 var (
 	ErrInvalidMetricsHubHostname  = errors.New("invalid metrics hub hostname")
@@ -122,6 +134,7 @@ var (
 // or partially owned by a user before deleting orphaned agents.
 // It also scopes AddOnDeploymentConfig to the install namespace and
 // ClusterManagementAddOn to the MCOA instance name to prevent unbounded cache growth.
+// StatefulSets are scoped to the hub install namespace.
 func GetCacheOptions() cache.Options {
 	return cache.Options{
 		DefaultTransform: cache.TransformStripManagedFields(),
@@ -140,6 +153,11 @@ func GetCacheOptions() cache.Options {
 				},
 				Transform: func(in any) (any, error) {
 					return in, nil
+				},
+			},
+			&appsv1.StatefulSet{}: {
+				Namespaces: map[string]cache.Config{
+					InstallNamespace: {},
 				},
 			},
 		},

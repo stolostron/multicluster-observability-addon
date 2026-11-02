@@ -28,6 +28,9 @@ spec:
     # Resources for configuring the deployment of the Log collection
     - group: observability.openshift.io
       resource: clusterlogforwarders
+    # Resources for configuring managed logging
+    - group: loki.grafana.com
+      resource: lokistacks
     # Resources for configuring the deployment of OpenTelemetry collection
     - group: opentelemetry.io
       resource: opentelemetrycollectors
@@ -52,3 +55,8 @@ spec:
             resource: instrumentations
             name: instance
             namespace: open-cluster-management-observability
+          # The default-stack ClusterLogForwarder and LokiStack are NOT listed
+          # here: they only exist while platformLogsDefault is enabled, and the
+          # resourcecreator controller adds/keeps them on this placement itself
+          # (see common.EnsureAddonConfig). Hardcoding them would advertise
+          # configs that never resolve when managed logging is off.
