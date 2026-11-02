@@ -158,7 +158,7 @@ func TestMetricsFederation(t *testing.T) {
 	}
 
 	require.EventuallyWithT(t, func(c *assert.CollectT) {
-		queryURL := fmt.Sprintf("%s/api/v1/query?query=%s", hubURL, url.QueryEscape(`up{cluster="local-cluster"}`))
+		queryURL := fmt.Sprintf("%s/api/v1/query?query=%s", hubURL, url.QueryEscape(`up{cluster="local-cluster"} == 1`))
 		resp, reqErr := httpClient.Get(queryURL)
 		if !assert.NoError(c, reqErr, "HTTP GET to Hub Prometheus failed") {
 			return
@@ -183,10 +183,10 @@ func TestMetricsFederation(t *testing.T) {
 			return
 		}
 
-		if !assert.NotEmpty(c, pResp.Data.Result, "Prometheus has not received any samples for up{cluster=\"local-cluster\"} yet") {
+		if !assert.NotEmpty(c, pResp.Data.Result, "Prometheus has not received any healthy samples for up{cluster=\"local-cluster\"} == 1 yet") {
 			return
 		}
 
 		t.Logf("Successfully queried Hub Prometheus! Sample: %+v", pResp.Data.Result[0])
-	}, 3*time.Minute, 5*time.Second, "Hub Prometheus did not receive federated metrics from local-cluster within timeout")
+	}, 3*time.Minute, 5*time.Second, "Hub Prometheus did not receive healthy federated metrics (up == 1) from local-cluster within timeout")
 }
