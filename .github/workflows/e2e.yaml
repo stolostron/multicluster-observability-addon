@@ -11,7 +11,7 @@ permissions:
 jobs:
   e2e:
     name: e2e (kind)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -24,19 +24,12 @@ jobs:
           go-version: '1.26'
         id: go
 
-      - name: Install kind
-        run: |
-          if ! command -v kind >/dev/null 2>&1; then
-            echo "Installing KinD..."
-            curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.25.0/kind-linux-amd64
-            chmod +x ./kind
-            sudo mv ./kind /usr/local/bin/kind
-          fi
-          kind version
+      - name: Verify kind
+        run: kind version
 
       - name: Install clusteradm
         run: |
-          curl -sSL https://raw.githubusercontent.com/open-cluster-management-io/clusteradm/main/install.sh | bash
+          curl -sSL https://raw.githubusercontent.com/open-cluster-management-io/clusteradm/v1.4.0/install.sh | bash -s -- v1.4.0
           clusteradm version
 
       - name: Run E2E tests

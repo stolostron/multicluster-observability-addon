@@ -19,6 +19,13 @@ if [ "${CONTAINER_ENGINE}" = "podman" ]; then
 fi
 
 CLUSTER_NAME="${CLUSTER_NAME:-mcoa-e2e}"
+KIND_NODE_IMAGE="${KIND_NODE_IMAGE:-kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5}"
+SERVICE_CA_OPERATOR_BRANCH="${SERVICE_CA_OPERATOR_BRANCH:-release-5.0}"
+PROMETHEUS_VERSION="${PROMETHEUS_VERSION:-$(go list -m -f '{{.Version}}' github.com/prometheus/prometheus 2>/dev/null | sed -E 's/^v0\.3/v3./; s/^v0\./v2./')}"
+PROMETHEUS_VERSION="${PROMETHEUS_VERSION:-v3.15.1}"
+RHOBS_OPERATOR_VERSION="${RHOBS_OPERATOR_VERSION:-$(go list -m -f '{{.Version}}' github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring 2>/dev/null || echo "v0.90.1-rhobs1")}"
+ENDPOINT_MONITORING_OPERATOR_VERSION="${ENDPOINT_MONITORING_OPERATOR_VERSION:-5.1.0-SNAPSHOT-2026-10-12-16-50-23}"
+KUBE_RBAC_PROXY_VERSION="${KUBE_RBAC_PROXY_VERSION:-v0.23.1}"
 E2E_KUBECONFIG="${E2E_KUBECONFIG:-/tmp/mcoa-e2e.kubeconfig}"
 export KUBECONFIG="${E2E_KUBECONFIG}"
 
@@ -67,6 +74,7 @@ echo "=== 2. Creating KinD Cluster '${CLUSTER_NAME}' ==="
 "${KIND_BIN}" create cluster \
     --name "${CLUSTER_NAME}" \
     --config "${SCRIPT_DIR}/kind-config.yaml" \
+    --image "${KIND_NODE_IMAGE}" \
     --kubeconfig "${KUBECONFIG}"
 
 echo "=== 2b. Labeling Node for master-role compatibility ==="
@@ -86,11 +94,13 @@ echo "Building local MCOA image (localhost/mcoa:e2e)..."
 "${CONTAINER_ENGINE}" build --platform "linux/${PLATFORM}" -t localhost/mcoa:e2e "${REPO_ROOT}"
 
 if ! image_exists localhost/origin-service-ca-operator:kind-e2e; then
-    echo "Building native localhost/origin-service-ca-operator:kind-e2e..."
-    cat <<'EOF' | "${CONTAINER_ENGINE}" build --platform "linux/${PLATFORM}" -t localhost/origin-service-ca-operator:kind-e2e -
+    echo "Building native localhost/origin-service-ca-operator:kind-e2e (branch: ${SERVICE_CA_OPERATOR_BRANCH})..."
+    cat <<'EOF' | "${CONTAINER_ENGINE}" build --platform "linux/${PLATFORM}" --build-arg SERVICE_CA_OPERATOR_BRANCH="${SERVICE_CA_OPERATOR_BRANCH}" -t localhost/origin-service-ca-operator:kind-e2e -
+ARG SERVICE_CA_OPERATOR_BRANCH=release-5.0
 FROM registry.access.redhat.com/ubi9/go-toolset:latest AS builder
+ARG SERVICE_CA_OPERATOR_BRANCH
 USER 0
-RUN git clone --depth 1 -b release-4.16 https://github.com/openshift/service-ca-operator.git /src
+RUN git clone --depth 1 -b ${SERVICE_CA_OPERATOR_BRANCH} https://github.com/openshift/service-ca-operator.git /src
 WORKDIR /src
 ENV GOTOOLCHAIN=local
 RUN CGO_ENABLED=0 go build -mod=vendor -o /bin/service-ca-operator ./cmd/service-ca-operator && \
@@ -105,17 +115,17 @@ ENTRYPOINT ["/usr/bin/service-ca-operator"]
 EOF
 fi
 
-if ! image_exists localhost/prometheus:v3.0.0; then
-    echo "Building localhost/prometheus:v3.0.0 (non-root)..."
-    if ! image_exists quay.io/prometheus/prometheus:v3.0.0; then
-        "${CONTAINER_ENGINE}" pull quay.io/prometheus/prometheus:v3.0.0
+if ! image_exists localhost/prometheus:kind-e2e; then
+    echo "Building localhost/prometheus:kind-e2e (${PROMETHEUS_VERSION}, non-root)..."
+    if ! image_exists "quay.io/prometheus/prometheus:${PROMETHEUS_VERSION}"; then
+        "${CONTAINER_ENGINE}" pull "quay.io/prometheus/prometheus:${PROMETHEUS_VERSION}"
     fi
-    printf "FROM quay.io/prometheus/prometheus:v3.0.0\nUSER 65534\n" | "${CONTAINER_ENGINE}" build --platform "linux/${PLATFORM}" -t localhost/prometheus:v3.0.0 -
+    printf "FROM quay.io/prometheus/prometheus:%s\nUSER 65534\n" "${PROMETHEUS_VERSION}" | "${CONTAINER_ENGINE}" build --platform "linux/${PLATFORM}" -t localhost/prometheus:kind-e2e -
 fi
 
-if ! image_exists localhost/obo-prometheus-operator:v4.18 || ! "${CONTAINER_ENGINE}" image inspect localhost/obo-prometheus-operator:v4.18 2>/dev/null | grep -q "rhobs"; then
-    echo "Building localhost/obo-prometheus-operator:v4.18..."
-    OBO_SRC="${OBO_SRC:-quay.io/rhobs/obo-prometheus-operator:v0.93.1-rhobs1}"
+if ! image_exists localhost/obo-prometheus-operator:kind-e2e || ! "${CONTAINER_ENGINE}" image inspect localhost/obo-prometheus-operator:kind-e2e 2>/dev/null | grep -q "rhobs"; then
+    echo "Building localhost/obo-prometheus-operator:kind-e2e (${RHOBS_OPERATOR_VERSION})..."
+    OBO_SRC="${OBO_SRC:-quay.io/rhobs/obo-prometheus-operator:${RHOBS_OPERATOR_VERSION}}"
     if ! image_exists "${OBO_SRC}"; then
         # Quay only publishes linux/amd64 manifests for RHOBS images.
         # On arm64 hosts, omitting --platform causes Docker/Podman to fail with:
@@ -124,12 +134,12 @@ if ! image_exists localhost/obo-prometheus-operator:v4.18 || ! "${CONTAINER_ENGI
         "${CONTAINER_ENGINE}" pull --platform "linux/${PLATFORM}" "${OBO_SRC}" 2>/dev/null || \
             "${CONTAINER_ENGINE}" pull --platform linux/amd64 "${OBO_SRC}"
     fi
-    printf "FROM %s\nLABEL kind.e2e=true\n" "${OBO_SRC}" | "${CONTAINER_ENGINE}" build --platform linux/amd64 -t localhost/obo-prometheus-operator:v4.18 -
+    printf "FROM %s\nLABEL kind.e2e=true\n" "${OBO_SRC}" | "${CONTAINER_ENGINE}" build --platform linux/amd64 -t localhost/obo-prometheus-operator:kind-e2e -
 fi
 
-if ! image_exists localhost/prometheus-config-reloader:v4.18 || ! "${CONTAINER_ENGINE}" image inspect localhost/prometheus-config-reloader:v4.18 2>/dev/null | grep -q "rhobs"; then
-    echo "Building localhost/prometheus-config-reloader:v4.18..."
-    RELOADER_SRC="${RELOADER_SRC:-quay.io/rhobs/obo-prometheus-config-reloader:v0.93.1-rhobs1}"
+if ! image_exists localhost/prometheus-config-reloader:kind-e2e || ! "${CONTAINER_ENGINE}" image inspect localhost/prometheus-config-reloader:kind-e2e 2>/dev/null | grep -q "rhobs"; then
+    echo "Building localhost/prometheus-config-reloader:kind-e2e (${RHOBS_OPERATOR_VERSION})..."
+    RELOADER_SRC="${RELOADER_SRC:-quay.io/rhobs/obo-prometheus-config-reloader:${RHOBS_OPERATOR_VERSION}}"
     if ! image_exists "${RELOADER_SRC}"; then
         # Quay only publishes linux/amd64 manifests for RHOBS images.
         # On arm64 hosts, omitting --platform causes Docker/Podman to fail with:
@@ -138,29 +148,29 @@ if ! image_exists localhost/prometheus-config-reloader:v4.18 || ! "${CONTAINER_E
         "${CONTAINER_ENGINE}" pull --platform "linux/${PLATFORM}" "${RELOADER_SRC}" 2>/dev/null || \
             "${CONTAINER_ENGINE}" pull --platform linux/amd64 "${RELOADER_SRC}"
     fi
-    printf "FROM %s\nUSER 65534\n" "${RELOADER_SRC}" | "${CONTAINER_ENGINE}" build --platform linux/amd64 -t localhost/prometheus-config-reloader:v4.18 -
+    printf "FROM %s\nUSER 65534\n" "${RELOADER_SRC}" | "${CONTAINER_ENGINE}" build --platform linux/amd64 -t localhost/prometheus-config-reloader:kind-e2e -
 fi
 
 if ! image_exists localhost/endpoint-monitoring-operator:kind-e2e; then
-    EMO_SRC="quay.io/stolostron/endpoint-monitoring-operator:5.1.0-SNAPSHOT-2026-10-12-16-50-23"
-    if ! image_exists "${EMO_SRC}"; then
-        "${CONTAINER_ENGINE}" pull --platform "linux/${PLATFORM}" "${EMO_SRC}" 2>/dev/null || \
-            "${CONTAINER_ENGINE}" pull --platform linux/amd64 "${EMO_SRC}"
+    echo "Building localhost/endpoint-monitoring-operator:kind-e2e (${ENDPOINT_MONITORING_OPERATOR_VERSION})..."
+    ENDPOINT_MONITORING_OPERATOR_SRC="${ENDPOINT_MONITORING_OPERATOR_SRC:-quay.io/stolostron/endpoint-monitoring-operator:${ENDPOINT_MONITORING_OPERATOR_VERSION}}"
+    if ! image_exists "${ENDPOINT_MONITORING_OPERATOR_SRC}"; then
+        "${CONTAINER_ENGINE}" pull --platform "linux/${PLATFORM}" "${ENDPOINT_MONITORING_OPERATOR_SRC}" 2>/dev/null || \
+            "${CONTAINER_ENGINE}" pull --platform linux/amd64 "${ENDPOINT_MONITORING_OPERATOR_SRC}"
     fi
-    printf "FROM %s\nLABEL kind.e2e=true\n" "${EMO_SRC}" | "${CONTAINER_ENGINE}" build --platform linux/amd64 -t localhost/endpoint-monitoring-operator:kind-e2e -
+    printf "FROM %s\nLABEL kind.e2e=true\n" "${ENDPOINT_MONITORING_OPERATOR_SRC}" | "${CONTAINER_ENGINE}" build --platform linux/amd64 -t localhost/endpoint-monitoring-operator:kind-e2e -
 fi
 
 echo "=== 4. Loading Images into KinD ==="
 IMAGES_TO_LOAD=(
     localhost/mcoa:e2e
     localhost/origin-service-ca-operator:kind-e2e
-    localhost/obo-prometheus-operator:v4.18
-    localhost/prometheus-config-reloader:v4.18
-    localhost/prometheus:v3.0.0
+    localhost/obo-prometheus-operator:kind-e2e
+    localhost/prometheus-config-reloader:kind-e2e
+    localhost/prometheus:kind-e2e
     localhost/endpoint-monitoring-operator:kind-e2e
-    quay.io/prometheus/prometheus:v2.53.0
     docker.io/library/nginx:alpine
-    quay.io/brancz/kube-rbac-proxy:v0.15.0
+    "quay.io/brancz/kube-rbac-proxy:${KUBE_RBAC_PROXY_VERSION}"
 )
 
 for img in "${IMAGES_TO_LOAD[@]}"; do
