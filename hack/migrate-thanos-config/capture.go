@@ -7,6 +7,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -28,6 +29,10 @@ const (
 	mcoKind   = "MultiClusterObservability"
 	mcoCRName = "observability"
 )
+
+// errUnexpectedKind is returned when the offline input file is not a
+// MultiClusterObservability CR.
+var errUnexpectedKind = errors.New("unexpected kind")
 
 // prometheusDuration matches durations accepted by Prometheus model.ParseDuration,
 // which is what the thanos-operator Duration type uses. MCO's CRD allows Go-style
@@ -85,7 +90,7 @@ func loadMCOCR(inFile, name, version, namespace string) (*unstructured.Unstructu
 			return nil, fmt.Errorf("failed to parse %s: %w", inFile, err)
 		}
 		if mco.GetKind() != mcoKind {
-			return nil, fmt.Errorf("expected kind %s in %s, got %q", mcoKind, inFile, mco.GetKind())
+			return nil, fmt.Errorf("%w: expected kind %s in %s, got %q", errUnexpectedKind, mcoKind, inFile, mco.GetKind())
 		}
 		return mco, nil
 	}
@@ -411,15 +416,15 @@ func printSummary(cfg *MigrationConfig) {
 	}
 	fmt.Println("captured settings:")
 	if b, err := yaml.Marshal(struct {
-		Compact                CompactConfig   `json:"compact,omitempty"`
-		Receive                ReceiveConfig   `json:"receive,omitempty"`
-		Ruler                  RulerConfig     `json:"ruler,omitempty"`
-		Query                  QueryConfig     `json:"query,omitempty"`
-		Store                  StoreConfig     `json:"store,omitempty"`
-		StoreMemcached         MemcachedConfig `json:"storeMemcached,omitempty"`
-		QueryFrontendMemcached MemcachedConfig `json:"queryFrontendMemcached,omitempty"`
+		Compact                CompactConfig   `json:"compact,omitzero"`
+		Receive                ReceiveConfig   `json:"receive,omitzero"`
+		Ruler                  RulerConfig     `json:"ruler,omitzero"`
+		Query                  QueryConfig     `json:"query,omitzero"`
+		Store                  StoreConfig     `json:"store,omitzero"`
+		StoreMemcached         MemcachedConfig `json:"storeMemcached,omitzero"`
+		QueryFrontendMemcached MemcachedConfig `json:"queryFrontendMemcached,omitzero"`
 	}{cfg.Compact, cfg.Receive, cfg.Ruler, cfg.Query, cfg.Store, cfg.StoreMemcached, cfg.QueryFrontendMemcached}); err == nil {
-		os.Stdout.Write(b)
+		_, _ = os.Stdout.Write(b)
 	}
 	printWarnings(cfg)
 }

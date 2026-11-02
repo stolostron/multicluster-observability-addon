@@ -7,6 +7,7 @@ package main
 import (
 	"context"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 
@@ -192,7 +193,7 @@ func TestApplyReceiveAndRuler(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := cl.Update(context.Background(), recvLog.obj); err != nil {
+	if err = cl.Update(context.Background(), recvLog.obj); err != nil {
 		t.Fatal(err)
 	}
 	rulerLog, err := applyRuler(context.Background(), cl, key, cfg, false)
@@ -340,12 +341,7 @@ func memcachedArgs(d *appsv1.Deployment) []string {
 }
 
 func containsArg(args []string, want string) bool {
-	for _, a := range args {
-		if a == want {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(args, want)
 }
 
 // --- fixtures with the same defaults MCOA renders ---------------------------
