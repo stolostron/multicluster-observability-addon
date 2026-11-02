@@ -203,7 +203,7 @@ func extract(mco *unstructured.Unstructured) *MigrationConfig {
 
 	// Memcached tuning is applied to the memcached-store and
 	// memcached-query-frontend Deployments. It persists only on MCOA versions
-	// that manage those Deployments with SSA + OnSpokeChange.
+	// that manage those Deployments with SSA + OnSpokePresent.
 	cfg.StoreMemcached = extractMemcached(advanced, "storeMemcached")
 	cfg.QueryFrontendMemcached = extractMemcached(advanced, "queryFrontendMemcached")
 

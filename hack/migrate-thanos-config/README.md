@@ -95,7 +95,7 @@ snippet manually to the ADC that deploys MCOA.
 Memcached tuning is applied directly to the `memcached-store` and
 `memcached-query-frontend` Deployments (replica count and the `-m`/`-I`/`-c`
 container args). These edits persist only while MCOA manages those Deployments
-with server-side apply + `OnSpokeChange` on exactly those paths — on older
+with server-side apply + `OnSpokePresent` on exactly those paths — on older
 MCOA versions the default update strategy reverts cluster-side patches on the
 next reconcile, so run `apply` after upgrading to an MCOA build that includes
 the memcached manifest configs.

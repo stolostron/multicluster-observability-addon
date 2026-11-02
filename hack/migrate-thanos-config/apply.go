@@ -370,7 +370,7 @@ func applyMemcachedQueryFrontend(ctx context.Context, cl client.Client, key type
 // applyMemcached patches a memcached Deployment rendered by MCOA: the replica
 // count and the tuning flags of the "memcached" container (-m memory limit,
 // -I max item size, -c connection limit). These edits persist only while MCOA
-// manages the Deployments with SSA + OnSpokeChange on those paths.
+// manages the Deployments with SSA + OnSpokePresent on those paths.
 func applyMemcached(ctx context.Context, cl client.Client, key types.NamespacedName, c MemcachedConfig) (*changeLog, error) {
 	obj := &appsv1.Deployment{}
 	if err := cl.Get(ctx, key, obj); err != nil {
@@ -392,7 +392,7 @@ func applyMemcached(ctx context.Context, cl client.Client, key types.NamespacedN
 	}
 
 	if len(log.lines) > 0 {
-		log.note("memcached tuning persists only on MCOA versions managing these Deployments with SSA + OnSpokeChange")
+		log.note("memcached tuning persists only on MCOA versions managing these Deployments with SSA + OnSpokePresent")
 	}
 	return log, nil
 }
