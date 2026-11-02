@@ -12,7 +12,8 @@ if [ "${CONTAINER_ENGINE:-}" = "podman" ]; then
     export KIND_EXPERIMENTAL_PROVIDER=podman
 fi
 CLUSTER_NAME="${CLUSTER_NAME:-mcoa-e2e}"
-KUBECONFIG="${KUBECONFIG:-/tmp/mcoa-e2e.kubeconfig}"
+E2E_KUBECONFIG="${E2E_KUBECONFIG:-/tmp/mcoa-e2e.kubeconfig}"
+export KUBECONFIG="${E2E_KUBECONFIG}"
 
 if [ -z "${KIND_BIN:-}" ] || ! command -v "${KIND_BIN}" >/dev/null 2>&1; then
     for candidate in "$(which kind 2>/dev/null)" "/usr/local/bin/kind" "$HOME/go/bin/kind"; do
@@ -28,6 +29,9 @@ echo "=== Deleting KinD Cluster '${CLUSTER_NAME}' ==="
 "${KIND_BIN}" delete cluster --name "${CLUSTER_NAME}" || true
 
 echo "=== Removing temporary kubeconfig and join files ==="
-rm -f "${KUBECONFIG}" /tmp/mcoa-join.sh
+if [ -n "${E2E_KUBECONFIG}" ] && [ "${E2E_KUBECONFIG}" != "$HOME/.kube/config" ] && [ "${E2E_KUBECONFIG}" != "${HOME}/.kube/config" ]; then
+    rm -f "${E2E_KUBECONFIG}"
+fi
+rm -f /tmp/mcoa-join.sh
 
 echo "=== Cleanup Complete! ==="

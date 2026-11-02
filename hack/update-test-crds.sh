@@ -80,6 +80,9 @@ c = re.sub(r'  annotations:\n    feature-gate\.release\.openshift\.io/: [^\n]+\n
 with open(sys.argv[1], 'w') as f:
     f.write(c)
 " "${TARGET_DIR}/hostedclusters.hypershift.openshift.io.yaml"
+        else
+            echo "Error: yq or python3 is required to sanitize the HyperShift CRD" >&2
+            exit 1
         fi
     fi
 else

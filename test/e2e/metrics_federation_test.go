@@ -38,7 +38,10 @@ func TestMetricsFederation(t *testing.T) {
 	require.NoError(t, cooprometheusv1alpha1.AddToScheme(scheme))
 	require.NoError(t, cooprometheusv1.AddToScheme(scheme))
 
-	kubeconfigPath := os.Getenv("KUBECONFIG")
+	kubeconfigPath := os.Getenv("E2E_KUBECONFIG")
+	if kubeconfigPath == "" {
+		kubeconfigPath = os.Getenv("KUBECONFIG")
+	}
 	if kubeconfigPath == "" {
 		kubeconfigPath = "/tmp/mcoa-e2e.kubeconfig"
 	}
@@ -49,7 +52,7 @@ func TestMetricsFederation(t *testing.T) {
 	k8sClient, err := client.New(config, client.Options{Scheme: scheme})
 	require.NoError(t, err, "Failed to create k8s client")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	ctx, cancel := context.WithTimeout(t.Context(), 12*time.Minute)
 	defer cancel()
 
 	t.Log("=== Step 1: Validating prerequisites on Hub ===")
@@ -82,7 +85,7 @@ func TestMetricsFederation(t *testing.T) {
 	}
 
 	t.Log("=== Step 3: Asserting ManifestWork is created and applied by klusterlet ===")
-	assert.EventuallyWithT(t, func(c *assert.CollectT) {
+	require.EventuallyWithT(t, func(c *assert.CollectT) {
 		mwList := &workv1.ManifestWorkList{}
 		listErr := k8sClient.List(ctx, mwList, client.InNamespace("local-cluster"), client.MatchingLabels{
 			addonv1beta1.AddonLabelKey: "multicluster-observability-addon",
@@ -107,7 +110,7 @@ func TestMetricsFederation(t *testing.T) {
 	}, 2*time.Minute, 3*time.Second, "ManifestWork was not applied in local-cluster within timeout")
 
 	t.Log("=== Step 4: Asserting PrometheusAgent platform-metrics-collector is created ===")
-	assert.EventuallyWithT(t, func(c *assert.CollectT) {
+	require.EventuallyWithT(t, func(c *assert.CollectT) {
 		agent := &cooprometheusv1alpha1.PrometheusAgent{}
 		agentErr := k8sClient.Get(ctx, client.ObjectKey{
 			Namespace: "open-cluster-management-addon-observability",
@@ -117,7 +120,7 @@ func TestMetricsFederation(t *testing.T) {
 	}, 2*time.Minute, 3*time.Second, "PrometheusAgent was not created in spoke namespace within timeout")
 
 	t.Log("=== Step 4b: Asserting prom-agent-platform-metrics-collector pod is running and ready ===")
-	assert.EventuallyWithT(t, func(c *assert.CollectT) {
+	require.EventuallyWithT(t, func(c *assert.CollectT) {
 		pod := &corev1.Pod{}
 		podErr := k8sClient.Get(ctx, client.ObjectKey{
 			Namespace: "open-cluster-management-addon-observability",
@@ -154,7 +157,7 @@ func TestMetricsFederation(t *testing.T) {
 		} `json:"data"`
 	}
 
-	assert.EventuallyWithT(t, func(c *assert.CollectT) {
+	require.EventuallyWithT(t, func(c *assert.CollectT) {
 		queryURL := fmt.Sprintf("%s/api/v1/query?query=%s", hubURL, url.QueryEscape(`up{cluster="local-cluster"}`))
 		resp, reqErr := httpClient.Get(queryURL)
 		if !assert.NoError(c, reqErr, "HTTP GET to Hub Prometheus failed") {
