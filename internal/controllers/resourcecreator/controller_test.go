@@ -139,6 +139,35 @@ func TestMCOAAODCPredicate(t *testing.T) {
 		assert.True(t, mcoaAODCPredicate.Update(event.UpdateEvent{ObjectOld: oldAODC, ObjectNew: newAODC}))
 	})
 
+	t.Run("triggers update when Thanos annotation changes without a generation change", func(t *testing.T) {
+		oldAODC := &addonv1beta1.AddOnDeploymentConfig{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:       addoncfg.Name,
+				Namespace:  addoncfg.InstallNamespace,
+				Generation: 1,
+			},
+		}
+		newAODC := oldAODC.DeepCopy()
+		newAODC.Annotations = map[string]string{addoncfg.ThanosOperatorAnnotationKey: "true"}
+		assert.True(t, mcoaAODCPredicate.Update(event.UpdateEvent{ObjectOld: oldAODC, ObjectNew: newAODC}))
+
+		oldAODC, newAODC = newAODC, oldAODC
+		assert.True(t, mcoaAODCPredicate.Update(event.UpdateEvent{ObjectOld: oldAODC, ObjectNew: newAODC}))
+	})
+
+	t.Run("ignores unrelated annotation update", func(t *testing.T) {
+		oldAODC := &addonv1beta1.AddOnDeploymentConfig{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:       addoncfg.Name,
+				Namespace:  addoncfg.InstallNamespace,
+				Generation: 1,
+			},
+		}
+		newAODC := oldAODC.DeepCopy()
+		newAODC.Annotations = map[string]string{"unrelated": "changed"}
+		assert.False(t, mcoaAODCPredicate.Update(event.UpdateEvent{ObjectOld: oldAODC, ObjectNew: newAODC}))
+	})
+
 	t.Run("matches valid AODC delete", func(t *testing.T) {
 		aodc := &addonv1beta1.AddOnDeploymentConfig{
 			ObjectMeta: metav1.ObjectMeta{
