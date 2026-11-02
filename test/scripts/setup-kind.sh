@@ -64,6 +64,14 @@ image_exists() {
     "${CONTAINER_ENGINE}" image inspect "$1" >/dev/null 2>&1
 }
 
+image_matches_version() {
+    local img="$1"
+    local expected="$2"
+    local actual
+    actual="$("${CONTAINER_ENGINE}" image inspect --format '{{index .Config.Labels "kind.e2e.source-version"}}' "${img}" 2>/dev/null || true)"
+    [ "${actual}" = "${expected}" ]
+}
+
 echo "=== 1. Checking KinD Cluster '${CLUSTER_NAME}' ==="
 if "${CONTAINER_ENGINE}" ps -a --filter "name=^${CLUSTER_NAME}-control-plane\$" -q 2>/dev/null | grep -q .; then
     echo "Cluster '${CLUSTER_NAME}' already exists. Deleting to start clean..."
@@ -93,7 +101,7 @@ fi
 echo "Building local MCOA image (localhost/mcoa:e2e)..."
 "${CONTAINER_ENGINE}" build --platform "linux/${PLATFORM}" -t localhost/mcoa:e2e "${REPO_ROOT}"
 
-if ! image_exists localhost/origin-service-ca-operator:kind-e2e; then
+if ! image_exists localhost/origin-service-ca-operator:kind-e2e || ! image_matches_version localhost/origin-service-ca-operator:kind-e2e "${SERVICE_CA_OPERATOR_BRANCH}"; then
     echo "Building native localhost/origin-service-ca-operator:kind-e2e (branch: ${SERVICE_CA_OPERATOR_BRANCH})..."
     cat <<'EOF' | "${CONTAINER_ENGINE}" build --platform "linux/${PLATFORM}" --build-arg SERVICE_CA_OPERATOR_BRANCH="${SERVICE_CA_OPERATOR_BRANCH}" -t localhost/origin-service-ca-operator:kind-e2e -
 ARG SERVICE_CA_OPERATOR_BRANCH=release-4.18
@@ -107,6 +115,8 @@ RUN CGO_ENABLED=0 go build -mod=vendor -o /bin/service-ca-operator ./cmd/service
     chmod 0755 /bin/service-ca-operator
 
 FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
+ARG SERVICE_CA_OPERATOR_BRANCH
+LABEL kind.e2e=true kind.e2e.source-version="${SERVICE_CA_OPERATOR_BRANCH}"
 COPY --from=builder /bin/service-ca-operator /usr/bin/service-ca-operator
 RUN chmod 0755 /usr/bin/service-ca-operator && \
     ln -sf /usr/bin/service-ca-operator /usr/local/bin/service-ca-operator
@@ -115,15 +125,15 @@ ENTRYPOINT ["/usr/bin/service-ca-operator"]
 EOF
 fi
 
-if ! image_exists localhost/prometheus:kind-e2e; then
+if ! image_exists localhost/prometheus:kind-e2e || ! image_matches_version localhost/prometheus:kind-e2e "${PROMETHEUS_VERSION}"; then
     echo "Building localhost/prometheus:kind-e2e (${PROMETHEUS_VERSION}, non-root)..."
     if ! image_exists "quay.io/prometheus/prometheus:${PROMETHEUS_VERSION}"; then
         "${CONTAINER_ENGINE}" pull "quay.io/prometheus/prometheus:${PROMETHEUS_VERSION}"
     fi
-    printf "FROM quay.io/prometheus/prometheus:%s\nUSER 65534\n" "${PROMETHEUS_VERSION}" | "${CONTAINER_ENGINE}" build --platform "linux/${PLATFORM}" -t localhost/prometheus:kind-e2e -
+    printf "FROM quay.io/prometheus/prometheus:%s\nLABEL kind.e2e=true kind.e2e.source-version=%s\nUSER 65534\n" "${PROMETHEUS_VERSION}" "${PROMETHEUS_VERSION}" | "${CONTAINER_ENGINE}" build --platform "linux/${PLATFORM}" -t localhost/prometheus:kind-e2e -
 fi
 
-if ! image_exists localhost/obo-prometheus-operator:kind-e2e || ! "${CONTAINER_ENGINE}" image inspect localhost/obo-prometheus-operator:kind-e2e 2>/dev/null | grep -q "rhobs"; then
+if ! image_exists localhost/obo-prometheus-operator:kind-e2e || ! image_matches_version localhost/obo-prometheus-operator:kind-e2e "${RHOBS_OPERATOR_VERSION}"; then
     echo "Building localhost/obo-prometheus-operator:kind-e2e (${RHOBS_OPERATOR_VERSION})..."
     OBO_SRC="${OBO_SRC:-quay.io/rhobs/obo-prometheus-operator:${RHOBS_OPERATOR_VERSION}}"
     if ! image_exists "${OBO_SRC}"; then
@@ -134,10 +144,10 @@ if ! image_exists localhost/obo-prometheus-operator:kind-e2e || ! "${CONTAINER_E
         "${CONTAINER_ENGINE}" pull --platform "linux/${PLATFORM}" "${OBO_SRC}" 2>/dev/null || \
             "${CONTAINER_ENGINE}" pull --platform linux/amd64 "${OBO_SRC}"
     fi
-    printf "FROM %s\nLABEL kind.e2e=true\n" "${OBO_SRC}" | "${CONTAINER_ENGINE}" build --platform linux/amd64 -t localhost/obo-prometheus-operator:kind-e2e -
+    printf "FROM %s\nLABEL kind.e2e=true kind.e2e.source-version=%s\n" "${OBO_SRC}" "${RHOBS_OPERATOR_VERSION}" | "${CONTAINER_ENGINE}" build --platform linux/amd64 -t localhost/obo-prometheus-operator:kind-e2e -
 fi
 
-if ! image_exists localhost/prometheus-config-reloader:kind-e2e || ! "${CONTAINER_ENGINE}" image inspect localhost/prometheus-config-reloader:kind-e2e 2>/dev/null | grep -q "rhobs"; then
+if ! image_exists localhost/prometheus-config-reloader:kind-e2e || ! image_matches_version localhost/prometheus-config-reloader:kind-e2e "${RHOBS_OPERATOR_VERSION}"; then
     echo "Building localhost/prometheus-config-reloader:kind-e2e (${RHOBS_OPERATOR_VERSION})..."
     RELOADER_SRC="${RELOADER_SRC:-quay.io/rhobs/obo-prometheus-config-reloader:${RHOBS_OPERATOR_VERSION}}"
     if ! image_exists "${RELOADER_SRC}"; then
@@ -148,17 +158,17 @@ if ! image_exists localhost/prometheus-config-reloader:kind-e2e || ! "${CONTAINE
         "${CONTAINER_ENGINE}" pull --platform "linux/${PLATFORM}" "${RELOADER_SRC}" 2>/dev/null || \
             "${CONTAINER_ENGINE}" pull --platform linux/amd64 "${RELOADER_SRC}"
     fi
-    printf "FROM %s\nUSER 65534\n" "${RELOADER_SRC}" | "${CONTAINER_ENGINE}" build --platform linux/amd64 -t localhost/prometheus-config-reloader:kind-e2e -
+    printf "FROM %s\nLABEL kind.e2e=true kind.e2e.source-version=%s\nUSER 65534\n" "${RELOADER_SRC}" "${RHOBS_OPERATOR_VERSION}" | "${CONTAINER_ENGINE}" build --platform linux/amd64 -t localhost/prometheus-config-reloader:kind-e2e -
 fi
 
-if ! image_exists localhost/endpoint-monitoring-operator:kind-e2e; then
+if ! image_exists localhost/endpoint-monitoring-operator:kind-e2e || ! image_matches_version localhost/endpoint-monitoring-operator:kind-e2e "${ENDPOINT_MONITORING_OPERATOR_VERSION}"; then
     echo "Building localhost/endpoint-monitoring-operator:kind-e2e (${ENDPOINT_MONITORING_OPERATOR_VERSION})..."
     ENDPOINT_MONITORING_OPERATOR_SRC="${ENDPOINT_MONITORING_OPERATOR_SRC:-quay.io/stolostron/endpoint-monitoring-operator:${ENDPOINT_MONITORING_OPERATOR_VERSION}}"
     if ! image_exists "${ENDPOINT_MONITORING_OPERATOR_SRC}"; then
         "${CONTAINER_ENGINE}" pull --platform "linux/${PLATFORM}" "${ENDPOINT_MONITORING_OPERATOR_SRC}" 2>/dev/null || \
             "${CONTAINER_ENGINE}" pull --platform linux/amd64 "${ENDPOINT_MONITORING_OPERATOR_SRC}"
     fi
-    printf "FROM %s\nLABEL kind.e2e=true\n" "${ENDPOINT_MONITORING_OPERATOR_SRC}" | "${CONTAINER_ENGINE}" build --platform linux/amd64 -t localhost/endpoint-monitoring-operator:kind-e2e -
+    printf "FROM %s\nLABEL kind.e2e=true kind.e2e.source-version=%s\n" "${ENDPOINT_MONITORING_OPERATOR_SRC}" "${ENDPOINT_MONITORING_OPERATOR_VERSION}" | "${CONTAINER_ENGINE}" build --platform linux/amd64 -t localhost/endpoint-monitoring-operator:kind-e2e -
 fi
 
 echo "=== 4. Loading Images into KinD ==="

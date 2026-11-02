@@ -158,7 +158,7 @@ func TestMetricsFederation(t *testing.T) {
 	}
 
 	require.EventuallyWithT(t, func(c *assert.CollectT) {
-		queryURL := fmt.Sprintf("%s/api/v1/query?query=%s", hubURL, url.QueryEscape(`up{cluster="local-cluster"} == 1`))
+		queryURL := fmt.Sprintf("%s/api/v1/query?query=%s", hubURL, url.QueryEscape(`up{cluster="local-cluster",job="prometheus"} == 1`))
 		resp, reqErr := httpClient.Get(queryURL)
 		if !assert.NoError(c, reqErr, "HTTP GET to Hub Prometheus failed") {
 			return
