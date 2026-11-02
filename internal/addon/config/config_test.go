@@ -7,6 +7,7 @@ import (
 	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
@@ -18,11 +19,12 @@ func TestGetCacheOptions_Structure(t *testing.T) {
 
 	require.NotNil(t, opts.DefaultTransform, "DefaultTransform must be configured")
 	require.NotNil(t, opts.ByObject, "ByObject must be configured")
-	assert.Len(t, opts.ByObject, 3, "ByObject should contain exactly 3 object types")
+	assert.Len(t, opts.ByObject, 4, "ByObject should contain exactly 4 object types")
 
 	var aodcByObj *cache.ByObject
 	var cmaoByObj *cache.ByObject
 	var promAgentByObj *cache.ByObject
+	var statefulSetByObj *cache.ByObject
 
 	for obj, cfg := range opts.ByObject {
 		switch obj.(type) {
@@ -35,6 +37,9 @@ func TestGetCacheOptions_Structure(t *testing.T) {
 		case *cooprometheusv1alpha1.PrometheusAgent:
 			cfgCopy := cfg
 			promAgentByObj = &cfgCopy
+		case *appsv1.StatefulSet:
+			cfgCopy := cfg
+			statefulSetByObj = &cfgCopy
 		}
 	}
 
@@ -79,6 +84,11 @@ func TestGetCacheOptions_Structure(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, transformedAgent.(*cooprometheusv1alpha1.PrometheusAgent).GetManagedFields(), 1,
 		"PrometheusAgent Transform must preserve ManagedFields")
+
+	// StatefulSets are only cached in the hub install namespace.
+	require.NotNil(t, statefulSetByObj, "ByObject must contain StatefulSet")
+	assert.Contains(t, statefulSetByObj.Namespaces, InstallNamespace)
+	assert.Len(t, statefulSetByObj.Namespaces, 1)
 }
 
 func TestTransformStripManagedFields(t *testing.T) {
