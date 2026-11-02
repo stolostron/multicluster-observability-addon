@@ -39,6 +39,6 @@ spec:
     value: uiplugins.v1alpha1.observability.openshift.io
   # Managed Logging
   - name: platformLogsDefault
-    defaultValue: "false"
+    value: "false"
   - name: hubHostname
-    defaultValue: ""
+    value: ""
