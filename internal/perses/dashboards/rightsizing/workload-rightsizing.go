@@ -17,6 +17,9 @@ import (
 	acmHelpers "github.com/stolostron/multicluster-observability-addon/pkg/perses/dashboards/acm"
 )
 
+// withWorkloadCPUSection returns a dashboard option that adds the CPU panel
+// group: five stat panels (Recommendation, Usage, Request, Utilization, Limit),
+// a top-workloads chart, and a right-sizing table.
 func withWorkloadCPUSection(datasource string, project string) dashboard.Option {
 	return acmHelpers.AddCustomPanelGroup("CPU",
 		[]acmHelpers.GridItem{
@@ -38,6 +41,9 @@ func withWorkloadCPUSection(datasource string, project string) dashboard.Option 
 	)
 }
 
+// withWorkloadMemSection returns a dashboard option that adds the Memory panel
+// group: five stat panels (Recommendation, Usage, Request, Utilization, Limit),
+// a top-workloads chart, and a right-sizing table.
 func withWorkloadMemSection(datasource string, project string) dashboard.Option {
 	return acmHelpers.AddCustomPanelGroup("Memory",
 		[]acmHelpers.GridItem{

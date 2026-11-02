@@ -27,6 +27,8 @@ const (
 	wlMemDetail = `cluster="$cluster", profile="$memory_profile", namespace=~"$namespace", workload=~"$workload", workload_type=~"$workload_type"`
 )
 
+// workloadDataLink returns a DataLink that navigates from the workload overview
+// table to the workload detail dashboard, forwarding the current variable state.
 func workloadDataLink(project, title string) *DataLink {
 	return &DataLink{
 		OpenNewTab: false,
@@ -43,6 +45,8 @@ func workloadDataLink(project, title string) *DataLink {
 	}
 }
 
+// podDataLink returns a DataLink that navigates from the pod overview table
+// to the pod detail dashboard.
 func podDataLink(project, title string) *DataLink {
 	return &DataLink{OpenNewTab: false, Title: title, URL: fmt.Sprintf(
 		"/monitoring/v2/dashboards/view?dashboard=acm-rs-pod-detail&project=%s&var-cluster=$cluster&var-namespace=${__data.fields[\"namespace\"]}&var-pod=${__data.fields[\"pod\"]}&var-days=$days&var-cpu_profile=$cpu_profile&var-memory_profile=$memory_profile&start=$__range", project)}
@@ -64,10 +68,12 @@ func wlTable(metric, selector, by string) string {
 	return fmt.Sprintf(`max by (%s) (max_over_time(%s{%s}[$days]))`, by, metric, selector)
 }
 
+// wlStatUtil computes a utilization ratio (usage / request) for a stat panel.
 func wlStatUtil(usageMetric, requestMetric, selector string) string {
 	return wlStatWindow(usageMetric, selector) + " / " + wlStatWindow(requestMetric, selector)
 }
 
+// wlTableUtil computes a utilization ratio (usage / request) for a table cell.
 func wlTableUtil(usageMetric, requestMetric, selector, by string) string {
 	return wlTable(usageMetric, selector, by) + " / " + wlTable(requestMetric, selector, by)
 }
@@ -192,6 +198,8 @@ func WorkloadMemUtilizationPanel(datasourceName string) panelgroup.Option {
 	})
 }
 
+// timeSeriesPercentChart returns shared chart options for percent-unit time
+// series panels (e.g. top-workloads CPU/Memory utilization).
 func timeSeriesPercentChart() panel.Option {
 	return timeSeriesPanel.Chart(
 		timeSeriesPanel.WithYAxis(timeSeriesPanel.YAxis{
@@ -239,6 +247,10 @@ func WorkloadMemTopWorkloadsPanel(datasourceName string) panelgroup.Option {
 	)
 }
 
+// resourceTable builds a full table panel for workload or pod right-sizing,
+// with columns for recommendation, usage, request, limit, utilization, and a
+// drill-down link to the detail dashboard. When includePod is true, the table
+// uses pod-level grouping and links to the pod detail dashboard.
 func resourceTable(title, description, datasourceName, selector, usage, request, limit, rec string, cpu bool, project string, includePod bool) panelgroup.Option {
 	detailLink := workloadDataLink(project, "Workload Detailed View")
 	if includePod {
@@ -356,6 +368,8 @@ const (
 	podMemDetail = `cluster="$cluster", profile="$memory_profile", namespace="$namespace", pod="$pod"`
 )
 
+// podDetailStat builds a stat panel for the pod detail dashboard showing the
+// max_over_time value of a single metric over the selected $days window.
 func podDetailStat(datasource, title, description, metric, selector string, unit *string, decimals int, thresholds *commonSdk.Thresholds) panelgroup.Option {
 	return BuildStatPanel(datasource, StatPanelConfig{
 		Title: title, Description: description,
@@ -364,6 +378,8 @@ func podDetailStat(datasource, title, description, metric, selector string, unit
 	})
 }
 
+// podDetailRatioStat builds a stat panel showing the utilization ratio
+// (usage / request) for the pod detail dashboard.
 func podDetailRatioStat(datasource, title, description, usage, request, selector string, unit *string, thresholds *commonSdk.Thresholds) panelgroup.Option {
 	return BuildStatPanel(datasource, StatPanelConfig{
 		Title: title, Description: description,
@@ -482,6 +498,8 @@ func WorkloadDetailCPUUtilizationStatPanel(datasourceName string) panelgroup.Opt
 	})
 }
 
+// detailTimeSeries builds a time-series panel for the workload or pod detail
+// dashboard, overlaying usage, request, limit, and recommendation lines.
 func detailTimeSeries(title, description, datasourceName string, unit *string, usage, request, limit, rec, selector string) panelgroup.Option {
 	return panelgroup.AddPanel(title,
 		panel.Description(description),
@@ -600,6 +618,8 @@ func WorkloadDetailPodMemTablePanel(datasourceName string, project string) panel
 		false, project, true)
 }
 
+// WorkloadBackToMainDashboardPanel renders a markdown link panel for navigating
+// from the workload detail dashboard back to the workload overview.
 func WorkloadBackToMainDashboardPanel(_ string, project string) panelgroup.Option {
 	backURL := fmt.Sprintf(
 		"/monitoring/v2/dashboards/view?dashboard=acm-rs-workload-overview&project=%s"+
@@ -617,6 +637,8 @@ func WorkloadBackToMainDashboardPanel(_ string, project string) panelgroup.Optio
 	)
 }
 
+// PodBackToMainDashboardPanel renders a markdown link panel for navigating
+// from the pod detail dashboard back to the pod overview.
 func PodBackToMainDashboardPanel(_ string, project string) panelgroup.Option {
 	backURL := fmt.Sprintf("/monitoring/v2/dashboards/view?dashboard=acm-rs-pod-overview&project=%s&var-cluster=$cluster&var-namespace=$namespace&var-days=$days&var-cpu_profile=$cpu_profile&var-memory_profile=$memory_profile&start=$__range", project)
 	return panelgroup.AddPanel("Back to Pod Dashboard", panel.Description("Back to Pod Dashboard"), markdownPanel.Markdown(fmt.Sprintf("[Back to Pod Dashboard](%s)", backURL)), panel.AddLink(backURL, link.Name("Back to Pod Dashboard"), link.Tooltip("Back to Pod Dashboard")))

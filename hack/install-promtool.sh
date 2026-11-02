@@ -1,4 +1,11 @@
 #!/usr/bin/env bash
+# install-promtool.sh downloads and verifies a pinned version of promtool, the
+# Prometheus CLI testing tool. It is used by `make test-promql` to evaluate the
+# generated right-sizing PromQL recording rules against promtool's unit-test
+# framework (testdata/*.yaml fixtures), without adding Prometheus's TSDB and
+# cloud SDK dependencies to the Go module.
+#
+# Usage: install-promtool.sh VERSION DESTINATION
 
 set -euo pipefail
 

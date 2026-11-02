@@ -18,6 +18,8 @@ func GeneratePodPrometheusRule(configData rightsizing.RSConfigMapData) (monitori
 	return generatePrometheusRule(configData, "pod")
 }
 
+// generatePrometheusRule builds a complete PrometheusRule with two rule groups
+// (rolling 5m and daily 1d) for the given level ("workload" or "pod").
 func generatePrometheusRule(configData rightsizing.RSConfigMapData, level string) (monitoringv1.PrometheusRule, error) {
 	nsFilter, err := rightsizing.BuildNamespaceFilter(configData.PrometheusRuleConfig)
 	if err != nil {
@@ -201,6 +203,8 @@ func resourceRollingExpr(metric, resource, nsFilter, byLabels, mappingMetric, in
 		)[%s:])`, byLabels, metric, nsFilter, resource, mappingMetric, interval, interval)
 }
 
+// usageRollingExpr builds a max_over_time subquery for usage metrics (CPU or
+// memory), joining with the pod-to-workload mapping metric.
 func usageRollingExpr(metric, nsFilter, byLabels, mappingMetric, interval string) string {
 	return fmt.Sprintf(
 		`max_over_time(sum by (%s) (
@@ -210,22 +214,30 @@ func usageRollingExpr(metric, nsFilter, byLabels, mappingMetric, interval string
 		)[%s:])`, byLabels, metric, nsFilter, mappingMetric, interval, interval)
 }
 
+// podResourceRolling builds a rolling resource expression for pod-level metrics,
+// joining via the acm_rs:pod:info mapping.
 func podResourceRolling(metric, resource, nsFilter, byLabels, interval string) string {
 	return resourceRollingExpr(metric, resource, nsFilter, byLabels, "acm_rs:pod:info", interval)
 }
 
+// podUsageRolling builds a rolling usage expression for pod-level metrics.
 func podUsageRolling(metric, nsFilter, byLabels, interval string) string {
 	return usageRollingExpr(metric, nsFilter, byLabels, "acm_rs:pod:info", interval)
 }
 
+// workloadResourceRolling builds a rolling resource expression for workload-level
+// metrics, joining via the workload relabel mapping with a workload=~".+" filter.
 func workloadResourceRolling(metric, resource, nsFilter, byLabels, interval string) string {
 	return resourceRollingExpr(metric, resource, nsFilter, byLabels, "acm_rs:workload:pod_workload:relabel:5m{workload=~\".+\"}", interval)
 }
 
+// workloadUsageRolling builds a rolling usage expression for workload-level metrics.
 func workloadUsageRolling(metric, nsFilter, byLabels, interval string) string {
 	return usageRollingExpr(metric, nsFilter, byLabels, "acm_rs:workload:pod_workload:relabel:5m{workload=~\".+\"}", interval)
 }
 
+// buildPodRulesRolling returns the rolling (5m) rule group for pod-level metrics:
+// the pod:info mapping plus cpu/memory request, limit, and usage rules.
 func buildPodRulesRolling(nsFilter string, rb *rightsizing.RuleBuilder, interval string) []monitoringv1.Rule {
 	by := "namespace, pod, workload, workload_type"
 	return []monitoringv1.Rule{
@@ -239,6 +251,9 @@ func buildPodRulesRolling(nsFilter string, rb *rightsizing.RuleBuilder, interval
 	}
 }
 
+// buildWorkloadOnlyRulesRolling returns the rolling (5m) rule group for
+// workload-level metrics: the pod-to-workload relabel mapping plus cpu/memory
+// request, limit, and usage rules aggregated by workload.
 func buildWorkloadOnlyRulesRolling(nsFilter string, rb *rightsizing.RuleBuilder, interval string) []monitoringv1.Rule {
 	by := "namespace, workload, workload_type"
 	return []monitoringv1.Rule{
@@ -252,14 +267,19 @@ func buildWorkloadOnlyRulesRolling(nsFilter string, rb *rightsizing.RuleBuilder,
 	}
 }
 
+// buildPodRules1d returns the daily (1d) rule group for pod-level metrics.
 func buildPodRules1d(configData rightsizing.RSConfigMapData, rb *rightsizing.RuleBuilder) []monitoringv1.Rule {
 	return buildLevelRules1d(configData, rb, true)
 }
 
+// buildWorkloadOnlyRules1d returns the daily (1d) rule group for workload-level metrics.
 func buildWorkloadOnlyRules1d(configData rightsizing.RSConfigMapData, rb *rightsizing.RuleBuilder) []monitoringv1.Rule {
 	return buildLevelRules1d(configData, rb, false)
 }
 
+// buildLevelRules1d generates daily aggregation rules for a given level. When
+// pod is true, rules use the "pod" metric prefix; otherwise "workload". Each
+// profile produces request, limit, usage, and recommendation rules.
 func buildLevelRules1d(configData rightsizing.RSConfigMapData, rb *rightsizing.RuleBuilder, pod bool) []monitoringv1.Rule {
 	rp := configData.PrometheusRuleConfig.RecommendationPercentage
 	if rp == 0 {

@@ -23,8 +23,13 @@ func BuildWorkloadDetail(project string, datasource string, clusterLabelName str
 	return BuildWorkloadDetailForFeatures(project, datasource, clusterLabelName, true)
 }
 
-// BuildWorkloadDetailForFeatures omits pod drill-downs when pod right-sizing is disabled.
+// BuildWorkloadDetailForFeatures creates the workload detail drill-down
+// dashboard. When includePods is false, the per-pod CPU and Memory table
+// panels at the bottom of each section are omitted so the dashboard does not
+// reference pod-level metrics that may not exist.
 func BuildWorkloadDetailForFeatures(project string, datasource string, clusterLabelName string, includePods bool) (dashboard.Builder, error) {
+	// withCPUSection builds the CPU panel group: five stat panels, a time
+	// series chart, and optionally a per-pod table.
 	withCPUSection := func(includePods bool) dashboard.Option {
 		items := []acmHelpers.GridItem{
 			{X: 0, Y: 0, W: 5, H: 4},
@@ -49,6 +54,8 @@ func BuildWorkloadDetailForFeatures(project string, datasource string, clusterLa
 		return acmHelpers.AddCustomPanelGroup("CPU", items, panelOpts...)
 	}
 
+	// withMemSection builds the Memory panel group: five stat panels, a time
+	// series chart, and optionally a per-pod table.
 	withMemSection := func(includePods bool) dashboard.Option {
 		items := []acmHelpers.GridItem{
 			{X: 0, Y: 0, W: 5, H: 4},
