@@ -43,7 +43,6 @@ var (
 	errUnsupportedAppName          = errors.New("unsupported app name")
 	errMissingDesiredConfig        = errors.New("missing desiredConfig in managedClusterAddon.Status.ConfigReferences")
 	errMissingRemoteWriteConfig    = errors.New("missing expected remote write spec in the prometheusAgent")
-	errMissingCMAOOwnership        = errors.New("object is not owned by the ClusterManagementAddOn")
 	errMissingRouteHost            = errors.New("MCOA gateway route has no host")
 )
 
