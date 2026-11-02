@@ -50,7 +50,13 @@ func validateAODC(namespace, name string) bool {
 }
 
 var mcoaAODCPredicate = predicate.And(
-	predicate.GenerationChangedPredicate{},
+	predicate.Funcs{
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			// Enabling Thanos via an annotation does not increment AODC generation.
+			return e.ObjectOld.GetGeneration() != e.ObjectNew.GetGeneration() ||
+				e.ObjectOld.GetAnnotations()[addoncfg.ThanosOperatorAnnotationKey] != e.ObjectNew.GetAnnotations()[addoncfg.ThanosOperatorAnnotationKey]
+		},
+	},
 	predicate.NewPredicateFuncs(func(obj client.Object) bool {
 		return validateAODC(obj.GetNamespace(), obj.GetName())
 	}),

@@ -107,6 +107,7 @@ const (
 	RsProbePath             = ".metadata.name"
 
 	VendorOverrideAnnotationKey = "mcoa-override-vendor"
+	ThanosOperatorAnnotationKey = "mcoa-thanos-operator"
 	AnnotationOriginalResource  = "mcoa.openshift.io/original-resource"
 
 	GlobalPlacementName      = "global"
