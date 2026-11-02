@@ -664,6 +664,7 @@ func TestHostedClusterPredicate(t *testing.T) {
 	assert.True(t, hostedClusterPredicate.Delete(event.DeleteEvent{Object: hc}), "HostedCluster deletion should trigger reconciliation")
 	assert.False(t, hostedClusterPredicate.Generic(event.GenericEvent{Object: hc}), "HostedCluster generic events should not trigger reconciliation")
 }
+
 func TestHasCRD(t *testing.T) {
 	scheme := runtime.NewScheme()
 	_ = lokiv1.AddToScheme(scheme)
