@@ -191,7 +191,7 @@ kubectl wait -n open-cluster-management-hub --for=condition=Available deployment
 echo "=== 6. Joining local-cluster spoke to Hub ==="
 JOIN_CMD=$(cat "${JOIN_FILE}")
 MODIFIED_JOIN_CMD=$(echo "${JOIN_CMD}" | sed -E "s|^clusteradm|${CLUSTERADM_BIN}|" | sed -E 's|--cluster-name.*$|--cluster-name local-cluster|')
-MODIFIED_JOIN_CMD="${MODIFIED_JOIN_CMD} --force-internal-endpoint-lookup=true --wait --kubeconfig=${KUBECONFIG}"
+MODIFIED_JOIN_CMD="${MODIFIED_JOIN_CMD} --force-internal-endpoint-lookup=true --wait --kubeconfig='${KUBECONFIG}'"
 
 echo "Executing join command: ${MODIFIED_JOIN_CMD}"
 eval "${MODIFIED_JOIN_CMD}"
