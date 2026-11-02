@@ -39,12 +39,12 @@ metadata:
   name: images-list
   namespace: open-cluster-management-observability
 data:
-  obo_prometheus_rhel9_operator: "localhost/obo-prometheus-operator:v4.18"
-  prometheus_config_reloader: "localhost/prometheus-config-reloader:v4.18"
-  kube_rbac_proxy: "quay.io/brancz/kube-rbac-proxy:v0.15.0"
-  kube_state_metrics: "registry.k8s.io/kube-state-metrics/kube-state-metrics:v2.12.0"
-  prometheus: "localhost/prometheus:v3.0.0"
-  node_exporter: "quay.io/prometheus/node-exporter:v1.8.1"
+  obo_prometheus_rhel9_operator: "localhost/obo-prometheus-operator:kind-e2e"
+  prometheus_config_reloader: "localhost/prometheus-config-reloader:kind-e2e"
+  kube_rbac_proxy: "quay.io/brancz/kube-rbac-proxy:v0.23.1"
+  kube_state_metrics: "registry.k8s.io/kube-state-metrics/kube-state-metrics:v2.20.0"
+  prometheus: "localhost/prometheus:kind-e2e"
+  node_exporter: "quay.io/prometheus/node-exporter:v1.12.1"
   endpoint_monitoring_operator: "localhost/endpoint-monitoring-operator:kind-e2e"
 ---
 ---
@@ -136,7 +136,7 @@ spec:
     spec:
       containers:
       - name: prometheus
-        image: quay.io/prometheus/prometheus:v2.53.0
+        image: localhost/prometheus:kind-e2e
         imagePullPolicy: IfNotPresent
         command:
         - /bin/prometheus
