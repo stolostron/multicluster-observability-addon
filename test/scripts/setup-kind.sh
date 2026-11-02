@@ -20,7 +20,7 @@ fi
 
 CLUSTER_NAME="${CLUSTER_NAME:-mcoa-e2e}"
 KIND_NODE_IMAGE="${KIND_NODE_IMAGE:-kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5}"
-SERVICE_CA_OPERATOR_BRANCH="${SERVICE_CA_OPERATOR_BRANCH:-release-5.0}"
+SERVICE_CA_OPERATOR_BRANCH="${SERVICE_CA_OPERATOR_BRANCH:-release-4.18}"
 PROMETHEUS_VERSION="${PROMETHEUS_VERSION:-$(go list -m -f '{{.Version}}' github.com/prometheus/prometheus 2>/dev/null | sed -E 's/^v0\.3/v3./; s/^v0\./v2./')}"
 PROMETHEUS_VERSION="${PROMETHEUS_VERSION:-v3.15.1}"
 RHOBS_OPERATOR_VERSION="${RHOBS_OPERATOR_VERSION:-$(go list -m -f '{{.Version}}' github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring 2>/dev/null || echo "v0.90.1-rhobs1")}"
@@ -96,7 +96,7 @@ echo "Building local MCOA image (localhost/mcoa:e2e)..."
 if ! image_exists localhost/origin-service-ca-operator:kind-e2e; then
     echo "Building native localhost/origin-service-ca-operator:kind-e2e (branch: ${SERVICE_CA_OPERATOR_BRANCH})..."
     cat <<'EOF' | "${CONTAINER_ENGINE}" build --platform "linux/${PLATFORM}" --build-arg SERVICE_CA_OPERATOR_BRANCH="${SERVICE_CA_OPERATOR_BRANCH}" -t localhost/origin-service-ca-operator:kind-e2e -
-ARG SERVICE_CA_OPERATOR_BRANCH=release-5.0
+ARG SERVICE_CA_OPERATOR_BRANCH=release-4.18
 FROM registry.access.redhat.com/ubi9/go-toolset:latest AS builder
 ARG SERVICE_CA_OPERATOR_BRANCH
 USER 0
