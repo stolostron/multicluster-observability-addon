@@ -1,5 +1,10 @@
 //go:build promql
 
+// promql_test.go — PromQL integration tests that run generated recording-rule
+// expressions through a real promtool binary (make test-promql). Guarded by the
+// "promql" build tag so they never run during the regular `go test` suite and
+// never pull Prometheus TSDB/cloud-SDK dependencies into go.mod.
+
 package workload
 
 import (

@@ -14,6 +14,10 @@ import (
 	acmHelpers "github.com/stolostron/multicluster-observability-addon/pkg/perses/dashboards/acm"
 )
 
+// BuildPodDetail creates the pod-level detail dashboard showing CPU and memory
+// stat panels (Recommendation, Usage, Request, Utilization, Limit) and a time
+// series chart for a single pod, with drill-down variables for cluster,
+// namespace, pod, profile, and aggregation window.
 func BuildPodDetail(project string, datasource string, _ string) (dashboard.Builder, error) {
 	return dashboard.New("acm-rs-pod-detail",
 		dashboard.ProjectName(project),

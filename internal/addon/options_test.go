@@ -852,3 +852,27 @@ func TestProxyConfig_ProxyURLForTarget(t *testing.T) {
 		})
 	}
 }
+
+// TestIndependentRightSizingOptions verifies that workload and pod right-sizing
+// are opt-in: they default to disabled when the keys are absent and are only
+// enabled when MCO explicitly writes the corresponding key as "enabled".
+func TestIndependentRightSizingOptions(t *testing.T) {
+	for _, tt := range []struct {
+		name          string
+		variables     []addonapiv1beta1.CustomizedVariable
+		workload, pod bool
+	}{
+		{"defaults", nil, false, false},
+		{"workload enabled", []addonapiv1beta1.CustomizedVariable{{Name: KeyPlatformWorkloadRightSizing, Value: "enabled"}}, true, false},
+		{"pod enabled", []addonapiv1beta1.CustomizedVariable{{Name: KeyPlatformPodRightSizing, Value: "enabled"}}, false, true},
+		{"both disabled", []addonapiv1beta1.CustomizedVariable{{Name: KeyPlatformWorkloadRightSizing, Value: "disabled"}, {Name: KeyPlatformPodRightSizing, Value: "disabled"}}, false, false},
+		{"both enabled", []addonapiv1beta1.CustomizedVariable{{Name: KeyPlatformWorkloadRightSizing, Value: "enabled"}, {Name: KeyPlatformPodRightSizing, Value: "enabled"}}, true, true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			opts, err := BuildOptions(&addonapiv1beta1.AddOnDeploymentConfig{Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{CustomizedVariables: tt.variables}})
+			require.NoError(t, err)
+			require.Equal(t, tt.workload, opts.Platform.AnalyticsOptions.RightSizing.WorkloadEnabled)
+			require.Equal(t, tt.pod, opts.Platform.AnalyticsOptions.RightSizing.PodEnabled)
+		})
+	}
+}

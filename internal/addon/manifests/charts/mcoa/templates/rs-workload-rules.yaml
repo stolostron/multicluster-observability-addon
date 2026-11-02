@@ -1,3 +1,9 @@
+{{- /*
+  Right-sizing workload and pod PrometheusRules.
+  Iterates over both components in a single loop to avoid duplicating the
+  template. Namespace and virtualization rules live in their own templates
+  (rs-namespace-rules.yaml, rs-virt-rules.yaml) for historical reasons.
+*/ -}}
 {{- range $component, $label := dict "workloadRightSizing" "right-sizing-workload" "podRightSizing" "right-sizing-pod" }}
 {{- if and $.Values.rightSizing (index $.Values.rightSizing $component) (index (index $.Values.rightSizing $component) "enabled") }}
 {{- range $_, $rule := (index (index $.Values.rightSizing $component) "rules") }}
