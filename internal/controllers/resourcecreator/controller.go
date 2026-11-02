@@ -89,14 +89,14 @@ func isGatewayRoute(namespace, name string) bool {
 	return namespace == addoncfg.InstallNamespace && name == mcoagateway.GatewayRouteName
 }
 
-var mcoaGatewayRoutePredicate = builder.WithPredicates(predicate.Funcs{
+var mcoaGatewayRoutePredicate = predicate.Funcs{
 	CreateFunc: func(e event.CreateEvent) bool { return isGatewayRoute(e.Object.GetNamespace(), e.Object.GetName()) },
 	UpdateFunc: func(e event.UpdateEvent) bool {
 		return isGatewayRoute(e.ObjectNew.GetNamespace(), e.ObjectNew.GetName())
 	},
 	DeleteFunc:  func(e event.DeleteEvent) bool { return false },
 	GenericFunc: func(e event.GenericEvent) bool { return false },
-})
+}
 
 var partOfMCOALabelSelector = labels.SelectorFromSet(labels.Set{
 	addoncfg.PartOfK8sLabelKey: addoncfg.Name,
@@ -105,6 +105,7 @@ var partOfMCOALabelSelector = labels.SelectorFromSet(labels.Set{
 var (
 	lokiStackGVK           = lokiv1.GroupVersion.WithKind("LokiStack")
 	clusterLogForwarderGVK = loggingv1.GroupVersion.WithKind("ClusterLogForwarder")
+	gatewayRouteGVK        = routev1.GroupVersion.WithKind("Route")
 )
 
 // errLokiStackCRDMissing is returned when the default logging stack is turned
@@ -152,17 +153,13 @@ func SetupWithManager(mgr ctrl.Manager, logger logr.Logger) error {
 		Watches(&prometheusv1.PrometheusRule{}, r.enqueueForMCOControlledResources()).
 		// Trigger reconciliations if right-sizing ConfigMaps change
 		Watches(&corev1.ConfigMap{}, r.enqueueAODC(), rsConfigMapPredicate).
-		// Trigger reconciliations once the mcoa-gateway Route is admitted (or its
-		// host changes), so the gateway server certificate's SAN can be updated
-		// to match without waiting for an unrelated reconcile trigger.
-		Watches(&routev1.Route{}, r.enqueueAODC(), mcoaGatewayRoutePredicate).
 		Build(r)
 	if err != nil {
 		return err
 	}
 	r.ctrl = c
 
-	// Logging resources are watched dynamically, see loggingWatchTargets.
+	// Optional logging and Route APIs are watched dynamically once served.
 	return nil
 }
 
@@ -209,14 +206,32 @@ func (r *ResourceCreatorReconciler) registerLoggingWatches() {
 	}
 }
 
+// registerGatewayRouteWatch avoids blocking controller startup on clusters that
+// do not serve OpenShift Routes. Once available, Route host changes trigger a
+// reconcile so the gateway server certificate includes the admitted host.
+func (r *ResourceCreatorReconciler) registerGatewayRouteWatch() {
+	if r.watchedGVKs[gatewayRouteGVK] || !r.hasCRD(gatewayRouteGVK) {
+		return
+	}
+
+	if err := r.ctrl.Watch(source.Kind(r.cache, client.Object(&routev1.Route{}), r.enqueueAODC(), mcoaGatewayRoutePredicate)); err != nil {
+		r.Log.Error(err, "failed to register gateway Route watch")
+		return
+	}
+
+	r.watchedGVKs[gatewayRouteGVK] = true
+	r.Log.Info("registered gateway Route watch")
+}
+
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.11.0/pkg/reconcile
 func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	r.Log.V(2).Info("reconciliation triggered", "request", req.String())
 
-	// Pick up the logging CRDs as soon as their operators are installed. Done
-	// first so the watches are registered even if a later step fails.
+	// Pick up optional logging and Route APIs as soon as they are served. Do
+	// this first so watches are registered even if a later step fails.
 	r.registerLoggingWatches()
+	r.registerGatewayRouteWatch()
 
 	// Fetch the AddOnDeploymentConfig instance and transform it into the Options struct
 	key := client.ObjectKey{Namespace: req.Namespace, Name: req.Name}
