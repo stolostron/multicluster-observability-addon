@@ -33,7 +33,7 @@ type MigrationConfig struct {
 	Store   StoreConfig   `json:"store,omitempty"`
 	// Memcached settings are applied to the memcached-store and
 	// memcached-query-frontend Deployments. They persist only on MCOA versions
-	// that manage those Deployments with SSA + OnSpokeChange (see README).
+	// that manage those Deployments with SSA + OnSpokePresent (see README).
 	StoreMemcached         MemcachedConfig `json:"storeMemcached,omitempty"`
 	QueryFrontendMemcached MemcachedConfig `json:"queryFrontendMemcached,omitempty"`
 
