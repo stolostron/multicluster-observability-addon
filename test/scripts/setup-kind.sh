@@ -19,8 +19,8 @@ if [ "${CONTAINER_ENGINE}" = "podman" ]; then
 fi
 
 CLUSTER_NAME="${CLUSTER_NAME:-mcoa-e2e}"
-KUBECONFIG="${KUBECONFIG:-/tmp/mcoa-e2e.kubeconfig}"
-export KUBECONFIG
+E2E_KUBECONFIG="${E2E_KUBECONFIG:-/tmp/mcoa-e2e.kubeconfig}"
+export KUBECONFIG="${E2E_KUBECONFIG}"
 
 if [ -z "${KIND_BIN:-}" ] || ! command -v "${KIND_BIN}" >/dev/null 2>&1; then
     for candidate in "$(which kind 2>/dev/null)" "/usr/local/bin/kind" "$HOME/go/bin/kind"; do

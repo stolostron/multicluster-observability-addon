@@ -12,7 +12,7 @@ VERSION ?= v0.0.1
 CRD_DIR := $(shell pwd)/deploy/crds
 BIN_DIR := $(CURDIR)/bin
 CONTAINER_ENGINE ?= $(shell which podman 2>/dev/null || which docker 2>/dev/null)
-KUBECONFIG ?= /tmp/mcoa-e2e.kubeconfig
+E2E_KUBECONFIG ?= /tmp/mcoa-e2e.kubeconfig
 
 # REGISTRY_BASE
 # defines the container registry and organization for the bundle and operator container images.
@@ -31,31 +31,31 @@ deps: go.mod go.sum
 
 $(CRD_DIR)/observability.openshift.io_clusterlogforwarders.yaml:
 	@mkdir -p $(CRD_DIR)
-	@curl -s -L https://raw.githubusercontent.com/openshift/cluster-logging-operator/release-6.0/bundle/manifests/observability.openshift.io_clusterlogforwarders.yaml > $(CRD_DIR)/observability.openshift.io_clusterlogforwarders.yaml
+	@curl -sSfL https://raw.githubusercontent.com/openshift/cluster-logging-operator/release-6.0/bundle/manifests/observability.openshift.io_clusterlogforwarders.yaml -o $@ || { rm -f $@; exit 1; }
 
 $(CRD_DIR)/opentelemetry.io_opentelemetrycollectors.yaml:
 	@mkdir -p $(CRD_DIR)
-	@curl -s -L https://raw.githubusercontent.com/open-telemetry/opentelemetry-operator/v0.100.1/bundle/manifests/opentelemetry.io_opentelemetrycollectors.yaml > $(CRD_DIR)/opentelemetry.io_opentelemetrycollectors.yaml
+	@curl -sSfL https://raw.githubusercontent.com/open-telemetry/opentelemetry-operator/v0.100.1/bundle/manifests/opentelemetry.io_opentelemetrycollectors.yaml -o $@ || { rm -f $@; exit 1; }
 
 $(CRD_DIR)/opentelemetry.io_instrumentations.yaml:
 	@mkdir -p $(CRD_DIR)
-	@curl -s -L https://raw.githubusercontent.com/open-telemetry/opentelemetry-operator/v0.100.1/bundle/manifests/opentelemetry.io_instrumentations.yaml > $(CRD_DIR)/opentelemetry.io_instrumentations.yaml
+	@curl -sSfL https://raw.githubusercontent.com/open-telemetry/opentelemetry-operator/v0.100.1/bundle/manifests/opentelemetry.io_instrumentations.yaml -o $@ || { rm -f $@; exit 1; }
 
 $(CRD_DIR)/monitoring.rhobs_prometheusagents.yaml:
 	@mkdir -p $(CRD_DIR)
-	@curl -s -L https://raw.githubusercontent.com/rhobs/obo-prometheus-operator/refs/tags/v0.90.1-rhobs1/example/prometheus-operator-crd/monitoring.rhobs_prometheusagents.yaml > $(CRD_DIR)/monitoring.rhobs_prometheusagents.yaml
+	@curl -sSfL https://raw.githubusercontent.com/rhobs/obo-prometheus-operator/refs/tags/v0.90.1-rhobs1/example/prometheus-operator-crd/monitoring.rhobs_prometheusagents.yaml -o $@ || { rm -f $@; exit 1; }
 
 $(CRD_DIR)/monitoring.rhobs_scrapeconfigs.yaml:
 	@mkdir -p $(CRD_DIR)
-	@curl -s -L https://raw.githubusercontent.com/rhobs/obo-prometheus-operator/refs/tags/v0.90.1-rhobs1/example/prometheus-operator-crd/monitoring.rhobs_scrapeconfigs.yaml > $(CRD_DIR)/monitoring.rhobs_scrapeconfigs.yaml
+	@curl -sSfL https://raw.githubusercontent.com/rhobs/obo-prometheus-operator/refs/tags/v0.90.1-rhobs1/example/prometheus-operator-crd/monitoring.rhobs_scrapeconfigs.yaml -o $@ || { rm -f $@; exit 1; }
 
 $(CRD_DIR)/monitoring.rhobs_prometheusrules.yaml:
 	@mkdir -p $(CRD_DIR)
-	@curl -s -L https://raw.githubusercontent.com/rhobs/obo-prometheus-operator/refs/tags/v0.90.1-rhobs1/example/prometheus-operator-crd/monitoring.rhobs_prometheusrules.yaml > $(CRD_DIR)/monitoring.rhobs_prometheusrules.yaml
+	@curl -sSfL https://raw.githubusercontent.com/rhobs/obo-prometheus-operator/refs/tags/v0.90.1-rhobs1/example/prometheus-operator-crd/monitoring.rhobs_prometheusrules.yaml -o $@ || { rm -f $@; exit 1; }
 
 $(CRD_DIR)/core.observatorium.io_observatoria.yaml:
 	@mkdir -p $(CRD_DIR)
-	@curl -s -L https://raw.githubusercontent.com/stolostron/observatorium-operator/main/manifests/crds/core.observatorium.io_observatoria.yaml > $(CRD_DIR)/core.observatorium.io_observatoria.yaml
+	@curl -sSfL https://raw.githubusercontent.com/stolostron/observatorium-operator/main/manifests/crds/core.observatorium.io_observatoria.yaml -o $@ || { rm -f $@; exit 1; }
 
 .PHONY: download-crds
 download-crds: $(CRD_DIR)/observability.openshift.io_clusterlogforwarders.yaml $(CRD_DIR)/opentelemetry.io_opentelemetrycollectors.yaml $(CRD_DIR)/opentelemetry.io_instrumentations.yaml $(CRD_DIR)/monitoring.rhobs_prometheusagents.yaml $(CRD_DIR)/monitoring.rhobs_scrapeconfigs.yaml $(CRD_DIR)/monitoring.rhobs_prometheusrules.yaml $(CRD_DIR)/core.observatorium.io_observatoria.yaml
@@ -154,15 +154,15 @@ addon-undeploy: download-crds
 
 .PHONY: test-e2e-setup
 test-e2e-setup: ## Setup KinD cluster and dependencies for E2E tests
-	./test/scripts/setup-kind.sh
+	E2E_KUBECONFIG=$(E2E_KUBECONFIG) ./test/scripts/setup-kind.sh
 
 .PHONY: test-e2e-run
 test-e2e-run: ## Run E2E tests against running KinD cluster
-	KUBECONFIG=$(KUBECONFIG) go test -v -tags=e2e -count=1 -timeout=15m ./test/e2e/...
+	E2E_KUBECONFIG=$(E2E_KUBECONFIG) KUBECONFIG=$(E2E_KUBECONFIG) go test -v -tags=e2e -count=1 -timeout=15m ./test/e2e/...
 
 .PHONY: test-e2e-clean
 test-e2e-clean: ## Teardown KinD E2E cluster
-	./test/scripts/cleanup-kind.sh
+	E2E_KUBECONFIG=$(E2E_KUBECONFIG) ./test/scripts/cleanup-kind.sh
 
 .PHONY: test-e2e
 test-e2e: test-e2e-setup test-e2e-run ## Run complete E2E test lifecycle
