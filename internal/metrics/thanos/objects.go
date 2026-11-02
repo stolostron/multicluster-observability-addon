@@ -78,7 +78,7 @@ func (b *ObjectBuilder) buildStore(opts addon.Options, storeImage string) *thano
 				Key:                  config.ObjectStorageSecretKey,
 			},
 			StorageConfiguration: thanosv1alpha1.StorageConfiguration{
-				Size: thanosv1alpha1.StorageSize(config.DefaultStoreStorageSize),
+				Size: resource.MustParse(config.DefaultStoreStorageSize),
 			},
 			ShardingStrategy: thanosv1alpha1.ShardingStrategy{
 				Type:   thanosv1alpha1.Block,
@@ -139,7 +139,7 @@ func (b *ObjectBuilder) buildReceive(opts addon.Options) *thanosv1alpha1.ThanosR
 							Retention: retention,
 						},
 						StorageConfiguration: thanosv1alpha1.StorageConfiguration{
-							Size: thanosv1alpha1.StorageSize(config.DefaultReceiveIngesterStorageSize),
+							Size: resource.MustParse(config.DefaultReceiveIngesterStorageSize),
 						},
 						TooFarInFutureTimeWindow: &tooFarInFuture,
 					},
@@ -205,23 +205,28 @@ func (b *ObjectBuilder) buildRuler(opts addon.Options) *thanosv1alpha1.ThanosRul
 		},
 		Spec: thanosv1alpha1.ThanosRulerSpec{
 			Replicas: config.DefaultRulerReplicas,
-			ObjectStorageConfig: thanosv1alpha1.ObjectStorageConfig{
-				LocalObjectReference: corev1.LocalObjectReference{Name: config.ObjectStorageSecretName},
-				Key:                  config.ObjectStorageSecretKey,
+			RulerMode: thanosv1alpha1.RulerMode{
+				Type: "Stateful",
+				Stateful: &thanosv1alpha1.StatefulSpec{
+					ObjectStorageConfig: thanosv1alpha1.ObjectStorageConfig{
+						LocalObjectReference: corev1.LocalObjectReference{Name: config.ObjectStorageSecretName},
+						Key:                  config.ObjectStorageSecretKey,
+					},
+					Retention: retention,
+					ExternalLabels: thanosv1alpha1.ExternalLabels{
+						"rule_replica": "$(NAME)",
+					},
+				},
 			},
 			StorageConfiguration: thanosv1alpha1.StorageConfiguration{
-				Size: thanosv1alpha1.StorageSize(config.DefaultRulerStorageSize),
+				Size: resource.MustParse(config.DefaultRulerStorageSize),
 			},
 			AlertmanagerURL:    config.DefaultRulerAlertmanagerURL,
-			Retention:          retention,
 			EvaluationInterval: evalInterval,
 			RuleConfigSelector: metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"app.kubernetes.io/part-of": "multicluster-observability-addon",
 				},
-			},
-			ExternalLabels: thanosv1alpha1.ExternalLabels{
-				"rule_replica": "$(NAME)",
 			},
 		},
 	}
@@ -252,7 +257,7 @@ func (b *ObjectBuilder) buildCompact(opts addon.Options) *thanosv1alpha1.ThanosC
 				Key:                  config.ObjectStorageSecretKey,
 			},
 			StorageConfiguration: thanosv1alpha1.StorageConfiguration{
-				Size: thanosv1alpha1.StorageSize(config.DefaultCompactStorageSize),
+				Size: resource.MustParse(config.DefaultCompactStorageSize),
 			},
 			RetentionConfig: thanosv1alpha1.RetentionResolutionConfig{
 				Raw:         thanosv1alpha1.Duration(config.DefaultCompactRetentionRaw),
