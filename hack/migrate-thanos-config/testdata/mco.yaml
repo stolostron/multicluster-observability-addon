@@ -1,0 +1,62 @@
+apiVersion: observability.open-cluster-management.io/v1beta2
+kind: MultiClusterObservability
+metadata:
+  name: observability
+  namespace: open-cluster-management-observability
+spec:
+  instanceSize: medium
+  nodeSelector:
+    node-role.kubernetes.io/infra: ""
+  tolerations:
+    - key: node-role.kubernetes.io/infra
+      operator: Exists
+      effect: NoSchedule
+  storageConfig:
+    storageClass: gp2-csi
+    ruleStorageSize: 5Gi
+    compactStorageSize: 200Gi
+    receiveStorageSize: 150Gi
+    storeStorageSize: 50Gi
+  observabilityAddonSpec:
+    interval: 60
+  advanced:
+    retentionConfig:
+      retentionResolutionRaw: 730d
+      retentionResolution5m: 730d
+      retentionResolution1h: 1825d
+      retentionInLocal: 48h
+      deleteDelay: 48h
+      blockDuration: 2h
+    query:
+      replicas: 3
+      resources:
+        requests:
+          cpu: 500m
+          memory: 2Gi
+      usePrometheusEngine: true
+      containers:
+        - name: oauth-proxy
+          image: quay.io/openshift/origin-oauth-proxy:latest
+    queryFrontend:
+      replicas: 3
+    receive:
+      replicas: 6
+      debug:
+        logLevel: debug
+    rule:
+      replicas: 3
+      evalInterval: 30s
+    compact:
+      debug:
+        downsampleConcurrency: 8
+        blockMetaFetchConcurrency: 32
+        waitInterval: 5m
+    store:
+      replicas: 3
+    storeMemcached:
+      replicas: 2
+      memoryLimitMb: 2048
+      maxItemSize: 5m
+      connectionLimit: 2048
+    queryFrontendMemcached:
+      memoryLimitMb: 1024
