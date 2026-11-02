@@ -6,6 +6,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -23,6 +24,9 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
+// errMissingInput is returned when apply is invoked without -f.
+var errMissingInput = errors.New("-f is required")
+
 func runApply(args []string) error {
 	fs := flag.NewFlagSet("apply", flag.ExitOnError)
 	inFile := fs.String("f", "", "path to the migration file produced by capture (required)")
@@ -33,7 +37,7 @@ func runApply(args []string) error {
 		return err
 	}
 	if *inFile == "" {
-		return fmt.Errorf("-f is required")
+		return errMissingInput
 	}
 
 	data, err := os.ReadFile(*inFile)
@@ -41,7 +45,7 @@ func runApply(args []string) error {
 		return fmt.Errorf("failed to read %s: %w", *inFile, err)
 	}
 	cfg := &MigrationConfig{}
-	if err := yaml.Unmarshal(data, cfg); err != nil {
+	if err = yaml.Unmarshal(data, cfg); err != nil {
 		return fmt.Errorf("failed to parse %s: %w", *inFile, err)
 	}
 	if cfg.isEmpty() {
@@ -54,13 +58,13 @@ func runApply(args []string) error {
 		return fmt.Errorf("failed to get kubeconfig: %w", err)
 	}
 	scheme := runtime.NewScheme()
-	if err := thanosv1alpha1.AddToScheme(scheme); err != nil {
+	if err = thanosv1alpha1.AddToScheme(scheme); err != nil {
 		return fmt.Errorf("failed to register thanos scheme: %w", err)
 	}
-	if err := corev1.AddToScheme(scheme); err != nil {
+	if err = corev1.AddToScheme(scheme); err != nil {
 		return fmt.Errorf("failed to register core scheme: %w", err)
 	}
-	if err := appsv1.AddToScheme(scheme); err != nil {
+	if err = appsv1.AddToScheme(scheme); err != nil {
 		return fmt.Errorf("failed to register apps scheme: %w", err)
 	}
 	cl, err := client.New(restCfg, client.Options{Scheme: scheme})
@@ -85,12 +89,16 @@ func runApply(args []string) error {
 		{"ThanosStore", applyStore, key},
 	}
 	if !cfg.StoreMemcached.isEmpty() {
-		steps = append(steps, applyStep{"Deployment/memcached-store", applyMemcachedStore,
-			types.NamespacedName{Name: mconfig.MemcachedStoreName, Namespace: *namespace}})
+		steps = append(steps, applyStep{
+			"Deployment/memcached-store", applyMemcachedStore,
+			types.NamespacedName{Name: mconfig.MemcachedStoreName, Namespace: *namespace},
+		})
 	}
 	if !cfg.QueryFrontendMemcached.isEmpty() {
-		steps = append(steps, applyStep{"Deployment/memcached-query-frontend", applyMemcachedQueryFrontend,
-			types.NamespacedName{Name: mconfig.MemcachedQueryFrontendName, Namespace: *namespace}})
+		steps = append(steps, applyStep{
+			"Deployment/memcached-query-frontend", applyMemcachedQueryFrontend,
+			types.NamespacedName{Name: mconfig.MemcachedQueryFrontendName, Namespace: *namespace},
+		})
 	}
 
 	for _, step := range steps {
@@ -295,7 +303,7 @@ func applyReceive(ctx context.Context, cl client.Client, key types.NamespacedNam
 	log.setDuration("spec.ingester.hashrings[0].tsdbConfig.retention", &hs.TSDBConfig.Retention, c.Retention)
 	log.setStorageSize("spec.ingester.hashrings[0].storage.size", &hs.StorageConfiguration.Size, c.StorageSize)
 	log.setStorageClass("spec.ingester.hashrings[0].storage.storageClass", &hs.StorageConfiguration.StorageClass, c.StorageClass)
-	log.setContainers("spec.ingester.additionalContainers", &obj.Spec.Ingester.Additional.Containers, c.Containers, includeSidecars)
+	log.setContainers("spec.ingester.additionalContainers", &obj.Spec.Ingester.Containers, c.Containers, includeSidecars)
 	return log, nil
 }
 

@@ -26,16 +26,16 @@ type MigrationConfig struct {
 
 	Source SourceInfo `json:"source"`
 
-	Compact CompactConfig `json:"compact,omitempty"`
-	Receive ReceiveConfig `json:"receive,omitempty"`
-	Ruler   RulerConfig   `json:"ruler,omitempty"`
-	Query   QueryConfig   `json:"query,omitempty"`
-	Store   StoreConfig   `json:"store,omitempty"`
+	Compact CompactConfig `json:"compact,omitzero"`
+	Receive ReceiveConfig `json:"receive,omitzero"`
+	Ruler   RulerConfig   `json:"ruler,omitzero"`
+	Query   QueryConfig   `json:"query,omitzero"`
+	Store   StoreConfig   `json:"store,omitzero"`
 	// Memcached settings are applied to the memcached-store and
 	// memcached-query-frontend Deployments. They persist only on MCOA versions
 	// that manage those Deployments with SSA + OnSpokePresent (see README).
-	StoreMemcached         MemcachedConfig `json:"storeMemcached,omitempty"`
-	QueryFrontendMemcached MemcachedConfig `json:"queryFrontendMemcached,omitempty"`
+	StoreMemcached         MemcachedConfig `json:"storeMemcached,omitzero"`
+	QueryFrontendMemcached MemcachedConfig `json:"queryFrontendMemcached,omitzero"`
 
 	// SuggestedAddOnDeploymentConfig holds node placement and per-container
 	// resources extracted from the MCO CR, expressed as a patch for the
