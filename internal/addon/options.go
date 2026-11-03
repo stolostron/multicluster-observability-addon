@@ -160,6 +160,10 @@ func parseProxyURL(rawURL string) (*url.URL, error) {
 	if u.Scheme == "" || u.Host == "" {
 		return nil, fmt.Errorf("%w: missing scheme or host in proxy URL %q", addoncfg.ErrInvalidProxyURL, rawURL)
 	}
+	scheme := strings.ToLower(u.Scheme)
+	if scheme != "http" && scheme != "https" && scheme != "socks5" {
+		return nil, fmt.Errorf("%w: unsupported scheme %q in proxy URL %q (expected http, https, or socks5)", addoncfg.ErrInvalidProxyURL, u.Scheme, rawURL)
+	}
 	return u, nil
 }
 

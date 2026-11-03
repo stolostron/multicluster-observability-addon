@@ -171,11 +171,10 @@ if ! image_exists localhost/endpoint-monitoring-operator:kind-e2e || ! image_mat
     printf "FROM %s\nLABEL kind.e2e=true kind.e2e.source-version=%s\n" "${ENDPOINT_MONITORING_OPERATOR_SRC}" "${ENDPOINT_MONITORING_OPERATOR_VERSION}" | "${CONTAINER_ENGINE}" build --platform linux/amd64 -t localhost/endpoint-monitoring-operator:kind-e2e -
 fi
 
-if ! image_exists localhost/e2e-https-proxy:kind-e2e; then
-    echo "Building localhost/e2e-https-proxy:kind-e2e..."
-    "${CONTAINER_ENGINE}" build --platform "linux/${PLATFORM}" \
-        -t localhost/e2e-https-proxy:kind-e2e \
-        -f - "${REPO_ROOT}" <<'EOF'
+echo "Building localhost/e2e-https-proxy:kind-e2e..."
+"${CONTAINER_ENGINE}" build --platform "linux/${PLATFORM}" \
+    -t localhost/e2e-https-proxy:kind-e2e \
+    -f - "${REPO_ROOT}" <<'EOF'
 FROM registry.access.redhat.com/ubi9/go-toolset:latest AS builder
 USER 0
 WORKDIR /src
@@ -189,7 +188,6 @@ COPY --from=builder /bin/https-proxy /usr/bin/https-proxy
 USER 65534
 ENTRYPOINT ["/usr/bin/https-proxy"]
 EOF
-fi
 
 echo "=== 4. Loading Images into KinD ==="
 IMAGES_TO_LOAD=(

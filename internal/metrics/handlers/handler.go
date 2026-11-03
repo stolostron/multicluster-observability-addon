@@ -334,8 +334,8 @@ func (o *OptionsBuilder) buildPrometheusAgent(ctx context.Context, opts *Options
 	// Add proxy configuration to all remoteWrite configurations
 	for i := range agent.Spec.RemoteWrite {
 		if proxyURL := opts.ProxyConfig.ProxyURLForTarget(string(agent.Spec.RemoteWrite[i].URL)); proxyURL != nil {
-			agent.Spec.RemoteWrite[i].ProxyURL = ptr.To(proxyURL.String())
-			agent.Spec.RemoteWrite[i].NoProxy = ptr.To(opts.ProxyConfig.NoProxy)
+			agent.Spec.RemoteWrite[i].ProxyURL = new(proxyURL.String())
+			agent.Spec.RemoteWrite[i].NoProxy = new(opts.ProxyConfig.NoProxy)
 		}
 	}
 
@@ -1001,6 +1001,15 @@ func (o *OptionsBuilder) overrideRemoteWriteEndpoint(ctx context.Context, opts *
 		for i := range agent.Spec.RemoteWrite {
 			if agent.Spec.RemoteWrite[i].Name != nil && *agent.Spec.RemoteWrite[i].Name == config.RemoteWriteCfgName {
 				agent.Spec.RemoteWrite[i].URL = cooprometheusv1.URL(endpoint)
+				// Re-evaluate proxy configuration for the new HTTPS endpoint: the initial proxy selection
+				// was resolved against the original URL scheme and host, which may differ (e.g. HTTP vs HTTPS proxy).
+				if proxyURL := opts.ProxyConfig.ProxyURLForTarget(endpoint); proxyURL != nil {
+					agent.Spec.RemoteWrite[i].ProxyURL = new(proxyURL.String())
+					agent.Spec.RemoteWrite[i].NoProxy = new(opts.ProxyConfig.NoProxy)
+				} else {
+					agent.Spec.RemoteWrite[i].ProxyURL = nil
+					agent.Spec.RemoteWrite[i].NoProxy = nil
+				}
 			}
 		}
 	}
