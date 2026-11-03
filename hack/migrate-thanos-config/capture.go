@@ -195,13 +195,17 @@ func extract(mco *unstructured.Unstructured) *MigrationConfig {
 	cfg.Compact.Containers = containersOf(advanced, "compact", "containers")
 	cfg.Store.Containers = containersOf(advanced, "store", "containers")
 
-	// serviceAccountAnnotations have no equivalent.
-	for _, comp := range []string{"query", "queryFrontend", "receive", "rule", "compact", "store"} {
-		if v, ok := nested(advanced, comp, "serviceAccountAnnotations"); ok {
-			warn("spec.advanced.%s.serviceAccountAnnotations: the Thanos CRs do not expose service account annotations; not migrated", comp)
-			_ = v
-		}
-	}
+	// serviceAccountAnnotations map to the CommonFields annotations of the
+	// CRs; the thanos-operator stamps them onto the component's
+	// ServiceAccount (and pod template). MCO ran one receive component where
+	// MCOA runs a router and an ingester per hashring, so receive's
+	// annotations go to both, mirroring the log level split.
+	cfg.Query.Annotations = strMapOf(advanced, "query", "serviceAccountAnnotations")
+	cfg.Query.QueryFrontendAnnotations = strMapOf(advanced, "queryFrontend", "serviceAccountAnnotations")
+	cfg.Receive.Annotations = strMapOf(advanced, "receive", "serviceAccountAnnotations")
+	cfg.Ruler.Annotations = strMapOf(advanced, "rule", "serviceAccountAnnotations")
+	cfg.Compact.Annotations = strMapOf(advanced, "compact", "serviceAccountAnnotations")
+	cfg.Store.Annotations = strMapOf(advanced, "store", "serviceAccountAnnotations")
 
 	// Memcached tuning is applied to the memcached-store and
 	// memcached-query-frontend Deployments. It persists only on MCOA versions
@@ -310,6 +314,25 @@ func mapOf(obj map[string]any, path ...string) map[string]any {
 		return m
 	}
 	return nil
+}
+
+// strMapOf reads a map[string]string field from unstructured data, returning
+// nil when absent or when no entry has a string value.
+func strMapOf(obj map[string]any, path ...string) map[string]string {
+	m := mapOf(obj, path...)
+	if len(m) == 0 {
+		return nil
+	}
+	out := make(map[string]string, len(m))
+	for k, v := range m {
+		if s, ok := v.(string); ok {
+			out[k] = s
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 func str(obj map[string]any, path ...string) string {

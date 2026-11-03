@@ -69,8 +69,12 @@ type CompactConfig struct {
 	// cleanup cadence is preserved here (see warnings on capture).
 	CleanupInterval string `json:"cleanupInterval,omitempty"`
 	// LogLevel maps MCO compact.debug.logLevel to the CommonFields log level.
-	LogLevel   string             `json:"logLevel,omitempty"`
-	Containers []corev1.Container `json:"containers,omitempty"`
+	LogLevel string `json:"logLevel,omitempty"`
+	// Annotations maps MCO serviceAccountAnnotations: the thanos-operator
+	// stamps spec.annotations onto the component's ServiceAccount (and pod
+	// template).
+	Annotations map[string]string  `json:"annotations,omitempty"`
+	Containers  []corev1.Container `json:"containers,omitempty"`
 }
 
 type ReceiveConfig struct {
@@ -82,32 +86,44 @@ type ReceiveConfig struct {
 	StorageClass string `json:"storageClass,omitempty"`
 	// LogLevel maps MCO receive.debug.logLevel onto both the router and the
 	// ingester hashring: MCO ran a single receive component, MCOA runs both.
-	LogLevel   string             `json:"logLevel,omitempty"`
-	Containers []corev1.Container `json:"containers,omitempty"`
+	LogLevel string `json:"logLevel,omitempty"`
+	// Annotations maps MCO serviceAccountAnnotations onto the router and the
+	// ingester hashring, mirroring the log level split.
+	Annotations map[string]string  `json:"annotations,omitempty"`
+	Containers  []corev1.Container `json:"containers,omitempty"`
 }
 
 type RulerConfig struct {
-	Replicas     *int32             `json:"replicas,omitempty"`
-	EvalInterval string             `json:"evalInterval,omitempty"`
-	Retention    string             `json:"retention,omitempty"`
-	StorageSize  string             `json:"storageSize,omitempty"`
-	StorageClass string             `json:"storageClass,omitempty"`
-	Containers   []corev1.Container `json:"containers,omitempty"`
+	Replicas     *int32 `json:"replicas,omitempty"`
+	EvalInterval string `json:"evalInterval,omitempty"`
+	Retention    string `json:"retention,omitempty"`
+	StorageSize  string `json:"storageSize,omitempty"`
+	StorageClass string `json:"storageClass,omitempty"`
+	// Annotations maps MCO serviceAccountAnnotations (rule).
+	Annotations map[string]string  `json:"annotations,omitempty"`
+	Containers  []corev1.Container `json:"containers,omitempty"`
 }
 
 type QueryConfig struct {
-	Replicas              *int32             `json:"replicas,omitempty"`
-	QueryFrontendReplicas *int32             `json:"queryFrontendReplicas,omitempty"`
-	Containers            []corev1.Container `json:"containers,omitempty"`
+	Replicas              *int32 `json:"replicas,omitempty"`
+	QueryFrontendReplicas *int32 `json:"queryFrontendReplicas,omitempty"`
+	// Annotations maps MCO serviceAccountAnnotations (query).
+	Annotations map[string]string  `json:"annotations,omitempty"`
+	Containers  []corev1.Container `json:"containers,omitempty"`
 	// QueryFrontendContainers maps MCO advanced.queryFrontend.containers.
 	QueryFrontendContainers []corev1.Container `json:"queryFrontendContainers,omitempty"`
+	// QueryFrontendAnnotations maps MCO serviceAccountAnnotations
+	// (queryFrontend) onto ThanosQuery.spec.queryFrontend.annotations.
+	QueryFrontendAnnotations map[string]string `json:"queryFrontendAnnotations,omitempty"`
 }
 
 type StoreConfig struct {
-	Replicas     *int32             `json:"replicas,omitempty"`
-	StorageSize  string             `json:"storageSize,omitempty"`
-	StorageClass string             `json:"storageClass,omitempty"`
-	Containers   []corev1.Container `json:"containers,omitempty"`
+	Replicas     *int32 `json:"replicas,omitempty"`
+	StorageSize  string `json:"storageSize,omitempty"`
+	StorageClass string `json:"storageClass,omitempty"`
+	// Annotations maps MCO serviceAccountAnnotations (store).
+	Annotations map[string]string  `json:"annotations,omitempty"`
+	Containers  []corev1.Container `json:"containers,omitempty"`
 }
 
 // MemcachedConfig mirrors the MCO CacheConfig knobs that map onto the

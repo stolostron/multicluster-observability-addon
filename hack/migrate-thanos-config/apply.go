@@ -164,6 +164,30 @@ func (c *changeLog) setInt32(field string, dst *int32, val *int32) {
 	}
 }
 
+// setAnnotations merges the given annotations into a CR's spec.annotations
+// key by key, without removing keys already present. The thanos-operator
+// stamps these onto the component's ServiceAccount and pod template.
+func (c *changeLog) setAnnotations(field string, dst *map[string]string, val map[string]string) {
+	if len(val) == 0 {
+		return
+	}
+	if *dst == nil {
+		*dst = make(map[string]string, len(val))
+	}
+	for k, v := range val {
+		old, ok := (*dst)[k]
+		if !ok {
+			(*dst)[k] = v
+			c.set(field+"."+k, "<unset>", v)
+			continue
+		}
+		if old != v {
+			(*dst)[k] = v
+			c.set(field+"."+k, old, v)
+		}
+	}
+}
+
 // setStrPtr assigns to optional *string CR fields that may be unset.
 func (c *changeLog) setStrPtr(field string, dst **string, val string) {
 	if val == "" {
@@ -276,6 +300,7 @@ func applyCompact(ctx context.Context, cl client.Client, key types.NamespacedNam
 	log.setDuration("spec.retentionConfig.fiveMinutes", &obj.Spec.RetentionConfig.FiveMinutes, c.Retention5m)
 	log.setDuration("spec.retentionConfig.oneHour", &obj.Spec.RetentionConfig.OneHour, c.Retention1h)
 	log.setStrPtr("spec.logLevel", &obj.Spec.LogLevel, c.LogLevel)
+	log.setAnnotations("spec.annotations", &obj.Spec.Annotations, c.Annotations)
 	log.setStorageSize("spec.storage.size", &obj.Spec.StorageConfiguration.Size, c.StorageSize)
 	log.setStorageClass("spec.storage.storageClass", &obj.Spec.StorageConfiguration.StorageClass, c.StorageClass)
 
@@ -317,9 +342,11 @@ func applyReceive(ctx context.Context, cl client.Client, key types.NamespacedNam
 	hs := &obj.Spec.Ingester.Hashrings[0]
 
 	// MCO ran a single receive component; MCOA runs a router and an ingester
-	// per hashring, so the log level goes to both.
+	// per hashring, so the log level and annotations go to both.
 	log.setStrPtr("spec.router.logLevel", &obj.Spec.Router.LogLevel, c.LogLevel)
 	log.setStrPtr("spec.ingester.hashrings[0].logLevel", &hs.LogLevel, c.LogLevel)
+	log.setAnnotations("spec.router.annotations", &obj.Spec.Router.Annotations, c.Annotations)
+	log.setAnnotations("spec.ingester.hashrings[0].annotations", &hs.Annotations, c.Annotations)
 	log.setInt32("spec.ingester.hashrings[0].replicas", &hs.Replicas, c.Replicas)
 	log.setDuration("spec.ingester.hashrings[0].tsdbConfig.retention", &hs.TSDBConfig.Retention, c.Retention)
 	log.setStorageSize("spec.ingester.hashrings[0].storage.size", &hs.StorageConfiguration.Size, c.StorageSize)
@@ -338,6 +365,7 @@ func applyRuler(ctx context.Context, cl client.Client, key types.NamespacedName,
 
 	log.setInt32("spec.replicas", &obj.Spec.Replicas, c.Replicas)
 	log.setDuration("spec.evaluationInterval", &obj.Spec.EvaluationInterval, c.EvalInterval)
+	log.setAnnotations("spec.annotations", &obj.Spec.Annotations, c.Annotations)
 	// Retention lives under the stateful ruler mode in the current API.
 	if obj.Spec.RulerMode.Stateful == nil {
 		log.note("spec.rulerMode.stateful.retention: ruler is not in stateful mode; retention not applied")
@@ -359,12 +387,16 @@ func applyQuery(ctx context.Context, cl client.Client, key types.NamespacedName,
 	c := cfg.Query
 
 	log.setInt32("spec.replicas", &obj.Spec.Replicas, c.Replicas)
+	log.setAnnotations("spec.annotations", &obj.Spec.Annotations, c.Annotations)
 	if c.QueryFrontendReplicas != nil {
 		if obj.Spec.QueryFrontend != nil {
 			log.setInt32("spec.queryFrontend.replicas", &obj.Spec.QueryFrontend.Replicas, c.QueryFrontendReplicas)
 		} else {
 			log.note("spec.queryFrontend.replicas: CR has no query frontend section; not applied")
 		}
+	}
+	if obj.Spec.QueryFrontend != nil {
+		log.setAnnotations("spec.queryFrontend.annotations", &obj.Spec.QueryFrontend.Annotations, c.QueryFrontendAnnotations)
 	}
 	log.setContainers("spec.additionalContainers", &obj.Spec.Containers, c.Containers, includeSidecars)
 	if obj.Spec.QueryFrontend != nil {
@@ -382,6 +414,7 @@ func applyStore(ctx context.Context, cl client.Client, key types.NamespacedName,
 	c := cfg.Store
 
 	log.setInt32("spec.replicas", &obj.Spec.Replicas, c.Replicas)
+	log.setAnnotations("spec.annotations", &obj.Spec.Annotations, c.Annotations)
 	log.setStorageSize("spec.storage.size", &obj.Spec.StorageConfiguration.Size, c.StorageSize)
 	log.setStorageClass("spec.storage.storageClass", &obj.Spec.StorageConfiguration.StorageClass, c.StorageClass)
 	log.setContainers("spec.additionalContainers", &obj.Spec.Containers, c.Containers, includeSidecars)
