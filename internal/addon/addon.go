@@ -456,25 +456,13 @@ func ManifestConfigs() []workv1.ManifestConfigOption {
 	}
 
 	// Memcached deployments backing the Thanos store index cache and query
-	// frontend response cache. Their tuning knobs (replicas and the memcached
-	// container args: -m memory limit, -I max item size, -c connection limit)
-	// are user-defined configuration on otherwise addon-rendered objects.
-	// The ignore paths are deliberately scoped: resources, node placement and
-	// the exporter container stay hub-managed through the AddOnDeploymentConfig.
-	//
-	// OnSpokePresent (not OnSpokeChange) on purpose: the work agent only skips
-	// applies while the rendered manifest is byte-identical, and re-asserts
-	// OnSpokeChange fields from the manifest whenever it changes. These
-	// Deployments are re-rendered with new image tags on every MCOA upgrade,
-	// which would revert user tuning (with Force) or brick the Deployment on an
-	// ApplyConflict (without). OnSpokePresent fields are dropped from every
-	// post-creation apply and the live values are carried in the payload, so
-	// user tuning survives re-renders. The trade-off: MCOA can only change the
-	// rendered defaults for newly created Deployments, never existing ones.
-	//
-	// jsonPointers/jqPathExpressions in ignoreFields require a hub ManifestWork
-	// CRD from open-cluster-management.io/api v1.3.0 (April 2026) or newer;
-	// older CRDs reject entries without jsonPaths.
+	// frontend response cache. Replicas and the memcached container args are
+	// user-tunable; everything else stays hub-managed via the
+	// AddOnDeploymentConfig. OnSpokePresent (not OnSpokeChange) so upgrades
+	// re-rendering these Deployments with new image tags do not re-assert
+	// manifest values over user tuning. jsonPointers/jqPathExpressions
+	// require a ManifestWork CRD from open-cluster-management.io/api v1.3.0
+	// or newer.
 	for _, name := range []string{mconfig.MemcachedStoreName, mconfig.MemcachedQueryFrontendName} {
 		manifestConfigs = append(manifestConfigs, workv1.ManifestConfigOption{
 			ResourceIdentifier: workv1.ResourceIdentifier{
@@ -487,13 +475,10 @@ func ManifestConfigs() []workv1.ManifestConfigOption {
 				Type: workv1.UpdateStrategyTypeServerSideApply,
 				ServerSideApply: &workv1.ServerSideApplyConfig{
 					// Force so a conflicting edit to a hub-managed field does
-					// not brick further updates with an ApplyConflict. The
-					// ignored fields are unaffected: they carry the live
-					// values in the apply payload, so their values always
-					// agree and never conflict.
+					// not brick further updates with an ApplyConflict.
+					// ignoreFields is keyed by condition: one entry per
+					// condition, duplicates are rejected.
 					Force: true,
-					// A single entry per condition: the ManifestWork API keys
-					// ignoreFields by condition and rejects duplicates.
 					IgnoreFields: []workv1.IgnoreField{
 						{
 							Condition: workv1.IgnoreFieldsConditionOnSpokePresent,
