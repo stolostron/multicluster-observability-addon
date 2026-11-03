@@ -20,9 +20,10 @@ const (
 	DefaultCollectionCertCommonName = "mcoa-observability-observatorium-api"
 	DefaultCollectionMTLSSecretName = "mcoa-gateway-tls"
 
-	DefaultStorageCertCommonName    = "mcoa-observability-observatorium-api"
-	DefaultStorageMTLSSecretName    = "mcoa-gateway-server-tls"
-	DefaultLokiClientMTLSSecretName = "mcoa-gateway-loki-client-tls"
+	DefaultStorageCertCommonName          = "mcoa-observability-observatorium-api"
+	DefaultStorageMTLSSecretName          = "mcoa-gateway-server-tls"
+	DefaultLokiClientMTLSSecretName       = "mcoa-gateway-loki-client-tls"
+	DefaultPersesLokiClientMTLSSecretName = "mcoa-perses-loki-client-tls"
 )
 
 var (
@@ -69,6 +70,16 @@ func BuildLokiClientCertificate() (*certmanagerv1.Certificate, error) {
 	}
 	lokiClientKey := client.ObjectKey{Name: DefaultLokiClientMTLSSecretName, Namespace: addoncfg.InstallNamespace}
 	return manifests.BuildClientCertificate(lokiClientKey, lokiClientCertConfig)
+}
+
+func BuildPersesLokiClientCertificate() (*certmanagerv1.Certificate, error) {
+	persesClientCertConfig := manifests.CertificateConfig{
+		CommonName: "mcoa-perses-loki-client",
+		Subject:    &certmanagerv1.X509Subject{},
+		DNSNames:   []string{"mcoa-perses-loki-client"},
+	}
+	persesClientKey := client.ObjectKey{Name: DefaultPersesLokiClientMTLSSecretName, Namespace: addoncfg.InstallNamespace}
+	return manifests.BuildClientCertificate(persesClientKey, persesClientCertConfig)
 }
 
 // ServerCertIncludesHost reports whether the issued gateway server certificate
