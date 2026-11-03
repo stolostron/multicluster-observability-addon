@@ -377,6 +377,7 @@ func TestResolveEvaluationInterval1d(t *testing.T) {
 	})
 }
 
+// TestWorkloadAndPodDefaultsIncludeAllNamespaces verifies workload/pod defaults include all namespaces and shared evaluation intervals.
 func TestWorkloadAndPodDefaultsIncludeAllNamespaces(t *testing.T) {
 	config := GetDefaultWorkloadPrometheusRuleConfig()
 	assert.Empty(t, config.NamespaceFilterCriteria.ExclusionCriteria)
