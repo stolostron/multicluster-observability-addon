@@ -7,6 +7,7 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -22,7 +23,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -33,6 +34,8 @@ import (
 	workv1 "open-cluster-management.io/api/work/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+var errMetricsHubHostnameNotFound = errors.New("metricsHubHostname variable not found in AddOnDeploymentConfig")
 
 func TestMetricsFederation(t *testing.T) {
 	scheme := runtime.NewScheme()
@@ -85,7 +88,7 @@ func TestMetricsFederation(t *testing.T) {
 		},
 	}
 	err = k8sClient.Create(ctx, mca)
-	if err != nil && !errors.IsAlreadyExists(err) {
+	if err != nil && !k8serrors.IsAlreadyExists(err) {
 		require.NoError(t, err, "Failed to create ManagedClusterAddOn")
 	}
 
@@ -114,15 +117,56 @@ func TestMetricsFederation(t *testing.T) {
 		assert.True(c, applied, "Expected at least one ManifestWork to have Condition Applied=True")
 	}, 2*time.Minute, 3*time.Second, "ManifestWork was not applied in local-cluster within timeout")
 
-	t.Log("=== Step 4: Asserting PrometheusAgent platform-metrics-collector is created ===")
+	t.Log("=== Step 4: Asserting PrometheusAgent platform-metrics-collector is created with mTLS ===")
 	require.EventuallyWithT(t, func(c *assert.CollectT) {
 		agent := &cooprometheusv1alpha1.PrometheusAgent{}
 		agentErr := k8sClient.Get(ctx, client.ObjectKey{
 			Namespace: "open-cluster-management-addon-observability",
 			Name:      "platform-metrics-collector",
 		}, agent)
-		assert.NoError(c, agentErr, "PrometheusAgent 'platform-metrics-collector' not found in spoke namespace")
+		if !assert.NoError(c, agentErr, "PrometheusAgent 'platform-metrics-collector' not found in spoke namespace") {
+			return
+		}
+		if !assert.NotEmpty(c, agent.Spec.RemoteWrite, "PrometheusAgent remoteWrite is empty") {
+			return
+		}
+		rw := agent.Spec.RemoteWrite[0]
+		assert.Equal(c, "https://hub-prometheus.open-cluster-management-observability.svc:8443/api/metrics/v1/default/api/v1/receive", string(rw.URL))
+		assert.NotNil(c, rw.TLSConfig, "TLSConfig should be configured for mTLS")
 	}, 2*time.Minute, 3*time.Second, "PrometheusAgent was not created in spoke namespace within timeout")
+
+	t.Log("=== Step 4a: Asserting hub-mtls-ca secret contains Hub CA ===")
+	require.EventuallyWithT(t, func(c *assert.CollectT) {
+		secretList := &corev1.SecretList{}
+		if !assert.NoError(c, k8sClient.List(ctx, secretList, client.InNamespace("open-cluster-management-addon-observability"))) {
+			return
+		}
+		var caSecret *corev1.Secret
+		for i := range secretList.Items {
+			if strings.HasPrefix(secretList.Items[i].Name, "hub-mtls-ca-") {
+				caSecret = &secretList.Items[i]
+				break
+			}
+		}
+		if !assert.NotNil(c, caSecret, "Secret hub-mtls-ca-* not found in spoke namespace") {
+			return
+		}
+
+		caPEM := caSecret.Data["ca.crt"]
+		if !assert.NotEmpty(c, caPEM, "ca.crt is empty in hub-mtls-ca secret") {
+			return
+		}
+
+		block, _ := pem.Decode(caPEM)
+		if !assert.NotNil(c, block, "Failed to decode PEM block from ca.crt") {
+			return
+		}
+		cert, parseErr := x509.ParseCertificate(block.Bytes)
+		if !assert.NoError(c, parseErr, "Failed to parse certificate from ca.crt") {
+			return
+		}
+		assert.Equal(c, "observability-ca", cert.Subject.CommonName)
+	}, 2*time.Minute, 3*time.Second, "hub-mtls-ca secret with Hub CA was not found within timeout")
 
 	t.Log("=== Step 4b: Asserting prom-agent-platform-metrics-collector pod is running and ready ===")
 	require.EventuallyWithT(t, func(c *assert.CollectT) {
@@ -144,7 +188,7 @@ func TestMetricsFederation(t *testing.T) {
 		assert.True(c, ready, "Pod 'prom-agent-platform-metrics-collector-0' is not ready yet (phase: %s)", pod.Status.Phase)
 	}, 3*time.Minute, 3*time.Second, "prom-agent-platform-metrics-collector-0 did not reach Ready state within timeout")
 
-	t.Log("=== Step 5: Asserting Hub Prometheus receives federated metrics from local-cluster ===")
+	t.Log("=== Step 5: Asserting Hub Prometheus receives federated metrics via direct mTLS from local-cluster ===")
 	hubURL := os.Getenv("HUB_PROMETHEUS_URL")
 	if hubURL == "" {
 		hubURL = "http://127.0.0.1:9090"
@@ -168,7 +212,7 @@ func TestMetricsFederation(t *testing.T) {
 		if !assert.NoError(c, reqErr, "HTTP GET to Hub Prometheus failed") {
 			return
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		body, readErr := io.ReadAll(resp.Body)
 		if !assert.NoError(c, readErr, "Failed to read response body") {
@@ -231,7 +275,7 @@ func TestMetricsFederation(t *testing.T) {
 				}
 			}
 			if !foundMetricsHubHostname {
-				return fmt.Errorf("metricsHubHostname variable not found in AddOnDeploymentConfig")
+				return errMetricsHubHostnameNotFound
 			}
 			aodc.Spec.ProxyConfig = addonv1beta1.ProxyConfig{
 				HTTPSProxy: expectedProxyURL,
@@ -319,7 +363,7 @@ func TestMetricsFederation(t *testing.T) {
 			if !assert.NoError(c, reqErr, "HTTP GET to proxy /stats failed") {
 				return
 			}
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 
 			var stats struct {
 				ConnectCount map[string]uint64 `json:"connectCount"`
@@ -330,7 +374,7 @@ func TestMetricsFederation(t *testing.T) {
 			}
 			assert.GreaterOrEqual(c, stats.ConnectCount[expectedTargetHost], uint64(1),
 				"Expected HTTPS proxy to record CONNECT tunnel to %s", expectedTargetHost)
-			assert.Greater(c, stats.BytesCopied, uint64(0),
+			assert.Positive(c, stats.BytesCopied,
 				"Expected HTTPS proxy to transfer mTLS remote-write bytes")
 		}, 2*time.Minute, 3*time.Second, "HTTPS proxy did not record CONNECT tunnel or bytes transferred")
 
@@ -342,7 +386,7 @@ func TestMetricsFederation(t *testing.T) {
 			if !assert.NoError(c, reqErr, "HTTP GET to Hub Prometheus failed") {
 				return
 			}
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 
 			body, readErr := io.ReadAll(resp.Body)
 			if !assert.NoError(c, readErr, "Failed to read response body") {

@@ -6,6 +6,7 @@ import (
 	"flag"
 	"io"
 	"log"
+	"maps"
 	"net"
 	"net/http"
 	"sync"
@@ -42,10 +43,7 @@ func main() {
 	statsMux := http.NewServeMux()
 	statsMux.HandleFunc("/stats", func(w http.ResponseWriter, _ *http.Request) {
 		stats.mu.Lock()
-		connectCountCopy := make(map[string]uint64, len(stats.ConnectCount))
-		for k, v := range stats.ConnectCount {
-			connectCountCopy[k] = v
-		}
+		connectCountCopy := maps.Clone(stats.ConnectCount)
 		stats.mu.Unlock()
 
 		snapshot := map[string]any{
@@ -77,7 +75,7 @@ func main() {
 			http.Error(w, err.Error(), http.StatusServiceUnavailable)
 			return
 		}
-		defer dstConn.Close()
+		defer func() { _ = dstConn.Close() }()
 
 		hijacker, ok := w.(http.Hijacker)
 		if !ok {
