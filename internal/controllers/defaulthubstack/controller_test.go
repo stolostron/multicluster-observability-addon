@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	certmanagerv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	"github.com/go-logr/logr"
 	operatorsv1 "github.com/operator-framework/api/pkg/operators/v1"
 	operatorsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
@@ -37,6 +38,7 @@ func allGVKsRegistered() map[schema.GroupVersionKind]bool {
 func newTestScheme() *runtime.Scheme {
 	scheme := runtime.NewScheme()
 	_ = corev1.AddToScheme(scheme)
+	_ = certmanagerv1.AddToScheme(scheme)
 	_ = addonv1beta1.Install(scheme)
 	_ = operatorsv1.AddToScheme(scheme)
 	_ = operatorsv1alpha1.AddToScheme(scheme)
@@ -302,6 +304,49 @@ func TestReconcile_RightSizingInstallsCOOOnHub(t *testing.T) {
 		Namespace: addoncfg.AnalyticsNamespace,
 	}, ds)
 	require.NoError(t, err, "analytics datasource should exist when right-sizing is enabled")
+}
+
+func TestReconcile_LoggingOnlyInstallsCOOOnHub(t *testing.T) {
+	scheme := newTestScheme()
+	aodc := &addonv1beta1.AddOnDeploymentConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      addoncfg.Name,
+			Namespace: addoncfg.InstallNamespace,
+		},
+		Spec: addonv1beta1.AddOnDeploymentConfigSpec{
+			CustomizedVariables: []addonv1beta1.CustomizedVariable{
+				{Name: addon.KeyPlatformLogsDefault, Value: "true"},
+			},
+		},
+	}
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(aodc).Build()
+	r := &DefaultHubStackReconciler{
+		Client:      fakeClient,
+		Log:         logr.Discard(),
+		Scheme:      scheme,
+		watchedGVKs: allGVKsRegistered(),
+	}
+
+	result, err := r.Reconcile(t.Context(), reconcile.Request{})
+	require.NoError(t, err)
+	assert.Zero(t, result.RequeueAfter)
+
+	key := client.ObjectKey{Namespace: addoncfg.CooSubscriptionNamespace, Name: addoncfg.CooSubscriptionName}
+	require.NoError(t, fakeClient.Get(t.Context(), key, &operatorsv1alpha1.Subscription{}))
+
+	key = client.ObjectKey{Namespace: addoncfg.InstallNamespace, Name: "acm-logs"}
+	require.NoError(t, fakeClient.Get(t.Context(), key, &persesv1.PersesDashboard{}))
+	key.Name = "loki-datasource"
+	require.NoError(t, fakeClient.Get(t.Context(), key, &persesv1.PersesDatasource{}))
+	key.Name = "mcoa-perses-loki-client-tls"
+	require.NoError(t, fakeClient.Get(t.Context(), key, &certmanagerv1.Certificate{}))
+
+	plugin := &uiplugin.UIPlugin{}
+	require.NoError(t, fakeClient.Get(t.Context(), client.ObjectKey{Name: "monitoring"}, plugin))
+	require.NotNil(t, plugin.Spec.Monitoring)
+	require.NotNil(t, plugin.Spec.Monitoring.Perses)
+	assert.True(t, plugin.Spec.Monitoring.Perses.Enabled)
+	assert.Nil(t, plugin.Spec.Monitoring.ACM)
 }
 
 func TestReconcile_IncidentDetectionInstallsCOOOnHub(t *testing.T) {
