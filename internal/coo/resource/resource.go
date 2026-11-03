@@ -85,7 +85,7 @@ func EvaluateHubStackFeatures(opts addon.Options) HubStackFeatures {
 			(opts.Platform.AnalyticsOptions.RightSizing.NamespaceEnabled ||
 				opts.Platform.AnalyticsOptions.RightSizing.VirtualizationEnabled))
 
-	persesEnabled := hasDashboards || hasAnalyticsDashboards
+	persesEnabled := hasDashboards || hasAnalyticsDashboards || opts.Platform.Logs.DefaultStack
 
 	return HubStackFeatures{
 		HasDashboards:            hasDashboards,
