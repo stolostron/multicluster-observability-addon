@@ -503,6 +503,8 @@ func (o *OptionsBuilder) ensureVirtualizationConfigMap(ctx context.Context) erro
 	return o.backfillAggregatorKeys(ctx, cm)
 }
 
+// ensureWorkloadConfigMap creates the workload right-sizing ConfigMap with defaults
+// if missing, otherwise backfills aggregator keys on the existing ConfigMap.
 func (o *OptionsBuilder) ensureWorkloadConfigMap(ctx context.Context) error {
 	cm, err := common.GetConfigMap(ctx, o.Client, addoncfg.InstallNamespace, rightsizing.WorkloadConfigMapName)
 	if err != nil {
@@ -517,6 +519,8 @@ func (o *OptionsBuilder) ensureWorkloadConfigMap(ctx context.Context) error {
 	return o.backfillAggregatorKeys(ctx, cm)
 }
 
+// ensurePodConfigMap creates the pod right-sizing ConfigMap with defaults
+// if missing, otherwise backfills aggregator keys on the existing ConfigMap.
 func (o *OptionsBuilder) ensurePodConfigMap(ctx context.Context) error {
 	cm, err := common.GetConfigMap(ctx, o.Client, addoncfg.InstallNamespace, rightsizing.PodConfigMapName)
 	if err != nil {
