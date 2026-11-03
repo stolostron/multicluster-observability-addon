@@ -26,6 +26,19 @@ func (s *proxyStats) recordConnect(target string) {
 	s.ConnectCount[target]++
 }
 
+type countingWriter struct {
+	w       io.Writer
+	counter *atomic.Uint64
+}
+
+func (cw *countingWriter) Write(p []byte) (int, error) {
+	n, err := cw.w.Write(p)
+	if n > 0 {
+		cw.counter.Add(uint64(n))
+	}
+	return n, err
+}
+
 func main() {
 	var (
 		proxyAddr = flag.String("proxy-listen", ":8443", "TLS listen address for HTTPS forward proxy")
@@ -83,10 +96,27 @@ func main() {
 			return
 		}
 
-		w.WriteHeader(http.StatusOK)
+		// Hijack the connection to take raw control of the underlying stream.
+		// Note: We deliberately do NOT call w.WriteHeader(http.StatusOK) prior to Hijack().
+		// In Go's net/http, calling WriteHeader without a Content-Length causes the chunk-writer
+		// to emit "Transfer-Encoding: chunked", violating RFC 9110 §9.3.6 (CONNECT tunnel
+		// responses MUST NOT send Transfer-Encoding or Content-Length headers).
+		// Instead, we hijack first and write the standard RFC "200 Connection Established"
+		// response directly to the client's buffered writer and flush it before tunneling.
 		clientConn, brw, err := hijacker.Hijack()
 		if err != nil {
 			log.Printf("Hijack failed: %v", err)
+			return
+		}
+
+		if _, err := brw.WriteString("HTTP/1.1 200 Connection Established\r\n\r\n"); err != nil {
+			log.Printf("Failed to write 200 to client: %v", err)
+			_ = clientConn.Close()
+			return
+		}
+		if err := brw.Flush(); err != nil {
+			log.Printf("Failed to flush 200 to client: %v", err)
+			_ = clientConn.Close()
 			return
 		}
 
@@ -104,15 +134,17 @@ func main() {
 		pipe := func(dst io.Writer, src io.Reader) {
 			defer wg.Done()
 			defer closeBoth()
-			n, _ := io.Copy(dst, src)
-			if n > 0 {
-				stats.BytesCopied.Add(uint64(n))
-			}
+			_, _ = io.Copy(dst, src)
 		}
 
+		// Wrap destinations with countingWriter to record transferred bytes in real-time
+		// rather than waiting for persistent Keep-Alive connections to terminate.
+		cwDst := &countingWriter{w: dstConn, counter: &stats.BytesCopied}
+		cwClient := &countingWriter{w: clientConn, counter: &stats.BytesCopied}
+
 		// brw.Reader preserves any pre-buffered client payload received during header processing
-		go pipe(dstConn, brw.Reader)
-		go pipe(clientConn, dstConn)
+		go pipe(cwDst, brw.Reader)
+		go pipe(cwClient, dstConn)
 		wg.Wait()
 	})
 
