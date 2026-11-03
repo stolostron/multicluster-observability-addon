@@ -14,7 +14,6 @@ import (
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog/v2"
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -51,7 +50,7 @@ func reconcileHubResources(t *testing.T, cv []addonapiv1beta1.CustomizedVariable
 	t.Helper()
 
 	k8s := fake.NewClientBuilder().
-		WithScheme(scheme.Scheme).
+		WithScheme(addoncfg.NewScheme()).
 		Build()
 
 	reconciler := &cooresource.HubResourceReconciler{
