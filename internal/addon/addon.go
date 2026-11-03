@@ -236,6 +236,8 @@ func getTracesProbeFields() []agent.ProbeField {
 	}
 }
 
+// getRightSizingProbeFields returns HealthProber probe fields for all
+// right-sizing PrometheusRules (namespace, virtualization, workload, and pod).
 func getRightSizingProbeFields() []agent.ProbeField {
 	names := []string{
 		rightsizing.NamespacePrometheusRuleName,
@@ -708,6 +710,8 @@ func checkTracing(fields []agent.FieldResult, opts Options, isOCP bool) error {
 	return nil
 }
 
+// checkRightSizing validates HealthProber feedback for enabled right-sizing
+// PrometheusRules. Workload and pod rules are included when their feature flags are on.
 func checkRightSizing(fields []agent.FieldResult, opts Options, isOpenShiftVendor bool) error {
 	rs := opts.Platform.AnalyticsOptions.RightSizing
 	if !rs.Delegated {

@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TestBuildPodRightSizing verifies the pod overview dashboard queries and drill-down link.
 func TestBuildPodRightSizing(t *testing.T) {
 	db, err := BuildPodRightSizing(testProject, testDatasource, testClusterLbl)
 	require.NoError(t, err)
@@ -26,6 +27,7 @@ func TestBuildPodRightSizing(t *testing.T) {
 	assert.NotContains(t, specStr, `"text":"N/A"`, "missing pod fields must stay blank")
 }
 
+// TestPodOverviewTablesKeepInventoryRowsWithoutResourceSamples checks pod tables keep inventory rows via acm_rs:pod:info.
 func TestPodOverviewTablesKeepInventoryRowsWithoutResourceSamples(t *testing.T) {
 	db, err := BuildPodRightSizing(testProject, testDatasource, testClusterLbl)
 	require.NoError(t, err)
@@ -47,6 +49,7 @@ func TestPodOverviewTablesKeepInventoryRowsWithoutResourceSamples(t *testing.T) 
 	}
 }
 
+// TestBuildPodDetail verifies the pod detail dashboard layout, variables, and panels.
 func TestBuildPodDetail(t *testing.T) {
 	db, err := BuildPodDetail(testProject, testDatasource, testClusterLbl)
 	require.NoError(t, err)
