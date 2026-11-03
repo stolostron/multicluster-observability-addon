@@ -509,6 +509,29 @@ func TestBuildOptions(t *testing.T) {
 			},
 		},
 		{
+			name: "valid socks5 proxy",
+			addOnDeploy: &addonapiv1beta1.AddOnDeploymentConfig{
+				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+					ProxyConfig: addonapiv1beta1.ProxyConfig{
+						HTTPProxy: "socks5://socks-proxy.example.com:1080",
+					},
+					CustomizedVariables: []addonapiv1beta1.CustomizedVariable{
+						{Name: KeyPlatformNamespaceRightSizing, Value: "disabled"},
+						{Name: KeyPlatformVirtualizationRightSizing, Value: "disabled"},
+					},
+				},
+			},
+			expectedOpts: Options{
+				Platform: PlatformOptions{Enabled: true},
+				ProxyConfig: ProxyConfig{
+					HTTPProxy: &url.URL{
+						Scheme: "socks5",
+						Host:   "socks-proxy.example.com:1080",
+					},
+				},
+			},
+		},
+		{
 			name: "valid node exporter ports",
 			addOnDeploy: &addonapiv1beta1.AddOnDeploymentConfig{
 				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
@@ -620,6 +643,17 @@ func TestBuildOptions(t *testing.T) {
 				},
 			},
 			expectedErrMsg: "invalid proxy URL",
+		},
+		{
+			name: "unsupported proxy scheme",
+			addOnDeploy: &addonapiv1beta1.AddOnDeploymentConfig{
+				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+					ProxyConfig: addonapiv1beta1.ProxyConfig{
+						HTTPSProxy: "ftp://proxy.example.com:21",
+					},
+				},
+			},
+			expectedErrMsg: "unsupported scheme \"ftp\" in proxy URL",
 		},
 		{
 			name: "invalid ca bundle - non-pem garbage",

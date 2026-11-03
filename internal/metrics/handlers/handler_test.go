@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	configv1 "github.com/openshift/api/config/v1"
+	routev1 "github.com/openshift/api/route/v1"
 	hyperv1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	cooprometheusv1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1"
@@ -46,6 +47,7 @@ func TestBuildOptions(t *testing.T) {
 	scheme := runtime.NewScheme()
 	require.NoError(t, kubescheme.AddToScheme(scheme))
 	require.NoError(t, configv1.AddToScheme(scheme))
+	require.NoError(t, routev1.AddToScheme(scheme))
 	require.NoError(t, cooprometheusv1alpha1.AddToScheme(scheme))
 	require.NoError(t, cooprometheusv1.AddToScheme(scheme))
 	require.NoError(t, prometheusv1.AddToScheme(scheme))
@@ -313,14 +315,15 @@ func TestBuildOptions(t *testing.T) {
 	}
 
 	testCases := map[string]struct {
-		addon                *addonapiv1beta1.ManagedClusterAddOn
-		platformEnabled      bool
-		userWorkloadsEnabled bool
-		proxyConfig          *addon.ProxyConfig
-		tolerations          []corev1.Toleration
-		nodeSelector         map[string]string
-		resources            func() []client.Object
-		expects              func(t *testing.T, opts Options, err error)
+		addon                 *addonapiv1beta1.ManagedClusterAddOn
+		platformEnabled       bool
+		userWorkloadsEnabled  bool
+		proxyConfig           *addon.ProxyConfig
+		thanosOperatorEnabled bool
+		tolerations           []corev1.Toleration
+		nodeSelector          map[string]string
+		resources             func() []client.Object
+		expects               func(t *testing.T, opts Options, err error)
 	}{
 		"no metrics collection enabled": {
 			resources: createResources,
@@ -861,6 +864,48 @@ func TestBuildOptions(t *testing.T) {
 				assert.Equal(t, "https://secure-proxy.example.com:8443", *opts.Platform.PrometheusAgent.Spec.RemoteWrite[1].ProxyURL)
 			},
 		},
+		"thanos operator enabled recomputes proxy configuration for overridden remote-write endpoint": {
+			addon:                 platformManagedClusterAddOn,
+			platformEnabled:       true,
+			thanosOperatorEnabled: true,
+			proxyConfig: &addon.ProxyConfig{
+				HTTPProxy: func() *url.URL {
+					u, _ := url.Parse("http://insecure-proxy.example.com:8080")
+					return u
+				}(),
+				HTTPSProxy: func() *url.URL {
+					u, _ := url.Parse("https://secure-proxy.example.com:8443")
+					return u
+				}(),
+				NoProxy: "*.internal.example.com",
+			},
+			resources: func() []client.Object {
+				res := createResources()
+				res = append(res, &routev1.Route{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      mcoaObsAPIRouteName,
+						Namespace: config.HubInstallNamespace,
+					},
+					Spec: routev1.RouteSpec{
+						Host: "obs-api.apps.example.com",
+					},
+				})
+				return res
+			},
+			expects: func(t *testing.T, opts Options, err error) {
+				require.NoError(t, err)
+				require.NotNil(t, opts.Platform.PrometheusAgent)
+				require.Len(t, opts.Platform.PrometheusAgent.Spec.RemoteWrite, 1)
+
+				rw := opts.Platform.PrometheusAgent.Spec.RemoteWrite[0]
+				assert.Equal(t, cooprometheusv1.URL("https://obs-api.apps.example.com/api/metrics/v1/default/api/v1/receive"), rw.URL)
+				require.NotNil(t, rw.ProxyURL)
+				// Overridden endpoint is HTTPS, so ProxyURL must recompute to the HTTPS proxy instead of the initial HTTP proxy
+				assert.Equal(t, "https://secure-proxy.example.com:8443", *rw.ProxyURL)
+				require.NotNil(t, rw.NoProxy)
+				assert.Equal(t, "*.internal.example.com", *rw.NoProxy)
+			},
+		},
 		"platform collection is enabled with existing relabel configs": {
 			addon:           platformManagedClusterAddOn,
 			platformEnabled: true,
@@ -956,8 +1001,9 @@ func TestBuildOptions(t *testing.T) {
 				UserWorkloads: addon.UserWorkloadOptions{
 					Metrics: addon.MetricsOptions{CollectionEnabled: tc.userWorkloadsEnabled},
 				},
-				Tolerations:  tc.tolerations,
-				NodeSelector: tc.nodeSelector,
+				ThanosOperatorEnabled: tc.thanosOperatorEnabled,
+				Tolerations:           tc.tolerations,
+				NodeSelector:          tc.nodeSelector,
 			}
 			if tc.proxyConfig != nil {
 				addonOpts.ProxyConfig = *tc.proxyConfig
