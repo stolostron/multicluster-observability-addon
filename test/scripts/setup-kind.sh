@@ -171,6 +171,26 @@ if ! image_exists localhost/endpoint-monitoring-operator:kind-e2e || ! image_mat
     printf "FROM %s\nLABEL kind.e2e=true kind.e2e.source-version=%s\n" "${ENDPOINT_MONITORING_OPERATOR_SRC}" "${ENDPOINT_MONITORING_OPERATOR_VERSION}" | "${CONTAINER_ENGINE}" build --platform linux/amd64 -t localhost/endpoint-monitoring-operator:kind-e2e -
 fi
 
+if ! image_exists localhost/e2e-https-proxy:kind-e2e; then
+    echo "Building localhost/e2e-https-proxy:kind-e2e..."
+    "${CONTAINER_ENGINE}" build --platform "linux/${PLATFORM}" \
+        -t localhost/e2e-https-proxy:kind-e2e \
+        -f - "${REPO_ROOT}" <<'EOF'
+FROM registry.access.redhat.com/ubi9/go-toolset:latest AS builder
+USER 0
+WORKDIR /src
+COPY go.mod go.sum ./
+COPY test/cmd/https-proxy/ ./test/cmd/https-proxy/
+ENV GOTOOLCHAIN=local
+RUN CGO_ENABLED=0 go build -o /bin/https-proxy ./test/cmd/https-proxy
+
+FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
+COPY --from=builder /bin/https-proxy /usr/bin/https-proxy
+USER 65534
+ENTRYPOINT ["/usr/bin/https-proxy"]
+EOF
+fi
+
 echo "=== 4. Loading Images into KinD ==="
 IMAGES_TO_LOAD=(
     localhost/mcoa:e2e
@@ -179,6 +199,7 @@ IMAGES_TO_LOAD=(
     localhost/prometheus-config-reloader:kind-e2e
     localhost/prometheus:kind-e2e
     localhost/endpoint-monitoring-operator:kind-e2e
+    localhost/e2e-https-proxy:kind-e2e
     docker.io/library/nginx:alpine
     "quay.io/brancz/kube-rbac-proxy:${KUBE_RBAC_PROXY_VERSION}"
 )
@@ -254,17 +275,56 @@ done
 kubectl wait -n openshift-service-ca --for=condition=Available deployment/service-ca --timeout=120s
 
 echo "=== 11. Deploying Hub Setup (Prometheus receiver + TLS secrets + ScrapeConfig) ==="
-kubectl apply -f "${SCRIPT_DIR}/../manifests/02-hub-setup.yaml"
-
-echo "Generating dynamic test certificates and Hub secrets..."
+echo "Generating dynamic test certificates (Hub mTLS CA + Independent Proxy CA)..."
 CERT_DIR="$(mktemp -d)"
-openssl req -x509 -newkey rsa:2048 -nodes -keyout "${CERT_DIR}/ca.key" -out "${CERT_DIR}/ca.crt" -days 365 -subj "/CN=observability-ca" 2>/dev/null
-openssl req -newkey rsa:2048 -nodes -keyout "${CERT_DIR}/tls.key" -out "${CERT_DIR}/tls.csr" -subj "/CN=observability-client" 2>/dev/null
-openssl x509 -req -in "${CERT_DIR}/tls.csr" -CA "${CERT_DIR}/ca.crt" -CAkey "${CERT_DIR}/ca.key" -CAcreateserial -out "${CERT_DIR}/tls.crt" -days 365 2>/dev/null
 
+# 1. Hub mTLS CA + Server Cert + Client Cert
+openssl req -x509 -newkey rsa:2048 -nodes \
+    -keyout "${CERT_DIR}/ca.key" -out "${CERT_DIR}/ca.crt" \
+    -days 365 -subj "/CN=observability-ca" 2>/dev/null
+
+openssl req -newkey rsa:2048 -nodes \
+    -keyout "${CERT_DIR}/hub-server.key" -out "${CERT_DIR}/hub-server.csr" \
+    -subj "/CN=hub-prometheus.open-cluster-management-observability.svc" 2>/dev/null
+openssl x509 -req -in "${CERT_DIR}/hub-server.csr" \
+    -CA "${CERT_DIR}/ca.crt" -CAkey "${CERT_DIR}/ca.key" -CAcreateserial \
+    -out "${CERT_DIR}/hub-server.crt" -days 365 \
+    -extfile <(printf "subjectAltName=DNS:hub-prometheus.open-cluster-management-observability.svc,DNS:hub-prometheus.open-cluster-management-observability.svc.cluster.local\nextendedKeyUsage=serverAuth") 2>/dev/null
+
+openssl req -newkey rsa:2048 -nodes \
+    -keyout "${CERT_DIR}/tls.key" -out "${CERT_DIR}/tls.csr" \
+    -subj "/CN=observability-client" 2>/dev/null
+openssl x509 -req -in "${CERT_DIR}/tls.csr" \
+    -CA "${CERT_DIR}/ca.crt" -CAkey "${CERT_DIR}/ca.key" -CAcreateserial \
+    -out "${CERT_DIR}/tls.crt" -days 365 \
+    -extfile <(printf "extendedKeyUsage=clientAuth") 2>/dev/null
+
+# 2. Independent HTTPS Proxy CA + Proxy Server Cert
+openssl req -x509 -newkey rsa:2048 -nodes \
+    -keyout "${CERT_DIR}/proxy-ca.key" -out "${CERT_DIR}/proxy-ca.crt" \
+    -days 365 -subj "/CN=e2e-proxy-ca" 2>/dev/null
+
+openssl req -newkey rsa:2048 -nodes \
+    -keyout "${CERT_DIR}/proxy-server.key" -out "${CERT_DIR}/proxy-server.csr" \
+    -subj "/CN=https-proxy.open-cluster-management-observability.svc" 2>/dev/null
+openssl x509 -req -in "${CERT_DIR}/proxy-server.csr" \
+    -CA "${CERT_DIR}/proxy-ca.crt" -CAkey "${CERT_DIR}/proxy-ca.key" -CAcreateserial \
+    -out "${CERT_DIR}/proxy-server.crt" -days 365 \
+    -extfile <(printf "subjectAltName=DNS:https-proxy.open-cluster-management-observability.svc,DNS:https-proxy.open-cluster-management-observability.svc.cluster.local\nextendedKeyUsage=serverAuth") 2>/dev/null
+
+# Ensure namespace exists before creating secrets
+kubectl create namespace open-cluster-management-observability --dry-run=client -o yaml | kubectl apply -f -
+
+# Create Hub & Proxy secrets
 kubectl create secret generic observability-managed-cluster-certs \
     -n open-cluster-management-observability \
     --from-file=ca.crt="${CERT_DIR}/ca.crt" \
+    --dry-run=client -o yaml | kubectl apply -f -
+
+kubectl create secret tls hub-prometheus-tls \
+    -n open-cluster-management-observability \
+    --cert="${CERT_DIR}/hub-server.crt" \
+    --key="${CERT_DIR}/hub-server.key" \
     --dry-run=client -o yaml | kubectl apply -f -
 
 kubectl create secret generic observability-controller-open-cluster-management.io-observability-signer-client-cert \
@@ -278,10 +338,26 @@ kubectl create secret generic observability-alertmanager-accessor \
     --from-literal=token="dummy-token" \
     --dry-run=client -o yaml | kubectl apply -f -
 
+kubectl create secret tls https-proxy-tls \
+    -n open-cluster-management-observability \
+    --cert="${CERT_DIR}/proxy-server.crt" \
+    --key="${CERT_DIR}/proxy-server.key" \
+    --dry-run=client -o yaml | kubectl apply -f -
+
+kubectl create configmap e2e-proxy-ca \
+    -n open-cluster-management-observability \
+    --from-file=ca.crt="${CERT_DIR}/proxy-ca.crt" \
+    --dry-run=client -o yaml | kubectl apply -f -
+
 rm -rf "${CERT_DIR}"
+
+kubectl apply -f "${SCRIPT_DIR}/../manifests/02-hub-setup.yaml"
 
 echo "Waiting for hub-prometheus deployment..."
 kubectl wait -n open-cluster-management-observability --for=condition=Available deployment/hub-prometheus --timeout=120s
+
+echo "Waiting for https-proxy deployment..."
+kubectl wait -n open-cluster-management-observability --for=condition=Available deployment/https-proxy --timeout=120s
 
 echo "=== 12. Deploying Spoke CMO (prometheus-k8s with dynamic serving cert) ==="
 kubectl apply -f "${SCRIPT_DIR}/../manifests/03-spoke-cmo.yaml"

@@ -4,12 +4,16 @@ package e2e
 
 import (
 	"context"
+	"crypto/x509"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -23,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/util/retry"
 	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	workv1 "open-cluster-management.io/api/work/v1"
@@ -189,4 +194,193 @@ func TestMetricsFederation(t *testing.T) {
 
 		t.Logf("Successfully queried Hub Prometheus! Sample: %+v", pResp.Data.Result[0])
 	}, 3*time.Minute, 5*time.Second, "Hub Prometheus did not receive healthy federated metrics (up == 1) from local-cluster within timeout")
+
+	t.Run("HTTPSProxyWithMTLS", func(t *testing.T) {
+		t.Log("=== Step 6: Validating HTTPS Proxy with mTLS ===")
+
+		// 1. Read Proxy CA from e2e-proxy-ca ConfigMap
+		proxyCAConfigMap := &corev1.ConfigMap{}
+		err := k8sClient.Get(ctx, client.ObjectKey{
+			Namespace: "open-cluster-management-observability",
+			Name:      "e2e-proxy-ca",
+		}, proxyCAConfigMap)
+		require.NoError(t, err, "Failed to get e2e-proxy-ca ConfigMap")
+		proxyCABundle := []byte(proxyCAConfigMap.Data["ca.crt"])
+		require.NotEmpty(t, proxyCABundle, "Proxy CA bundle must not be empty")
+
+		// 2. Update AddOnDeploymentConfig to point to mTLS port (:8443) via HTTPS forward proxy
+		const expectedTargetHost = "hub-prometheus.open-cluster-management-observability.svc:8443"
+		const expectedProxyURL = "https://https-proxy.open-cluster-management-observability.svc:8443"
+		const expectedNoProxy = "localhost,127.0.0.1"
+		const expectedTargetURL = "https://" + expectedTargetHost + "/api/metrics/v1/default/api/v1/receive"
+
+		var cutoverTime int64
+		err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+			aodc := &addonv1beta1.AddOnDeploymentConfig{}
+			if getErr := k8sClient.Get(ctx, client.ObjectKey{
+				Namespace: "open-cluster-management-observability",
+				Name:      "multicluster-observability-addon",
+			}, aodc); getErr != nil {
+				return getErr
+			}
+			foundMetricsHubHostname := false
+			for i := range aodc.Spec.CustomizedVariables {
+				if aodc.Spec.CustomizedVariables[i].Name == "metricsHubHostname" {
+					aodc.Spec.CustomizedVariables[i].Value = "https://" + expectedTargetHost
+					foundMetricsHubHostname = true
+				}
+			}
+			if !foundMetricsHubHostname {
+				return fmt.Errorf("metricsHubHostname variable not found in AddOnDeploymentConfig")
+			}
+			aodc.Spec.ProxyConfig = addonv1beta1.ProxyConfig{
+				HTTPSProxy: expectedProxyURL,
+				NoProxy:    expectedNoProxy,
+				CABundle:   proxyCABundle,
+			}
+			cutoverTime = time.Now().Unix()
+			return k8sClient.Update(ctx, aodc)
+		})
+		require.NoError(t, err, "Failed to update AddOnDeploymentConfig with proxyConfig")
+
+		// 3. Assert Control-Plane: Secret hub-mtls-ca-<trimmedID> contains merged Hub CA + Proxy CA
+		t.Log("=== Step 6a: Asserting hub-mtls-ca secret contains merged CAs ===")
+		require.EventuallyWithT(t, func(c *assert.CollectT) {
+			secretList := &corev1.SecretList{}
+			if !assert.NoError(c, k8sClient.List(ctx, secretList, client.InNamespace("open-cluster-management-addon-observability"))) {
+				return
+			}
+			var caSecret *corev1.Secret
+			for i := range secretList.Items {
+				if strings.HasPrefix(secretList.Items[i].Name, "hub-mtls-ca-") {
+					caSecret = &secretList.Items[i]
+					break
+				}
+			}
+			if !assert.NotNil(c, caSecret, "Secret hub-mtls-ca-* not found in spoke namespace") {
+				return
+			}
+
+			caPEM := caSecret.Data["ca.crt"]
+			if !assert.NotEmpty(c, caPEM, "ca.crt is empty in hub-mtls-ca secret") {
+				return
+			}
+
+			var commonNames []string
+			rest := caPEM
+			for {
+				var block *pem.Block
+				block, rest = pem.Decode(rest)
+				if block == nil {
+					break
+				}
+				if block.Type == "CERTIFICATE" {
+					cert, parseErr := x509.ParseCertificate(block.Bytes)
+					if parseErr == nil {
+						commonNames = append(commonNames, cert.Subject.CommonName)
+					}
+				}
+			}
+			assert.Contains(c, commonNames, "observability-ca", "Merged secret must contain Hub CA")
+			assert.Contains(c, commonNames, "e2e-proxy-ca", "Merged secret must contain Proxy CA")
+		}, 2*time.Minute, 3*time.Second, "hub-mtls-ca secret was not updated with merged CAs")
+
+		// 4. Assert Control-Plane: PrometheusAgent platform-metrics-collector spec is updated
+		t.Log("=== Step 6b: Asserting PrometheusAgent spec is updated with httpsProxy and https URL ===")
+		require.EventuallyWithT(t, func(c *assert.CollectT) {
+			agent := &cooprometheusv1alpha1.PrometheusAgent{}
+			if !assert.NoError(c, k8sClient.Get(ctx, client.ObjectKey{
+				Namespace: "open-cluster-management-addon-observability",
+				Name:      "platform-metrics-collector",
+			}, agent)) {
+				return
+			}
+			if !assert.NotEmpty(c, agent.Spec.RemoteWrite, "remoteWrite spec is empty") {
+				return
+			}
+			rw := agent.Spec.RemoteWrite[0]
+			assert.Equal(c, expectedTargetURL, string(rw.URL))
+			if assert.NotNil(c, rw.ProxyURL, "proxyURL is nil") {
+				assert.Equal(c, expectedProxyURL, *rw.ProxyURL)
+			}
+			if assert.NotNil(c, rw.NoProxy, "noProxy is nil") {
+				assert.Equal(c, expectedNoProxy, string(*rw.NoProxy))
+			}
+		}, 2*time.Minute, 3*time.Second, "PrometheusAgent spec was not updated within timeout")
+
+		// 5. Assert Data-Plane: HTTPS forward proxy receives CONNECT tunnel requests and transfers bytes
+		t.Log("=== Step 6c: Asserting HTTPS forward proxy receives CONNECT tunnel requests ===")
+		proxyStatsURL := os.Getenv("PROXY_STATS_URL")
+		if proxyStatsURL == "" {
+			proxyStatsURL = "http://127.0.0.1:18080/stats"
+		}
+		require.EventuallyWithT(t, func(c *assert.CollectT) {
+			resp, reqErr := httpClient.Get(proxyStatsURL)
+			if !assert.NoError(c, reqErr, "HTTP GET to proxy /stats failed") {
+				return
+			}
+			defer resp.Body.Close()
+
+			var stats struct {
+				ConnectCount map[string]uint64 `json:"connectCount"`
+				BytesCopied  uint64            `json:"bytesCopied"`
+			}
+			if !assert.NoError(c, json.NewDecoder(resp.Body).Decode(&stats)) {
+				return
+			}
+			assert.GreaterOrEqual(c, stats.ConnectCount[expectedTargetHost], uint64(1),
+				"Expected HTTPS proxy to record CONNECT tunnel to %s", expectedTargetHost)
+			assert.Greater(c, stats.BytesCopied, uint64(0),
+				"Expected HTTPS proxy to transfer mTLS remote-write bytes")
+		}, 2*time.Minute, 3*time.Second, "HTTPS proxy did not record CONNECT tunnel or bytes transferred")
+
+		// 6. Assert Data-Plane: Hub Prometheus receives fresh federated metrics via mTLS over tunnel
+		t.Log("=== Step 6d: Asserting Hub Prometheus receives fresh federated metrics via mTLS ===")
+		require.EventuallyWithT(t, func(c *assert.CollectT) {
+			queryURL := fmt.Sprintf("%s/api/v1/query?query=%s", hubURL, url.QueryEscape(`timestamp(up{cluster="local-cluster",job="prometheus"} == 1)`))
+			resp, reqErr := httpClient.Get(queryURL)
+			if !assert.NoError(c, reqErr, "HTTP GET to Hub Prometheus failed") {
+				return
+			}
+			defer resp.Body.Close()
+
+			body, readErr := io.ReadAll(resp.Body)
+			if !assert.NoError(c, readErr, "Failed to read response body") {
+				return
+			}
+
+			if !assert.Equal(c, http.StatusOK, resp.StatusCode, "Hub Prometheus returned status %d: %s", resp.StatusCode, string(body)) {
+				return
+			}
+
+			var pResp PromResponse
+			if !assert.NoError(c, json.Unmarshal(body, &pResp), "Failed to unmarshal Prometheus response JSON") {
+				return
+			}
+
+			if !assert.Equal(c, "success", pResp.Status, "Prometheus response status is not success") {
+				return
+			}
+
+			if !assert.NotEmpty(c, pResp.Data.Result, "Prometheus has no result for query") {
+				return
+			}
+
+			valSlice := pResp.Data.Result[0].Value
+			if !assert.Len(c, valSlice, 2, "Expected Value slice to have 2 elements [evalTime, sampleTimeStr]") {
+				return
+			}
+			sampleTimeStr, ok := valSlice[1].(string)
+			if !assert.True(c, ok, "Expected timestamp value to be string, got %T", valSlice[1]) {
+				return
+			}
+			sampleTime, parseErr := strconv.ParseFloat(sampleTimeStr, 64)
+			if !assert.NoError(c, parseErr, "Failed to parse sample timestamp") {
+				return
+			}
+			// Allow a small 5-second tolerance for clock drift between host runner and KinD/Podman container VM
+			assert.GreaterOrEqual(c, int64(sampleTime), cutoverTime-5,
+				"Expected fresh metric sample delivered after cutover (sample: %v, cutover: %v)", int64(sampleTime), cutoverTime)
+		}, 3*time.Minute, 5*time.Second, "Hub Prometheus did not receive fresh federated metrics over mTLS tunnel within timeout")
+	})
 }
