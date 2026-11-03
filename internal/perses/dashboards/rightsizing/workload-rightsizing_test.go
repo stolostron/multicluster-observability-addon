@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TestBuildWorkloadRightSizing verifies the workload overview dashboard variables and metric queries.
 func TestBuildWorkloadRightSizing(t *testing.T) {
 	db, err := BuildWorkloadRightSizing(testProject, testDatasource, testClusterLbl)
 	require.NoError(t, err)

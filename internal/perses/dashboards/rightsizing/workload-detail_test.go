@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TestBuildWorkloadDetail verifies the workload detail dashboard variables and panels.
 func TestBuildWorkloadDetail(t *testing.T) {
 	db, err := BuildWorkloadDetail(testProject, testDatasource, testClusterLbl)
 	require.NoError(t, err)
@@ -50,6 +51,7 @@ func TestBuildWorkloadDetail(t *testing.T) {
 	})
 }
 
+// TestBuildWorkloadDetailForFeaturesOmitsPodTables ensures pod tables are omitted when includePods is false.
 func TestBuildWorkloadDetailForFeaturesOmitsPodTables(t *testing.T) {
 	db, err := BuildWorkloadDetailForFeatures(testProject, testDatasource, testClusterLbl, false)
 	require.NoError(t, err)
