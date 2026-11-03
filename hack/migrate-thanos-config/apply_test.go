@@ -132,10 +132,18 @@ func TestExtract(t *testing.T) {
 
 	// Gaps must be warned about.
 	joined := strings.Join(cfg.Warnings, "\n")
-	for _, gap := range []string{"deleteDelay", "blockDuration", "logLevel", "usePrometheusEngine"} {
+	for _, gap := range []string{"deleteDelay", "blockDuration", "usePrometheusEngine"} {
 		if !strings.Contains(joined, gap) {
 			t.Errorf("expected a warning mentioning %q, warnings: %v", gap, cfg.Warnings)
 		}
+	}
+
+	// Log levels must be captured (the CRs expose CommonFields.logLevel).
+	if cfg.Compact.LogLevel != "debug" {
+		t.Errorf("compact log level not captured: %+v", cfg.Compact)
+	}
+	if cfg.Receive.LogLevel != "debug" {
+		t.Errorf("receive log level not captured: %+v", cfg.Receive)
 	}
 }
 
@@ -173,6 +181,9 @@ func TestApplyCompact(t *testing.T) {
 	if applied.Spec.CompactConfig == nil || applied.Spec.CompactConfig.CleanupInterval == nil ||
 		string(*applied.Spec.CompactConfig.CleanupInterval) != "5m" {
 		t.Errorf("cleanup interval not applied")
+	}
+	if applied.Spec.LogLevel == nil || *applied.Spec.LogLevel != "debug" {
+		t.Errorf("compact log level not applied: %v", applied.Spec.LogLevel)
 	}
 	// Sidecars must NOT be applied without the flag.
 	if len(applied.Spec.Containers) != 0 {
@@ -214,6 +225,12 @@ func TestApplyReceiveAndRuler(t *testing.T) {
 	hs := receive.Spec.Ingester.Hashrings[0]
 	if hs.Replicas != 6 {
 		t.Errorf("hashring replicas not applied: %d", hs.Replicas)
+	}
+	if hs.LogLevel == nil || *hs.LogLevel != "debug" {
+		t.Errorf("hashring log level not applied: %v", hs.LogLevel)
+	}
+	if receive.Spec.Router.LogLevel == nil || *receive.Spec.Router.LogLevel != "debug" {
+		t.Errorf("router log level not applied: %v", receive.Spec.Router.LogLevel)
 	}
 	if string(hs.TSDBConfig.Retention) != "48h" {
 		t.Errorf("hashring retention not applied: %s", hs.TSDBConfig.Retention)
