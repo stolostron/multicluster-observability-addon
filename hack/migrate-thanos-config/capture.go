@@ -397,16 +397,17 @@ func resourcesOf(obj map[string]any, path ...string) *corev1.ResourceRequirement
 	return &out
 }
 
-// setDuration records the value if set and valid, and warns when the value
-// uses Go-style syntax that Prometheus (and therefore thanos-operator) rejects.
+// setDuration records the value if set, and warns and skips values that use
+// syntax Prometheus (and therefore thanos-operator) rejects.
 func setDuration(dst *string, val, field string, warn func(string, ...any)) {
 	if val == "" {
 		return
 	}
-	*dst = val
 	if !prometheusDuration.MatchString(val) {
-		warn("%s=%q: not a Prometheus-style duration (e.g. 24h, 365d, 2w); thanos-operator may reject it", field, val)
+		warn("%s=%q: not a Prometheus-style duration (e.g. 24h, 365d, 2w); not migrated", field, val)
+		return
 	}
+	*dst = val
 }
 
 func printSummary(cfg *MigrationConfig) {

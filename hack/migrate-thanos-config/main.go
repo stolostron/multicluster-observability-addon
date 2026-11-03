@@ -64,12 +64,12 @@ Capture flags:
   -o string            output migration file (default "thanos-migration.yaml")
   --mco-name string    name of the MultiClusterObservability CR (default "observability")
   --mco-api-version    API version of the MultiClusterObservability CR (default "v1beta2")
-  -n, --namespace      namespace of the MultiClusterObservability CR
+  --namespace string   namespace of the MultiClusterObservability CR
                        (default "open-cluster-management-observability")
 
 Apply flags:
   -f string            path to the migration file produced by capture (required)
-  -n, --namespace      namespace of the MCOA Thanos CRs
+  --namespace string   namespace of the MCOA Thanos CRs
                        (default "open-cluster-management-observability")
   --dry-run            compute and print the changes without writing to the cluster
   --include-sidecars   also copy MCO sidecar containers into the Thanos CRs
