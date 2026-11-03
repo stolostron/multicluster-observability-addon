@@ -1,10 +1,9 @@
 {{- /*
-  Right-sizing workload and pod PrometheusRules.
-  Iterates over both components in a single loop to avoid duplicating the
-  template. Namespace and virtualization rules live in their own templates
-  (rs-namespace-rules.yaml, rs-virt-rules.yaml) for historical reasons.
+  Right-sizing PrometheusRules for all levels (namespace, virtualization,
+  workload, and pod). Iterates over every component in a single loop so the
+  PrometheusRule manifest is not duplicated per feature.
 */ -}}
-{{- range $component, $label := dict "workloadRightSizing" "right-sizing-workload" "podRightSizing" "right-sizing-pod" }}
+{{- range $component, $label := dict "namespaceRightSizing" "right-sizing-namespace" "virtRightSizing" "right-sizing-virtualization" "workloadRightSizing" "right-sizing-workload" "podRightSizing" "right-sizing-pod" }}
 {{- if and $.Values.rightSizing (index $.Values.rightSizing $component) (index (index $.Values.rightSizing $component) "enabled") }}
 {{- range $_, $rule := (index (index $.Values.rightSizing $component) "rules") }}
 apiVersion: monitoring.coreos.com/v1
