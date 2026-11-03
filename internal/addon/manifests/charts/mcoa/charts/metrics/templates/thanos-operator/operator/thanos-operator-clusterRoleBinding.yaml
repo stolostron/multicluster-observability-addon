@@ -13,6 +13,10 @@ roleRef:
   name: {{ .Values.thanosOperator.appName }}-manager-role
 subjects:
 - kind: ServiceAccount
+  # The operator runs in the observability namespace (see the serviceAccount
+  # and deployment templates); the chart is rendered on the hub with
+  # .Release.Namespace = open-cluster-management-agent-addon, so the subject
+  # namespace must not follow the release namespace.
   name: {{ .Values.thanosOperator.appName }}-controller-manager
-  namespace: {{ .Release.Namespace }}
+  namespace: open-cluster-management-observability
 {{- end }}
