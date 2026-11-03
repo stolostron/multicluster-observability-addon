@@ -104,6 +104,19 @@ data:
                 proxy_set_header X-Real-IP $remote_addr;
             }
         }
+        server {
+            listen 8443 ssl;
+            ssl_certificate     /etc/nginx/server-tls/tls.crt;
+            ssl_certificate_key /etc/nginx/server-tls/tls.key;
+            ssl_client_certificate /etc/nginx/client-ca/ca.crt;
+            ssl_verify_client   on;
+
+            location /api/metrics/v1/default/api/v1/receive {
+                proxy_pass http://127.0.0.1:9091/api/v1/write;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+            }
+        }
     }
 ---
 apiVersion: v1
@@ -160,10 +173,18 @@ spec:
         ports:
         - containerPort: 9090
           name: http
+        - containerPort: 8443
+          name: https-mtls
         volumeMounts:
         - name: nginx-conf
           mountPath: /etc/nginx/nginx.conf
           subPath: nginx.conf
+        - name: server-tls
+          mountPath: /etc/nginx/server-tls
+          readOnly: true
+        - name: client-ca
+          mountPath: /etc/nginx/client-ca
+          readOnly: true
       volumes:
       - name: prometheus-config
         configMap:
@@ -173,6 +194,12 @@ spec:
           name: hub-prometheus-nginx-conf
       - name: tsdb-data
         emptyDir: {}
+      - name: server-tls
+        secret:
+          secretName: hub-prometheus-tls
+      - name: client-ca
+        secret:
+          secretName: observability-managed-cluster-certs
 ---
 apiVersion: v1
 kind: Service
@@ -188,5 +215,63 @@ spec:
     port: 9090
     targetPort: 9090
     nodePort: 30090
+  - name: https-mtls
+    port: 8443
+    targetPort: 8443
   selector:
     app: hub-prometheus
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: https-proxy
+  namespace: open-cluster-management-observability
+  labels:
+    app: https-proxy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: https-proxy
+  template:
+    metadata:
+      labels:
+        app: https-proxy
+    spec:
+      containers:
+      - name: https-proxy
+        image: localhost/e2e-https-proxy:kind-e2e
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8443
+          name: https-proxy
+        - containerPort: 8080
+          name: stats
+        volumeMounts:
+        - name: proxy-tls
+          mountPath: /etc/proxy-tls
+          readOnly: true
+      volumes:
+      - name: proxy-tls
+        secret:
+          secretName: https-proxy-tls
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: https-proxy
+  namespace: open-cluster-management-observability
+  labels:
+    app: https-proxy
+spec:
+  type: NodePort
+  ports:
+  - name: https-proxy
+    port: 8443
+    targetPort: 8443
+  - name: stats
+    port: 8080
+    targetPort: 8080
+    nodePort: 30080
+  selector:
+    app: https-proxy
