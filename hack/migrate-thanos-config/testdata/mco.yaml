@@ -41,12 +41,16 @@ spec:
       replicas: 3
     receive:
       replicas: 6
+      serviceAccountAnnotations:
+        test.com/role-arn: s3_role
       debug:
         logLevel: debug
     rule:
       replicas: 3
       evalInterval: 30s
     compact:
+      serviceAccountAnnotations:
+        test.com/role-arn: s3_role
       debug:
         logLevel: debug
         downsampleConcurrency: 8

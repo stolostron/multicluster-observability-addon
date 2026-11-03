@@ -145,6 +145,15 @@ func TestExtract(t *testing.T) {
 	if cfg.Receive.LogLevel != "debug" {
 		t.Errorf("receive log level not captured: %+v", cfg.Receive)
 	}
+
+	// serviceAccountAnnotations must be captured (they map to
+	// CommonFields.annotations, stamped on the ServiceAccount).
+	if cfg.Compact.Annotations["test.com/role-arn"] != "s3_role" {
+		t.Errorf("compact service account annotations not captured: %+v", cfg.Compact.Annotations)
+	}
+	if cfg.Receive.Annotations["test.com/role-arn"] != "s3_role" {
+		t.Errorf("receive service account annotations not captured: %+v", cfg.Receive.Annotations)
+	}
 }
 
 func TestApplyCompact(t *testing.T) {
@@ -184,6 +193,9 @@ func TestApplyCompact(t *testing.T) {
 	}
 	if applied.Spec.LogLevel == nil || *applied.Spec.LogLevel != "debug" {
 		t.Errorf("compact log level not applied: %v", applied.Spec.LogLevel)
+	}
+	if applied.Spec.Annotations["test.com/role-arn"] != "s3_role" {
+		t.Errorf("compact annotations not applied: %v", applied.Spec.Annotations)
 	}
 	// Sidecars must NOT be applied without the flag.
 	if len(applied.Spec.Containers) != 0 {
@@ -231,6 +243,9 @@ func TestApplyReceiveAndRuler(t *testing.T) {
 	}
 	if receive.Spec.Router.LogLevel == nil || *receive.Spec.Router.LogLevel != "debug" {
 		t.Errorf("router log level not applied: %v", receive.Spec.Router.LogLevel)
+	}
+	if receive.Spec.Router.Annotations["test.com/role-arn"] != "s3_role" || hs.Annotations["test.com/role-arn"] != "s3_role" {
+		t.Errorf("receive annotations not applied: router %v hashring %v", receive.Spec.Router.Annotations, hs.Annotations)
 	}
 	if string(hs.TSDBConfig.Retention) != "48h" {
 		t.Errorf("hashring retention not applied: %s", hs.TSDBConfig.Retention)

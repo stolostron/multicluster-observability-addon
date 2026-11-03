@@ -69,6 +69,7 @@ own `instanceSize` handling via the AddOnDeploymentConfig.
 | `spec.advanced.compact.debug.waitInterval` | `ThanosCompact.spec.compactConfig.cleanupInterval` (approximate, warned) |
 | `spec.advanced.compact.debug.logLevel` | `ThanosCompact.spec.logLevel` |
 | `spec.advanced.receive.debug.logLevel` | `ThanosReceive.spec.router.logLevel` **and** `ThanosReceive.spec.ingester.hashrings[0].logLevel` (MCO ran one receive component, MCOA runs router + ingester) |
+| `spec.advanced.<component>.serviceAccountAnnotations` | `.spec.annotations` on the matching CR (`receive` → router **and** hashring, `queryFrontend` → `ThanosQuery.spec.queryFrontend.annotations`) |
 | `spec.advanced.<component>.containers` | `.spec.additionalContainers` (only with `--include-sidecars`) |
 | `spec.advanced.<component>.resources` | **not written to CRs** — emitted as a suggested `AddOnDeploymentConfig` patch (`suggestedAddOnDeploymentConfig` in the migration file) |
 | `spec.nodeSelector` / `spec.tolerations` | same — suggested ADC patch only |
@@ -91,7 +92,6 @@ snippet manually to the ADC that deploys MCOA.
 | `retentionConfig.deleteDelay` | Thanos CRs expose no delete-delay |
 | `retentionConfig.blockDuration` | ThanosRuler exposes no TSDB block duration |
 | `query.usePrometheusEngine` | ThanosQuery exposes no query engine selector |
-| `<component>.serviceAccountAnnotations` | no equivalent |
 
 Memcached tuning is applied directly to the `memcached-store` and
 `memcached-query-frontend` Deployments (replica count and the `-m`/`-I`/`-c`
@@ -112,6 +112,12 @@ the memcached manifest configs.
   `apply` only sets it when the CR has none yet and notes this otherwise.
 - **Durations** must be Prometheus-style (`24h`, `365d`, `2w`); values that
   only parse as Go durations (e.g. fractional `1.5h`) are warned about.
+- **serviceAccountAnnotations** land on the component's ServiceAccount *and*
+  its pod template: the thanos-operator stamps `spec.annotations` onto both,
+  where MCO applied them to the ServiceAccount only. `apply` merges them key
+  by key and never removes annotations already present on the CR. Annotating
+  the ServiceAccounts directly does not stick — the operator resets them on
+  every reconcile, so the CR is the only durable path.
 - The `mcoa` CRs must already exist when running `apply`; the tool does not
   create them. If they are missing, the thanos-operator stack is probably not
   enabled (annotation `mcoa-thanos-operator: "true"` on the
