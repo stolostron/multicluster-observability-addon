@@ -60,6 +60,8 @@ require (
 	github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus v1.1.0 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.3.3 // indirect
 	github.com/perses/plugins/barchart v0.11.1 // indirect
+	github.com/perses/plugins/logstable v0.2.1 // indirect
+	github.com/perses/plugins/loki v0.5.1 // indirect
 	github.com/perses/plugins/piechart v0.13.2-0.20260326134814-37e86f6b1c58 // indirect
 	github.com/perses/plugins/staticlistvariable v0.8.1 // indirect
 	github.com/perses/plugins/table v0.11.3-0.20260416092358-50d24073dacc // indirect
