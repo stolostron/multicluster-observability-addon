@@ -78,6 +78,7 @@ func wlTableUtil(usageMetric, requestMetric, selector, by string) string {
 	return wlTable(usageMetric, selector, by) + " / " + wlTable(requestMetric, selector, by)
 }
 
+// WorkloadCPURecommendationPanel renders the overview CPU recommendation stat.
 func WorkloadCPURecommendationPanel(datasourceName string) panelgroup.Option {
 	return BuildStatPanel(datasourceName, StatPanelConfig{
 		Title:       "CPU Recommendation",
@@ -90,6 +91,7 @@ func WorkloadCPURecommendationPanel(datasourceName string) panelgroup.Option {
 	})
 }
 
+// WorkloadCPUUsagePanel renders the overview CPU usage stat.
 func WorkloadCPUUsagePanel(datasourceName string) panelgroup.Option {
 	return BuildStatPanel(datasourceName, StatPanelConfig{
 		Title:       "CPU Usage",
@@ -102,6 +104,7 @@ func WorkloadCPUUsagePanel(datasourceName string) panelgroup.Option {
 	})
 }
 
+// WorkloadCPURequestPanel renders the overview CPU request stat.
 func WorkloadCPURequestPanel(datasourceName string) panelgroup.Option {
 	return BuildStatPanel(datasourceName, StatPanelConfig{
 		Title:       "CPU Request",
@@ -114,6 +117,7 @@ func WorkloadCPURequestPanel(datasourceName string) panelgroup.Option {
 	})
 }
 
+// WorkloadCPULimitPanel renders the overview CPU limit stat.
 func WorkloadCPULimitPanel(datasourceName string) panelgroup.Option {
 	return BuildStatPanel(datasourceName, StatPanelConfig{
 		Title:       "CPU Limit",
@@ -126,6 +130,7 @@ func WorkloadCPULimitPanel(datasourceName string) panelgroup.Option {
 	})
 }
 
+// WorkloadCPUUtilizationPanel renders the overview CPU utilization (usage/request) stat.
 func WorkloadCPUUtilizationPanel(datasourceName string) panelgroup.Option {
 	return BuildStatPanel(datasourceName, StatPanelConfig{
 		Title:       "CPU Utilization",
@@ -138,6 +143,7 @@ func WorkloadCPUUtilizationPanel(datasourceName string) panelgroup.Option {
 	})
 }
 
+// WorkloadMemRecommendationPanel renders the overview memory recommendation stat.
 func WorkloadMemRecommendationPanel(datasourceName string) panelgroup.Option {
 	return BuildStatPanel(datasourceName, StatPanelConfig{
 		Title:       "Memory Recommendation",
@@ -150,6 +156,7 @@ func WorkloadMemRecommendationPanel(datasourceName string) panelgroup.Option {
 	})
 }
 
+// WorkloadMemUsagePanel renders the overview memory usage stat.
 func WorkloadMemUsagePanel(datasourceName string) panelgroup.Option {
 	return BuildStatPanel(datasourceName, StatPanelConfig{
 		Title:       "Memory Usage",
@@ -162,6 +169,7 @@ func WorkloadMemUsagePanel(datasourceName string) panelgroup.Option {
 	})
 }
 
+// WorkloadMemRequestPanel renders the overview memory request stat.
 func WorkloadMemRequestPanel(datasourceName string) panelgroup.Option {
 	return BuildStatPanel(datasourceName, StatPanelConfig{
 		Title:       "Memory Request",
@@ -174,6 +182,7 @@ func WorkloadMemRequestPanel(datasourceName string) panelgroup.Option {
 	})
 }
 
+// WorkloadMemLimitPanel renders the overview memory limit stat.
 func WorkloadMemLimitPanel(datasourceName string) panelgroup.Option {
 	return BuildStatPanel(datasourceName, StatPanelConfig{
 		Title:       "Memory Limit",
@@ -186,6 +195,7 @@ func WorkloadMemLimitPanel(datasourceName string) panelgroup.Option {
 	})
 }
 
+// WorkloadMemUtilizationPanel renders the overview memory utilization (usage/request) stat.
 func WorkloadMemUtilizationPanel(datasourceName string) panelgroup.Option {
 	return BuildStatPanel(datasourceName, StatPanelConfig{
 		Title:       "Memory Utilization",
@@ -219,6 +229,7 @@ func timeSeriesPercentChart() panel.Option {
 	)
 }
 
+// WorkloadCPUTopWorkloadsPanel renders the top-20 workloads by CPU utilization.
 func WorkloadCPUTopWorkloadsPanel(datasourceName string) panelgroup.Option {
 	return panelgroup.AddPanel("CPU Usage to Request Ratio of Top Workloads",
 		panel.Description("CPU utilization of the top 20 workloads by usage/request ratio"),
@@ -233,6 +244,7 @@ func WorkloadCPUTopWorkloadsPanel(datasourceName string) panelgroup.Option {
 	)
 }
 
+// WorkloadMemTopWorkloadsPanel renders the top-20 workloads by memory utilization.
 func WorkloadMemTopWorkloadsPanel(datasourceName string) panelgroup.Option {
 	return panelgroup.AddPanel("Memory Usage to Request Ratio of Top Workloads",
 		panel.Description("Memory utilization of the top 20 workloads by usage/request ratio"),
@@ -331,6 +343,7 @@ func resourceTable(title, description, datasourceName, selector, usage, request,
 	return panelgroup.AddPanel(title, options...)
 }
 
+// WorkloadCPUTablePanel renders the workload overview CPU right-sizing table.
 func WorkloadCPUTablePanel(datasourceName string, project string) panelgroup.Option {
 	return resourceTable("Workload CPU Table",
 		"CPU utilization, usage, request, limit, and recommendation per workload.\nClick Workload or Namespace to see detailed view.",
@@ -339,6 +352,7 @@ func WorkloadCPUTablePanel(datasourceName string, project string) panelgroup.Opt
 		true, project, false)
 }
 
+// WorkloadMemTablePanel renders the workload overview memory right-sizing table.
 func WorkloadMemTablePanel(datasourceName string, project string) panelgroup.Option {
 	return resourceTable("Workload Memory Table",
 		"Memory utilization, usage, request, limit, and recommendation per workload.\nClick Workload or Namespace to see detailed view.",
@@ -347,6 +361,7 @@ func WorkloadMemTablePanel(datasourceName string, project string) panelgroup.Opt
 		false, project, false)
 }
 
+// PodCPUTablePanel renders the pod overview CPU right-sizing table.
 func PodCPUTablePanel(datasourceName string, project string) panelgroup.Option {
 	return resourceTable("Pod CPU Table",
 		"CPU utilization, usage, request, limit, and recommendation per pod.",
@@ -355,6 +370,7 @@ func PodCPUTablePanel(datasourceName string, project string) panelgroup.Option {
 		true, project, true)
 }
 
+// PodMemTablePanel renders the pod overview memory right-sizing table.
 func PodMemTablePanel(datasourceName string, project string) panelgroup.Option {
 	return resourceTable("Pod Memory Table",
 		"Memory utilization, usage, request, limit, and recommendation per pod.",
@@ -388,56 +404,69 @@ func podDetailRatioStat(datasource, title, description, usage, request, selector
 	})
 }
 
+// PodDetailCPURecommendationStatPanel renders the pod-detail CPU recommendation stat.
 func PodDetailCPURecommendationStatPanel(datasource string) panelgroup.Option {
 	return podDetailStat(datasource, "CPU Recommendation", "Recommended CPU cores for the selected pod based on usage profile.", "acm_rs:pod:cpu_recommendation", podCPUDetail, &dashboards.DecimalUnit, 2, nsStatThreshold)
 }
 
+// PodDetailCPUUsageStatPanel renders the pod-detail CPU usage stat.
 func PodDetailCPUUsageStatPanel(datasource string) panelgroup.Option {
 	return podDetailStat(datasource, "CPU Usage", "Actual CPU cores consumed by the selected pod over the aggregation period.", "acm_rs:pod:cpu_usage", podCPUDetail, &dashboards.DecimalUnit, 2, detailGrayThreshold)
 }
 
+// PodDetailCPURequestStatPanel renders the pod-detail CPU request stat.
 func PodDetailCPURequestStatPanel(datasource string) panelgroup.Option {
 	return podDetailStat(datasource, "CPU Request", "CPU cores requested by the selected pod.", "acm_rs:pod:cpu_request", podCPUDetail, &dashboards.DecimalUnit, 2, detailGrayThreshold)
 }
 
+// PodDetailCPULimitStatPanel renders the pod-detail CPU limit stat.
 func PodDetailCPULimitStatPanel(datasource string) panelgroup.Option {
 	return podDetailStat(datasource, "CPU Limit", "CPU cores limit for the selected pod.", "acm_rs:pod:cpu_limit", podCPUDetail, &dashboards.DecimalUnit, 2, detailGrayThreshold)
 }
 
+// PodDetailCPUUtilizationStatPanel renders the pod-detail CPU utilization stat.
 func PodDetailCPUUtilizationStatPanel(datasource string) panelgroup.Option {
 	return podDetailRatioStat(datasource, "CPU Utilization", "CPU usage divided by CPU request for the selected pod.", "acm_rs:pod:cpu_usage", "acm_rs:pod:cpu_request", podCPUDetail, &dashboards.PercentDecimalUnit, detailPercentThreshold)
 }
 
+// PodDetailMemRecommendationStatPanel renders the pod-detail memory recommendation stat.
 func PodDetailMemRecommendationStatPanel(datasource string) panelgroup.Option {
 	return podDetailStat(datasource, "Memory Recommendation", "Recommended memory for the selected pod based on usage profile.", "acm_rs:pod:memory_recommendation", podMemDetail, &dashboards.BytesUnit, 1, nsStatThreshold)
 }
 
+// PodDetailMemUsageStatPanel renders the pod-detail memory usage stat.
 func PodDetailMemUsageStatPanel(datasource string) panelgroup.Option {
 	return podDetailStat(datasource, "Memory Usage", "Actual memory consumed by the selected pod over the aggregation period.", "acm_rs:pod:memory_usage", podMemDetail, &dashboards.BytesUnit, 1, detailGrayThreshold)
 }
 
+// PodDetailMemRequestStatPanel renders the pod-detail memory request stat.
 func PodDetailMemRequestStatPanel(datasource string) panelgroup.Option {
 	return podDetailStat(datasource, "Memory Request", "Memory requested by the selected pod.", "acm_rs:pod:memory_request", podMemDetail, &dashboards.BytesUnit, 1, detailGrayThreshold)
 }
 
+// PodDetailMemLimitStatPanel renders the pod-detail memory limit stat.
 func PodDetailMemLimitStatPanel(datasource string) panelgroup.Option {
 	return podDetailStat(datasource, "Memory Limit", "Memory limit for the selected pod.", "acm_rs:pod:memory_limit", podMemDetail, &dashboards.BytesUnit, 1, detailGrayThreshold)
 }
 
+// PodDetailMemUtilizationStatPanel renders the pod-detail memory utilization stat.
 func PodDetailMemUtilizationStatPanel(datasource string) panelgroup.Option {
 	return podDetailRatioStat(datasource, "Memory Utilization", "Memory usage divided by memory request for the selected pod.", "acm_rs:pod:memory_usage", "acm_rs:pod:memory_request", podMemDetail, &dashboards.PercentDecimalUnit, detailPercentThreshold)
 }
 
+// PodDetailCPUTimeSeriesPanel renders the pod-detail CPU usage/request/limit/recommendation chart.
 func PodDetailCPUTimeSeriesPanel(datasource string) panelgroup.Option {
 	return detailTimeSeries("CPU Over Time - Pod", "CPU usage, request, limit, and recommendation for the selected pod.", datasource, &dashboards.DecimalUnit,
 		"acm_rs:pod:cpu_usage", "acm_rs:pod:cpu_request", "acm_rs:pod:cpu_limit", "acm_rs:pod:cpu_recommendation", podCPUDetail)
 }
 
+// PodDetailMemTimeSeriesPanel renders the pod-detail memory usage/request/limit/recommendation chart.
 func PodDetailMemTimeSeriesPanel(datasource string) panelgroup.Option {
 	return detailTimeSeries("Memory Over Time - Pod", "Memory usage, request, limit, and recommendation for the selected pod.", datasource, &dashboards.BytesUnit,
 		"acm_rs:pod:memory_usage", "acm_rs:pod:memory_request", "acm_rs:pod:memory_limit", "acm_rs:pod:memory_recommendation", podMemDetail)
 }
 
+// WorkloadDetailCPURecommendationStatPanel renders the workload-detail CPU recommendation stat.
 func WorkloadDetailCPURecommendationStatPanel(datasourceName string) panelgroup.Option {
 	return BuildStatPanel(datasourceName, StatPanelConfig{
 		Title:       "CPU Recommendation",
@@ -450,6 +479,7 @@ func WorkloadDetailCPURecommendationStatPanel(datasourceName string) panelgroup.
 	})
 }
 
+// WorkloadDetailCPUUsageStatPanel renders the workload-detail CPU usage stat.
 func WorkloadDetailCPUUsageStatPanel(datasourceName string) panelgroup.Option {
 	return BuildStatPanel(datasourceName, StatPanelConfig{
 		Title:       "CPU Usage",
@@ -462,6 +492,7 @@ func WorkloadDetailCPUUsageStatPanel(datasourceName string) panelgroup.Option {
 	})
 }
 
+// WorkloadDetailCPURequestStatPanel renders the workload-detail CPU request stat.
 func WorkloadDetailCPURequestStatPanel(datasourceName string) panelgroup.Option {
 	return BuildStatPanel(datasourceName, StatPanelConfig{
 		Title:       "CPU Request",
@@ -474,6 +505,7 @@ func WorkloadDetailCPURequestStatPanel(datasourceName string) panelgroup.Option 
 	})
 }
 
+// WorkloadDetailCPULimitStatPanel renders the workload-detail CPU limit stat.
 func WorkloadDetailCPULimitStatPanel(datasourceName string) panelgroup.Option {
 	return BuildStatPanel(datasourceName, StatPanelConfig{
 		Title:       "CPU Limit",
@@ -486,6 +518,7 @@ func WorkloadDetailCPULimitStatPanel(datasourceName string) panelgroup.Option {
 	})
 }
 
+// WorkloadDetailCPUUtilizationStatPanel renders the workload-detail CPU utilization stat.
 func WorkloadDetailCPUUtilizationStatPanel(datasourceName string) panelgroup.Option {
 	return BuildStatPanel(datasourceName, StatPanelConfig{
 		Title:       "CPU Utilization",
@@ -526,6 +559,7 @@ func detailTimeSeries(title, description, datasourceName string, unit *string, u
 	)
 }
 
+// WorkloadDetailCPUTimeSeriesPanel renders the workload-detail CPU time-series chart.
 func WorkloadDetailCPUTimeSeriesPanel(datasourceName string) panelgroup.Option {
 	return detailTimeSeries("CPU Over Time - Workload",
 		"CPU usage, request, limit, and recommendation over time for the selected workload.",
@@ -534,6 +568,7 @@ func WorkloadDetailCPUTimeSeriesPanel(datasourceName string) panelgroup.Option {
 		wlCPUDetail)
 }
 
+// WorkloadDetailMemRecommendationStatPanel renders the workload-detail memory recommendation stat.
 func WorkloadDetailMemRecommendationStatPanel(datasourceName string) panelgroup.Option {
 	return BuildStatPanel(datasourceName, StatPanelConfig{
 		Title:       "Memory Recommendation",
@@ -546,6 +581,7 @@ func WorkloadDetailMemRecommendationStatPanel(datasourceName string) panelgroup.
 	})
 }
 
+// WorkloadDetailMemUsageStatPanel renders the workload-detail memory usage stat.
 func WorkloadDetailMemUsageStatPanel(datasourceName string) panelgroup.Option {
 	return BuildStatPanel(datasourceName, StatPanelConfig{
 		Title:       "Memory Usage",
@@ -558,6 +594,7 @@ func WorkloadDetailMemUsageStatPanel(datasourceName string) panelgroup.Option {
 	})
 }
 
+// WorkloadDetailMemRequestStatPanel renders the workload-detail memory request stat.
 func WorkloadDetailMemRequestStatPanel(datasourceName string) panelgroup.Option {
 	return BuildStatPanel(datasourceName, StatPanelConfig{
 		Title:       "Memory Request",
@@ -570,6 +607,7 @@ func WorkloadDetailMemRequestStatPanel(datasourceName string) panelgroup.Option 
 	})
 }
 
+// WorkloadDetailMemLimitStatPanel renders the workload-detail memory limit stat.
 func WorkloadDetailMemLimitStatPanel(datasourceName string) panelgroup.Option {
 	return BuildStatPanel(datasourceName, StatPanelConfig{
 		Title:       "Memory Limit",
@@ -582,6 +620,7 @@ func WorkloadDetailMemLimitStatPanel(datasourceName string) panelgroup.Option {
 	})
 }
 
+// WorkloadDetailMemUtilizationStatPanel renders the workload-detail memory utilization stat.
 func WorkloadDetailMemUtilizationStatPanel(datasourceName string) panelgroup.Option {
 	return BuildStatPanel(datasourceName, StatPanelConfig{
 		Title:       "Memory Utilization",
@@ -594,6 +633,7 @@ func WorkloadDetailMemUtilizationStatPanel(datasourceName string) panelgroup.Opt
 	})
 }
 
+// WorkloadDetailMemTimeSeriesPanel renders the workload-detail memory time-series chart.
 func WorkloadDetailMemTimeSeriesPanel(datasourceName string) panelgroup.Option {
 	return detailTimeSeries("Memory Over Time - Workload",
 		"Memory usage, request, limit, and recommendation over time for the selected workload.",
@@ -602,6 +642,7 @@ func WorkloadDetailMemTimeSeriesPanel(datasourceName string) panelgroup.Option {
 		wlMemDetail)
 }
 
+// WorkloadDetailPodCPUTablePanel renders the per-pod CPU table on the workload detail dashboard.
 func WorkloadDetailPodCPUTablePanel(datasourceName string, project string) panelgroup.Option {
 	return resourceTable("Pod CPU Table",
 		"CPU usage, request, limit, and recommendation for pods in the selected workload.",
@@ -610,6 +651,7 @@ func WorkloadDetailPodCPUTablePanel(datasourceName string, project string) panel
 		true, project, true)
 }
 
+// WorkloadDetailPodMemTablePanel renders the per-pod memory table on the workload detail dashboard.
 func WorkloadDetailPodMemTablePanel(datasourceName string, project string) panelgroup.Option {
 	return resourceTable("Pod Memory Table",
 		"Memory usage, request, limit, and recommendation for pods in the selected workload.",

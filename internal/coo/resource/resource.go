@@ -768,6 +768,8 @@ func buildVMRSPersesDashboards() ([]persesv1.PersesDashboard, error) {
 	}, dsThanos, addoncfg.AnalyticsNamespace)
 }
 
+// buildWorkloadRSPersesDashboards returns a builder for the workload overview and
+// detail dashboards. When includePods is false, the detail dashboard omits pod tables.
 func buildWorkloadRSPersesDashboards(includePods bool) func() ([]persesv1.PersesDashboard, error) {
 	return func() ([]persesv1.PersesDashboard, error) {
 		detail := func(project, datasource, clusterLabel string) (dashboard.Builder, error) {
@@ -780,6 +782,7 @@ func buildWorkloadRSPersesDashboards(includePods bool) func() ([]persesv1.Perses
 	}
 }
 
+// buildPodRSPersesDashboards builds the pod overview and detail right-sizing dashboards.
 func buildPodRSPersesDashboards() ([]persesv1.PersesDashboard, error) {
 	return buildFromBuilders([]dashboardBuilderFunc{
 		rsperses.BuildPodRightSizing,
