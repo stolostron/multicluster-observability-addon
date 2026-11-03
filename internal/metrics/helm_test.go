@@ -201,6 +201,17 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				require.NotNil(t, job[0].Spec.ActiveDeadlineSeconds)
 				assert.Equal(t, int64(300), *job[0].Spec.ActiveDeadlineSeconds)
 				assert.Contains(t, job[0].Spec.Template.Spec.Tolerations, corev1.Toleration{Operator: corev1.TolerationOpExists})
+				// An omitted selector is generated server-side from the Job UID and is immutable,
+				// so every later apply of this manifest fails and the addon's pre-delete finalizer
+				// is never released. manualSelector must accompany it or the create is rejected.
+				require.NotNil(t, job[0].Spec.ManualSelector)
+				assert.True(t, *job[0].Spec.ManualSelector)
+				require.NotNil(t, job[0].Spec.Selector)
+				assert.NotEmpty(t, job[0].Spec.Selector.MatchLabels)
+				for k, v := range job[0].Spec.Selector.MatchLabels {
+					assert.Equal(t, v, job[0].Spec.Template.Labels[k],
+						"selector label %q must match the pod template labels", k)
+				}
 			},
 		},
 		"platform metrics enabled but agent missing": {
