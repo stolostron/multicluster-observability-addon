@@ -153,7 +153,7 @@ spec:
   agentInstallNamespace: open-cluster-management-addon-observability
   customizedVariables:
   - name: metricsHubHostname
-    value: "http://hub-prometheus.open-cluster-management-observability.svc:9090"
+    value: "https://hub-prometheus.open-cluster-management-observability.svc:8443"
   - name: platformMetricsCollection
     value: prometheusagents.v1alpha1.monitoring.rhobs
   - name: platformNamespaceRightSizing

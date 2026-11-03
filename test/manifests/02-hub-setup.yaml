@@ -90,13 +90,6 @@ data:
         server {
             listen 9090;
 
-            # Reverse proxy MCOA remote write URL to Prometheus receiver
-            location /api/metrics/v1/default/api/v1/receive {
-                proxy_pass http://127.0.0.1:9091/api/v1/write;
-                proxy_set_header Host $host;
-                proxy_set_header X-Real-IP $remote_addr;
-            }
-
             # Forward standard queries and web dashboard
             location / {
                 proxy_pass http://127.0.0.1:9091/;
