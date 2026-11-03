@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 
+	certmanagerv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	"github.com/go-logr/logr"
 	operatorsv1 "github.com/operator-framework/api/pkg/operators/v1"
 	operatorsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
@@ -21,6 +22,7 @@ import (
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	imanifests "github.com/stolostron/multicluster-observability-addon/internal/analytics/incident-detection/manifests"
 	cmanifests "github.com/stolostron/multicluster-observability-addon/internal/coo/manifests"
+	"github.com/stolostron/multicluster-observability-addon/internal/mcoagateway"
 	rsperses "github.com/stolostron/multicluster-observability-addon/internal/perses/dashboards/rightsizing"
 	"github.com/stolostron/multicluster-observability-addon/pkg/perses/dashboards/acm"
 	hcp "github.com/stolostron/multicluster-observability-addon/pkg/perses/dashboards/acm/hosted-control-plane"
@@ -28,6 +30,7 @@ import (
 	networking "github.com/stolostron/multicluster-observability-addon/pkg/perses/dashboards/acm/k8s/networking"
 	slo "github.com/stolostron/multicluster-observability-addon/pkg/perses/dashboards/acm/k8s/slo"
 	incident_management "github.com/stolostron/multicluster-observability-addon/pkg/perses/dashboards/incident-management"
+	"github.com/stolostron/multicluster-observability-addon/pkg/perses/dashboards/logging"
 	"github.com/stolostron/multicluster-observability-addon/pkg/perses/dashboards/thanos"
 	virt "github.com/stolostron/multicluster-observability-addon/pkg/perses/dashboards/virtualization"
 	corev1 "k8s.io/api/core/v1"
@@ -41,6 +44,7 @@ import (
 const (
 	dsThanos             = "rbac-query-proxy-datasource"
 	dsPlatformPrometheus = "platform-prometheus-datasource"
+	dsLoki               = "loki-datasource"
 	clusterLabelName     = ""
 
 	ManagedByLabelValue = "mcoa-hub-resource-reconciler"
@@ -81,7 +85,7 @@ func EvaluateHubStackFeatures(opts addon.Options) HubStackFeatures {
 			(opts.Platform.AnalyticsOptions.RightSizing.NamespaceEnabled ||
 				opts.Platform.AnalyticsOptions.RightSizing.VirtualizationEnabled))
 
-	persesEnabled := hasDashboards || hasAnalyticsDashboards
+	persesEnabled := hasDashboards || hasAnalyticsDashboards || opts.Platform.Logs.DefaultStack
 
 	return HubStackFeatures{
 		HasDashboards:            hasDashboards,
@@ -102,7 +106,7 @@ type HubResourceReconciler struct {
 }
 
 // reader returns APIReader when configured so reads on unwatched hub resources
-// (Namespace, OperatorGroup) bypass the informer cache. Falls back to Client
+// (Namespace, OperatorGroup, Certificate, Secret) bypass the informer cache. Falls back to Client
 // for unit tests that only wire a fake client.
 func (r *HubResourceReconciler) reader() client.Reader {
 	if r.APIReader != nil {
@@ -112,11 +116,11 @@ func (r *HubResourceReconciler) reader() client.Reader {
 }
 
 // readerFor returns APIReader for unwatched hub resource types (Namespace,
-// OperatorGroup) and the cached Client for watched types (Subscription,
+// OperatorGroup, Certificate, Secret) and the cached Client for watched types (Subscription,
 // PersesDashboard, PersesDatasource, UIPlugin).
 func (r *HubResourceReconciler) readerFor(obj client.Object) client.Reader {
 	switch obj.(type) {
-	case *corev1.Namespace, *operatorsv1.OperatorGroup:
+	case *corev1.Namespace, *operatorsv1.OperatorGroup, *certmanagerv1.Certificate, *corev1.Secret:
 		return r.reader()
 	default:
 		return r.Client
@@ -126,6 +130,7 @@ func (r *HubResourceReconciler) readerFor(obj client.Object) client.Reader {
 func (r *HubResourceReconciler) Reconcile(ctx context.Context, hasCardinalityRules, canManageCOO bool) error {
 	features := EvaluateHubStackFeatures(r.Opts)
 	cooNeeded := features.PersesEnabled && canManageCOO
+	hasLokiDatasource := r.Opts.Platform.Logs.DefaultStack
 
 	// Install COO first — Perses CRD conversion webhooks must be available
 	// before we can create/update dashboards and datasources.
@@ -145,11 +150,11 @@ func (r *HubResourceReconciler) Reconcile(ctx context.Context, hasCardinalityRul
 		return fmt.Errorf("failed to reconcile dashboards: %w", err)
 	}
 
-	if err := r.reconcileDatasources(ctx, features.HasDashboards, features.HasAnalyticsDashboards); err != nil {
+	if err := r.reconcileDatasources(ctx, features.HasDashboards, features.HasAnalyticsDashboards, hasLokiDatasource); err != nil {
 		return fmt.Errorf("failed to reconcile datasources: %w", err)
 	}
 
-	if err := r.reconcileUIPlugin(ctx, features.PersesEnabled, features.IncidentDetectionEnabled); err != nil {
+	if err := r.reconcileUIPlugin(ctx, features.PersesEnabled, features.HasDashboards, features.IncidentDetectionEnabled); err != nil {
 		return fmt.Errorf("failed to reconcile UIPlugin: %w", err)
 	}
 
@@ -285,7 +290,7 @@ func (r *HubResourceReconciler) ensureAnalyticsNamespace(ctx context.Context) er
 
 // --- UIPlugin ---
 
-func (r *HubResourceReconciler) reconcileUIPlugin(ctx context.Context, persesEnabled, incidentDetectionEnabled bool) error {
+func (r *HubResourceReconciler) reconcileUIPlugin(ctx context.Context, persesEnabled, metricsUIEnabled, incidentDetectionEnabled bool) error {
 	monitoringUINeeded := persesEnabled || incidentDetectionEnabled
 
 	if !monitoringUINeeded {
@@ -311,7 +316,9 @@ func (r *HubResourceReconciler) reconcileUIPlugin(ctx context.Context, persesEna
 		},
 	}
 
-	if persesEnabled {
+	// Logging or analytics can enable Perses without the metrics UI. Configure
+	// ACM's Alertmanager and Thanos integration only when metrics UI is enabled.
+	if metricsUIEnabled {
 		desired.Spec.Monitoring.ACM = &uiplugin.AdvancedClusterManagementReference{
 			Enabled: true,
 			Alertmanager: uiplugin.AlertmanagerReference{
@@ -332,7 +339,7 @@ func (r *HubResourceReconciler) reconcileUIPlugin(ctx context.Context, persesEna
 
 // --- Datasources ---
 
-func (r *HubResourceReconciler) reconcileDatasources(ctx context.Context, hasDashboards, hasAnalyticsDashboards bool) error {
+func (r *HubResourceReconciler) reconcileDatasources(ctx context.Context, hasDashboards, hasAnalyticsDashboards, hasLokiDatasource bool) error {
 	if hasDashboards {
 		if err := r.applyResource(ctx, buildRBACQueryProxyDatasource(addoncfg.InstallNamespace)); err != nil {
 			return fmt.Errorf("failed to apply rbac-query-proxy datasource: %w", err)
@@ -357,6 +364,37 @@ func (r *HubResourceReconciler) reconcileDatasources(ctx context.Context, hasDas
 	} else {
 		if err := r.deleteIfManaged(ctx, &persesv1.PersesDatasource{
 			ObjectMeta: metav1.ObjectMeta{Name: dsThanos, Namespace: addoncfg.AnalyticsNamespace},
+		}); err != nil {
+			return err
+		}
+	}
+
+	if hasLokiDatasource {
+		cert, err := mcoagateway.BuildPersesLokiClientCertificate()
+		if err != nil {
+			return fmt.Errorf("failed to build Perses Loki client certificate: %w", err)
+		}
+		cert.Labels = managedResourceLabels
+		cert.Spec.SecretTemplate = &certmanagerv1.CertificateSecretTemplate{Labels: managedResourceLabels}
+		if err := r.applyResource(ctx, cert); err != nil {
+			return fmt.Errorf("failed to apply Perses Loki client certificate: %w", err)
+		}
+		if err := r.applyResource(ctx, buildLokiDatasource(addoncfg.InstallNamespace)); err != nil {
+			return fmt.Errorf("failed to apply loki datasource: %w", err)
+		}
+	} else {
+		if err := r.deleteIfManaged(ctx, &persesv1.PersesDatasource{
+			ObjectMeta: metav1.ObjectMeta{Name: dsLoki, Namespace: addoncfg.InstallNamespace},
+		}); err != nil {
+			return err
+		}
+		if err := r.deleteIfManaged(ctx, &certmanagerv1.Certificate{
+			ObjectMeta: metav1.ObjectMeta{Name: mcoagateway.DefaultPersesLokiClientMTLSSecretName, Namespace: addoncfg.InstallNamespace},
+		}); err != nil {
+			return err
+		}
+		if err := r.deleteIfManaged(ctx, &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{Name: mcoagateway.DefaultPersesLokiClientMTLSSecretName, Namespace: addoncfg.InstallNamespace},
 		}); err != nil {
 			return err
 		}
@@ -436,6 +474,56 @@ func buildPlatformPrometheusDatasource(namespace string) *persesv1.PersesDatasou
 								},
 							},
 							"scrapeInterval": "5m",
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func buildLokiDatasource(namespace string) *persesv1.PersesDatasource {
+	return &persesv1.PersesDatasource{
+		TypeMeta: metav1.TypeMeta{APIVersion: "perses.dev/v1alpha1", Kind: "PersesDatasource"},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      dsLoki,
+			Namespace: namespace,
+			Labels:    managedResourceLabels,
+		},
+		Spec: persesv1.DatasourceSpec{
+			Client: &persesv1.Client{
+				TLS: &persesv1.TLS{
+					Enable: true,
+					CaCert: &persesv1.Certificate{
+						SecretSource: persesv1.SecretSource{
+							Type: persesv1.SecretSourceTypeSecret,
+							Name: mcoagateway.DefaultStorageMTLSSecretName,
+						},
+						CertPath: "ca.crt",
+					},
+					UserCert: &persesv1.Certificate{
+						SecretSource: persesv1.SecretSource{
+							Type: persesv1.SecretSourceTypeSecret,
+							Name: mcoagateway.DefaultPersesLokiClientMTLSSecretName,
+						},
+						CertPath:       "tls.crt",
+						PrivateKeyPath: "tls.key",
+					},
+				},
+			},
+			Config: persesv1.Datasource{
+				DatasourceSpec: persesmodelv1.DatasourceSpec{
+					Default: false,
+					Plugin: persescommon.Plugin{
+						Kind: "LokiDatasource",
+						Spec: map[string]any{
+							"proxy": map[string]any{
+								"kind": "HTTPProxy",
+								"spec": map[string]any{
+									"url":    "https://mcoa-observability-observatorium-api." + addoncfg.InstallNamespace + ".svc:8080/api/logs/v1",
+									"secret": dsLoki + "-secret",
+								},
+							},
 						},
 					},
 				},
@@ -536,6 +624,7 @@ func allPossibleDashboardNames() map[string]struct{} {
 			buildACMPersesDashboards,
 			buildK8sPersesDashboards,
 			buildThanosPersesDashboards,
+			buildLokiPersesDashboards,
 			buildCardinalityPersesDashboards,
 			buildIncidentDetectionPersesDashboards,
 			buildNamespaceRSPersesDashboards,
@@ -573,6 +662,9 @@ func (r *HubResourceReconciler) buildDesiredDashboards(hasCardinalityRules, inci
 
 	if incidentDetectionEnabled {
 		dashboards = r.appendDashboards(dashboards, "incident-detection", buildIncidentDetectionPersesDashboards)
+	}
+	if r.Opts.Platform.Logs.DefaultStack {
+		dashboards = r.appendDashboards(dashboards, "Loki", buildLokiPersesDashboards)
 	}
 
 	if r.Opts.Platform.AnalyticsOptions.RightSizing.Delegated {
@@ -736,6 +828,12 @@ func buildCardinalityPersesDashboards() ([]persesv1.PersesDashboard, error) {
 		acm.BuildACMMetricsCardinalityCluster,
 		acm.BuildACMMetricsCardinalityName,
 	}, dsThanos, addoncfg.InstallNamespace)
+}
+
+func buildLokiPersesDashboards() ([]persesv1.PersesDashboard, error) {
+	return buildFromBuilders([]dashboardBuilderFunc{
+		logging.BuildACMLogs,
+	}, dsLoki, addoncfg.InstallNamespace)
 }
 
 func buildIncidentDetectionPersesDashboards() ([]persesv1.PersesDashboard, error) {
