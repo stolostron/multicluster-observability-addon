@@ -48,6 +48,7 @@ spec:
       evalInterval: 30s
     compact:
       debug:
+        logLevel: debug
         downsampleConcurrency: 8
         blockMetaFetchConcurrency: 32
         waitInterval: 5m

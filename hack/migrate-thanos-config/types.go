@@ -67,18 +67,23 @@ type CompactConfig struct {
 	// CleanupInterval is mapped from MCO compact.debug.waitInterval. MCO used
 	// that value to synchronize --compact.cleanup-interval, so only the
 	// cleanup cadence is preserved here (see warnings on capture).
-	CleanupInterval string             `json:"cleanupInterval,omitempty"`
-	Containers      []corev1.Container `json:"containers,omitempty"`
+	CleanupInterval string `json:"cleanupInterval,omitempty"`
+	// LogLevel maps MCO compact.debug.logLevel to the CommonFields log level.
+	LogLevel   string             `json:"logLevel,omitempty"`
+	Containers []corev1.Container `json:"containers,omitempty"`
 }
 
 type ReceiveConfig struct {
 	// Replicas maps MCO advanced.receive.replicas (the receive ingester
 	// StatefulSet replica count) to the "default" hashring.
-	Replicas     *int32             `json:"replicas,omitempty"`
-	Retention    string             `json:"retention,omitempty"`
-	StorageSize  string             `json:"storageSize,omitempty"`
-	StorageClass string             `json:"storageClass,omitempty"`
-	Containers   []corev1.Container `json:"containers,omitempty"`
+	Replicas     *int32 `json:"replicas,omitempty"`
+	Retention    string `json:"retention,omitempty"`
+	StorageSize  string `json:"storageSize,omitempty"`
+	StorageClass string `json:"storageClass,omitempty"`
+	// LogLevel maps MCO receive.debug.logLevel onto both the router and the
+	// ingester hashring: MCO ran a single receive component, MCOA runs both.
+	LogLevel   string             `json:"logLevel,omitempty"`
+	Containers []corev1.Container `json:"containers,omitempty"`
 }
 
 type RulerConfig struct {

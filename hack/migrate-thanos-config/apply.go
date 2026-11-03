@@ -164,6 +164,22 @@ func (c *changeLog) setInt32(field string, dst *int32, val *int32) {
 	}
 }
 
+// setStrPtr assigns to optional *string CR fields that may be unset.
+func (c *changeLog) setStrPtr(field string, dst **string, val string) {
+	if val == "" {
+		return
+	}
+	if *dst == nil {
+		*dst = &val
+		c.set(field, "<unset>", val)
+		return
+	}
+	if old := **dst; old != val {
+		*dst = &val
+		c.set(field, old, val)
+	}
+}
+
 // setDurationPtr assigns to optional *Duration CR fields that may be unset.
 func (c *changeLog) setDurationPtr(field string, dst **thanosv1alpha1.Duration, val string) {
 	if val == "" {
@@ -259,6 +275,7 @@ func applyCompact(ctx context.Context, cl client.Client, key types.NamespacedNam
 	log.setDuration("spec.retentionConfig.raw", &obj.Spec.RetentionConfig.Raw, c.RetentionRaw)
 	log.setDuration("spec.retentionConfig.fiveMinutes", &obj.Spec.RetentionConfig.FiveMinutes, c.Retention5m)
 	log.setDuration("spec.retentionConfig.oneHour", &obj.Spec.RetentionConfig.OneHour, c.Retention1h)
+	log.setStrPtr("spec.logLevel", &obj.Spec.LogLevel, c.LogLevel)
 	log.setStorageSize("spec.storage.size", &obj.Spec.StorageConfiguration.Size, c.StorageSize)
 	log.setStorageClass("spec.storage.storageClass", &obj.Spec.StorageConfiguration.StorageClass, c.StorageClass)
 
@@ -299,6 +316,10 @@ func applyReceive(ctx context.Context, cl client.Client, key types.NamespacedNam
 	}
 	hs := &obj.Spec.Ingester.Hashrings[0]
 
+	// MCO ran a single receive component; MCOA runs a router and an ingester
+	// per hashring, so the log level goes to both.
+	log.setStrPtr("spec.router.logLevel", &obj.Spec.Router.LogLevel, c.LogLevel)
+	log.setStrPtr("spec.ingester.hashrings[0].logLevel", &hs.LogLevel, c.LogLevel)
 	log.setInt32("spec.ingester.hashrings[0].replicas", &hs.Replicas, c.Replicas)
 	log.setDuration("spec.ingester.hashrings[0].tsdbConfig.retention", &hs.TSDBConfig.Retention, c.Retention)
 	log.setStorageSize("spec.ingester.hashrings[0].storage.size", &hs.StorageConfiguration.Size, c.StorageSize)

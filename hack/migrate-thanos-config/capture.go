@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"slices"
 	"time"
 
 	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
@@ -178,12 +179,8 @@ func extract(mco *unstructured.Unstructured) *MigrationConfig {
 		cfg.Compact.CleanupInterval = v
 		warn("spec.advanced.compact.debug.waitInterval=%q: mapped approximately to ThanosCompact.spec.compactConfig.cleanupInterval (compaction cycle wait itself has no equivalent)", v)
 	}
-	if v := str(compactDebug, "logLevel"); v != "" {
-		warn("spec.advanced.compact.debug.logLevel=%q: the Thanos CRs do not expose a log level; not migrated", v)
-	}
-	if v := str(advanced, "receive", "debug", "logLevel"); v != "" {
-		warn("spec.advanced.receive.debug.logLevel=%q: the Thanos CRs do not expose a log level; not migrated", v)
-	}
+	setLogLevel(&cfg.Compact.LogLevel, str(compactDebug, "logLevel"), "spec.advanced.compact.debug.logLevel", warn)
+	setLogLevel(&cfg.Receive.LogLevel, str(advanced, "receive", "debug", "logLevel"), "spec.advanced.receive.debug.logLevel", warn)
 	if b, ok := nested(advanced, "query", "usePrometheusEngine"); ok {
 		if use, _ := b.(bool); use {
 			warn("spec.advanced.query.usePrometheusEngine=true: ThanosQuery does not expose a query engine selector; not migrated")
@@ -405,6 +402,22 @@ func setDuration(dst *string, val, field string, warn func(string, ...any)) {
 	}
 	if !prometheusDuration.MatchString(val) {
 		warn("%s=%q: not a Prometheus-style duration (e.g. 24h, 365d, 2w); not migrated", field, val)
+		return
+	}
+	*dst = val
+}
+
+// validLogLevels mirrors the CommonFields.logLevel enum of the Thanos CRs.
+var validLogLevels = []string{"debug", "info", "warn", "error"}
+
+// setLogLevel records the value if it matches the logLevel enum the Thanos CRs
+// accept, and warns and skips anything else.
+func setLogLevel(dst *string, val, field string, warn func(string, ...any)) {
+	if val == "" {
+		return
+	}
+	if !slices.Contains(validLogLevels, val) {
+		warn("%s=%q: not one of debug|info|warn|error; not migrated", field, val)
 		return
 	}
 	*dst = val

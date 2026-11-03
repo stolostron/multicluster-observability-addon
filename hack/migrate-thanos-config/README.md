@@ -67,6 +67,8 @@ own `instanceSize` handling via the AddOnDeploymentConfig.
 | `spec.advanced.compact.debug.downsampleConcurrency` | `ThanosCompact.spec.downsamplingConfig.concurrency` |
 | `spec.advanced.compact.debug.blockMetaFetchConcurrency` | `ThanosCompact.spec.blockConfig.blockMetaFetchConcurrency` |
 | `spec.advanced.compact.debug.waitInterval` | `ThanosCompact.spec.compactConfig.cleanupInterval` (approximate, warned) |
+| `spec.advanced.compact.debug.logLevel` | `ThanosCompact.spec.logLevel` |
+| `spec.advanced.receive.debug.logLevel` | `ThanosReceive.spec.router.logLevel` **and** `ThanosReceive.spec.ingester.hashrings[0].logLevel` (MCO ran one receive component, MCOA runs router + ingester) |
 | `spec.advanced.<component>.containers` | `.spec.additionalContainers` (only with `--include-sidecars`) |
 | `spec.advanced.<component>.resources` | **not written to CRs** — emitted as a suggested `AddOnDeploymentConfig` patch (`suggestedAddOnDeploymentConfig` in the migration file) |
 | `spec.nodeSelector` / `spec.tolerations` | same — suggested ADC patch only |
@@ -88,7 +90,6 @@ snippet manually to the ADC that deploys MCOA.
 |---|---|
 | `retentionConfig.deleteDelay` | Thanos CRs expose no delete-delay |
 | `retentionConfig.blockDuration` | ThanosRuler exposes no TSDB block duration |
-| `<component>.debug.logLevel` | Thanos CRs expose no log level |
 | `query.usePrometheusEngine` | ThanosQuery exposes no query engine selector |
 | `<component>.serviceAccountAnnotations` | no equivalent |
 
