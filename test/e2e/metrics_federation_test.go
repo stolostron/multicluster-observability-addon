@@ -258,7 +258,6 @@ func TestMetricsFederation(t *testing.T) {
 		const expectedNoProxy = "localhost,127.0.0.1"
 		const expectedTargetURL = "https://" + expectedTargetHost + "/api/metrics/v1/default/api/v1/receive"
 
-		var cutoverTime int64
 		err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 			aodc := &addonv1beta1.AddOnDeploymentConfig{}
 			if getErr := k8sClient.Get(ctx, client.ObjectKey{
@@ -282,7 +281,6 @@ func TestMetricsFederation(t *testing.T) {
 				NoProxy:    expectedNoProxy,
 				CABundle:   proxyCABundle,
 			}
-			cutoverTime = time.Now().Unix()
 			return k8sClient.Update(ctx, aodc)
 		})
 		require.NoError(t, err, "Failed to update AddOnDeploymentConfig with proxyConfig")
@@ -358,6 +356,7 @@ func TestMetricsFederation(t *testing.T) {
 		if proxyStatsURL == "" {
 			proxyStatsURL = "http://127.0.0.1:18080/stats"
 		}
+		var proxyActiveTime int64
 		require.EventuallyWithT(t, func(c *assert.CollectT) {
 			resp, reqErr := httpClient.Get(proxyStatsURL)
 			if !assert.NoError(c, reqErr, "HTTP GET to proxy /stats failed") {
@@ -376,6 +375,7 @@ func TestMetricsFederation(t *testing.T) {
 				"Expected HTTPS proxy to record CONNECT tunnel to %s", expectedTargetHost)
 			assert.Positive(c, stats.BytesCopied,
 				"Expected HTTPS proxy to transfer mTLS remote-write bytes")
+			proxyActiveTime = time.Now().Unix()
 		}, 2*time.Minute, 3*time.Second, "HTTPS proxy did not record CONNECT tunnel or bytes transferred")
 
 		// 6. Assert Data-Plane: Hub Prometheus receives fresh federated metrics via mTLS over tunnel
@@ -422,9 +422,10 @@ func TestMetricsFederation(t *testing.T) {
 			if !assert.NoError(c, parseErr, "Failed to parse sample timestamp") {
 				return
 			}
-			// Allow a small 5-second tolerance for clock drift between host runner and KinD/Podman container VM
-			assert.GreaterOrEqual(c, int64(sampleTime), cutoverTime-5,
-				"Expected fresh metric sample delivered after cutover (sample: %v, cutover: %v)", int64(sampleTime), cutoverTime)
+			// Require the sample timestamp to be at or after proxyActiveTime, ensuring that
+			// the sample was ingested after the proxy tunnel was active and PrometheusAgent had reloaded.
+			assert.GreaterOrEqual(c, int64(sampleTime), proxyActiveTime,
+				"Expected fresh metric sample delivered after proxy tunnel was established (sample: %v, proxyActive: %v)", int64(sampleTime), proxyActiveTime)
 		}, 3*time.Minute, 5*time.Second, "Hub Prometheus did not receive fresh federated metrics over mTLS tunnel within timeout")
 	})
 }
