@@ -106,7 +106,7 @@ type HubResourceReconciler struct {
 }
 
 // reader returns APIReader when configured so reads on unwatched hub resources
-// (Namespace, OperatorGroup) bypass the informer cache. Falls back to Client
+// (Namespace, OperatorGroup, Certificate, Secret) bypass the informer cache. Falls back to Client
 // for unit tests that only wire a fake client.
 func (r *HubResourceReconciler) reader() client.Reader {
 	if r.APIReader != nil {
@@ -116,11 +116,11 @@ func (r *HubResourceReconciler) reader() client.Reader {
 }
 
 // readerFor returns APIReader for unwatched hub resource types (Namespace,
-// OperatorGroup) and the cached Client for watched types (Subscription,
+// OperatorGroup, Certificate, Secret) and the cached Client for watched types (Subscription,
 // PersesDashboard, PersesDatasource, UIPlugin).
 func (r *HubResourceReconciler) readerFor(obj client.Object) client.Reader {
 	switch obj.(type) {
-	case *corev1.Namespace, *operatorsv1.OperatorGroup:
+	case *corev1.Namespace, *operatorsv1.OperatorGroup, *certmanagerv1.Certificate, *corev1.Secret:
 		return r.reader()
 	default:
 		return r.Client
