@@ -1,4 +1,4 @@
-{{- if not .Values.deployNonOCPStack }}
+{{- if .Values.isOpenShiftVendor }}
 apiVersion: v1
 kind: Service
 metadata:
