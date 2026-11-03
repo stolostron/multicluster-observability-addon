@@ -296,6 +296,7 @@ func (o *OptionsBuilder) buildVirtualizationOptionsFromConfig(configData rightsi
 	return opts, nil
 }
 
+// buildWorkloadOptionsFromConfig builds ComponentOptions for workload right-sizing from ConfigMap data.
 func (o *OptionsBuilder) buildWorkloadOptionsFromConfig(configData rightsizing.RSConfigMapData) (ComponentOptions, error) {
 	opts := ComponentOptions{Enabled: true}
 	rule, err := rsworkload.GenerateWorkloadPrometheusRule(configData)
@@ -306,6 +307,7 @@ func (o *OptionsBuilder) buildWorkloadOptionsFromConfig(configData rightsizing.R
 	return opts, nil
 }
 
+// buildPodOptionsFromConfig builds ComponentOptions for pod right-sizing from ConfigMap data.
 func (o *OptionsBuilder) buildPodOptionsFromConfig(configData rightsizing.RSConfigMapData) (ComponentOptions, error) {
 	opts := ComponentOptions{Enabled: true}
 	rule, err := rsworkload.GeneratePodPrometheusRule(configData)

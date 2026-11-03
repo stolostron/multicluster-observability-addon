@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TestEvaluationIntervals verifies workload and pod rules honor configured rolling and daily evaluation intervals.
 func TestEvaluationIntervals(t *testing.T) {
 	for _, gen := range []struct {
 		name string
@@ -71,6 +72,7 @@ func TestEvaluationIntervals(t *testing.T) {
 	}
 }
 
+// TestSeparateRulesKeepOwnerlessPodsAndWorkloadIdentity checks pod rules keep ownerless pods and workload rules require a workload label.
 func TestSeparateRulesKeepOwnerlessPodsAndWorkloadIdentity(t *testing.T) {
 	config := rightsizing.RSConfigMapData{PrometheusRuleConfig: rightsizing.GetDefaultRSPrometheusRuleConfig()}
 	podRule, err := GeneratePodPrometheusRule(config)
@@ -88,6 +90,7 @@ func TestSeparateRulesKeepOwnerlessPodsAndWorkloadIdentity(t *testing.T) {
 	assert.Contains(t, workloadExpr, `workload=~".+"`)
 }
 
+// TestGenerateWorkloadPrometheusRule verifies workload PrometheusRule generation for valid and invalid configs.
 func TestGenerateWorkloadPrometheusRule(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -166,6 +169,7 @@ func TestGenerateWorkloadPrometheusRule(t *testing.T) {
 	}
 }
 
+// TestGeneratePodPrometheusRule verifies the pod PrometheusRule name, namespace, and rule groups.
 func TestGeneratePodPrometheusRule(t *testing.T) {
 	config := rightsizing.RSConfigMapData{
 		PrometheusRuleConfig: rightsizing.GetDefaultRSPrometheusRuleConfig(),
@@ -179,6 +183,7 @@ func TestGeneratePodPrometheusRule(t *testing.T) {
 	assert.Equal(t, "acm-right-sizing-pod-1d.rules", rule.Spec.Groups[1].Name)
 }
 
+// TestPodRulesIncludeMappingRule verifies the pod:info mapping rule and owner-kind branches.
 func TestPodRulesIncludeMappingRule(t *testing.T) {
 	config := rightsizing.RSConfigMapData{
 		PrometheusRuleConfig: rightsizing.GetDefaultRSPrometheusRuleConfig(),
@@ -197,6 +202,7 @@ func TestPodRulesIncludeMappingRule(t *testing.T) {
 	assert.Contains(t, expr, `"workload_type", "ReplicaSet"`)
 }
 
+// TestWorkloadRulesIncludeLimitRules verifies workload CPU/memory limit rules exist in 5m and 1d groups.
 func TestWorkloadRulesIncludeLimitRules(t *testing.T) {
 	rule, err := GenerateWorkloadPrometheusRule(rightsizing.RSConfigMapData{
 		PrometheusRuleConfig: rightsizing.GetDefaultRSPrometheusRuleConfig(),
@@ -230,6 +236,7 @@ func TestWorkloadRulesIncludeLimitRules(t *testing.T) {
 	assert.Equal(t, 3, limit1d["acm_rs:workload:memory_limit"])
 }
 
+// TestPodRulesIncludeLimitRules verifies pod CPU/memory limit rules exist in 5m and 1d groups.
 func TestPodRulesIncludeLimitRules(t *testing.T) {
 	rule, err := GeneratePodPrometheusRule(rightsizing.RSConfigMapData{
 		PrometheusRuleConfig: rightsizing.GetDefaultRSPrometheusRuleConfig(),
@@ -263,6 +270,7 @@ func TestPodRulesIncludeLimitRules(t *testing.T) {
 	assert.Equal(t, 3, limit1d["acm_rs:pod:memory_limit"])
 }
 
+// TestAllProfilesGenerated verifies all default CPU profiles generate recommendation rules.
 func TestAllProfilesGenerated(t *testing.T) {
 	rule, err := GenerateWorkloadPrometheusRule(rightsizing.RSConfigMapData{
 		PrometheusRuleConfig: rightsizing.GetDefaultRSPrometheusRuleConfig(),
@@ -286,6 +294,7 @@ func TestAllProfilesGenerated(t *testing.T) {
 	}
 }
 
+// TestProfileAggregationExpressions verifies each profile uses the expected aggregation expression.
 func TestProfileAggregationExpressions(t *testing.T) {
 	rule, err := GenerateWorkloadPrometheusRule(rightsizing.RSConfigMapData{
 		PrometheusRuleConfig: rightsizing.GetDefaultRSPrometheusRuleConfig(),
@@ -310,6 +319,7 @@ func TestProfileAggregationExpressions(t *testing.T) {
 	require.Len(t, matched, len(profileExprs))
 }
 
+// TestDifferentCpuAndMemoryAggregators verifies CPU and memory aggregator lists can differ.
 func TestDifferentCpuAndMemoryAggregators(t *testing.T) {
 	config := rightsizing.GetDefaultRSPrometheusRuleConfig()
 	config.CpuAggregator = []string{"Max OverAll", "P99", "P95", "P90"}
@@ -334,6 +344,7 @@ func TestDifferentCpuAndMemoryAggregators(t *testing.T) {
 	assert.False(t, memProfiles["P90"])
 }
 
+// TestDefaultRecommendationPercentage verifies a zero percentage falls back to the default headroom.
 func TestDefaultRecommendationPercentage(t *testing.T) {
 	config := rightsizing.GetDefaultRSPrometheusRuleConfig()
 	config.RecommendationPercentage = 0
@@ -350,6 +361,7 @@ func TestDefaultRecommendationPercentage(t *testing.T) {
 	assert.True(t, found, "pod cpu_recommendation rule should exist")
 }
 
+// TestPhaseFilterExcludesNonRunningPods verifies request/limit rules filter on Running phase with == 1.
 func TestPhaseFilterExcludesNonRunningPods(t *testing.T) {
 	config := rightsizing.RSConfigMapData{
 		PrometheusRuleConfig: rightsizing.GetDefaultRSPrometheusRuleConfig(),

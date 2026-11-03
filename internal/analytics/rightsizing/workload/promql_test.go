@@ -27,6 +27,7 @@ func TestPodMappingWithPromtool(t *testing.T) {
 	runPromtoolTest(t, "pod_mapping.yaml", podWorkloadRelabelExpr(`namespace!=""`))
 }
 
+// TestRollingWindowWithPromtool verifies rolling-window peak retention across evaluation cadences via promtool.
 func TestRollingWindowWithPromtool(t *testing.T) {
 	config := rightsizing.GetDefaultWorkloadPrometheusRuleConfig()
 	config.EvaluationInterval = "10m"
@@ -54,6 +55,7 @@ func TestRollingWindowWithPromtool(t *testing.T) {
 	}
 }
 
+// runPromtoolTest injects a generated expression into a YAML fixture and evaluates it with promtool.
 func runPromtoolTest(t *testing.T, fixtureName, expr string) {
 	t.Helper()
 	promtool := os.Getenv("PROMTOOL")

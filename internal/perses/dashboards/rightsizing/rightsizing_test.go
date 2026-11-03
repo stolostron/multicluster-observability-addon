@@ -21,6 +21,7 @@ const (
 	testClusterLbl = ""
 )
 
+// TestWorkloadAndPodQueriesDeclareAllVariables ensures every $variable used in workload/pod queries is declared.
 func TestWorkloadAndPodQueriesDeclareAllVariables(t *testing.T) {
 	for _, build := range []func(string, string, string) (dashboard.Builder, error){
 		BuildWorkloadRightSizing, BuildWorkloadDetail, BuildPodRightSizing, BuildPodDetail,
