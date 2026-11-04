@@ -110,7 +110,6 @@ type ImageOverrides struct {
 	Prometheus                 string `json:"prometheus"`
 	EndpointMonitoringOperator string `json:"endpoint_monitoring_operator"`
 	ThanosOperator             string `json:"thanos_operator"`
-	ThanosStore                string `json:"thanos_store"`
 	Memcached                  string `json:"memcached"`
 	MemcachedExporter          string `json:"memcached_exporter"`
 }
@@ -153,9 +152,6 @@ func GetImageOverrides(ctx context.Context, c client.Client, registries []addona
 		ret.EndpointMonitoringOperator = overrideImage(ret.EndpointMonitoringOperator, registries, logger)
 		if ret.ThanosOperator != "" {
 			ret.ThanosOperator = overrideImage(ret.ThanosOperator, registries, logger)
-		}
-		if ret.ThanosStore != "" {
-			ret.ThanosStore = overrideImage(ret.ThanosStore, registries, logger)
 		}
 		if ret.Memcached != "" {
 			ret.Memcached = overrideImage(ret.Memcached, registries, logger)
@@ -284,18 +280,11 @@ func (o *ImageOverrides) ApplyClusterRegistryOverrides(registries []addonapiv1be
 	o.NodeExporter = overrideImageByRegistry(o.NodeExporter, registries)
 	o.Prometheus = overrideImageByRegistry(o.Prometheus, registries)
 	o.EndpointMonitoringOperator = overrideImageByRegistry(o.EndpointMonitoringOperator, registries)
-	if o.ThanosOperator != "" {
-		o.ThanosOperator = overrideImageByRegistry(o.ThanosOperator, registries)
-	}
-	if o.ThanosStore != "" {
-		o.ThanosStore = overrideImageByRegistry(o.ThanosStore, registries)
-	}
-	if o.Memcached != "" {
-		o.Memcached = overrideImageByRegistry(o.Memcached, registries)
-	}
-	if o.MemcachedExporter != "" {
-		o.MemcachedExporter = overrideImageByRegistry(o.MemcachedExporter, registries)
-	}
+	// overrideImageByRegistry is a no-op on empty strings, so the optional images
+	// (which may be unset in the images-list) need no guard.
+	o.ThanosOperator = overrideImageByRegistry(o.ThanosOperator, registries)
+	o.Memcached = overrideImageByRegistry(o.Memcached, registries)
+	o.MemcachedExporter = overrideImageByRegistry(o.MemcachedExporter, registries)
 }
 
 func overrideImageByRegistry(image string, registries []addonapiv1beta1.ImageMirror) string {

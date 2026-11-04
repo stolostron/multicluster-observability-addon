@@ -282,7 +282,6 @@ func TestApplyClusterRegistryOverrides(t *testing.T) {
 			name: "optional thanos images",
 			images: ImageOverrides{
 				ThanosOperator:    "registry.redhat.io/rhacm2/thanos-operator:v1.0.0",
-				ThanosStore:       "registry.redhat.io/rhacm2/thanos-store:v1.0.0",
 				Memcached:         "registry.redhat.io/rhacm2/memcached:1.6.3",
 				MemcachedExporter: "registry.redhat.io/rhacm2/memcached-exporter:v0.9.0",
 			},
@@ -291,7 +290,6 @@ func TestApplyClusterRegistryOverrides(t *testing.T) {
 			},
 			expected: ImageOverrides{
 				ThanosOperator:    "registry.stage.redhat.io/rhacm2/thanos-operator:v1.0.0",
-				ThanosStore:       "registry.stage.redhat.io/rhacm2/thanos-store:v1.0.0",
 				Memcached:         "registry.stage.redhat.io/rhacm2/memcached:1.6.3",
 				MemcachedExporter: "registry.stage.redhat.io/rhacm2/memcached-exporter:v0.9.0",
 			},
