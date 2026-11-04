@@ -77,6 +77,16 @@ spec:
   backoffLimit: 2
   activeDeadlineSeconds: 300
   ttlSecondsAfterFinished: 180
+  # Without an explicit selector the API server generates one from the Job's UID at
+  # create time. Job selectors are immutable, so the work agent's next apply of this
+  # manifest (which carries selector: null) is rejected, the sync backs off, and the
+  # JobComplete feedback the addon-framework needs to release the pre-delete finalizer
+  # never reaches the hub. manualSelector is required alongside it: a selector supplied
+  # without it is rejected at create with "`selector` not auto-generated".
+  manualSelector: true
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: endpoint-monitoring-operator-cleanup
   template:
     metadata:
       labels:

@@ -15,11 +15,11 @@ spec:
     - Egress
   ingress:
     - ports:
-        {{- if .Values.deployNonOCPStack }}
-        - port: 8080
+        {{- if .Values.isOpenShiftVendor }}
+        - port: 8443
           protocol: TCP
         {{- else }}
-        - port: 8443
+        - port: 8080
           protocol: TCP
         {{- end }}
   egress:
