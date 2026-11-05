@@ -13,15 +13,15 @@ import (
 	listVar "github.com/perses/perses/go-sdk/variable/list-variable"
 	labelValuesVar "github.com/perses/plugins/prometheus/sdk/go/variable/label-values"
 	staticListVar "github.com/perses/plugins/staticlistvariable/sdk/go"
-	panels "github.com/stolostron/multicluster-observability-addon/internal/perses/panels/rightsizing"
 	acmHelpers "github.com/stolostron/multicluster-observability-addon/pkg/perses/dashboards/acm"
+	panels "github.com/stolostron/multicluster-observability-addon/pkg/perses/panels/rightsizing"
 )
 
-// BuildVMUnderestimation creates the VM underestimation detail dashboard
-func BuildVMUnderestimation(project string, datasource string, clusterLabelName string) (dashboard.Builder, error) {
-	return dashboard.New("acm-rightsizing-vm-underestimation",
+// BuildVMOverestimation creates the VM overestimation detail dashboard
+func BuildVMOverestimation(project string, datasource string, clusterLabelName string) (dashboard.Builder, error) {
+	return dashboard.New("acm-rightsizing-vm-overestimation",
 		dashboard.ProjectName(project),
-		dashboard.Name("ACM Right-Sizing OpenShift Virtualization VM Underestimation"),
+		dashboard.Name("ACM Right-Sizing OpenShift Virtualization VM Overestimation"),
 		dashboard.Duration(time.Hour*24*7),
 
 		dashboard.AddVariable("cluster",
@@ -131,7 +131,7 @@ func BuildVMUnderestimation(project string, datasource string, clusterLabelName 
 				{X: 0, Y: 12, W: 6, H: 4},
 				{X: 6, Y: 0, W: 18, H: 16},
 			},
-			panels.VMCPUUnderestimationStatPanel(datasource),
+			panels.VMCPUOverestimationStatPanel(datasource),
 			panels.VMCPUUsageStatPanel(datasource),
 			panels.VMCPURequestStatPanel(datasource),
 			panels.VMCPUUtilizationStatPanel(datasource),
@@ -146,7 +146,7 @@ func BuildVMUnderestimation(project string, datasource string, clusterLabelName 
 				{X: 0, Y: 12, W: 6, H: 4},
 				{X: 6, Y: 0, W: 18, H: 16},
 			},
-			panels.VMMemoryUnderestimationStatPanel(datasource),
+			panels.VMMemoryOverestimationStatPanel(datasource),
 			panels.VMMemoryUsageStatPanel(datasource),
 			panels.VMMemoryRequestStatPanel(datasource),
 			panels.VMMemoryUtilizationStatPanel(datasource),
