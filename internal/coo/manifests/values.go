@@ -2,7 +2,6 @@ package manifests
 
 import (
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
-	config "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	imanifests "github.com/stolostron/multicluster-observability-addon/internal/analytics/incident-detection/manifests"
 )
 
@@ -63,32 +62,16 @@ func BuildValues(opts addon.Options, isHubCluster bool) *COOValues {
 	needsUIPlugin := incidentDetectionEnabled || hasDashboards
 
 	values := &COOValues{
-		Enabled:                hasDashboards || incidentDetectionEnabled || rightSizingEnabled,
-		InstallCOO:             installCOO,
-		IsHub:                  isHubCluster,
-		MonitoringUIPlugin:     needsUIPlugin,
-		Perses:                 hasDashboards,
-		Metrics:                metricsUI,
-		IncidentDetection:      incidentDetection,
-		CatalogSource:          catalogSourceOrDefault(opts.COO.CatalogSource),
-		CatalogSourceNamespace: catalogSourceNamespaceOrDefault(opts.COO.CatalogSourceNamespace),
+		Enabled:            hasDashboards || incidentDetectionEnabled || rightSizingEnabled,
+		InstallCOO:         installCOO,
+		IsHub:              isHubCluster,
+		MonitoringUIPlugin: needsUIPlugin,
+		Perses:             hasDashboards,
+		Metrics:            metricsUI,
+		IncidentDetection:  incidentDetection,
 	}
 
 	return values
-}
-
-func catalogSourceOrDefault(name string) string {
-	if name != "" {
-		return name
-	}
-	return config.DefaultCooCatalogSource
-}
-
-func catalogSourceNamespaceOrDefault(namespace string) string {
-	if namespace != "" {
-		return namespace
-	}
-	return config.DefaultCooCatalogSourceNamespace
 }
 
 func EnableUI(opts addon.MetricsOptions, isHub bool) *UIValues {
