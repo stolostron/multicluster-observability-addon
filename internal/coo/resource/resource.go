@@ -1,6 +1,7 @@
 package resource
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	stderrors "errors"
@@ -249,8 +250,8 @@ func (r *HubResourceReconciler) reconcileCOOOperator(ctx context.Context, instal
 			Channel:                addoncfg.CooSubscriptionChannel,
 			InstallPlanApproval:    operatorsv1alpha1.ApprovalAutomatic,
 			Package:                addoncfg.CooSubscriptionName,
-			CatalogSource:          "redhat-operators",
-			CatalogSourceNamespace: "openshift-marketplace",
+			CatalogSource:          cmp.Or(r.Opts.COO.CatalogSource, addoncfg.DefaultCooCatalogSource),
+			CatalogSourceNamespace: cmp.Or(r.Opts.COO.CatalogSourceNamespace, addoncfg.DefaultCooCatalogSourceNamespace),
 		},
 	}
 	if err := r.applyResource(ctx, sub); err != nil {
