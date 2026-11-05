@@ -11,6 +11,7 @@ require (
 	github.com/perses/plugins/piechart v0.13.2-0.20260326134814-37e86f6b1c58
 	github.com/perses/plugins/prometheus v0.57.1
 	github.com/perses/plugins/statchart v0.12.1
+	github.com/perses/plugins/staticlistvariable v0.8.1
 	github.com/perses/plugins/table v0.11.3-0.20260416092358-50d24073dacc
 	github.com/perses/plugins/timeserieschart v0.12.1
 	github.com/perses/promql-builder v0.2.1-0.20260106092606-e4909fea9c57
