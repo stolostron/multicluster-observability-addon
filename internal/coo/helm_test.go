@@ -1,6 +1,7 @@
 package coo
 
 import (
+	"cmp"
 	"context"
 	"testing"
 
@@ -54,6 +55,8 @@ func fakeGetValues(ctx context.Context, k8s client.Client) addonfactory.GetValue
 		isHub := common.IsHubCluster(cluster)
 
 		cooValues := manifests.BuildValues(addonOpts, isHub)
+		cooValues.CatalogSource = cmp.Or(addonOpts.COO.CatalogSource, addoncfg.DefaultCooCatalogSource)
+		cooValues.CatalogSourceNamespace = cmp.Or(addonOpts.COO.CatalogSourceNamespace, addoncfg.DefaultCooCatalogSourceNamespace)
 
 		return addonfactory.JsonStructToValues(cooValues)
 	}

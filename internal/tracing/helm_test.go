@@ -33,10 +33,6 @@ var (
 )
 
 func fakeGetValues(k8s client.Client) addonfactory.GetValuesFunc {
-	return fakeGetValuesWithCatalog(k8s, "", "")
-}
-
-func fakeGetValuesWithCatalog(k8s client.Client, catalogSource, catalogSourceNamespace string) addonfactory.GetValuesFunc {
 	return func(
 		cluster *clusterv1.ManagedCluster,
 		mcAddon *addonapiv1beta1.ManagedClusterAddOn,
@@ -49,13 +45,6 @@ func fakeGetValuesWithCatalog(k8s client.Client, catalogSource, catalogSourceNam
 		tracing, err := manifests.BuildValues(opts)
 		if err != nil {
 			return nil, err
-		}
-
-		if catalogSource != "" {
-			tracing.CatalogSource = catalogSource
-		}
-		if catalogSourceNamespace != "" {
-			tracing.CatalogSourceNamespace = catalogSourceNamespace
 		}
 
 		return addonfactory.JsonStructToValues(tracing)

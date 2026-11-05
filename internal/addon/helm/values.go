@@ -1,6 +1,7 @@
 package helm
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"slices"
@@ -158,8 +159,8 @@ func getLoggingValues(ctx context.Context, k8s client.Client, cluster *clusterv1
 		return nil, err
 	}
 	if values != nil {
-		values.CatalogSource = catalogSourceOrDefault(opts.COO.CatalogSource)
-		values.CatalogSourceNamespace = catalogSourceNamespaceOrDefault(opts.COO.CatalogSourceNamespace)
+		values.CatalogSource = cmp.Or(opts.COO.CatalogSource, addoncfg.DefaultCooCatalogSource)
+		values.CatalogSourceNamespace = cmp.Or(opts.COO.CatalogSourceNamespace, addoncfg.DefaultCooCatalogSourceNamespace)
 	}
 	return values, nil
 }
@@ -183,8 +184,8 @@ func getTracingValues(ctx context.Context, k8s client.Client, cluster *clusterv1
 		return nil, err
 	}
 
-	tracing.CatalogSource = catalogSourceOrDefault(opts.COO.CatalogSource)
-	tracing.CatalogSourceNamespace = catalogSourceNamespaceOrDefault(opts.COO.CatalogSourceNamespace)
+	tracing.CatalogSource = cmp.Or(opts.COO.CatalogSource, addoncfg.DefaultCooCatalogSource)
+	tracing.CatalogSourceNamespace = cmp.Or(opts.COO.CatalogSourceNamespace, addoncfg.DefaultCooCatalogSourceNamespace)
 
 	return &tracing, nil
 }
@@ -194,7 +195,10 @@ func getCOOValues(_ context.Context, _ client.Client, _ logr.Logger, cluster *cl
 		return nil, nil
 	}
 
-	return cmanifests.BuildValues(opts, common.IsHubCluster(cluster)), nil
+	values := cmanifests.BuildValues(opts, common.IsHubCluster(cluster))
+	values.CatalogSource = cmp.Or(opts.COO.CatalogSource, addoncfg.DefaultCooCatalogSource)
+	values.CatalogSourceNamespace = cmp.Or(opts.COO.CatalogSourceNamespace, addoncfg.DefaultCooCatalogSourceNamespace)
+	return values, nil
 }
 
 func getRightSizingValues(ctx context.Context, k8s client.Client, logger logr.Logger, cluster *clusterv1.ManagedCluster, opts addon.Options) (*rshandlers.RightSizingValues, error) {
@@ -208,18 +212,4 @@ func getRightSizingValues(ctx context.Context, k8s client.Client, logger logr.Lo
 	}
 
 	return rshandlers.BuildValues(rsOpts)
-}
-
-func catalogSourceOrDefault(name string) string {
-	if name != "" {
-		return name
-	}
-	return addoncfg.DefaultCooCatalogSource
-}
-
-func catalogSourceNamespaceOrDefault(namespace string) string {
-	if namespace != "" {
-		return namespace
-	}
-	return addoncfg.DefaultCooCatalogSourceNamespace
 }
