@@ -43,6 +43,7 @@ var (
 	errMissingDesiredConfig        = errors.New("missing desiredConfig in managedClusterAddon.Status.ConfigReferences")
 	errMissingRemoteWriteConfig    = errors.New("missing expected remote write spec in the prometheusAgent")
 	errMissingRouteHost            = errors.New("MCOA obs-api route has no host")
+	errInvalidPullSecretFormat     = errors.New("invalid pullSecret format, expected namespace.name")
 )
 
 type OptionsBuilder struct {
@@ -80,6 +81,17 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1beta1.Man
 	ret.Images, err = config.GetImageOverrides(ctx, o.Client, opts.Registries, o.Logger)
 	if err != nil {
 		return ret, fmt.Errorf("failed to get image overrides: %w", err)
+	}
+
+	// Apply per-cluster registry overrides from ManagedCluster annotation
+	clusterRegs := config.ParseClusterImageRegistries(managedCluster)
+	if clusterRegs != nil {
+		ret.Images.ApplyClusterRegistryOverrides(clusterRegs.Registries)
+		if clusterRegs.PullSecret != "" {
+			if psErr := o.addClusterPullSecret(ctx, &ret.Secrets, clusterRegs.PullSecret); psErr != nil {
+				o.Logger.Error(psErr, "failed to add custom pull secret from ManagedCluster annotation, using default")
+			}
+		}
 	}
 
 	// Fetch configuration references
@@ -135,6 +147,11 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1beta1.Man
 			o.Logger.V(2).Info("No rules found for user workloads")
 		}
 	}
+
+	// The agents are copied from the hub-wide default agents, whose images are set once
+	// for all clusters, so the per-cluster overrides above do not reach them.
+	applyClusterRegistriesToAgent(ret.Platform.PrometheusAgent, clusterRegs)
+	applyClusterRegistriesToAgent(ret.UserWorkloads.PrometheusAgent, clusterRegs)
 
 	if isHypershiftCluster {
 		if opts.UserWorkloads.Metrics.CollectionEnabled {
@@ -293,6 +310,24 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1beta1.Man
 	}
 
 	return ret, nil
+}
+
+// applyClusterRegistriesToAgent applies the cluster's registry prefix overrides to
+// the images of the agent: the Prometheus image and the extra containers, such as
+// the kube-rbac-proxy sidecar.
+func applyClusterRegistriesToAgent(agent *cooprometheusv1alpha1.PrometheusAgent, clusterRegs *config.ClusterImageRegistries) {
+	if agent == nil || clusterRegs == nil || len(clusterRegs.Registries) == 0 {
+		return
+	}
+	if agent.Spec.Image != nil {
+		agent.Spec.Image = ptr.To(clusterRegs.OverrideImage(*agent.Spec.Image))
+	}
+	for i := range agent.Spec.Containers {
+		agent.Spec.Containers[i].Image = clusterRegs.OverrideImage(agent.Spec.Containers[i].Image)
+	}
+	for i := range agent.Spec.InitContainers {
+		agent.Spec.InitContainers[i].Image = clusterRegs.OverrideImage(agent.Spec.InitContainers[i].Image)
+	}
 }
 
 // buildPrometheusAgent abstracts the logic of building a Prometheus agent for platform or user workloads
@@ -502,6 +537,33 @@ func (o *OptionsBuilder) addSecret(ctx context.Context, secrets *[]*corev1.Secre
 		}
 		secret.Data[config.MTLSCASecretKey] = mergeCABundle(secret.Data[config.MTLSCASecretKey], proxyCABundle)
 	}
+
+	*secrets = append(*secrets, secret)
+	return nil
+}
+
+const defaultImagePullSecretName = "open-cluster-management-image-pull-credentials"
+
+// addClusterPullSecret fetches the pull secret referenced in the
+// ManagedCluster's image-registries annotation (format: "namespace.name")
+// and adds it to the secrets list with the default pull secret name so it
+// replaces the one the addon framework would normally deploy.
+func (o *OptionsBuilder) addClusterPullSecret(ctx context.Context, secrets *[]*corev1.Secret, pullSecretRef string) error {
+	parts := strings.SplitN(pullSecretRef, ".", 2)
+	if len(parts) != 2 {
+		return fmt.Errorf("%w: %q", errInvalidPullSecretFormat, pullSecretRef)
+	}
+	namespace, name := parts[0], parts[1]
+
+	secret := &corev1.Secret{}
+	if err := o.Client.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, secret); err != nil {
+		return fmt.Errorf("failed to get custom pull secret %s/%s: %w", namespace, name, err)
+	}
+
+	secret = secret.DeepCopy()
+	secret.ResourceVersion = ""
+	secret.Name = defaultImagePullSecretName
+	secret.Namespace = ""
 
 	*secrets = append(*secrets, secret)
 	return nil
