@@ -23,6 +23,12 @@ jobs:
       with:
         version: v2.11.4
         args: --timeout=4m --build-tags=promql
+    - name: Lint pkg/perses submodule
+      uses: golangci/golangci-lint-action@v9
+      with:
+        version: v2.11.4
+        args: --timeout=4m
+        working-directory: pkg/perses
     - name: Run shellcheck
       run: make lint-scripts
 
@@ -40,6 +46,9 @@ jobs:
       id: go
     - name: Run tests
       run: go test -coverprofile=profile.cov ./internal/...
+    - name: Run pkg/perses submodule tests
+      run: go test ./...
+      working-directory: pkg/perses
     - name: Cache promtool
       uses: actions/cache@v4
       with:
