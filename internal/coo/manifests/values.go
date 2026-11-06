@@ -44,10 +44,12 @@ type COOValues struct {
 	// omitempty removed: when no regular dashboards are needed, the key must
 	// still appear in the serialized JSON so Helm uses the empty list instead
 	// of falling back to the default in values.yaml.
-	Dashboards          []DashboardValue                    `json:"dashboards"`
-	AnalyticsDashboards []DashboardValue                    `json:"analyticsDashboards,omitempty"`
-	Metrics             *UIValues                           `json:"metrics,omitempty"`
-	IncidentDetection   *imanifests.IncidentDetectionValues `json:"incidentDetection,omitempty"`
+	Dashboards             []DashboardValue                    `json:"dashboards"`
+	AnalyticsDashboards    []DashboardValue                    `json:"analyticsDashboards,omitempty"`
+	Metrics                *UIValues                           `json:"metrics,omitempty"`
+	IncidentDetection      *imanifests.IncidentDetectionValues `json:"incidentDetection,omitempty"`
+	CatalogSource          string                              `json:"catalogSource"`
+	CatalogSourceNamespace string                              `json:"catalogSourceNamespace"`
 }
 
 type UIValues struct {
