@@ -1,12 +1,14 @@
 package helm
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 
 	"github.com/go-logr/logr"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
+	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	rshandlers "github.com/stolostron/multicluster-observability-addon/internal/analytics/rightsizing/handlers"
 	chandlers "github.com/stolostron/multicluster-observability-addon/internal/coo/handlers"
 	cmanifests "github.com/stolostron/multicluster-observability-addon/internal/coo/manifests"
@@ -124,7 +126,15 @@ func getLoggingValues(ctx context.Context, k8s client.Client, cluster *clusterv1
 		return nil, err
 	}
 
-	return lmanifests.BuildValues(loggingOpts)
+	values, err := lmanifests.BuildValues(loggingOpts)
+	if err != nil {
+		return nil, err
+	}
+	if values != nil {
+		values.CatalogSource = cmp.Or(opts.COO.CatalogSource, addoncfg.DefaultCooCatalogSource)
+		values.CatalogSourceNamespace = cmp.Or(opts.COO.CatalogSourceNamespace, addoncfg.DefaultCooCatalogSourceNamespace)
+	}
+	return values, nil
 }
 
 func getTracingValues(ctx context.Context, k8s client.Client, cluster *clusterv1.ManagedCluster, mcAddon *addonapiv1alpha1.ManagedClusterAddOn, opts addon.Options) (*tmanifests.TracingValues, error) {
@@ -146,6 +156,9 @@ func getTracingValues(ctx context.Context, k8s client.Client, cluster *clusterv1
 		return nil, err
 	}
 
+	tracing.CatalogSource = cmp.Or(opts.COO.CatalogSource, addoncfg.DefaultCooCatalogSource)
+	tracing.CatalogSourceNamespace = cmp.Or(opts.COO.CatalogSourceNamespace, addoncfg.DefaultCooCatalogSourceNamespace)
+
 	return &tracing, nil
 }
 
@@ -159,7 +172,10 @@ func getCOOValues(ctx context.Context, k8s client.Client, logger logr.Logger, cl
 		return nil, err
 	}
 
-	return cmanifests.BuildValues(opts, installCOO, common.IsHubCluster(cluster)), nil
+	values := cmanifests.BuildValues(opts, installCOO, common.IsHubCluster(cluster))
+	values.CatalogSource = cmp.Or(opts.COO.CatalogSource, addoncfg.DefaultCooCatalogSource)
+	values.CatalogSourceNamespace = cmp.Or(opts.COO.CatalogSourceNamespace, addoncfg.DefaultCooCatalogSourceNamespace)
+	return values, nil
 }
 
 func getRightSizingValues(ctx context.Context, k8s client.Client, logger logr.Logger, cluster *clusterv1.ManagedCluster, opts addon.Options) (*rshandlers.RightSizingValues, error) {
