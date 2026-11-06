@@ -90,10 +90,12 @@ lint-scripts: ## Run shellcheck on repository shell scripts
 lint: $(GOLANGCI_LINT) verify-dockerfile-labels lint-scripts ## Run all linters (golangci-lint, dockerfile, shellcheck)
 	$(GOLANGCI_LINT) config verify
 	$(GOLANGCI_LINT) run --timeout=5m ./...
+	cd pkg/perses && $(GOLANGCI_LINT) run --timeout=5m ./...
 
 .PHONY: lint-fix
 lint-fix: $(GOLANGCI_LINT) ## Attempt to automatically fix lint issues in source code.
 	$(GOLANGCI_LINT) run --fix --timeout=5m ./...
+	cd pkg/perses && $(GOLANGCI_LINT) run --fix --timeout=5m ./...
 
 .PHONY: fmt
 fmt: lint-fix
@@ -101,6 +103,7 @@ fmt: lint-fix
 .PHONY: test
 test:
 	go test ./internal/...
+	cd pkg/perses && go test ./...
 
 $(PROMTOOL):
 	bash ./hack/install-promtool.sh "$(PROMTOOL_VERSION)" "$@"
