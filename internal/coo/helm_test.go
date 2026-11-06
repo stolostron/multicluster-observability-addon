@@ -1,6 +1,7 @@
 package coo
 
 import (
+	"cmp"
 	"context"
 	"testing"
 
@@ -68,6 +69,8 @@ func fakeGetValues(ctx context.Context, k8s client.Client) addonfactory.GetValue
 		}
 
 		cooValues := manifests.BuildValues(addonOpts, installCOO, isHub, false)
+		cooValues.CatalogSource = cmp.Or(addonOpts.COO.CatalogSource, addoncfg.DefaultCooCatalogSource)
+		cooValues.CatalogSourceNamespace = cmp.Or(addonOpts.COO.CatalogSourceNamespace, addoncfg.DefaultCooCatalogSourceNamespace)
 
 		return addonfactory.JsonStructToValues(cooValues)
 	}
@@ -105,12 +108,34 @@ func Test_IncidentDetection_AllConfigsTogether_AllResources(t *testing.T) {
 		name         string
 		isHub        bool
 		cv           []addonapiv1beta1.CustomizedVariable
+		cooClaim     string
 		expectedFunc func(*testing.T, []runtime.Object)
 	}{
 		{
 			name: "no config",
 			expectedFunc: func(t *testing.T, objects []runtime.Object) {
 				require.Empty(t, objects)
+			},
+		},
+		{
+			name:     "spoke COO subscription uses custom catalog source",
+			cooClaim: "not-installed",
+			cv: []addonapiv1beta1.CustomizedVariable{
+				{Name: addon.KeyPlatformIncidentDetection, Value: string(addon.UIPluginV1alpha1)},
+				{Name: addon.KeyCOOCatalogSource, Value: "cs-redhat-operator-index-v4-20"},
+				{Name: addon.KeyCOOCatalogSourceNamespace, Value: "openshift-marketplace"},
+			},
+			expectedFunc: func(t *testing.T, objects []runtime.Object) {
+				var sub *operatorsv1alpha1.Subscription
+				for _, o := range objects {
+					if s, ok := o.(*operatorsv1alpha1.Subscription); ok {
+						sub = s
+						break
+					}
+				}
+				require.NotNil(t, sub, "expected a COO Subscription on the spoke")
+				require.Equal(t, "cs-redhat-operator-index-v4-20", sub.Spec.CatalogSource)
+				require.Equal(t, "openshift-marketplace", sub.Spec.CatalogSourceNamespace)
 			},
 		},
 		{
@@ -337,6 +362,11 @@ func Test_IncidentDetection_AllConfigsTogether_AllResources(t *testing.T) {
 			if tc.isHub {
 				mc.Labels = map[string]string{
 					"local-cluster": "true",
+				}
+			}
+			if tc.cooClaim != "" {
+				mc.Status.ClusterClaims = []clusterv1.ManagedClusterClaim{
+					{Name: addoncfg.CooStatusClaimName, Value: tc.cooClaim},
 				}
 			}
 
