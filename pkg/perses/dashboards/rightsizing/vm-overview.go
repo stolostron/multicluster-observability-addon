@@ -10,18 +10,61 @@ import (
 	"github.com/perses/community-mixins/pkg/dashboards"
 	"github.com/perses/community-mixins/pkg/promql"
 	"github.com/perses/perses/go-sdk/dashboard"
+	panelgroup "github.com/perses/perses/go-sdk/panel-group"
 	listVar "github.com/perses/perses/go-sdk/variable/list-variable"
 	labelValuesVar "github.com/perses/plugins/prometheus/sdk/go/variable/label-values"
 	staticListVar "github.com/perses/plugins/staticlistvariable/sdk/go"
-	panels "github.com/stolostron/multicluster-observability-addon/internal/perses/panels/rightsizing"
-	acmHelpers "github.com/stolostron/multicluster-observability-addon/pkg/perses/dashboards/acm"
+	panels "github.com/stolostron/multicluster-observability-addon/pkg/perses/panels/rightsizing"
 )
 
-// BuildVMOverestimation creates the VM overestimation detail dashboard
-func BuildVMOverestimation(project string, datasource string, clusterLabelName string) (dashboard.Builder, error) {
-	return dashboard.New("acm-rightsizing-vm-overestimation",
+func withVMOverviewStatsGroup(datasource string) dashboard.Option {
+	return dashboard.AddPanelGroup("",
+		panelgroup.PanelsPerLine(4),
+		panelgroup.PanelHeight(4),
+		panels.VMTotalCPUOverestimationPanel(datasource),
+		panels.VMTotalCPUUnderestimationPanel(datasource),
+		panels.VMTotalMemOverestimationPanel(datasource),
+		panels.VMTotalMemUnderestimationPanel(datasource),
+	)
+}
+
+func withVMCPUOverestimationTableGroup(datasource string, project string) dashboard.Option {
+	return dashboard.AddPanelGroup("",
+		panelgroup.PanelsPerLine(1),
+		panelgroup.PanelHeight(10),
+		panels.VMCPUOverestimationTablePanel(datasource, project),
+	)
+}
+
+func withVMCPUUnderestimationTableGroup(datasource string, project string) dashboard.Option {
+	return dashboard.AddPanelGroup("",
+		panelgroup.PanelsPerLine(1),
+		panelgroup.PanelHeight(10),
+		panels.VMCPUUnderestimationTablePanel(datasource, project),
+	)
+}
+
+func withVMMemOverestimationTableGroup(datasource string, project string) dashboard.Option {
+	return dashboard.AddPanelGroup("",
+		panelgroup.PanelsPerLine(1),
+		panelgroup.PanelHeight(10),
+		panels.VMMemOverestimationTablePanel(datasource, project),
+	)
+}
+
+func withVMMemUnderestimationTableGroup(datasource string, project string) dashboard.Option {
+	return dashboard.AddPanelGroup("",
+		panelgroup.PanelsPerLine(1),
+		panelgroup.PanelHeight(10),
+		panels.VMMemUnderestimationTablePanel(datasource, project),
+	)
+}
+
+// BuildVMOverview creates the main VM right-sizing overview dashboard
+func BuildVMOverview(project string, datasource string, clusterLabelName string) (dashboard.Builder, error) {
+	return dashboard.New("acm-rightsizing-openshift-virtualization",
 		dashboard.ProjectName(project),
-		dashboard.Name("ACM Right-Sizing OpenShift Virtualization VM Overestimation"),
+		dashboard.Name("ACM Right-Sizing OpenShift Virtualization"),
 		dashboard.Duration(time.Hour*24*7),
 
 		dashboard.AddVariable("cluster",
@@ -30,7 +73,7 @@ func BuildVMOverestimation(project string, datasource string, clusterLabelName s
 					dashboards.AddVariableDatasource(datasource),
 					labelValuesVar.Matchers(
 						promql.SetLabelMatchers(
-							`{__name__=~"acm_rs_vm:namespace:(cpu_request|cpu_usage|memory_request|memory_usage)"}`,
+							"acm_rs_vm:namespace:cpu_request",
 							[]promql.LabelMatcher{},
 						)),
 				),
@@ -97,60 +140,16 @@ func BuildVMOverestimation(project string, datasource string, clusterLabelName s
 						)),
 				),
 				listVar.DisplayName("Namespace"),
-				listVar.AllowAllValue(false),
-				listVar.AllowMultiple(false),
+				listVar.DefaultValue("$__all"),
+				listVar.AllowAllValue(true),
+				listVar.AllowMultiple(true),
 			),
 		),
 
-		dashboard.AddVariable("vm",
-			listVar.List(
-				labelValuesVar.PrometheusLabelValues("name",
-					dashboards.AddVariableDatasource(datasource),
-					labelValuesVar.Matchers(
-						promql.SetLabelMatchers(
-							`acm_rs_vm:namespace:cpu_usage{cluster="$cluster",profile="$cpu_profile",namespace="$namespace"}`,
-							[]promql.LabelMatcher{},
-						)),
-				),
-				listVar.DisplayName("VM"),
-				listVar.AllowAllValue(false),
-				listVar.AllowMultiple(false),
-			),
-		),
-
-		acmHelpers.AddCustomPanelGroup("",
-			[]acmHelpers.GridItem{{X: 17, Y: 0, W: 7, H: 2}},
-			panels.VMBackToMainDashboardPanel(datasource, project),
-		),
-
-		acmHelpers.AddCustomPanelGroup("CPU",
-			[]acmHelpers.GridItem{
-				{X: 0, Y: 0, W: 6, H: 4},
-				{X: 0, Y: 4, W: 6, H: 4},
-				{X: 0, Y: 8, W: 6, H: 4},
-				{X: 0, Y: 12, W: 6, H: 4},
-				{X: 6, Y: 0, W: 18, H: 16},
-			},
-			panels.VMCPUOverestimationStatPanel(datasource),
-			panels.VMCPUUsageStatPanel(datasource),
-			panels.VMCPURequestStatPanel(datasource),
-			panels.VMCPUUtilizationStatPanel(datasource),
-			panels.VMCPUUtilizationTimeSeriesPanel(datasource),
-		),
-
-		acmHelpers.AddCustomPanelGroup("Memory",
-			[]acmHelpers.GridItem{
-				{X: 0, Y: 0, W: 6, H: 4},
-				{X: 0, Y: 4, W: 6, H: 4},
-				{X: 0, Y: 8, W: 6, H: 4},
-				{X: 0, Y: 12, W: 6, H: 4},
-				{X: 6, Y: 0, W: 18, H: 16},
-			},
-			panels.VMMemoryOverestimationStatPanel(datasource),
-			panels.VMMemoryUsageStatPanel(datasource),
-			panels.VMMemoryRequestStatPanel(datasource),
-			panels.VMMemoryUtilizationStatPanel(datasource),
-			panels.VMMemoryUtilizationTimeSeriesPanel(datasource),
-		),
+		withVMOverviewStatsGroup(datasource),
+		withVMCPUOverestimationTableGroup(datasource, project),
+		withVMCPUUnderestimationTableGroup(datasource, project),
+		withVMMemOverestimationTableGroup(datasource, project),
+		withVMMemUnderestimationTableGroup(datasource, project),
 	)
 }
