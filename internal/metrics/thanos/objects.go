@@ -46,7 +46,12 @@ func (b *ObjectBuilder) Build(ctx context.Context, cluster *clusterv1.ManagedClu
 		}
 	}
 
-	store := b.buildStore(opts, images.ThanosStore)
+	// Apply per-cluster registry overrides from ManagedCluster annotation
+	if clusterRegs := config.ParseClusterImageRegistries(cluster); clusterRegs != nil {
+		images.ApplyClusterRegistryOverrides(clusterRegs.Registries)
+	}
+
+	store := b.buildStore(opts)
 	receive := b.buildReceive(opts)
 	query := b.buildQuery(opts)
 	ruler := b.buildRuler(opts)
@@ -58,7 +63,7 @@ func (b *ObjectBuilder) Build(ctx context.Context, cluster *clusterv1.ManagedClu
 	return objects, nil
 }
 
-func (b *ObjectBuilder) buildStore(opts addon.Options, storeImage string) *thanosv1alpha1.ThanosStore {
+func (b *ObjectBuilder) buildStore(opts addon.Options) *thanosv1alpha1.ThanosStore {
 	shards := int32(config.DefaultStoreShards)
 
 	store := &thanosv1alpha1.ThanosStore{
@@ -93,10 +98,9 @@ func (b *ObjectBuilder) buildStore(opts addon.Options, storeImage string) *thano
 		},
 	}
 
-	if storeImage != "" {
-		store.Spec.Image = &storeImage
-	}
-
+	// Store, like the other Thanos components (receive, query, ruler, compact),
+	// inherits the thanos image from the Thanos Operator default. Setting it only
+	// here would risk version skew across the Thanos stack.
 	ApplyCommonThanosFields(&store.Spec.CommonFields, opts, config.ThanosStoreContainerID)
 
 	return store
