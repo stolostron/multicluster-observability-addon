@@ -28,6 +28,8 @@ require (
 )
 
 require (
+	github.com/cert-manager/cert-manager v1.20.2
+	github.com/grafana/loki/operator/api/loki v0.0.0-20260618161557-5b6cddfaab00
 	github.com/openshift/controller-runtime-common v0.0.0-20260428152732-64ee174f5e2e
 	github.com/openshift/library-go v0.0.0-20260713143403-795ac1a480b5
 	github.com/perses/community-mixins v0.0.0-20251209094652-b91692c6ac00
@@ -44,7 +46,6 @@ require (
 )
 
 require (
-	github.com/AdaLogics/go-fuzz-headers v0.0.0-20240806141605-e8a1dd7889d6 // indirect
 	github.com/go-openapi/swag/cmdutils v0.25.5 // indirect
 	github.com/go-openapi/swag/conv v0.25.5 // indirect
 	github.com/go-openapi/swag/fileutils v0.25.5 // indirect
@@ -61,10 +62,13 @@ require (
 	github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus v1.1.0 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.3.3 // indirect
 	github.com/perses/plugins/barchart v0.11.1 // indirect
+	github.com/perses/plugins/logstable v0.2.1 // indirect
+	github.com/perses/plugins/loki v0.5.1 // indirect
 	github.com/perses/plugins/piechart v0.13.2-0.20260326134814-37e86f6b1c58 // indirect
 	github.com/prometheus/otlptranslator v1.0.0 // indirect
 	golang.org/x/text v0.41.0 // indirect
 	k8s.io/streaming v0.36.2 // indirect
+	sigs.k8s.io/gateway-api v1.5.0 // indirect
 )
 
 require (

@@ -43,6 +43,9 @@ const (
 
 	KeyPlatformMetricsUI          = "platformMetricsUI"
 	KeyMetricsStorageInstanceSize = "metricsStorageInstanceSize"
+
+	KeyPlatformLogsDefault = "platformLogsDefault"
+	KeyHubHostname         = "hubHostname"
 )
 
 type CollectionKind string
@@ -85,6 +88,7 @@ type IncidentDetection struct {
 type LogsOptions struct {
 	CollectionEnabled   bool
 	SubscriptionChannel string
+	DefaultStack        bool
 }
 
 type TracesOptions struct {
@@ -216,6 +220,7 @@ type Options struct {
 	ProxyConfig           ProxyConfig
 	Registries            []addonapiv1beta1.ImageMirror
 	ThanosOperatorEnabled bool
+	HubHostname           string
 }
 
 func (o Options) validate() error {
@@ -275,7 +280,7 @@ func BuildOptions(addOnDeployment *addonapiv1beta1.AddOnDeploymentConfig) (Optio
 
 	opts.ProxyConfig.NoProxy = addOnDeployment.Spec.ProxyConfig.NoProxy
 	opts.Registries = addOnDeployment.Spec.Registries
-	opts.ThanosOperatorEnabled = addOnDeployment.Annotations["mcoa-thanos-operator"] == "true"
+	opts.ThanosOperatorEnabled = addOnDeployment.Annotations[addoncfg.ThanosOperatorAnnotationKey] == "true"
 
 	// Default alerts to disabled
 	opts.Platform.Metrics.AlertsEnabled = false
@@ -405,6 +410,13 @@ func BuildOptions(addOnDeployment *addonapiv1beta1.AddOnDeploymentConfig) (Optio
 			}
 		case KeyMetricsStorageInstanceSize:
 			opts.InstanceSize = keyvalue.Value
+		case KeyPlatformLogsDefault:
+			if keyvalue.Value == "true" {
+				opts.Platform.Enabled = true
+				opts.Platform.Logs.DefaultStack = true
+			}
+		case KeyHubHostname:
+			opts.HubHostname = keyvalue.Value
 		}
 	}
 
