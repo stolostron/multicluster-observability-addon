@@ -92,14 +92,23 @@ func componentName(isUWL bool) string {
 
 // PrometheusAgentSSA applies configuration and invariants to an existing PrometheusAgent
 // It is used to enforce mandatory fields with server-side apply.
+// GlobalHubRemoteWriteConfig holds the configuration for an additional remote-write
+// to a Global Hub's Observatorium instance. When set, the PrometheusAgent will
+// dual-write metrics to both the local hub and the Global Hub.
+type GlobalHubRemoteWriteConfig struct {
+	Endpoint  string
+	ManagedBy string
+}
+
 type PrometheusAgentSSA struct {
-	ExistingAgent       *cooprometheusv1alpha1.PrometheusAgent
-	IsUwl               bool
-	PrometheusImage     string
-	KubeRBACProxyImage  string
-	Labels              map[string]string
-	RemoteWriteEndpoint string
-	Annotations         map[string]string
+	ExistingAgent        *cooprometheusv1alpha1.PrometheusAgent
+	IsUwl                bool
+	PrometheusImage      string
+	KubeRBACProxyImage   string
+	Labels               map[string]string
+	RemoteWriteEndpoint  string
+	Annotations          map[string]string
+	GlobalHubRemoteWrite *GlobalHubRemoteWriteConfig
 
 	desiredAgent *cooprometheusv1alpha1.PrometheusAgent
 }
@@ -230,6 +239,58 @@ func (p *PrometheusAgentSSA) setPrometheusRemoteWriteConfig() {
 		p.desiredAgent.Spec.RemoteWrite[index] = desiredRemoteWriteSpec
 	} else {
 		p.desiredAgent.Spec.RemoteWrite = append(p.desiredAgent.Spec.RemoteWrite, desiredRemoteWriteSpec)
+	}
+
+	p.setGlobalHubRemoteWrite()
+}
+
+func (p *PrometheusAgentSSA) setGlobalHubRemoteWrite() {
+	if p.GlobalHubRemoteWrite == nil {
+		// Remove stale Global Hub remote-write if it was previously configured
+		p.desiredAgent.Spec.RemoteWrite = slices.DeleteFunc(p.desiredAgent.Spec.RemoteWrite, func(e cooprometheusv1.RemoteWriteSpec) bool {
+			return e.Name != nil && *e.Name == config.GlobalHubRemoteWriteCfgName
+		})
+		p.desiredAgent.Spec.Secrets = slices.DeleteFunc(p.desiredAgent.Spec.Secrets, func(s string) bool {
+			return s == config.GlobalHubObservabilitySecretName
+		})
+		return
+	}
+
+	if !slices.Contains(p.desiredAgent.Spec.Secrets, config.GlobalHubObservabilitySecretName) {
+		p.desiredAgent.Spec.Secrets = append(p.desiredAgent.Spec.Secrets, config.GlobalHubObservabilitySecretName)
+	}
+
+	globalHubRemoteWrite := cooprometheusv1.RemoteWriteSpec{
+		URL:           cooprometheusv1.URL(p.GlobalHubRemoteWrite.Endpoint),
+		Name:          ptr.To(config.GlobalHubRemoteWriteCfgName),
+		RemoteTimeout: ptr.To(cooprometheusv1.Duration("30s")),
+		TLSConfig: &cooprometheusv1.TLSConfig{
+			TLSFilesConfig: cooprometheusv1.TLSFilesConfig{
+				CAFile:   p.formatSecretPath(config.GlobalHubObservabilitySecretName, config.MTLSCASecretKey),
+				CertFile: p.formatSecretPath(config.GlobalHubObservabilitySecretName, config.MTLSCertSecretKey),
+				KeyFile:  p.formatSecretPath(config.GlobalHubObservabilitySecretName, config.MTLSCertKeySecretKey),
+			},
+		},
+	}
+
+	if p.GlobalHubRemoteWrite.ManagedBy != "" {
+		managedBy := p.GlobalHubRemoteWrite.ManagedBy
+		globalHubRemoteWrite.WriteRelabelConfigs = append(globalHubRemoteWrite.WriteRelabelConfigs,
+			cooprometheusv1.RelabelConfig{
+				Replacement: &managedBy,
+				TargetLabel: config.ManagedByMetricLabel,
+				Action:      "replace",
+			},
+		)
+	}
+
+	index := slices.IndexFunc(p.desiredAgent.Spec.RemoteWrite, func(e cooprometheusv1.RemoteWriteSpec) bool {
+		return e.Name != nil && *e.Name == config.GlobalHubRemoteWriteCfgName
+	})
+	if index >= 0 {
+		p.desiredAgent.Spec.RemoteWrite[index] = globalHubRemoteWrite
+	} else {
+		p.desiredAgent.Spec.RemoteWrite = append(p.desiredAgent.Spec.RemoteWrite, globalHubRemoteWrite)
 	}
 }
 
