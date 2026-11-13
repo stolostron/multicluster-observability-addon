@@ -9,7 +9,7 @@ metadata:
     release: {{ .Release.Name }}
 spec:
   monitoring:
-{{- if .Values.metrics.enabled }}
+{{- if .Values.perses }}
     acm:
       enabled: true
       alertmanager:
