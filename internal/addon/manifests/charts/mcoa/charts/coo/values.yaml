@@ -16,3 +16,6 @@ incidentDetection:
   enabled: false
 
 monitoringUIPlugin: false
+
+catalogSource: redhat-operators
+catalogSourceNamespace: openshift-marketplace
