@@ -7,10 +7,10 @@ import (
 	panelgroup "github.com/perses/perses/go-sdk/panel-group"
 	markdownPanel "github.com/perses/plugins/markdown/sdk/go"
 	"github.com/perses/plugins/prometheus/sdk/go/query"
-	"github.com/prometheus/prometheus/promql/parser"
 	statPanel "github.com/perses/plugins/statchart/sdk/go"
 	tablePanel "github.com/perses/plugins/table/sdk/go"
 	timeSeriesPanel "github.com/perses/plugins/timeserieschart/sdk/go"
+	"github.com/prometheus/prometheus/promql/parser"
 	dl "github.com/stolostron/multicluster-observability-addon/pkg/perses/panels/datalinks"
 )
 
