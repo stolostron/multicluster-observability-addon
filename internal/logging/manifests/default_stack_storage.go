@@ -38,7 +38,7 @@ func BuildSSALokiStack(opts Options, lsName, placementNamespace, placementName s
 
 	if existingLS.Name == "" {
 		// Default fields for SSA
-		lokistackSpec.Size = lokiv1.SizeOneXPico
+		lokistackSpec.Size = lokiv1.SizeOneXDemo
 		// Default value can't be changed due to https://redhat.atlassian.net/browse/LOG-7390
 		lokistackSpec.StorageClassName = "gp3-csi"
 		lokistackSpec.Storage = lokiv1.ObjectStorageSpec{
