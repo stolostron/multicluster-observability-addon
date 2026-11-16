@@ -102,6 +102,9 @@ rules:
   - apiGroups: ["observability.openshift.io"]
     resources: ["uiplugins"]
     verbs: ["get", "list", "watch", "create", "update", "delete", "patch"]
+  - apiGroups: ["apps"]
+    resources: ["statefulsets"]
+    verbs: ["get", "list", "watch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
