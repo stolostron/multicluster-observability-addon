@@ -13,6 +13,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"math/big"
 	"net/http"
 	"net/url"
@@ -221,7 +222,68 @@ func generateRotatedMTLSCerts(caCommonName, clientCommonName string) (*rotatedCe
 	}, nil
 }
 
+func rolloutHubPrometheus(ctx context.Context, k8sClient client.Client) error {
+	var targetGeneration int64
+	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		deploy := &appsv1.Deployment{}
+		if getErr := k8sClient.Get(ctx, client.ObjectKey{
+			Namespace: hubNamespace,
+			Name:      "hub-prometheus",
+		}, deploy); getErr != nil {
+			return getErr
+		}
+		if deploy.Spec.Template.Annotations == nil {
+			deploy.Spec.Template.Annotations = map[string]string{}
+		}
+		deploy.Spec.Template.Annotations["kubectl.kubernetes.io/restartedAt"] = time.Now().Format(time.RFC3339Nano)
+		if updateErr := k8sClient.Update(ctx, deploy); updateErr != nil {
+			return updateErr
+		}
+		targetGeneration = deploy.Generation
+		return nil
+	}); err != nil {
+		return fmt.Errorf("failed to update hub-prometheus deployment: %w", err)
+	}
+
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+	for {
+		deploy := &appsv1.Deployment{}
+		if err := k8sClient.Get(ctx, client.ObjectKey{
+			Namespace: hubNamespace,
+			Name:      "hub-prometheus",
+		}, deploy); err == nil {
+			if deploy.Status.ObservedGeneration >= targetGeneration &&
+				deploy.Status.UpdatedReplicas == 1 &&
+				deploy.Status.ReadyReplicas == 1 &&
+				deploy.Status.Replicas == 1 {
+				podList := &corev1.PodList{}
+				if listErr := k8sClient.List(ctx, podList, client.InNamespace(hubNamespace), client.MatchingLabels{"app": "hub-prometheus"}); listErr == nil {
+					activeReady := 0
+					totalPods := 0
+					for i := range podList.Items {
+						totalPods++
+						if podList.Items[i].DeletionTimestamp == nil && isPodReady(&podList.Items[i]) {
+							activeReady++
+						}
+					}
+					if totalPods == 1 && activeReady == 1 {
+						return nil
+					}
+				}
+			}
+		}
+
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("timed out waiting for hub-prometheus rollout: %w", ctx.Err())
+		case <-ticker.C:
+		}
+	}
+}
+
 func TestMetricsFederation(t *testing.T) {
+	outerT := t
 	scheme := runtime.NewScheme()
 	require.NoError(t, clientgoscheme.AddToScheme(scheme))
 	require.NoError(t, clusterv1.Install(scheme))
@@ -644,14 +706,25 @@ func TestMetricsFederation(t *testing.T) {
 		certs, err := generateRotatedMTLSCerts(rotatedCACommonName, rotatedClientCommonName)
 		require.NoError(t, err, "Failed to generate rotated mTLS certificates")
 
+		const (
+			caSecretName     = "observability-managed-cluster-certs"
+			serverSecretName = "hub-prometheus-tls"
+			clientSecretName = "observability-controller-open-cluster-management.io-observability-signer-client-cert"
+		)
+
+		var origCAData, origServerData, origClientData map[string][]byte
+
 		// 1. Update Hub CA secret (observability-managed-cluster-certs)
 		err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 			caSecret := &corev1.Secret{}
 			if getErr := k8sClient.Get(ctx, client.ObjectKey{
 				Namespace: hubNamespace,
-				Name:      "observability-managed-cluster-certs",
+				Name:      caSecretName,
 			}, caSecret); getErr != nil {
 				return getErr
+			}
+			if origCAData == nil {
+				origCAData = maps.Clone(caSecret.Data)
 			}
 			caSecret.Data["ca.crt"] = certs.caCertPEM
 			return k8sClient.Update(ctx, caSecret)
@@ -663,9 +736,12 @@ func TestMetricsFederation(t *testing.T) {
 			serverSecret := &corev1.Secret{}
 			if getErr := k8sClient.Get(ctx, client.ObjectKey{
 				Namespace: hubNamespace,
-				Name:      "hub-prometheus-tls",
+				Name:      serverSecretName,
 			}, serverSecret); getErr != nil {
 				return getErr
+			}
+			if origServerData == nil {
+				origServerData = maps.Clone(serverSecret.Data)
 			}
 			serverSecret.Data["tls.crt"] = certs.serverCertPEM
 			serverSecret.Data["tls.key"] = certs.serverKeyPEM
@@ -678,9 +754,12 @@ func TestMetricsFederation(t *testing.T) {
 			clientSecret := &corev1.Secret{}
 			if getErr := k8sClient.Get(ctx, client.ObjectKey{
 				Namespace: hubNamespace,
-				Name:      "observability-controller-open-cluster-management.io-observability-signer-client-cert",
+				Name:      clientSecretName,
 			}, clientSecret); getErr != nil {
 				return getErr
+			}
+			if origClientData == nil {
+				origClientData = maps.Clone(clientSecret.Data)
 			}
 			clientSecret.Data["tls.crt"] = certs.clientCertPEM
 			clientSecret.Data["tls.key"] = certs.clientKeyPEM
@@ -688,22 +767,39 @@ func TestMetricsFederation(t *testing.T) {
 		})
 		require.NoError(t, err, "Failed to update client cert secret on Hub")
 
-		// 4. Restart hub-prometheus Deployment so Nginx immediately enforces the rotated CA and server cert
-		err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-			deploy := &appsv1.Deployment{}
-			if getErr := k8sClient.Get(ctx, client.ObjectKey{
-				Namespace: hubNamespace,
-				Name:      "hub-prometheus",
-			}, deploy); getErr != nil {
-				return getErr
+		outerT.Cleanup(func() {
+			cleanupCtx, cancelCleanup := context.WithTimeout(context.Background(), 2*time.Minute)
+			defer cancelCleanup()
+
+			restoreSecret := func(name string, data map[string][]byte) {
+				if data == nil {
+					return
+				}
+				restoreErr := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+					sec := &corev1.Secret{}
+					if getErr := k8sClient.Get(cleanupCtx, client.ObjectKey{
+						Namespace: hubNamespace,
+						Name:      name,
+					}, sec); getErr != nil {
+						return getErr
+					}
+					sec.Data = maps.Clone(data)
+					return k8sClient.Update(cleanupCtx, sec)
+				})
+				assert.NoError(outerT, restoreErr, "Failed to restore Secret %s in cleanup", name)
 			}
-			if deploy.Spec.Template.Annotations == nil {
-				deploy.Spec.Template.Annotations = map[string]string{}
-			}
-			deploy.Spec.Template.Annotations["kubectl.kubernetes.io/restartedAt"] = time.Now().Format(time.RFC3339Nano)
-			return k8sClient.Update(ctx, deploy)
+
+			restoreSecret(caSecretName, origCAData)
+			restoreSecret(serverSecretName, origServerData)
+			restoreSecret(clientSecretName, origClientData)
+			assert.NoError(outerT, rolloutHubPrometheus(cleanupCtx, k8sClient), "Failed to rollout hub-prometheus after restoring original certificates")
 		})
-		require.NoError(t, err, "Failed to trigger rollout of hub-prometheus")
+
+		// 4. Restart hub-prometheus Deployment and wait for replacement receiver rollout before asserting recovery
+		rolloutCtx, cancelRollout := context.WithTimeout(ctx, 2*time.Minute)
+		defer cancelRollout()
+		require.NoError(t, rolloutHubPrometheus(rolloutCtx, k8sClient), "Failed to rollout hub-prometheus with rotated certificates")
+		rotationTime := float64(time.Now().UnixNano()) / 1e9
 
 		// 5. Assert WatcherReconciler propagates rotated CA and client cert secrets to spoke namespace
 		t.Log("=== Asserting rotated CA and client cert secrets are propagated to spoke ===")
@@ -738,7 +834,6 @@ func TestMetricsFederation(t *testing.T) {
 
 		// 6. Assert PrometheusAgent recovers connection to Hub Prometheus receiver with rotated certs
 		t.Log("=== Asserting PrometheusAgent recovers mTLS connection and delivers fresh metrics ===")
-		rotationTime := float64(time.Now().UnixNano()) / 1e9
 		require.EventuallyWithT(t, func(c *assert.CollectT) {
 			samples, ok := queryPrometheus(c, httpClient, hubURL, `timestamp(up{cluster="local-cluster",job="prometheus"} == 1)`)
 			if !ok {
@@ -1034,10 +1129,19 @@ http {
 		t.Log("=== Validating Non-OCP Managed Cluster Stack via mcoa-override-vendor (ACM-47975) ===")
 
 		// 1. Annotate ManagedCluster 'local-cluster' with mcoa-override-vendor: "Other"
+		var (
+			prevVendorOverride string
+			hadVendorOverride  bool
+			vendorCaptured     bool
+		)
 		err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 			mc := &clusterv1.ManagedCluster{}
 			if getErr := k8sClient.Get(ctx, client.ObjectKey{Name: clusterName}, mc); getErr != nil {
 				return getErr
+			}
+			if !vendorCaptured {
+				prevVendorOverride, hadVendorOverride = mc.Annotations["mcoa-override-vendor"]
+				vendorCaptured = true
 			}
 			if mc.Annotations == nil {
 				mc.Annotations = map[string]string{}
@@ -1046,6 +1150,31 @@ http {
 			return k8sClient.Update(ctx, mc)
 		})
 		require.NoError(t, err, "Failed to set mcoa-override-vendor annotation on ManagedCluster")
+
+		t.Cleanup(func() {
+			cleanupCtx, cancelCleanup := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancelCleanup()
+
+			restoreErr := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+				mc := &clusterv1.ManagedCluster{}
+				if getErr := k8sClient.Get(cleanupCtx, client.ObjectKey{Name: clusterName}, mc); getErr != nil {
+					return getErr
+				}
+				if hadVendorOverride {
+					if mc.Annotations == nil {
+						mc.Annotations = map[string]string{}
+					}
+					mc.Annotations["mcoa-override-vendor"] = prevVendorOverride
+				} else if mc.Annotations != nil {
+					if _, exists := mc.Annotations["mcoa-override-vendor"]; !exists {
+						return nil
+					}
+					delete(mc.Annotations, "mcoa-override-vendor")
+				}
+				return k8sClient.Update(cleanupCtx, mc)
+			})
+			assert.NoError(t, restoreErr, "Failed to restore mcoa-override-vendor annotation on ManagedCluster in cleanup")
+		})
 
 		// 2. Assert deployment and readiness of node-exporter DaemonSet, kube-state-metrics Deployment, and acm-prometheus-k8s Prometheus server
 		t.Log("=== Asserting node-exporter, kube-state-metrics, and acm-prometheus-k8s reach Ready state ===")
@@ -1154,21 +1283,27 @@ http {
 	t.Run("AddonTeardownAndReinstall", func(t *testing.T) {
 		t.Log("=== Validating Addon Teardown, Garbage Collection & Idempotent Re-installation (ACM-47976) ===")
 
+		var (
+			origPredicates     []clusterv1beta1.ClusterPredicate
+			predicatesCaptured bool
+		)
+
 		t.Cleanup(func() {
-			_ = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+			cleanupCtx, cancelCleanup := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancelCleanup()
+
+			cleanupErr := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 				placement := &clusterv1beta1.Placement{}
-				if getErr := k8sClient.Get(ctx, client.ObjectKey{
+				if getErr := k8sClient.Get(cleanupCtx, client.ObjectKey{
 					Namespace: "open-cluster-management-global-set",
 					Name:      "global",
 				}, placement); getErr != nil {
 					return getErr
 				}
-				if len(placement.Spec.Predicates) == 0 {
-					return nil
-				}
-				placement.Spec.Predicates = nil
-				return k8sClient.Update(ctx, placement)
+				placement.Spec.Predicates = slices.Clone(origPredicates)
+				return k8sClient.Update(cleanupCtx, placement)
 			})
+			assert.NoError(t, cleanupErr, "Failed to restore global Placement predicates in cleanup")
 		})
 
 		// 1. Exclude local-cluster from the global Placement so OCM addon-manager triggers
@@ -1180,6 +1315,10 @@ http {
 				Name:      "global",
 			}, placement); getErr != nil {
 				return getErr
+			}
+			if !predicatesCaptured {
+				origPredicates = slices.Clone(placement.Spec.Predicates)
+				predicatesCaptured = true
 			}
 			placement.Spec.Predicates = []clusterv1beta1.ClusterPredicate{
 				{
