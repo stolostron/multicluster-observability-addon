@@ -114,7 +114,36 @@ func TestMetricsFederation(t *testing.T) {
 				}
 			}
 		}
-		assert.True(c, applied, "Expected at least one ManifestWork to have Condition Applied=True")
+		if applied {
+			return
+		}
+
+		var details strings.Builder
+		for _, mw := range mwList.Items {
+			fmt.Fprintf(&details, "\nManifestWork %s (generation %d):", mw.Name, mw.Generation)
+			if len(mw.Status.Conditions) == 0 {
+				details.WriteString("\n  work conditions: none reported")
+			}
+			for _, cond := range mw.Status.Conditions {
+				fmt.Fprintf(&details, "\n  work condition: %s=%s reason=%s observedGeneration=%d message=%q",
+					cond.Type, cond.Status, cond.Reason, cond.ObservedGeneration, cond.Message)
+			}
+			if len(mw.Status.ResourceStatus.Manifests) == 0 {
+				details.WriteString("\n  resource conditions: none reported")
+			}
+			for _, manifest := range mw.Status.ResourceStatus.Manifests {
+				meta := manifest.ResourceMeta
+				fmt.Fprintf(&details, "\n  manifest[%d] %s %s/%s:", meta.Ordinal, meta.Kind, meta.Namespace, meta.Name)
+				if len(manifest.Conditions) == 0 {
+					details.WriteString(" no conditions reported")
+				}
+				for _, cond := range manifest.Conditions {
+					fmt.Fprintf(&details, "\n    %s=%s reason=%s observedGeneration=%d message=%q",
+						cond.Type, cond.Status, cond.Reason, cond.ObservedGeneration, cond.Message)
+				}
+			}
+		}
+		assert.Fail(c, "Expected at least one ManifestWork to have Condition Applied=True", details.String())
 	}, 2*time.Minute, 3*time.Second, "ManifestWork was not applied in local-cluster within timeout")
 
 	t.Log("=== Step 4: Asserting PrometheusAgent platform-metrics-collector is created with mTLS ===")
