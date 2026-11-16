@@ -714,6 +714,37 @@ func TestMetricsFederation(t *testing.T) {
 
 		var origCAData, origServerData, origClientData map[string][]byte
 
+		outerT.Cleanup(func() {
+			if origCAData == nil && origServerData == nil && origClientData == nil {
+				return
+			}
+			cleanupCtx, cancelCleanup := context.WithTimeout(context.Background(), 2*time.Minute)
+			defer cancelCleanup()
+
+			restoreSecret := func(name string, data map[string][]byte) {
+				if data == nil {
+					return
+				}
+				restoreErr := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+					sec := &corev1.Secret{}
+					if getErr := k8sClient.Get(cleanupCtx, client.ObjectKey{
+						Namespace: hubNamespace,
+						Name:      name,
+					}, sec); getErr != nil {
+						return getErr
+					}
+					sec.Data = maps.Clone(data)
+					return k8sClient.Update(cleanupCtx, sec)
+				})
+				assert.NoError(outerT, restoreErr, "Failed to restore Secret %s in cleanup", name)
+			}
+
+			restoreSecret(caSecretName, origCAData)
+			restoreSecret(serverSecretName, origServerData)
+			restoreSecret(clientSecretName, origClientData)
+			assert.NoError(outerT, rolloutHubPrometheus(cleanupCtx, k8sClient), "Failed to rollout hub-prometheus after restoring original certificates")
+		})
+
 		// 1. Update Hub CA secret (observability-managed-cluster-certs)
 		err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 			caSecret := &corev1.Secret{}
@@ -766,34 +797,6 @@ func TestMetricsFederation(t *testing.T) {
 			return k8sClient.Update(ctx, clientSecret)
 		})
 		require.NoError(t, err, "Failed to update client cert secret on Hub")
-
-		outerT.Cleanup(func() {
-			cleanupCtx, cancelCleanup := context.WithTimeout(context.Background(), 2*time.Minute)
-			defer cancelCleanup()
-
-			restoreSecret := func(name string, data map[string][]byte) {
-				if data == nil {
-					return
-				}
-				restoreErr := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-					sec := &corev1.Secret{}
-					if getErr := k8sClient.Get(cleanupCtx, client.ObjectKey{
-						Namespace: hubNamespace,
-						Name:      name,
-					}, sec); getErr != nil {
-						return getErr
-					}
-					sec.Data = maps.Clone(data)
-					return k8sClient.Update(cleanupCtx, sec)
-				})
-				assert.NoError(outerT, restoreErr, "Failed to restore Secret %s in cleanup", name)
-			}
-
-			restoreSecret(caSecretName, origCAData)
-			restoreSecret(serverSecretName, origServerData)
-			restoreSecret(clientSecretName, origClientData)
-			assert.NoError(outerT, rolloutHubPrometheus(cleanupCtx, k8sClient), "Failed to rollout hub-prometheus after restoring original certificates")
-		})
 
 		// 4. Restart hub-prometheus Deployment and wait for replacement receiver rollout before asserting recovery
 		rolloutCtx, cancelRollout := context.WithTimeout(ctx, 2*time.Minute)
@@ -1152,6 +1155,9 @@ http {
 		require.NoError(t, err, "Failed to set mcoa-override-vendor annotation on ManagedCluster")
 
 		t.Cleanup(func() {
+			if !vendorCaptured {
+				return
+			}
 			cleanupCtx, cancelCleanup := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancelCleanup()
 
@@ -1289,6 +1295,9 @@ http {
 		)
 
 		t.Cleanup(func() {
+			if !predicatesCaptured {
+				return
+			}
 			cleanupCtx, cancelCleanup := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancelCleanup()
 
