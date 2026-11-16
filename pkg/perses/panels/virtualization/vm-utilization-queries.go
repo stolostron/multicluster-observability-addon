@@ -42,4 +42,8 @@ const utilizationFSUsageMaxPercentQuery = `max by (cluster, namespace, name) (
   (max by (cluster, namespace, name, disk_name) (avg_over_time(kubevirt_vmi_filesystem_capacity_bytes{cluster=~"$cluster", name=~"$name", namespace=~"$namespace"}[10m])))
 )` + statusFilterJoin
 
-const utilizationGuestAgentQuery = `sum by (cluster, namespace, name)(kubevirt_vmi_memory_available_bytes{cluster=~"$cluster", namespace=~"$namespace", name=~"$name"}*0+1)` + statusFilterJoin
+// utilizationGuestAgentQuery reports 1 for VMIs whose QEMU guest agent has
+// reported guest OS info, rendered as the Guest Agent "Reporting" indicator.
+// kubevirt_vmi_info.guest_os_name is populated only from agent-reported data
+// and works for both Linux and Windows guests; see inventoryGuestAgentQuery.
+const utilizationGuestAgentQuery = `sum by (cluster, namespace, name)(kubevirt_vmi_info{cluster=~"$cluster", namespace=~"$namespace", name=~"$name", guest_os_name!=""})` + statusFilterJoin

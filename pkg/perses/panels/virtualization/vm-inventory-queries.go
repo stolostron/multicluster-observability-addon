@@ -25,7 +25,14 @@ const inventoryCPUQuery = allocatedCPUMultiVMExpr + `
 const inventoryMemoryQuery = allocatedMemoryMultiVMExpr + `
 ` + inventoryStatusAndDimensionFilterJoin
 
-const inventoryGuestAgentQuery = `sum by (cluster, namespace, name)(kubevirt_vmi_memory_available_bytes{cluster=~"$cluster", namespace=~"$namespace", name=~"$name"}*0+1)` + inventoryStatusAndDimensionFilterJoin
+// inventoryGuestAgentQuery reports 1 for VMIs whose QEMU guest agent has
+// reported guest OS info, rendered by the table as the Guest Agent
+// "Reporting" indicator. kubevirt_vmi_info.guest_os_name is populated only
+// from agent-reported data (libvirt virDomainGetGuestInfo), which the agent
+// provides on both Linux (qemu-guest-agent) and Windows (qemu-ga from
+// virtio-win, name "Microsoft Windows"). A running VMI without a row here
+// shows "Not Reporting".
+const inventoryGuestAgentQuery = `sum by (cluster, namespace, name)(kubevirt_vmi_info{cluster=~"$cluster", namespace=~"$namespace", name=~"$name", guest_os_name!=""})` + inventoryStatusAndDimensionFilterJoin
 
 const inventoryCreateDateQuery = `sum by (cluster, namespace, name)(kubevirt_vm_create_date_timestamp_seconds{cluster=~"$cluster", name=~"$name", namespace=~"$namespace"}*1000)
 ` + inventoryStatusAndDimensionFilterJoin
@@ -61,3 +68,13 @@ const inventoryEvictableOutdatedQuery = `sum by (cluster,namespace,name,outdated
   kubevirt_vmi_info{cluster=~"$cluster", name=~"$name", namespace=~"$namespace",flavor=~"$flavor",workload=~"$workload", instance_type=~"$instance_type", preference=~"$preference",guest_os_name=~"$guest_os_name" ,guest_os_version_id=~"$guest_os_version_id"}
   or on(cluster,namespace,name) kubevirt_vm_info{cluster=~"$cluster", name=~"$name", namespace=~"$namespace",flavor=~"$flavor",workload=~"$workload", instance_type=~"$instance_type", preference=~"$preference",guest_os_name=~"$guest_os_name" ,guest_os_version_id=~"$guest_os_version_id"}
 )` + statusFilterJoin
+
+// inventoryPanicDeviceQuery carries the has_panic_device VMI label as a table
+// column for every running VMI, so operators can spot any VM whose panic
+// device (pvpanic) is missing: guests need it to report panic events to the
+// host (CNV-95849). The label only exists on kubevirt_vmi_info, so the
+// column is empty for stopped VMs and on kubevirt versions that do not
+// expose the label yet.
+const inventoryPanicDeviceQuery = `sum by (cluster, namespace, name, has_panic_device)(
+  kubevirt_vmi_info{cluster=~"$cluster", namespace=~"$namespace", name=~"$name"}
+)` + inventoryStatusAndDimensionFilterJoin
