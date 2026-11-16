@@ -1,6 +1,6 @@
 module github.com/stolostron/multicluster-observability-addon
 
-go 1.26.0
+go 1.26.9
 
 require (
 	github.com/ViaQ/logerr/v2 v2.1.0
@@ -41,7 +41,6 @@ require (
 	github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring v0.90.1-rhobs1
 	github.com/rhobs/observability-operator/pkg/apis v0.0.0-20250902133632-f98bd8a20a80
 	github.com/thanos-community/thanos-operator v0.0.0-20260313095634-17889a0e1c1a
-	golang.org/x/text v0.41.0
 )
 
 require (
@@ -62,6 +61,7 @@ require (
 	github.com/perses/plugins/barchart v0.11.1 // indirect
 	github.com/perses/plugins/piechart v0.13.2-0.20260326134814-37e86f6b1c58 // indirect
 	github.com/prometheus/otlptranslator v1.0.0 // indirect
+	golang.org/x/text v0.42.0 // indirect
 )
 
 require (
@@ -178,13 +178,13 @@ require (
 	go.uber.org/zap v1.27.1 // indirect
 	go.yaml.in/yaml/v2 v2.4.4 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
-	golang.org/x/crypto v0.55.0 // indirect
+	golang.org/x/crypto v0.57.0 // indirect
 	golang.org/x/exp v0.0.0-20260312153236-7ab1446f8b90 // indirect
-	golang.org/x/net v0.58.0 // indirect
+	golang.org/x/net v0.60.0 // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect
-	golang.org/x/sync v0.22.0 // indirect
-	golang.org/x/sys v0.47.0 // indirect
-	golang.org/x/term v0.45.0 // indirect
+	golang.org/x/sync v0.23.0 // indirect
+	golang.org/x/sys v0.48.0 // indirect
+	golang.org/x/term v0.46.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.5.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260526163538-3dc84a4a5aaa // indirect
