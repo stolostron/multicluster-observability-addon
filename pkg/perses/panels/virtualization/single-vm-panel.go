@@ -218,16 +218,24 @@ func SingleVMAllocatedResourcesTable(datasourceName string) panelgroup.Option {
 func SingleVMGeneralInformationTable(datasourceName string) panelgroup.Option {
 	return panelgroup.AddPanel("General Information",
 		tablePanel.Table(
-			tablePanel.WithColumnSettings([]tablePanel.ColumnSettings{
-				{Name: "timestamp", Hide: true},
-				{Name: "Field", EnableSorting: true},
-				{Name: "Value", EnableSorting: true},
-			}),
 			tablePanel.Transform([]commonSdk.Transform{
 				{Kind: commonSdk.MergeSeriesKind, Spec: commonSdk.MergeSeriesSpec{}},
 				{Kind: commonSdk.MergeByColumnsKind, Spec: commonSdk.MergeColumnsSpec{
-					Columns: []string{"namespace", "node", "pod", "evictable", "machine_type", "outdated"},
+					Columns: []string{"namespace", "node", "pod", "evictable", "machine_type", "outdated", "guest_agent", "has_panic_device"},
 					Name:    "Value",
+				}},
+			}),
+			tablePanel.WithColumnSettings([]tablePanel.ColumnSettings{
+				{Name: "timestamp", Hide: true},
+				{Name: "Field", EnableSorting: true},
+				{Name: "Value", EnableSorting: true, CellSettings: []tablePanel.CellSettings{
+					{
+						Condition: tablePanel.Condition{
+							Kind: tablePanel.ValueConditionKind,
+							Spec: tablePanel.ValueConditionSpec{Value: "Not Reporting"},
+						},
+						TextColor: "#F2495C",
+					},
 				}},
 			}),
 		),
@@ -238,6 +246,8 @@ func SingleVMGeneralInformationTable(datasourceName string) panelgroup.Option {
 		panel.AddQuery(query.PromQL(singleVMGeneralInformationEvictableQuery, dashboards.AddQueryDataSource(datasourceName))),
 		panel.AddQuery(query.PromQL(singleVMGeneralInformationMachineTypeQuery, dashboards.AddQueryDataSource(datasourceName))),
 		panel.AddQuery(query.PromQL(singleVMGeneralInformationOutdatedQuery, dashboards.AddQueryDataSource(datasourceName))),
+		panel.AddQuery(query.PromQL(singleVMGeneralInformationGuestAgentQuery, dashboards.AddQueryDataSource(datasourceName))),
+		panel.AddQuery(query.PromQL(singleVMGeneralInformationPanicDeviceQuery, dashboards.AddQueryDataSource(datasourceName))),
 	)
 }
 

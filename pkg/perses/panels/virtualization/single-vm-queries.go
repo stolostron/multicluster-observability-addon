@@ -89,6 +89,26 @@ const (
 	singleVMGeneralInformationMachineTypeQuery = `label_replace(sum by (machine_type)(kubevirt_vm_info{cluster="$cluster", namespace="$namespace", name="$name", machine_type!=""}) or sum by (machine_type)(kubevirt_vmi_info{cluster="$cluster", namespace="$namespace", name="$name", machine_type!=""}), "Field", "Machine Type", "name", ".*")`
 
 	singleVMGeneralInformationOutdatedQuery = `label_replace(sum by (outdated)(kubevirt_vmi_info{cluster="$cluster", namespace="$namespace", name="$name"}), "Field", "Outdated", "name", ".*")`
+
+	// singleVMGeneralInformationGuestAgentQuery reports whether the QEMU guest
+	// agent is reporting guest OS info for the VMI. kubevirt_vmi_info's
+	// guest_os_name is populated only from agent-reported data
+	// (libvirt virDomainGetGuestInfo), which the agent provides on both Linux
+	// (qemu-guest-agent) and Windows (qemu-ga from virtio-win). The row is
+	// absent for stopped VMs, which have no VMI.
+	singleVMGeneralInformationGuestAgentQuery = `label_replace(sum by (guest_agent)(label_replace(kubevirt_vmi_info{cluster="$cluster", namespace="$namespace", name="$name", guest_os_name!=""}, "guest_agent", "Reporting", "", "")), "Field", "Guest Agent", "name", ".*")
+or
+label_replace(sum by (guest_agent)(label_replace(kubevirt_vmi_info{cluster="$cluster", namespace="$namespace", name="$name", guest_os_name=""}, "guest_agent", "Not Reporting", "", "")), "Field", "Guest Agent", "name", ".*")`
+
+	// singleVMGeneralInformationPanicDeviceQuery surfaces the has_panic_device
+	// label from kubevirt_vmi_info (CNV-95849) for every running VMI.
+	// Without a panic device (pvpanic), a guest cannot report panic events
+	// to the host. The has_panic_device!="" guard hides the row on kubevirt
+	// versions that do not expose the label yet, and the row is absent for
+	// stopped VMs, which have no VMI.
+	singleVMGeneralInformationPanicDeviceQuery = `label_replace(sum by (has_panic_device)(
+  kubevirt_vmi_info{cluster="$cluster", namespace="$namespace", name="$name", has_panic_device!=""}
+), "Field", "Panic Device", "name", ".*")`
 )
 
 // Network & snapshots
