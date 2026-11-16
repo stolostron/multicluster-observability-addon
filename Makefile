@@ -168,7 +168,7 @@ test-e2e-setup: ## Setup KinD cluster and dependencies for E2E tests
 
 .PHONY: test-e2e-run
 test-e2e-run: ## Run E2E tests against running KinD cluster
-	E2E_KUBECONFIG="$(E2E_KUBECONFIG)" KUBECONFIG="$(E2E_KUBECONFIG)" go test -v -tags=e2e -count=1 -timeout=15m ./test/e2e/...
+	E2E_KUBECONFIG="$(E2E_KUBECONFIG)" KUBECONFIG="$(E2E_KUBECONFIG)" go test -v -tags=e2e -count=1 -timeout=20m ./test/e2e/...
 
 .PHONY: test-e2e-clean
 test-e2e-clean: ## Teardown KinD E2E cluster

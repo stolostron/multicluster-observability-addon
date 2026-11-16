@@ -1,4 +1,3 @@
-{{- if or .Values.platformEnabled .Values.userWorkloadsEnabled }}
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -15,4 +14,3 @@ metadata:
     addon.open-cluster-management.io/namespace: "true"
     {{- end }}
     openshift.io/cluster-monitoring: "true"
-{{- end }}

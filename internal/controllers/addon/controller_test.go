@@ -540,3 +540,29 @@ func TestManifestsMetricsTracking(t *testing.T) {
 		assert.InDelta(t, initialRenderErrors+1, testutil.ToFloat64(addonmetrics.ManifestRenderErrors.WithLabelValues(addonmetrics.StageRender)), 0.001)
 	})
 }
+
+func TestShouldTriggerAgentDeploy(t *testing.T) {
+	baseCluster := &clusterv1.ManagedCluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        "local-cluster",
+			Labels:      map[string]string{"vendor": "OpenShift"},
+			Annotations: map[string]string{"unrelated": "val1"},
+		},
+	}
+
+	assert.False(t, shouldTriggerAgentDeploy(nil, nil))
+	assert.True(t, shouldTriggerAgentDeploy(nil, baseCluster))
+	assert.True(t, shouldTriggerAgentDeploy(baseCluster, nil))
+
+	sameCluster := baseCluster.DeepCopy()
+	sameCluster.Annotations["unrelated"] = "val2"
+	assert.False(t, shouldTriggerAgentDeploy(baseCluster, sameCluster), "unrelated annotation change must not trigger redeploy")
+
+	labelChanged := baseCluster.DeepCopy()
+	labelChanged.Labels["vendor"] = "Other"
+	assert.True(t, shouldTriggerAgentDeploy(baseCluster, labelChanged), "label change must trigger redeploy")
+
+	vendorOverrideAdded := baseCluster.DeepCopy()
+	vendorOverrideAdded.Annotations[addoncfg.VendorOverrideAnnotationKey] = "Other"
+	assert.True(t, shouldTriggerAgentDeploy(baseCluster, vendorOverrideAdded), "mcoa-override-vendor annotation change must trigger redeploy")
+}
