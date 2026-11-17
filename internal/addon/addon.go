@@ -431,6 +431,33 @@ func ManifestConfigs() []workv1.ManifestConfigOption {
 				Type: workv1.UpdateStrategyTypeCreateOnly,
 			},
 		},
+		// The monitoring UIPlugin is a shared COO resource. MCOA owns the fields
+		// it renders -- spec.type, spec.monitoring.incidents, spec.monitoring.acm
+		// (incl. the alertmanager/thanosQuerier URLs) and spec.monitoring.perses
+		// -- but NOT spec.monitoring.clusterHealthAnalyzer, which may be set by an
+		// admin or a newer COO. The addon default Update strategy does a full
+		// object replace, which strips clusterHealthAnalyzer. Server-Side Apply
+		// instead tracks ownership per field (spec.monitoring is a granular,
+		// non-atomic object in the CRD), so MCOA reconciles only the fields in
+		// its own field set and leaves clusterHealthAnalyzer untouched -- SSA
+		// only deletes fields the applier itself declares, never a field MCOA
+		// never renders. Force is true (matching the hub reconciler's
+		// ForceOwnership) so MCOA can assert the fields it owns over a
+		// pre-existing UIPlugin created by another manager instead of failing
+		// with an apply conflict.
+		workv1.ManifestConfigOption{
+			ResourceIdentifier: workv1.ResourceIdentifier{
+				Group:    "observability.openshift.io",
+				Resource: addoncfg.UiPluginsResource,
+				Name:     addoncfg.IDetectionUIPluginName,
+			},
+			UpdateStrategy: &workv1.UpdateStrategy{
+				Type: workv1.UpdateStrategyTypeServerSideApply,
+				ServerSideApply: &workv1.ServerSideApplyConfig{
+					Force: true,
+				},
+			},
+		},
 	)
 
 	thanosResources := []string{
