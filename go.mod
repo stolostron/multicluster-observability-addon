@@ -14,6 +14,7 @@ require (
 	github.com/operator-framework/api v0.42.0
 	github.com/perses/perses v0.55.0
 	github.com/perses/perses-operator v0.5.0
+	github.com/perses/spec v0.3.0
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.94.2
 	github.com/prometheus/client_golang v1.25.0
 	github.com/prometheus/common v0.72.1
@@ -124,7 +125,6 @@ require (
 	github.com/perses/plugins/table v0.14.1 // indirect
 	github.com/perses/plugins/timeserieschart v0.14.1 // indirect
 	github.com/perses/promql-builder v0.2.1-0.20260729085143-2ecc15b73750 // indirect
-	github.com/perses/spec v0.3.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/prometheus/client_model v0.6.3 // indirect
