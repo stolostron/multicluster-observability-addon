@@ -5,8 +5,8 @@ import (
 	commonSdk "github.com/perses/perses/go-sdk/common"
 	"github.com/perses/perses/go-sdk/panel"
 	panelgroup "github.com/perses/perses/go-sdk/panel-group"
-	apicommon "github.com/perses/perses/pkg/model/api/v1/common"
 	"github.com/perses/plugins/prometheus/sdk/go/query"
+	apicommon "github.com/perses/spec/go/plugin"
 )
 
 func VMInventoryTable(datasourceName, project string) panelgroup.Option {

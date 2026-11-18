@@ -8,7 +8,6 @@ import (
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 )
@@ -44,20 +43,16 @@ func Test_BuildSecrets(t *testing.T) {
 	resources := Options{
 		Secrets: []corev1.Secret{
 			{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "foo",
-					Namespace: "cluster-1",
-				},
+				Name:      "foo",
+				Namespace: "cluster-1",
 				Data: map[string][]byte{
 					"foo-1": []byte("foo-user"),
 					"foo-2": []byte("foo-pass"),
 				},
 			},
 			{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "bar",
-					Namespace: "cluster-1",
-				},
+				Name:      "bar",
+				Namespace: "cluster-1",
 				Data: map[string][]byte{
 					"bar-1": []byte("bar-user"),
 					"bar-2": []byte("bar-pass"),
@@ -94,25 +89,19 @@ func Test_BuildCLFSpec(t *testing.T) {
 	managedClusterAddOn = addontesting.NewAddon("test", "cluster-1")
 	managedClusterAddOn.Status.ConfigReferences = []addonapiv1beta1.ConfigReference{
 		{
-			ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
-				Group:    "observability.openshift.io",
-				Resource: "clusterlogforwarders",
-			},
+			Group:    "observability.openshift.io",
+			Resource: "clusterlogforwarders",
 			DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
-				ConfigReferent: addonapiv1beta1.ConfigReferent{
-					Namespace: "open-cluster-management-observability",
-					Name:      "mcoa-instance",
-				},
+				Namespace: "open-cluster-management-observability",
+				Name:      "mcoa-instance",
 			},
 		},
 	}
 
 	// Setup configuration resources: ClusterLogForwarder, AddOnDeploymentConfig, Secrets, ConfigMaps
 	clf = &loggingv1.ClusterLogForwarder{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "mcoa-instance",
-			Namespace: "open-cluster-management-observability",
-		},
+		Name:      "mcoa-instance",
+		Namespace: "open-cluster-management-observability",
 		Spec: loggingv1.ClusterLogForwarderSpec{
 			Inputs: []loggingv1.InputSpec{
 				{

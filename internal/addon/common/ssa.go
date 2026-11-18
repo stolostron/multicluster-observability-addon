@@ -134,7 +134,7 @@ func DeriveSSAManagedFields(obj client.Object) []string {
 	}
 
 	// Build a zero-value object of the same type as obj.
-	zero, ok := reflect.New(objType.Elem()).Interface().(client.Object)
+	zero, ok := reflect.TypeAssert[client.Object](reflect.New(objType.Elem()))
 	if !ok {
 		return nil
 	}

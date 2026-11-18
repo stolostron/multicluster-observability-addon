@@ -34,7 +34,7 @@ const defaultAgentName = "mcoa-default-platform-metrics-collector-global"
 
 func setupTestNamespace(ctx context.Context, t *testing.T, k8sClient client.Client, name string) {
 	t.Helper()
-	ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: name}}
+	ns := &corev1.Namespace{Name: name}
 	if err := k8sClient.Create(ctx, ns); err != nil && !apierrors.IsAlreadyExists(err) {
 		require.NoError(t, err)
 	}
@@ -106,10 +106,8 @@ func TestResourceCreator_DefaultMetricsPipeline(t *testing.T) {
 
 	// 1. Create AddOnDeploymentConfig enabling platform metrics
 	aodc := &addonv1beta1.AddOnDeploymentConfig{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      addoncfg.Name,
-			Namespace: addoncfg.InstallNamespace,
-		},
+		Name:      addoncfg.Name,
+		Namespace: addoncfg.InstallNamespace,
 		Spec: addonv1beta1.AddOnDeploymentConfigSpec{
 			CustomizedVariables: []addonv1beta1.CustomizedVariable{
 				{
@@ -127,18 +125,14 @@ func TestResourceCreator_DefaultMetricsPipeline(t *testing.T) {
 
 	// 2. Create ClusterManagementAddOn with placement "global"
 	cmao := &addonv1beta1.ClusterManagementAddOn{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: addoncfg.Name,
-		},
+		Name: addoncfg.Name,
 		Spec: addonv1beta1.ClusterManagementAddOnSpec{
 			InstallStrategy: addonv1beta1.InstallStrategy{
 				Type: "Placements",
 				Placements: []addonv1beta1.PlacementStrategy{
 					{
-						PlacementRef: addonv1beta1.PlacementRef{
-							Name:      "global",
-							Namespace: addoncfg.InstallNamespace,
-						},
+						Name:      "global",
+						Namespace: addoncfg.InstallNamespace,
 					},
 				},
 			},
@@ -164,14 +158,10 @@ func TestResourceCreator_DefaultMetricsPipeline(t *testing.T) {
 
 	// 4. Assert ClusterManagementAddOn configs were updated by the manager to reference the PrometheusAgent
 	expectedAgentConfig := addonv1beta1.AddOnConfig{
-		ConfigGroupResource: addonv1beta1.ConfigGroupResource{
-			Group:    cooprometheusv1alpha1.SchemeGroupVersion.Group,
-			Resource: cooprometheusv1alpha1.PrometheusAgentName,
-		},
-		ConfigReferent: addonv1beta1.ConfigReferent{
-			Namespace: addoncfg.InstallNamespace,
-			Name:      defaultAgentName,
-		},
+		Group:     cooprometheusv1alpha1.SchemeGroupVersion.Group,
+		Resource:  cooprometheusv1alpha1.PrometheusAgentName,
+		Namespace: addoncfg.InstallNamespace,
+		Name:      defaultAgentName,
 	}
 
 	updatedCMAO := &addonv1beta1.ClusterManagementAddOn{}
@@ -213,10 +203,8 @@ func TestResourceCreator_CustomConfiguration_SSAIdempotent(t *testing.T) {
 
 	// Initial setup
 	aodc := &addonv1beta1.AddOnDeploymentConfig{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      addoncfg.Name,
-			Namespace: addoncfg.InstallNamespace,
-		},
+		Name:      addoncfg.Name,
+		Namespace: addoncfg.InstallNamespace,
 		Spec: addonv1beta1.AddOnDeploymentConfigSpec{
 			CustomizedVariables: []addonv1beta1.CustomizedVariable{
 				{
@@ -233,16 +221,14 @@ func TestResourceCreator_CustomConfiguration_SSAIdempotent(t *testing.T) {
 	require.NoError(t, testEnv.K8sClient.Create(ctx, aodc))
 
 	cmao := &addonv1beta1.ClusterManagementAddOn{
-		ObjectMeta: metav1.ObjectMeta{Name: addoncfg.Name},
+		Name: addoncfg.Name,
 		Spec: addonv1beta1.ClusterManagementAddOnSpec{
 			InstallStrategy: addonv1beta1.InstallStrategy{
 				Type: "Placements",
 				Placements: []addonv1beta1.PlacementStrategy{
 					{
-						PlacementRef: addonv1beta1.PlacementRef{
-							Name:      "global",
-							Namespace: addoncfg.InstallNamespace,
-						},
+						Name:      "global",
+						Namespace: addoncfg.InstallNamespace,
 					},
 				},
 			},
@@ -301,20 +287,16 @@ func TestResourceCreator_ImageOverrides(t *testing.T) {
 
 	// 1. Create image overrides ConfigMap with complete required schema
 	imgConfigMap := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      mconfig.ImagesConfigMapObjKey.Name,
-			Namespace: mconfig.ImagesConfigMapObjKey.Namespace,
-		},
-		Data: defaultImageOverridesData(),
+		Name:      mconfig.ImagesConfigMapObjKey.Name,
+		Namespace: mconfig.ImagesConfigMapObjKey.Namespace,
+		Data:      defaultImageOverridesData(),
 	}
 	require.NoError(t, testEnv.K8sClient.Create(ctx, imgConfigMap))
 
 	// 2. Create AODC and CMAO to trigger reconciliation
 	aodc := &addonv1beta1.AddOnDeploymentConfig{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      addoncfg.Name,
-			Namespace: addoncfg.InstallNamespace,
-		},
+		Name:      addoncfg.Name,
+		Namespace: addoncfg.InstallNamespace,
 		Spec: addonv1beta1.AddOnDeploymentConfigSpec{
 			CustomizedVariables: []addonv1beta1.CustomizedVariable{
 				{
@@ -331,18 +313,14 @@ func TestResourceCreator_ImageOverrides(t *testing.T) {
 	require.NoError(t, testEnv.K8sClient.Create(ctx, aodc))
 
 	cmao := &addonv1beta1.ClusterManagementAddOn{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: addoncfg.Name,
-		},
+		Name: addoncfg.Name,
 		Spec: addonv1beta1.ClusterManagementAddOnSpec{
 			InstallStrategy: addonv1beta1.InstallStrategy{
 				Type: "Placements",
 				Placements: []addonv1beta1.PlacementStrategy{
 					{
-						PlacementRef: addonv1beta1.PlacementRef{
-							Name:      "global",
-							Namespace: addoncfg.InstallNamespace,
-						},
+						Name:      "global",
+						Namespace: addoncfg.InstallNamespace,
 					},
 				},
 			},
@@ -376,10 +354,8 @@ func TestResourceCreator_TerminalErrorOnMalformedAODC(t *testing.T) {
 
 	// Create AODC with invalid hostname (e.g. only a colon ":")
 	aodc := &addonv1beta1.AddOnDeploymentConfig{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      addoncfg.Name,
-			Namespace: addoncfg.InstallNamespace,
-		},
+		Name:      addoncfg.Name,
+		Namespace: addoncfg.InstallNamespace,
 		Spec: addonv1beta1.AddOnDeploymentConfigSpec{
 			CustomizedVariables: []addonv1beta1.CustomizedVariable{
 				{
@@ -396,18 +372,14 @@ func TestResourceCreator_TerminalErrorOnMalformedAODC(t *testing.T) {
 	require.NoError(t, testEnv.K8sClient.Create(ctx, aodc))
 
 	cmao := &addonv1beta1.ClusterManagementAddOn{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: addoncfg.Name,
-		},
+		Name: addoncfg.Name,
 		Spec: addonv1beta1.ClusterManagementAddOnSpec{
 			InstallStrategy: addonv1beta1.InstallStrategy{
 				Type: "Placements",
 				Placements: []addonv1beta1.PlacementStrategy{
 					{
-						PlacementRef: addonv1beta1.PlacementRef{
-							Name:      "global",
-							Namespace: addoncfg.InstallNamespace,
-						},
+						Name:      "global",
+						Namespace: addoncfg.InstallNamespace,
 					},
 				},
 			},
@@ -461,10 +433,8 @@ func TestResourceCreator_UserModifications_SSAFieldPreservation(t *testing.T) {
 
 	// 1. Initial provisioning via AODC and CMAO
 	aodc := &addonv1beta1.AddOnDeploymentConfig{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      addoncfg.Name,
-			Namespace: addoncfg.InstallNamespace,
-		},
+		Name:      addoncfg.Name,
+		Namespace: addoncfg.InstallNamespace,
 		Spec: addonv1beta1.AddOnDeploymentConfigSpec{
 			CustomizedVariables: []addonv1beta1.CustomizedVariable{
 				{
@@ -481,18 +451,14 @@ func TestResourceCreator_UserModifications_SSAFieldPreservation(t *testing.T) {
 	require.NoError(t, testEnv.K8sClient.Create(ctx, aodc))
 
 	cmao := &addonv1beta1.ClusterManagementAddOn{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: addoncfg.Name,
-		},
+		Name: addoncfg.Name,
 		Spec: addonv1beta1.ClusterManagementAddOnSpec{
 			InstallStrategy: addonv1beta1.InstallStrategy{
 				Type: "Placements",
 				Placements: []addonv1beta1.PlacementStrategy{
 					{
-						PlacementRef: addonv1beta1.PlacementRef{
-							Name:      "global",
-							Namespace: addoncfg.InstallNamespace,
-						},
+						Name:      "global",
+						Namespace: addoncfg.InstallNamespace,
 					},
 				},
 			},
@@ -562,10 +528,8 @@ func TestResourceCreator_UserDefinedScrapeConfig_SSAAndPlacementPropagation(t *t
 
 	// 1. Initial provisioning via AODC and CMAO with MCO controller owner reference
 	aodc := &addonv1beta1.AddOnDeploymentConfig{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      addoncfg.Name,
-			Namespace: addoncfg.InstallNamespace,
-		},
+		Name:      addoncfg.Name,
+		Namespace: addoncfg.InstallNamespace,
 		Spec: addonv1beta1.AddOnDeploymentConfigSpec{
 			CustomizedVariables: []addonv1beta1.CustomizedVariable{
 				{
@@ -583,16 +547,14 @@ func TestResourceCreator_UserDefinedScrapeConfig_SSAAndPlacementPropagation(t *t
 
 	mcoUID := types.UID("test-mco-uid-123")
 	cmao := &addonv1beta1.ClusterManagementAddOn{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: addoncfg.Name,
-			OwnerReferences: []metav1.OwnerReference{
-				{
-					APIVersion: "observability.open-cluster-management.io/v1beta2",
-					Kind:       "MultiClusterObservability",
-					Name:       "observability",
-					UID:        mcoUID,
-					Controller: ptr.To(true),
-				},
+		Name: addoncfg.Name,
+		OwnerReferences: []metav1.OwnerReference{
+			{
+				APIVersion: "observability.open-cluster-management.io/v1beta2",
+				Kind:       "MultiClusterObservability",
+				Name:       "observability",
+				UID:        mcoUID,
+				Controller: ptr.To(true),
 			},
 		},
 		Spec: addonv1beta1.ClusterManagementAddOnSpec{
@@ -600,10 +562,8 @@ func TestResourceCreator_UserDefinedScrapeConfig_SSAAndPlacementPropagation(t *t
 				Type: "Placements",
 				Placements: []addonv1beta1.PlacementStrategy{
 					{
-						PlacementRef: addonv1beta1.PlacementRef{
-							Name:      "global",
-							Namespace: addoncfg.InstallNamespace,
-						},
+						Name:      "global",
+						Namespace: addoncfg.InstallNamespace,
 					},
 				},
 			},
@@ -627,17 +587,15 @@ func TestResourceCreator_UserDefinedScrapeConfig_SSAAndPlacementPropagation(t *t
 	//      and tampered invariant scheme: HTTP (desired is HTTPS).
 	scName := "custom-app-metrics"
 	userSC := &cooprometheusv1alpha1.ScrapeConfig{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      scName,
-			Namespace: addoncfg.InstallNamespace,
-			Labels: map[string]string{
-				addoncfg.PartOfK8sLabelKey:    addoncfg.Name,
-				addoncfg.ComponentK8sLabelKey: mconfig.PlatformPrometheusMatchLabels[addoncfg.ComponentK8sLabelKey],
-				"user.io/app":                 "custom-service",
-			},
-			Annotations: map[string]string{
-				addoncfg.PlacementAnnotationKey: fmt.Sprintf("%s/global", addoncfg.InstallNamespace),
-			},
+		Name:      scName,
+		Namespace: addoncfg.InstallNamespace,
+		Labels: map[string]string{
+			addoncfg.PartOfK8sLabelKey:    addoncfg.Name,
+			addoncfg.ComponentK8sLabelKey: mconfig.PlatformPrometheusMatchLabels[addoncfg.ComponentK8sLabelKey],
+			"user.io/app":                 "custom-service",
+		},
+		Annotations: map[string]string{
+			addoncfg.PlacementAnnotationKey: fmt.Sprintf("%s/global", addoncfg.InstallNamespace),
 		},
 		Spec: cooprometheusv1alpha1.ScrapeConfigSpec{
 			ScrapeInterval: ptr.To(cooprometheusv1.Duration("45s")),
@@ -675,14 +633,10 @@ func TestResourceCreator_UserDefinedScrapeConfig_SSAAndPlacementPropagation(t *t
 
 	// 4. Verify that CMAO placement configs were updated to include the user-defined ScrapeConfig
 	expectedSCConfig := addonv1beta1.AddOnConfig{
-		ConfigGroupResource: addonv1beta1.ConfigGroupResource{
-			Group:    "monitoring.rhobs",
-			Resource: cooprometheusv1alpha1.ScrapeConfigName,
-		},
-		ConfigReferent: addonv1beta1.ConfigReferent{
-			Namespace: addoncfg.InstallNamespace,
-			Name:      scName,
-		},
+		Group:     "monitoring.rhobs",
+		Resource:  cooprometheusv1alpha1.ScrapeConfigName,
+		Namespace: addoncfg.InstallNamespace,
+		Name:      scName,
 	}
 	updatedCMAO := &addonv1beta1.ClusterManagementAddOn{}
 	require.Eventually(t, func() bool {
@@ -728,10 +682,8 @@ func TestResourceCreator_MultiPlacementOrphanGarbageCollection(t *testing.T) {
 
 	// 1. Initial provisioning via AODC and CMAO with four placements: "global", "regional", "edge", and "canary"
 	aodc := &addonv1beta1.AddOnDeploymentConfig{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      addoncfg.Name,
-			Namespace: addoncfg.InstallNamespace,
-		},
+		Name:      addoncfg.Name,
+		Namespace: addoncfg.InstallNamespace,
 		Spec: addonv1beta1.AddOnDeploymentConfigSpec{
 			CustomizedVariables: []addonv1beta1.CustomizedVariable{
 				{
@@ -748,36 +700,26 @@ func TestResourceCreator_MultiPlacementOrphanGarbageCollection(t *testing.T) {
 	require.NoError(t, testEnv.K8sClient.Create(ctx, aodc))
 
 	cmao := &addonv1beta1.ClusterManagementAddOn{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: addoncfg.Name,
-		},
+		Name: addoncfg.Name,
 		Spec: addonv1beta1.ClusterManagementAddOnSpec{
 			InstallStrategy: addonv1beta1.InstallStrategy{
 				Type: "Placements",
 				Placements: []addonv1beta1.PlacementStrategy{
 					{
-						PlacementRef: addonv1beta1.PlacementRef{
-							Name:      "global",
-							Namespace: addoncfg.InstallNamespace,
-						},
+						Name:      "global",
+						Namespace: addoncfg.InstallNamespace,
 					},
 					{
-						PlacementRef: addonv1beta1.PlacementRef{
-							Name:      "regional",
-							Namespace: addoncfg.InstallNamespace,
-						},
+						Name:      "regional",
+						Namespace: addoncfg.InstallNamespace,
 					},
 					{
-						PlacementRef: addonv1beta1.PlacementRef{
-							Name:      "edge",
-							Namespace: addoncfg.InstallNamespace,
-						},
+						Name:      "edge",
+						Namespace: addoncfg.InstallNamespace,
 					},
 					{
-						PlacementRef: addonv1beta1.PlacementRef{
-							Name:      "canary",
-							Namespace: addoncfg.InstallNamespace,
-						},
+						Name:      "canary",
+						Namespace: addoncfg.InstallNamespace,
 					},
 				},
 			},
@@ -828,16 +770,14 @@ func TestResourceCreator_MultiPlacementOrphanGarbageCollection(t *testing.T) {
 	//    - unmanagedAgent: third-party unmanaged agent targeting "regional" without MCOA part-of label
 	regionalAgentName := "user-regional-collector"
 	regionalAgent := &cooprometheusv1alpha1.PrometheusAgent{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      regionalAgentName,
-			Namespace: addoncfg.InstallNamespace,
-			Labels: map[string]string{
-				addoncfg.PartOfK8sLabelKey:    addoncfg.Name,
-				addoncfg.ComponentK8sLabelKey: mconfig.PlatformMetricsCollectorApp,
-			},
-			Annotations: map[string]string{
-				addoncfg.PlacementAnnotationKey: fmt.Sprintf("%s/regional", addoncfg.InstallNamespace),
-			},
+		Name:      regionalAgentName,
+		Namespace: addoncfg.InstallNamespace,
+		Labels: map[string]string{
+			addoncfg.PartOfK8sLabelKey:    addoncfg.Name,
+			addoncfg.ComponentK8sLabelKey: mconfig.PlatformMetricsCollectorApp,
+		},
+		Annotations: map[string]string{
+			addoncfg.PlacementAnnotationKey: fmt.Sprintf("%s/regional", addoncfg.InstallNamespace),
 		},
 		Spec: cooprometheusv1alpha1.PrometheusAgentSpec{
 			CommonPrometheusFields: cooprometheusv1.CommonPrometheusFields{
@@ -849,16 +789,14 @@ func TestResourceCreator_MultiPlacementOrphanGarbageCollection(t *testing.T) {
 
 	multiAgentName := "user-multi-collector"
 	multiAgent := &cooprometheusv1alpha1.PrometheusAgent{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      multiAgentName,
-			Namespace: addoncfg.InstallNamespace,
-			Labels: map[string]string{
-				addoncfg.PartOfK8sLabelKey:    addoncfg.Name,
-				addoncfg.ComponentK8sLabelKey: mconfig.PlatformMetricsCollectorApp,
-			},
-			Annotations: map[string]string{
-				addoncfg.PlacementAnnotationKey: fmt.Sprintf("%s/regional,%s/edge", addoncfg.InstallNamespace, addoncfg.InstallNamespace),
-			},
+		Name:      multiAgentName,
+		Namespace: addoncfg.InstallNamespace,
+		Labels: map[string]string{
+			addoncfg.PartOfK8sLabelKey:    addoncfg.Name,
+			addoncfg.ComponentK8sLabelKey: mconfig.PlatformMetricsCollectorApp,
+		},
+		Annotations: map[string]string{
+			addoncfg.PlacementAnnotationKey: fmt.Sprintf("%s/regional,%s/edge", addoncfg.InstallNamespace, addoncfg.InstallNamespace),
 		},
 		Spec: cooprometheusv1alpha1.PrometheusAgentSpec{
 			CommonPrometheusFields: cooprometheusv1.CommonPrometheusFields{
@@ -870,15 +808,13 @@ func TestResourceCreator_MultiPlacementOrphanGarbageCollection(t *testing.T) {
 
 	unmanagedAgentName := "unmanaged-collector"
 	unmanagedAgent := &cooprometheusv1alpha1.PrometheusAgent{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      unmanagedAgentName,
-			Namespace: addoncfg.InstallNamespace,
-			Labels: map[string]string{
-				"custom.vendor.io/managed": "true",
-			},
-			Annotations: map[string]string{
-				addoncfg.PlacementAnnotationKey: fmt.Sprintf("%s/regional", addoncfg.InstallNamespace),
-			},
+		Name:      unmanagedAgentName,
+		Namespace: addoncfg.InstallNamespace,
+		Labels: map[string]string{
+			"custom.vendor.io/managed": "true",
+		},
+		Annotations: map[string]string{
+			addoncfg.PlacementAnnotationKey: fmt.Sprintf("%s/regional", addoncfg.InstallNamespace),
 		},
 		Spec: cooprometheusv1alpha1.PrometheusAgentSpec{
 			CommonPrometheusFields: cooprometheusv1.CommonPrometheusFields{
@@ -913,44 +849,28 @@ func TestResourceCreator_MultiPlacementOrphanGarbageCollection(t *testing.T) {
 	}
 
 	regionalAgentConfig := addonv1beta1.AddOnConfig{
-		ConfigGroupResource: addonv1beta1.ConfigGroupResource{
-			Group:    cooprometheusv1alpha1.SchemeGroupVersion.Group,
-			Resource: cooprometheusv1alpha1.PrometheusAgentName,
-		},
-		ConfigReferent: addonv1beta1.ConfigReferent{
-			Namespace: addoncfg.InstallNamespace,
-			Name:      regionalAgentName,
-		},
+		Group:     cooprometheusv1alpha1.SchemeGroupVersion.Group,
+		Resource:  cooprometheusv1alpha1.PrometheusAgentName,
+		Namespace: addoncfg.InstallNamespace,
+		Name:      regionalAgentName,
 	}
 	multiAgentConfig := addonv1beta1.AddOnConfig{
-		ConfigGroupResource: addonv1beta1.ConfigGroupResource{
-			Group:    cooprometheusv1alpha1.SchemeGroupVersion.Group,
-			Resource: cooprometheusv1alpha1.PrometheusAgentName,
-		},
-		ConfigReferent: addonv1beta1.ConfigReferent{
-			Namespace: addoncfg.InstallNamespace,
-			Name:      multiAgentName,
-		},
+		Group:     cooprometheusv1alpha1.SchemeGroupVersion.Group,
+		Resource:  cooprometheusv1alpha1.PrometheusAgentName,
+		Namespace: addoncfg.InstallNamespace,
+		Name:      multiAgentName,
 	}
 	defaultRegionalConfig := addonv1beta1.AddOnConfig{
-		ConfigGroupResource: addonv1beta1.ConfigGroupResource{
-			Group:    cooprometheusv1alpha1.SchemeGroupVersion.Group,
-			Resource: cooprometheusv1alpha1.PrometheusAgentName,
-		},
-		ConfigReferent: addonv1beta1.ConfigReferent{
-			Namespace: addoncfg.InstallNamespace,
-			Name:      defaultRegionalKey.Name,
-		},
+		Group:     cooprometheusv1alpha1.SchemeGroupVersion.Group,
+		Resource:  cooprometheusv1alpha1.PrometheusAgentName,
+		Namespace: addoncfg.InstallNamespace,
+		Name:      defaultRegionalKey.Name,
 	}
 	defaultEdgeConfig := addonv1beta1.AddOnConfig{
-		ConfigGroupResource: addonv1beta1.ConfigGroupResource{
-			Group:    cooprometheusv1alpha1.SchemeGroupVersion.Group,
-			Resource: cooprometheusv1alpha1.PrometheusAgentName,
-		},
-		ConfigReferent: addonv1beta1.ConfigReferent{
-			Namespace: addoncfg.InstallNamespace,
-			Name:      defaultEdgeKey.Name,
-		},
+		Group:     cooprometheusv1alpha1.SchemeGroupVersion.Group,
+		Resource:  cooprometheusv1alpha1.PrometheusAgentName,
+		Namespace: addoncfg.InstallNamespace,
+		Name:      defaultEdgeKey.Name,
 	}
 
 	cmaoKey := types.NamespacedName{Name: addoncfg.Name}

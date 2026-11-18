@@ -28,10 +28,8 @@ func TestHypershift_Nominal(t *testing.T) {
 	require.NoError(t, clusterv1.Install(scheme))
 
 	mc := &clusterv1.ManagedCluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Labels: map[string]string{
-				"feature.open-cluster-management.io/addon-hypershift-addon": "available",
-			},
+		Labels: map[string]string{
+			"feature.open-cluster-management.io/addon-hypershift-addon": "available",
 		},
 		Spec: clusterv1.ManagedClusterSpec{},
 	}
@@ -41,7 +39,7 @@ func TestHypershift_Nominal(t *testing.T) {
 			Params: map[string][]string{
 				"match[]": {
 					`{__name__=":node_memory_MemAvailable_bytes:sum"}`, // ignore rules
-					`{__name__=~"acm_"}`, // ignore regex
+					`{__name__=~"acm_"}`,                               // ignore regex
 					`{__name__="acm_managed_cluster_labels"}`,
 				},
 			},
@@ -68,7 +66,7 @@ func TestHypershift_Nominal(t *testing.T) {
 			Params: map[string][]string{
 				"match[]": {
 					`{__name__=":node_memory_MemAvailable_bytes:sum"}`, // ignore rules
-					`{__name__=~"acm_"}`, // ignore regex
+					`{__name__=~"acm_"}`,                               // ignore regex
 					`{__name__="grpc_server_handled_total"}`,
 				},
 			},
@@ -92,10 +90,8 @@ func TestHypershift_Nominal(t *testing.T) {
 	}
 
 	hostedCluster := &hyperv1.HostedCluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "name",
-			Namespace: "namespace",
-		},
+		Name:      "name",
+		Namespace: "namespace",
 		Spec: hyperv1.HostedClusterSpec{
 			ClusterID: "cluster-id",
 		},
@@ -103,23 +99,15 @@ func TestHypershift_Nominal(t *testing.T) {
 
 	targetPort := intstr.FromString("target")
 	hyperEtcdSM := &prometheusv1.ServiceMonitor{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      config.HypershiftEtcdServiceMonitorName,
-			Namespace: "namespace-name",
-		},
+		Name:      config.HypershiftEtcdServiceMonitorName,
+		Namespace: "namespace-name",
 		Spec: prometheusv1.ServiceMonitorSpec{
 			Endpoints: []prometheusv1.Endpoint{
 				{
 					Port:       "metrics",
 					TargetPort: &targetPort,
-					HTTPConfigWithProxyAndTLSFiles: prometheusv1.HTTPConfigWithProxyAndTLSFiles{
-						HTTPConfigWithTLSFiles: prometheusv1.HTTPConfigWithTLSFiles{
-							TLSConfig: &prometheusv1.TLSConfig{
-								TLSFilesConfig: prometheusv1.TLSFilesConfig{
-									CAFile: "cafile",
-								},
-							},
-						},
+					TLSConfig: &prometheusv1.TLSConfig{
+						CAFile: "cafile",
 					},
 				},
 			},
@@ -133,23 +121,15 @@ func TestHypershift_Nominal(t *testing.T) {
 	}
 
 	hyperApiserverSM := &prometheusv1.ServiceMonitor{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      config.HypershiftApiServerServiceMonitorName,
-			Namespace: "namespace-name",
-		},
+		Name:      config.HypershiftApiServerServiceMonitorName,
+		Namespace: "namespace-name",
 		Spec: prometheusv1.ServiceMonitorSpec{
 			Endpoints: []prometheusv1.Endpoint{
 				{
 					TargetPort: &targetPort,
 					Port:       "client",
-					HTTPConfigWithProxyAndTLSFiles: prometheusv1.HTTPConfigWithProxyAndTLSFiles{
-						HTTPConfigWithTLSFiles: prometheusv1.HTTPConfigWithTLSFiles{
-							TLSConfig: &prometheusv1.TLSConfig{
-								TLSFilesConfig: prometheusv1.TLSFilesConfig{
-									CAFile: "cafile",
-								},
-							},
-						},
+					TLSConfig: &prometheusv1.TLSConfig{
+						CAFile: "cafile",
 					},
 				},
 			},
@@ -225,10 +205,8 @@ func TestHypershift_NoScrapeConfigsAndRules(t *testing.T) {
 	require.NoError(t, clusterv1.Install(scheme))
 
 	hostedCluster := &hyperv1.HostedCluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "name",
-			Namespace: "namespace",
-		},
+		Name:      "name",
+		Namespace: "namespace",
 		Spec: hyperv1.HostedClusterSpec{
 			ClusterID: "cluster-id",
 		},
@@ -259,10 +237,8 @@ func TestHypershift_NoHypershiftServiceMonitors(t *testing.T) {
 	require.NoError(t, clusterv1.Install(scheme))
 
 	hostedCluster := &hyperv1.HostedCluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "name",
-			Namespace: "namespace",
-		},
+		Name:      "name",
+		Namespace: "namespace",
 		Spec: hyperv1.HostedClusterSpec{
 			ClusterID: "cluster-id",
 		},
@@ -275,7 +251,7 @@ func TestHypershift_NoHypershiftServiceMonitors(t *testing.T) {
 			Params: map[string][]string{
 				"match[]": {
 					`{__name__=":node_memory_MemAvailable_bytes:sum"}`, // ignore rules
-					`{__name__=~"acm_"}`, // ignore regex
+					`{__name__=~"acm_"}`,                               // ignore regex
 					`{__name__="grpc_server_handled_total"}`,
 				},
 			},
@@ -287,7 +263,7 @@ func TestHypershift_NoHypershiftServiceMonitors(t *testing.T) {
 			Params: map[string][]string{
 				"match[]": {
 					`{__name__=":node_memory_MemAvailable_bytes:sum"}`, // ignore rules
-					`{__name__=~"acm_"}`, // ignore regex
+					`{__name__=~"acm_"}`,                               // ignore regex
 					`{__name__="acm_managed_cluster_labels"}`,
 				},
 			},
@@ -337,7 +313,7 @@ func TestHypershift_ExtractDependentMetrics(t *testing.T) {
 					Params: map[string][]string{
 						"match[]": {
 							`{__name__=":node_memory_MemAvailable_bytes:sum"}`, // ignore rules
-							`{__name__=~"acm_"}`, // ignore regex
+							`{__name__=~"acm_"}`,                               // ignore regex
 							`{__name__="acm_managed_cluster_labels"}`,
 							`{__name__="active_streams_lease:grpc_server_handled_total:sum"}`,
 						},

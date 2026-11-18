@@ -16,7 +16,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
@@ -632,10 +631,8 @@ func TestIsVersionOlder(t *testing.T) {
 
 func newAddonDeploymentConfig() *addonapiv1beta1.AddOnDeploymentConfig {
 	return &addonapiv1beta1.AddOnDeploymentConfig{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "multicluster-observability-addon",
-			Namespace: "open-cluster-management-observability",
-		},
+		Name:      "multicluster-observability-addon",
+		Namespace: "open-cluster-management-observability",
 	}
 }
 
@@ -673,15 +670,11 @@ func addTracingCustomizedVariables(aodc *addonapiv1beta1.AddOnDeploymentConfig) 
 func addAODCConfigReference(managedClusterAddOn *addonapiv1beta1.ManagedClusterAddOn, aodc *addonapiv1beta1.AddOnDeploymentConfig) {
 	managedClusterAddOn.Status.ConfigReferences = []addonapiv1beta1.ConfigReference{
 		{
-			ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
-				Group:    addonutils.AddOnDeploymentConfigGVR.Group,
-				Resource: addoncfg.AddonDeploymentConfigResource,
-			},
+			Group:    addonutils.AddOnDeploymentConfigGVR.Group,
+			Resource: addoncfg.AddonDeploymentConfigResource,
 			DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
-				ConfigReferent: addonapiv1beta1.ConfigReferent{
-					Namespace: aodc.Namespace,
-					Name:      aodc.Name,
-				},
+				Namespace: aodc.Namespace,
+				Name:      aodc.Name,
 			},
 		},
 	}

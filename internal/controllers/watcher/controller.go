@@ -20,7 +20,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/workqueue"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager"
 	workv1 "open-cluster-management.io/api/work/v1"
@@ -172,10 +171,8 @@ func (r *WatcherReconciler) enqueueForLocalCluster() handler.EventHandler {
 		r.Log.V(2).Info("Enqueue for local cluster event", "gvk", obj.GetObjectKind().GroupVersionKind().String(), "name", obj.GetName(), "namespace", obj.GetNamespace())
 		return []reconcile.Request{
 			{
-				NamespacedName: types.NamespacedName{
-					Name:      addoncfg.Name,
-					Namespace: localClusterNamespace,
-				},
+				Name:      addoncfg.Name,
+				Namespace: localClusterNamespace,
 			},
 		}
 	})
@@ -199,10 +196,8 @@ func (r *WatcherReconciler) enqueueForAllManagedClusters() handler.EventHandler 
 		requests := make([]reconcile.Request, 0, len(namespaces))
 		for ns := range namespaces {
 			requests = append(requests, reconcile.Request{
-				NamespacedName: types.NamespacedName{
-					Name:      addoncfg.Name,
-					Namespace: ns,
-				},
+				Name:      addoncfg.Name,
+				Namespace: ns,
 			})
 		}
 		r.Log.V(2).Info("enqueuing reconciliation for all managed clusters", "count", len(requests))
@@ -224,10 +219,8 @@ func (r *WatcherReconciler) enqueueForConfigResource() handler.EventHandler {
 			rqs = append(rqs,
 				// Trigger a reconcile request for the addon in the ManifestWork namespace
 				reconcile.Request{
-					NamespacedName: types.NamespacedName{
-						Name:      addoncfg.Name,
-						Namespace: ns,
-					},
+					Name:      addoncfg.Name,
+					Namespace: ns,
 				},
 			)
 		}

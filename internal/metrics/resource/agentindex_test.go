@@ -18,10 +18,8 @@ func TestAgentIndex(t *testing.T) {
 	cmaoUID := types.UID("cmao-uid-1")
 	newCMAOForIndex := func(placements ...addonv1beta1.PlacementStrategy) *addonv1beta1.ClusterManagementAddOn {
 		return &addonv1beta1.ClusterManagementAddOn{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: addoncfg.Name,
-				UID:  cmaoUID,
-			},
+			Name: addoncfg.Name,
+			UID:  cmaoUID,
 			Spec: addonv1beta1.ClusterManagementAddOnSpec{
 				InstallStrategy: addonv1beta1.InstallStrategy{
 					Placements: placements,
@@ -64,62 +62,48 @@ func TestAgentIndex(t *testing.T) {
 
 	promAgentConfig := func(name string) addonv1beta1.AddOnConfig {
 		return addonv1beta1.AddOnConfig{
-			ConfigGroupResource: addonv1beta1.ConfigGroupResource{
-				Group:    cooprometheusv1alpha1.SchemeGroupVersion.Group,
-				Resource: cooprometheusv1alpha1.PrometheusAgentName,
-			},
-			ConfigReferent: addonv1beta1.ConfigReferent{
-				Namespace: config.HubInstallNamespace,
-				Name:      name,
-			},
+			Group:     cooprometheusv1alpha1.SchemeGroupVersion.Group,
+			Resource:  cooprometheusv1alpha1.PrometheusAgentName,
+			Namespace: config.HubInstallNamespace,
+			Name:      name,
 		}
 	}
 
 	t.Run("classifies CMAO-owned, user-owned, unrecognized, and other-component agents", func(t *testing.T) {
 		cmaoDefaultGlobal := cooprometheusv1alpha1.PrometheusAgent{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:            "mcoa-default-platform-metrics-collector-global",
-				Namespace:       config.HubInstallNamespace,
-				Labels:          map[string]string{addoncfg.ComponentK8sLabelKey: config.PlatformMetricsCollectorApp},
-				Annotations:     map[string]string{addoncfg.PlacementAnnotationKey: globalRef.Namespace + "/" + globalRef.Name},
-				OwnerReferences: []metav1.OwnerReference{cmaoOwnerRef},
-				ManagedFields:   cmaoManagedFields,
-			},
+			Name:            "mcoa-default-platform-metrics-collector-global",
+			Namespace:       config.HubInstallNamespace,
+			Labels:          map[string]string{addoncfg.ComponentK8sLabelKey: config.PlatformMetricsCollectorApp},
+			Annotations:     map[string]string{addoncfg.PlacementAnnotationKey: globalRef.Namespace + "/" + globalRef.Name},
+			OwnerReferences: []metav1.OwnerReference{cmaoOwnerRef},
+			ManagedFields:   cmaoManagedFields,
 		}
 		userModifiedDefault := cooprometheusv1alpha1.PrometheusAgent{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:            "mcoa-default-platform-metrics-collector-custom",
-				Namespace:       config.HubInstallNamespace,
-				Labels:          map[string]string{addoncfg.ComponentK8sLabelKey: config.PlatformMetricsCollectorApp},
-				Annotations:     map[string]string{addoncfg.PlacementAnnotationKey: customRef.Namespace + "/" + customRef.Name},
-				OwnerReferences: []metav1.OwnerReference{cmaoOwnerRef},
-				ManagedFields:   userModifiedManagedFields,
-			},
+			Name:            "mcoa-default-platform-metrics-collector-custom",
+			Namespace:       config.HubInstallNamespace,
+			Labels:          map[string]string{addoncfg.ComponentK8sLabelKey: config.PlatformMetricsCollectorApp},
+			Annotations:     map[string]string{addoncfg.PlacementAnnotationKey: customRef.Namespace + "/" + customRef.Name},
+			OwnerReferences: []metav1.OwnerReference{cmaoOwnerRef},
+			ManagedFields:   userModifiedManagedFields,
 		}
 		userUnrecognized := cooprometheusv1alpha1.PrometheusAgent{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:        "user-agent-without-part-of",
-				Namespace:   config.HubInstallNamespace,
-				Labels:      map[string]string{addoncfg.ComponentK8sLabelKey: config.PlatformMetricsCollectorApp},
-				Annotations: map[string]string{addoncfg.PlacementAnnotationKey: globalRef.Namespace + "/" + globalRef.Name},
-			},
+			Name:        "user-agent-without-part-of",
+			Namespace:   config.HubInstallNamespace,
+			Labels:      map[string]string{addoncfg.ComponentK8sLabelKey: config.PlatformMetricsCollectorApp},
+			Annotations: map[string]string{addoncfg.PlacementAnnotationKey: globalRef.Namespace + "/" + globalRef.Name},
 		}
 		uwlAgent := cooprometheusv1alpha1.PrometheusAgent{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "uwl-custom-agent",
-				Namespace: config.HubInstallNamespace,
-				Labels: map[string]string{
-					addoncfg.ComponentK8sLabelKey: config.UserWorkloadMetricsCollectorApp,
-					addoncfg.PartOfK8sLabelKey:    addoncfg.Name,
-				},
+			Name:      "uwl-custom-agent",
+			Namespace: config.HubInstallNamespace,
+			Labels: map[string]string{
+				addoncfg.ComponentK8sLabelKey: config.UserWorkloadMetricsCollectorApp,
+				addoncfg.PartOfK8sLabelKey:    addoncfg.Name,
 			},
 		}
 		unrelatedAgent := cooprometheusv1alpha1.PrometheusAgent{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "third-party-agent",
-				Namespace: config.HubInstallNamespace,
-				Labels:    map[string]string{addoncfg.ComponentK8sLabelKey: "something-else"},
-			},
+			Name:      "third-party-agent",
+			Namespace: config.HubInstallNamespace,
+			Labels:    map[string]string{addoncfg.ComponentK8sLabelKey: "something-else"},
 		}
 
 		idx, err := newAgentIndex(newCMAOForIndex(), []cooprometheusv1alpha1.PrometheusAgent{
@@ -144,23 +128,19 @@ func TestAgentIndex(t *testing.T) {
 
 	t.Run("cmaoOwnedAgentsForPlacement indexes CMAO-owned agents only via placement annotation", func(t *testing.T) {
 		annotatedAgent := cooprometheusv1alpha1.PrometheusAgent{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:            "cmao-annotated",
-				Namespace:       config.HubInstallNamespace,
-				Labels:          map[string]string{addoncfg.ComponentK8sLabelKey: config.PlatformMetricsCollectorApp},
-				Annotations:     map[string]string{addoncfg.PlacementAnnotationKey: globalRef.Namespace + "/" + globalRef.Name},
-				OwnerReferences: []metav1.OwnerReference{cmaoOwnerRef},
-				ManagedFields:   cmaoManagedFields,
-			},
+			Name:            "cmao-annotated",
+			Namespace:       config.HubInstallNamespace,
+			Labels:          map[string]string{addoncfg.ComponentK8sLabelKey: config.PlatformMetricsCollectorApp},
+			Annotations:     map[string]string{addoncfg.PlacementAnnotationKey: globalRef.Namespace + "/" + globalRef.Name},
+			OwnerReferences: []metav1.OwnerReference{cmaoOwnerRef},
+			ManagedFields:   cmaoManagedFields,
 		}
 		configOnlyAgent := cooprometheusv1alpha1.PrometheusAgent{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:            "cmao-in-configs-without-annotation",
-				Namespace:       config.HubInstallNamespace,
-				Labels:          map[string]string{addoncfg.ComponentK8sLabelKey: config.PlatformMetricsCollectorApp},
-				OwnerReferences: []metav1.OwnerReference{cmaoOwnerRef},
-				ManagedFields:   cmaoManagedFields,
-			},
+			Name:            "cmao-in-configs-without-annotation",
+			Namespace:       config.HubInstallNamespace,
+			Labels:          map[string]string{addoncfg.ComponentK8sLabelKey: config.PlatformMetricsCollectorApp},
+			OwnerReferences: []metav1.OwnerReference{cmaoOwnerRef},
+			ManagedFields:   cmaoManagedFields,
 		}
 
 		placement := addonv1beta1.PlacementStrategy{
@@ -184,40 +164,32 @@ func TestAgentIndex(t *testing.T) {
 
 	t.Run("isPlacementCoveredByUser handles annotations, placement.Configs, other-component, and stale entries", func(t *testing.T) {
 		cmaoAgent := cooprometheusv1alpha1.PrometheusAgent{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:            "mcoa-default-platform-metrics-collector-global",
-				Namespace:       config.HubInstallNamespace,
-				Labels:          map[string]string{addoncfg.ComponentK8sLabelKey: config.PlatformMetricsCollectorApp},
-				OwnerReferences: []metav1.OwnerReference{cmaoOwnerRef},
-				ManagedFields:   cmaoManagedFields,
-			},
+			Name:            "mcoa-default-platform-metrics-collector-global",
+			Namespace:       config.HubInstallNamespace,
+			Labels:          map[string]string{addoncfg.ComponentK8sLabelKey: config.PlatformMetricsCollectorApp},
+			OwnerReferences: []metav1.OwnerReference{cmaoOwnerRef},
+			ManagedFields:   cmaoManagedFields,
 		}
 		userAgentInCluster := cooprometheusv1alpha1.PrometheusAgent{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "user-platform-agent",
-				Namespace: config.HubInstallNamespace,
-				Labels: map[string]string{
-					addoncfg.ComponentK8sLabelKey: config.PlatformMetricsCollectorApp,
-					addoncfg.PartOfK8sLabelKey:    addoncfg.Name,
-				},
+			Name:      "user-platform-agent",
+			Namespace: config.HubInstallNamespace,
+			Labels: map[string]string{
+				addoncfg.ComponentK8sLabelKey: config.PlatformMetricsCollectorApp,
+				addoncfg.PartOfK8sLabelKey:    addoncfg.Name,
 			},
 		}
 		unlabeledUserAgentInConfigs := cooprometheusv1alpha1.PrometheusAgent{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "unlabeled-user-platform-agent",
-				Namespace: config.HubInstallNamespace,
-				Labels: map[string]string{
-					addoncfg.ComponentK8sLabelKey: config.PlatformMetricsCollectorApp,
-				},
+			Name:      "unlabeled-user-platform-agent",
+			Namespace: config.HubInstallNamespace,
+			Labels: map[string]string{
+				addoncfg.ComponentK8sLabelKey: config.PlatformMetricsCollectorApp,
 			},
 		}
 		unlabeledUwlAgentInConfigs := cooprometheusv1alpha1.PrometheusAgent{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "unlabeled-user-uwl-agent",
-				Namespace: config.HubInstallNamespace,
-				Labels: map[string]string{
-					addoncfg.ComponentK8sLabelKey: config.UserWorkloadMetricsCollectorApp,
-				},
+			Name:      "unlabeled-user-uwl-agent",
+			Namespace: config.HubInstallNamespace,
+			Labels: map[string]string{
+				addoncfg.ComponentK8sLabelKey: config.UserWorkloadMetricsCollectorApp,
 			},
 		}
 
@@ -272,16 +244,14 @@ func TestAgentIndex(t *testing.T) {
 
 	t.Run("returns error when recognized agent has malformed placement annotation", func(t *testing.T) {
 		malformedAgent := cooprometheusv1alpha1.PrometheusAgent{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "user-agent-bad-annotation",
-				Namespace: config.HubInstallNamespace,
-				Labels: map[string]string{
-					addoncfg.ComponentK8sLabelKey: config.PlatformMetricsCollectorApp,
-					addoncfg.PartOfK8sLabelKey:    addoncfg.Name,
-				},
-				Annotations: map[string]string{
-					addoncfg.PlacementAnnotationKey: "open-cluster-management-observability/global, malformed-entry",
-				},
+			Name:      "user-agent-bad-annotation",
+			Namespace: config.HubInstallNamespace,
+			Labels: map[string]string{
+				addoncfg.ComponentK8sLabelKey: config.PlatformMetricsCollectorApp,
+				addoncfg.PartOfK8sLabelKey:    addoncfg.Name,
+			},
+			Annotations: map[string]string{
+				addoncfg.PlacementAnnotationKey: "open-cluster-management-observability/global, malformed-entry",
 			},
 		}
 

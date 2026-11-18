@@ -67,12 +67,10 @@ func TestGetCacheOptions_Structure(t *testing.T) {
 		"PrometheusAgent cache should only watch a single install namespace")
 	require.NotNil(t, promAgentByObj.Transform, "PrometheusAgent must have an identity Transform to preserve managedFields")
 	agent := &cooprometheusv1alpha1.PrometheusAgent{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-agent",
-			Namespace: InstallNamespace,
-			ManagedFields: []metav1.ManagedFieldsEntry{
-				{Manager: Name, Operation: metav1.ManagedFieldsOperationApply},
-			},
+		Name:      "test-agent",
+		Namespace: InstallNamespace,
+		ManagedFields: []metav1.ManagedFieldsEntry{
+			{Manager: Name, Operation: metav1.ManagedFieldsOperationApply},
 		},
 	}
 	transformedAgent, err := promAgentByObj.Transform(agent)
@@ -86,28 +84,26 @@ func TestTransformStripManagedFields(t *testing.T) {
 	require.NotNil(t, opts.DefaultTransform)
 
 	testObj := &addonv1beta1.AddOnDeploymentConfig{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      Name,
-			Namespace: InstallNamespace,
-			Labels: map[string]string{
-				"app.kubernetes.io/name": "mcoa",
+		Name:      Name,
+		Namespace: InstallNamespace,
+		Labels: map[string]string{
+			"app.kubernetes.io/name": "mcoa",
+		},
+		Annotations: map[string]string{
+			"test.annotation": "true",
+		},
+		ManagedFields: []metav1.ManagedFieldsEntry{
+			{
+				Manager:    "test-manager",
+				Operation:  metav1.ManagedFieldsOperationApply,
+				APIVersion: "addon.open-cluster-management.io/v1beta1",
+				Time:       &metav1.Time{Time: time.Now()},
+				FieldsType: "FieldsV1",
 			},
-			Annotations: map[string]string{
-				"test.annotation": "true",
-			},
-			ManagedFields: []metav1.ManagedFieldsEntry{
-				{
-					Manager:    "test-manager",
-					Operation:  metav1.ManagedFieldsOperationApply,
-					APIVersion: "addon.open-cluster-management.io/v1beta1",
-					Time:       &metav1.Time{Time: time.Now()},
-					FieldsType: "FieldsV1",
-				},
-				{
-					Manager:    "other-controller",
-					Operation:  metav1.ManagedFieldsOperationUpdate,
-					APIVersion: "addon.open-cluster-management.io/v1beta1",
-				},
+			{
+				Manager:    "other-controller",
+				Operation:  metav1.ManagedFieldsOperationUpdate,
+				APIVersion: "addon.open-cluster-management.io/v1beta1",
 			},
 		},
 		Spec: addonv1beta1.AddOnDeploymentConfigSpec{

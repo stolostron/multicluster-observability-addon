@@ -19,7 +19,6 @@ import (
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -89,10 +88,8 @@ func TestDefaultHubStack_LifecycleAndDynamicWatchSelfHealing(t *testing.T) {
 
 	// 1. Create cardinality rules ConfigMap (watched with builder.OnlyMetadata, read via APIReader)
 	cardinalityCM := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "thanos-ruler-custom-rules",
-			Namespace: addoncfg.InstallNamespace,
-		},
+		Name:      "thanos-ruler-custom-rules",
+		Namespace: addoncfg.InstallNamespace,
 		Data: map[string]string{
 			"custom_rules.yaml": "record: cluster:cardinality:sum",
 		},
@@ -101,10 +98,8 @@ func TestDefaultHubStack_LifecycleAndDynamicWatchSelfHealing(t *testing.T) {
 
 	// 2. Create AddOnDeploymentConfig enabling platform metrics UI, incident detection, and right-sizing
 	aodc := &addonv1beta1.AddOnDeploymentConfig{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      addoncfg.Name,
-			Namespace: addoncfg.InstallNamespace,
-		},
+		Name:      addoncfg.Name,
+		Namespace: addoncfg.InstallNamespace,
 		Spec: addonv1beta1.AddOnDeploymentConfigSpec{
 			CustomizedVariables: []addonv1beta1.CustomizedVariable{
 				{Name: addon.KeyPlatformMetricsCollection, Value: string(addon.PrometheusAgentV1alpha1)},
@@ -194,14 +189,12 @@ func TestDefaultHubStack_LifecycleAndDynamicWatchSelfHealing(t *testing.T) {
 
 	// 5. Verify Dynamic Watch Self-Healing: deleting a managed UIPlugin and PersesDatasource
 	// triggers the dynamically registered watches and recreates them via Server-Side Apply.
-	uipToDelete := &uiplugin.UIPlugin{ObjectMeta: metav1.ObjectMeta{Name: "monitoring"}}
+	uipToDelete := &uiplugin.UIPlugin{Name: "monitoring"}
 	require.NoError(t, testEnv.K8sClient.Delete(ctx, uipToDelete))
 
 	dsToDelete := &persesv1.PersesDatasource{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      dsKey.Name,
-			Namespace: dsKey.Namespace,
-		},
+		Name:      dsKey.Name,
+		Namespace: dsKey.Namespace,
 	}
 	require.NoError(t, testEnv.K8sClient.Delete(ctx, dsToDelete))
 
@@ -221,10 +214,8 @@ func TestDefaultHubStack_LifecycleAndDynamicWatchSelfHealing(t *testing.T) {
 	// 6. Seed a user-created PersesDashboard (without MCOA managed-by label or known name)
 	// and verify feature disablement cleans up all MCOA-managed resources while preserving the user dashboard.
 	userDashboard := &persesv1.PersesDashboard{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "user-custom-dashboard",
-			Namespace: addoncfg.InstallNamespace,
-		},
+		Name:      "user-custom-dashboard",
+		Namespace: addoncfg.InstallNamespace,
 	}
 	require.NoError(t, testEnv.K8sClient.Create(ctx, userDashboard))
 

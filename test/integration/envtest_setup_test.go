@@ -7,7 +7,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
@@ -24,17 +23,15 @@ func TestEnvtestBootstrap(t *testing.T) {
 
 	// Verify core namespace creation
 	ns := &corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{Name: "test-bootstrap"},
+		Name: "test-bootstrap",
 	}
 	err := testEnv.K8sClient.Create(ctx, ns)
 	require.NoError(t, err)
 
 	// Verify custom resource (CRD) creation
 	aodc := &addonv1beta1.AddOnDeploymentConfig{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-aodc",
-			Namespace: "test-bootstrap",
-		},
+		Name:      "test-aodc",
+		Namespace: "test-bootstrap",
 	}
 	err = testEnv.K8sClient.Create(ctx, aodc)
 	require.NoError(t, err)

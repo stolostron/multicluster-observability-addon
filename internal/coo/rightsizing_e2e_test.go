@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog/v2"
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
@@ -34,10 +33,8 @@ var (
 func buildOpts(t *testing.T, cv []addonapiv1beta1.CustomizedVariable) addon.Options {
 	t.Helper()
 	aodc := &addonapiv1beta1.AddOnDeploymentConfig{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      addoncfg.Name,
-			Namespace: addoncfg.InstallNamespace,
-		},
+		Name:      addoncfg.Name,
+		Namespace: addoncfg.InstallNamespace,
 		Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
 			CustomizedVariables: cv,
 		},

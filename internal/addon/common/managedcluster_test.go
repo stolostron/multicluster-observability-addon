@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 )
 
@@ -17,11 +16,9 @@ func TestGetManagedClusterID(t *testing.T) {
 		{
 			name: "with clusterID label",
 			cluster: &clusterv1.ManagedCluster{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "cluster1",
-					Labels: map[string]string{
-						addoncfg.ManagedClusterLabelClusterID: "cluster1-id-from-label",
-					},
+				Name: "cluster1",
+				Labels: map[string]string{
+					addoncfg.ManagedClusterLabelClusterID: "cluster1-id-from-label",
 				},
 				Status: clusterv1.ManagedClusterStatus{
 					ClusterClaims: []clusterv1.ManagedClusterClaim{
@@ -37,9 +34,7 @@ func TestGetManagedClusterID(t *testing.T) {
 		{
 			name: "with id.k8s.io claim",
 			cluster: &clusterv1.ManagedCluster{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "cluster2",
-				},
+				Name: "cluster2",
 				Status: clusterv1.ManagedClusterStatus{
 					ClusterClaims: []clusterv1.ManagedClusterClaim{
 						{
@@ -54,9 +49,7 @@ func TestGetManagedClusterID(t *testing.T) {
 		{
 			name: "with no label or claim",
 			cluster: &clusterv1.ManagedCluster{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "cluster3",
-				},
+				Name: "cluster3",
 			},
 			expectedClusterID: "cluster3",
 		},
@@ -87,9 +80,7 @@ func TestIsOCPVersionAtLeast(t *testing.T) {
 		{
 			name: "OCP 5 meets minimum 5",
 			cluster: &clusterv1.ManagedCluster{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{"openshiftVersion-major": "5"},
-				},
+				Labels: map[string]string{"openshiftVersion-major": "5"},
 			},
 			major:    5,
 			expected: true,
@@ -97,9 +88,7 @@ func TestIsOCPVersionAtLeast(t *testing.T) {
 		{
 			name: "OCP 4 does not meet minimum 5",
 			cluster: &clusterv1.ManagedCluster{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{"openshiftVersion-major": "4"},
-				},
+				Labels: map[string]string{"openshiftVersion-major": "4"},
 			},
 			major:    5,
 			expected: false,
@@ -107,9 +96,7 @@ func TestIsOCPVersionAtLeast(t *testing.T) {
 		{
 			name: "OCP 6 meets minimum 5",
 			cluster: &clusterv1.ManagedCluster{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{"openshiftVersion-major": "6"},
-				},
+				Labels: map[string]string{"openshiftVersion-major": "6"},
 			},
 			major:    5,
 			expected: true,
@@ -129,9 +116,7 @@ func TestIsOCPVersionAtLeast(t *testing.T) {
 		{
 			name: "non-numeric label returns false",
 			cluster: &clusterv1.ManagedCluster{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{"openshiftVersion-major": "abc"},
-				},
+				Labels: map[string]string{"openshiftVersion-major": "abc"},
 			},
 			major:    5,
 			expected: false,
@@ -157,10 +142,8 @@ func TestIsOpenShiftVendor(t *testing.T) {
 		{
 			name: "with vendor label",
 			cluster: &clusterv1.ManagedCluster{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						"vendor": "OpenShift",
-					},
+				Labels: map[string]string{
+					"vendor": "OpenShift",
 				},
 			},
 			expected: true,
@@ -168,10 +151,8 @@ func TestIsOpenShiftVendor(t *testing.T) {
 		{
 			name: "with openshiftVersion label",
 			cluster: &clusterv1.ManagedCluster{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						"openshiftVersion": "4.15.0",
-					},
+				Labels: map[string]string{
+					"openshiftVersion": "4.15.0",
 				},
 			},
 			expected: true,
@@ -193,10 +174,8 @@ func TestIsOpenShiftVendor(t *testing.T) {
 		{
 			name: "with other vendor",
 			cluster: &clusterv1.ManagedCluster{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						"vendor": "Other",
-					},
+				Labels: map[string]string{
+					"vendor": "Other",
 				},
 			},
 			expected: false,
@@ -204,10 +183,8 @@ func TestIsOpenShiftVendor(t *testing.T) {
 		{
 			name: "with vendor override annotation (OpenShift)",
 			cluster: &clusterv1.ManagedCluster{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						addoncfg.VendorOverrideAnnotationKey: "OpenShift",
-					},
+				Annotations: map[string]string{
+					addoncfg.VendorOverrideAnnotationKey: "OpenShift",
 				},
 			},
 			expected: true,
@@ -215,13 +192,11 @@ func TestIsOpenShiftVendor(t *testing.T) {
 		{
 			name: "with vendor override annotation (Other)",
 			cluster: &clusterv1.ManagedCluster{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						addoncfg.VendorOverrideAnnotationKey: "Other",
-					},
-					Labels: map[string]string{
-						"vendor": "OpenShift",
-					},
+				Annotations: map[string]string{
+					addoncfg.VendorOverrideAnnotationKey: "Other",
+				},
+				Labels: map[string]string{
+					"vendor": "OpenShift",
 				},
 			},
 			expected: false,

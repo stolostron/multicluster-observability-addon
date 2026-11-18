@@ -17,13 +17,11 @@ import (
 // nsTblCol is a shorthand to create a ColumnSettingsWithLink for namespace tables (no DataLink).
 func nsTblCol(name, header string, align tablePanel.Align, format *commonSdk.Format, opts ...func(*ColumnSettingsWithLink)) ColumnSettingsWithLink {
 	c := ColumnSettingsWithLink{
-		ColumnSettings: tablePanel.ColumnSettings{
-			Name:          name,
-			Header:        header,
-			Align:         align,
-			Format:        format,
-			EnableSorting: true,
-		},
+		Name:          name,
+		Header:        header,
+		Align:         align,
+		Format:        format,
+		EnableSorting: true,
 	}
 	for _, fn := range opts {
 		fn(&c)
@@ -210,7 +208,7 @@ func CPUQuotaTablePanel(datasourceName string) panelgroup.Option {
 		panel.Description("CPU utilization, usage, request, recommendation, and request hard per namespace"),
 		TableWithLinks(TablePluginSpec{
 			ColumnSettings: []ColumnSettingsWithLink{
-				{ColumnSettings: tablePanel.ColumnSettings{Name: "timestamp", Hide: true}},
+				{Name: "timestamp", Hide: true},
 				nsTblCol("namespace", "Namespace", tablePanel.LeftAlign, nil),
 				nsTblCol("value #1", "CPU Utilization %", tablePanel.RightAlign,
 					&commonSdk.Format{Unit: &dashboards.PercentDecimalUnit, DecimalPlaces: 2},
@@ -271,7 +269,7 @@ func MemQuotaTablePanel(datasourceName string) panelgroup.Option {
 		panel.Description("Memory utilization, usage, request, recommendation, and request hard per namespace"),
 		TableWithLinks(TablePluginSpec{
 			ColumnSettings: []ColumnSettingsWithLink{
-				{ColumnSettings: tablePanel.ColumnSettings{Name: "timestamp", Hide: true}},
+				{Name: "timestamp", Hide: true},
 				nsTblCol("namespace", "Namespace", tablePanel.LeftAlign, nil),
 				nsTblCol("value #1", "Memory Utilization %", tablePanel.RightAlign,
 					&commonSdk.Format{Unit: &dashboards.PercentDecimalUnit, DecimalPlaces: 2},

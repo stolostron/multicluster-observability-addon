@@ -15,7 +15,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -47,10 +46,8 @@ func newTestScheme() *runtime.Scheme {
 
 func TestManagedByPredicate(t *testing.T) {
 	managedObj := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Labels: map[string]string{
-				addoncfg.ManagedByK8sLabelKey: cooresource.ManagedByLabelValue,
-			},
+		Labels: map[string]string{
+			addoncfg.ManagedByK8sLabelKey: cooresource.ManagedByLabelValue,
 		},
 	}
 	unmanagedObj := &corev1.ConfigMap{}
@@ -75,66 +72,52 @@ func TestManagedByPredicate(t *testing.T) {
 func TestMCOAAODCPredicate(t *testing.T) {
 	t.Run("matches MCOA AODC", func(t *testing.T) {
 		obj := &addonv1beta1.AddOnDeploymentConfig{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      addoncfg.Name,
-				Namespace: addoncfg.InstallNamespace,
-			},
+			Name:      addoncfg.Name,
+			Namespace: addoncfg.InstallNamespace,
 		}
 		assert.True(t, mcoaAODCPredicate.Create(event.CreateEvent{Object: obj}))
 	})
 
 	t.Run("rejects wrong name", func(t *testing.T) {
 		obj := &addonv1beta1.AddOnDeploymentConfig{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "wrong-name",
-				Namespace: addoncfg.InstallNamespace,
-			},
+			Name:      "wrong-name",
+			Namespace: addoncfg.InstallNamespace,
 		}
 		assert.False(t, mcoaAODCPredicate.Create(event.CreateEvent{Object: obj}))
 	})
 
 	t.Run("rejects wrong namespace", func(t *testing.T) {
 		obj := &addonv1beta1.AddOnDeploymentConfig{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      addoncfg.Name,
-				Namespace: "wrong-ns",
-			},
+			Name:      addoncfg.Name,
+			Namespace: "wrong-ns",
 		}
 		assert.False(t, mcoaAODCPredicate.Create(event.CreateEvent{Object: obj}))
 	})
 
 	t.Run("ignores update when generation is unchanged", func(t *testing.T) {
 		oldObj := &addonv1beta1.AddOnDeploymentConfig{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:       addoncfg.Name,
-				Namespace:  addoncfg.InstallNamespace,
-				Generation: 1,
-			},
+			Name:       addoncfg.Name,
+			Namespace:  addoncfg.InstallNamespace,
+			Generation: 1,
 		}
 		newObj := &addonv1beta1.AddOnDeploymentConfig{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:       addoncfg.Name,
-				Namespace:  addoncfg.InstallNamespace,
-				Generation: 1,
-			},
+			Name:       addoncfg.Name,
+			Namespace:  addoncfg.InstallNamespace,
+			Generation: 1,
 		}
 		assert.False(t, mcoaAODCPredicate.Update(event.UpdateEvent{ObjectOld: oldObj, ObjectNew: newObj}))
 	})
 
 	t.Run("triggers update when generation changed", func(t *testing.T) {
 		oldObj := &addonv1beta1.AddOnDeploymentConfig{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:       addoncfg.Name,
-				Namespace:  addoncfg.InstallNamespace,
-				Generation: 1,
-			},
+			Name:       addoncfg.Name,
+			Namespace:  addoncfg.InstallNamespace,
+			Generation: 1,
 		}
 		newObj := &addonv1beta1.AddOnDeploymentConfig{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:       addoncfg.Name,
-				Namespace:  addoncfg.InstallNamespace,
-				Generation: 2,
-			},
+			Name:       addoncfg.Name,
+			Namespace:  addoncfg.InstallNamespace,
+			Generation: 2,
 		}
 		assert.True(t, mcoaAODCPredicate.Update(event.UpdateEvent{ObjectOld: oldObj, ObjectNew: newObj}))
 	})
@@ -158,10 +141,8 @@ func TestReconcile_AODCNotFound(t *testing.T) {
 func TestReconcile_DynamicWatchesPendingRequeues(t *testing.T) {
 	scheme := newTestScheme()
 	aodc := &addonv1beta1.AddOnDeploymentConfig{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      addoncfg.Name,
-			Namespace: addoncfg.InstallNamespace,
-		},
+		Name:      addoncfg.Name,
+		Namespace: addoncfg.InstallNamespace,
 		Spec: addonv1beta1.AddOnDeploymentConfigSpec{
 			CustomizedVariables: []addonv1beta1.CustomizedVariable{
 				{Name: addon.KeyRightSizingDelegated, Value: "true"},
@@ -186,10 +167,8 @@ func TestReconcile_DynamicWatchesPendingRequeues(t *testing.T) {
 func TestReconcile_EmptyOptions(t *testing.T) {
 	scheme := newTestScheme()
 	aodc := &addonv1beta1.AddOnDeploymentConfig{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      addoncfg.Name,
-			Namespace: addoncfg.InstallNamespace,
-		},
+		Name:      addoncfg.Name,
+		Namespace: addoncfg.InstallNamespace,
 	}
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(aodc).Build()
 
@@ -212,10 +191,8 @@ func TestReconcile_EmptyOptions(t *testing.T) {
 func TestReconcile_COOSubscriptionWrongChannel(t *testing.T) {
 	scheme := newTestScheme()
 	aodc := &addonv1beta1.AddOnDeploymentConfig{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      addoncfg.Name,
-			Namespace: addoncfg.InstallNamespace,
-		},
+		Name:      addoncfg.Name,
+		Namespace: addoncfg.InstallNamespace,
 		Spec: addonv1beta1.AddOnDeploymentConfigSpec{
 			CustomizedVariables: []addonv1beta1.CustomizedVariable{
 				{Name: "platformMetricsCollection", Value: "prometheusagent/v1alpha1"},
@@ -224,10 +201,8 @@ func TestReconcile_COOSubscriptionWrongChannel(t *testing.T) {
 		},
 	}
 	sub := &operatorsv1alpha1.Subscription{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      addoncfg.CooSubscriptionName,
-			Namespace: addoncfg.CooSubscriptionNamespace,
-		},
+		Name:      addoncfg.CooSubscriptionName,
+		Namespace: addoncfg.CooSubscriptionNamespace,
 		Spec: &operatorsv1alpha1.SubscriptionSpec{
 			Channel: "wrong-channel",
 		},
@@ -248,10 +223,8 @@ func TestReconcile_COOSubscriptionWrongChannel(t *testing.T) {
 func TestReconcile_RightSizingInstallsCOOOnHub(t *testing.T) {
 	scheme := newTestScheme()
 	aodc := &addonv1beta1.AddOnDeploymentConfig{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      addoncfg.Name,
-			Namespace: addoncfg.InstallNamespace,
-		},
+		Name:      addoncfg.Name,
+		Namespace: addoncfg.InstallNamespace,
 		Spec: addonv1beta1.AddOnDeploymentConfigSpec{
 			CustomizedVariables: []addonv1beta1.CustomizedVariable{
 				{Name: addon.KeyRightSizingDelegated, Value: "true"},
@@ -307,10 +280,8 @@ func TestReconcile_RightSizingInstallsCOOOnHub(t *testing.T) {
 func TestReconcile_IncidentDetectionInstallsCOOOnHub(t *testing.T) {
 	scheme := newTestScheme()
 	aodc := &addonv1beta1.AddOnDeploymentConfig{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      addoncfg.Name,
-			Namespace: addoncfg.InstallNamespace,
-		},
+		Name:      addoncfg.Name,
+		Namespace: addoncfg.InstallNamespace,
 		Spec: addonv1beta1.AddOnDeploymentConfigSpec{
 			CustomizedVariables: []addonv1beta1.CustomizedVariable{
 				{Name: addon.KeyPlatformIncidentDetection, Value: string(addon.UIPluginV1alpha1)},
@@ -356,10 +327,8 @@ func TestReconcile_IncidentDetectionInstallsCOOOnHub(t *testing.T) {
 func TestReconcile_BuildOptionsError_ReturnsTerminalError(t *testing.T) {
 	scheme := newTestScheme()
 	invalidAODC := &addonv1beta1.AddOnDeploymentConfig{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      addoncfg.Name,
-			Namespace: addoncfg.InstallNamespace,
-		},
+		Name:      addoncfg.Name,
+		Namespace: addoncfg.InstallNamespace,
 		Spec: addonv1beta1.AddOnDeploymentConfigSpec{
 			ProxyConfig: addonv1beta1.ProxyConfig{
 				HTTPProxy: "http://invalid proxy url with spaces",
@@ -384,10 +353,8 @@ func TestReconcile_BuildOptionsError_ReturnsTerminalError(t *testing.T) {
 func TestReconcile_InvalidSubscriptionChannel_ReturnsTerminalError(t *testing.T) {
 	scheme := newTestScheme()
 	invalidSub := &operatorsv1alpha1.Subscription{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      addoncfg.CooSubscriptionName,
-			Namespace: addoncfg.CooSubscriptionNamespace,
-		},
+		Name:      addoncfg.CooSubscriptionName,
+		Namespace: addoncfg.CooSubscriptionNamespace,
 		Spec: &operatorsv1alpha1.SubscriptionSpec{
 			Channel: "unsupported-channel",
 		},

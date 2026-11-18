@@ -14,8 +14,8 @@ import (
 	operatorsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	persesv1 "github.com/perses/perses-operator/api/v1alpha1"
 	"github.com/perses/perses/go-sdk/dashboard"
-	persesmodelv1 "github.com/perses/perses/pkg/model/api/v1"
-	persescommon "github.com/perses/perses/pkg/model/api/v1/common"
+	specdatasource "github.com/perses/spec/go/datasource"
+	specplugin "github.com/perses/spec/go/plugin"
 	uiplugin "github.com/rhobs/observability-operator/pkg/apis/uiplugin/v1alpha1"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
@@ -34,7 +34,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -158,7 +157,7 @@ func (r *HubResourceReconciler) Reconcile(ctx context.Context, hasCardinalityRul
 
 	if !features.HasAnalyticsDashboards {
 		if err := r.deleteIfManaged(ctx, &corev1.Namespace{
-			ObjectMeta: metav1.ObjectMeta{Name: addoncfg.AnalyticsNamespace},
+			Name: addoncfg.AnalyticsNamespace,
 		}); err != nil {
 			return fmt.Errorf("failed to delete analytics namespace: %w", err)
 		}
@@ -181,19 +180,15 @@ func (r *HubResourceReconciler) reconcileCOOOperator(ctx context.Context, instal
 	if !installCOO {
 		for _, obj := range []client.Object{
 			&operatorsv1alpha1.Subscription{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      addoncfg.CooSubscriptionName,
-					Namespace: addoncfg.CooSubscriptionNamespace,
-				},
+				Name:      addoncfg.CooSubscriptionName,
+				Namespace: addoncfg.CooSubscriptionNamespace,
 			},
 			&operatorsv1.OperatorGroup{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      addoncfg.CooSubscriptionNamespace,
-					Namespace: addoncfg.CooSubscriptionNamespace,
-				},
+				Name:      addoncfg.CooSubscriptionNamespace,
+				Namespace: addoncfg.CooSubscriptionNamespace,
 			},
 			&corev1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{Name: addoncfg.CooSubscriptionNamespace},
+				Name: addoncfg.CooSubscriptionNamespace,
 			},
 		} {
 			if err := r.deleteIfManaged(ctx, obj); err != nil {
@@ -204,13 +199,11 @@ func (r *HubResourceReconciler) reconcileCOOOperator(ctx context.Context, instal
 	}
 
 	ns := &corev1.Namespace{
-		TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "Namespace"},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: addoncfg.CooSubscriptionNamespace,
-			Labels: map[string]string{
-				addoncfg.ManagedByK8sLabelKey:     ManagedByLabelValue,
-				"openshift.io/cluster-monitoring": "true",
-			},
+		APIVersion: "v1", Kind: "Namespace",
+		Name: addoncfg.CooSubscriptionNamespace,
+		Labels: map[string]string{
+			addoncfg.ManagedByK8sLabelKey:     ManagedByLabelValue,
+			"openshift.io/cluster-monitoring": "true",
 		},
 	}
 	if err := r.applyResource(ctx, ns); err != nil {
@@ -218,15 +211,11 @@ func (r *HubResourceReconciler) reconcileCOOOperator(ctx context.Context, instal
 	}
 
 	og := &operatorsv1.OperatorGroup{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "operators.coreos.com/v1",
-			Kind:       "OperatorGroup",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      addoncfg.CooSubscriptionNamespace,
-			Namespace: addoncfg.CooSubscriptionNamespace,
-			Labels:    managedResourceLabels,
-		},
+		APIVersion: "operators.coreos.com/v1",
+		Kind:       "OperatorGroup",
+		Name:       addoncfg.CooSubscriptionNamespace,
+		Namespace:  addoncfg.CooSubscriptionNamespace,
+		Labels:     managedResourceLabels,
 		Spec: operatorsv1.OperatorGroupSpec{
 			UpgradeStrategy: operatorsv1.UpgradeStrategyDefault,
 		},
@@ -236,17 +225,13 @@ func (r *HubResourceReconciler) reconcileCOOOperator(ctx context.Context, instal
 	}
 
 	sub := &operatorsv1alpha1.Subscription{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "operators.coreos.com/v1alpha1",
-			Kind:       "Subscription",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      addoncfg.CooSubscriptionName,
-			Namespace: addoncfg.CooSubscriptionNamespace,
-			Labels: map[string]string{
-				addoncfg.ManagedByK8sLabelKey: ManagedByLabelValue,
-				addoncfg.ReleaseLabelKey:      addoncfg.Name,
-			},
+		APIVersion: "operators.coreos.com/v1alpha1",
+		Kind:       "Subscription",
+		Name:       addoncfg.CooSubscriptionName,
+		Namespace:  addoncfg.CooSubscriptionNamespace,
+		Labels: map[string]string{
+			addoncfg.ManagedByK8sLabelKey: ManagedByLabelValue,
+			addoncfg.ReleaseLabelKey:      addoncfg.Name,
 		},
 		Spec: &operatorsv1alpha1.SubscriptionSpec{
 			Channel:                addoncfg.CooSubscriptionChannel,
@@ -267,11 +252,9 @@ func (r *HubResourceReconciler) reconcileCOOOperator(ctx context.Context, instal
 
 func (r *HubResourceReconciler) ensureAnalyticsNamespace(ctx context.Context) error {
 	ns := &corev1.Namespace{
-		TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "Namespace"},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   addoncfg.AnalyticsNamespace,
-			Labels: managedResourceLabels,
-		},
+		APIVersion: "v1", Kind: "Namespace",
+		Name:   addoncfg.AnalyticsNamespace,
+		Labels: managedResourceLabels,
 	}
 	existing := &corev1.Namespace{}
 	if err := r.reader().Get(ctx, client.ObjectKeyFromObject(ns), existing); err != nil {
@@ -293,19 +276,15 @@ func (r *HubResourceReconciler) reconcileUIPlugin(ctx context.Context, persesEna
 
 	if !monitoringUINeeded {
 		return r.deleteIfManaged(ctx, &uiplugin.UIPlugin{
-			ObjectMeta: metav1.ObjectMeta{Name: uiPluginName},
+			Name: uiPluginName,
 		})
 	}
 
 	desired := &uiplugin.UIPlugin{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "observability.openshift.io/v1alpha1",
-			Kind:       "UIPlugin",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   uiPluginName,
-			Labels: managedResourceLabels,
-		},
+		APIVersion: "observability.openshift.io/v1alpha1",
+		Kind:       "UIPlugin",
+		Name:       uiPluginName,
+		Labels:     managedResourceLabels,
 		Spec: uiplugin.UIPluginSpec{
 			Type: uiplugin.TypeMonitoring,
 			Monitoring: &uiplugin.MonitoringConfig{
@@ -346,7 +325,7 @@ func (r *HubResourceReconciler) reconcileDatasources(ctx context.Context, hasDas
 	} else {
 		for _, name := range []string{dsThanos, dsPlatformPrometheus} {
 			if err := r.deleteIfManaged(ctx, &persesv1.PersesDatasource{
-				ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: addoncfg.InstallNamespace},
+				Name: name, Namespace: addoncfg.InstallNamespace,
 			}); err != nil {
 				return err
 			}
@@ -359,7 +338,7 @@ func (r *HubResourceReconciler) reconcileDatasources(ctx context.Context, hasDas
 		}
 	} else {
 		if err := r.deleteIfManaged(ctx, &persesv1.PersesDatasource{
-			ObjectMeta: metav1.ObjectMeta{Name: dsThanos, Namespace: addoncfg.AnalyticsNamespace},
+			Name: dsThanos, Namespace: addoncfg.AnalyticsNamespace,
 		}); err != nil {
 			return err
 		}
@@ -370,26 +349,24 @@ func (r *HubResourceReconciler) reconcileDatasources(ctx context.Context, hasDas
 
 func buildRBACQueryProxyDatasource(namespace string) *persesv1.PersesDatasource {
 	return &persesv1.PersesDatasource{
-		TypeMeta: metav1.TypeMeta{APIVersion: "perses.dev/v1alpha1", Kind: "PersesDatasource"},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      dsThanos,
-			Namespace: namespace,
-			Labels:    managedResourceLabels,
-		},
+		APIVersion: "perses.dev/v1alpha1", Kind: "PersesDatasource",
+		Name:      dsThanos,
+		Namespace: namespace,
+		Labels:    managedResourceLabels,
 		Spec: persesv1.DatasourceSpec{
 			Client: &persesv1.Client{
 				TLS: &persesv1.TLS{
 					Enable: true,
 					CaCert: &persesv1.Certificate{
-						SecretSource: persesv1.SecretSource{Type: persesv1.SecretSourceTypeFile},
-						CertPath:     "/ca/service-ca.crt",
+						Type:     persesv1.SecretSourceTypeFile,
+						CertPath: "/ca/service-ca.crt",
 					},
 				},
 			},
 			Config: persesv1.Datasource{
-				DatasourceSpec: persesmodelv1.DatasourceSpec{
+				Spec: specdatasource.Spec{
 					Default: false,
-					Plugin: persescommon.Plugin{
+					Plugin: specplugin.Plugin{
 						Kind: "PrometheusDatasource",
 						Spec: map[string]any{
 							"scrapeInterval": "5m",
@@ -409,26 +386,24 @@ func buildRBACQueryProxyDatasource(namespace string) *persesv1.PersesDatasource 
 
 func buildPlatformPrometheusDatasource(namespace string) *persesv1.PersesDatasource {
 	return &persesv1.PersesDatasource{
-		TypeMeta: metav1.TypeMeta{APIVersion: "perses.dev/v1alpha1", Kind: "PersesDatasource"},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      dsPlatformPrometheus,
-			Namespace: namespace,
-			Labels:    managedResourceLabels,
-		},
+		APIVersion: "perses.dev/v1alpha1", Kind: "PersesDatasource",
+		Name:      dsPlatformPrometheus,
+		Namespace: namespace,
+		Labels:    managedResourceLabels,
 		Spec: persesv1.DatasourceSpec{
 			Client: &persesv1.Client{
 				TLS: &persesv1.TLS{
 					Enable: true,
 					CaCert: &persesv1.Certificate{
-						SecretSource: persesv1.SecretSource{Type: persesv1.SecretSourceTypeFile},
-						CertPath:     "/ca/service-ca.crt",
+						Type:     persesv1.SecretSourceTypeFile,
+						CertPath: "/ca/service-ca.crt",
 					},
 				},
 			},
 			Config: persesv1.Datasource{
-				DatasourceSpec: persesmodelv1.DatasourceSpec{
+				Spec: specdatasource.Spec{
 					Default: false,
-					Plugin: persescommon.Plugin{
+					Plugin: specplugin.Plugin{
 						Kind: "PrometheusDatasource",
 						Spec: map[string]any{
 							"proxy": map[string]any{
@@ -633,17 +608,13 @@ func toDashboardCR(builder dashboard.Builder, namespace string) persesv1.PersesD
 	}
 
 	return persesv1.PersesDashboard{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "perses.dev/v1alpha1",
-			Kind:       "PersesDashboard",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      builder.Dashboard.Metadata.Name,
-			Namespace: namespace,
-			Labels:    lbls,
-		},
+		APIVersion: "perses.dev/v1alpha1",
+		Kind:       "PersesDashboard",
+		Name:       builder.Dashboard.Metadata.Name,
+		Namespace:  namespace,
+		Labels:     lbls,
 		Spec: persesv1.Dashboard{
-			DashboardSpec: builder.Dashboard.Spec,
+			Spec: builder.Dashboard.Spec,
 		},
 	}
 }

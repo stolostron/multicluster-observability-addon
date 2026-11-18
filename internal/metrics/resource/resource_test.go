@@ -40,16 +40,12 @@ const testGlobalNamespace = "open-cluster-management-global-set"
 
 func TestCreateDefaultAgent(t *testing.T) {
 	globalPlacement := addonv1beta1.PlacementStrategy{
-		PlacementRef: addonv1beta1.PlacementRef{
-			Name:      "global",
-			Namespace: testGlobalNamespace,
-		},
+		Name:      "global",
+		Namespace: testGlobalNamespace,
 	}
 	customPlacement := addonv1beta1.PlacementStrategy{
-		PlacementRef: addonv1beta1.PlacementRef{
-			Name:      "custom",
-			Namespace: config.HubInstallNamespace,
-		},
+		Name:      "custom",
+		Namespace: config.HubInstallNamespace,
 	}
 
 	testCases := []struct {
@@ -153,14 +149,14 @@ func TestCreateDefaultAgent(t *testing.T) {
 							Operation:  metav1.ManagedFieldsOperationApply,
 							APIVersion: cooprometheusv1alpha1.SchemeGroupVersion.String(),
 							FieldsType: "FieldsV1",
-							FieldsV1:   &metav1.FieldsV1{Raw: []byte(`{"f:metadata":{"f:annotations":{}}}`)},
+							FieldsV1:   metav1.NewFieldsV1(`{"f:metadata":{"f:annotations":{}}}`),
 						},
 						{
 							Manager:    "kubectl-edit",
 							Operation:  metav1.ManagedFieldsOperationUpdate,
 							APIVersion: cooprometheusv1alpha1.SchemeGroupVersion.String(),
 							FieldsType: "FieldsV1",
-							FieldsV1:   &metav1.FieldsV1{Raw: []byte(`{"f:spec":{"f:replicas":{}}}`)},
+							FieldsV1:   metav1.NewFieldsV1(`{"f:spec":{"f:replicas":{}}}`),
 						},
 					}
 					return a
@@ -222,14 +218,10 @@ func TestCreateDefaultAgent(t *testing.T) {
 					PlacementRef: globalPlacement.PlacementRef,
 					Configs: []addonv1beta1.AddOnConfig{
 						{
-							ConfigGroupResource: addonv1beta1.ConfigGroupResource{
-								Group:    cooprometheusv1alpha1.SchemeGroupVersion.Group,
-								Resource: cooprometheusv1alpha1.PrometheusAgentName,
-							},
-							ConfigReferent: addonv1beta1.ConfigReferent{
-								Namespace: config.HubInstallNamespace,
-								Name:      "custom-agent-in-configs",
-							},
+							Group:     cooprometheusv1alpha1.SchemeGroupVersion.Group,
+							Resource:  cooprometheusv1alpha1.PrometheusAgentName,
+							Namespace: config.HubInstallNamespace,
+							Name:      "custom-agent-in-configs",
 						},
 					},
 				},
@@ -248,14 +240,10 @@ func TestCreateDefaultAgent(t *testing.T) {
 					PlacementRef: globalPlacement.PlacementRef,
 					Configs: []addonv1beta1.AddOnConfig{
 						{
-							ConfigGroupResource: addonv1beta1.ConfigGroupResource{
-								Group:    cooprometheusv1alpha1.SchemeGroupVersion.Group,
-								Resource: cooprometheusv1alpha1.PrometheusAgentName,
-							},
-							ConfigReferent: addonv1beta1.ConfigReferent{
-								Namespace: config.HubInstallNamespace,
-								Name:      "user-agent-in-configs",
-							},
+							Group:     cooprometheusv1alpha1.SchemeGroupVersion.Group,
+							Resource:  cooprometheusv1alpha1.PrometheusAgentName,
+							Namespace: config.HubInstallNamespace,
+							Name:      "user-agent-in-configs",
 						},
 					},
 				},
@@ -288,14 +276,10 @@ func TestCreateDefaultAgent(t *testing.T) {
 					PlacementRef: customPlacement.PlacementRef,
 					Configs: []addonv1beta1.AddOnConfig{
 						{
-							ConfigGroupResource: addonv1beta1.ConfigGroupResource{
-								Group:    cooprometheusv1alpha1.SchemeGroupVersion.Group,
-								Resource: cooprometheusv1alpha1.PrometheusAgentName,
-							},
-							ConfigReferent: addonv1beta1.ConfigReferent{
-								Namespace: config.HubInstallNamespace,
-								Name:      "platform-agent",
-							},
+							Group:     cooprometheusv1alpha1.SchemeGroupVersion.Group,
+							Resource:  cooprometheusv1alpha1.PrometheusAgentName,
+							Namespace: config.HubInstallNamespace,
+							Name:      "platform-agent",
 						},
 					},
 				},
@@ -322,14 +306,10 @@ func TestCreateDefaultAgent(t *testing.T) {
 					PlacementRef: globalPlacement.PlacementRef,
 					Configs: []addonv1beta1.AddOnConfig{
 						{
-							ConfigGroupResource: addonv1beta1.ConfigGroupResource{
-								Group:    cooprometheusv1alpha1.SchemeGroupVersion.Group,
-								Resource: cooprometheusv1alpha1.PrometheusAgentName,
-							},
-							ConfigReferent: addonv1beta1.ConfigReferent{
-								Namespace: config.HubInstallNamespace,
-								Name:      makeAgentName(config.PlatformMetricsCollectorApp, "global"),
-							},
+							Group:     cooprometheusv1alpha1.SchemeGroupVersion.Group,
+							Resource:  cooprometheusv1alpha1.PrometheusAgentName,
+							Namespace: config.HubInstallNamespace,
+							Name:      makeAgentName(config.PlatformMetricsCollectorApp, "global"),
 						},
 					},
 				},
@@ -342,8 +322,8 @@ func TestCreateDefaultAgent(t *testing.T) {
 			name:  "disambiguates default agent names with namespace when two placements share a name across namespaces",
 			isUWL: false,
 			placements: []addonv1beta1.PlacementStrategy{
-				{PlacementRef: addonv1beta1.PlacementRef{Namespace: "ns-a", Name: "global"}},
-				{PlacementRef: addonv1beta1.PlacementRef{Namespace: "ns-b", Name: "global"}},
+				{Namespace: "ns-a", Name: "global"},
+				{Namespace: "ns-b", Name: "global"},
 			},
 			expectCreatedCount:      2,
 			expectCreatedPlacements: []string{"ns-a/global", "ns-b/global"},
@@ -356,8 +336,8 @@ func TestCreateDefaultAgent(t *testing.T) {
 			name:  "preserves existing default agent and disambiguates newly added same-name placement in another namespace",
 			isUWL: false,
 			placements: []addonv1beta1.PlacementStrategy{
-				{PlacementRef: addonv1beta1.PlacementRef{Namespace: "ns-a", Name: "global"}},
-				{PlacementRef: addonv1beta1.PlacementRef{Namespace: "ns-b", Name: "global"}},
+				{Namespace: "ns-a", Name: "global"},
+				{Namespace: "ns-b", Name: "global"},
 			},
 			initObjs: []client.Object{
 				func() client.Object {
@@ -430,7 +410,7 @@ func TestCreateDefaultAgent(t *testing.T) {
 
 func TestReconcileAgents(t *testing.T) {
 	globalPlacement := addonv1beta1.PlacementStrategy{
-		PlacementRef: addonv1beta1.PlacementRef{Name: "global", Namespace: testGlobalNamespace},
+		Name: "global", Namespace: testGlobalNamespace,
 	}
 	cmao := newCMAO(globalPlacement)
 	opts := newAddonOptions(true, true)
@@ -506,10 +486,10 @@ func TestReconcileAgents(t *testing.T) {
 
 func TestReconcileAgentsUserDefined(t *testing.T) {
 	globalPlacement := addonv1beta1.PlacementStrategy{
-		PlacementRef: addonv1beta1.PlacementRef{Name: "global", Namespace: testGlobalNamespace},
+		Name: "global", Namespace: testGlobalNamespace,
 	}
 	placementB := addonv1beta1.PlacementStrategy{
-		PlacementRef: addonv1beta1.PlacementRef{Name: "custom-placement", Namespace: config.HubInstallNamespace},
+		Name: "custom-placement", Namespace: config.HubInstallNamespace,
 	}
 	kubeRbacImage := "kube-rbac-proxy:version"
 	prometheusImage := "prometheus:version"
@@ -696,20 +676,16 @@ func TestReconcileAgentsUserDefined(t *testing.T) {
 		// knows whether it's a platform or UWL agent) and the part-of label (to opt in). It
 		// would have no reason to also set the internal managed-by label.
 		userAgent := &cooprometheusv1alpha1.PrometheusAgent{
-			TypeMeta: metav1.TypeMeta{
-				Kind:       cooprometheusv1alpha1.PrometheusAgentsKind,
-				APIVersion: cooprometheusv1alpha1.SchemeGroupVersion.String(),
+			Kind:       cooprometheusv1alpha1.PrometheusAgentsKind,
+			APIVersion: cooprometheusv1alpha1.SchemeGroupVersion.String(),
+			Name:       "no-managed-by-agent",
+			Namespace:  config.HubInstallNamespace,
+			Labels: map[string]string{
+				addoncfg.ComponentK8sLabelKey: config.PlatformMetricsCollectorApp,
+				addoncfg.PartOfK8sLabelKey:    addoncfg.Name,
 			},
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "no-managed-by-agent",
-				Namespace: config.HubInstallNamespace,
-				Labels: map[string]string{
-					addoncfg.ComponentK8sLabelKey: config.PlatformMetricsCollectorApp,
-					addoncfg.PartOfK8sLabelKey:    addoncfg.Name,
-				},
-				Annotations: map[string]string{
-					addoncfg.PlacementAnnotationKey: testGlobalNamespace + "/global",
-				},
+			Annotations: map[string]string{
+				addoncfg.PlacementAnnotationKey: testGlobalNamespace + "/global",
 			},
 		}
 
@@ -798,14 +774,10 @@ func TestReconcileAgentsUserDefined(t *testing.T) {
 			PlacementRef: globalPlacement.PlacementRef,
 			Configs: []addonv1beta1.AddOnConfig{
 				{
-					ConfigGroupResource: addonv1beta1.ConfigGroupResource{
-						Group:    cooprometheusv1alpha1.SchemeGroupVersion.Group,
-						Resource: cooprometheusv1alpha1.PrometheusAgentName,
-					},
-					ConfigReferent: addonv1beta1.ConfigReferent{
-						Namespace: config.HubInstallNamespace,
-						Name:      "user-agent-in-configs",
-					},
+					Group:     cooprometheusv1alpha1.SchemeGroupVersion.Group,
+					Resource:  cooprometheusv1alpha1.PrometheusAgentName,
+					Namespace: config.HubInstallNamespace,
+					Name:      "user-agent-in-configs",
 				},
 			},
 		}
@@ -813,16 +785,12 @@ func TestReconcileAgentsUserDefined(t *testing.T) {
 		opts := newAddonOptions(true, false)
 
 		userAgent := &cooprometheusv1alpha1.PrometheusAgent{
-			TypeMeta: metav1.TypeMeta{
-				Kind:       cooprometheusv1alpha1.PrometheusAgentsKind,
-				APIVersion: cooprometheusv1alpha1.SchemeGroupVersion.String(),
-			},
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "user-agent-in-configs",
-				Namespace: config.HubInstallNamespace,
-				Labels: map[string]string{
-					addoncfg.ComponentK8sLabelKey: config.PlatformMetricsCollectorApp,
-				},
+			Kind:       cooprometheusv1alpha1.PrometheusAgentsKind,
+			APIVersion: cooprometheusv1alpha1.SchemeGroupVersion.String(),
+			Name:       "user-agent-in-configs",
+			Namespace:  config.HubInstallNamespace,
+			Labels: map[string]string{
+				addoncfg.ComponentK8sLabelKey: config.PlatformMetricsCollectorApp,
 			},
 		}
 
@@ -851,7 +819,7 @@ func TestReconcileAgentsUserDefined(t *testing.T) {
 
 func TestReconcileAgentWithRegistries(t *testing.T) {
 	globalPlacement := addonv1beta1.PlacementStrategy{
-		PlacementRef: addonv1beta1.PlacementRef{Name: "global", Namespace: testGlobalNamespace},
+		Name: "global", Namespace: testGlobalNamespace,
 	}
 	cmao := newCMAO(globalPlacement)
 	registries := []addonv1beta1.ImageMirror{
@@ -878,11 +846,9 @@ func TestReconcileAgentWithRegistries(t *testing.T) {
 	}
 
 	imagesCM := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      config.ImagesConfigMapObjKey.Name,
-			Namespace: config.ImagesConfigMapObjKey.Namespace,
-		},
-		Data: baseImages,
+		Name:      config.ImagesConfigMapObjKey.Name,
+		Namespace: config.ImagesConfigMapObjKey.Namespace,
+		Data:      baseImages,
 	}
 
 	scheme := newTestScheme()
@@ -932,104 +898,78 @@ func TestReconcile(t *testing.T) {
 	}
 
 	platformSC := &cooprometheusv1alpha1.ScrapeConfig{
-		TypeMeta: metav1.TypeMeta{
-			Kind: cooprometheusv1alpha1.ScrapeConfigsKind,
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: config.HubInstallNamespace,
-			Name:      "platform",
-			Labels:    config.PlatformPrometheusMatchLabels,
-			OwnerReferences: []metav1.OwnerReference{
-				{
-					UID:        types.UID("mco-operator"),
-					Controller: ptr.To(true),
-				},
+		Kind:      cooprometheusv1alpha1.ScrapeConfigsKind,
+		Namespace: config.HubInstallNamespace,
+		Name:      "platform",
+		Labels:    config.PlatformPrometheusMatchLabels,
+		OwnerReferences: []metav1.OwnerReference{
+			{
+				UID:        types.UID("mco-operator"),
+				Controller: ptr.To(true),
 			},
 		},
 	}
 	uwlSC := &cooprometheusv1alpha1.ScrapeConfig{
-		TypeMeta: metav1.TypeMeta{
-			Kind: cooprometheusv1alpha1.ScrapeConfigsKind,
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: config.HubInstallNamespace,
-			Name:      "uwl",
-			Labels:    config.UserWorkloadPrometheusMatchLabels,
-			OwnerReferences: []metav1.OwnerReference{
-				{
-					UID:        types.UID("mco-operator"),
-					Controller: ptr.To(true),
-				},
+		Kind:      cooprometheusv1alpha1.ScrapeConfigsKind,
+		Namespace: config.HubInstallNamespace,
+		Name:      "uwl",
+		Labels:    config.UserWorkloadPrometheusMatchLabels,
+		OwnerReferences: []metav1.OwnerReference{
+			{
+				UID:        types.UID("mco-operator"),
+				Controller: ptr.To(true),
 			},
 		},
 	}
 	hostedCluster := &hyperv1.HostedCluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "hcp",
-			Namespace: "hcpns",
-		},
+		Name:      "hcp",
+		Namespace: "hcpns",
 	}
 	hcpApiserverSC := &cooprometheusv1alpha1.ScrapeConfig{
-		TypeMeta: metav1.TypeMeta{
-			Kind: cooprometheusv1alpha1.ScrapeConfigsKind,
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: config.HubInstallNamespace,
-			Name:      "apiserver",
-			Labels:    config.ApiserverHcpUserWorkloadPrometheusMatchLabels,
-			OwnerReferences: []metav1.OwnerReference{
-				{
-					UID:        types.UID("mco-operator"),
-					Controller: ptr.To(true),
-				},
+		Kind:      cooprometheusv1alpha1.ScrapeConfigsKind,
+		Namespace: config.HubInstallNamespace,
+		Name:      "apiserver",
+		Labels:    config.ApiserverHcpUserWorkloadPrometheusMatchLabels,
+		OwnerReferences: []metav1.OwnerReference{
+			{
+				UID:        types.UID("mco-operator"),
+				Controller: ptr.To(true),
 			},
 		},
 	}
 	hcpApiserverRule := &prometheusv1.PrometheusRule{
-		TypeMeta: metav1.TypeMeta{
-			Kind: prometheusv1.PrometheusRuleKind,
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: config.HubInstallNamespace,
-			Name:      "hcp-apiserver-rule",
-			Labels:    config.ApiserverHcpUserWorkloadPrometheusMatchLabels,
-			OwnerReferences: []metav1.OwnerReference{
-				{
-					UID:        types.UID("mco-operator"),
-					Controller: ptr.To(true),
-				},
+		Kind:      prometheusv1.PrometheusRuleKind,
+		Namespace: config.HubInstallNamespace,
+		Name:      "hcp-apiserver-rule",
+		Labels:    config.ApiserverHcpUserWorkloadPrometheusMatchLabels,
+		OwnerReferences: []metav1.OwnerReference{
+			{
+				UID:        types.UID("mco-operator"),
+				Controller: ptr.To(true),
 			},
 		},
 	}
 	hcpEtcdSC := &cooprometheusv1alpha1.ScrapeConfig{
-		TypeMeta: metav1.TypeMeta{
-			Kind: cooprometheusv1alpha1.ScrapeConfigsKind,
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: config.HubInstallNamespace,
-			Name:      "etcd",
-			Labels:    config.EtcdHcpUserWorkloadPrometheusMatchLabels,
-			OwnerReferences: []metav1.OwnerReference{
-				{
-					UID:        types.UID("mco-operator"),
-					Controller: ptr.To(true),
-				},
+		Kind:      cooprometheusv1alpha1.ScrapeConfigsKind,
+		Namespace: config.HubInstallNamespace,
+		Name:      "etcd",
+		Labels:    config.EtcdHcpUserWorkloadPrometheusMatchLabels,
+		OwnerReferences: []metav1.OwnerReference{
+			{
+				UID:        types.UID("mco-operator"),
+				Controller: ptr.To(true),
 			},
 		},
 	}
 	hcpEtcdRule := &prometheusv1.PrometheusRule{
-		TypeMeta: metav1.TypeMeta{
-			Kind: prometheusv1.PrometheusRuleKind,
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: config.HubInstallNamespace,
-			Name:      "hcp-etcd-rule",
-			Labels:    config.EtcdHcpUserWorkloadPrometheusMatchLabels,
-			OwnerReferences: []metav1.OwnerReference{
-				{
-					UID:        types.UID("mco-operator"),
-					Controller: ptr.To(true),
-				},
+		Kind:      prometheusv1.PrometheusRuleKind,
+		Namespace: config.HubInstallNamespace,
+		Name:      "hcp-etcd-rule",
+		Labels:    config.EtcdHcpUserWorkloadPrometheusMatchLabels,
+		OwnerReferences: []metav1.OwnerReference{
+			{
+				UID:        types.UID("mco-operator"),
+				Controller: ptr.To(true),
 			},
 		},
 	}
@@ -1109,14 +1049,10 @@ func TestReconcile(t *testing.T) {
 				{
 					Configs: []addonv1beta1.AddOnConfig{
 						{
-							ConfigGroupResource: addonv1beta1.ConfigGroupResource{
-								Group:    cooprometheusv1alpha1.SchemeGroupVersion.Group,
-								Resource: cooprometheusv1alpha1.PrometheusAgentName,
-							},
-							ConfigReferent: addonv1beta1.ConfigReferent{
-								Namespace: config.HubInstallNamespace,
-								Name:      makeAgentName(config.PlatformMetricsCollectorApp, "global"),
-							},
+							Group:     cooprometheusv1alpha1.SchemeGroupVersion.Group,
+							Resource:  cooprometheusv1alpha1.PrometheusAgentName,
+							Namespace: config.HubInstallNamespace,
+							Name:      makeAgentName(config.PlatformMetricsCollectorApp, "global"),
 						},
 					},
 					PlacementRef: globalPlacementRef,
@@ -1229,14 +1165,10 @@ func TestReconcileScrapeConfigs(t *testing.T) {
 			name: "unmanaged SC is ignored",
 			initObjs: []client.Object{
 				&cooprometheusv1alpha1.ScrapeConfig{
-					TypeMeta: metav1.TypeMeta{
-						Kind: cooprometheusv1alpha1.ScrapeConfigsKind,
-					},
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: config.HubInstallNamespace,
-						Name:      "test",
-						Labels:    config.PlatformPrometheusMatchLabels,
-					},
+					Kind:      cooprometheusv1alpha1.ScrapeConfigsKind,
+					Namespace: config.HubInstallNamespace,
+					Name:      "test",
+					Labels:    config.PlatformPrometheusMatchLabels,
 				},
 			},
 			expects: func(t *testing.T, objs []cooprometheusv1alpha1.ScrapeConfig) {
@@ -1247,15 +1179,11 @@ func TestReconcileScrapeConfigs(t *testing.T) {
 			name: "SC target is enforced for platform",
 			initObjs: []client.Object{
 				&cooprometheusv1alpha1.ScrapeConfig{
-					TypeMeta: metav1.TypeMeta{
-						Kind: cooprometheusv1alpha1.ScrapeConfigsKind,
-					},
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace:       config.HubInstallNamespace,
-						Name:            "test",
-						Labels:          config.PlatformPrometheusMatchLabels,
-						OwnerReferences: []metav1.OwnerReference{mcoOwnerRef},
-					},
+					Kind:            cooprometheusv1alpha1.ScrapeConfigsKind,
+					Namespace:       config.HubInstallNamespace,
+					Name:            "test",
+					Labels:          config.PlatformPrometheusMatchLabels,
+					OwnerReferences: []metav1.OwnerReference{mcoOwnerRef},
 					Spec: cooprometheusv1alpha1.ScrapeConfigSpec{
 						ScrapeClassName: ptr.To("invalid"),
 					},
@@ -1275,15 +1203,11 @@ func TestReconcileScrapeConfigs(t *testing.T) {
 			name: "SC target is left for uwl",
 			initObjs: []client.Object{
 				&cooprometheusv1alpha1.ScrapeConfig{
-					TypeMeta: metav1.TypeMeta{
-						Kind: cooprometheusv1alpha1.ScrapeConfigsKind,
-					},
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace:       config.HubInstallNamespace,
-						Name:            "test",
-						Labels:          config.UserWorkloadPrometheusMatchLabels,
-						OwnerReferences: []metav1.OwnerReference{mcoOwnerRef},
-					},
+					Kind:            cooprometheusv1alpha1.ScrapeConfigsKind,
+					Namespace:       config.HubInstallNamespace,
+					Name:            "test",
+					Labels:          config.UserWorkloadPrometheusMatchLabels,
+					OwnerReferences: []metav1.OwnerReference{mcoOwnerRef},
 					Spec: cooprometheusv1alpha1.ScrapeConfigSpec{
 						ScrapeClassName: ptr.To("custom"),
 						StaticConfigs: []cooprometheusv1alpha1.StaticConfig{
@@ -1308,19 +1232,15 @@ func TestReconcileScrapeConfigs(t *testing.T) {
 			name: "user-defined SC with single placement annotation",
 			initObjs: []client.Object{
 				&cooprometheusv1alpha1.ScrapeConfig{
-					TypeMeta: metav1.TypeMeta{
-						Kind: cooprometheusv1alpha1.ScrapeConfigsKind,
+					Kind:      cooprometheusv1alpha1.ScrapeConfigsKind,
+					Namespace: config.HubInstallNamespace,
+					Name:      "user-sc",
+					Labels: map[string]string{
+						addoncfg.ComponentK8sLabelKey: config.PlatformPrometheusMatchLabels[addoncfg.ComponentK8sLabelKey],
+						addoncfg.PartOfK8sLabelKey:    addoncfg.Name,
 					},
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: config.HubInstallNamespace,
-						Name:      "user-sc",
-						Labels: map[string]string{
-							addoncfg.ComponentK8sLabelKey: config.PlatformPrometheusMatchLabels[addoncfg.ComponentK8sLabelKey],
-							addoncfg.PartOfK8sLabelKey:    addoncfg.Name,
-						},
-						Annotations: map[string]string{
-							addoncfg.PlacementAnnotationKey: "ns/a",
-						},
+					Annotations: map[string]string{
+						addoncfg.PlacementAnnotationKey: "ns/a",
 					},
 				},
 			},
@@ -1335,19 +1255,15 @@ func TestReconcileScrapeConfigs(t *testing.T) {
 			name: "user-defined SC with multiple placement annotations",
 			initObjs: []client.Object{
 				&cooprometheusv1alpha1.ScrapeConfig{
-					TypeMeta: metav1.TypeMeta{
-						Kind: cooprometheusv1alpha1.ScrapeConfigsKind,
+					Kind:      cooprometheusv1alpha1.ScrapeConfigsKind,
+					Namespace: config.HubInstallNamespace,
+					Name:      "user-sc-multi",
+					Labels: map[string]string{
+						addoncfg.ComponentK8sLabelKey: config.PlatformPrometheusMatchLabels[addoncfg.ComponentK8sLabelKey],
+						addoncfg.PartOfK8sLabelKey:    addoncfg.Name,
 					},
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: config.HubInstallNamespace,
-						Name:      "user-sc-multi",
-						Labels: map[string]string{
-							addoncfg.ComponentK8sLabelKey: config.PlatformPrometheusMatchLabels[addoncfg.ComponentK8sLabelKey],
-							addoncfg.PartOfK8sLabelKey:    addoncfg.Name,
-						},
-						Annotations: map[string]string{
-							addoncfg.PlacementAnnotationKey: "ns/a,ns/b",
-						},
+					Annotations: map[string]string{
+						addoncfg.PlacementAnnotationKey: "ns/a,ns/b",
 					},
 				},
 			},
@@ -1359,16 +1275,12 @@ func TestReconcileScrapeConfigs(t *testing.T) {
 			name: "user-defined SC without placement annotation is skipped",
 			initObjs: []client.Object{
 				&cooprometheusv1alpha1.ScrapeConfig{
-					TypeMeta: metav1.TypeMeta{
-						Kind: cooprometheusv1alpha1.ScrapeConfigsKind,
-					},
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: config.HubInstallNamespace,
-						Name:      "user-sc-no-annotation",
-						Labels: map[string]string{
-							addoncfg.ComponentK8sLabelKey: config.PlatformPrometheusMatchLabels[addoncfg.ComponentK8sLabelKey],
-							addoncfg.PartOfK8sLabelKey:    addoncfg.Name,
-						},
+					Kind:      cooprometheusv1alpha1.ScrapeConfigsKind,
+					Namespace: config.HubInstallNamespace,
+					Name:      "user-sc-no-annotation",
+					Labels: map[string]string{
+						addoncfg.ComponentK8sLabelKey: config.PlatformPrometheusMatchLabels[addoncfg.ComponentK8sLabelKey],
+						addoncfg.PartOfK8sLabelKey:    addoncfg.Name,
 					},
 				},
 			},
@@ -1380,30 +1292,22 @@ func TestReconcileScrapeConfigs(t *testing.T) {
 			name: "user-defined SC coexists with MCO-managed SC",
 			initObjs: []client.Object{
 				&cooprometheusv1alpha1.ScrapeConfig{
-					TypeMeta: metav1.TypeMeta{
-						Kind: cooprometheusv1alpha1.ScrapeConfigsKind,
-					},
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace:       config.HubInstallNamespace,
-						Name:            "mco-sc",
-						Labels:          config.PlatformPrometheusMatchLabels,
-						OwnerReferences: []metav1.OwnerReference{mcoOwnerRef},
-					},
+					Kind:            cooprometheusv1alpha1.ScrapeConfigsKind,
+					Namespace:       config.HubInstallNamespace,
+					Name:            "mco-sc",
+					Labels:          config.PlatformPrometheusMatchLabels,
+					OwnerReferences: []metav1.OwnerReference{mcoOwnerRef},
 				},
 				&cooprometheusv1alpha1.ScrapeConfig{
-					TypeMeta: metav1.TypeMeta{
-						Kind: cooprometheusv1alpha1.ScrapeConfigsKind,
+					Kind:      cooprometheusv1alpha1.ScrapeConfigsKind,
+					Namespace: config.HubInstallNamespace,
+					Name:      "user-sc",
+					Labels: map[string]string{
+						addoncfg.ComponentK8sLabelKey: config.PlatformPrometheusMatchLabels[addoncfg.ComponentK8sLabelKey],
+						addoncfg.PartOfK8sLabelKey:    addoncfg.Name,
 					},
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: config.HubInstallNamespace,
-						Name:      "user-sc",
-						Labels: map[string]string{
-							addoncfg.ComponentK8sLabelKey: config.PlatformPrometheusMatchLabels[addoncfg.ComponentK8sLabelKey],
-							addoncfg.PartOfK8sLabelKey:    addoncfg.Name,
-						},
-						Annotations: map[string]string{
-							addoncfg.PlacementAnnotationKey: "ns/a",
-						},
+					Annotations: map[string]string{
+						addoncfg.PlacementAnnotationKey: "ns/a",
 					},
 				},
 			},
@@ -1418,15 +1322,11 @@ func TestReconcileScrapeConfigs(t *testing.T) {
 			name: "hcp SC is handled",
 			initObjs: []client.Object{
 				&cooprometheusv1alpha1.ScrapeConfig{
-					TypeMeta: metav1.TypeMeta{
-						Kind: cooprometheusv1alpha1.ScrapeConfigsKind,
-					},
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace:       config.HubInstallNamespace,
-						Name:            "test",
-						Labels:          config.EtcdHcpUserWorkloadPrometheusMatchLabels,
-						OwnerReferences: []metav1.OwnerReference{mcoOwnerRef},
-					},
+					Kind:            cooprometheusv1alpha1.ScrapeConfigsKind,
+					Namespace:       config.HubInstallNamespace,
+					Name:            "test",
+					Labels:          config.EtcdHcpUserWorkloadPrometheusMatchLabels,
+					OwnerReferences: []metav1.OwnerReference{mcoOwnerRef},
 				},
 			},
 			isUWL:             true,
@@ -1498,14 +1398,10 @@ func TestGetPrometheusRules(t *testing.T) {
 			name: "unmanaged rule is ignored",
 			initObjs: []client.Object{
 				&prometheusv1.PrometheusRule{
-					TypeMeta: metav1.TypeMeta{
-						Kind: prometheusv1.PrometheusRuleKind,
-					},
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: config.HubInstallNamespace,
-						Name:      "test",
-						Labels:    config.PlatformPrometheusMatchLabels,
-					},
+					Kind:      prometheusv1.PrometheusRuleKind,
+					Namespace: config.HubInstallNamespace,
+					Name:      "test",
+					Labels:    config.PlatformPrometheusMatchLabels,
 				},
 			},
 			platformEnabled: true,
@@ -1517,26 +1413,18 @@ func TestGetPrometheusRules(t *testing.T) {
 			name: "disabled rules are ignored",
 			initObjs: []client.Object{
 				&prometheusv1.PrometheusRule{
-					TypeMeta: metav1.TypeMeta{
-						Kind: prometheusv1.PrometheusRuleKind,
-					},
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace:       config.HubInstallNamespace,
-						Name:            "test",
-						Labels:          config.PlatformPrometheusMatchLabels,
-						OwnerReferences: []metav1.OwnerReference{mcoOwnerRef},
-					},
+					Kind:            prometheusv1.PrometheusRuleKind,
+					Namespace:       config.HubInstallNamespace,
+					Name:            "test",
+					Labels:          config.PlatformPrometheusMatchLabels,
+					OwnerReferences: []metav1.OwnerReference{mcoOwnerRef},
 				},
 				&prometheusv1.PrometheusRule{
-					TypeMeta: metav1.TypeMeta{
-						Kind: prometheusv1.PrometheusRuleKind,
-					},
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace:       config.HubInstallNamespace,
-						Name:            "test-uwl",
-						Labels:          config.UserWorkloadPrometheusMatchLabels,
-						OwnerReferences: []metav1.OwnerReference{mcoOwnerRef},
-					},
+					Kind:            prometheusv1.PrometheusRuleKind,
+					Namespace:       config.HubInstallNamespace,
+					Name:            "test-uwl",
+					Labels:          config.UserWorkloadPrometheusMatchLabels,
+					OwnerReferences: []metav1.OwnerReference{mcoOwnerRef},
 				},
 			},
 			expects: func(t *testing.T, objs []prometheusv1.PrometheusRule) {
@@ -1547,15 +1435,11 @@ func TestGetPrometheusRules(t *testing.T) {
 			name: "platform rule is fetched",
 			initObjs: []client.Object{
 				&prometheusv1.PrometheusRule{
-					TypeMeta: metav1.TypeMeta{
-						Kind: prometheusv1.PrometheusRuleKind,
-					},
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace:       config.HubInstallNamespace,
-						Name:            "test",
-						Labels:          config.PlatformPrometheusMatchLabels,
-						OwnerReferences: []metav1.OwnerReference{mcoOwnerRef},
-					},
+					Kind:            prometheusv1.PrometheusRuleKind,
+					Namespace:       config.HubInstallNamespace,
+					Name:            "test",
+					Labels:          config.PlatformPrometheusMatchLabels,
+					OwnerReferences: []metav1.OwnerReference{mcoOwnerRef},
 				},
 			},
 			platformEnabled: true,
@@ -1567,15 +1451,11 @@ func TestGetPrometheusRules(t *testing.T) {
 			name: "uwl rule is fetched",
 			initObjs: []client.Object{
 				&prometheusv1.PrometheusRule{
-					TypeMeta: metav1.TypeMeta{
-						Kind: prometheusv1.PrometheusRuleKind,
-					},
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace:       config.HubInstallNamespace,
-						Name:            "test",
-						Labels:          config.UserWorkloadPrometheusMatchLabels,
-						OwnerReferences: []metav1.OwnerReference{mcoOwnerRef},
-					},
+					Kind:            prometheusv1.PrometheusRuleKind,
+					Namespace:       config.HubInstallNamespace,
+					Name:            "test",
+					Labels:          config.UserWorkloadPrometheusMatchLabels,
+					OwnerReferences: []metav1.OwnerReference{mcoOwnerRef},
 				},
 			},
 			uwlEnabled: true,
@@ -1587,19 +1467,15 @@ func TestGetPrometheusRules(t *testing.T) {
 			name: "user-defined rule with single placement annotation",
 			initObjs: []client.Object{
 				&prometheusv1.PrometheusRule{
-					TypeMeta: metav1.TypeMeta{
-						Kind: prometheusv1.PrometheusRuleKind,
+					Kind:      prometheusv1.PrometheusRuleKind,
+					Namespace: config.HubInstallNamespace,
+					Name:      "user-rule",
+					Labels: map[string]string{
+						addoncfg.ComponentK8sLabelKey: config.PlatformPrometheusMatchLabels[addoncfg.ComponentK8sLabelKey],
+						addoncfg.PartOfK8sLabelKey:    addoncfg.Name,
 					},
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: config.HubInstallNamespace,
-						Name:      "user-rule",
-						Labels: map[string]string{
-							addoncfg.ComponentK8sLabelKey: config.PlatformPrometheusMatchLabels[addoncfg.ComponentK8sLabelKey],
-							addoncfg.PartOfK8sLabelKey:    addoncfg.Name,
-						},
-						Annotations: map[string]string{
-							addoncfg.PlacementAnnotationKey: "ns/a",
-						},
+					Annotations: map[string]string{
+						addoncfg.PlacementAnnotationKey: "ns/a",
 					},
 				},
 			},
@@ -1613,19 +1489,15 @@ func TestGetPrometheusRules(t *testing.T) {
 			name: "user-defined rule with multiple placement annotations",
 			initObjs: []client.Object{
 				&prometheusv1.PrometheusRule{
-					TypeMeta: metav1.TypeMeta{
-						Kind: prometheusv1.PrometheusRuleKind,
+					Kind:      prometheusv1.PrometheusRuleKind,
+					Namespace: config.HubInstallNamespace,
+					Name:      "user-rule-multi",
+					Labels: map[string]string{
+						addoncfg.ComponentK8sLabelKey: config.PlatformPrometheusMatchLabels[addoncfg.ComponentK8sLabelKey],
+						addoncfg.PartOfK8sLabelKey:    addoncfg.Name,
 					},
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: config.HubInstallNamespace,
-						Name:      "user-rule-multi",
-						Labels: map[string]string{
-							addoncfg.ComponentK8sLabelKey: config.PlatformPrometheusMatchLabels[addoncfg.ComponentK8sLabelKey],
-							addoncfg.PartOfK8sLabelKey:    addoncfg.Name,
-						},
-						Annotations: map[string]string{
-							addoncfg.PlacementAnnotationKey: "ns/a,ns/b",
-						},
+					Annotations: map[string]string{
+						addoncfg.PlacementAnnotationKey: "ns/a,ns/b",
 					},
 				},
 			},
@@ -1638,16 +1510,12 @@ func TestGetPrometheusRules(t *testing.T) {
 			name: "user-defined rule without placement annotation is skipped",
 			initObjs: []client.Object{
 				&prometheusv1.PrometheusRule{
-					TypeMeta: metav1.TypeMeta{
-						Kind: prometheusv1.PrometheusRuleKind,
-					},
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: config.HubInstallNamespace,
-						Name:      "user-rule-no-annotation",
-						Labels: map[string]string{
-							addoncfg.ComponentK8sLabelKey: config.PlatformPrometheusMatchLabels[addoncfg.ComponentK8sLabelKey],
-							addoncfg.PartOfK8sLabelKey:    addoncfg.Name,
-						},
+					Kind:      prometheusv1.PrometheusRuleKind,
+					Namespace: config.HubInstallNamespace,
+					Name:      "user-rule-no-annotation",
+					Labels: map[string]string{
+						addoncfg.ComponentK8sLabelKey: config.PlatformPrometheusMatchLabels[addoncfg.ComponentK8sLabelKey],
+						addoncfg.PartOfK8sLabelKey:    addoncfg.Name,
 					},
 				},
 			},
@@ -1660,30 +1528,22 @@ func TestGetPrometheusRules(t *testing.T) {
 			name: "user-defined rule coexists with MCO-managed rule",
 			initObjs: []client.Object{
 				&prometheusv1.PrometheusRule{
-					TypeMeta: metav1.TypeMeta{
-						Kind: prometheusv1.PrometheusRuleKind,
-					},
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace:       config.HubInstallNamespace,
-						Name:            "mco-rule",
-						Labels:          config.PlatformPrometheusMatchLabels,
-						OwnerReferences: []metav1.OwnerReference{mcoOwnerRef},
-					},
+					Kind:            prometheusv1.PrometheusRuleKind,
+					Namespace:       config.HubInstallNamespace,
+					Name:            "mco-rule",
+					Labels:          config.PlatformPrometheusMatchLabels,
+					OwnerReferences: []metav1.OwnerReference{mcoOwnerRef},
 				},
 				&prometheusv1.PrometheusRule{
-					TypeMeta: metav1.TypeMeta{
-						Kind: prometheusv1.PrometheusRuleKind,
+					Kind:      prometheusv1.PrometheusRuleKind,
+					Namespace: config.HubInstallNamespace,
+					Name:      "user-rule",
+					Labels: map[string]string{
+						addoncfg.ComponentK8sLabelKey: config.PlatformPrometheusMatchLabels[addoncfg.ComponentK8sLabelKey],
+						addoncfg.PartOfK8sLabelKey:    addoncfg.Name,
 					},
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: config.HubInstallNamespace,
-						Name:      "user-rule",
-						Labels: map[string]string{
-							addoncfg.ComponentK8sLabelKey: config.PlatformPrometheusMatchLabels[addoncfg.ComponentK8sLabelKey],
-							addoncfg.PartOfK8sLabelKey:    addoncfg.Name,
-						},
-						Annotations: map[string]string{
-							addoncfg.PlacementAnnotationKey: "ns/a",
-						},
+					Annotations: map[string]string{
+						addoncfg.PlacementAnnotationKey: "ns/a",
 					},
 				},
 			},
@@ -1699,26 +1559,18 @@ func TestGetPrometheusRules(t *testing.T) {
 			name: "hcp rules are fetched",
 			initObjs: []client.Object{
 				&prometheusv1.PrometheusRule{
-					TypeMeta: metav1.TypeMeta{
-						Kind: prometheusv1.PrometheusRuleKind,
-					},
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace:       config.HubInstallNamespace,
-						Name:            "etcd",
-						Labels:          config.EtcdHcpUserWorkloadPrometheusMatchLabels,
-						OwnerReferences: []metav1.OwnerReference{mcoOwnerRef},
-					},
+					Kind:            prometheusv1.PrometheusRuleKind,
+					Namespace:       config.HubInstallNamespace,
+					Name:            "etcd",
+					Labels:          config.EtcdHcpUserWorkloadPrometheusMatchLabels,
+					OwnerReferences: []metav1.OwnerReference{mcoOwnerRef},
 				},
 				&prometheusv1.PrometheusRule{
-					TypeMeta: metav1.TypeMeta{
-						Kind: prometheusv1.PrometheusRuleKind,
-					},
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace:       config.HubInstallNamespace,
-						Name:            "apiserver",
-						Labels:          config.ApiserverHcpUserWorkloadPrometheusMatchLabels,
-						OwnerReferences: []metav1.OwnerReference{mcoOwnerRef},
-					},
+					Kind:            prometheusv1.PrometheusRuleKind,
+					Namespace:       config.HubInstallNamespace,
+					Name:            "apiserver",
+					Labels:          config.ApiserverHcpUserWorkloadPrometheusMatchLabels,
+					OwnerReferences: []metav1.OwnerReference{mcoOwnerRef},
 				},
 			},
 			uwlEnabled:        true,
@@ -1951,14 +1803,12 @@ func newTestScheme() *runtime.Scheme {
 
 func newCMAO(placements ...addonv1beta1.PlacementStrategy) *addonv1beta1.ClusterManagementAddOn {
 	return &addonv1beta1.ClusterManagementAddOn{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: addoncfg.Name,
-			UID:  types.UID("test-cmao-uid"),
-			OwnerReferences: []metav1.OwnerReference{
-				{
-					UID:        types.UID("mco-operator"), // needed to identify scrapeConfigs owned by mco
-					Controller: ptr.To(true),
-				},
+		Name: addoncfg.Name,
+		UID:  types.UID("test-cmao-uid"),
+		OwnerReferences: []metav1.OwnerReference{
+			{
+				UID:        types.UID("mco-operator"), // needed to identify scrapeConfigs owned by mco
+				Controller: ptr.To(true),
 			},
 		},
 		Spec: addonv1beta1.ClusterManagementAddOnSpec{
@@ -2022,7 +1872,7 @@ func TestSSAManagedFields(t *testing.T) {
 	t.Run("prometheus agent annotation is derived from the SSA object", func(t *testing.T) {
 		builder := PrometheusAgentSSA{
 			ExistingAgent: &cooprometheusv1alpha1.PrometheusAgent{
-				ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "test"},
+				Name: "test", Namespace: "test",
 			},
 			RemoteWriteEndpoint: "https://example.com/write",
 			KubeRBACProxyImage:  "kube-rbac-proxy:latest",

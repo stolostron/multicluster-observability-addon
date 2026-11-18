@@ -183,10 +183,8 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 func mcoaAODCRequest() []reconcile.Request {
 	return []reconcile.Request{
 		{
-			NamespacedName: types.NamespacedName{
-				Name:      addoncfg.Name,
-				Namespace: addoncfg.InstallNamespace,
-			},
+			Name:      addoncfg.Name,
+			Namespace: addoncfg.InstallNamespace,
 		},
 	}
 }

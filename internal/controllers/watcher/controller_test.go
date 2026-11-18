@@ -34,28 +34,20 @@ import (
 
 func TestEnqueueForConfigResource(t *testing.T) {
 	existingSecret := &corev1.Secret{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "v1",
-			Kind:       "Secret",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-secret",
-			Namespace: "foo",
-		},
+		APIVersion: "v1",
+		Kind:       "Secret",
+		Name:       "test-secret",
+		Namespace:  "foo",
 		Data: map[string][]byte{
 			"foo": []byte("bar"),
 		},
 	}
 
 	newSecret := &corev1.Secret{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "v1",
-			Kind:       "Secret",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-secret",
-			Namespace: "foo",
-		},
+		APIVersion: "v1",
+		Kind:       "Secret",
+		Name:       "test-secret",
+		Namespace:  "foo",
 		Data: map[string][]byte{
 			"foo": []byte("baz"),
 		},
@@ -65,27 +57,19 @@ func TestEnqueueForConfigResource(t *testing.T) {
 	newSecretNoGVK.SetGroupVersionKind(schema.GroupVersionKind{})
 
 	existingConfigmap := &corev1.ConfigMap{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "v1",
-			Kind:       "ConfigMap",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-configmap",
-			Namespace: "bar",
-		},
+		APIVersion: "v1",
+		Kind:       "ConfigMap",
+		Name:       "test-configmap",
+		Namespace:  "bar",
 		Data: map[string]string{
 			"foo": "bar",
 		},
 	}
 	newConfigmap := &corev1.ConfigMap{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "v1",
-			Kind:       "ConfigMap",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-configmap",
-			Namespace: "bar",
-		},
+		APIVersion: "v1",
+		Kind:       "ConfigMap",
+		Name:       "test-configmap",
+		Namespace:  "bar",
 		Data: map[string]string{
 			"foo": "baz",
 		},
@@ -102,17 +86,13 @@ func TestEnqueueForConfigResource(t *testing.T) {
 			object: newSecret,
 			manifests: []workv1.Manifest{
 				{
-					RawExtension: runtime.RawExtension{
-						Object: existingSecret,
-					},
+					Object: existingSecret,
 				},
 			},
 			expectedReconcileRequests: []reconcile.Request{
 				{
-					NamespacedName: types.NamespacedName{
-						Name:      "multicluster-observability-addon",
-						Namespace: "test-namespace",
-					},
+					Name:      "multicluster-observability-addon",
+					Namespace: "test-namespace",
 				},
 			},
 		},
@@ -121,17 +101,13 @@ func TestEnqueueForConfigResource(t *testing.T) {
 			object: newSecretNoGVK,
 			manifests: []workv1.Manifest{
 				{
-					RawExtension: runtime.RawExtension{
-						Object: existingSecret,
-					},
+					Object: existingSecret,
 				},
 			},
 			expectedReconcileRequests: []reconcile.Request{
 				{
-					NamespacedName: types.NamespacedName{
-						Name:      "multicluster-observability-addon",
-						Namespace: "test-namespace",
-					},
+					Name:      "multicluster-observability-addon",
+					Namespace: "test-namespace",
 				},
 			},
 		},
@@ -140,17 +116,13 @@ func TestEnqueueForConfigResource(t *testing.T) {
 			object: newConfigmap,
 			manifests: []workv1.Manifest{
 				{
-					RawExtension: runtime.RawExtension{
-						Object: existingConfigmap,
-					},
+					Object: existingConfigmap,
 				},
 			},
 			expectedReconcileRequests: []reconcile.Request{
 				{
-					NamespacedName: types.NamespacedName{
-						Name:      "multicluster-observability-addon",
-						Namespace: "test-namespace",
-					},
+					Name:      "multicluster-observability-addon",
+					Namespace: "test-namespace",
 				},
 			},
 		},
@@ -159,17 +131,13 @@ func TestEnqueueForConfigResource(t *testing.T) {
 			object: existingConfigmap,
 			manifests: []workv1.Manifest{
 				{
-					RawExtension: runtime.RawExtension{
-						Object: existingConfigmap,
-					},
+					Object: existingConfigmap,
 				},
 			},
 			expectedReconcileRequests: []reconcile.Request{
 				{
-					NamespacedName: types.NamespacedName{
-						Name:      "multicluster-observability-addon",
-						Namespace: "test-namespace",
-					},
+					Name:      "multicluster-observability-addon",
+					Namespace: "test-namespace",
 				},
 			},
 		},
@@ -178,9 +146,7 @@ func TestEnqueueForConfigResource(t *testing.T) {
 			object: existingSecret,
 			manifests: []workv1.Manifest{
 				{
-					RawExtension: runtime.RawExtension{
-						Object: existingConfigmap,
-					},
+					Object: existingConfigmap,
 				},
 			},
 			expectedReconcileRequests: []reconcile.Request{},
@@ -188,12 +154,10 @@ func TestEnqueueForConfigResource(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			manifestWork := &workv1.ManifestWork{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-manifestwork",
-					Namespace: "test-namespace",
-					Labels: map[string]string{
-						"open-cluster-management.io/addon-name": "multicluster-observability-addon",
-					},
+				Name:      "test-manifestwork",
+				Namespace: "test-namespace",
+				Labels: map[string]string{
+					"open-cluster-management.io/addon-name": "multicluster-observability-addon",
 				},
 				Spec: workv1.ManifestWorkSpec{
 					Workload: workv1.ManifestsTemplate{
@@ -408,46 +372,32 @@ func TestUpdateCache(t *testing.T) {
 		{
 			name: "ManifestWork with valid Secret and ConfigMap",
 			obj: &workv1.ManifestWork{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "mw1",
-					Namespace: "cluster1",
-				},
+				Name:      "mw1",
+				Namespace: "cluster1",
 				Spec: workv1.ManifestWorkSpec{
 					Workload: workv1.ManifestsTemplate{
 						Manifests: []workv1.Manifest{
 							{
-								RawExtension: runtime.RawExtension{
-									Raw: mustMarshal(&corev1.Secret{
-										TypeMeta: metav1.TypeMeta{
-											Kind:       "Secret",
-											APIVersion: "v1",
-										},
-										ObjectMeta: metav1.ObjectMeta{
-											Name:      "secret1",
-											Namespace: "ns1",
-											Annotations: map[string]string{
-												addoncfg.AnnotationOriginalResource: "source-ns/source-secret",
-											},
-										},
-									}),
-								},
+								Raw: mustMarshal(&corev1.Secret{
+									Kind:       "Secret",
+									APIVersion: "v1",
+									Name:       "secret1",
+									Namespace:  "ns1",
+									Annotations: map[string]string{
+										addoncfg.AnnotationOriginalResource: "source-ns/source-secret",
+									},
+								}),
 							},
 							{
-								RawExtension: runtime.RawExtension{
-									Raw: mustMarshal(&corev1.ConfigMap{
-										TypeMeta: metav1.TypeMeta{
-											Kind:       "ConfigMap",
-											APIVersion: "v1",
-										},
-										ObjectMeta: metav1.ObjectMeta{
-											Name:      "cm1",
-											Namespace: "ns1",
-											Annotations: map[string]string{
-												addoncfg.AnnotationOriginalResource: "source-ns/source-cm",
-											},
-										},
-									}),
-								},
+								Raw: mustMarshal(&corev1.ConfigMap{
+									Kind:       "ConfigMap",
+									APIVersion: "v1",
+									Name:       "cm1",
+									Namespace:  "ns1",
+									Annotations: map[string]string{
+										addoncfg.AnnotationOriginalResource: "source-ns/source-cm",
+									},
+								}),
 							},
 						},
 					},
@@ -462,26 +412,18 @@ func TestUpdateCache(t *testing.T) {
 		{
 			name: "ManifestWork with missing annotations",
 			obj: &workv1.ManifestWork{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "mw2",
-					Namespace: "cluster1",
-				},
+				Name:      "mw2",
+				Namespace: "cluster1",
 				Spec: workv1.ManifestWorkSpec{
 					Workload: workv1.ManifestsTemplate{
 						Manifests: []workv1.Manifest{
 							{
-								RawExtension: runtime.RawExtension{
-									Raw: mustMarshal(&corev1.Secret{
-										TypeMeta: metav1.TypeMeta{
-											Kind:       "Secret",
-											APIVersion: "v1",
-										},
-										ObjectMeta: metav1.ObjectMeta{
-											Name:      "secret2",
-											Namespace: "ns1",
-										},
-									}),
-								},
+								Raw: mustMarshal(&corev1.Secret{
+									Kind:       "Secret",
+									APIVersion: "v1",
+									Name:       "secret2",
+									Namespace:  "ns1",
+								}),
 							},
 						},
 					},
@@ -493,29 +435,21 @@ func TestUpdateCache(t *testing.T) {
 		{
 			name: "ManifestWork with invalid annotation format",
 			obj: &workv1.ManifestWork{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "mw3",
-					Namespace: "cluster1",
-				},
+				Name:      "mw3",
+				Namespace: "cluster1",
 				Spec: workv1.ManifestWorkSpec{
 					Workload: workv1.ManifestsTemplate{
 						Manifests: []workv1.Manifest{
 							{
-								RawExtension: runtime.RawExtension{
-									Raw: mustMarshal(&corev1.Secret{
-										TypeMeta: metav1.TypeMeta{
-											Kind:       "Secret",
-											APIVersion: "v1",
-										},
-										ObjectMeta: metav1.ObjectMeta{
-											Name:      "secret3",
-											Namespace: "ns1",
-											Annotations: map[string]string{
-												addoncfg.AnnotationOriginalResource: "invalid-format",
-											},
-										},
-									}),
-								},
+								Raw: mustMarshal(&corev1.Secret{
+									Kind:       "Secret",
+									APIVersion: "v1",
+									Name:       "secret3",
+									Namespace:  "ns1",
+									Annotations: map[string]string{
+										addoncfg.AnnotationOriginalResource: "invalid-format",
+									},
+								}),
 							},
 						},
 					},
@@ -527,29 +461,21 @@ func TestUpdateCache(t *testing.T) {
 		{
 			name: "ManifestWork with non-config resource",
 			obj: &workv1.ManifestWork{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "mw4",
-					Namespace: "cluster1",
-				},
+				Name:      "mw4",
+				Namespace: "cluster1",
 				Spec: workv1.ManifestWorkSpec{
 					Workload: workv1.ManifestsTemplate{
 						Manifests: []workv1.Manifest{
 							{
-								RawExtension: runtime.RawExtension{
-									Raw: mustMarshal(&corev1.Service{
-										TypeMeta: metav1.TypeMeta{
-											Kind:       "Service",
-											APIVersion: "v1",
-										},
-										ObjectMeta: metav1.ObjectMeta{
-											Name:      "svc1",
-											Namespace: "ns1",
-											Annotations: map[string]string{
-												addoncfg.AnnotationOriginalResource: "source-ns/source-svc",
-											},
-										},
-									}),
-								},
+								Raw: mustMarshal(&corev1.Service{
+									Kind:       "Service",
+									APIVersion: "v1",
+									Name:       "svc1",
+									Namespace:  "ns1",
+									Annotations: map[string]string{
+										addoncfg.AnnotationOriginalResource: "source-ns/source-svc",
+									},
+								}),
 							},
 						},
 					},
@@ -661,12 +587,10 @@ func TestWatcherReconciler_EnqueueForAllManagedClusters(t *testing.T) {
 	var initObjs []client.Object
 	for _, cluster := range clusters {
 		initObjs = append(initObjs, &workv1.ManifestWork{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "mcoa-work",
-				Namespace: cluster,
-				Labels: map[string]string{
-					addoncfg.LabelOCMAddonName: addoncfg.Name,
-				},
+			Name:      "mcoa-work",
+			Namespace: cluster,
+			Labels: map[string]string{
+				addoncfg.LabelOCMAddonName: addoncfg.Name,
 			},
 		})
 	}
@@ -682,10 +606,8 @@ func TestWatcherReconciler_EnqueueForAllManagedClusters(t *testing.T) {
 	}
 
 	imgConfigMap := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      mconfig.ImagesConfigMapObjKey.Name,
-			Namespace: mconfig.ImagesConfigMapObjKey.Namespace,
-		},
+		Name:      mconfig.ImagesConfigMapObjKey.Name,
+		Namespace: mconfig.ImagesConfigMapObjKey.Namespace,
 	}
 
 	h := reconciler.enqueueForAllManagedClusters()
@@ -723,16 +645,14 @@ func TestWatcherReconciler_HypershiftServiceMonitorDiscovery(t *testing.T) {
 
 	// Positive Test 1: ServiceMonitor "etcd" owned by HostedCluster
 	etcdSm := &prometheusv1.ServiceMonitor{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      mconfig.HypershiftEtcdServiceMonitorName,
-			Namespace: "clusters-hosted-cluster-1",
-			OwnerReferences: []metav1.OwnerReference{
-				{
-					APIVersion: hyperv1.GroupVersion.String(),
-					Kind:       "HostedCluster",
-					Name:       "hosted-cluster-1",
-					UID:        types.UID("12345"),
-				},
+		Name:      mconfig.HypershiftEtcdServiceMonitorName,
+		Namespace: "clusters-hosted-cluster-1",
+		OwnerReferences: []metav1.OwnerReference{
+			{
+				APIVersion: hyperv1.GroupVersion.String(),
+				Kind:       "HostedCluster",
+				Name:       "hosted-cluster-1",
+				UID:        types.UID("12345"),
 			},
 		},
 	}
@@ -760,16 +680,14 @@ func TestWatcherReconciler_HypershiftServiceMonitorDiscovery(t *testing.T) {
 	// Positive Test 2: ServiceMonitor "kube-apiserver" owned by HostedCluster
 	addonMgr.reset()
 	apiserverSm := &prometheusv1.ServiceMonitor{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      mconfig.HypershiftApiServerServiceMonitorName,
-			Namespace: "clusters-hosted-cluster-1",
-			OwnerReferences: []metav1.OwnerReference{
-				{
-					APIVersion: hyperv1.GroupVersion.String(),
-					Kind:       "HostedCluster",
-					Name:       "hosted-cluster-1",
-					UID:        types.UID("12345"),
-				},
+		Name:      mconfig.HypershiftApiServerServiceMonitorName,
+		Namespace: "clusters-hosted-cluster-1",
+		OwnerReferences: []metav1.OwnerReference{
+			{
+				APIVersion: hyperv1.GroupVersion.String(),
+				Kind:       "HostedCluster",
+				Name:       "hosted-cluster-1",
+				UID:        types.UID("12345"),
 			},
 		},
 	}
@@ -777,16 +695,14 @@ func TestWatcherReconciler_HypershiftServiceMonitorDiscovery(t *testing.T) {
 
 	// Negative Test 1: ServiceMonitor "etcd" owned by non-hypershift CRD
 	unrelatedOwnerSm := &prometheusv1.ServiceMonitor{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      mconfig.HypershiftEtcdServiceMonitorName,
-			Namespace: "clusters-hosted-cluster-1",
-			OwnerReferences: []metav1.OwnerReference{
-				{
-					APIVersion: "monitoring.coreos.com/v1",
-					Kind:       "Prometheus",
-					Name:       "k8s",
-					UID:        types.UID("67890"),
-				},
+		Name:      mconfig.HypershiftEtcdServiceMonitorName,
+		Namespace: "clusters-hosted-cluster-1",
+		OwnerReferences: []metav1.OwnerReference{
+			{
+				APIVersion: "monitoring.coreos.com/v1",
+				Kind:       "Prometheus",
+				Name:       "k8s",
+				UID:        types.UID("67890"),
 			},
 		},
 	}
@@ -794,16 +710,14 @@ func TestWatcherReconciler_HypershiftServiceMonitorDiscovery(t *testing.T) {
 
 	// Negative Test 2: ServiceMonitor not named etcd or kube-apiserver even if owned by HostedCluster
 	otherAppSm := &prometheusv1.ServiceMonitor{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "custom-application-monitor",
-			Namespace: "clusters-hosted-cluster-1",
-			OwnerReferences: []metav1.OwnerReference{
-				{
-					APIVersion: hyperv1.GroupVersion.String(),
-					Kind:       "HostedCluster",
-					Name:       "hosted-cluster-1",
-					UID:        types.UID("12345"),
-				},
+		Name:      "custom-application-monitor",
+		Namespace: "clusters-hosted-cluster-1",
+		OwnerReferences: []metav1.OwnerReference{
+			{
+				APIVersion: hyperv1.GroupVersion.String(),
+				Kind:       "HostedCluster",
+				Name:       "hosted-cluster-1",
+				UID:        types.UID("12345"),
 			},
 		},
 	}

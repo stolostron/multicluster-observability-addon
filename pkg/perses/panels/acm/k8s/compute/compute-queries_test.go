@@ -1,7 +1,6 @@
 package compute
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -24,7 +23,7 @@ func TestClusterQueriesHaveClusterFilter(t *testing.T) {
 			require.True(t, ok, "ClusterQueries[%q] not found", key)
 
 			promql := expr.Pretty(0)
-			assert.True(t, strings.Contains(promql, `cluster="$cluster"`),
+			assert.Contains(t, promql, `cluster="$cluster"`,
 				"ClusterQueries[%q] is missing cluster=\"$cluster\" label matcher; got: %s", key, promql)
 		})
 	}

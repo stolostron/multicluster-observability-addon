@@ -5,12 +5,12 @@ import (
 	commonSdk "github.com/perses/perses/go-sdk/common"
 	"github.com/perses/perses/go-sdk/panel"
 	panelgroup "github.com/perses/perses/go-sdk/panel-group"
-	apicommon "github.com/perses/perses/pkg/model/api/v1/common"
 	gaugePanel "github.com/perses/plugins/gaugechart/sdk/go"
 	"github.com/perses/plugins/prometheus/sdk/go/query"
 	statPanel "github.com/perses/plugins/statchart/sdk/go"
 	tablePanel "github.com/perses/plugins/table/sdk/go"
 	timeSeriesPanel "github.com/perses/plugins/timeserieschart/sdk/go"
+	apicommon "github.com/perses/spec/go/plugin"
 )
 
 // Perses unit string not exported by community-mixins.

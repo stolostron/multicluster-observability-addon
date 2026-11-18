@@ -6,7 +6,6 @@ import (
 	operatorv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestShouldInstallCLO(t *testing.T) {
@@ -30,9 +29,7 @@ func TestShouldInstallCLO(t *testing.T) {
 			name: "Empty subscription name",
 			opts: Options{
 				ClusterLoggingSubscription: &operatorv1alpha1.Subscription{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "",
-					},
+					Name: "",
 				},
 			},
 			expectedResult: true,
@@ -42,9 +39,7 @@ func TestShouldInstallCLO(t *testing.T) {
 			name: "Subscription with mismatched channel",
 			opts: Options{
 				ClusterLoggingSubscription: &operatorv1alpha1.Subscription{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "cluster-logging",
-					},
+					Name: "cluster-logging",
 					Spec: &operatorv1alpha1.SubscriptionSpec{
 						Channel: "wrong-channel",
 					},
@@ -57,9 +52,7 @@ func TestShouldInstallCLO(t *testing.T) {
 			name: "Subscription with matching channel",
 			opts: Options{
 				ClusterLoggingSubscription: &operatorv1alpha1.Subscription{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "cluster-logging",
-					},
+					Name: "cluster-logging",
 					Spec: &operatorv1alpha1.SubscriptionSpec{
 						Channel: testChannel,
 					},
@@ -72,11 +65,9 @@ func TestShouldInstallCLO(t *testing.T) {
 			name: "Subscription with our release label",
 			opts: Options{
 				ClusterLoggingSubscription: &operatorv1alpha1.Subscription{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "cluster-logging",
-						Labels: map[string]string{
-							"release": "multicluster-observability-addon",
-						},
+					Name: "cluster-logging",
+					Labels: map[string]string{
+						"release": "multicluster-observability-addon",
 					},
 					Spec: &operatorv1alpha1.SubscriptionSpec{
 						Channel: testChannel,
@@ -90,11 +81,9 @@ func TestShouldInstallCLO(t *testing.T) {
 			name: "Subscription with different release label value",
 			opts: Options{
 				ClusterLoggingSubscription: &operatorv1alpha1.Subscription{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "cluster-logging",
-						Labels: map[string]string{
-							"release": "some-other-value",
-						},
+					Name: "cluster-logging",
+					Labels: map[string]string{
+						"release": "some-other-value",
 					},
 					Spec: &operatorv1alpha1.SubscriptionSpec{
 						Channel: testChannel,
@@ -108,11 +97,9 @@ func TestShouldInstallCLO(t *testing.T) {
 			name: "Subscription with different label key",
 			opts: Options{
 				ClusterLoggingSubscription: &operatorv1alpha1.Subscription{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "cluster-logging",
-						Labels: map[string]string{
-							"app": "multicluster-observability-addon",
-						},
+					Name: "cluster-logging",
+					Labels: map[string]string{
+						"app": "multicluster-observability-addon",
 					},
 					Spec: &operatorv1alpha1.SubscriptionSpec{
 						Channel: testChannel,

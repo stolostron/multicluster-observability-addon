@@ -20,7 +20,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
 	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -68,10 +67,8 @@ type DefaultHubStackReconciler struct {
 func (r *DefaultHubStackReconciler) enqueueAODC() handler.EventHandler {
 	return handler.EnqueueRequestsFromMapFunc(func(_ context.Context, _ client.Object) []reconcile.Request {
 		return []reconcile.Request{{
-			NamespacedName: types.NamespacedName{
-				Namespace: addoncfg.InstallNamespace,
-				Name:      addoncfg.Name,
-			},
+			Namespace: addoncfg.InstallNamespace,
+			Name:      addoncfg.Name,
 		}}
 	})
 }

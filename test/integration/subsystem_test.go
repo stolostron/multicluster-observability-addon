@@ -199,9 +199,7 @@ func TestSubsystem_PlatformMetricsDeploymentAndSecretRotation(t *testing.T) {
 	// 2. Setup Prerequisites required for real AddonManager manifest rendering:
 	// - OpenShift ClusterVersion CR named "version" (required by getClusterID)
 	clusterVersion := &ocinfrav1.ClusterVersion{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "version",
-		},
+		Name: "version",
 		Spec: ocinfrav1.ClusterVersionSpec{
 			ClusterID: "c0ffeebabe-1234-5678-9abc-def012345678",
 		},
@@ -210,10 +208,8 @@ func TestSubsystem_PlatformMetricsDeploymentAndSecretRotation(t *testing.T) {
 
 	// - Upstream mTLS and Accessor Secrets in addon install namespace
 	hubCASecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      metricsconfig.HubCASecretName,
-			Namespace: addoncfg.InstallNamespace,
-		},
+		Name:      metricsconfig.HubCASecretName,
+		Namespace: addoncfg.InstallNamespace,
 		Data: map[string][]byte{
 			metricsconfig.MTLSCASecretKey: []byte("initial-ca-cert-payload"),
 		},
@@ -221,10 +217,8 @@ func TestSubsystem_PlatformMetricsDeploymentAndSecretRotation(t *testing.T) {
 	require.NoError(t, testEnv.K8sClient.Create(ctx, hubCASecret))
 
 	clientCertSecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      metricsconfig.ClientCertSecretName,
-			Namespace: addoncfg.InstallNamespace,
-		},
+		Name:      metricsconfig.ClientCertSecretName,
+		Namespace: addoncfg.InstallNamespace,
 		Data: map[string][]byte{
 			metricsconfig.MTLSCertSecretKey:    []byte("client-cert-payload"),
 			metricsconfig.MTLSCertKeySecretKey: []byte("client-key-payload"),
@@ -233,10 +227,8 @@ func TestSubsystem_PlatformMetricsDeploymentAndSecretRotation(t *testing.T) {
 	require.NoError(t, testEnv.K8sClient.Create(ctx, clientCertSecret))
 
 	accessorSecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      metricsconfig.AlertmanagerAccessorSecretName,
-			Namespace: addoncfg.InstallNamespace,
-		},
+		Name:      metricsconfig.AlertmanagerAccessorSecretName,
+		Namespace: addoncfg.InstallNamespace,
 		Data: map[string][]byte{
 			"token": []byte("initial-token"),
 		},
@@ -245,10 +237,8 @@ func TestSubsystem_PlatformMetricsDeploymentAndSecretRotation(t *testing.T) {
 
 	// - Images list ConfigMap for metrics agent image overrides
 	imagesCM := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      metricsconfig.ImagesConfigMapObjKey.Name,
-			Namespace: metricsconfig.ImagesConfigMapObjKey.Namespace,
-		},
+		Name:      metricsconfig.ImagesConfigMapObjKey.Name,
+		Namespace: metricsconfig.ImagesConfigMapObjKey.Namespace,
 		Data: map[string]string{
 			"obo_prometheus_rhel9_operator": "quay.io/prometheus/obo-operator",
 			"prometheus_config_reloader":    "quay.io/prometheus/config-reloader",
@@ -263,18 +253,14 @@ func TestSubsystem_PlatformMetricsDeploymentAndSecretRotation(t *testing.T) {
 
 	// - ManagedCluster representing spokeCluster
 	managedCluster := &clusterv1.ManagedCluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: spokeCluster,
-		},
+		Name: spokeCluster,
 	}
 	require.NoError(t, testEnv.K8sClient.Create(ctx, managedCluster))
 
 	// - AddOnDeploymentConfig and ClusterManagementAddOn for ResourceCreator and AddonManager
 	aodc := &addonv1beta1.AddOnDeploymentConfig{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      addoncfg.Name,
-			Namespace: addoncfg.InstallNamespace,
-		},
+		Name:      addoncfg.Name,
+		Namespace: addoncfg.InstallNamespace,
 		Spec: addonv1beta1.AddOnDeploymentConfigSpec{
 			CustomizedVariables: []addonv1beta1.CustomizedVariable{
 				{
@@ -294,18 +280,14 @@ func TestSubsystem_PlatformMetricsDeploymentAndSecretRotation(t *testing.T) {
 	require.NoError(t, err)
 
 	cmao := &addonv1beta1.ClusterManagementAddOn{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: addoncfg.Name,
-		},
+		Name: addoncfg.Name,
 		Spec: addonv1beta1.ClusterManagementAddOnSpec{
 			InstallStrategy: addonv1beta1.InstallStrategy{
 				Type: "Placements",
 				Placements: []addonv1beta1.PlacementStrategy{
 					{
-						PlacementRef: addonv1beta1.PlacementRef{
-							Name:      "global",
-							Namespace: addoncfg.InstallNamespace,
-						},
+						Name:      "global",
+						Namespace: addoncfg.InstallNamespace,
 					},
 				},
 			},
@@ -315,11 +297,9 @@ func TestSubsystem_PlatformMetricsDeploymentAndSecretRotation(t *testing.T) {
 
 	// - ManagedClusterAddOn for spokeCluster
 	mcAddon := &addonv1beta1.ManagedClusterAddOn{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      addoncfg.Name,
-			Namespace: spokeCluster,
-		},
-		Spec: addonv1beta1.ManagedClusterAddOnSpec{},
+		Name:      addoncfg.Name,
+		Namespace: spokeCluster,
+		Spec:      addonv1beta1.ManagedClusterAddOnSpec{},
 	}
 	require.NoError(t, testEnv.K8sClient.Create(ctx, mcAddon))
 
@@ -336,28 +316,20 @@ func TestSubsystem_PlatformMetricsDeploymentAndSecretRotation(t *testing.T) {
 	}
 	mcAddon.Status.ConfigReferences = []addonv1beta1.ConfigReference{
 		{
-			ConfigGroupResource: addonv1beta1.ConfigGroupResource{
-				Group:    "addon.open-cluster-management.io",
-				Resource: "addondeploymentconfigs",
-			},
+			Group:    "addon.open-cluster-management.io",
+			Resource: "addondeploymentconfigs",
 			DesiredConfig: &addonv1beta1.ConfigSpecHash{
-				ConfigReferent: addonv1beta1.ConfigReferent{
-					Namespace: addoncfg.InstallNamespace,
-					Name:      addoncfg.Name,
-				},
-				SpecHash: aodcHash,
+				Namespace: addoncfg.InstallNamespace,
+				Name:      addoncfg.Name,
+				SpecHash:  aodcHash,
 			},
 		},
 		{
-			ConfigGroupResource: addonv1beta1.ConfigGroupResource{
-				Group:    cooprometheusv1alpha1.SchemeGroupVersion.Group,
-				Resource: cooprometheusv1alpha1.PrometheusAgentName,
-			},
+			Group:    cooprometheusv1alpha1.SchemeGroupVersion.Group,
+			Resource: cooprometheusv1alpha1.PrometheusAgentName,
 			DesiredConfig: &addonv1beta1.ConfigSpecHash{
-				ConfigReferent: addonv1beta1.ConfigReferent{
-					Namespace: addoncfg.InstallNamespace,
-					Name:      defaultAgentName,
-				},
+				Namespace: addoncfg.InstallNamespace,
+				Name:      defaultAgentName,
 			},
 		},
 	}
@@ -452,16 +424,14 @@ func TestSubsystem_PlatformMetricsDeploymentAndSecretRotation(t *testing.T) {
 	// without adding a CMAO OwnerReference, and that the real AddonManager renders it into the spoke ManifestWork.
 	userAgentName := "user-custom-platform-agent"
 	userAgent := &cooprometheusv1alpha1.PrometheusAgent{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      userAgentName,
-			Namespace: addoncfg.InstallNamespace,
-			Labels: map[string]string{
-				addoncfg.ComponentK8sLabelKey: metricsconfig.PlatformMetricsCollectorApp,
-				addoncfg.PartOfK8sLabelKey:    addoncfg.Name,
-			},
-			Annotations: map[string]string{
-				addoncfg.PlacementAnnotationKey: fmt.Sprintf("%s/%s", addoncfg.InstallNamespace, "global"),
-			},
+		Name:      userAgentName,
+		Namespace: addoncfg.InstallNamespace,
+		Labels: map[string]string{
+			addoncfg.ComponentK8sLabelKey: metricsconfig.PlatformMetricsCollectorApp,
+			addoncfg.PartOfK8sLabelKey:    addoncfg.Name,
+		},
+		Annotations: map[string]string{
+			addoncfg.PlacementAnnotationKey: fmt.Sprintf("%s/%s", addoncfg.InstallNamespace, "global"),
 		},
 		Spec: cooprometheusv1alpha1.PrometheusAgentSpec{
 			CommonPrometheusFields: cooprometheusv1.CommonPrometheusFields{

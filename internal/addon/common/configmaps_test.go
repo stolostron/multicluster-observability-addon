@@ -5,7 +5,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
@@ -13,19 +12,15 @@ func TestGetConfigMaps(t *testing.T) {
 	var (
 		defaultNamespace = "open-cluster-management"
 		clusterConfigMap = &corev1.ConfigMap{
-			ObjectMeta: v1.ObjectMeta{
-				Name:      "foo",
-				Namespace: "cluster",
-			},
+			Name:      "foo",
+			Namespace: "cluster",
 			Data: map[string]string{
 				"foo": "bar",
 			},
 		}
 		defaultConfigMap = &corev1.ConfigMap{
-			ObjectMeta: v1.ObjectMeta{
-				Name:      "foo",
-				Namespace: defaultNamespace,
-			},
+			Name:      "foo",
+			Namespace: defaultNamespace,
 			Data: map[string]string{
 				"bar": "baz",
 			},

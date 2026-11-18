@@ -59,11 +59,9 @@ func TestServerSideApply(t *testing.T) {
 		c := fake.NewClientBuilder().WithScheme(scheme).Build()
 
 		cm := &corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "typed-nil-owner-cm",
-				Namespace: "default",
-			},
-			Data: map[string]string{"foo": "bar"},
+			Name:      "typed-nil-owner-cm",
+			Namespace: "default",
+			Data:      map[string]string{"foo": "bar"},
 		}
 
 		var nilOwner *corev1.ConfigMap
@@ -82,15 +80,13 @@ func TestServerSideApply(t *testing.T) {
 		c := fake.NewClientBuilder().WithScheme(scheme).Build()
 
 		cm := &corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "test-cm",
-				Namespace: "default",
-				Labels: map[string]string{
-					"app": "mcoa",
-				},
-				Annotations: map[string]string{
-					"note": "synced",
-				},
+			Name:      "test-cm",
+			Namespace: "default",
+			Labels: map[string]string{
+				"app": "mcoa",
+			},
+			Annotations: map[string]string{
+				"note": "synced",
 			},
 			Data: map[string]string{
 				"key": "value",
@@ -154,18 +150,14 @@ func TestServerSideApply(t *testing.T) {
 		c := fake.NewClientBuilder().WithScheme(scheme).Build()
 
 		owner := &corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "owner-cm",
-				Namespace: "default",
-				UID:       types.UID("owner-123"),
-			},
+			Name:      "owner-cm",
+			Namespace: "default",
+			UID:       types.UID("owner-123"),
 		}
 
 		child := &corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "child-secret",
-				Namespace: "default",
-			},
+			Name:      "child-secret",
+			Namespace: "default",
 		}
 
 		err := common.ServerSideApply(ctx, c, child, owner)
@@ -191,17 +183,13 @@ func TestServerSideApply(t *testing.T) {
 		c := fake.NewClientBuilder().WithScheme(scheme).Build()
 
 		unregisteredOwner := &dummyUnregisteredObject{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "invalid-owner",
-				Namespace: "default",
-			},
+			Name:      "invalid-owner",
+			Namespace: "default",
 		}
 
 		child := &corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "child-cm",
-				Namespace: "default",
-			},
+			Name:      "child-cm",
+			Namespace: "default",
 		}
 
 		err := common.ServerSideApply(ctx, c, child, unregisteredOwner)
@@ -215,15 +203,13 @@ func TestServerSideApply(t *testing.T) {
 		c := fake.NewClientBuilder().WithScheme(scheme).Build()
 
 		cm := &corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "cm-with-managed-fields",
-				Namespace: "default",
-				ManagedFields: []metav1.ManagedFieldsEntry{
-					{
-						Manager:    "old-manager",
-						Operation:  metav1.ManagedFieldsOperationApply,
-						APIVersion: "v1",
-					},
+			Name:      "cm-with-managed-fields",
+			Namespace: "default",
+			ManagedFields: []metav1.ManagedFieldsEntry{
+				{
+					Manager:    "old-manager",
+					Operation:  metav1.ManagedFieldsOperationApply,
+					APIVersion: "v1",
 				},
 			},
 			Data: map[string]string{"foo": "bar"},
@@ -244,11 +230,9 @@ func TestServerSideApply(t *testing.T) {
 		c := fake.NewClientBuilder().WithScheme(scheme).Build()
 
 		cm := &corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "updated-cm",
-				Namespace: "default",
-			},
-			Data: map[string]string{"k": "initial"},
+			Name:      "updated-cm",
+			Namespace: "default",
+			Data:      map[string]string{"k": "initial"},
 		}
 
 		err := common.ServerSideApply(ctx, c, cm, nil)
@@ -270,10 +254,8 @@ func TestServerSideApply(t *testing.T) {
 		c := fake.NewClientBuilder().WithScheme(scheme).Build()
 
 		unregistered := &dummyUnregisteredObject{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "unregistered-obj",
-				Namespace: "default",
-			},
+			Name:      "unregistered-obj",
+			Namespace: "default",
 		}
 
 		err := common.ServerSideApply(ctx, c, unregistered, nil)
@@ -285,11 +267,9 @@ func TestServerSideApply(t *testing.T) {
 func TestSetSSAManagedFieldsAnnotation(t *testing.T) {
 	t.Run("sets sorted newline-separated paths", func(t *testing.T) {
 		obj := &corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "test",
-				Annotations: map[string]string{
-					"keep": "me",
-				},
+			Name: "test",
+			Annotations: map[string]string{
+				"keep": "me",
 			},
 		}
 
@@ -302,7 +282,7 @@ func TestSetSSAManagedFieldsAnnotation(t *testing.T) {
 
 	t.Run("creates annotations map when nil", func(t *testing.T) {
 		obj := &corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{Name: "test"},
+			Name: "test",
 		}
 
 		common.SetSSAManagedFieldsAnnotation(obj, []string{".spec.image"})
@@ -313,7 +293,7 @@ func TestSetSSAManagedFieldsAnnotation(t *testing.T) {
 
 	t.Run("no-op for empty fields", func(t *testing.T) {
 		obj := &corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{Name: "test"},
+			Name: "test",
 		}
 
 		common.SetSSAManagedFieldsAnnotation(obj, nil)
@@ -334,10 +314,8 @@ func TestSSAManagedFieldsAnnotation(t *testing.T) {
 	assert.Empty(t, common.SSAManagedFieldsAnnotation(nilObj))
 
 	obj := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Annotations: map[string]string{
-				addoncfg.SSAManagedFieldsAnnotationKey: ".spec.image",
-			},
+		Annotations: map[string]string{
+			addoncfg.SSAManagedFieldsAnnotationKey: ".spec.image",
 		},
 	}
 	assert.Equal(t, ".spec.image", common.SSAManagedFieldsAnnotation(obj))
@@ -431,10 +409,8 @@ func TestServerSideApply_PopulatesGVKWhenEmpty(t *testing.T) {
 	}).Build()
 
 	cm := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-cm",
-			Namespace: "default",
-		},
+		Name:      "test-cm",
+		Namespace: "default",
 	}
 	require.True(t, cm.GetObjectKind().GroupVersionKind().Empty())
 

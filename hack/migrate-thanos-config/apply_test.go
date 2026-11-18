@@ -15,7 +15,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -380,7 +379,7 @@ func containsArg(args []string, want string) bool {
 
 func newCompact() *thanosv1alpha1.ThanosCompact {
 	return &thanosv1alpha1.ThanosCompact{
-		ObjectMeta: metav1.ObjectMeta{Name: "mcoa", Namespace: "open-cluster-management-observability"},
+		Name: "mcoa", Namespace: "open-cluster-management-observability",
 		Spec: thanosv1alpha1.ThanosCompactSpec{
 			StorageConfiguration: thanosv1alpha1.StorageConfiguration{
 				Size: resource.MustParse("10Gi"),
@@ -396,7 +395,7 @@ func newCompact() *thanosv1alpha1.ThanosCompact {
 
 func newReceive() *thanosv1alpha1.ThanosReceive {
 	return &thanosv1alpha1.ThanosReceive{
-		ObjectMeta: metav1.ObjectMeta{Name: "mcoa", Namespace: "open-cluster-management-observability"},
+		Name: "mcoa", Namespace: "open-cluster-management-observability",
 		Spec: thanosv1alpha1.ThanosReceiveSpec{
 			Ingester: thanosv1alpha1.IngesterSpec{
 				Hashrings: []thanosv1alpha1.IngesterHashringSpec{
@@ -414,7 +413,7 @@ func newReceive() *thanosv1alpha1.ThanosReceive {
 
 func newRuler() *thanosv1alpha1.ThanosRuler {
 	return &thanosv1alpha1.ThanosRuler{
-		ObjectMeta: metav1.ObjectMeta{Name: "mcoa", Namespace: "open-cluster-management-observability"},
+		Name: "mcoa", Namespace: "open-cluster-management-observability",
 		Spec: thanosv1alpha1.ThanosRulerSpec{
 			Replicas:           3,
 			EvaluationInterval: "1m",
@@ -429,7 +428,7 @@ func newRuler() *thanosv1alpha1.ThanosRuler {
 
 func newQuery() *thanosv1alpha1.ThanosQuery {
 	return &thanosv1alpha1.ThanosQuery{
-		ObjectMeta: metav1.ObjectMeta{Name: "mcoa", Namespace: "open-cluster-management-observability"},
+		Name: "mcoa", Namespace: "open-cluster-management-observability",
 		Spec: thanosv1alpha1.ThanosQuerySpec{
 			Replicas:      2,
 			QueryFrontend: &thanosv1alpha1.QueryFrontendSpec{Replicas: 2},
@@ -440,7 +439,7 @@ func newQuery() *thanosv1alpha1.ThanosQuery {
 func newMemcachedStore() *appsv1.Deployment {
 	replicas := int32(3)
 	return &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{Name: "memcached-store", Namespace: "open-cluster-management-observability"},
+		Name: "memcached-store", Namespace: "open-cluster-management-observability",
 		Spec: appsv1.DeploymentSpec{
 			Replicas: &replicas,
 			Template: corev1.PodTemplateSpec{

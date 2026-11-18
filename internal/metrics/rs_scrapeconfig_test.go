@@ -23,7 +23,6 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -79,16 +78,14 @@ func setupFullMCOA(t *testing.T, s rsSetup) (agent.AgentAddon, *clusterv1.Manage
 	require.NoError(t, workv1.Install(scheme))
 
 	platformSC := &cooprometheusv1alpha1.ScrapeConfig{
-		TypeMeta: metav1.TypeMeta{Kind: cooprometheusv1alpha1.ScrapeConfigsKind, APIVersion: cooprometheusv1alpha1.SchemeGroupVersion.Identifier()},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      s.platformSCName,
-			Namespace: hubNamespace,
-			Labels:    config.PlatformPrometheusMatchLabels,
-		},
+		Kind: cooprometheusv1alpha1.ScrapeConfigsKind, APIVersion: cooprometheusv1alpha1.SchemeGroupVersion.Identifier(),
+		Name:      s.platformSCName,
+		Namespace: hubNamespace,
+		Labels:    config.PlatformPrometheusMatchLabels,
 	}
 	clusterVersion := &configv1.ClusterVersion{
-		ObjectMeta: metav1.ObjectMeta{Name: "version"},
-		Spec:       configv1.ClusterVersionSpec{ClusterID: configv1.ClusterID(testClusterID)},
+		Name: "version",
+		Spec: configv1.ClusterVersionSpec{ClusterID: configv1.ClusterID(testClusterID)},
 	}
 
 	aodc := newAddonDeploymentConfig()
@@ -119,7 +116,7 @@ func setupFullMCOA(t *testing.T, s rsSetup) (agent.AgentAddon, *clusterv1.Manage
 		newSecret(config.AlertmanagerAccessorSecretName, hubNamespace),
 		newManifestWork("cluster-1"),
 		&corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{Name: config.ImagesConfigMapObjKey.Name, Namespace: config.ImagesConfigMapObjKey.Namespace},
+			Name: config.ImagesConfigMapObjKey.Name, Namespace: config.ImagesConfigMapObjKey.Namespace,
 			Data: map[string]string{
 				"obo_prometheus_rhel9_operator": "quay.io/prometheus/obo-operator",
 				"prometheus_config_reloader":    "quay.io/prometheus/config-reloader",

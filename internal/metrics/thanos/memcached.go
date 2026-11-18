@@ -61,15 +61,11 @@ func buildMemcachedDeployment(name string, labels map[string]string, memcachedIm
 	maxItemArg := fmt.Sprintf("-I %s", config.DefaultMemcachedMaxItemSize)
 
 	return &appsv1.Deployment{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "apps/v1",
-			Kind:       "Deployment",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: config.HubInstallNamespace,
-			Labels:    labels,
-		},
+		APIVersion: "apps/v1",
+		Kind:       "Deployment",
+		Name:       name,
+		Namespace:  config.HubInstallNamespace,
+		Labels:     labels,
 		Spec: appsv1.DeploymentSpec{
 			Replicas: &replicas,
 			Selector: &metav1.LabelSelector{
@@ -143,15 +139,11 @@ func buildMemcachedDeployment(name string, labels map[string]string, memcachedIm
 
 func buildMemcachedService(name string, labels map[string]string) *corev1.Service {
 	return &corev1.Service{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "v1",
-			Kind:       "Service",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: config.HubInstallNamespace,
-			Labels:    labels,
-		},
+		APIVersion: "v1",
+		Kind:       "Service",
+		Name:       name,
+		Namespace:  config.HubInstallNamespace,
+		Labels:     labels,
 		Spec: corev1.ServiceSpec{
 			Selector:  labels,
 			ClusterIP: "None",
@@ -188,15 +180,11 @@ config:
 `, serviceName, config.HubInstallNamespace, config.DefaultMemcachedMaxItemSizeCache)
 
 	return &corev1.Secret{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "v1",
-			Kind:       "Secret",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      secretName,
-			Namespace: config.HubInstallNamespace,
-			Labels:    mcoaLabels,
-		},
+		APIVersion: "v1",
+		Kind:       "Secret",
+		Name:       secretName,
+		Namespace:  config.HubInstallNamespace,
+		Labels:     mcoaLabels,
 		StringData: map[string]string{
 			secretKey: cacheConfigYAML,
 		},
@@ -206,15 +194,11 @@ config:
 func buildMemcachedServiceMonitor(name string, labels map[string]string) *prometheusv1.ServiceMonitor {
 	acmPrefix := "acm_${1}"
 	return &prometheusv1.ServiceMonitor{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "monitoring.coreos.com/v1",
-			Kind:       "ServiceMonitor",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: config.HubInstallNamespace,
-			Labels:    labels,
-		},
+		APIVersion: "monitoring.coreos.com/v1",
+		Kind:       "ServiceMonitor",
+		Name:       name,
+		Namespace:  config.HubInstallNamespace,
+		Labels:     labels,
 		Spec: prometheusv1.ServiceMonitorSpec{
 			Selector: metav1.LabelSelector{
 				MatchLabels: labels,

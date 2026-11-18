@@ -14,8 +14,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager"
 	workv1 "open-cluster-management.io/api/work/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -104,16 +102,14 @@ func TestWatcherReconciler_SecretMutationTrigger(t *testing.T) {
 	hubConfigNs := "hub-config-ns"
 
 	for _, nsName := range []string{spokeCluster, hubConfigNs} {
-		ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: nsName}}
+		ns := &corev1.Namespace{Name: nsName}
 		require.NoError(t, testEnv.K8sClient.Create(ctx, ns))
 	}
 
 	// 1. Create upstream Secret on the hub
 	upstreamSecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "upstream-config-secret",
-			Namespace: hubConfigNs,
-		},
+		Name:      "upstream-config-secret",
+		Namespace: hubConfigNs,
 		StringData: map[string]string{
 			"key": "initial-secret-data",
 		},
@@ -122,16 +118,12 @@ func TestWatcherReconciler_SecretMutationTrigger(t *testing.T) {
 
 	// 2. Wrap secret into ManifestWork
 	embeddedSecret := &corev1.Secret{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "v1",
-			Kind:       "Secret",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "spoke-secret",
-			Namespace: spokeCluster,
-			Annotations: map[string]string{
-				addoncfg.AnnotationOriginalResource: fmt.Sprintf("%s/%s", hubConfigNs, upstreamSecret.Name),
-			},
+		APIVersion: "v1",
+		Kind:       "Secret",
+		Name:       "spoke-secret",
+		Namespace:  spokeCluster,
+		Annotations: map[string]string{
+			addoncfg.AnnotationOriginalResource: fmt.Sprintf("%s/%s", hubConfigNs, upstreamSecret.Name),
 		},
 		Data: map[string][]byte{
 			"key": []byte("initial-secret-data"),
@@ -141,17 +133,15 @@ func TestWatcherReconciler_SecretMutationTrigger(t *testing.T) {
 	require.NoError(t, err)
 
 	mw := &workv1.ManifestWork{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "mcoa-spoke-work",
-			Namespace: spokeCluster,
-			Labels: map[string]string{
-				addoncfg.LabelOCMAddonName: addoncfg.Name,
-			},
+		Name:      "mcoa-spoke-work",
+		Namespace: spokeCluster,
+		Labels: map[string]string{
+			addoncfg.LabelOCMAddonName: addoncfg.Name,
 		},
 		Spec: workv1.ManifestWorkSpec{
 			Workload: workv1.ManifestsTemplate{
 				Manifests: []workv1.Manifest{
-					{RawExtension: runtime.RawExtension{Raw: rawSecret}},
+					{Raw: rawSecret},
 				},
 			},
 		},

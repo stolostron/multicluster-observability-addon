@@ -886,29 +886,21 @@ func getClusterID(ctx context.Context, c client.Client) (string, error) {
 // createSafeTLSConfig generates a TLSConfig configured to use SafeTLSConfig Kubernetes secret selectors.
 func createSafeTLSConfig(caTargetName, certTargetName string) *cooprometheusv1.TLSConfig {
 	return &cooprometheusv1.TLSConfig{
-		SafeTLSConfig: cooprometheusv1.SafeTLSConfig{
-			CA: cooprometheusv1.SecretOrConfigMap{
-				Secret: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: caTargetName,
-					},
-					Key: config.MTLSCASecretKey,
-				},
+		CA: cooprometheusv1.SecretOrConfigMap{
+			Secret: &corev1.SecretKeySelector{
+				Name: caTargetName,
+				Key:  config.MTLSCASecretKey,
 			},
-			Cert: cooprometheusv1.SecretOrConfigMap{
-				Secret: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: certTargetName,
-					},
-					Key: config.MTLSCertSecretKey,
-				},
+		},
+		Cert: cooprometheusv1.SecretOrConfigMap{
+			Secret: &corev1.SecretKeySelector{
+				Name: certTargetName,
+				Key:  config.MTLSCertSecretKey,
 			},
-			KeySecret: &corev1.SecretKeySelector{
-				LocalObjectReference: corev1.LocalObjectReference{
-					Name: certTargetName,
-				},
-				Key: config.MTLSCertKeySecretKey,
-			},
+		},
+		KeySecret: &corev1.SecretKeySelector{
+			Name: certTargetName,
+			Key:  config.MTLSCertKeySecretKey,
 		},
 	}
 }

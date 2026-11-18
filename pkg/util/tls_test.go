@@ -12,7 +12,6 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -26,7 +25,7 @@ func newTestScheme() *runtime.Scheme {
 
 func newAPIServerWithProfile(profile *configv1.TLSSecurityProfile, adherence configv1.TLSAdherencePolicy) *configv1.APIServer {
 	return &configv1.APIServer{
-		ObjectMeta: metav1.ObjectMeta{Name: "cluster"},
+		Name: "cluster",
 		Spec: configv1.APIServerSpec{
 			TLSSecurityProfile: profile,
 			TLSAdherence:       adherence,

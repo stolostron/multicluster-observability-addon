@@ -440,9 +440,7 @@ func configureAgentForOCP(agent *cooprometheusv1alpha1.PrometheusAgent) {
 		},
 		Name: config.ScrapeClassCfgName,
 		TLSConfig: &cooprometheusv1.TLSConfig{
-			TLSFilesConfig: cooprometheusv1.TLSFilesConfig{
-				CAFile: fmt.Sprintf("/etc/prometheus/configmaps/%s/service-ca.crt", config.PrometheusCAConfigMapName),
-			},
+			CAFile: fmt.Sprintf("/etc/prometheus/configmaps/%s/service-ca.crt", config.PrometheusCAConfigMapName),
 		},
 		Default: ptr.To(true),
 	}

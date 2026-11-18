@@ -15,7 +15,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	kubescheme "k8s.io/client-go/kubernetes/scheme"
@@ -45,20 +44,16 @@ func TestBuildOptionsRawMetrics(t *testing.T) {
 	require.NoError(t, workv1.Install(scheme))
 
 	clusterVersion := &configv1.ClusterVersion{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "version",
-		},
+		Name: "version",
 		Spec: configv1.ClusterVersionSpec{
 			ClusterID: configv1.ClusterID(clusterID),
 		},
 	}
 
 	platformAgent := &cooprometheusv1alpha1.PrometheusAgent{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-prometheus-agent",
-			Namespace: hubNamespace,
-			Labels:    config.PlatformPrometheusMatchLabels,
-		},
+		Name:      "test-prometheus-agent",
+		Namespace: hubNamespace,
+		Labels:    config.PlatformPrometheusMatchLabels,
 		Spec: cooprometheusv1alpha1.PrometheusAgentSpec{
 			CommonPrometheusFields: cooprometheusv1.CommonPrometheusFields{
 				RemoteWrite: []cooprometheusv1.RemoteWriteSpec{
@@ -71,24 +66,20 @@ func TestBuildOptionsRawMetrics(t *testing.T) {
 	}
 
 	cmao := &addonapiv1beta1.ClusterManagementAddOn{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "multicluster-observability-addon",
-			UID:  types.UID("test-cmao-uid"),
-		},
+		Name: "multicluster-observability-addon",
+		UID:  types.UID("test-cmao-uid"),
 	}
 	require.NoError(t, controllerutil.SetOwnerReference(cmao, platformAgent, scheme))
 
 	rawScrapeConfig := &cooprometheusv1alpha1.ScrapeConfig{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "raw-scrape-config",
-			Namespace: hubNamespace,
-			Labels: map[string]string{
-				"app.kubernetes.io/component": "platform-metrics-collector",
-			},
-			Annotations: map[string]string{
-				config.RawResolutionAnnotation:       config.RawResolutionValue,
-				config.COOMonitoringStacksAnnotation: "stack-namespace/stack-name",
-			},
+		Name:      "raw-scrape-config",
+		Namespace: hubNamespace,
+		Labels: map[string]string{
+			"app.kubernetes.io/component": "platform-metrics-collector",
+		},
+		Annotations: map[string]string{
+			config.RawResolutionAnnotation:       config.RawResolutionValue,
+			config.COOMonitoringStacksAnnotation: "stack-namespace/stack-name",
 		},
 		Spec: cooprometheusv1alpha1.ScrapeConfigSpec{
 			Params: map[string][]string{
@@ -101,24 +92,18 @@ func TestBuildOptionsRawMetrics(t *testing.T) {
 
 	// mTLS Secrets on Hub
 	caSecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      config.HubCASecretName,
-			Namespace: config.HubInstallNamespace,
-		},
-		Data: map[string][]byte{"ca.crt": []byte("test-ca")},
+		Name:      config.HubCASecretName,
+		Namespace: config.HubInstallNamespace,
+		Data:      map[string][]byte{"ca.crt": []byte("test-ca")},
 	}
 	certSecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      config.ClientCertSecretName,
-			Namespace: config.HubInstallNamespace,
-		},
-		Data: map[string][]byte{"tls.crt": []byte("test-cert"), "tls.key": []byte("test-key")},
+		Name:      config.ClientCertSecretName,
+		Namespace: config.HubInstallNamespace,
+		Data:      map[string][]byte{"tls.crt": []byte("test-cert"), "tls.key": []byte("test-key")},
 	}
 	accessorSecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      config.AlertmanagerAccessorSecretName,
-			Namespace: config.HubInstallNamespace,
-		},
+		Name:      config.AlertmanagerAccessorSecretName,
+		Namespace: config.HubInstallNamespace,
 		Data: map[string][]byte{
 			"key":  []byte("data"),
 			"pass": []byte("data"),
@@ -126,10 +111,8 @@ func TestBuildOptionsRawMetrics(t *testing.T) {
 	}
 
 	addonCM := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      config.ImagesConfigMapObjKey.Name,
-			Namespace: config.ImagesConfigMapObjKey.Namespace,
-		},
+		Name:      config.ImagesConfigMapObjKey.Name,
+		Namespace: config.ImagesConfigMapObjKey.Namespace,
 		Data: map[string]string{
 			"obo_prometheus_rhel9_operator": "obo-prom-operator-image",
 			"kube_rbac_proxy":               "kube-rbac-proxy-image",
@@ -147,46 +130,32 @@ func TestBuildOptionsRawMetrics(t *testing.T) {
 		Build()
 
 	mcAddon := &addonapiv1beta1.ManagedClusterAddOn{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-addon",
-			Namespace: spokeName,
-		},
+		Name:      "test-addon",
+		Namespace: spokeName,
 		Status: addonapiv1beta1.ManagedClusterAddOnStatus{
 			ConfigReferences: []addonapiv1beta1.ConfigReference{
 				{
-					ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
-						Group:    "",
-						Resource: "configmaps",
-					},
+					Group:    "",
+					Resource: "configmaps",
 					DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
-						ConfigReferent: addonapiv1beta1.ConfigReferent{
-							Name:      config.ImagesConfigMapObjKey.Name,
-							Namespace: config.ImagesConfigMapObjKey.Namespace,
-						},
+						Name:      config.ImagesConfigMapObjKey.Name,
+						Namespace: config.ImagesConfigMapObjKey.Namespace,
 					},
 				},
 				{
-					ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
-						Group:    "monitoring.rhobs",
-						Resource: "prometheusagents",
-					},
+					Group:    "monitoring.rhobs",
+					Resource: "prometheusagents",
 					DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
-						ConfigReferent: addonapiv1beta1.ConfigReferent{
-							Name:      "test-prometheus-agent",
-							Namespace: hubNamespace,
-						},
+						Name:      "test-prometheus-agent",
+						Namespace: hubNamespace,
 					},
 				},
 				{
-					ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
-						Group:    "monitoring.rhobs",
-						Resource: "scrapeconfigs",
-					},
+					Group:    "monitoring.rhobs",
+					Resource: "scrapeconfigs",
 					DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
-						ConfigReferent: addonapiv1beta1.ConfigReferent{
-							Name:      "raw-scrape-config",
-							Namespace: hubNamespace,
-						},
+						Name:      "raw-scrape-config",
+						Namespace: hubNamespace,
 					},
 				},
 			},
@@ -194,11 +163,9 @@ func TestBuildOptionsRawMetrics(t *testing.T) {
 	}
 
 	managedCluster := &clusterv1.ManagedCluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: spokeName,
-			Labels: map[string]string{
-				"vendor": "OpenShift",
-			},
+		Name: spokeName,
+		Labels: map[string]string{
+			"vendor": "OpenShift",
 		},
 	}
 
@@ -268,20 +235,16 @@ func TestBuildOptionsRawMetricsNonOCP(t *testing.T) {
 	require.NoError(t, workv1.Install(scheme))
 
 	clusterVersion := &configv1.ClusterVersion{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "version",
-		},
+		Name: "version",
 		Spec: configv1.ClusterVersionSpec{
 			ClusterID: configv1.ClusterID(clusterID),
 		},
 	}
 
 	platformAgent := &cooprometheusv1alpha1.PrometheusAgent{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-prometheus-agent",
-			Namespace: hubNamespace,
-			Labels:    config.PlatformPrometheusMatchLabels,
-		},
+		Name:      "test-prometheus-agent",
+		Namespace: hubNamespace,
+		Labels:    config.PlatformPrometheusMatchLabels,
 		Spec: cooprometheusv1alpha1.PrometheusAgentSpec{
 			CommonPrometheusFields: cooprometheusv1.CommonPrometheusFields{
 				RemoteWrite: []cooprometheusv1.RemoteWriteSpec{
@@ -294,23 +257,19 @@ func TestBuildOptionsRawMetricsNonOCP(t *testing.T) {
 	}
 
 	cmao := &addonapiv1beta1.ClusterManagementAddOn{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "multicluster-observability-addon",
-			UID:  types.UID("test-cmao-uid"),
-		},
+		Name: "multicluster-observability-addon",
+		UID:  types.UID("test-cmao-uid"),
 	}
 	require.NoError(t, controllerutil.SetOwnerReference(cmao, platformAgent, scheme))
 
 	rawScrapeConfig := &cooprometheusv1alpha1.ScrapeConfig{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "raw-scrape-config",
-			Namespace: hubNamespace,
-			Labels: map[string]string{
-				"app.kubernetes.io/component": "platform-metrics-collector",
-			},
-			Annotations: map[string]string{
-				config.RawResolutionAnnotation: config.RawResolutionValue,
-			},
+		Name:      "raw-scrape-config",
+		Namespace: hubNamespace,
+		Labels: map[string]string{
+			"app.kubernetes.io/component": "platform-metrics-collector",
+		},
+		Annotations: map[string]string{
+			config.RawResolutionAnnotation: config.RawResolutionValue,
 		},
 		Spec: cooprometheusv1alpha1.ScrapeConfigSpec{
 			Params: map[string][]string{
@@ -323,24 +282,18 @@ func TestBuildOptionsRawMetricsNonOCP(t *testing.T) {
 
 	// mTLS Secrets on Hub
 	caSecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      config.HubCASecretName,
-			Namespace: config.HubInstallNamespace,
-		},
-		Data: map[string][]byte{"ca.crt": []byte("test-ca")},
+		Name:      config.HubCASecretName,
+		Namespace: config.HubInstallNamespace,
+		Data:      map[string][]byte{"ca.crt": []byte("test-ca")},
 	}
 	certSecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      config.ClientCertSecretName,
-			Namespace: config.HubInstallNamespace,
-		},
-		Data: map[string][]byte{"tls.crt": []byte("test-cert"), "tls.key": []byte("test-key")},
+		Name:      config.ClientCertSecretName,
+		Namespace: config.HubInstallNamespace,
+		Data:      map[string][]byte{"tls.crt": []byte("test-cert"), "tls.key": []byte("test-key")},
 	}
 	accessorSecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      config.AlertmanagerAccessorSecretName,
-			Namespace: config.HubInstallNamespace,
-		},
+		Name:      config.AlertmanagerAccessorSecretName,
+		Namespace: config.HubInstallNamespace,
 		Data: map[string][]byte{
 			"key":  []byte("data"),
 			"pass": []byte("data"),
@@ -348,10 +301,8 @@ func TestBuildOptionsRawMetricsNonOCP(t *testing.T) {
 	}
 
 	addonCM := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      config.ImagesConfigMapObjKey.Name,
-			Namespace: config.ImagesConfigMapObjKey.Namespace,
-		},
+		Name:      config.ImagesConfigMapObjKey.Name,
+		Namespace: config.ImagesConfigMapObjKey.Namespace,
 		Data: map[string]string{
 			"obo_prometheus_rhel9_operator": "obo-prom-operator-image",
 			"kube_rbac_proxy":               "kube-rbac-proxy-image",
@@ -369,46 +320,32 @@ func TestBuildOptionsRawMetricsNonOCP(t *testing.T) {
 		Build()
 
 	mcAddon := &addonapiv1beta1.ManagedClusterAddOn{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-addon",
-			Namespace: spokeName,
-		},
+		Name:      "test-addon",
+		Namespace: spokeName,
 		Status: addonapiv1beta1.ManagedClusterAddOnStatus{
 			ConfigReferences: []addonapiv1beta1.ConfigReference{
 				{
-					ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
-						Group:    "",
-						Resource: "configmaps",
-					},
+					Group:    "",
+					Resource: "configmaps",
 					DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
-						ConfigReferent: addonapiv1beta1.ConfigReferent{
-							Name:      config.ImagesConfigMapObjKey.Name,
-							Namespace: config.ImagesConfigMapObjKey.Namespace,
-						},
+						Name:      config.ImagesConfigMapObjKey.Name,
+						Namespace: config.ImagesConfigMapObjKey.Namespace,
 					},
 				},
 				{
-					ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
-						Group:    "monitoring.rhobs",
-						Resource: "prometheusagents",
-					},
+					Group:    "monitoring.rhobs",
+					Resource: "prometheusagents",
 					DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
-						ConfigReferent: addonapiv1beta1.ConfigReferent{
-							Name:      "test-prometheus-agent",
-							Namespace: hubNamespace,
-						},
+						Name:      "test-prometheus-agent",
+						Namespace: hubNamespace,
 					},
 				},
 				{
-					ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
-						Group:    "monitoring.rhobs",
-						Resource: "scrapeconfigs",
-					},
+					Group:    "monitoring.rhobs",
+					Resource: "scrapeconfigs",
 					DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
-						ConfigReferent: addonapiv1beta1.ConfigReferent{
-							Name:      "raw-scrape-config",
-							Namespace: hubNamespace,
-						},
+						Name:      "raw-scrape-config",
+						Namespace: hubNamespace,
 					},
 				},
 			},
@@ -417,11 +354,9 @@ func TestBuildOptionsRawMetricsNonOCP(t *testing.T) {
 
 	// Managed Cluster with Non-OCP Vendor Label (eg: vendor=other)
 	managedCluster := &clusterv1.ManagedCluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: spokeName,
-			Labels: map[string]string{
-				"vendor": "other",
-			},
+		Name: spokeName,
+		Labels: map[string]string{
+			"vendor": "other",
 		},
 	}
 
@@ -467,18 +402,14 @@ func TestProcessScrapeConfigs(t *testing.T) {
 	require.NoError(t, corev1.AddToScheme(scheme))
 
 	caSecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      config.HubCASecretName,
-			Namespace: config.HubInstallNamespace,
-		},
-		Data: map[string][]byte{"ca.crt": []byte("test-ca")},
+		Name:      config.HubCASecretName,
+		Namespace: config.HubInstallNamespace,
+		Data:      map[string][]byte{"ca.crt": []byte("test-ca")},
 	}
 	certSecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      config.ClientCertSecretName,
-			Namespace: config.HubInstallNamespace,
-		},
-		Data: map[string][]byte{"tls.crt": []byte("test-cert"), "tls.key": []byte("test-key")},
+		Name:      config.ClientCertSecretName,
+		Namespace: config.HubInstallNamespace,
+		Data:      map[string][]byte{"tls.crt": []byte("test-cert"), "tls.key": []byte("test-key")},
 	}
 
 	builder := &OptionsBuilder{
@@ -499,12 +430,10 @@ func TestProcessScrapeConfigs(t *testing.T) {
 	}
 
 	scRaw := &cooprometheusv1alpha1.ScrapeConfig{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "raw-sc",
-			Annotations: map[string]string{
-				config.RawResolutionAnnotation:       config.RawResolutionValue,
-				config.COOMonitoringStacksAnnotation: "ns1/stack1",
-			},
+		Name: "raw-sc",
+		Annotations: map[string]string{
+			config.RawResolutionAnnotation:       config.RawResolutionValue,
+			config.COOMonitoringStacksAnnotation: "ns1/stack1",
 		},
 		Spec: cooprometheusv1alpha1.ScrapeConfigSpec{
 			Params: map[string][]string{
@@ -514,9 +443,7 @@ func TestProcessScrapeConfigs(t *testing.T) {
 	}
 
 	scStandard := &cooprometheusv1alpha1.ScrapeConfig{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "standard-sc",
-		},
+		Name: "standard-sc",
 		Spec: cooprometheusv1alpha1.ScrapeConfigSpec{
 			Params: map[string][]string{
 				"match[]": {"up"},
@@ -557,12 +484,10 @@ func TestProcessScrapeConfigs(t *testing.T) {
 	t.Run("OCP - Multiple Raw Metrics ScrapeConfigs targeting the same COO stack should aggregate remoteWrite specs", func(t *testing.T) {
 		secrets := &[]*corev1.Secret{}
 		scRaw2 := &cooprometheusv1alpha1.ScrapeConfig{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "raw-sc-2",
-				Annotations: map[string]string{
-					config.RawResolutionAnnotation:       config.RawResolutionValue,
-					config.COOMonitoringStacksAnnotation: "ns1/stack1",
-				},
+			Name: "raw-sc-2",
+			Annotations: map[string]string{
+				config.RawResolutionAnnotation:       config.RawResolutionValue,
+				config.COOMonitoringStacksAnnotation: "ns1/stack1",
 			},
 			Spec: cooprometheusv1alpha1.ScrapeConfigSpec{
 				Params: map[string][]string{
@@ -633,11 +558,9 @@ func TestProcessScrapeConfigs(t *testing.T) {
 		secrets := &[]*corev1.Secret{}
 		// ScrapeConfig with Raw resolution but no COO target stack annotation
 		scCmo := &cooprometheusv1alpha1.ScrapeConfig{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "raw-cmo-sc",
-				Annotations: map[string]string{
-					config.RawResolutionAnnotation: config.RawResolutionValue,
-				},
+			Name: "raw-cmo-sc",
+			Annotations: map[string]string{
+				config.RawResolutionAnnotation: config.RawResolutionValue,
 			},
 			Spec: cooprometheusv1alpha1.ScrapeConfigSpec{
 				Params: map[string][]string{
