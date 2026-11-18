@@ -739,15 +739,11 @@ func TestManifestConfigs_UIPluginServerSideApply(t *testing.T) {
 	}
 
 	require.NotNil(t, found, "expected a ManifestConfigOption for the monitoring UIPlugin")
-	assert.Equal(t, addoncfg.IDetectionUIPluginName, found.ResourceIdentifier.Name)
+	assert.Equal(t, addoncfg.MonitoringUIPluginName, found.ResourceIdentifier.Name)
 
-	// Must use Server-Side Apply (not the default full-replace Update) so MCOA
-	// reconciles only the fields it renders and does not strip a user/COO-set
-	// spec.monitoring.clusterHealthAnalyzer. Force is true so MCOA can assert
-	// the fields it owns (type, incidents, acm + URLs, perses) over a
-	// pre-existing UIPlugin without failing on an apply conflict; SSA still
-	// preserves clusterHealthAnalyzer because MCOA never includes it in its
-	// field set.
+	// Must use Server-Side Apply so MCOA does not strip externally-set fields
+	// (e.g. clusterHealthAnalyzer) from the shared UIPlugin, and Force so it
+	// can assert its own fields over a pre-existing object.
 	require.NotNil(t, found.UpdateStrategy)
 	assert.Equal(t, workv1.UpdateStrategyTypeServerSideApply, found.UpdateStrategy.Type)
 	require.NotNil(t, found.UpdateStrategy.ServerSideApply)

@@ -22,11 +22,9 @@ var uiPluginGVK = schema.GroupVersionKind{
 	Kind:    "UIPlugin",
 }
 
-// mcoaUIPlugin returns the UIPlugin carrying only the fields MCOA renders:
-// spec.type, spec.monitoring.incidents, spec.monitoring.acm (incl. the
-// alertmanager/thanosQuerier URLs) and spec.monitoring.perses. It deliberately
-// cannot express spec.monitoring.clusterHealthAnalyzer -- the vendored API has
-// no such field -- which is exactly why MCOA must not clobber it.
+// mcoaUIPlugin returns the UIPlugin with only the fields MCOA renders. The
+// vendored API cannot express clusterHealthAnalyzer, which is why MCOA must
+// not clobber it.
 func mcoaUIPlugin(name string) *uiplugin.UIPlugin {
 	return &uiplugin.UIPlugin{
 		TypeMeta: metav1.TypeMeta{
@@ -49,9 +47,8 @@ func mcoaUIPlugin(name string) *uiplugin.UIPlugin {
 	}
 }
 
-// applyExternalUIPlugin creates the monitoring UIPlugin on behalf of an external
-// manager (admin or a newer COO), owning clusterHealthAnalyzer and an explicit
-// incidents=false under a field manager that is NOT MCOA.
+// applyExternalUIPlugin creates the UIPlugin under a non-MCOA field manager,
+// owning clusterHealthAnalyzer and incidents=false.
 func applyExternalUIPlugin(t *testing.T, ctx context.Context, c client.Client, name string) {
 	t.Helper()
 	admin := &unstructured.Unstructured{}
@@ -72,21 +69,16 @@ func getUIPlugin(t *testing.T, ctx context.Context, c client.Client, name string
 	return got
 }
 
-// TestUIPlugin_ServerSideApply validates the Kubernetes server-side-apply
-// ownership semantics that the uiplugins ManifestConfigOption relies on (see
-// addon.ManifestConfigs, which selects UpdateStrategyTypeServerSideApply with
-// Force: true for the monitoring UIPlugin). It does NOT exercise the OCM Work
-// Agent that consumes that option -- TestManifestConfigs_UIPluginServerSideApply
-// covers the config wiring; this test covers the behavior that wiring delegates
-// to. The negative control sub-test demonstrates that the addon-framework
-// default (full-object Update) is what strips clusterHealthAnalyzer, i.e. the
-// regression this fix prevents.
+// TestUIPlugin_ServerSideApply validates the SSA ownership semantics the
+// uiplugins ManifestConfigOption relies on. It does not exercise the Work
+// Agent itself -- TestManifestConfigs_UIPluginServerSideApply covers the
+// config wiring. The negative control shows the default full-object Update
+// is what strips clusterHealthAnalyzer.
 func TestUIPlugin_ServerSideApply(t *testing.T) {
-	name := addoncfg.IDetectionUIPluginName // "monitoring"
+	name := addoncfg.MonitoringUIPluginName // "monitoring"
 
-	// Server-side apply of the fields MCOA renders must preserve an externally
-	// owned clusterHealthAnalyzer, and ForceOwnership must let MCOA assert the
-	// fields it owns over a pre-existing UIPlugin without an apply conflict.
+	// SSA must preserve the externally owned clusterHealthAnalyzer and
+	// force-win on MCOA-owned fields.
 	t.Run("ssa preserves externally-owned fields and force-wins on MCOA fields", func(t *testing.T) {
 		te := SetupTestEnv(t)
 		ctx := context.Background()
@@ -94,9 +86,8 @@ func TestUIPlugin_ServerSideApply(t *testing.T) {
 
 		applyExternalUIPlugin(t, ctx, c, name)
 
-		// MCOA applies through the shared SSA helper (FieldOwner=addoncfg.Name,
-		// ForceOwnership) -- the same ownership model the Work Agent's SSA update
-		// strategy uses.
+		// Apply through the shared SSA helper, the same ownership model the
+		// Work Agent's SSA strategy uses.
 		require.NoError(t, common.ServerSideApply(ctx, c, mcoaUIPlugin(name), nil))
 
 		got := getUIPlugin(t, ctx, c, name)
@@ -113,9 +104,8 @@ func TestUIPlugin_ServerSideApply(t *testing.T) {
 		require.True(t, found)
 		assert.True(t, inc, "MCOA must assert its own incidents value via ForceOwnership")
 
-		// Field ownership is tracked per manager (the "SSA tracks ownership per
-		// field" guarantee): clusterHealthAnalyzer.enabled stays with external-admin
-		// while incidents.enabled transfers to MCOA.
+		// Ownership is tracked per field: clusterHealthAnalyzer stays with
+		// external-admin, incidents transfers to MCOA.
 		assert.Equal(t, "external-admin", fieldManagerFor(t, got, "f:monitoring", "f:clusterHealthAnalyzer", "f:enabled"),
 			"clusterHealthAnalyzer must remain owned by the external manager")
 		assert.Equal(t, addoncfg.Name, fieldManagerFor(t, got, "f:monitoring", "f:incidents", "f:enabled"),
@@ -130,10 +120,8 @@ func TestUIPlugin_ServerSideApply(t *testing.T) {
 		assert.Equal(t, "Monitoring", typ)
 	})
 
-	// Negative control: the addon-framework default (full-object Update), which
-	// is what the fix replaces, prunes the externally-owned clusterHealthAnalyzer.
-	// This proves the test above would have caught the original bug and that the
-	// CRD schema does not mask the pruning.
+	// Negative control: the pre-fix default full-object Update prunes the
+	// externally-owned clusterHealthAnalyzer.
 	t.Run("negative control: full-object update strips clusterHealthAnalyzer", func(t *testing.T) {
 		te := SetupTestEnv(t)
 		ctx := context.Background()
@@ -141,9 +129,7 @@ func TestUIPlugin_ServerSideApply(t *testing.T) {
 
 		applyExternalUIPlugin(t, ctx, c, name)
 
-		// Mimic a full-replace update: Get into the typed object (which cannot
-		// hold clusterHealthAnalyzer), overwrite the spec with MCOA's fields and
-		// PUT. This is the pre-fix behavior.
+		// Mimic a full-replace update: overwrite the spec and PUT.
 		existing := &uiplugin.UIPlugin{}
 		require.NoError(t, c.Get(ctx, client.ObjectKey{Name: name}, existing))
 		existing.Spec = mcoaUIPlugin(name).Spec
@@ -172,10 +158,9 @@ func TestUIPlugin_ServerSideApply(t *testing.T) {
 	})
 }
 
-// fieldManagerFor returns the name of the manager that owns the leaf addressed
-// by the given key path under f:spec, read from metadata.managedFields. The full
-// path must be present (an empty intermediate map left behind after another
-// manager took the leaf does not count as ownership).
+// fieldManagerFor returns the manager owning the leaf at the given path under
+// f:spec, per metadata.managedFields. The full path must be present; an empty
+// intermediate map does not count as ownership.
 func fieldManagerFor(t *testing.T, obj *unstructured.Unstructured, specPath ...string) string {
 	t.Helper()
 	for _, mf := range obj.GetManagedFields() {
