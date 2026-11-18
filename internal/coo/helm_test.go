@@ -124,7 +124,7 @@ func Test_COOHelmRendering(t *testing.T) {
 			cv: []addonapiv1beta1.CustomizedVariable{
 				{
 					Name:  addon.KeyPlatformIncidentDetection,
-					Value: "uiplugins.v1alpha1.observability.openshift.io",
+					Value: "true",
 				},
 			},
 			expectedFunc: func(t *testing.T, objects []runtime.Object) {
@@ -145,7 +145,7 @@ func Test_COOHelmRendering(t *testing.T) {
 			cv: []addonapiv1beta1.CustomizedVariable{
 				{
 					Name:  addon.KeyPlatformIncidentDetection,
-					Value: "uiplugins.v1alpha1.observability.openshift.io",
+					Value: "true",
 				},
 				{
 					Name:  addon.KeyCOOCatalogSource,
@@ -173,9 +173,9 @@ func Test_COOHelmRendering(t *testing.T) {
 			name:  "hub with metrics UI renders no Perses resources from Helm",
 			isHub: true,
 			cv: []addonapiv1beta1.CustomizedVariable{
-				{Name: "platformMetricsCollection", Value: "prometheusagents.v1alpha1.monitoring.rhobs"},
+				{Name: addon.KeyPlatformMetricsCollection, Value: "true"},
 				{Name: addon.KeyMetricsHubHostname, Value: "metrics.hub.com"},
-				{Name: "platformMetricsUI", Value: "uiplugins.v1alpha1.observability.openshift.io"},
+				{Name: addon.KeyPlatformMetricsUI, Value: "true"},
 			},
 			expectedFunc: func(t *testing.T, objects []runtime.Object) {
 				for _, o := range objects {

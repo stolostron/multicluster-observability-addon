@@ -82,38 +82,48 @@ metadata:
   namespace: open-cluster-management-observability
 spec:
   customizedVariables:
+  # Metrics hub hostname (required when metrics collection is enabled; must be resolvable from spoke clusters)
+  - name: metricsHubHostname
+    value: obs-metrics.apps.hub.example.com
   # Platform Observability
+  - name: platformMetricsCollection
+    value: "true"
   - name: platformLogsCollection
-    value: clusterlogforwarders.v1.observability.openshift.io
+    value: "true"
   # User Workloads Observability
+  - name: userWorkloadMetricsCollection
+    value: "true"
   - name: userWorkloadLogsCollection
-    value: clusterlogforwarders.v1.observability.openshift.io
+    value: "true"
   - name: userWorkloadTracesCollection
-    value: opentelemetrycollectors.v1beta1.opentelemetry.io
+    value: "true"
   - name: userWorkloadInstrumentation
-    value: instrumentations.v1alpha1.opentelemetry.io
+    value: "true"
 ``` 
 
-Supported keys are:
-- `platformLogsCollection`: Supports values `clusterlogforwarders.v1.observability.openshift.io`
-- `userWorkloadLogsCollection`: Supports values `clusterlogforwarders.v1.observability.openshift.io`
-- `userWorkloadTracesCollection`: Supports values `opentelemetrycollectors.v1beta1.opentelemetry.io`
-- `userWorkloadTracesInstrumentation`: Supports values `instrumentations.v1alpha1.opentelemetry.io`
+Feature flags accept boolean values (`"true"`, `"enabled"`, `"false"`, `"disabled"`, or `""` to disable), as well as backward-compatible legacy Kubernetes API resource strings where indicated:
 
-__Note__: Some keys can hold multiple values separated by semicolon to support multiple data collection capabilities in parallel, e.g:
+| Key | Accepted Boolean Values | Legacy API Group Resource |
+|---|---|---|
+| `platformMetricsCollection` | `true`, `enabled`, `false`, `disabled`, `""` | `prometheusagents.v1alpha1.monitoring.rhobs` |
+| `platformMetricsAlerts` | `true`, `enabled`, `false`, `disabled`, `""` | - |
+| `platformLogsCollection` | `true`, `enabled`, `false`, `disabled`, `""` | `clusterlogforwarders.v1.observability.openshift.io` |
+| `platformIncidentDetection` | `true`, `enabled`, `false`, `disabled`, `""` | `uiplugins.v1alpha1.observability.openshift.io` |
+| `platformMetricsUI` | `true`, `enabled`, `false`, `disabled`, `""` | `uiplugins.v1alpha1.observability.openshift.io` |
+| `platformNamespaceRightSizing` | `true`, `enabled`, `false`, `disabled`, `""` | - |
+| `platformVirtualizationRightSizing` | `true`, `enabled`, `false`, `disabled`, `""` | - |
+| `platformWorkloadRightSizing` | `true`, `enabled`, `false`, `disabled`, `""` | - |
+| `platformPodRightSizing` | `true`, `enabled`, `false`, `disabled`, `""` | - |
+| `rightSizingDelegated` | `true`, `enabled`, `false`, `disabled`, `""` | - |
+| `userWorkloadMetricsCollection` | `true`, `enabled`, `false`, `disabled`, `""` | `prometheusagents.v1alpha1.monitoring.rhobs` |
+| `userWorkloadMetricsAlerts` | `true`, `enabled`, `false`, `disabled`, `""` | - |
+| `userWorkloadLogsCollection` | `true`, `enabled`, `false`, `disabled`, `""` | `clusterlogforwarders.v1.observability.openshift.io` |
+| `userWorkloadTracesCollection` | `true`, `enabled`, `false`, `disabled`, `""` | `opentelemetrycollectors.v1beta1.opentelemetry.io` |
+| `userWorkloadInstrumentation` | `true`, `enabled`, `false`, `disabled`, `""` | `instrumentations.v1alpha1.opentelemetry.io` |
 
-```yaml
-apiVersion: addon.open-cluster-management.io/v1beta1
-kind: AddOnDeploymentConfig
-metadata:
-  name: multicluster-observability-addon
-  namespace: open-cluster-management-observability
-spec:
-  customizedVariables:
-  # User Workloads Observability with multiple collectors
-  - name: userWorkloadLogsCollection
-    value: clusterlogforwarders.v1.observability.openshift.io;opentelemetrycollectors.v1beta1.opentelemetry.io
-```
+> **Notes on configuration behavior:**
+> - **Metrics Dependency:** Enabling either `platformMetricsCollection` or `userWorkloadMetricsCollection` requires `metricsHubHostname` to be configured. If omitted or empty while metrics collection is enabled, configuration validation returns a missing dependency error (`ErrMissingDependency`). For managed spoke clusters, this must be an externally resolvable route or ingress endpoint on the hub (e.g., `obs-metrics.apps.hub.example.com`). A cluster-local `.svc` domain (e.g., `metrics-hub.openshift-monitoring.svc`) only resolves when the hub cluster is scraping and forwarding to its own local receiver.
+> - **Right-Sizing Defaults:** `platformNamespaceRightSizing` and `platformVirtualizationRightSizing` are enabled by default during bootstrap. To disable them, you must explicitly set them to `"false"`, `"disabled"`, or `""`. Omitting them from `customizedVariables` leaves them enabled.
 
 The addon installation is managed by the addon-manager. This means that users
 don't need to explicitly create resources to install the addon on spoke

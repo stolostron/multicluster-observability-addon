@@ -155,7 +155,7 @@ spec:
   - name: metricsHubHostname
     value: "https://hub-prometheus.open-cluster-management-observability.svc:8443"
   - name: platformMetricsCollection
-    value: prometheusagents.v1alpha1.monitoring.rhobs
+    value: "true"
   - name: platformNamespaceRightSizing
     value: disabled
   - name: platformVirtualizationRightSizing
