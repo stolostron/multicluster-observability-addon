@@ -67,10 +67,12 @@ verify-dockerfile-labels: ## Verify Dockerfile.Konflux RHEL version consistency
 lint: $(GOLANGCI_LINT) verify-dockerfile-labels ## Run golangci-lint and dockerfile verification
 	$(GOLANGCI_LINT) config verify
 	$(GOLANGCI_LINT) run --timeout=5m ./...
+	cd pkg/perses && $(GOLANGCI_LINT) run --timeout=5m ./...
 
 .PHONY: lint-fix
 lint-fix: $(GOLANGCI_LINT) ## Attempt to automatically fix lint issues in source code.
 	$(GOLANGCI_LINT) run --fix --timeout=5m ./...
+	cd pkg/perses && $(GOLANGCI_LINT) run --fix --timeout=5m ./...
 
 .PHONY: fmt
 fmt: lint-fix
@@ -78,6 +80,7 @@ fmt: lint-fix
 .PHONY: test
 test:
 	go test ./internal/...
+	cd pkg/perses && go test ./...
 
 .PHONY: prepare-bin
 prepare-bin:
