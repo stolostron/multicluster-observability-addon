@@ -10,7 +10,7 @@ import (
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	imanifests "github.com/stolostron/multicluster-observability-addon/internal/analytics/incident-detection/manifests"
-	rsperses "github.com/stolostron/multicluster-observability-addon/internal/perses/dashboards/rightsizing"
+	rsperses "github.com/stolostron/multicluster-observability-addon/pkg/perses/dashboards/rightsizing"
 	"github.com/stolostron/multicluster-observability-addon/pkg/perses/dashboards/acm"
 	hcp "github.com/stolostron/multicluster-observability-addon/pkg/perses/dashboards/acm/hosted-control-plane"
 	compute "github.com/stolostron/multicluster-observability-addon/pkg/perses/dashboards/acm/k8s/compute"

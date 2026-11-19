@@ -35,13 +35,10 @@ require (
 	github.com/perses/perses-operator v0.2.0
 	github.com/perses/plugins/prometheus v0.57.1
 	github.com/perses/plugins/statchart v0.12.1
-	github.com/perses/plugins/staticlistvariable v0.8.1
-	github.com/perses/plugins/table v0.11.3-0.20260416092358-50d24073dacc
 	github.com/perses/plugins/timeserieschart v0.12.1
 	github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring v0.90.1-rhobs1
 	github.com/rhobs/observability-operator/pkg/apis v0.0.0-20250902133632-f98bd8a20a80
 	github.com/thanos-community/thanos-operator v0.0.0-20260313095634-17889a0e1c1a
-	golang.org/x/text v0.41.0
 )
 
 require (
@@ -61,7 +58,10 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.3.1 // indirect
 	github.com/perses/plugins/barchart v0.11.1 // indirect
 	github.com/perses/plugins/piechart v0.13.2-0.20260326134814-37e86f6b1c58 // indirect
+	github.com/perses/plugins/staticlistvariable v0.8.1 // indirect
+	github.com/perses/plugins/table v0.11.3-0.20260416092358-50d24073dacc // indirect
 	github.com/prometheus/otlptranslator v1.0.0 // indirect
+	golang.org/x/text v0.41.0 // indirect
 )
 
 require (
@@ -128,7 +128,7 @@ require (
 	github.com/openshift/api v0.0.0-20260619095050-5346161d1bf2
 	github.com/perses/common v0.30.2 // indirect
 	github.com/perses/plugins/gaugechart v0.12.1 // indirect
-	github.com/perses/plugins/markdown v0.11.1
+	github.com/perses/plugins/markdown v0.11.1 // indirect
 	github.com/perses/promql-builder v0.2.1-0.20260106092606-e4909fea9c57
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
