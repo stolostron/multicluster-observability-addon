@@ -587,7 +587,7 @@ func TestReconcileAgentWithRegistries(t *testing.T) {
 		WithObjects(cmao, imagesCM).
 		Build()
 
-	images, err := config.GetImageOverrides(context.Background(), fakeClient, opts.Registries, klog.Background())
+	images, err := config.GetImageOverrides(context.Background(), fakeClient, opts.Registries, nil, klog.Background())
 	require.NoError(t, err)
 
 	d := DefaultStackResources{

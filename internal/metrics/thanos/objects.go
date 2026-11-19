@@ -39,16 +39,11 @@ func (b *ObjectBuilder) Build(ctx context.Context, cluster *clusterv1.ManagedClu
 	var images config.ImageOverrides
 	if b.Client != nil {
 		var err error
-		images, err = config.GetImageOverrides(ctx, b.Client, opts.Registries, b.Logger)
+		images, err = config.GetImageOverrides(ctx, b.Client, opts.Registries, cluster, b.Logger)
 		if err != nil {
 			b.Logger.Error(err, "failed to get image overrides, will use default images")
 			images = config.ImageOverrides{}
 		}
-	}
-
-	// Apply per-cluster registry overrides from ManagedCluster annotation
-	if clusterRegs := config.ParseClusterImageRegistries(cluster); clusterRegs != nil {
-		images.ApplyClusterRegistryOverrides(clusterRegs.Registries)
 	}
 
 	store := b.buildStore(opts)

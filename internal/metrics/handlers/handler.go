@@ -76,17 +76,18 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1beta1.Man
 		o.Logger.V(2).Info("Vendor for the managed cluster is overridden. This annotation is for testing prupose only", "managedcluster", managedCluster.Name, "newVendor", fakeVendor)
 	}
 
-	// Fetch image overrides
+	// Fetch image overrides (includes the per-cluster registry overrides from
+	// the ManagedCluster annotation)
 	var err error
-	ret.Images, err = config.GetImageOverrides(ctx, o.Client, opts.Registries, o.Logger)
+	ret.Images, err = config.GetImageOverrides(ctx, o.Client, opts.Registries, managedCluster, o.Logger)
 	if err != nil {
 		return ret, fmt.Errorf("failed to get image overrides: %w", err)
 	}
 
-	// Apply per-cluster registry overrides from ManagedCluster annotation
+	// The cluster registries are still needed for the pull secret and for
+	// rewriting images embedded in the fetched configuration resources.
 	clusterRegs := config.ParseClusterImageRegistries(managedCluster)
 	if clusterRegs != nil {
-		ret.Images.ApplyClusterRegistryOverrides(clusterRegs.Registries)
 		if clusterRegs.PullSecret != "" {
 			if psErr := o.addClusterPullSecret(ctx, &ret.Secrets, clusterRegs.PullSecret); psErr != nil {
 				o.Logger.Error(psErr, "failed to add custom pull secret from ManagedCluster annotation, using default")
@@ -150,8 +151,8 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1beta1.Man
 
 	// The agents are copied from the hub-wide default agents, whose images are set once
 	// for all clusters, so the per-cluster overrides above do not reach them.
-	applyClusterRegistriesToAgent(ret.Platform.PrometheusAgent, clusterRegs)
-	applyClusterRegistriesToAgent(ret.UserWorkloads.PrometheusAgent, clusterRegs)
+	clusterRegs.ApplyToPrometheusAgent(ret.Platform.PrometheusAgent)
+	clusterRegs.ApplyToPrometheusAgent(ret.UserWorkloads.PrometheusAgent)
 
 	if isHypershiftCluster {
 		if opts.UserWorkloads.Metrics.CollectionEnabled {
@@ -308,24 +309,6 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1beta1.Man
 	}
 
 	return ret, nil
-}
-
-// applyClusterRegistriesToAgent applies the cluster's registry prefix overrides to
-// the images of the agent: the Prometheus image and the extra containers, such as
-// the kube-rbac-proxy sidecar.
-func applyClusterRegistriesToAgent(agent *cooprometheusv1alpha1.PrometheusAgent, clusterRegs *config.ClusterImageRegistries) {
-	if agent == nil || clusterRegs == nil || len(clusterRegs.Registries) == 0 {
-		return
-	}
-	if agent.Spec.Image != nil {
-		agent.Spec.Image = ptr.To(clusterRegs.OverrideImage(*agent.Spec.Image))
-	}
-	for i := range agent.Spec.Containers {
-		agent.Spec.Containers[i].Image = clusterRegs.OverrideImage(agent.Spec.Containers[i].Image)
-	}
-	for i := range agent.Spec.InitContainers {
-		agent.Spec.InitContainers[i].Image = clusterRegs.OverrideImage(agent.Spec.InitContainers[i].Image)
-	}
 }
 
 // buildPrometheusAgent abstracts the logic of building a Prometheus agent for platform or user workloads

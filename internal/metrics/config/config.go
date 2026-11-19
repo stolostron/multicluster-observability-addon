@@ -9,9 +9,11 @@ import (
 
 	"github.com/go-logr/logr"
 	hyperv1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
+	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -114,7 +116,15 @@ type ImageOverrides struct {
 	MemcachedExporter          string `json:"memcached_exporter"`
 }
 
-func GetImageOverrides(ctx context.Context, c client.Client, registries []addonapiv1beta1.ImageMirror, logger logr.Logger) (ImageOverrides, error) {
+// GetImageOverrides returns the addon image overrides, combining the
+// images-list ConfigMap, full-image overrides from the AddOnDeploymentConfig
+// registries, and per-cluster registry overrides from the ManagedCluster
+// image-registries annotation. The cluster annotation takes precedence: it
+// declares which registries the cluster can actually reach (e.g. in
+// disconnected environments), so it is authoritative for the sources it
+// claims, and the AODC overrides apply only to images the annotation did not
+// claim. A nil cluster skips the cluster-annotation overrides.
+func GetImageOverrides(ctx context.Context, c client.Client, registries []addonapiv1beta1.ImageMirror, cluster *clusterv1.ManagedCluster, logger logr.Logger) (ImageOverrides, error) {
 	ret := ImageOverrides{}
 	// Get the ACM images overrides
 	imagesList := &corev1.ConfigMap{}
@@ -141,24 +151,34 @@ func GetImageOverrides(ctx context.Context, c client.Client, registries []addona
 		return ret, fmt.Errorf("%w: %+v", ErrMissingImageOverride, ret)
 	}
 
-	// Apply registry overrides
-	if len(registries) > 0 {
-		ret.PrometheusConfigReloader = overrideImage(ret.PrometheusConfigReloader, registries, logger)
-		ret.KubeRBACProxy = overrideImage(ret.KubeRBACProxy, registries, logger)
-		ret.CooPrometheusOperatorImage = overrideImage(ret.CooPrometheusOperatorImage, registries, logger)
-		ret.KubeStateMetrics = overrideImage(ret.KubeStateMetrics, registries, logger)
-		ret.NodeExporter = overrideImage(ret.NodeExporter, registries, logger)
-		ret.Prometheus = overrideImage(ret.Prometheus, registries, logger)
-		ret.EndpointMonitoringOperator = overrideImage(ret.EndpointMonitoringOperator, registries, logger)
-		if ret.ThanosOperator != "" {
-			ret.ThanosOperator = overrideImage(ret.ThanosOperator, registries, logger)
+	// Resolve overrides per image: the cluster annotation first (matching
+	// against the original image), then the AODC registries for images the
+	// annotation did not claim.
+	clusterRegs := ParseClusterImageRegistries(cluster)
+	resolve := func(image string) string {
+		if clusterRegs != nil {
+			if overridden := overrideImageByRegistry(image, clusterRegs.Registries); overridden != image {
+				return overridden
+			}
 		}
-		if ret.Memcached != "" {
-			ret.Memcached = overrideImage(ret.Memcached, registries, logger)
-		}
-		if ret.MemcachedExporter != "" {
-			ret.MemcachedExporter = overrideImage(ret.MemcachedExporter, registries, logger)
-		}
+		return overrideImage(image, registries, logger)
+	}
+
+	ret.PrometheusConfigReloader = resolve(ret.PrometheusConfigReloader)
+	ret.KubeRBACProxy = resolve(ret.KubeRBACProxy)
+	ret.CooPrometheusOperatorImage = resolve(ret.CooPrometheusOperatorImage)
+	ret.KubeStateMetrics = resolve(ret.KubeStateMetrics)
+	ret.NodeExporter = resolve(ret.NodeExporter)
+	ret.Prometheus = resolve(ret.Prometheus)
+	ret.EndpointMonitoringOperator = resolve(ret.EndpointMonitoringOperator)
+	if ret.ThanosOperator != "" {
+		ret.ThanosOperator = resolve(ret.ThanosOperator)
+	}
+	if ret.Memcached != "" {
+		ret.Memcached = resolve(ret.Memcached)
+	}
+	if ret.MemcachedExporter != "" {
+		ret.MemcachedExporter = resolve(ret.MemcachedExporter)
 	}
 
 	return ret, nil
@@ -262,6 +282,25 @@ func (c *ClusterImageRegistries) OverrideImage(image string) string {
 		return image
 	}
 	return overrideImageByRegistry(image, c.Registries)
+}
+
+// ApplyToPrometheusAgent applies the cluster's registry prefix overrides to
+// the images of the given PrometheusAgent: the Prometheus image and the extra
+// containers, such as the kube-rbac-proxy sidecar. It is a no-op on a nil
+// agent.
+func (c *ClusterImageRegistries) ApplyToPrometheusAgent(agent *cooprometheusv1alpha1.PrometheusAgent) {
+	if c == nil || agent == nil || len(c.Registries) == 0 {
+		return
+	}
+	if agent.Spec.Image != nil {
+		agent.Spec.Image = ptr.To(c.OverrideImage(*agent.Spec.Image))
+	}
+	for i := range agent.Spec.Containers {
+		agent.Spec.Containers[i].Image = c.OverrideImage(agent.Spec.Containers[i].Image)
+	}
+	for i := range agent.Spec.InitContainers {
+		agent.Spec.InitContainers[i].Image = c.OverrideImage(agent.Spec.InitContainers[i].Image)
+	}
 }
 
 // ApplyClusterRegistryOverrides applies registry-level prefix overrides

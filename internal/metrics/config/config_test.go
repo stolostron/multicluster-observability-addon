@@ -42,6 +42,7 @@ func TestGetImageOverrides(t *testing.T) {
 	tests := []struct {
 		name       string
 		registries []addonapiv1beta1.ImageMirror
+		cluster    *clusterv1.ManagedCluster
 		expected   ImageOverrides
 	}{
 		{
@@ -115,11 +116,88 @@ func TestGetImageOverrides(t *testing.T) {
 				EndpointMonitoringOperator: "quay.io/stolostron/endpoint-monitoring-operator:v1.0.0",
 			},
 		},
+		{
+			// The same registry-level source that the AODC path ignores is
+			// applied when it comes from the ManagedCluster annotation.
+			name: "cluster annotation registry override",
+			cluster: &clusterv1.ManagedCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cluster1",
+					Annotations: map[string]string{
+						clusterv1.ClusterImageRegistriesAnnotationKey: `{"registries":[{"mirror":"registry.example.com","source":"quay.io"}]}`,
+					},
+				},
+			},
+			expected: ImageOverrides{
+				PrometheusConfigReloader:   "registry.example.com/prometheus-operator/prometheus-config-reloader:v0.60.0",
+				KubeRBACProxy:              "registry.example.com/brancz/kube-rbac-proxy:v0.14.0",
+				CooPrometheusOperatorImage: "registry.example.com/rhobs/obo-prometheus-operator:v0.0.1",
+				KubeStateMetrics:           "k8s.gcr.io/kube-state-metrics/kube-state-metrics:v2.0.0",
+				NodeExporter:               "registry.example.com/prometheus/node-exporter:v1.0.0",
+				Prometheus:                 "registry.example.com/prometheus/prometheus:v2.0.0",
+				EndpointMonitoringOperator: "registry.example.com/stolostron/endpoint-monitoring-operator:v1.0.0",
+			},
+		},
+		{
+			// Disconnected cluster: the annotation's source overlaps an AODC
+			// full-image pin, but the cluster can only reach its local
+			// registry, so the annotation must win.
+			name: "cluster annotation wins over AODC pin",
+			registries: []addonapiv1beta1.ImageMirror{
+				{
+					Source: "quay.io/prometheus/prometheus",
+					Mirror: "corp-mirror.example.com/prometheus",
+				},
+			},
+			cluster: &clusterv1.ManagedCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "disconnected-cluster",
+					Annotations: map[string]string{
+						clusterv1.ClusterImageRegistriesAnnotationKey: `{"registries":[{"mirror":"local-registry.dmz.corp","source":"quay.io"}]}`,
+					},
+				},
+			},
+			expected: ImageOverrides{
+				PrometheusConfigReloader:   "local-registry.dmz.corp/prometheus-operator/prometheus-config-reloader:v0.60.0",
+				KubeRBACProxy:              "local-registry.dmz.corp/brancz/kube-rbac-proxy:v0.14.0",
+				CooPrometheusOperatorImage: "local-registry.dmz.corp/rhobs/obo-prometheus-operator:v0.0.1",
+				KubeStateMetrics:           "k8s.gcr.io/kube-state-metrics/kube-state-metrics:v2.0.0",
+				NodeExporter:               "local-registry.dmz.corp/prometheus/node-exporter:v1.0.0",
+				Prometheus:                 "local-registry.dmz.corp/prometheus/prometheus:v2.0.0",
+				EndpointMonitoringOperator: "local-registry.dmz.corp/stolostron/endpoint-monitoring-operator:v1.0.0",
+			},
+		},
+		{
+			name: "AODC override applies when the cluster annotation does not claim the image",
+			registries: []addonapiv1beta1.ImageMirror{
+				{
+					Source: "quay.io/prometheus/prometheus",
+					Mirror: "registry.example.com/prometheus/prometheus",
+				},
+			},
+			cluster: &clusterv1.ManagedCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cluster1",
+					Annotations: map[string]string{
+						clusterv1.ClusterImageRegistriesAnnotationKey: `{"registries":[{"mirror":"registry.stage.redhat.io/rhacm2","source":"registry.redhat.io/rhacm2"}]}`,
+					},
+				},
+			},
+			expected: ImageOverrides{
+				PrometheusConfigReloader:   "quay.io/prometheus-operator/prometheus-config-reloader:v0.60.0",
+				KubeRBACProxy:              "quay.io/brancz/kube-rbac-proxy:v0.14.0",
+				CooPrometheusOperatorImage: "quay.io/rhobs/obo-prometheus-operator:v0.0.1",
+				KubeStateMetrics:           "k8s.gcr.io/kube-state-metrics/kube-state-metrics:v2.0.0",
+				NodeExporter:               "quay.io/prometheus/node-exporter:v1.0.0",
+				Prometheus:                 "registry.example.com/prometheus/prometheus:v2.0.0",
+				EndpointMonitoringOperator: "quay.io/stolostron/endpoint-monitoring-operator:v1.0.0",
+			},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := GetImageOverrides(context.Background(), client, tt.registries, logr.Discard())
+			got, err := GetImageOverrides(context.Background(), client, tt.registries, tt.cluster, logr.Discard())
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected, got)
 		})

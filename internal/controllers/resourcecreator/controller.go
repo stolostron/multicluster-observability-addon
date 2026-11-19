@@ -121,9 +121,10 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, fmt.Errorf("failed to get the ClusterManagementAddOn: %w", err)
 	}
 
-	// Reconcile metrics resources
+	// Reconcile metrics resources. The default-stack resources are not
+	// per-cluster, so no ManagedCluster annotation overrides apply here.
 	objs := []common.DefaultConfig{}
-	images, err := mconfig.GetImageOverrides(ctx, r.Client, opts.Registries, r.Log)
+	images, err := mconfig.GetImageOverrides(ctx, r.Client, opts.Registries, nil, r.Log)
 	if err != nil && !errors.IsNotFound(err) {
 		return ctrl.Result{}, fmt.Errorf("failed to get image overrides: %w", err)
 	}
