@@ -23,6 +23,12 @@ jobs:
       with:
         version: v2.11.4
         args: --timeout=4m
+    - name: Lint pkg/perses submodule
+      uses: golangci/golangci-lint-action@v9
+      with:
+        version: v2.11.4
+        args: --timeout=4m
+        working-directory: pkg/perses
 
   test:
     name: test
@@ -38,6 +44,9 @@ jobs:
       id: go
     - name: Run tests
       run: go test -coverprofile=profile.cov ./...
+    - name: Run pkg/perses submodule tests
+      run: go test ./...
+      working-directory: pkg/perses
     - name: Send coverage
       uses: shogo82148/actions-goveralls@v1
       with:
