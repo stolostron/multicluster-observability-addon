@@ -214,7 +214,13 @@ func TestBuildOptionsRawMetrics(t *testing.T) {
 	assert.Equal(t, "stack-namespace", patch.Namespace)
 	assert.Equal(t, "stack-name", patch.Name)
 	require.Len(t, patch.RemoteWriteSpecs, 1)
-	assert.NotNil(t, patch.RemoteWriteSpecs[0])
+	rwSpec := patch.RemoteWriteSpecs[0]
+	require.NotNil(t, rwSpec.TLSConfig)
+	assert.Equal(t, config.GetHubMtlsCASecretName(config.GetTrimmedClusterID(clusterID)), rwSpec.TLSConfig.CA.Secret.Name)
+	assert.Equal(t, config.MTLSCASecretKey, rwSpec.TLSConfig.CA.Secret.Key)
+	assert.Equal(t, config.GetHubMtlsCertSecretName(config.GetTrimmedClusterID(clusterID)), rwSpec.TLSConfig.Cert.Secret.Name)
+	assert.Equal(t, config.MTLSCertSecretKey, rwSpec.TLSConfig.Cert.Secret.Key)
+	assert.Equal(t, config.MTLSCertKeySecretKey, rwSpec.TLSConfig.KeySecret.Key)
 }
 
 func TestBuildOptionsRawMetricsNonOCP(t *testing.T) {
@@ -390,7 +396,9 @@ func TestBuildOptionsRawMetricsNonOCP(t *testing.T) {
 	rwSpec := retOpts.PrometheusServerRemoteWrite[0]
 	assert.NotNil(t, rwSpec)
 	assert.Equal(t, config.GetHubMtlsCASecretName(config.GetTrimmedClusterID(clusterID)), rwSpec.TLSConfig.CA.Secret.Name)
+	assert.Equal(t, config.MTLSCASecretKey, rwSpec.TLSConfig.CA.Secret.Key)
 	assert.Equal(t, config.GetHubMtlsCertSecretName(config.GetTrimmedClusterID(clusterID)), rwSpec.TLSConfig.Cert.Secret.Name)
+	assert.Equal(t, config.MTLSCertSecretKey, rwSpec.TLSConfig.Cert.Secret.Key)
 	assert.Equal(t, config.GetHubMtlsCertSecretName(config.GetTrimmedClusterID(clusterID)), rwSpec.TLSConfig.KeySecret.Name)
 	assert.Equal(t, config.MTLSCertKeySecretKey, rwSpec.TLSConfig.KeySecret.Key)
 }

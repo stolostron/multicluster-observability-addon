@@ -305,6 +305,7 @@ func Test_Logging_Unmanaged_CLF(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, objects, 11)
 
+	var foundCAConfigMap bool
 	for _, obj := range objects {
 		switch obj := obj.(type) {
 		case *operatorsv1alpha1.Subscription:
@@ -319,6 +320,10 @@ func Test_Logging_Unmanaged_CLF(t *testing.T) {
 			require.NotNil(t, obj.Spec.Outputs[1].Cloudwatch.Authentication.AWSAccessKey)
 			require.Equal(t, "static-authentication", obj.Spec.Outputs[0].Loki.Authentication.Token.Secret.Name)
 			require.Equal(t, "static-authentication", obj.Spec.Outputs[1].Cloudwatch.Authentication.AWSAccessKey.KeySecret.SecretName)
+			// The Loki output must keep referencing the CA ConfigMap rendered below.
+			require.NotNil(t, obj.Spec.Outputs[0].TLS)
+			require.NotNil(t, obj.Spec.Outputs[0].TLS.CA)
+			require.Equal(t, "foo", obj.Spec.Outputs[0].TLS.CA.ConfigMapName)
 			// Check name and namespace to make sure that if we change the helm
 			// manifests that we don't break the addon probes
 			require.Equal(t, addoncfg.SpokeCLFName, obj.Name)
@@ -329,10 +334,12 @@ func Test_Logging_Unmanaged_CLF(t *testing.T) {
 			}
 		case *corev1.ConfigMap:
 			if obj.Name == "foo" {
+				foundCAConfigMap = true
 				require.Equal(t, caConfigMap.Data, obj.Data)
 			}
 		}
 	}
+	require.True(t, foundCAConfigMap, "expected the CA ConfigMap in rendered objects")
 }
 
 // Test_Logging_Unmanaged tests the scenarios fo the Unamanged scenario

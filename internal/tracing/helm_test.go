@@ -119,7 +119,29 @@ func Test_Tracing_AllConfigsTogether_AllResources(t *testing.T) {
 								"otlphttp": map[string]any{},
 							},
 						},
+						"otlphttp": map[string]any{
+							"endpoint": "https://test.com",
+							"tls": map[string]any{
+								"cert_file": "/etc/tracing/otlphttp/tls.crt",
+								"key_file":  "/etc/tracing/otlphttp/tls.key",
+								"ca_file":   "/etc/tracing/otlphttp/ca.crt",
+							},
+						},
 					},
+				},
+			},
+			Volumes: []corev1.Volume{
+				{
+					Name: "tracing-otlphttp-auth",
+					Secret: &corev1.SecretVolumeSource{
+						SecretName: "tracing-otlphttp-auth",
+					},
+				},
+			},
+			VolumeMounts: []corev1.VolumeMount{
+				{
+					Name:      "tracing-otlphttp-auth",
+					MountPath: "/etc/tracing/otlphttp",
 				},
 			},
 		},
@@ -185,9 +207,9 @@ func Test_Tracing_AllConfigsTogether_AllResources(t *testing.T) {
 	// Render manifests and return them as k8s runtime objects
 	objects, err := tracingAgentAddon.Manifests(t.Context(), managedCluster, managedClusterAddOn)
 	require.NoError(t, err)
-	require.Len(t, objects, 6)
+	require.Len(t, objects, 7)
 
-	var foundSubscription bool
+	var foundSubscription, foundTLSSecret bool
 	for _, obj := range objects {
 		switch obj := obj.(type) {
 		case *otelv1beta1.OpenTelemetryCollector:
@@ -201,6 +223,7 @@ func Test_Tracing_AllConfigsTogether_AllResources(t *testing.T) {
 			require.Equal(t, addoncfg.SpokeOTELColNamespace, obj.Namespace)
 		case *corev1.Secret:
 			if obj.Name == "tracing-otlphttp-auth" {
+				foundTLSSecret = true
 				require.Equal(t, generatedSecret.Data, obj.Data)
 			}
 		case *operatorsv1alpha1.Subscription:
@@ -210,6 +233,7 @@ func Test_Tracing_AllConfigsTogether_AllResources(t *testing.T) {
 		}
 	}
 	require.True(t, foundSubscription, "expected an OTel operator Subscription in rendered objects")
+	require.True(t, foundTLSSecret, "expected the tracing TLS Secret in rendered objects")
 }
 
 type mockAODCGetter struct {

@@ -169,7 +169,8 @@ func TestHypershift_Nominal(t *testing.T) {
 		assert.Len(t, sm.Spec.Endpoints[0].RelabelConfigs, 1)
 		assert.NotEmpty(t, sm.Spec.Endpoints[0].Port)
 		assert.NotEmpty(t, sm.Spec.Endpoints[0].TargetPort.StrVal)
-		assert.NotEmpty(t, sm.Spec.Endpoints[0].TLSConfig)
+		require.NotNil(t, sm.Spec.Endpoints[0].TLSConfig)
+		assert.Equal(t, "cafile", sm.Spec.Endpoints[0].TLSConfig.CAFile)
 		assert.NotEmpty(t, sm.Spec.Selector)
 		assert.NotEmpty(t, sm.Spec.NamespaceSelector)
 	}
