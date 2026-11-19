@@ -144,6 +144,7 @@ func TestBuildOptions_ClusterImageRegistriesAgentImages(t *testing.T) {
 	testCases := map[string]struct {
 		vendor       string
 		annotation   string
+		registries   []addonapiv1beta1.ImageMirror
 		withUWL      bool
 		wantRegistry string
 	}{
@@ -168,6 +169,29 @@ func TestBuildOptions_ClusterImageRegistriesAgentImages(t *testing.T) {
 			annotation:   `{"registries":[{"mirror":"mirror.example.com/other","source":"quay.io/other"}]}`,
 			wantRegistry: source,
 		},
+		// The agent CR carries the original image, which both the AODC pin
+		// and the annotation claim; the annotation must win.
+		"annotation wins over an AODC pin on the agent image": {
+			vendor:     "GKE",
+			annotation: mirrorAnnotation,
+			registries: []addonapiv1beta1.ImageMirror{
+				{
+					Source: source + prometheus,
+					Mirror: "corp-mirror.example.com/prometheus",
+				},
+			},
+			wantRegistry: mirror,
+		},
+		// Without the annotation, the AODC pin applies to the agent image at
+		// render time.
+		"AODC pin applies to the agent image without the annotation": {
+			vendor: "GKE",
+			registries: []addonapiv1beta1.ImageMirror{
+				{Source: source + prometheus, Mirror: "corp-mirror.example.com" + prometheus},
+				{Source: source + rbacProxy, Mirror: "corp-mirror.example.com" + rbacProxy},
+			},
+			wantRegistry: "corp-mirror.example.com",
+		},
 	}
 
 	for name, tc := range testCases {
@@ -191,6 +215,7 @@ func TestBuildOptions_ClusterImageRegistriesAgentImages(t *testing.T) {
 
 			opts := addon.Options{
 				InstallNamespace: "test-install-ns",
+				Registries:       tc.registries,
 				Platform: addon.PlatformOptions{
 					Metrics: addon.MetricsOptions{
 						CollectionEnabled: true,
@@ -226,6 +251,142 @@ func TestBuildOptions_ClusterImageRegistriesAgentImages(t *testing.T) {
 				require.Len(t, agent.Spec.Containers, 1)
 				assert.Equal(t, tc.wantRegistry+rbacProxy, agent.Spec.Containers[0].Image, "agent %s sidecar image", agent.Name)
 			}
+		})
+	}
+}
+
+// TestBuildOptions_ClusterPullSecret checks that a pullSecret referenced in
+// the image-registries annotation is fetched and added under the default pull
+// secret name, and that a malformed or missing reference only logs instead of
+// failing the build.
+func TestBuildOptions_ClusterPullSecret(t *testing.T) {
+	const (
+		hubNamespace = "test-hub"
+		spokeName    = "test-spoke"
+		pullSecretNS = "custom-ns"
+		pullSecret   = "custom-pull-secret"
+	)
+	pullSecretData := map[string][]byte{corev1.DockerConfigJsonKey: []byte(`{"auths":{"local-registry.dmz.corp":{"auth":"dXNlcjpwYXNz"}}}`)}
+
+	scheme := runtime.NewScheme()
+	require.NoError(t, kubescheme.AddToScheme(scheme))
+	require.NoError(t, configv1.AddToScheme(scheme))
+	require.NoError(t, cooprometheusv1alpha1.AddToScheme(scheme))
+	require.NoError(t, cooprometheusv1.AddToScheme(scheme))
+	require.NoError(t, prometheusv1.AddToScheme(scheme))
+	require.NoError(t, clusterv1.Install(scheme))
+	require.NoError(t, addonapiv1beta1.Install(scheme))
+	require.NoError(t, workv1.Install(scheme))
+
+	customPullSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            pullSecret,
+			Namespace:       pullSecretNS,
+			ResourceVersion: "42",
+		},
+		Data: pullSecretData,
+	}
+
+	testCases := map[string]struct {
+		annotation string
+		wantSecret bool
+	}{
+		"pull secret referenced in the annotation": {
+			annotation: `{"pullSecret":"` + pullSecretNS + `.` + pullSecret + `"}`,
+			wantSecret: true,
+		},
+		"malformed pull secret reference": {
+			annotation: `{"pullSecret":"no-namespace-separator"}`,
+			wantSecret: false,
+		},
+		"missing pull secret": {
+			annotation: `{"pullSecret":"custom-ns.does-not-exist"}`,
+			wantSecret: false,
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			managedCluster := &clusterv1.ManagedCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        spokeName,
+					Labels:      map[string]string{"vendor": "GKE"},
+					Annotations: map[string]string{clusterv1.ClusterImageRegistriesAnnotationKey: tc.annotation},
+				},
+			}
+
+			mcAddon := &addonapiv1beta1.ManagedClusterAddOn{
+				ObjectMeta: metav1.ObjectMeta{Name: addoncfg.Name, Namespace: spokeName},
+			}
+
+			opts := addon.Options{
+				InstallNamespace: "test-install-ns",
+				Platform: addon.PlatformOptions{
+					Metrics: addon.MetricsOptions{
+						CollectionEnabled: true,
+						HubEndpoint:       url.URL{Host: "hub-endpoint"},
+					},
+				},
+			}
+
+			builder := &OptionsBuilder{
+				Client: fake.NewClientBuilder().
+					WithScheme(scheme).
+					WithObjects(
+						&configv1.ClusterVersion{
+							ObjectMeta: metav1.ObjectMeta{Name: "version"},
+							Spec:       configv1.ClusterVersionSpec{ClusterID: "hub-cluster-id"},
+						},
+						&corev1.ConfigMap{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      config.ImagesConfigMapObjKey.Name,
+								Namespace: config.ImagesConfigMapObjKey.Namespace,
+							},
+							Data: map[string]string{
+								"obo_prometheus_rhel9_operator": "registry.redhat.io/rhacm2/obo-prometheus-rhel9-operator@sha256:cccc",
+								"kube_rbac_proxy":               "registry.redhat.io/rhacm2/kube-rbac-proxy-rhel9@sha256:bbbb",
+								"prometheus_config_reloader":    "registry.redhat.io/rhacm2/prometheus-config-reloader-rhel9@sha256:dddd",
+								"kube_state_metrics":            "registry.redhat.io/rhacm2/kube-state-metrics-rhel9@sha256:eeee",
+								"node_exporter":                 "registry.redhat.io/rhacm2/node-exporter-rhel9@sha256:ffff",
+								"prometheus":                    "registry.redhat.io/rhacm2/prometheus-rhel9@sha256:aaaa",
+								"endpoint_monitoring_operator":  "registry.redhat.io/rhacm2/endpoint-monitoring-rhel9-operator@sha256:1111",
+							},
+						},
+						&corev1.Secret{
+							ObjectMeta: metav1.ObjectMeta{Name: config.HubCASecretName, Namespace: config.HubInstallNamespace},
+							Data:       map[string][]byte{"ca.crt": []byte("test-ca")},
+						},
+						&corev1.Secret{
+							ObjectMeta: metav1.ObjectMeta{Name: config.ClientCertSecretName, Namespace: config.HubInstallNamespace},
+							Data:       map[string][]byte{"tls.crt": []byte("test-cert"), "tls.key": []byte("test-key")},
+						},
+						&corev1.Secret{
+							ObjectMeta: metav1.ObjectMeta{Name: config.AlertmanagerAccessorSecretName, Namespace: config.HubInstallNamespace},
+							Data:       map[string][]byte{"key": []byte("data"), "pass": []byte("data")},
+						},
+						customPullSecret,
+					).
+					Build(),
+				Logger: logr.Discard(),
+			}
+			retOpts, err := builder.Build(t.Context(), mcAddon, managedCluster, opts)
+			require.NoError(t, err)
+
+			var pull *corev1.Secret
+			for _, s := range retOpts.Secrets {
+				if s.Name == "open-cluster-management-image-pull-credentials" {
+					pull = s
+				}
+			}
+
+			if !tc.wantSecret {
+				assert.Nil(t, pull, "no pull secret should be added")
+				return
+			}
+			require.NotNil(t, pull, "the custom pull secret should be added under the default name")
+			assert.Empty(t, pull.Namespace, "namespace is set by the addon framework at deploy time")
+			assert.Empty(t, pull.ResourceVersion, "resource version must be cleared for redeployment")
+			assert.Equal(t, pullSecretData, pull.Data, "the custom pull secret data must be preserved")
 		})
 	}
 }

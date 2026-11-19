@@ -156,12 +156,7 @@ func GetImageOverrides(ctx context.Context, c client.Client, registries []addona
 	// annotation did not claim.
 	clusterRegs := ParseClusterImageRegistries(cluster)
 	resolve := func(image string) string {
-		if clusterRegs != nil {
-			if overridden := overrideImageByRegistry(image, clusterRegs.Registries); overridden != image {
-				return overridden
-			}
-		}
-		return overrideImage(image, registries, logger)
+		return ResolveImage(image, clusterRegs, registries, logger)
 	}
 
 	ret.PrometheusConfigReloader = resolve(ret.PrometheusConfigReloader)
@@ -275,31 +270,42 @@ func ParseClusterImageRegistries(cluster *clusterv1.ManagedCluster) *ClusterImag
 	}
 }
 
-// OverrideImage applies the cluster's registry prefix overrides to a single
-// image, the same way ApplyClusterRegistryOverrides does for the images list.
-func (c *ClusterImageRegistries) OverrideImage(image string) string {
-	if c == nil {
-		return image
+// ResolveImage resolves the overrides for a single image: the per-cluster
+// registry overrides from the ManagedCluster annotation take precedence when
+// the annotation claims the image (a source prefix match, including identity
+// mappings), and the AODC full-image overrides apply only to images the
+// annotation does not claim.
+func ResolveImage(image string, clusterRegs *ClusterImageRegistries, registries []addonapiv1beta1.ImageMirror, logger logr.Logger) string {
+	if clusterRegs != nil {
+		if overridden, claimed := overrideImageByRegistry(image, clusterRegs.Registries); claimed {
+			return overridden
+		}
 	}
-	return overrideImageByRegistry(image, c.Registries)
+	return overrideImage(image, registries, logger)
 }
 
-// ApplyToPrometheusAgent applies the cluster's registry prefix overrides to
-// the images of the given PrometheusAgent: the Prometheus image and the extra
-// containers, such as the kube-rbac-proxy sidecar. It is a no-op on a nil
-// agent.
-func (c *ClusterImageRegistries) ApplyToPrometheusAgent(agent *cooprometheusv1alpha1.PrometheusAgent) {
-	if c == nil || agent == nil || len(c.Registries) == 0 {
+// ApplyToPrometheusAgent resolves the images of the given PrometheusAgent —
+// the Prometheus image and the extra containers, such as the kube-rbac-proxy
+// sidecar — with the same precedence as the images list: the cluster
+// annotation first, the AODC registries as the fallback for unclaimed
+// images. It is a no-op on a nil agent. The agent is expected to carry the
+// original (images-list) images; per-cluster resolution happens here, at
+// render time.
+func (c *ClusterImageRegistries) ApplyToPrometheusAgent(agent *cooprometheusv1alpha1.PrometheusAgent, registries []addonapiv1beta1.ImageMirror, logger logr.Logger) {
+	if agent == nil {
 		return
 	}
+	resolve := func(image string) string {
+		return ResolveImage(image, c, registries, logger)
+	}
 	if agent.Spec.Image != nil {
-		agent.Spec.Image = ptr.To(c.OverrideImage(*agent.Spec.Image))
+		agent.Spec.Image = ptr.To(resolve(*agent.Spec.Image))
 	}
 	for i := range agent.Spec.Containers {
-		agent.Spec.Containers[i].Image = c.OverrideImage(agent.Spec.Containers[i].Image)
+		agent.Spec.Containers[i].Image = resolve(agent.Spec.Containers[i].Image)
 	}
 	for i := range agent.Spec.InitContainers {
-		agent.Spec.InitContainers[i].Image = c.OverrideImage(agent.Spec.InitContainers[i].Image)
+		agent.Spec.InitContainers[i].Image = resolve(agent.Spec.InitContainers[i].Image)
 	}
 }
 
@@ -312,31 +318,45 @@ func (o *ImageOverrides) ApplyClusterRegistryOverrides(registries []addonapiv1be
 	if len(registries) == 0 {
 		return
 	}
-	o.PrometheusConfigReloader = overrideImageByRegistry(o.PrometheusConfigReloader, registries)
-	o.KubeRBACProxy = overrideImageByRegistry(o.KubeRBACProxy, registries)
-	o.CooPrometheusOperatorImage = overrideImageByRegistry(o.CooPrometheusOperatorImage, registries)
-	o.KubeStateMetrics = overrideImageByRegistry(o.KubeStateMetrics, registries)
-	o.NodeExporter = overrideImageByRegistry(o.NodeExporter, registries)
-	o.Prometheus = overrideImageByRegistry(o.Prometheus, registries)
-	o.EndpointMonitoringOperator = overrideImageByRegistry(o.EndpointMonitoringOperator, registries)
+	apply := func(image string) string {
+		overridden, _ := overrideImageByRegistry(image, registries)
+		return overridden
+	}
+	o.PrometheusConfigReloader = apply(o.PrometheusConfigReloader)
+	o.KubeRBACProxy = apply(o.KubeRBACProxy)
+	o.CooPrometheusOperatorImage = apply(o.CooPrometheusOperatorImage)
+	o.KubeStateMetrics = apply(o.KubeStateMetrics)
+	o.NodeExporter = apply(o.NodeExporter)
+	o.Prometheus = apply(o.Prometheus)
+	o.EndpointMonitoringOperator = apply(o.EndpointMonitoringOperator)
 	// overrideImageByRegistry is a no-op on empty strings, so the optional images
 	// (which may be unset in the images-list) need no guard.
-	o.ThanosOperator = overrideImageByRegistry(o.ThanosOperator, registries)
-	o.Memcached = overrideImageByRegistry(o.Memcached, registries)
-	o.MemcachedExporter = overrideImageByRegistry(o.MemcachedExporter, registries)
+	o.ThanosOperator = apply(o.ThanosOperator)
+	o.Memcached = apply(o.Memcached)
+	o.MemcachedExporter = apply(o.MemcachedExporter)
 }
 
-func overrideImageByRegistry(image string, registries []addonapiv1beta1.ImageMirror) string {
+// overrideImageByRegistry applies the cluster registry overrides to the image
+// and reports whether any registry source claimed it. A claim is a source
+// prefix match (an empty source claims every image); an identity mapping
+// (e.g. quay.io to quay.io) claims the image even though the value is
+// unchanged.
+func overrideImageByRegistry(image string, registries []addonapiv1beta1.ImageMirror) (string, bool) {
 	if image == "" {
-		return image
+		return image, false
 	}
 	overridden := image
+	claimed := false
 	for _, reg := range registries {
-		if name := registryPrefixReplace(reg.Source, reg.Mirror, image); name != image {
-			overridden = name
+		source := strings.TrimSuffix(reg.Source, "/")
+		if source == "" || strings.HasPrefix(image, source) {
+			claimed = true
+			if name := registryPrefixReplace(reg.Source, reg.Mirror, image); name != image {
+				overridden = name
+			}
 		}
 	}
-	return overridden
+	return overridden, claimed
 }
 
 func registryPrefixReplace(source, mirror, imageName string) string {

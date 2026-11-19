@@ -149,10 +149,11 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1beta1.Man
 		}
 	}
 
-	// The agents are copied from the hub-wide default agents, whose images are set once
-	// for all clusters, so the per-cluster overrides above do not reach them.
-	clusterRegs.ApplyToPrometheusAgent(ret.Platform.PrometheusAgent)
-	clusterRegs.ApplyToPrometheusAgent(ret.UserWorkloads.PrometheusAgent)
+	// The agents are copied from the hub-wide default agents, which carry the
+	// original images-list values; resolve them per cluster here (annotation
+	// first, AODC registries as the fallback), the same way as the images list.
+	clusterRegs.ApplyToPrometheusAgent(ret.Platform.PrometheusAgent, opts.Registries, o.Logger)
+	clusterRegs.ApplyToPrometheusAgent(ret.UserWorkloads.PrometheusAgent, opts.Registries, o.Logger)
 
 	if isHypershiftCluster {
 		if opts.UserWorkloads.Metrics.CollectionEnabled {

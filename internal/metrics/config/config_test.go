@@ -443,40 +443,81 @@ func TestRegistryPrefixReplace(t *testing.T) {
 	}
 }
 
-func TestClusterImageRegistriesOverrideImage(t *testing.T) {
-	regs := &ClusterImageRegistries{
+func TestResolveImage(t *testing.T) {
+	clusterRegs := &ClusterImageRegistries{
 		Registries: []addonapiv1beta1.ImageMirror{
 			{Source: "registry.redhat.io/rhacm2", Mirror: "registry.stage.redhat.io/rhacm2"},
 		},
 	}
 
 	tests := []struct {
-		name     string
-		regs     *ClusterImageRegistries
-		image    string
-		expected string
+		name        string
+		clusterRegs *ClusterImageRegistries
+		registries  []addonapiv1beta1.ImageMirror
+		image       string
+		expected    string
 	}{
 		{
-			name:     "matching source uses the mirror",
-			regs:     regs,
+			name:        "annotation claims the image and wins over the AODC pin",
+			clusterRegs: clusterRegs,
+			registries: []addonapiv1beta1.ImageMirror{
+				{Source: "registry.redhat.io/rhacm2/prometheus-rhel9", Mirror: "corp-mirror.example.com/prometheus-rhel9"},
+			},
 			image:    "registry.redhat.io/rhacm2/prometheus-rhel9@sha256:abc123",
 			expected: "registry.stage.redhat.io/rhacm2/prometheus-rhel9@sha256:abc123",
 		},
 		{
-			name:     "other registry is unchanged",
-			regs:     regs,
+			name:        "AODC applies to an image the annotation does not claim",
+			clusterRegs: clusterRegs,
+			registries: []addonapiv1beta1.ImageMirror{
+				{Source: "quay.io/prometheus/prometheus", Mirror: "registry.example.com/prometheus/prometheus"},
+			},
+			image:    "quay.io/prometheus/prometheus:v2.0.0",
+			expected: "registry.example.com/prometheus/prometheus:v2.0.0",
+		},
+		{
+			// An identity mapping claims the image without changing it, so it
+			// must still block the AODC fallback.
+			name: "identity mapping claims the image and blocks the AODC pin",
+			clusterRegs: &ClusterImageRegistries{
+				Registries: []addonapiv1beta1.ImageMirror{
+					{Source: "quay.io", Mirror: "quay.io"},
+				},
+			},
+			registries: []addonapiv1beta1.ImageMirror{
+				{Source: "quay.io/prometheus/prometheus", Mirror: "corp-mirror.example.com/prometheus"},
+			},
 			image:    "quay.io/prometheus/prometheus:v2.0.0",
 			expected: "quay.io/prometheus/prometheus:v2.0.0",
 		},
 		{
-			name:     "empty image stays empty",
-			regs:     regs,
-			image:    "",
-			expected: "",
+			name:        "annotation applies with no AODC registries",
+			clusterRegs: clusterRegs,
+			image:       "registry.redhat.io/rhacm2/prometheus-rhel9@sha256:abc123",
+			expected:    "registry.stage.redhat.io/rhacm2/prometheus-rhel9@sha256:abc123",
 		},
 		{
-			name:     "nil registries is a no-op",
-			regs:     nil,
+			name: "AODC applies with no cluster annotation",
+			registries: []addonapiv1beta1.ImageMirror{
+				{Source: "quay.io/prometheus/prometheus", Mirror: "registry.example.com/prometheus/prometheus"},
+			},
+			image:    "quay.io/prometheus/prometheus:v2.0.0",
+			expected: "registry.example.com/prometheus/prometheus:v2.0.0",
+		},
+		{
+			name:        "other registry is unchanged",
+			clusterRegs: clusterRegs,
+			image:       "quay.io/prometheus/prometheus:v2.0.0",
+			expected:    "quay.io/prometheus/prometheus:v2.0.0",
+		},
+		{
+			name:        "empty image stays empty",
+			clusterRegs: clusterRegs,
+			image:       "",
+			expected:    "",
+		},
+		{
+			name:     "no overrides at all is a no-op",
 			image:    "registry.redhat.io/rhacm2/prometheus-rhel9@sha256:abc123",
 			expected: "registry.redhat.io/rhacm2/prometheus-rhel9@sha256:abc123",
 		},
@@ -484,7 +525,7 @@ func TestClusterImageRegistriesOverrideImage(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.expected, tt.regs.OverrideImage(tt.image))
+			assert.Equal(t, tt.expected, ResolveImage(tt.image, tt.clusterRegs, tt.registries, logr.Discard()))
 		})
 	}
 }
