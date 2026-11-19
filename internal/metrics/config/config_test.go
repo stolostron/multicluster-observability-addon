@@ -286,101 +286,48 @@ func TestParseClusterImageRegistries(t *testing.T) {
 	}
 }
 
-func TestApplyClusterRegistryOverrides(t *testing.T) {
-	tests := []struct {
-		name       string
-		images     ImageOverrides
-		registries []addonapiv1beta1.ImageMirror
-		expected   ImageOverrides
-	}{
-		{
-			name: "no registries - no change",
-			images: ImageOverrides{
-				Prometheus:                 "registry.redhat.io/rhacm2/prometheus:v2.0.0",
-				EndpointMonitoringOperator: "registry.redhat.io/rhacm2/endpoint-monitoring-operator:v1.0.0",
-			},
-			registries: nil,
-			expected: ImageOverrides{
-				Prometheus:                 "registry.redhat.io/rhacm2/prometheus:v2.0.0",
-				EndpointMonitoringOperator: "registry.redhat.io/rhacm2/endpoint-monitoring-operator:v1.0.0",
-			},
+// TestGetImageOverrides_OptionalImages checks that the optional images
+// (thanos operator, memcached), which may be absent from the images-list,
+// are resolved with the same precedence when they are present.
+func TestGetImageOverrides_OptionalImages(t *testing.T) {
+	scheme := runtime.NewScheme()
+	_ = corev1.AddToScheme(scheme)
+
+	imagesCM := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      ImagesConfigMapObjKey.Name,
+			Namespace: ImagesConfigMapObjKey.Namespace,
 		},
-		{
-			name: "registry prefix override",
-			images: ImageOverrides{
-				PrometheusConfigReloader:   "registry.redhat.io/rhacm2/prometheus-config-reloader:v0.60.0",
-				KubeRBACProxy:              "registry.redhat.io/multicluster-engine/kube-rbac-proxy:v0.14.0",
-				CooPrometheusOperatorImage: "registry.redhat.io/rhacm2/obo-prometheus-operator:v0.0.1",
-				KubeStateMetrics:           "registry.redhat.io/rhacm2/kube-state-metrics:v2.0.0",
-				NodeExporter:               "registry.redhat.io/rhacm2/node-exporter:v1.0.0",
-				Prometheus:                 "registry.redhat.io/rhacm2/prometheus:v2.0.0",
-				EndpointMonitoringOperator: "registry.redhat.io/rhacm2/endpoint-monitoring-operator:v1.0.0",
-			},
-			registries: []addonapiv1beta1.ImageMirror{
-				{Source: "registry.redhat.io/rhacm2", Mirror: "registry.stage.redhat.io/rhacm2"},
-				{Source: "registry.redhat.io/multicluster-engine", Mirror: "registry.stage.redhat.io/multicluster-engine"},
-			},
-			expected: ImageOverrides{
-				PrometheusConfigReloader:   "registry.stage.redhat.io/rhacm2/prometheus-config-reloader:v0.60.0",
-				KubeRBACProxy:              "registry.stage.redhat.io/multicluster-engine/kube-rbac-proxy:v0.14.0",
-				CooPrometheusOperatorImage: "registry.stage.redhat.io/rhacm2/obo-prometheus-operator:v0.0.1",
-				KubeStateMetrics:           "registry.stage.redhat.io/rhacm2/kube-state-metrics:v2.0.0",
-				NodeExporter:               "registry.stage.redhat.io/rhacm2/node-exporter:v1.0.0",
-				Prometheus:                 "registry.stage.redhat.io/rhacm2/prometheus:v2.0.0",
-				EndpointMonitoringOperator: "registry.stage.redhat.io/rhacm2/endpoint-monitoring-operator:v1.0.0",
-			},
+		Data: map[string]string{
+			"prometheus_config_reloader":    "registry.redhat.io/rhacm2/prometheus-config-reloader-rhel9@sha256:dddd",
+			"kube_rbac_proxy":               "registry.redhat.io/multicluster-engine/kube-rbac-proxy-rhel9@sha256:bbbb",
+			"obo_prometheus_rhel9_operator": "registry.redhat.io/rhacm2/obo-prometheus-rhel9-operator@sha256:cccc",
+			"kube_state_metrics":            "registry.redhat.io/rhacm2/kube-state-metrics-rhel9@sha256:eeee",
+			"node_exporter":                 "registry.redhat.io/rhacm2/node-exporter-rhel9@sha256:ffff",
+			"prometheus":                    "registry.redhat.io/rhacm2/prometheus-rhel9@sha256:aaaa",
+			"endpoint_monitoring_operator":  "registry.redhat.io/rhacm2/endpoint-monitoring-rhel9-operator@sha256:1111",
+			"thanos_operator":               "registry.redhat.io/rhacm2/thanos-rhel9-operator@sha256:2222",
+			"memcached":                     "registry.redhat.io/rhacm2/memcached-rhel9@sha256:3333",
+			"memcached_exporter":            "registry.redhat.io/rhacm2/memcached-exporter-rhel9@sha256:4444",
 		},
-		{
-			name: "no matching prefix - no change",
-			images: ImageOverrides{
-				Prometheus:                 "quay.io/prometheus/prometheus:v2.0.0",
-				EndpointMonitoringOperator: "quay.io/stolostron/endpoint-monitoring-operator:v1.0.0",
-			},
-			registries: []addonapiv1beta1.ImageMirror{
-				{Source: "registry.redhat.io/rhacm2", Mirror: "registry.stage.redhat.io/rhacm2"},
-			},
-			expected: ImageOverrides{
-				Prometheus:                 "quay.io/prometheus/prometheus:v2.0.0",
-				EndpointMonitoringOperator: "quay.io/stolostron/endpoint-monitoring-operator:v1.0.0",
-			},
-		},
-		{
-			name: "sha256 digest images",
-			images: ImageOverrides{
-				EndpointMonitoringOperator: "registry.redhat.io/rhacm2/endpoint-monitoring-rhel9-operator@sha256:abc123",
-			},
-			registries: []addonapiv1beta1.ImageMirror{
-				{Source: "registry.redhat.io/rhacm2", Mirror: "registry.stage.redhat.io/rhacm2"},
-			},
-			expected: ImageOverrides{
-				EndpointMonitoringOperator: "registry.stage.redhat.io/rhacm2/endpoint-monitoring-rhel9-operator@sha256:abc123",
-			},
-		},
-		{
-			name: "optional thanos images",
-			images: ImageOverrides{
-				ThanosOperator:    "registry.redhat.io/rhacm2/thanos-operator:v1.0.0",
-				Memcached:         "registry.redhat.io/rhacm2/memcached:1.6.3",
-				MemcachedExporter: "registry.redhat.io/rhacm2/memcached-exporter:v0.9.0",
-			},
-			registries: []addonapiv1beta1.ImageMirror{
-				{Source: "registry.redhat.io/rhacm2", Mirror: "registry.stage.redhat.io/rhacm2"},
-			},
-			expected: ImageOverrides{
-				ThanosOperator:    "registry.stage.redhat.io/rhacm2/thanos-operator:v1.0.0",
-				Memcached:         "registry.stage.redhat.io/rhacm2/memcached:1.6.3",
-				MemcachedExporter: "registry.stage.redhat.io/rhacm2/memcached-exporter:v0.9.0",
+	}
+	client := fake.NewClientBuilder().WithScheme(scheme).WithObjects(imagesCM).Build()
+
+	cluster := &clusterv1.ManagedCluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "cluster1",
+			Annotations: map[string]string{
+				clusterv1.ClusterImageRegistriesAnnotationKey: `{"registries":[{"mirror":"registry.stage.redhat.io/rhacm2","source":"registry.redhat.io/rhacm2"}]}`,
 			},
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			images := tt.images
-			images.ApplyClusterRegistryOverrides(tt.registries)
-			assert.Equal(t, tt.expected, images)
-		})
-	}
+	got, err := GetImageOverrides(context.Background(), client, nil, cluster, logr.Discard())
+	require.NoError(t, err)
+
+	assert.Equal(t, "registry.stage.redhat.io/rhacm2/thanos-rhel9-operator@sha256:2222", got.ThanosOperator)
+	assert.Equal(t, "registry.stage.redhat.io/rhacm2/memcached-rhel9@sha256:3333", got.Memcached)
+	assert.Equal(t, "registry.stage.redhat.io/rhacm2/memcached-exporter-rhel9@sha256:4444", got.MemcachedExporter)
 }
 
 func TestRegistryPrefixReplace(t *testing.T) {

@@ -309,33 +309,6 @@ func (c *ClusterImageRegistries) ApplyToPrometheusAgent(agent *cooprometheusv1al
 	}
 }
 
-// ApplyClusterRegistryOverrides applies registry-level prefix overrides
-// (from the ManagedCluster annotation) to all images. Unlike the AODC
-// overrideImage (which only matches at image-name boundaries), this uses
-// prefix-based registry/org replacement — matching how MCO and the addon
-// framework handle the same annotation.
-func (o *ImageOverrides) ApplyClusterRegistryOverrides(registries []addonapiv1beta1.ImageMirror) {
-	if len(registries) == 0 {
-		return
-	}
-	apply := func(image string) string {
-		overridden, _ := overrideImageByRegistry(image, registries)
-		return overridden
-	}
-	o.PrometheusConfigReloader = apply(o.PrometheusConfigReloader)
-	o.KubeRBACProxy = apply(o.KubeRBACProxy)
-	o.CooPrometheusOperatorImage = apply(o.CooPrometheusOperatorImage)
-	o.KubeStateMetrics = apply(o.KubeStateMetrics)
-	o.NodeExporter = apply(o.NodeExporter)
-	o.Prometheus = apply(o.Prometheus)
-	o.EndpointMonitoringOperator = apply(o.EndpointMonitoringOperator)
-	// overrideImageByRegistry is a no-op on empty strings, so the optional images
-	// (which may be unset in the images-list) need no guard.
-	o.ThanosOperator = apply(o.ThanosOperator)
-	o.Memcached = apply(o.Memcached)
-	o.MemcachedExporter = apply(o.MemcachedExporter)
-}
-
 // overrideImageByRegistry applies the cluster registry overrides to the image
 // and reports whether any registry source claimed it. A claim is a source
 // prefix match (an empty source claims every image); an identity mapping
