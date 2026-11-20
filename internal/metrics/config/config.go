@@ -9,10 +9,13 @@ import (
 
 	"github.com/go-logr/logr"
 	hyperv1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
+	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -109,12 +112,19 @@ type ImageOverrides struct {
 	Prometheus                 string `json:"prometheus"`
 	EndpointMonitoringOperator string `json:"endpoint_monitoring_operator"`
 	ThanosOperator             string `json:"thanos_operator"`
-	ThanosStore                string `json:"thanos_store"`
 	Memcached                  string `json:"memcached"`
 	MemcachedExporter          string `json:"memcached_exporter"`
 }
 
-func GetImageOverrides(ctx context.Context, c client.Client, registries []addonapiv1beta1.ImageMirror, logger logr.Logger) (ImageOverrides, error) {
+// GetImageOverrides returns the addon image overrides, combining the
+// images-list ConfigMap, full-image overrides from the AddOnDeploymentConfig
+// registries, and per-cluster registry overrides from the ManagedCluster
+// image-registries annotation. The cluster annotation takes precedence: it
+// declares which registries the cluster can actually reach (e.g. in
+// disconnected environments), so it is authoritative for the sources it
+// claims, and the AODC overrides apply only to images the annotation did not
+// claim. A nil cluster skips the cluster-annotation overrides.
+func GetImageOverrides(ctx context.Context, c client.Client, registries []addonapiv1beta1.ImageMirror, cluster *clusterv1.ManagedCluster, logger logr.Logger) (ImageOverrides, error) {
 	ret := ImageOverrides{}
 	// Get the ACM images overrides
 	imagesList := &corev1.ConfigMap{}
@@ -141,27 +151,29 @@ func GetImageOverrides(ctx context.Context, c client.Client, registries []addona
 		return ret, fmt.Errorf("%w: %+v", ErrMissingImageOverride, ret)
 	}
 
-	// Apply registry overrides
-	if len(registries) > 0 {
-		ret.PrometheusConfigReloader = overrideImage(ret.PrometheusConfigReloader, registries, logger)
-		ret.KubeRBACProxy = overrideImage(ret.KubeRBACProxy, registries, logger)
-		ret.CooPrometheusOperatorImage = overrideImage(ret.CooPrometheusOperatorImage, registries, logger)
-		ret.KubeStateMetrics = overrideImage(ret.KubeStateMetrics, registries, logger)
-		ret.NodeExporter = overrideImage(ret.NodeExporter, registries, logger)
-		ret.Prometheus = overrideImage(ret.Prometheus, registries, logger)
-		ret.EndpointMonitoringOperator = overrideImage(ret.EndpointMonitoringOperator, registries, logger)
-		if ret.ThanosOperator != "" {
-			ret.ThanosOperator = overrideImage(ret.ThanosOperator, registries, logger)
-		}
-		if ret.ThanosStore != "" {
-			ret.ThanosStore = overrideImage(ret.ThanosStore, registries, logger)
-		}
-		if ret.Memcached != "" {
-			ret.Memcached = overrideImage(ret.Memcached, registries, logger)
-		}
-		if ret.MemcachedExporter != "" {
-			ret.MemcachedExporter = overrideImage(ret.MemcachedExporter, registries, logger)
-		}
+	// Resolve overrides per image: the cluster annotation first (matching
+	// against the original image), then the AODC registries for images the
+	// annotation did not claim.
+	clusterRegs := ParseClusterImageRegistries(cluster)
+	resolve := func(image string) string {
+		return ResolveImage(image, clusterRegs, registries, logger)
+	}
+
+	ret.PrometheusConfigReloader = resolve(ret.PrometheusConfigReloader)
+	ret.KubeRBACProxy = resolve(ret.KubeRBACProxy)
+	ret.CooPrometheusOperatorImage = resolve(ret.CooPrometheusOperatorImage)
+	ret.KubeStateMetrics = resolve(ret.KubeStateMetrics)
+	ret.NodeExporter = resolve(ret.NodeExporter)
+	ret.Prometheus = resolve(ret.Prometheus)
+	ret.EndpointMonitoringOperator = resolve(ret.EndpointMonitoringOperator)
+	if ret.ThanosOperator != "" {
+		ret.ThanosOperator = resolve(ret.ThanosOperator)
+	}
+	if ret.Memcached != "" {
+		ret.Memcached = resolve(ret.Memcached)
+	}
+	if ret.MemcachedExporter != "" {
+		ret.MemcachedExporter = resolve(ret.MemcachedExporter)
 	}
 
 	return ret, nil
@@ -217,6 +229,124 @@ func GetTrimmedClusterID(clusterID string) string {
 
 func GetAlertmanagerAccessorSecretName(trimmedClusterID string) string {
 	return fmt.Sprintf("%s-%s", AlertmanagerAccessorSecretName, trimmedClusterID)
+}
+
+// ClusterImageRegistries holds parsed image registry overrides from the
+// ManagedCluster's open-cluster-management.io/image-registries annotation.
+type ClusterImageRegistries struct {
+	// PullSecret references a hub secret in "namespace.name" format.
+	PullSecret string
+	Registries []addonapiv1beta1.ImageMirror
+}
+
+// ParseClusterImageRegistries extracts image registry mirrors and an optional
+// pull secret reference from the ManagedCluster annotation.
+func ParseClusterImageRegistries(cluster *clusterv1.ManagedCluster) *ClusterImageRegistries {
+	if cluster == nil {
+		return nil
+	}
+	annotations := cluster.GetAnnotations()
+	if len(annotations) == 0 {
+		return nil
+	}
+	raw := annotations[clusterv1.ClusterImageRegistriesAnnotationKey]
+	if raw == "" {
+		return nil
+	}
+	type imageRegistries struct {
+		PullSecret string                        `json:"pullSecret"`
+		Registries []addonapiv1beta1.ImageMirror `json:"registries"`
+	}
+	var parsed imageRegistries
+	if err := json.Unmarshal([]byte(raw), &parsed); err != nil {
+		return nil
+	}
+	if len(parsed.Registries) == 0 && parsed.PullSecret == "" {
+		return nil
+	}
+	return &ClusterImageRegistries{
+		PullSecret: parsed.PullSecret,
+		Registries: parsed.Registries,
+	}
+}
+
+// ResolveImage resolves the overrides for a single image: the per-cluster
+// registry overrides from the ManagedCluster annotation take precedence when
+// the annotation claims the image (a source prefix match, including identity
+// mappings), and the AODC full-image overrides apply only to images the
+// annotation does not claim.
+func ResolveImage(image string, clusterRegs *ClusterImageRegistries, registries []addonapiv1beta1.ImageMirror, logger logr.Logger) string {
+	if clusterRegs != nil {
+		if overridden, claimed := overrideImageByRegistry(image, clusterRegs.Registries); claimed {
+			return overridden
+		}
+	}
+	return overrideImage(image, registries, logger)
+}
+
+// ApplyToPrometheusAgent resolves the images of the given PrometheusAgent —
+// the Prometheus image and the extra containers, such as the kube-rbac-proxy
+// sidecar — with the same precedence as the images list: the cluster
+// annotation first, the AODC registries as the fallback for unclaimed
+// images. It is a no-op on a nil agent. The agent is expected to carry the
+// original (images-list) images; per-cluster resolution happens here, at
+// render time.
+func (c *ClusterImageRegistries) ApplyToPrometheusAgent(agent *cooprometheusv1alpha1.PrometheusAgent, registries []addonapiv1beta1.ImageMirror, logger logr.Logger) {
+	if agent == nil {
+		return
+	}
+	resolve := func(image string) string {
+		return ResolveImage(image, c, registries, logger)
+	}
+	if agent.Spec.Image != nil {
+		agent.Spec.Image = ptr.To(resolve(*agent.Spec.Image))
+	}
+	for i := range agent.Spec.Containers {
+		agent.Spec.Containers[i].Image = resolve(agent.Spec.Containers[i].Image)
+	}
+	for i := range agent.Spec.InitContainers {
+		agent.Spec.InitContainers[i].Image = resolve(agent.Spec.InitContainers[i].Image)
+	}
+}
+
+// overrideImageByRegistry applies the cluster registry overrides to the image
+// and reports whether any registry source claimed it. A claim is a source
+// prefix match (an empty source claims every image); an identity mapping
+// (e.g. quay.io to quay.io) claims the image even though the value is
+// unchanged.
+func overrideImageByRegistry(image string, registries []addonapiv1beta1.ImageMirror) (string, bool) {
+	if image == "" {
+		return image, false
+	}
+	overridden := image
+	claimed := false
+	for _, reg := range registries {
+		source := strings.TrimSuffix(reg.Source, "/")
+		if source == "" || strings.HasPrefix(image, source) {
+			claimed = true
+			if name := registryPrefixReplace(reg.Source, reg.Mirror, image); name != image {
+				overridden = name
+			}
+		}
+	}
+	return overridden, claimed
+}
+
+func registryPrefixReplace(source, mirror, imageName string) string {
+	source = strings.TrimSuffix(source, "/")
+	mirror = strings.TrimSuffix(mirror, "/")
+	segments := strings.Split(imageName, "/")
+	nameTag := segments[len(segments)-1]
+	if source == "" {
+		if mirror == "" {
+			return nameTag
+		}
+		return fmt.Sprintf("%s/%s", mirror, nameTag)
+	}
+	if !strings.HasPrefix(imageName, source) {
+		return imageName
+	}
+	return fmt.Sprintf("%s%s", mirror, strings.TrimPrefix(imageName, source))
 }
 
 func GetHubMtlsCASecretName(trimmedClusterID string) string {
