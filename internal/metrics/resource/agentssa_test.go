@@ -213,3 +213,113 @@ func TestPrometheusAgentSSAManagedFieldsAnnotationUWL(t *testing.T) {
 	assert.Contains(t, got, ".spec.image")
 	assert.NotContains(t, got, ".spec.scrapeConfigNamespaceSelector")
 }
+
+func TestPrometheusAgentSSA_GlobalHubRemoteWrite(t *testing.T) {
+	baseAgent := func() *cooprometheusv1alpha1.PrometheusAgent {
+		return &cooprometheusv1alpha1.PrometheusAgent{
+			ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "test"},
+			Spec:       cooprometheusv1alpha1.PrometheusAgentSpec{},
+		}
+	}
+
+	t.Run("adds global hub remote-write with managed_by label", func(t *testing.T) {
+		builder := resource.PrometheusAgentSSA{
+			ExistingAgent:       baseAgent(),
+			RemoteWriteEndpoint: "https://local-hub.example.com/write",
+			KubeRBACProxyImage:  "kube-rbac-proxy:latest",
+			GlobalHubRemoteWrite: &resource.GlobalHubRemoteWriteConfig{
+				Endpoint:  "https://global-hub.example.com/api/metrics/v1/default/api/v1/receive",
+				ManagedBy: "managed-hub-east",
+			},
+		}
+
+		result := builder.Build()
+
+		assert.Len(t, result.Spec.RemoteWrite, 2)
+
+		ghIdx := slices.IndexFunc(result.Spec.RemoteWrite, func(e cooprometheusv1.RemoteWriteSpec) bool {
+			return e.Name != nil && *e.Name == config.GlobalHubRemoteWriteCfgName
+		})
+		assert.GreaterOrEqual(t, ghIdx, 0, "global hub remote-write should be present")
+		assert.Equal(t, cooprometheusv1.URL("https://global-hub.example.com/api/metrics/v1/default/api/v1/receive"), result.Spec.RemoteWrite[ghIdx].URL)
+		assert.Contains(t, result.Spec.RemoteWrite[ghIdx].TLSConfig.CAFile, config.GlobalHubObservabilitySecretName)
+		assert.Contains(t, result.Spec.RemoteWrite[ghIdx].TLSConfig.CertFile, config.GlobalHubObservabilitySecretName)
+		assert.Contains(t, result.Spec.RemoteWrite[ghIdx].TLSConfig.KeyFile, config.GlobalHubObservabilitySecretName)
+		assert.Contains(t, result.Spec.Secrets, config.GlobalHubObservabilitySecretName)
+
+		// Verify managed_by relabel config
+		assert.Len(t, result.Spec.RemoteWrite[ghIdx].WriteRelabelConfigs, 1)
+		assert.Equal(t, config.ManagedByMetricLabel, result.Spec.RemoteWrite[ghIdx].WriteRelabelConfigs[0].TargetLabel)
+		assert.Equal(t, "managed-hub-east", *result.Spec.RemoteWrite[ghIdx].WriteRelabelConfigs[0].Replacement)
+	})
+
+	t.Run("does not add global hub remote-write when not configured", func(t *testing.T) {
+		builder := resource.PrometheusAgentSSA{
+			ExistingAgent:       baseAgent(),
+			RemoteWriteEndpoint: "https://local-hub.example.com/write",
+			KubeRBACProxyImage:  "kube-rbac-proxy:latest",
+		}
+
+		result := builder.Build()
+
+		assert.Len(t, result.Spec.RemoteWrite, 1)
+		ghIdx := slices.IndexFunc(result.Spec.RemoteWrite, func(e cooprometheusv1.RemoteWriteSpec) bool {
+			return e.Name != nil && *e.Name == config.GlobalHubRemoteWriteCfgName
+		})
+		assert.Equal(t, -1, ghIdx, "global hub remote-write should not be present")
+		assert.NotContains(t, result.Spec.Secrets, config.GlobalHubObservabilitySecretName)
+	})
+
+	t.Run("cleans up stale global hub remote-write", func(t *testing.T) {
+		existingAgent := baseAgent()
+		existingAgent.Spec.Secrets = []string{config.HubCASecretName, config.GlobalHubObservabilitySecretName}
+		existingAgent.Spec.RemoteWrite = []cooprometheusv1.RemoteWriteSpec{
+			{Name: ptr.To(config.RemoteWriteCfgName), URL: "https://local-hub.example.com/write"},
+			{Name: ptr.To(config.GlobalHubRemoteWriteCfgName), URL: "https://old-global-hub.example.com/write"},
+		}
+
+		builder := resource.PrometheusAgentSSA{
+			ExistingAgent:       existingAgent,
+			RemoteWriteEndpoint: "https://local-hub.example.com/write",
+			KubeRBACProxyImage:  "kube-rbac-proxy:latest",
+			// GlobalHubRemoteWrite is nil — should clean up
+		}
+
+		result := builder.Build()
+
+		ghIdx := slices.IndexFunc(result.Spec.RemoteWrite, func(e cooprometheusv1.RemoteWriteSpec) bool {
+			return e.Name != nil && *e.Name == config.GlobalHubRemoteWriteCfgName
+		})
+		assert.Equal(t, -1, ghIdx, "stale global hub remote-write should be removed")
+		assert.NotContains(t, result.Spec.Secrets, config.GlobalHubObservabilitySecretName)
+	})
+
+	t.Run("preserves user remote-write configs alongside global hub", func(t *testing.T) {
+		existingAgent := baseAgent()
+		existingAgent.Spec.RemoteWrite = []cooprometheusv1.RemoteWriteSpec{
+			{Name: ptr.To("custom-user-rw"), URL: "https://custom.example.com/write"},
+		}
+
+		builder := resource.PrometheusAgentSSA{
+			ExistingAgent:       existingAgent,
+			RemoteWriteEndpoint: "https://local-hub.example.com/write",
+			KubeRBACProxyImage:  "kube-rbac-proxy:latest",
+			GlobalHubRemoteWrite: &resource.GlobalHubRemoteWriteConfig{
+				Endpoint: "https://global-hub.example.com/write",
+			},
+		}
+
+		result := builder.Build()
+
+		assert.Len(t, result.Spec.RemoteWrite, 3, "should have user + hub + global hub remote-write")
+		names := make([]string, 0, len(result.Spec.RemoteWrite))
+		for _, rw := range result.Spec.RemoteWrite {
+			if rw.Name != nil {
+				names = append(names, *rw.Name)
+			}
+		}
+		assert.Contains(t, names, "custom-user-rw")
+		assert.Contains(t, names, config.RemoteWriteCfgName)
+		assert.Contains(t, names, config.GlobalHubRemoteWriteCfgName)
+	})
+}

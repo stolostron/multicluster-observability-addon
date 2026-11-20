@@ -15,6 +15,7 @@ import (
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -322,6 +323,11 @@ func (d DefaultStackResources) reconcileAgents(ctx context.Context, isUWL bool) 
 		return nil, errMissingHubEndpoint
 	}
 
+	globalHubRW, err := d.getGlobalHubRemoteWriteConfig(ctx)
+	if err != nil {
+		d.Logger.Info("Global Hub remote-write not available, skipping", "error", err)
+	}
+
 	promAgents := &cooprometheusv1alpha1.PrometheusAgentList{}
 	if err := d.Client.List(ctx, promAgents, &client.ListOptions{
 		Namespace:     config.HubInstallNamespace,
@@ -339,11 +345,12 @@ func (d DefaultStackResources) reconcileAgents(ctx context.Context, isUWL bool) 
 		}
 
 		promBuilder := PrometheusAgentSSA{
-			ExistingAgent:       agent,
-			IsUwl:               isUWL,
-			PrometheusImage:     d.PrometheusImage,
-			KubeRBACProxyImage:  d.KubeRBACProxyImage,
-			RemoteWriteEndpoint: d.AddonOptions.Platform.Metrics.HubEndpoint.String(),
+			ExistingAgent:        agent,
+			IsUwl:                isUWL,
+			PrometheusImage:      d.PrometheusImage,
+			KubeRBACProxyImage:   d.KubeRBACProxyImage,
+			RemoteWriteEndpoint:  d.AddonOptions.Platform.Metrics.HubEndpoint.String(),
+			GlobalHubRemoteWrite: globalHubRW,
 		}
 		promSSA := promBuilder.Build()
 
@@ -377,6 +384,33 @@ func (d DefaultStackResources) reconcileAgents(ctx context.Context, isUWL bool) 
 		}
 	}
 	return configs, nil
+}
+
+// getGlobalHubRemoteWriteConfig reads the global-hub-observability-secret from the
+// hub's observability namespace. If the secret exists, it returns a
+// GlobalHubRemoteWriteConfig with the remote-write endpoint extracted from the
+// secret's "observatorium.url" key. Returns nil when the secret is absent.
+func (d DefaultStackResources) getGlobalHubRemoteWriteConfig(ctx context.Context) (*GlobalHubRemoteWriteConfig, error) {
+	secret := &corev1.Secret{}
+	key := types.NamespacedName{
+		Name:      config.GlobalHubObservabilitySecretName,
+		Namespace: config.HubInstallNamespace,
+	}
+	if err := d.Client.Get(ctx, key, secret); err != nil {
+		return nil, err
+	}
+
+	obsURL, ok := secret.Data["observatorium.url"]
+	if !ok || len(obsURL) == 0 {
+		return nil, fmt.Errorf("global hub secret %s is missing observatorium.url", config.GlobalHubObservabilitySecretName)
+	}
+
+	managedBy := string(secret.Data["managed-hub-name"])
+
+	return &GlobalHubRemoteWriteConfig{
+		Endpoint:  string(obsURL) + "/api/metrics/v1/default/api/v1/receive",
+		ManagedBy: managedBy,
+	}, nil
 }
 
 func (d DefaultStackResources) CreateDefaultAgent(ctx context.Context, isUWL bool) ([]*cooprometheusv1alpha1.PrometheusAgent, error) {

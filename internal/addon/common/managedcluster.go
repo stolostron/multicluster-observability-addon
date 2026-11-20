@@ -33,6 +33,15 @@ func IsHubCluster(cluster *clusterv1.ManagedCluster) bool {
 	return cluster.Labels[clusterlifecycleconstants.SelfManagedClusterLabelKey] == "true"
 }
 
+// IsMCOHub returns true if the managed cluster has MCO installed, indicated by
+// the hub.observability.open-cluster-management.io ClusterClaim.
+func IsMCOHub(cluster *clusterv1.ManagedCluster) bool {
+	idx := slices.IndexFunc(cluster.Status.ClusterClaims, func(c clusterv1.ManagedClusterClaim) bool {
+		return c.Name == addoncfg.ClusterClaimMCOHub
+	})
+	return idx != -1
+}
+
 func IsOpenShiftVendor(cluster *clusterv1.ManagedCluster) bool {
 	if cluster == nil {
 		return false
