@@ -45,8 +45,27 @@ func TestBuildSingleClusterView(t *testing.T) {
 }
 
 func TestBuildSingleVMView(t *testing.T) {
-	_, err := BuildSingleVMView("test-project", "test-datasource")
+	b, err := BuildSingleVMView("test-project", "test-datasource")
 	require.NoError(t, err)
+
+	raw, err := json.Marshal(b.Dashboard.Spec)
+	require.NoError(t, err)
+
+	// VM Snapshots table: prefer the controller info metrics and fall back
+	// to the legacy succeeded-timestamp metric only on clusters that do not
+	// federate kubevirt_vmsnapshot_info yet (the legacy metric keeps
+	// reporting deleted snapshots, CNV-85389).
+	assert.Contains(t, string(raw), "kubevirt_vmsnapshot_create_date_timestamp_seconds")
+	assert.Contains(t, string(raw), `vm=\"$name\",phase=\"succeeded\"`)
+	assert.Contains(t, string(raw), "unless on (cluster) kubevirt_vmsnapshot_info")
+	// Duplicate series exported by multiple controller replicas must
+	// collapse before the group_left join, otherwise Prometheus rejects
+	// the query with a many-to-many matching error.
+	assert.Contains(t, string(raw), `max by (cluster, namespace, name)(kubevirt_vmsnapshot_create_date_timestamp_seconds`)
+	assert.Contains(t, string(raw), `max by (cluster, namespace, name, vm, phase)(kubevirt_vmsnapshot_info`)
+	// The new query exposes vm and phase labels; the table hides them.
+	assert.Contains(t, string(raw), `{"name":"phase","hide":true}`)
+	assert.Contains(t, string(raw), `{"name":"vm","hide":true}`)
 }
 
 func TestBuildTopConsumers(t *testing.T) {

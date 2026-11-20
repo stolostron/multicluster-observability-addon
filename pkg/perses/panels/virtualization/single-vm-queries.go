@@ -95,7 +95,19 @@ const (
 const (
 	singleVMNetworkAddressesQuery = `sum by(cluster,name,namespace,address,network_name, type)(kubevirt_vmi_status_addresses{cluster="$cluster",namespace="$namespace",name="$name"})`
 
-	singleVMSnapshotsQuery = `kubevirt_vmsnapshot_succeeded_timestamp_seconds{cluster=~"$cluster",namespace="$namespace", name="$name"}*1000`
+	// singleVMSnapshotsQuery lists succeeded snapshots by creation time,
+	// preferring the kubevirt-observability-controller info metrics over the
+	// legacy kubevirt_vmsnapshot_succeeded_timestamp_seconds, which keeps
+	// reporting timestamps of deleted snapshots (CNV-85389). Both selectors
+	// are deduplicated with max by because multiple controller replicas can
+	// export the same snapshot series; duplicate right-hand series would
+	// fail the group_left join with a many-to-many matching error (see
+	// vm-by-time-in-status-queries.go), and duplicate left-hand series would
+	// render one table row per replica. The "unless on (cluster)" gate keeps
+	// the legacy series only for clusters that do not federate
+	// kubevirt_vmsnapshot_info yet. label_replace copies the snapshot name
+	// to snapshot_name for the table column.
+	singleVMSnapshotsQuery = `label_replace((max by (cluster, namespace, name)(kubevirt_vmsnapshot_create_date_timestamp_seconds{cluster=~"$cluster",namespace="$namespace"}) * on (cluster, namespace, name) group_left (vm, phase) max by (cluster, namespace, name, vm, phase)(kubevirt_vmsnapshot_info{cluster=~"$cluster",namespace="$namespace",vm="$name",phase="succeeded"})), "snapshot_name", "$1", "name", "(.*)") * 1000 or (kubevirt_vmsnapshot_succeeded_timestamp_seconds{cluster=~"$cluster",namespace="$namespace",name="$name"} * 1000 unless on (cluster) kubevirt_vmsnapshot_info)`
 )
 
 // CPU time series
