@@ -218,8 +218,8 @@ func TestReconcile_COOSubscriptionWrongChannel(t *testing.T) {
 		},
 		Spec: addonv1beta1.AddOnDeploymentConfigSpec{
 			CustomizedVariables: []addonv1beta1.CustomizedVariable{
-				{Name: "platformMetricsCollection", Value: "prometheusagent/v1alpha1"},
-				{Name: "metricsHubHostname", Value: "https://the-hub.com"},
+				{Name: addon.KeyPlatformMetricsCollection, Value: string(addon.PrometheusAgentV1alpha1)},
+				{Name: addon.KeyMetricsHubHostname, Value: "https://the-hub.com"},
 			},
 		},
 	}

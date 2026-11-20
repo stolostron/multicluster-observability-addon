@@ -7,11 +7,14 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
+	"fmt"
 	"math/big"
 	"net/url"
+	"strings"
 	"testing"
 	"time"
 
+	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -50,6 +53,7 @@ func TestBuildOptions(t *testing.T) {
 		addOnDeploy    *addonapiv1beta1.AddOnDeploymentConfig
 		expectedOpts   Options
 		expectedErrMsg string
+		expectedErr    error
 	}{
 		{
 			name:         "nil AddOnDeploymentConfig",
@@ -759,32 +763,456 @@ func TestBuildOptions(t *testing.T) {
 			},
 			expectedErrMsg: "invalid proxy CA bundle",
 		},
+		{
+			name: "valid options using true and enabled values",
+			addOnDeploy: &addonapiv1beta1.AddOnDeploymentConfig{
+				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+					CustomizedVariables: []addonapiv1beta1.CustomizedVariable{
+						{Name: KeyPlatformMetricsCollection, Value: "true"},
+						{Name: KeyMetricsHubHostname, Value: "https://metrics.example.com"},
+						{Name: KeyPlatformLogsCollection, Value: "enabled"},
+						{Name: KeyOpenShiftLoggingChannel, Value: "stable-6"},
+						{Name: KeyPlatformIncidentDetection, Value: "true"},
+						{Name: KeyPlatformNamespaceRightSizing, Value: "true"},
+						{Name: KeyPlatformVirtualizationRightSizing, Value: "enabled"},
+						{Name: KeyRightSizingDelegated, Value: "true"},
+						{Name: KeyUserWorkloadMetricsCollection, Value: "enabled"},
+						{Name: KeyUserWorkloadLogsCollection, Value: "true"},
+						{Name: KeyUserWorkloadTracesCollection, Value: "enabled"},
+						{Name: KeyUserWorkloadInstrumentation, Value: "true"},
+						{Name: KeyPlatformMetricsUI, Value: "true"},
+					},
+				},
+			},
+			expectedOpts: Options{
+				Platform: PlatformOptions{
+					Enabled: true,
+					Metrics: MetricsOptions{
+						CollectionEnabled: true,
+						HubEndpoint: url.URL{
+							Scheme: "https",
+							Host:   "metrics.example.com",
+							Path:   "api/metrics/v1/default/api/v1/receive",
+						},
+						UI: MetricsUIOptions{
+							Enabled: true,
+						},
+					},
+					Logs: LogsOptions{
+						CollectionEnabled:   true,
+						SubscriptionChannel: "stable-6",
+					},
+					AnalyticsOptions: AnalyticsOptions{
+						IncidentDetection: IncidentDetection{
+							Enabled: true,
+						},
+						RightSizing: RightSizingOptions{
+							Delegated:             true,
+							NamespaceEnabled:      true,
+							VirtualizationEnabled: true,
+						},
+					},
+				},
+				UserWorkloads: UserWorkloadOptions{
+					Enabled: true,
+					Metrics: MetricsOptions{
+						CollectionEnabled: true,
+					},
+					Logs: LogsOptions{
+						CollectionEnabled:   true,
+						SubscriptionChannel: "stable-6",
+					},
+					Traces: TracesOptions{
+						CollectionEnabled:      true,
+						InstrumentationEnabled: true,
+					},
+				},
+			},
+		},
+		{
+			name: "valid options using false and disabled values",
+			addOnDeploy: &addonapiv1beta1.AddOnDeploymentConfig{
+				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+					CustomizedVariables: []addonapiv1beta1.CustomizedVariable{
+						{Name: KeyPlatformMetricsCollection, Value: "false"},
+						{Name: KeyPlatformLogsCollection, Value: "disabled"},
+						{Name: KeyPlatformIncidentDetection, Value: "false"},
+						{Name: KeyPlatformNamespaceRightSizing, Value: "false"},
+						{Name: KeyPlatformVirtualizationRightSizing, Value: "disabled"},
+						{Name: KeyRightSizingDelegated, Value: "disabled"},
+						{Name: KeyUserWorkloadMetricsCollection, Value: "disabled"},
+						{Name: KeyUserWorkloadLogsCollection, Value: "false"},
+						{Name: KeyUserWorkloadTracesCollection, Value: "disabled"},
+						{Name: KeyUserWorkloadInstrumentation, Value: "false"},
+						{Name: KeyPlatformMetricsUI, Value: "disabled"},
+					},
+				},
+			},
+			expectedOpts: Options{
+				Platform: PlatformOptions{
+					Enabled: true,
+					AnalyticsOptions: AnalyticsOptions{
+						RightSizing: RightSizingOptions{
+							Delegated:             false,
+							NamespaceEnabled:      false,
+							VirtualizationEnabled: false,
+						},
+					},
+				},
+				UserWorkloads: UserWorkloadOptions{},
+			},
+		},
+		{
+			name: "empty string values in customizedVariables cleanly disable features",
+			addOnDeploy: &addonapiv1beta1.AddOnDeploymentConfig{
+				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+					CustomizedVariables: []addonapiv1beta1.CustomizedVariable{
+						{Name: KeyPlatformMetricsCollection, Value: ""},
+						{Name: KeyPlatformLogsCollection, Value: ""},
+						{Name: KeyPlatformIncidentDetection, Value: ""},
+						{Name: KeyPlatformNamespaceRightSizing, Value: ""},
+						{Name: KeyPlatformVirtualizationRightSizing, Value: ""},
+						{Name: KeyRightSizingDelegated, Value: ""},
+						{Name: KeyPlatformWorkloadRightSizing, Value: ""},
+						{Name: KeyPlatformPodRightSizing, Value: ""},
+						{Name: KeyUserWorkloadMetricsCollection, Value: ""},
+						{Name: KeyUserWorkloadLogsCollection, Value: ""},
+						{Name: KeyUserWorkloadTracesCollection, Value: ""},
+						{Name: KeyUserWorkloadInstrumentation, Value: ""},
+						{Name: KeyPlatformMetricsUI, Value: ""},
+						{Name: KeyPlatformMetricsAlerts, Value: ""},
+						{Name: KeyUserWorkloadMetricsAlerts, Value: ""},
+					},
+				},
+			},
+			expectedOpts: Options{
+				Platform: PlatformOptions{
+					Enabled: true,
+					AnalyticsOptions: AnalyticsOptions{
+						RightSizing: RightSizingOptions{
+							Delegated:             false,
+							NamespaceEnabled:      false,
+							VirtualizationEnabled: false,
+							WorkloadEnabled:       false,
+							PodEnabled:            false,
+						},
+					},
+				},
+				UserWorkloads: UserWorkloadOptions{},
+			},
+		},
+		{
+			name: "platformMetricsUI enabled via true is overridden to false when metrics collection is disabled",
+			addOnDeploy: &addonapiv1beta1.AddOnDeploymentConfig{
+				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+					CustomizedVariables: []addonapiv1beta1.CustomizedVariable{
+						{Name: KeyPlatformMetricsUI, Value: "true"},
+						{Name: KeyPlatformMetricsCollection, Value: "false"},
+					},
+				},
+			},
+			expectedOpts: Options{
+				Platform: PlatformOptions{
+					Enabled: true,
+					AnalyticsOptions: AnalyticsOptions{
+						RightSizing: RightSizingOptions{
+							NamespaceEnabled:      true,
+							VirtualizationEnabled: true,
+						},
+					},
+					Metrics: MetricsOptions{
+						CollectionEnabled: false,
+						UI:                MetricsUIOptions{Enabled: false},
+					},
+				},
+			},
+		},
+		{
+			name: "invalid value for userWorkloadMetricsCollection (yes)",
+			addOnDeploy: &addonapiv1beta1.AddOnDeploymentConfig{
+				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+					CustomizedVariables: []addonapiv1beta1.CustomizedVariable{
+						{Name: KeyUserWorkloadMetricsCollection, Value: "yes"},
+					},
+				},
+			},
+			expectedErr:    addoncfg.ErrInvalidConfigurationValue,
+			expectedErrMsg: `unrecognized value "yes" for userWorkloadMetricsCollection`,
+		},
+		{
+			name: "invalid value for platformMetricsCollection (on)",
+			addOnDeploy: &addonapiv1beta1.AddOnDeploymentConfig{
+				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+					CustomizedVariables: []addonapiv1beta1.CustomizedVariable{
+						{Name: KeyPlatformMetricsCollection, Value: "on"},
+					},
+				},
+			},
+			expectedErr:    addoncfg.ErrInvalidConfigurationValue,
+			expectedErrMsg: `unrecognized value "on" for platformMetricsCollection`,
+		},
+		{
+			name: "invalid value for platformLogsCollection (typo)",
+			addOnDeploy: &addonapiv1beta1.AddOnDeploymentConfig{
+				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+					CustomizedVariables: []addonapiv1beta1.CustomizedVariable{
+						{Name: KeyPlatformLogsCollection, Value: "typo"},
+					},
+				},
+			},
+			expectedErr:    addoncfg.ErrInvalidConfigurationValue,
+			expectedErrMsg: `unrecognized value "typo" for platformLogsCollection`,
+		},
+		{
+			name: "invalid value for platformIncidentDetection (invalid)",
+			addOnDeploy: &addonapiv1beta1.AddOnDeploymentConfig{
+				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+					CustomizedVariables: []addonapiv1beta1.CustomizedVariable{
+						{Name: KeyPlatformIncidentDetection, Value: "invalid"},
+					},
+				},
+			},
+			expectedErr:    addoncfg.ErrInvalidConfigurationValue,
+			expectedErrMsg: `unrecognized value "invalid" for platformIncidentDetection`,
+		},
+		{
+			name: "invalid value for platformNamespaceRightSizing (invalid)",
+			addOnDeploy: &addonapiv1beta1.AddOnDeploymentConfig{
+				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+					CustomizedVariables: []addonapiv1beta1.CustomizedVariable{
+						{Name: KeyPlatformNamespaceRightSizing, Value: "1"},
+					},
+				},
+			},
+			expectedErr:    addoncfg.ErrInvalidConfigurationValue,
+			expectedErrMsg: `unrecognized value "1" for platformNamespaceRightSizing`,
+		},
+		{
+			name: "invalid value for platformVirtualizationRightSizing (invalid)",
+			addOnDeploy: &addonapiv1beta1.AddOnDeploymentConfig{
+				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+					CustomizedVariables: []addonapiv1beta1.CustomizedVariable{
+						{Name: KeyPlatformVirtualizationRightSizing, Value: "maybe"},
+					},
+				},
+			},
+			expectedErr:    addoncfg.ErrInvalidConfigurationValue,
+			expectedErrMsg: `unrecognized value "maybe" for platformVirtualizationRightSizing`,
+		},
+		{
+			name: "invalid value for rightSizingDelegated (invalid)",
+			addOnDeploy: &addonapiv1beta1.AddOnDeploymentConfig{
+				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+					CustomizedVariables: []addonapiv1beta1.CustomizedVariable{
+						{Name: KeyRightSizingDelegated, Value: "not-a-bool"},
+					},
+				},
+			},
+			expectedErr:    addoncfg.ErrInvalidConfigurationValue,
+			expectedErrMsg: `unrecognized value "not-a-bool" for rightSizingDelegated`,
+		},
+		{
+			name: "invalid value for platformWorkloadRightSizing (invalid)",
+			addOnDeploy: &addonapiv1beta1.AddOnDeploymentConfig{
+				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+					CustomizedVariables: []addonapiv1beta1.CustomizedVariable{
+						{Name: KeyPlatformWorkloadRightSizing, Value: "bad"},
+					},
+				},
+			},
+			expectedErr:    addoncfg.ErrInvalidConfigurationValue,
+			expectedErrMsg: `unrecognized value "bad" for platformWorkloadRightSizing`,
+		},
+		{
+			name: "invalid value for platformPodRightSizing (invalid)",
+			addOnDeploy: &addonapiv1beta1.AddOnDeploymentConfig{
+				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+					CustomizedVariables: []addonapiv1beta1.CustomizedVariable{
+						{Name: KeyPlatformPodRightSizing, Value: "bad"},
+					},
+				},
+			},
+			expectedErr:    addoncfg.ErrInvalidConfigurationValue,
+			expectedErrMsg: `unrecognized value "bad" for platformPodRightSizing`,
+		},
+		{
+			name: "invalid value for platformMetricsAlerts (invalid)",
+			addOnDeploy: &addonapiv1beta1.AddOnDeploymentConfig{
+				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+					CustomizedVariables: []addonapiv1beta1.CustomizedVariable{
+						{Name: KeyPlatformMetricsAlerts, Value: "bad"},
+					},
+				},
+			},
+			expectedErr:    addoncfg.ErrInvalidConfigurationValue,
+			expectedErrMsg: `unrecognized value "bad" for platformMetricsAlerts`,
+		},
+		{
+			name: "invalid value for userWorkloadMetricsAlerts (invalid)",
+			addOnDeploy: &addonapiv1beta1.AddOnDeploymentConfig{
+				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+					CustomizedVariables: []addonapiv1beta1.CustomizedVariable{
+						{Name: KeyUserWorkloadMetricsAlerts, Value: "bad"},
+					},
+				},
+			},
+			expectedErr:    addoncfg.ErrInvalidConfigurationValue,
+			expectedErrMsg: `unrecognized value "bad" for userWorkloadMetricsAlerts`,
+		},
+		{
+			name: "invalid value for userWorkloadLogsCollection (invalid)",
+			addOnDeploy: &addonapiv1beta1.AddOnDeploymentConfig{
+				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+					CustomizedVariables: []addonapiv1beta1.CustomizedVariable{
+						{Name: KeyUserWorkloadLogsCollection, Value: "oui"},
+					},
+				},
+			},
+			expectedErr:    addoncfg.ErrInvalidConfigurationValue,
+			expectedErrMsg: `unrecognized value "oui" for userWorkloadLogsCollection`,
+		},
+		{
+			name: "invalid value for userWorkloadTracesCollection (invalid)",
+			addOnDeploy: &addonapiv1beta1.AddOnDeploymentConfig{
+				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+					CustomizedVariables: []addonapiv1beta1.CustomizedVariable{
+						{Name: KeyUserWorkloadTracesCollection, Value: "trueee"},
+					},
+				},
+			},
+			expectedErr:    addoncfg.ErrInvalidConfigurationValue,
+			expectedErrMsg: `unrecognized value "trueee" for userWorkloadTracesCollection`,
+		},
+		{
+			name: "invalid value for userWorkloadInstrumentation (invalid)",
+			addOnDeploy: &addonapiv1beta1.AddOnDeploymentConfig{
+				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+					CustomizedVariables: []addonapiv1beta1.CustomizedVariable{
+						{Name: KeyUserWorkloadInstrumentation, Value: "nope"},
+					},
+				},
+			},
+			expectedErr:    addoncfg.ErrInvalidConfigurationValue,
+			expectedErrMsg: `unrecognized value "nope" for userWorkloadInstrumentation`,
+		},
+		{
+			name: "invalid value for platformMetricsUI (invalid)",
+			addOnDeploy: &addonapiv1beta1.AddOnDeploymentConfig{
+				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+					CustomizedVariables: []addonapiv1beta1.CustomizedVariable{
+						{Name: KeyPlatformMetricsUI, Value: "sure"},
+					},
+				},
+			},
+			expectedErr:    addoncfg.ErrInvalidConfigurationValue,
+			expectedErrMsg: `unrecognized value "sure" for platformMetricsUI`,
+		},
+		{
+			name: "platform metrics enabled via true but metricsHubHostname omitted",
+			addOnDeploy: &addonapiv1beta1.AddOnDeploymentConfig{
+				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+					CustomizedVariables: []addonapiv1beta1.CustomizedVariable{
+						{Name: KeyPlatformMetricsCollection, Value: "true"},
+					},
+				},
+			},
+			expectedErr:    addoncfg.ErrMissingDependency,
+			expectedErrMsg: "metricsHubHostname is required when metrics collection is enabled",
+		},
+		{
+			name: "platform metrics enabled via legacy string but metricsHubHostname omitted",
+			addOnDeploy: &addonapiv1beta1.AddOnDeploymentConfig{
+				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+					CustomizedVariables: []addonapiv1beta1.CustomizedVariable{
+						{Name: KeyPlatformMetricsCollection, Value: string(PrometheusAgentV1alpha1)},
+					},
+				},
+			},
+			expectedErr:    addoncfg.ErrMissingDependency,
+			expectedErrMsg: "metricsHubHostname is required when metrics collection is enabled",
+		},
+		{
+			name: "user workload metrics enabled via enabled but metricsHubHostname omitted",
+			addOnDeploy: &addonapiv1beta1.AddOnDeploymentConfig{
+				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+					CustomizedVariables: []addonapiv1beta1.CustomizedVariable{
+						{Name: KeyUserWorkloadMetricsCollection, Value: "enabled"},
+					},
+				},
+			},
+			expectedErr:    addoncfg.ErrMissingDependency,
+			expectedErrMsg: "metricsHubHostname is required when metrics collection is enabled",
+		},
+		{
+			name: "platform metrics enabled via true but metricsHubHostname is empty",
+			addOnDeploy: &addonapiv1beta1.AddOnDeploymentConfig{
+				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+					CustomizedVariables: []addonapiv1beta1.CustomizedVariable{
+						{Name: KeyPlatformMetricsCollection, Value: "true"},
+						{Name: KeyMetricsHubHostname, Value: ""},
+					},
+				},
+			},
+			expectedErr:    addoncfg.ErrMissingDependency,
+			expectedErrMsg: "metricsHubHostname is required when metrics collection is enabled",
+		},
+		{
+			name: "metrics disabled and metricsHubHostname is empty",
+			addOnDeploy: &addonapiv1beta1.AddOnDeploymentConfig{
+				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+					CustomizedVariables: []addonapiv1beta1.CustomizedVariable{
+						{Name: KeyPlatformMetricsCollection, Value: "false"},
+						{Name: KeyMetricsHubHostname, Value: ""},
+					},
+				},
+			},
+			expectedOpts: Options{
+				Platform: PlatformOptions{
+					Enabled: true,
+					AnalyticsOptions: AnalyticsOptions{
+						RightSizing: RightSizingOptions{
+							NamespaceEnabled:      true,
+							VirtualizationEnabled: true,
+						},
+					},
+					Metrics: MetricsOptions{
+						CollectionEnabled: false,
+					},
+				},
+			},
+		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			opts, err := BuildOptions(tc.addOnDeploy)
+			if tc.expectedErr != nil {
+				require.Error(t, err)
+				require.ErrorIs(t, err, tc.expectedErr)
+			}
 			if tc.expectedErrMsg != "" {
 				require.Error(t, err)
-				assert.ErrorContains(t, err, tc.expectedErrMsg)
-			} else {
-				require.NoError(t, err)
-				if tc.addOnDeploy != nil {
-					expectedPlatformAlerts := false
-					expectedUserWorkloadAlerts := false
-					for _, kv := range tc.addOnDeploy.Spec.CustomizedVariables {
-						if kv.Name == KeyPlatformMetricsAlerts && kv.Value == "enabled" {
-							expectedPlatformAlerts = true
-						}
-						if kv.Name == KeyUserWorkloadMetricsAlerts && kv.Value == "enabled" {
-							expectedUserWorkloadAlerts = true
-						}
-					}
-					tc.expectedOpts.Platform.Metrics.AlertsEnabled = expectedPlatformAlerts
-					tc.expectedOpts.UserWorkloads.Metrics.AlertsEnabled = expectedUserWorkloadAlerts
-				}
-				assert.Equal(t, tc.expectedOpts, opts)
+				require.ErrorContains(t, err, tc.expectedErrMsg)
 			}
+			if tc.expectedErr != nil || tc.expectedErrMsg != "" {
+				return
+			}
+			require.NoError(t, err)
+			if tc.addOnDeploy != nil {
+				expectedPlatformAlerts := false
+				expectedUserWorkloadAlerts := false
+				for _, kv := range tc.addOnDeploy.Spec.CustomizedVariables {
+					if kv.Name == KeyPlatformMetricsAlerts && (kv.Value == "enabled" || kv.Value == "true") {
+						expectedPlatformAlerts = true
+					}
+					if kv.Name == KeyUserWorkloadMetricsAlerts && (kv.Value == "enabled" || kv.Value == "true") {
+						expectedUserWorkloadAlerts = true
+					}
+				}
+				tc.expectedOpts.Platform.Metrics.AlertsEnabled = expectedPlatformAlerts
+				tc.expectedOpts.UserWorkloads.Metrics.AlertsEnabled = expectedUserWorkloadAlerts
+			}
+			assert.Equal(t, tc.expectedOpts, opts)
 		})
 	}
 }
@@ -901,4 +1329,109 @@ func TestIndependentRightSizingOptions(t *testing.T) {
 			require.Equal(t, tt.pod, opts.Platform.AnalyticsOptions.RightSizing.PodEnabled)
 		})
 	}
+}
+
+func TestParseFeatureFlag(t *testing.T) {
+	testCases := []struct {
+		name        string
+		key         string
+		value       string
+		legacyValue string
+		expected    bool
+		expectErr   bool
+	}{
+		// Truth values
+		{name: "lowercase true", key: "testKey", value: "true", expected: true},
+		{name: "uppercase true", key: "testKey", value: "TRUE", expected: true},
+		{name: "mixed case true", key: "testKey", value: "True", expected: true},
+		{name: "trimmed true", key: "testKey", value: "  true  ", expected: true},
+		{name: "lowercase enabled", key: "testKey", value: "enabled", expected: true},
+		{name: "uppercase enabled", key: "testKey", value: "ENABLED", expected: true},
+		{name: "mixed case enabled", key: "testKey", value: "Enabled", expected: true},
+		{name: "trimmed enabled", key: "testKey", value: "  enabled  ", expected: true},
+
+		// False values
+		{name: "lowercase false", key: "testKey", value: "false", expected: false},
+		{name: "uppercase false", key: "testKey", value: "FALSE", expected: false},
+		{name: "mixed case false", key: "testKey", value: "False", expected: false},
+		{name: "trimmed false", key: "testKey", value: "  false  ", expected: false},
+		{name: "lowercase disabled", key: "testKey", value: "disabled", expected: false},
+		{name: "uppercase disabled", key: "testKey", value: "DISABLED", expected: false},
+		{name: "mixed case disabled", key: "testKey", value: "Disabled", expected: false},
+		{name: "trimmed disabled", key: "testKey", value: "  disabled  ", expected: false},
+		{name: "empty string", key: "testKey", value: "", expected: false},
+		{name: "whitespace only", key: "testKey", value: "   ", expected: false},
+
+		// Legacy values
+		{
+			name:        "matching legacy value",
+			key:         KeyPlatformMetricsCollection,
+			value:       string(PrometheusAgentV1alpha1),
+			legacyValue: string(PrometheusAgentV1alpha1),
+			expected:    true,
+		},
+		{
+			name:        "matching legacy value uppercase (case-insensitive)",
+			key:         KeyPlatformMetricsCollection,
+			value:       strings.ToUpper(string(PrometheusAgentV1alpha1)),
+			legacyValue: string(PrometheusAgentV1alpha1),
+			expected:    true,
+		},
+		{
+			name:        "matching legacy value with whitespace",
+			key:         KeyPlatformLogsCollection,
+			value:       " " + string(ClusterLogForwarderV1) + " ",
+			legacyValue: string(ClusterLogForwarderV1),
+			expected:    true,
+		},
+		{
+			name:        "mismatched legacy value",
+			key:         KeyPlatformMetricsCollection,
+			value:       string(ClusterLogForwarderV1),
+			legacyValue: string(PrometheusAgentV1alpha1),
+			expectErr:   true,
+		},
+
+		// Invalid values
+		{name: "invalid on", key: "testKey", value: "on", expectErr: true},
+		{name: "invalid off", key: "testKey", value: "off", expectErr: true},
+		{name: "invalid yes", key: "testKey", value: "yes", expectErr: true},
+		{name: "invalid no", key: "testKey", value: "no", expectErr: true},
+		{name: "invalid 1", key: "testKey", value: "1", expectErr: true},
+		{name: "invalid 0", key: "testKey", value: "0", expectErr: true},
+		{name: "invalid typo", key: "testKey", value: "typo", expectErr: true},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result, err := parseFeatureFlag(tc.key, tc.value, tc.legacyValue)
+			if tc.expectErr {
+				require.Error(t, err)
+				require.ErrorIs(t, err, addoncfg.ErrInvalidConfigurationValue)
+				require.ErrorContains(t, err, fmt.Sprintf("unrecognized value %q for %s", tc.value, tc.key))
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tc.expected, result)
+			}
+		})
+	}
+}
+
+func TestParseBoolFlag(t *testing.T) {
+	enabled, err := parseBoolFlag("testBoolKey", "true")
+	require.NoError(t, err)
+	assert.True(t, enabled)
+
+	disabled, err := parseBoolFlag("testBoolKey", "false")
+	require.NoError(t, err)
+	assert.False(t, disabled)
+
+	empty, err := parseBoolFlag("testBoolKey", "")
+	require.NoError(t, err)
+	assert.False(t, empty)
+
+	_, err = parseBoolFlag("testBoolKey", "invalid-val")
+	require.Error(t, err)
+	require.ErrorIs(t, err, addoncfg.ErrInvalidConfigurationValue)
+	require.ErrorContains(t, err, `unrecognized value "invalid-val" for testBoolKey`)
 }
