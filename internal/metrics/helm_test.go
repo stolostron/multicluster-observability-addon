@@ -108,8 +108,8 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 			UserMetrics:     false,
 			IsOCP:           true,
 			Expects: func(t *testing.T, objects []client.Object) {
-				// 8 endpoint-monitoring-operator resources + 4 pre-delete cleanup hook resources
-				assert.Len(t, objects, 12)
+				// 1 Namespace + 8 endpoint-monitoring-operator resources + 4 pre-delete cleanup hook resources
+				assert.Len(t, objects, 13)
 				deployments := common.FilterResourcesByLabelSelector[*appsv1.Deployment](objects, nil)
 				assert.Len(t, deployments, 1)
 				assert.Equal(t, "endpoint-monitoring-operator", deployments[0].GetName())
@@ -226,9 +226,9 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 			UserMetrics:     false,
 			IsOCP:           false,
 			Expects: func(t *testing.T, objects []client.Object) {
-				// 4 endpoint-monitoring-operator resources (SA, CR, CRB, Deployment)
-				// + 4 pre-delete cleanup hook resources (SA, CR, CRB, Job) = 8 total.
-				assert.Len(t, objects, 8)
+				// 1 Namespace + 4 endpoint-monitoring-operator resources (SA, CR, CRB, Deployment)
+				// + 4 pre-delete cleanup hook resources (SA, CR, CRB, Job) = 9 total.
+				assert.Len(t, objects, 9)
 				deployments := common.FilterResourcesByLabelSelector[*appsv1.Deployment](objects, nil)
 				require.Len(t, deployments, 1)
 				emoDeployment := deployments[0]
@@ -275,7 +275,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 			IsOCP:           true,
 			AgentMissing:    true,
 			Expects: func(t *testing.T, objects []client.Object) {
-				assert.Len(t, objects, 15)
+				assert.Len(t, objects, 16)
 				sa := common.FilterResourcesByLabelSelector[*corev1.ServiceAccount](objects, nil)
 				assert.Len(t, sa, 2)
 				job := common.FilterResourcesByLabelSelector[*batchv1.Job](objects, nil)

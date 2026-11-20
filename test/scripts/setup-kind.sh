@@ -26,6 +26,8 @@ PROMETHEUS_VERSION="${PROMETHEUS_VERSION:-v3.15.1}"
 RHOBS_OPERATOR_VERSION="${RHOBS_OPERATOR_VERSION:-$(go list -m -f '{{.Version}}' github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring 2>/dev/null || echo "v0.90.1-rhobs1")}"
 ENDPOINT_MONITORING_OPERATOR_VERSION="${ENDPOINT_MONITORING_OPERATOR_VERSION:-5.1.0-SNAPSHOT-2026-10-12-16-50-23}"
 KUBE_RBAC_PROXY_VERSION="${KUBE_RBAC_PROXY_VERSION:-v0.23.1}"
+KUBE_STATE_METRICS_VERSION="${KUBE_STATE_METRICS_VERSION:-v2.20.0}"
+NODE_EXPORTER_VERSION="${NODE_EXPORTER_VERSION:-v1.12.1}"
 E2E_KUBECONFIG="${E2E_KUBECONFIG:-/tmp/mcoa-e2e.kubeconfig}"
 export KUBECONFIG="${E2E_KUBECONFIG}"
 
@@ -133,6 +135,14 @@ if ! image_exists localhost/prometheus:kind-e2e || ! image_matches_version local
     printf "FROM quay.io/prometheus/prometheus:%s\nLABEL kind.e2e=true kind.e2e.source-version=%s\nUSER 65534\n" "${PROMETHEUS_VERSION}" "${PROMETHEUS_VERSION}" | "${CONTAINER_ENGINE}" build --platform "linux/${PLATFORM}" -t localhost/prometheus:kind-e2e -
 fi
 
+if ! image_exists localhost/kube-state-metrics:kind-e2e || ! image_matches_version localhost/kube-state-metrics:kind-e2e "${KUBE_STATE_METRICS_VERSION}"; then
+    echo "Building localhost/kube-state-metrics:kind-e2e (${KUBE_STATE_METRICS_VERSION}, non-root)..."
+    if ! image_exists "registry.k8s.io/kube-state-metrics/kube-state-metrics:${KUBE_STATE_METRICS_VERSION}"; then
+        "${CONTAINER_ENGINE}" pull "registry.k8s.io/kube-state-metrics/kube-state-metrics:${KUBE_STATE_METRICS_VERSION}"
+    fi
+    printf "FROM registry.k8s.io/kube-state-metrics/kube-state-metrics:%s\nLABEL kind.e2e=true kind.e2e.source-version=%s\nUSER 65534\n" "${KUBE_STATE_METRICS_VERSION}" "${KUBE_STATE_METRICS_VERSION}" | "${CONTAINER_ENGINE}" build --platform "linux/${PLATFORM}" -t localhost/kube-state-metrics:kind-e2e -
+fi
+
 if ! image_exists localhost/obo-prometheus-operator:kind-e2e || ! image_matches_version localhost/obo-prometheus-operator:kind-e2e "${RHOBS_OPERATOR_VERSION}"; then
     echo "Building localhost/obo-prometheus-operator:kind-e2e (${RHOBS_OPERATOR_VERSION})..."
     OBO_SRC="${OBO_SRC:-quay.io/rhobs/obo-prometheus-operator:${RHOBS_OPERATOR_VERSION}}"
@@ -200,6 +210,8 @@ IMAGES_TO_LOAD=(
     localhost/e2e-https-proxy:kind-e2e
     docker.io/library/nginx:alpine
     "quay.io/brancz/kube-rbac-proxy:${KUBE_RBAC_PROXY_VERSION}"
+    localhost/kube-state-metrics:kind-e2e
+    "quay.io/prometheus/node-exporter:${NODE_EXPORTER_VERSION}"
 )
 
 for img in "${IMAGES_TO_LOAD[@]}"; do

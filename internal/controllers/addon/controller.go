@@ -101,9 +101,7 @@ func NewAddonManager(ctx context.Context, kubeConfig *rest.Config, scheme *runti
 		WithAgentHealthProber(addon.HealthProber(getter, agentLogger)).
 		WithGetValuesFuncs(addonConfigValuesFn, addonhelm.GetValuesFunc(ctx, k8sClient, getter, agentLogger)).
 		WithAgentRegistrationOption(registrationOption).
-		WithAgentDeployTriggerClusterFilter(func(old, new *clusterv1.ManagedCluster) bool {
-			return !maps.Equal(old.Labels, new.Labels)
-		}).
+		WithAgentDeployTriggerClusterFilter(shouldTriggerAgentDeploy).
 		WithAgentInstallNamespace(
 			// Set agent install namespace from addon deployment config if it exists
 			utils.AgentInstallNamespaceFromDeploymentConfigFunc(getter),
@@ -272,4 +270,12 @@ func (a *AgentAddonWithSortedManifests) toUnstructuredMonitoringStack(ms *monito
 		}
 	}
 	return &unstructured.Unstructured{Object: obj}
+}
+
+func shouldTriggerAgentDeploy(old, new *clusterv1.ManagedCluster) bool {
+	if old == nil || new == nil {
+		return old != new
+	}
+	return !maps.Equal(old.Labels, new.Labels) ||
+		old.Annotations[addoncfg.VendorOverrideAnnotationKey] != new.Annotations[addoncfg.VendorOverrideAnnotationKey]
 }
