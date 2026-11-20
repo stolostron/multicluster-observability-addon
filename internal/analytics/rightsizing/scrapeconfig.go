@@ -5,7 +5,6 @@ import (
 
 	cooprometheusv1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1"
 	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 )
 
@@ -115,17 +114,13 @@ func GenerateScrapeConfigForFeatures(includeNamespace, includeVirtualization, in
 	}
 
 	return &cooprometheusv1alpha1.ScrapeConfig{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "ScrapeConfig",
-			APIVersion: "monitoring.rhobs/v1alpha1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: ScrapeConfigName,
-			Labels: map[string]string{
-				"app.kubernetes.io/component":  componentLabel,
-				"app.kubernetes.io/part-of":    partOfLabel,
-				"app.kubernetes.io/managed-by": managedByLabel,
-			},
+		Kind:       "ScrapeConfig",
+		APIVersion: "monitoring.rhobs/v1alpha1",
+		Name:       ScrapeConfigName,
+		Labels: map[string]string{
+			"app.kubernetes.io/component":  componentLabel,
+			"app.kubernetes.io/part-of":    partOfLabel,
+			"app.kubernetes.io/managed-by": managedByLabel,
 		},
 		Spec: cooprometheusv1alpha1.ScrapeConfigSpec{
 			JobName:     ptr.To(ScrapeConfigJobName),

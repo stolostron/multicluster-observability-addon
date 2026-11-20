@@ -5,7 +5,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/utils/ptr"
 	workv1 "open-cluster-management.io/api/work/v1"
@@ -47,25 +46,19 @@ func TestListAddonManifestWorks(t *testing.T) {
 	scheme := newTestScheme(t)
 	works := []client.Object{
 		&workv1.ManifestWork{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "addon-work-1",
-				Namespace: testClusterName,
-				Labels:    map[string]string{"open-cluster-management.io/addon-name": testAddonName},
-			},
+			Name:      "addon-work-1",
+			Namespace: testClusterName,
+			Labels:    map[string]string{"open-cluster-management.io/addon-name": testAddonName},
 		},
 		&workv1.ManifestWork{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "other-addon-work",
-				Namespace: testClusterName,
-				Labels:    map[string]string{"open-cluster-management.io/addon-name": "other-addon"},
-			},
+			Name:      "other-addon-work",
+			Namespace: testClusterName,
+			Labels:    map[string]string{"open-cluster-management.io/addon-name": "other-addon"},
 		},
 		&workv1.ManifestWork{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "addon-work-2",
-				Namespace: "other-cluster",
-				Labels:    map[string]string{"open-cluster-management.io/addon-name": testAddonName},
-			},
+			Name:      "addon-work-2",
+			Namespace: "other-cluster",
+			Labels:    map[string]string{"open-cluster-management.io/addon-name": testAddonName},
 		},
 	}
 
@@ -85,11 +78,9 @@ func TestGetFeedbackValuesForResources(t *testing.T) {
 	scheme := newTestScheme(t)
 	works := []client.Object{
 		&workv1.ManifestWork{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "work-1",
-				Namespace: testClusterName,
-				Labels:    map[string]string{"open-cluster-management.io/addon-name": testAddonName},
-			},
+			Name:      "work-1",
+			Namespace: testClusterName,
+			Labels:    map[string]string{"open-cluster-management.io/addon-name": testAddonName},
 			Status: workv1.ManifestWorkStatus{
 				ResourceStatus: workv1.ManifestResourceStatus{
 					Manifests: []workv1.ManifestCondition{
@@ -113,11 +104,9 @@ func TestGetFeedbackValuesForResources(t *testing.T) {
 			},
 		},
 		&workv1.ManifestWork{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "work-2",
-				Namespace: testClusterName,
-				Labels:    map[string]string{"open-cluster-management.io/addon-name": testAddonName},
-			},
+			Name:      "work-2",
+			Namespace: testClusterName,
+			Labels:    map[string]string{"open-cluster-management.io/addon-name": testAddonName},
 			Status: workv1.ManifestWorkStatus{
 				ResourceStatus: workv1.ManifestResourceStatus{
 					Manifests: []workv1.ManifestCondition{

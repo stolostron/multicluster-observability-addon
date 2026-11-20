@@ -152,35 +152,35 @@ func VMCPUOverestimationTablePanel(datasourceName string, project string) panelg
 		panel.Description("VMs with CPU overestimation - where allocated CPU (Request) exceeds the recommended amount.\nClick VM Name or Namespace to see detailed overestimation view."),
 		TableWithLinks(TablePluginSpec{
 			ColumnSettings: []ColumnSettingsWithLink{
-				{ColumnSettings: tablePanel.ColumnSettings{Name: "timestamp", Hide: true, EnableSorting: true}},
-				{ColumnSettings: tablePanel.ColumnSettings{Name: "name_namespace", Hide: true}},
-				{ColumnSettings: tablePanel.ColumnSettings{Name: "name", Header: "VM Name", HeaderDescription: "Name of the Virtual Machine", EnableSorting: true}, DataLink: overestLink},
-				{ColumnSettings: tablePanel.ColumnSettings{Name: "namespace", Header: "Namespace", HeaderDescription: "Kubernetes namespace where the VM is deployed", EnableSorting: true}, DataLink: overestLink},
-				{ColumnSettings: tablePanel.ColumnSettings{
+				{Name: "timestamp", Hide: true, EnableSorting: true},
+				{Name: "name_namespace", Hide: true},
+				{Name: "name", Header: "VM Name", HeaderDescription: "Name of the Virtual Machine", EnableSorting: true, DataLink: overestLink},
+				{Name: "namespace", Header: "Namespace", HeaderDescription: "Kubernetes namespace where the VM is deployed", EnableSorting: true, DataLink: overestLink},
+				{
 					Name: "value #1", Header: "CPU Utilization %", HeaderDescription: "Ratio of CPU usage to CPU request as a percentage",
 					EnableSorting: true, Sort: tablePanel.DescSort,
 					Format: &commonSdk.Format{Unit: &dashboards.PercentDecimalUnit, DecimalPlaces: 2},
-				}},
-				{ColumnSettings: tablePanel.ColumnSettings{
+				},
+				{
 					Name: "value #2", Header: "CPU Usage", HeaderDescription: "Actual CPU cores consumed by the VM",
 					EnableSorting: true,
 					Format:        &commonSdk.Format{Unit: &dashboards.DecimalUnit, DecimalPlaces: 2},
-				}},
-				{ColumnSettings: tablePanel.ColumnSettings{
+				},
+				{
 					Name: "value #3", Header: "CPU Request", HeaderDescription: "CPU cores requested/allocated for the VM",
 					EnableSorting: true,
 					Format:        &commonSdk.Format{Unit: &dashboards.DecimalUnit, DecimalPlaces: 2},
-				}},
-				{ColumnSettings: tablePanel.ColumnSettings{
+				},
+				{
 					Name: "value #4", Header: "CPU Recommendation", HeaderDescription: "Recommended CPU cores based on usage profile",
 					EnableSorting: true,
 					Format:        &commonSdk.Format{Unit: &dashboards.DecimalUnit, DecimalPlaces: 0},
-				}},
-				{ColumnSettings: tablePanel.ColumnSettings{
+				},
+				{
 					Name: "value #5", Header: "CPU Overestimation", HeaderDescription: "Excess CPU cores allocated beyond recommendation (Request - Recommendation)",
 					EnableSorting: true,
 					Format:        &commonSdk.Format{Unit: &dashboards.DecimalUnit, DecimalPlaces: 0},
-				}},
+				},
 			},
 			CellSettings: []tablePanel.CellSettings{
 				{Condition: tablePanel.Condition{Kind: tablePanel.MiscConditionKind, Spec: &tablePanel.MiscConditionSpec{Value: tablePanel.NullValue}}, Text: "N/A"},
@@ -205,35 +205,35 @@ func VMCPUUnderestimationTablePanel(datasourceName string, project string) panel
 		panel.Description("VMs with CPU underestimation - where allocated CPU (Request) is below the recommended amount.\nClick VM Name or Namespace to see detailed underestimation view."),
 		TableWithLinks(TablePluginSpec{
 			ColumnSettings: []ColumnSettingsWithLink{
-				{ColumnSettings: tablePanel.ColumnSettings{Name: "timestamp", Hide: true, EnableSorting: true}},
-				{ColumnSettings: tablePanel.ColumnSettings{Name: "name_namespace", Hide: true}},
-				{ColumnSettings: tablePanel.ColumnSettings{Name: "name", Header: "VM Name", HeaderDescription: "Name of the Virtual Machine", EnableSorting: true}, DataLink: underestLink},
-				{ColumnSettings: tablePanel.ColumnSettings{Name: "namespace", Header: "Namespace", HeaderDescription: "Kubernetes namespace where the VM is deployed", EnableSorting: true}, DataLink: underestLink},
-				{ColumnSettings: tablePanel.ColumnSettings{
+				{Name: "timestamp", Hide: true, EnableSorting: true},
+				{Name: "name_namespace", Hide: true},
+				{Name: "name", Header: "VM Name", HeaderDescription: "Name of the Virtual Machine", EnableSorting: true, DataLink: underestLink},
+				{Name: "namespace", Header: "Namespace", HeaderDescription: "Kubernetes namespace where the VM is deployed", EnableSorting: true, DataLink: underestLink},
+				{
 					Name: "value #1", Header: "CPU Utilization %", HeaderDescription: "Ratio of CPU usage to CPU request as a percentage",
 					EnableSorting: true, Sort: tablePanel.DescSort,
 					Format: &commonSdk.Format{Unit: &dashboards.PercentDecimalUnit, DecimalPlaces: 2},
-				}},
-				{ColumnSettings: tablePanel.ColumnSettings{
+				},
+				{
 					Name: "value #2", Header: "CPU Usage", HeaderDescription: "Actual CPU cores consumed by the VM",
 					EnableSorting: true,
 					Format:        &commonSdk.Format{Unit: &dashboards.DecimalUnit, DecimalPlaces: 2},
-				}},
-				{ColumnSettings: tablePanel.ColumnSettings{
+				},
+				{
 					Name: "value #3", Header: "CPU Request", HeaderDescription: "CPU cores requested/allocated for the VM",
 					EnableSorting: true,
 					Format:        &commonSdk.Format{Unit: &dashboards.DecimalUnit, DecimalPlaces: 2},
-				}},
-				{ColumnSettings: tablePanel.ColumnSettings{
+				},
+				{
 					Name: "value #4", Header: "CPU Recommendation", HeaderDescription: "Recommended CPU cores based on usage profile",
 					EnableSorting: true,
 					Format:        &commonSdk.Format{Unit: &dashboards.DecimalUnit, DecimalPlaces: 0},
-				}},
-				{ColumnSettings: tablePanel.ColumnSettings{
+				},
+				{
 					Name: "value #5", Header: "CPU Underestimation", HeaderDescription: "Deficit of CPU cores below recommendation (Recommendation - Request)",
 					EnableSorting: true,
 					Format:        &commonSdk.Format{Unit: &dashboards.DecimalUnit, DecimalPlaces: 0},
-				}},
+				},
 			},
 			CellSettings: []tablePanel.CellSettings{
 				{Condition: tablePanel.Condition{Kind: tablePanel.MiscConditionKind, Spec: &tablePanel.MiscConditionSpec{Value: tablePanel.NullValue}}, Text: "N/A"},
@@ -258,35 +258,35 @@ func VMMemOverestimationTablePanel(datasourceName string, project string) panelg
 		panel.Description("VMs with Memory overestimation - where allocated Memory (Request) exceeds the recommended amount.\nClick VM Name or Namespace to see detailed overestimation view."),
 		TableWithLinks(TablePluginSpec{
 			ColumnSettings: []ColumnSettingsWithLink{
-				{ColumnSettings: tablePanel.ColumnSettings{Name: "timestamp", Hide: true, EnableSorting: true}},
-				{ColumnSettings: tablePanel.ColumnSettings{Name: "name_namespace", Hide: true}},
-				{ColumnSettings: tablePanel.ColumnSettings{Name: "name", Header: "VM Name", HeaderDescription: "Name of the Virtual Machine", EnableSorting: true}, DataLink: overestLink},
-				{ColumnSettings: tablePanel.ColumnSettings{Name: "namespace", Header: "Namespace", HeaderDescription: "Kubernetes namespace where the VM is deployed", EnableSorting: true}, DataLink: overestLink},
-				{ColumnSettings: tablePanel.ColumnSettings{
+				{Name: "timestamp", Hide: true, EnableSorting: true},
+				{Name: "name_namespace", Hide: true},
+				{Name: "name", Header: "VM Name", HeaderDescription: "Name of the Virtual Machine", EnableSorting: true, DataLink: overestLink},
+				{Name: "namespace", Header: "Namespace", HeaderDescription: "Kubernetes namespace where the VM is deployed", EnableSorting: true, DataLink: overestLink},
+				{
 					Name: "value #1", Header: "Memory Utilization %", HeaderDescription: "Ratio of memory usage to memory request as a percentage",
 					EnableSorting: true, Sort: tablePanel.DescSort,
 					Format: &commonSdk.Format{Unit: &dashboards.PercentDecimalUnit, DecimalPlaces: 2},
-				}},
-				{ColumnSettings: tablePanel.ColumnSettings{
+				},
+				{
 					Name: "value #2", Header: "Memory Usage", HeaderDescription: "Actual memory consumed by the VM",
 					EnableSorting: true,
 					Format:        &commonSdk.Format{Unit: &dashboards.BytesUnit, DecimalPlaces: 2},
-				}},
-				{ColumnSettings: tablePanel.ColumnSettings{
+				},
+				{
 					Name: "value #3", Header: "Memory Request", HeaderDescription: "Memory requested/allocated for the VM",
 					EnableSorting: true,
 					Format:        &commonSdk.Format{Unit: &dashboards.BytesUnit, DecimalPlaces: 2},
-				}},
-				{ColumnSettings: tablePanel.ColumnSettings{
+				},
+				{
 					Name: "value #4", Header: "Memory Recommendation", HeaderDescription: "Recommended memory allocation based on usage profile",
 					EnableSorting: true,
 					Format:        &commonSdk.Format{Unit: &dashboards.BytesUnit, DecimalPlaces: 2},
-				}},
-				{ColumnSettings: tablePanel.ColumnSettings{
+				},
+				{
 					Name: "value #5", Header: "Memory Overestimation", HeaderDescription: "Excess memory allocated beyond recommendation (Request - Recommendation)",
 					EnableSorting: true,
 					Format:        &commonSdk.Format{Unit: &dashboards.BytesUnit, DecimalPlaces: 2},
-				}},
+				},
 			},
 			CellSettings: []tablePanel.CellSettings{
 				{Condition: tablePanel.Condition{Kind: tablePanel.MiscConditionKind, Spec: &tablePanel.MiscConditionSpec{Value: tablePanel.NullValue}}, Text: "N/A"},
@@ -311,35 +311,35 @@ func VMMemUnderestimationTablePanel(datasourceName string, project string) panel
 		panel.Description("VMs with Memory underestimation - where allocated Memory (Request) is below the recommended amount.\nClick VM Name or Namespace to see detailed underestimation view."),
 		TableWithLinks(TablePluginSpec{
 			ColumnSettings: []ColumnSettingsWithLink{
-				{ColumnSettings: tablePanel.ColumnSettings{Name: "timestamp", Hide: true, EnableSorting: true}},
-				{ColumnSettings: tablePanel.ColumnSettings{Name: "name_namespace", Hide: true}},
-				{ColumnSettings: tablePanel.ColumnSettings{Name: "name", Header: "VM Name", HeaderDescription: "Name of the Virtual Machine", EnableSorting: true}, DataLink: underestLink},
-				{ColumnSettings: tablePanel.ColumnSettings{Name: "namespace", Header: "Namespace", HeaderDescription: "Kubernetes namespace where the VM is deployed", EnableSorting: true}, DataLink: underestLink},
-				{ColumnSettings: tablePanel.ColumnSettings{
+				{Name: "timestamp", Hide: true, EnableSorting: true},
+				{Name: "name_namespace", Hide: true},
+				{Name: "name", Header: "VM Name", HeaderDescription: "Name of the Virtual Machine", EnableSorting: true, DataLink: underestLink},
+				{Name: "namespace", Header: "Namespace", HeaderDescription: "Kubernetes namespace where the VM is deployed", EnableSorting: true, DataLink: underestLink},
+				{
 					Name: "value #1", Header: "Memory Utilization %", HeaderDescription: "Ratio of memory usage to memory request as a percentage",
 					EnableSorting: true, Sort: tablePanel.DescSort,
 					Format: &commonSdk.Format{Unit: &dashboards.PercentDecimalUnit, DecimalPlaces: 2},
-				}},
-				{ColumnSettings: tablePanel.ColumnSettings{
+				},
+				{
 					Name: "value #2", Header: "Memory Usage", HeaderDescription: "Actual memory consumed by the VM",
 					EnableSorting: true,
 					Format:        &commonSdk.Format{Unit: &dashboards.BytesUnit, DecimalPlaces: 2},
-				}},
-				{ColumnSettings: tablePanel.ColumnSettings{
+				},
+				{
 					Name: "value #3", Header: "Memory Request", HeaderDescription: "Memory requested/allocated for the VM",
 					EnableSorting: true,
 					Format:        &commonSdk.Format{Unit: &dashboards.BytesUnit, DecimalPlaces: 2},
-				}},
-				{ColumnSettings: tablePanel.ColumnSettings{
+				},
+				{
 					Name: "value #4", Header: "Memory Recommendation", HeaderDescription: "Recommended memory allocation based on usage profile",
 					EnableSorting: true,
 					Format:        &commonSdk.Format{Unit: &dashboards.BytesUnit, DecimalPlaces: 2},
-				}},
-				{ColumnSettings: tablePanel.ColumnSettings{
+				},
+				{
 					Name: "value #5", Header: "Memory Underestimation", HeaderDescription: "Deficit of memory below recommendation (Recommendation - Request)",
 					EnableSorting: true,
 					Format:        &commonSdk.Format{Unit: &dashboards.BytesUnit, DecimalPlaces: 2},
-				}},
+				},
 			},
 			CellSettings: []tablePanel.CellSettings{
 				{Condition: tablePanel.Condition{Kind: tablePanel.MiscConditionKind, Spec: &tablePanel.MiscConditionSpec{Value: tablePanel.NullValue}}, Text: "N/A"},

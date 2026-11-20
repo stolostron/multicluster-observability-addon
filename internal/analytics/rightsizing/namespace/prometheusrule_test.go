@@ -582,7 +582,7 @@ func TestGeneratedExpressionsParse(t *testing.T) {
 			for _, group := range rule.Spec.Groups {
 				require.NotEmpty(t, group.Rules, "rules in %s", group.Name)
 				for _, r := range group.Rules {
-					_, parseErr := parser.ParseExpr(r.Expr.String())
+					_, parseErr := parser.NewParser(parser.Options{}).ParseExpr(r.Expr.String())
 					assert.NoError(t, parseErr, "%s in %s: %s", r.Record, group.Name, r.Expr.String())
 				}
 			}

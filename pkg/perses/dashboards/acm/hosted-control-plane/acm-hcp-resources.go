@@ -8,10 +8,9 @@ import (
 	"github.com/perses/perses/go-sdk/dashboard"
 	panelgroup "github.com/perses/perses/go-sdk/panel-group"
 	listVar "github.com/perses/perses/go-sdk/variable/list-variable"
-	v1 "github.com/perses/perses/pkg/model/api/v1"
-	v1Common "github.com/perses/perses/pkg/model/api/v1/common"
-	dashboardModel "github.com/perses/perses/pkg/model/api/v1/dashboard"
 	labelValuesVar "github.com/perses/plugins/prometheus/sdk/go/variable/label-values"
+	v1Common "github.com/perses/spec/go/common"
+	dashboardModel "github.com/perses/spec/go/dashboard"
 	acm "github.com/stolostron/multicluster-observability-addon/pkg/perses/dashboards/acm"
 	panels "github.com/stolostron/multicluster-observability-addon/pkg/perses/panels/acm/hosted-control-plane"
 )
@@ -46,7 +45,7 @@ func withHCPResourcesLayout(datasource string) dashboard.Option {
 		}
 
 		if builder.Dashboard.Spec.Panels == nil {
-			builder.Dashboard.Spec.Panels = make(map[string]*v1.Panel)
+			builder.Dashboard.Spec.Panels = make(map[string]*dashboardModel.Panel)
 		}
 
 		layoutIdx := len(builder.Dashboard.Spec.Layouts)

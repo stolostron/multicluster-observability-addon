@@ -9,11 +9,11 @@ import (
 	"github.com/perses/perses/go-sdk/link"
 	"github.com/perses/perses/go-sdk/panel"
 	panelgroup "github.com/perses/perses/go-sdk/panel-group"
-	apicommon "github.com/perses/perses/pkg/model/api/v1/common"
 	"github.com/perses/plugins/prometheus/sdk/go/query"
 	statPanel "github.com/perses/plugins/statchart/sdk/go"
 	tablePanel "github.com/perses/plugins/table/sdk/go"
 	timeSeriesPanel "github.com/perses/plugins/timeserieschart/sdk/go"
+	apicommon "github.com/perses/spec/go/plugin"
 )
 
 var singleClusterOperatorHealthMappings = []any{

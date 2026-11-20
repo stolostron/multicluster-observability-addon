@@ -40,9 +40,7 @@ func TestCleanOrphanResources(t *testing.T) {
 		{
 			name: "No placement exists but resources exist not owned by CMAO",
 			cmao: &addonapiv1beta1.ClusterManagementAddOn{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: cmaoName,
-				},
+				Name: cmaoName,
 				Spec: addonapiv1beta1.ClusterManagementAddOnSpec{
 					// No placements
 				},
@@ -66,9 +64,7 @@ func TestCleanOrphanResources(t *testing.T) {
 		{
 			name: "user-defined resource (part-of label, not owned) is kept when none of its placements exist",
 			cmao: &addonapiv1beta1.ClusterManagementAddOn{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: cmaoName,
-				},
+				Name: cmaoName,
 				Spec: addonapiv1beta1.ClusterManagementAddOnSpec{
 					// No placements
 				},
@@ -95,36 +91,32 @@ func TestCleanOrphanResources(t *testing.T) {
 		{
 			name: "CMAO-owned resource modified by user (non-MCOA ManagedFields) is kept when none of its placements exist",
 			cmao: &addonapiv1beta1.ClusterManagementAddOn{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: cmaoName,
-				},
+				Name: cmaoName,
 				Spec: addonapiv1beta1.ClusterManagementAddOnSpec{
 					// No placements
 				},
 			},
 			cmaoOwnedResources: []*cooprometheusv1alpha1.PrometheusAgent{
 				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "agent-user-modified",
-						Namespace: testNamespace,
-						Annotations: map[string]string{
-							addoncfg.PlacementAnnotationKey: placementNs + "/" + placementName,
+					Name:      "agent-user-modified",
+					Namespace: testNamespace,
+					Annotations: map[string]string{
+						addoncfg.PlacementAnnotationKey: placementNs + "/" + placementName,
+					},
+					ManagedFields: []metav1.ManagedFieldsEntry{
+						{
+							Manager:    addoncfg.Name,
+							Operation:  metav1.ManagedFieldsOperationApply,
+							APIVersion: cooprometheusv1alpha1.SchemeGroupVersion.String(),
+							FieldsType: "FieldsV1",
+							FieldsV1:   metav1.NewFieldsV1(`{"f:metadata":{"f:annotations":{}}}`),
 						},
-						ManagedFields: []metav1.ManagedFieldsEntry{
-							{
-								Manager:    addoncfg.Name,
-								Operation:  metav1.ManagedFieldsOperationApply,
-								APIVersion: cooprometheusv1alpha1.SchemeGroupVersion.String(),
-								FieldsType: "FieldsV1",
-								FieldsV1:   &metav1.FieldsV1{Raw: []byte(`{"f:metadata":{"f:annotations":{}}}`)},
-							},
-							{
-								Manager:    "kubectl-edit",
-								Operation:  metav1.ManagedFieldsOperationUpdate,
-								APIVersion: cooprometheusv1alpha1.SchemeGroupVersion.String(),
-								FieldsType: "FieldsV1",
-								FieldsV1:   &metav1.FieldsV1{Raw: []byte(`{"f:spec":{"f:replicas":{}}}`)},
-							},
+						{
+							Manager:    "kubectl-edit",
+							Operation:  metav1.ManagedFieldsOperationUpdate,
+							APIVersion: cooprometheusv1alpha1.SchemeGroupVersion.String(),
+							FieldsType: "FieldsV1",
+							FieldsV1:   metav1.NewFieldsV1(`{"f:spec":{"f:replicas":{}}}`),
 						},
 					},
 				},
@@ -136,37 +128,33 @@ func TestCleanOrphanResources(t *testing.T) {
 		{
 			name: "CMAO-owned resource with status subresource ManagedFields is deleted when none of its placements exist",
 			cmao: &addonapiv1beta1.ClusterManagementAddOn{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: cmaoName,
-				},
+				Name: cmaoName,
 				Spec: addonapiv1beta1.ClusterManagementAddOnSpec{
 					// No placements
 				},
 			},
 			cmaoOwnedResources: []*cooprometheusv1alpha1.PrometheusAgent{
 				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "agent-status-managed",
-						Namespace: testNamespace,
-						Annotations: map[string]string{
-							addoncfg.PlacementAnnotationKey: placementNs + "/" + placementName,
+					Name:      "agent-status-managed",
+					Namespace: testNamespace,
+					Annotations: map[string]string{
+						addoncfg.PlacementAnnotationKey: placementNs + "/" + placementName,
+					},
+					ManagedFields: []metav1.ManagedFieldsEntry{
+						{
+							Manager:    addoncfg.Name,
+							Operation:  metav1.ManagedFieldsOperationApply,
+							APIVersion: cooprometheusv1alpha1.SchemeGroupVersion.String(),
+							FieldsType: "FieldsV1",
+							FieldsV1:   metav1.NewFieldsV1(`{"f:metadata":{"f:annotations":{}}}`),
 						},
-						ManagedFields: []metav1.ManagedFieldsEntry{
-							{
-								Manager:    addoncfg.Name,
-								Operation:  metav1.ManagedFieldsOperationApply,
-								APIVersion: cooprometheusv1alpha1.SchemeGroupVersion.String(),
-								FieldsType: "FieldsV1",
-								FieldsV1:   &metav1.FieldsV1{Raw: []byte(`{"f:metadata":{"f:annotations":{}}}`)},
-							},
-							{
-								Manager:     "obo-prometheus-operator",
-								Operation:   metav1.ManagedFieldsOperationUpdate,
-								Subresource: "status",
-								APIVersion:  cooprometheusv1alpha1.SchemeGroupVersion.String(),
-								FieldsType:  "FieldsV1",
-								FieldsV1:    &metav1.FieldsV1{Raw: []byte(`{"f:status":{}}`)},
-							},
+						{
+							Manager:     "obo-prometheus-operator",
+							Operation:   metav1.ManagedFieldsOperationUpdate,
+							Subresource: "status",
+							APIVersion:  cooprometheusv1alpha1.SchemeGroupVersion.String(),
+							FieldsType:  "FieldsV1",
+							FieldsV1:    metav1.NewFieldsV1(`{"f:status":{}}`),
 						},
 					},
 				},
@@ -178,17 +166,13 @@ func TestCleanOrphanResources(t *testing.T) {
 		{
 			name: "user-defined resource (part-of label, not owned) is kept while its placement still exists",
 			cmao: &addonapiv1beta1.ClusterManagementAddOn{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: cmaoName,
-				},
+				Name: cmaoName,
 				Spec: addonapiv1beta1.ClusterManagementAddOnSpec{
 					InstallStrategy: addonapiv1beta1.InstallStrategy{
 						Placements: []addonapiv1beta1.PlacementStrategy{
 							{
-								PlacementRef: addonapiv1beta1.PlacementRef{
-									Name:      placementName,
-									Namespace: placementNs,
-								},
+								Name:      placementName,
+								Namespace: placementNs,
 							},
 						},
 					},
@@ -216,9 +200,7 @@ func TestCleanOrphanResources(t *testing.T) {
 		{
 			name: "resource with neither CMAO ownership nor part-of label is never touched",
 			cmao: &addonapiv1beta1.ClusterManagementAddOn{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: cmaoName,
-				},
+				Name: cmaoName,
 				Spec: addonapiv1beta1.ClusterManagementAddOnSpec{
 					// No placements
 				},
@@ -242,9 +224,7 @@ func TestCleanOrphanResources(t *testing.T) {
 		{
 			name: "No placement but exist resources owned by CMAO",
 			cmao: &addonapiv1beta1.ClusterManagementAddOn{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: cmaoName,
-				},
+				Name: cmaoName,
 				Spec: addonapiv1beta1.ClusterManagementAddOnSpec{
 					// No placements
 				},
@@ -269,17 +249,13 @@ func TestCleanOrphanResources(t *testing.T) {
 		{
 			name: "Placement exists but also exists some resources not owned by CMAO",
 			cmao: &addonapiv1beta1.ClusterManagementAddOn{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: cmaoName,
-				},
+				Name: cmaoName,
 				Spec: addonapiv1beta1.ClusterManagementAddOnSpec{
 					InstallStrategy: addonapiv1beta1.InstallStrategy{
 						Placements: []addonapiv1beta1.PlacementStrategy{
 							{
-								PlacementRef: addonapiv1beta1.PlacementRef{
-									Name:      placementName,
-									Namespace: placementNs,
-								},
+								Name:      placementName,
+								Namespace: placementNs,
 							},
 						},
 					},
@@ -317,17 +293,13 @@ func TestCleanOrphanResources(t *testing.T) {
 		{
 			name: "Placement exists but also exists some resources owned by CMAO",
 			cmao: &addonapiv1beta1.ClusterManagementAddOn{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: cmaoName,
-				},
+				Name: cmaoName,
 				Spec: addonapiv1beta1.ClusterManagementAddOnSpec{
 					InstallStrategy: addonapiv1beta1.InstallStrategy{
 						Placements: []addonapiv1beta1.PlacementStrategy{
 							{
-								PlacementRef: addonapiv1beta1.PlacementRef{
-									Name:      placementName,
-									Namespace: placementNs,
-								},
+								Name:      placementName,
+								Namespace: placementNs,
 							},
 						},
 					},
@@ -365,17 +337,13 @@ func TestCleanOrphanResources(t *testing.T) {
 		{
 			name: "resource referencing multiple placements is kept while at least one still exists",
 			cmao: &addonapiv1beta1.ClusterManagementAddOn{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: cmaoName,
-				},
+				Name: cmaoName,
 				Spec: addonapiv1beta1.ClusterManagementAddOnSpec{
 					InstallStrategy: addonapiv1beta1.InstallStrategy{
 						Placements: []addonapiv1beta1.PlacementStrategy{
 							{
-								PlacementRef: addonapiv1beta1.PlacementRef{
-									Name:      placementName,
-									Namespace: placementNs,
-								},
+								Name:      placementName,
+								Namespace: placementNs,
 							},
 						},
 					},
@@ -401,9 +369,7 @@ func TestCleanOrphanResources(t *testing.T) {
 		{
 			name: "resource referencing multiple placements is deleted once none of them exist",
 			cmao: &addonapiv1beta1.ClusterManagementAddOn{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: cmaoName,
-				},
+				Name: cmaoName,
 				Spec: addonapiv1beta1.ClusterManagementAddOnSpec{
 					// No placements
 				},
@@ -428,17 +394,13 @@ func TestCleanOrphanResources(t *testing.T) {
 		{
 			name: "resource with no placement-ref annotation owned by CMAO is deleted",
 			cmao: &addonapiv1beta1.ClusterManagementAddOn{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: cmaoName,
-				},
+				Name: cmaoName,
 				Spec: addonapiv1beta1.ClusterManagementAddOnSpec{
 					InstallStrategy: addonapiv1beta1.InstallStrategy{
 						Placements: []addonapiv1beta1.PlacementStrategy{
 							{
-								PlacementRef: addonapiv1beta1.PlacementRef{
-									Name:      placementName,
-									Namespace: placementNs,
-								},
+								Name:      placementName,
+								Namespace: placementNs,
 							},
 						},
 					},

@@ -541,12 +541,10 @@ func (o *OptionsBuilder) ensurePodConfigMap(ctx context.Context) error {
 // The ConfigMap is labeled to indicate it's managed for right-sizing.
 func (o *OptionsBuilder) createDefaultConfigMap(ctx context.Context, name string, data map[string]string) error {
 	cm := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: addoncfg.InstallNamespace,
-			Labels:    rightsizing.RSLabels(),
-		},
-		Data: data,
+		Name:      name,
+		Namespace: addoncfg.InstallNamespace,
+		Labels:    rightsizing.RSLabels(),
+		Data:      data,
 	}
 
 	if err := o.Client.Create(ctx, cm); err != nil {

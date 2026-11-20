@@ -21,7 +21,6 @@ import (
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	intstr "k8s.io/apimachinery/pkg/util/intstr"
@@ -57,11 +56,9 @@ func TestBuildOptions(t *testing.T) {
 	require.NoError(t, workv1.Install(scheme))
 
 	platformAgent := &cooprometheusv1alpha1.PrometheusAgent{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-prometheus-agent",
-			Namespace: hubNamespace,
-			Labels:    config.PlatformPrometheusMatchLabels,
-		},
+		Name:      "test-prometheus-agent",
+		Namespace: hubNamespace,
+		Labels:    config.PlatformPrometheusMatchLabels,
 		Spec: cooprometheusv1alpha1.PrometheusAgentSpec{
 			CommonPrometheusFields: cooprometheusv1.CommonPrometheusFields{
 				LogLevel:   "debug",
@@ -77,36 +74,28 @@ func TestBuildOptions(t *testing.T) {
 	}
 
 	platformHAProxyCM := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-haproxy-config",
-			Namespace: hubNamespace,
-			Labels:    config.PlatformPrometheusMatchLabels,
-		},
-		Data: map[string]string{},
+		Name:      "test-haproxy-config",
+		Namespace: hubNamespace,
+		Labels:    config.PlatformPrometheusMatchLabels,
+		Data:      map[string]string{},
 	}
 
 	platformScrapeConfig := &cooprometheusv1alpha1.ScrapeConfig{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-scrape-config",
-			Namespace: hubNamespace,
-			Labels:    config.PlatformPrometheusMatchLabels,
-		},
+		Name:      "test-scrape-config",
+		Namespace: hubNamespace,
+		Labels:    config.PlatformPrometheusMatchLabels,
 	}
 
 	platformRule := &prometheusv1.PrometheusRule{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-prometheus-rule",
-			Namespace: hubNamespace,
-			Labels:    config.PlatformPrometheusMatchLabels,
-		},
+		Name:      "test-prometheus-rule",
+		Namespace: hubNamespace,
+		Labels:    config.PlatformPrometheusMatchLabels,
 	}
 
 	uwlAgent := &cooprometheusv1alpha1.PrometheusAgent{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-prometheus-agent-uwl",
-			Namespace: hubNamespace,
-			Labels:    config.UserWorkloadPrometheusMatchLabels,
-		},
+		Name:      "test-prometheus-agent-uwl",
+		Namespace: hubNamespace,
+		Labels:    config.UserWorkloadPrometheusMatchLabels,
 		Spec: cooprometheusv1alpha1.PrometheusAgentSpec{
 			CommonPrometheusFields: cooprometheusv1.CommonPrometheusFields{
 				LogLevel:   "warn",
@@ -121,20 +110,16 @@ func TestBuildOptions(t *testing.T) {
 	}
 
 	uwlHAProxyCM := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-haproxy-config-uwl",
-			Namespace: hubNamespace,
-			Labels:    config.UserWorkloadPrometheusMatchLabels,
-		},
-		Data: map[string]string{},
+		Name:      "test-haproxy-config-uwl",
+		Namespace: hubNamespace,
+		Labels:    config.UserWorkloadPrometheusMatchLabels,
+		Data:      map[string]string{},
 	}
 
 	uwlCooRule := &cooprometheusv1.PrometheusRule{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-uwl-rule-rhobs",
-			Namespace: hubNamespace,
-			Labels:    config.UserWorkloadPrometheusMatchLabels,
-		},
+		Name:      "test-uwl-rule-rhobs",
+		Namespace: hubNamespace,
+		Labels:    config.UserWorkloadPrometheusMatchLabels,
 		Spec: cooprometheusv1.PrometheusRuleSpec{
 			Groups: []cooprometheusv1.RuleGroup{
 				{Name: "uwl-rules", Interval: ptr.To(cooprometheusv1.Duration("30s"))},
@@ -143,58 +128,40 @@ func TestBuildOptions(t *testing.T) {
 	}
 
 	platformManagedClusterAddOn := &addonapiv1beta1.ManagedClusterAddOn{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: spokeName,
-			Name:      "observability-controller",
-		},
+		Namespace: spokeName,
+		Name:      "observability-controller",
 		Status: addonapiv1beta1.ManagedClusterAddOnStatus{
 			ConfigReferences: []addonapiv1beta1.ConfigReference{
 				{
-					ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
-						Group:    "monitoring.rhobs",
-						Resource: cooprometheusv1alpha1.PrometheusAgentName,
-					},
+					Group:    "monitoring.rhobs",
+					Resource: cooprometheusv1alpha1.PrometheusAgentName,
 					DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
-						ConfigReferent: addonapiv1beta1.ConfigReferent{
-							Name:      platformAgent.Name,
-							Namespace: platformAgent.Namespace,
-						},
+						Name:      platformAgent.Name,
+						Namespace: platformAgent.Namespace,
 					},
 				},
 				{
-					ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
-						Group:    "",
-						Resource: "configmaps",
-					},
+					Group:    "",
+					Resource: "configmaps",
 					DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
-						ConfigReferent: addonapiv1beta1.ConfigReferent{
-							Name:      platformHAProxyCM.Name,
-							Namespace: platformHAProxyCM.Namespace,
-						},
+						Name:      platformHAProxyCM.Name,
+						Namespace: platformHAProxyCM.Namespace,
 					},
 				},
 				{
-					ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
-						Group:    "monitoring.rhobs",
-						Resource: cooprometheusv1alpha1.ScrapeConfigName,
-					},
+					Group:    "monitoring.rhobs",
+					Resource: cooprometheusv1alpha1.ScrapeConfigName,
 					DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
-						ConfigReferent: addonapiv1beta1.ConfigReferent{
-							Name:      platformScrapeConfig.Name,
-							Namespace: platformScrapeConfig.Namespace,
-						},
+						Name:      platformScrapeConfig.Name,
+						Namespace: platformScrapeConfig.Namespace,
 					},
 				},
 				{
-					ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
-						Group:    "monitoring.coreos.com",
-						Resource: prometheusv1.PrometheusRuleName,
-					},
+					Group:    "monitoring.coreos.com",
+					Resource: prometheusv1.PrometheusRuleName,
 					DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
-						ConfigReferent: addonapiv1beta1.ConfigReferent{
-							Name:      platformRule.Name,
-							Namespace: platformRule.Namespace,
-						},
+						Name:      platformRule.Name,
+						Namespace: platformRule.Namespace,
 					},
 				},
 			},
@@ -202,20 +169,16 @@ func TestBuildOptions(t *testing.T) {
 	}
 
 	cmao := &addonapiv1beta1.ClusterManagementAddOn{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: addoncfg.Name,
-			UID:  types.UID("test-cmao-uid"),
-		},
+		Name: addoncfg.Name,
+		UID:  types.UID("test-cmao-uid"),
 	}
 	require.NoError(t, controllerutil.SetOwnerReference(cmao, platformAgent, scheme))
 	require.NoError(t, controllerutil.SetOwnerReference(cmao, uwlAgent, scheme))
 
 	// Alertmanager secrets
 	alertmanagerAccessorSecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      config.AlertmanagerAccessorSecretName,
-			Namespace: addoncfg.InstallNamespace,
-		},
+		Name:      config.AlertmanagerAccessorSecretName,
+		Namespace: addoncfg.InstallNamespace,
 		Data: map[string][]byte{
 			"key":  []byte("data"),
 			"pass": []byte("data"),
@@ -225,30 +188,22 @@ func TestBuildOptions(t *testing.T) {
 	createResources := func() []client.Object {
 		return []client.Object{
 			&corev1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: hubNamespace,
-				},
+				Name: hubNamespace,
 			},
 			&corev1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: spokeName,
-				},
+				Name: spokeName,
 			},
 			&clusterv1.ManagedCluster{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: spokeName,
-					Labels: map[string]string{
-						config.ManagedClusterLabelClusterID: "test-cluster-id",
-						clusterinfov1beta1.LabelKubeVendor:  string(clusterinfov1beta1.KubeVendorOpenShift),
-						clusterinfov1beta1.OCPVersionMajor:  "5",
-					},
+				Name: spokeName,
+				Labels: map[string]string{
+					config.ManagedClusterLabelClusterID: "test-cluster-id",
+					clusterinfov1beta1.LabelKubeVendor:  string(clusterinfov1beta1.KubeVendorOpenShift),
+					clusterinfov1beta1.OCPVersionMajor:  "5",
 				},
 			},
 			&corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      config.ImagesConfigMapObjKey.Name,
-					Namespace: config.ImagesConfigMapObjKey.Namespace,
-				},
+				Name:      config.ImagesConfigMapObjKey.Name,
+				Namespace: config.ImagesConfigMapObjKey.Namespace,
 				Data: map[string]string{
 					"obo_prometheus_rhel9_operator": "obo-prom-operator-image",
 					"kube_rbac_proxy":               "kube-rbac-proxy-image",
@@ -268,45 +223,37 @@ func TestBuildOptions(t *testing.T) {
 			cmao.DeepCopy(),
 			alertmanagerAccessorSecret.DeepCopy(),
 			&corev1.Secret{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      config.ClientCertSecretName,
-					Namespace: config.HubInstallNamespace,
-				},
+				Name:      config.ClientCertSecretName,
+				Namespace: config.HubInstallNamespace,
 				Data: map[string][]byte{
 					"tls.crt": []byte("test-crt"),
 					"tls.key": []byte("test-key"),
 				},
 			},
 			&corev1.Secret{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      config.HubCASecretName,
-					Namespace: config.HubInstallNamespace,
-				},
+				Name:      config.HubCASecretName,
+				Namespace: config.HubInstallNamespace,
 				Data: map[string][]byte{
 					"ca.crt": []byte("test-ca"),
 				},
 			},
 			&corev1.Secret{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      config.ClientCertSecretName,
-					Namespace: hubNamespace,
-				},
+				Name:      config.ClientCertSecretName,
+				Namespace: hubNamespace,
 				Data: map[string][]byte{
 					"tls.crt": []byte("test-crt"),
 					"tls.key": []byte("test-key"),
 				},
 			},
 			&corev1.Secret{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      config.HubCASecretName,
-					Namespace: hubNamespace,
-				},
+				Name:      config.HubCASecretName,
+				Namespace: hubNamespace,
 				Data: map[string][]byte{
 					"ca.crt": []byte("test-ca"),
 				},
 			},
 			&configv1.ClusterVersion{
-				ObjectMeta: metav1.ObjectMeta{Name: "version"},
+				Name: "version",
 				Spec: configv1.ClusterVersionSpec{
 					ClusterID: configv1.ClusterID("97e51387-3da1-4ae4-89e3-f29bcd42fd42"),
 				},
@@ -343,9 +290,7 @@ func TestBuildOptions(t *testing.T) {
 			resources: func() []client.Object {
 				res := filterOutResource[*clusterv1.ManagedCluster](createResources(), "")
 				res = append(res, &clusterv1.ManagedCluster{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: spokeName,
-					},
+					Name: spokeName,
 				})
 				return res
 			},
@@ -360,10 +305,8 @@ func TestBuildOptions(t *testing.T) {
 			resources: func() []client.Object {
 				res := filterOutResource[*corev1.ConfigMap](createResources(), config.ImagesConfigMapObjKey.Name)
 				res = append(res, &corev1.ConfigMap{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      config.ImagesConfigMapObjKey.Name,
-						Namespace: config.ImagesConfigMapObjKey.Namespace,
-					},
+					Name:      config.ImagesConfigMapObjKey.Name,
+					Namespace: config.ImagesConfigMapObjKey.Namespace,
 					Data: map[string]string{ // Missing image overrides for config reloader
 						"obo_prometheus_rhel9_operator": "obo_prom-operator-image",
 						"kube_rbac_proxy":               "kube-rbac-proxy-image",
@@ -378,10 +321,8 @@ func TestBuildOptions(t *testing.T) {
 		},
 		"missing config reference": {
 			addon: &addonapiv1beta1.ManagedClusterAddOn{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: spokeName,
-					Name:      "observability-controller",
-				},
+				Namespace: spokeName,
+				Name:      "observability-controller",
 			},
 			platformEnabled: true,
 			resources:       createResources,
@@ -496,34 +437,24 @@ func TestBuildOptions(t *testing.T) {
 		"user workloads collection is enabled": {
 			resources: createResources,
 			addon: &addonapiv1beta1.ManagedClusterAddOn{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: spokeName,
-					Name:      "observability-controller",
-				},
+				Namespace: spokeName,
+				Name:      "observability-controller",
 				Status: addonapiv1beta1.ManagedClusterAddOnStatus{
 					ConfigReferences: []addonapiv1beta1.ConfigReference{
 						{
-							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
-								Group:    "monitoring.rhobs",
-								Resource: cooprometheusv1alpha1.PrometheusAgentName,
-							},
+							Group:    "monitoring.rhobs",
+							Resource: cooprometheusv1alpha1.PrometheusAgentName,
 							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
-								ConfigReferent: addonapiv1beta1.ConfigReferent{
-									Name:      uwlAgent.Name,
-									Namespace: uwlAgent.Namespace,
-								},
+								Name:      uwlAgent.Name,
+								Namespace: uwlAgent.Namespace,
 							},
 						},
 						{
-							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
-								Group:    "",
-								Resource: "configmaps",
-							},
+							Group:    "",
+							Resource: "configmaps",
 							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
-								ConfigReferent: addonapiv1beta1.ConfigReferent{
-									Name:      uwlHAProxyCM.Name,
-									Namespace: uwlHAProxyCM.Namespace,
-								},
+								Name:      uwlHAProxyCM.Name,
+								Namespace: uwlHAProxyCM.Namespace,
 							},
 						},
 					},
@@ -547,46 +478,32 @@ func TestBuildOptions(t *testing.T) {
 				return append(createResources(), uwlCooRule.DeepCopy())
 			},
 			addon: &addonapiv1beta1.ManagedClusterAddOn{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: spokeName,
-					Name:      "observability-controller",
-				},
+				Namespace: spokeName,
+				Name:      "observability-controller",
 				Status: addonapiv1beta1.ManagedClusterAddOnStatus{
 					ConfigReferences: []addonapiv1beta1.ConfigReference{
 						{
-							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
-								Group:    "monitoring.rhobs",
-								Resource: cooprometheusv1alpha1.PrometheusAgentName,
-							},
+							Group:    "monitoring.rhobs",
+							Resource: cooprometheusv1alpha1.PrometheusAgentName,
 							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
-								ConfigReferent: addonapiv1beta1.ConfigReferent{
-									Name:      uwlAgent.Name,
-									Namespace: uwlAgent.Namespace,
-								},
+								Name:      uwlAgent.Name,
+								Namespace: uwlAgent.Namespace,
 							},
 						},
 						{
-							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
-								Group:    "",
-								Resource: "configmaps",
-							},
+							Group:    "",
+							Resource: "configmaps",
 							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
-								ConfigReferent: addonapiv1beta1.ConfigReferent{
-									Name:      uwlHAProxyCM.Name,
-									Namespace: uwlHAProxyCM.Namespace,
-								},
+								Name:      uwlHAProxyCM.Name,
+								Namespace: uwlHAProxyCM.Namespace,
 							},
 						},
 						{
-							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
-								Group:    "monitoring.rhobs",
-								Resource: cooprometheusv1.PrometheusRuleName,
-							},
+							Group:    "monitoring.rhobs",
+							Resource: cooprometheusv1.PrometheusRuleName,
 							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
-								ConfigReferent: addonapiv1beta1.ConfigReferent{
-									Name:      uwlCooRule.Name,
-									Namespace: uwlCooRule.Namespace,
-								},
+								Name:      uwlCooRule.Name,
+								Namespace: uwlCooRule.Namespace,
 							},
 						},
 					},
@@ -605,82 +522,56 @@ func TestBuildOptions(t *testing.T) {
 		},
 		"user workload is enabled and is hypershift hub": {
 			addon: &addonapiv1beta1.ManagedClusterAddOn{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: spokeName,
-					Name:      "observability-controller",
-				},
+				Namespace: spokeName,
+				Name:      "observability-controller",
 				Status: addonapiv1beta1.ManagedClusterAddOnStatus{
 					ConfigReferences: []addonapiv1beta1.ConfigReference{
 						{
-							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
-								Group:    "monitoring.rhobs",
-								Resource: cooprometheusv1alpha1.PrometheusAgentName,
-							},
+							Group:    "monitoring.rhobs",
+							Resource: cooprometheusv1alpha1.PrometheusAgentName,
 							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
-								ConfigReferent: addonapiv1beta1.ConfigReferent{
-									Name:      uwlAgent.Name,
-									Namespace: uwlAgent.Namespace,
-								},
+								Name:      uwlAgent.Name,
+								Namespace: uwlAgent.Namespace,
 							},
 						},
 						{
-							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
-								Group:    "",
-								Resource: "configmaps",
-							},
+							Group:    "",
+							Resource: "configmaps",
 							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
-								ConfigReferent: addonapiv1beta1.ConfigReferent{
-									Name:      uwlHAProxyCM.Name,
-									Namespace: uwlHAProxyCM.Namespace,
-								},
+								Name:      uwlHAProxyCM.Name,
+								Namespace: uwlHAProxyCM.Namespace,
 							},
 						},
 						{
-							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
-								Group:    "",
-								Resource: "scrapeconfigs",
-							},
+							Group:    "",
+							Resource: "scrapeconfigs",
 							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
-								ConfigReferent: addonapiv1beta1.ConfigReferent{
-									Name:      "etcd-base",
-									Namespace: hubNamespace,
-								},
+								Name:      "etcd-base",
+								Namespace: hubNamespace,
 							},
 						},
 						{
-							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
-								Group:    "",
-								Resource: "scrapeconfigs",
-							},
+							Group:    "",
+							Resource: "scrapeconfigs",
 							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
-								ConfigReferent: addonapiv1beta1.ConfigReferent{
-									Name:      "apiserver-base",
-									Namespace: hubNamespace,
-								},
+								Name:      "apiserver-base",
+								Namespace: hubNamespace,
 							},
 						},
 						{
-							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
-								Group:    "",
-								Resource: "prometheusrules",
-							},
+							Group:    "",
+							Resource: "prometheusrules",
 							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
-								ConfigReferent: addonapiv1beta1.ConfigReferent{
-									Name:      "etcd-base",
-									Namespace: hubNamespace,
-								},
+								Name:      "etcd-base",
+								Namespace: hubNamespace,
 							},
 						},
 						{
-							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
-								Group:    "",
-								Resource: "prometheusrules",
-							},
+							Group:    "",
+							Resource: "prometheusrules",
 							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
-								ConfigReferent: addonapiv1beta1.ConfigReferent{
-									Name:      "apiserver-base",
-									Namespace: hubNamespace,
-								},
+								Name:      "apiserver-base",
+								Namespace: hubNamespace,
 							},
 						},
 					},
@@ -689,14 +580,12 @@ func TestBuildOptions(t *testing.T) {
 			resources: func() []client.Object {
 				res := filterOutResource[*clusterv1.ManagedCluster](createResources(), "")
 				res = append(res, &clusterv1.ManagedCluster{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "local-cluster-custom-name",
-						Labels: map[string]string{
-							addoncfg.ManagedClusterLabelClusterID:                       "test-cluster-id",
-							"feature.open-cluster-management.io/addon-hypershift-addon": "available",
-							"local-cluster":                    "true",
-							clusterinfov1beta1.LabelKubeVendor: string(clusterinfov1beta1.KubeVendorOpenShift),
-						},
+					Name: "local-cluster-custom-name",
+					Labels: map[string]string{
+						addoncfg.ManagedClusterLabelClusterID:                       "test-cluster-id",
+						"feature.open-cluster-management.io/addon-hypershift-addon": "available",
+						"local-cluster":                    "true",
+						clusterinfov1beta1.LabelKubeVendor: string(clusterinfov1beta1.KubeVendorOpenShift),
 					},
 				})
 				res = append(res, newHCPResources()...)
@@ -882,10 +771,8 @@ func TestBuildOptions(t *testing.T) {
 			resources: func() []client.Object {
 				res := createResources()
 				res = append(res, &routev1.Route{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      mcoaObsAPIRouteName,
-						Namespace: config.HubInstallNamespace,
-					},
+					Name:      mcoaObsAPIRouteName,
+					Namespace: config.HubInstallNamespace,
 					Spec: routev1.RouteSpec{
 						Host: "obs-api.apps.example.com",
 					},
@@ -1040,12 +927,10 @@ func filterOutResource[T client.Object](resources []client.Object, name string) 
 
 func newManifestWork(name string) *workv1.ManifestWork {
 	return &workv1.ManifestWork{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: name,
-			Labels: map[string]string{
-				addonapiv1beta1.AddonLabelKey: addoncfg.Name,
-			},
+		Name:      name,
+		Namespace: name,
+		Labels: map[string]string{
+			addonapiv1beta1.AddonLabelKey: addoncfg.Name,
 		},
 		Status: workv1.ManifestWorkStatus{
 			ResourceStatus: workv1.ManifestResourceStatus{
@@ -1136,19 +1021,15 @@ func newHCPResources() []client.Object {
 	targetPort := intstr.FromString("target")
 	return []client.Object{
 		&hyperv1.HostedCluster{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "name",
-				Namespace: "namespace",
-			},
+			Name:      "name",
+			Namespace: "namespace",
 			Spec: hyperv1.HostedClusterSpec{
 				ClusterID: "cluster-id",
 			},
 		},
 		&prometheusv1.ServiceMonitor{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      config.HypershiftEtcdServiceMonitorName,
-				Namespace: "namespace-name",
-			},
+			Name:      config.HypershiftEtcdServiceMonitorName,
+			Namespace: "namespace-name",
 			Spec: prometheusv1.ServiceMonitorSpec{
 				Endpoints: []prometheusv1.Endpoint{
 					{
@@ -1158,10 +1039,8 @@ func newHCPResources() []client.Object {
 			},
 		},
 		&prometheusv1.ServiceMonitor{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      config.HypershiftApiServerServiceMonitorName,
-				Namespace: "namespace-name",
-			},
+			Name:      config.HypershiftApiServerServiceMonitorName,
+			Namespace: "namespace-name",
 			Spec: prometheusv1.ServiceMonitorSpec{
 				Endpoints: []prometheusv1.Endpoint{
 					{
@@ -1177,11 +1056,9 @@ func newHCPResources() []client.Object {
 func newHCPConfigResources(ns string) []client.Object {
 	return []client.Object{
 		&cooprometheusv1alpha1.ScrapeConfig{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "etcd-base",
-				Namespace: ns,
-				Labels:    config.EtcdHcpUserWorkloadPrometheusMatchLabels,
-			},
+			Name:      "etcd-base",
+			Namespace: ns,
+			Labels:    config.EtcdHcpUserWorkloadPrometheusMatchLabels,
 			Spec: cooprometheusv1alpha1.ScrapeConfigSpec{
 				Params: map[string][]string{
 					"match[]": {
@@ -1191,11 +1068,9 @@ func newHCPConfigResources(ns string) []client.Object {
 			},
 		},
 		&cooprometheusv1alpha1.ScrapeConfig{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "apiserver-base",
-				Namespace: ns,
-				Labels:    config.ApiserverHcpUserWorkloadPrometheusMatchLabels,
-			},
+			Name:      "apiserver-base",
+			Namespace: ns,
+			Labels:    config.ApiserverHcpUserWorkloadPrometheusMatchLabels,
 			Spec: cooprometheusv1alpha1.ScrapeConfigSpec{
 				Params: map[string][]string{
 					"match[]": {
@@ -1205,11 +1080,9 @@ func newHCPConfigResources(ns string) []client.Object {
 			},
 		},
 		&prometheusv1.PrometheusRule{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "etcd-base",
-				Namespace: ns,
-				Labels:    config.EtcdHcpUserWorkloadPrometheusMatchLabels,
-			},
+			Name:      "etcd-base",
+			Namespace: ns,
+			Labels:    config.EtcdHcpUserWorkloadPrometheusMatchLabels,
 			Spec: prometheusv1.PrometheusRuleSpec{
 				Groups: []prometheusv1.RuleGroup{
 					{
@@ -1223,11 +1096,9 @@ func newHCPConfigResources(ns string) []client.Object {
 			},
 		},
 		&prometheusv1.PrometheusRule{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "apiserver-base",
-				Namespace: ns,
-				Labels:    config.ApiserverHcpUserWorkloadPrometheusMatchLabels,
-			},
+			Name:      "apiserver-base",
+			Namespace: ns,
+			Labels:    config.ApiserverHcpUserWorkloadPrometheusMatchLabels,
 			Spec: prometheusv1.PrometheusRuleSpec{
 				Groups: []prometheusv1.RuleGroup{
 					{

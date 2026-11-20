@@ -14,7 +14,6 @@ import (
 	"github.com/stolostron/multicluster-observability-addon/internal/tracing/manifests"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
@@ -72,62 +71,44 @@ func Test_Tracing_AllConfigsTogether_AllResources(t *testing.T) {
 	managedClusterAddOn = addontesting.NewAddon("test", "cluster-1")
 	managedClusterAddOn.Spec.Configs = []addonapiv1beta1.AddOnConfig{
 		{
-			ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
-				Group:    "",
-				Resource: "configmaps",
-			},
-			ConfigReferent: addonapiv1beta1.ConfigReferent{
-				Namespace: "open-cluster-management-observability",
-				Name:      "tracing-auth",
-			},
+			Group:     "",
+			Resource:  "configmaps",
+			Namespace: "open-cluster-management-observability",
+			Name:      "tracing-auth",
 		},
 	}
 	managedClusterAddOn.Status.ConfigReferences = []addonapiv1beta1.ConfigReference{
 		{
-			ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
-				Group:    "addon.open-cluster-management.io",
-				Resource: "addondeploymentconfigs",
-			},
+			Group:    "addon.open-cluster-management.io",
+			Resource: "addondeploymentconfigs",
 			DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
-				ConfigReferent: addonapiv1beta1.ConfigReferent{
-					Namespace: "open-cluster-management-observability",
-					Name:      "multicluster-observability-addon",
-				},
-				SpecHash: "fake-spec-hash",
+				Namespace: "open-cluster-management-observability",
+				Name:      "multicluster-observability-addon",
+				SpecHash:  "fake-spec-hash",
 			},
 		},
 		{
-			ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
-				Group:    "opentelemetry.io",
-				Resource: "opentelemetrycollectors",
-			},
+			Group:    "opentelemetry.io",
+			Resource: "opentelemetrycollectors",
 			DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
-				ConfigReferent: addonapiv1beta1.ConfigReferent{
-					Namespace: "open-cluster-management-observability",
-					Name:      "mcoa-instance",
-				},
+				Namespace: "open-cluster-management-observability",
+				Name:      "mcoa-instance",
 			},
 		},
 		{
-			ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
-				Group:    "opentelemetry.io",
-				Resource: "instrumentations",
-			},
+			Group:    "opentelemetry.io",
+			Resource: "instrumentations",
 			DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
-				ConfigReferent: addonapiv1beta1.ConfigReferent{
-					Namespace: "open-cluster-management-observability",
-					Name:      "mcoa-instance",
-				},
+				Namespace: "open-cluster-management-observability",
+				Name:      "mcoa-instance",
 			},
 		},
 	}
 
 	// Setup configuration resources: OpenTelemetryCollector, AddOnDeploymentConfig
 	otelCol := otelv1beta1.OpenTelemetryCollector{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "mcoa-instance",
-			Namespace: "open-cluster-management-observability",
-		},
+		Name:      "mcoa-instance",
+		Namespace: "open-cluster-management-observability",
 		Spec: otelv1beta1.OpenTelemetryCollectorSpec{
 			Config: otelv1beta1.Config{
 				Exporters: otelv1beta1.AnyConfig{
@@ -138,17 +119,37 @@ func Test_Tracing_AllConfigsTogether_AllResources(t *testing.T) {
 								"otlphttp": map[string]any{},
 							},
 						},
+						"otlphttp": map[string]any{
+							"endpoint": "https://test.com",
+							"tls": map[string]any{
+								"cert_file": "/etc/tracing/otlphttp/tls.crt",
+								"key_file":  "/etc/tracing/otlphttp/tls.key",
+								"ca_file":   "/etc/tracing/otlphttp/ca.crt",
+							},
+						},
 					},
+				},
+			},
+			Volumes: []corev1.Volume{
+				{
+					Name: "tracing-otlphttp-auth",
+					Secret: &corev1.SecretVolumeSource{
+						SecretName: "tracing-otlphttp-auth",
+					},
+				},
+			},
+			VolumeMounts: []corev1.VolumeMount{
+				{
+					Name:      "tracing-otlphttp-auth",
+					MountPath: "/etc/tracing/otlphttp",
 				},
 			},
 		},
 	}
 
 	instr := otelv1alpha1.Instrumentation{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "mcoa-instance",
-			Namespace: "open-cluster-management-observability",
-		},
+		Name:      "mcoa-instance",
+		Namespace: "open-cluster-management-observability",
 		Spec: otelv1alpha1.InstrumentationSpec{
 			Exporter: otelv1alpha1.Exporter{
 				Endpoint: "http://test.com",
@@ -157,18 +158,14 @@ func Test_Tracing_AllConfigsTogether_AllResources(t *testing.T) {
 	}
 
 	addOnDeploymentConfig = &addonapiv1beta1.AddOnDeploymentConfig{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "multicluster-observability-addon",
-			Namespace: "open-cluster-management-observability",
-		},
-		Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{},
+		Name:      "multicluster-observability-addon",
+		Namespace: "open-cluster-management-observability",
+		Spec:      addonapiv1beta1.AddOnDeploymentConfigSpec{},
 	}
 
 	authCM = &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "tracing-auth",
-			Namespace: "open-cluster-management-observability",
-		},
+		Name:      "tracing-auth",
+		Namespace: "open-cluster-management-observability",
 		Data: map[string]string{
 			"otlphttp": "mTLS",
 		},
@@ -177,10 +174,8 @@ func Test_Tracing_AllConfigsTogether_AllResources(t *testing.T) {
 	// This secret will be generated by cert-manager. We need to create it here
 	// to mock the behavior from cert-manager
 	generatedSecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "tracing-otlphttp-auth",
-			Namespace: "cluster-1",
-		},
+		Name:      "tracing-otlphttp-auth",
+		Namespace: "cluster-1",
 		Data: map[string][]byte{
 			"tls.crt": []byte("data"),
 			"ca.crt":  []byte("data"),
@@ -212,9 +207,9 @@ func Test_Tracing_AllConfigsTogether_AllResources(t *testing.T) {
 	// Render manifests and return them as k8s runtime objects
 	objects, err := tracingAgentAddon.Manifests(t.Context(), managedCluster, managedClusterAddOn)
 	require.NoError(t, err)
-	require.Len(t, objects, 6)
+	require.Len(t, objects, 7)
 
-	var foundSubscription bool
+	var foundSubscription, foundTLSSecret bool
 	for _, obj := range objects {
 		switch obj := obj.(type) {
 		case *otelv1beta1.OpenTelemetryCollector:
@@ -228,6 +223,7 @@ func Test_Tracing_AllConfigsTogether_AllResources(t *testing.T) {
 			require.Equal(t, addoncfg.SpokeOTELColNamespace, obj.Namespace)
 		case *corev1.Secret:
 			if obj.Name == "tracing-otlphttp-auth" {
+				foundTLSSecret = true
 				require.Equal(t, generatedSecret.Data, obj.Data)
 			}
 		case *operatorsv1alpha1.Subscription:
@@ -237,6 +233,7 @@ func Test_Tracing_AllConfigsTogether_AllResources(t *testing.T) {
 		}
 	}
 	require.True(t, foundSubscription, "expected an OTel operator Subscription in rendered objects")
+	require.True(t, foundTLSSecret, "expected the tracing TLS Secret in rendered objects")
 }
 
 type mockAODCGetter struct {

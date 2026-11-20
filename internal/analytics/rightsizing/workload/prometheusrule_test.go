@@ -59,7 +59,7 @@ func TestEvaluationIntervals(t *testing.T) {
 						require.Len(t, group.Rules, len(baseline.Spec.Groups[i].Rules))
 						for j, r := range group.Rules {
 							assert.Equal(t, baseline.Spec.Groups[i].Rules[j].Record, r.Record)
-							_, parseErr := parser.ParseExpr(r.Expr.String())
+							_, parseErr := parser.NewParser(parser.Options{}).ParseExpr(r.Expr.String())
 							require.NoError(t, parseErr, "expression of %s", r.Record)
 							if i == 0 && j > 0 {
 								assert.Contains(t, r.Expr.String(), "["+tc.wantRolling+":]", "lookback of %s", r.Record)

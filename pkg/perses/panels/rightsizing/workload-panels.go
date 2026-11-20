@@ -278,9 +278,9 @@ func resourceTable(title, description, datasourceName, selector, usage, request,
 		usageUnit = &dashboards.BytesUnit
 	}
 	cols := []ColumnSettingsWithLink{
-		{ColumnSettings: tablePanel.ColumnSettings{Name: "timestamp", Hide: true}},
-		{ColumnSettings: tablePanel.ColumnSettings{Name: "namespace", Header: "Namespace", Align: tablePanel.LeftAlign, EnableSorting: true}, DataLink: detailLink},
-		{ColumnSettings: tablePanel.ColumnSettings{Name: "workload", Header: "Workload", Align: tablePanel.LeftAlign, EnableSorting: true}, DataLink: detailLink},
+		{Name: "timestamp", Hide: true},
+		{Name: "namespace", Header: "Namespace", Align: tablePanel.LeftAlign, EnableSorting: true, DataLink: detailLink},
+		{Name: "workload", Header: "Workload", Align: tablePanel.LeftAlign, EnableSorting: true, DataLink: detailLink},
 		nsTblCol("workload_type", "Type", tablePanel.LeftAlign, nil),
 	}
 	if includePod {
@@ -290,10 +290,10 @@ func resourceTable(title, description, datasourceName, selector, usage, request,
 		by = "namespace, pod, workload, workload_type"
 		joinCols = []string{"namespace", "pod", "workload", "workload_type"}
 		cols = []ColumnSettingsWithLink{
-			{ColumnSettings: tablePanel.ColumnSettings{Name: "timestamp", Hide: true}},
-			{ColumnSettings: tablePanel.ColumnSettings{Name: "namespace", Header: "Namespace", Align: tablePanel.LeftAlign, EnableSorting: true}, DataLink: detailLink},
-			{ColumnSettings: tablePanel.ColumnSettings{Name: "pod", Header: "Pod", Align: tablePanel.LeftAlign, EnableSorting: true}, DataLink: detailLink},
-			{ColumnSettings: tablePanel.ColumnSettings{Name: "workload", Header: "Workload", Align: tablePanel.LeftAlign, EnableSorting: true}, DataLink: detailLink},
+			{Name: "timestamp", Hide: true},
+			{Name: "namespace", Header: "Namespace", Align: tablePanel.LeftAlign, EnableSorting: true, DataLink: detailLink},
+			{Name: "pod", Header: "Pod", Align: tablePanel.LeftAlign, EnableSorting: true, DataLink: detailLink},
+			{Name: "workload", Header: "Workload", Align: tablePanel.LeftAlign, EnableSorting: true, DataLink: detailLink},
 			nsTblCol("workload_type", "Type", tablePanel.LeftAlign, nil),
 		}
 	}
@@ -315,7 +315,7 @@ func resourceTable(title, description, datasourceName, selector, usage, request,
 			&commonSdk.Format{Unit: usageUnit, DecimalPlaces: 2}),
 	)
 	if includePod {
-		cols = append(cols, ColumnSettingsWithLink{ColumnSettings: tablePanel.ColumnSettings{Name: "value #6", Hide: true}})
+		cols = append(cols, ColumnSettingsWithLink{Name: "value #6", Hide: true})
 	}
 	options := []panel.Option{
 		panel.Description(description),

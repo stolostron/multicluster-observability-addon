@@ -13,7 +13,6 @@ import (
 	"github.com/stolostron/multicluster-observability-addon/internal/metrics/manifests"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestBuildValues(t *testing.T) {
@@ -351,54 +350,40 @@ func TestBuildValues(t *testing.T) {
 
 func newSecret(name string) *corev1.Secret {
 	return &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
-		},
+		Name: name,
 	}
 }
 
 func newConfigmap(name string) *corev1.ConfigMap {
 	return &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
-		},
+		Name: name,
 	}
 }
 
 func newScrapeConfig(name string) *cooprometheusv1alpha1.ScrapeConfig {
 	return &cooprometheusv1alpha1.ScrapeConfig{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
-			Annotations: map[string]string{
-				"observability.open-cluster-management.io/resolution-strategy": "raw",
-			},
+		Name: name,
+		Annotations: map[string]string{
+			"observability.open-cluster-management.io/resolution-strategy": "raw",
 		},
 	}
 }
 
 func newRule(name string) *prometheusv1.PrometheusRule {
 	return &prometheusv1.PrometheusRule{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "monitoring.coreos.com/v1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
-		},
+		APIVersion: "monitoring.coreos.com/v1",
+		Name:       name,
 	}
 }
 
 func newCOORule(name string) *cooprometheusv1.PrometheusRule {
 	return &cooprometheusv1.PrometheusRule{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
-		},
+		Name: name,
 	}
 }
 
 func newServiceMonitor(name string) *prometheusv1.ServiceMonitor {
 	return &prometheusv1.ServiceMonitor{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
-		},
+		Name: name,
 	}
 }

@@ -14,7 +14,6 @@ import (
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -29,13 +28,9 @@ type DefaultConfig struct {
 
 func NewMCOAClusterManagementAddOn() *addonv1beta1.ClusterManagementAddOn {
 	return &addonv1beta1.ClusterManagementAddOn{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "ClusterManagementAddOn",
-			APIVersion: addonv1beta1.GroupVersion.String(),
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: addoncfg.Name,
-		},
+		Kind:       "ClusterManagementAddOn",
+		APIVersion: addonv1beta1.GroupVersion.String(),
+		Name:       addoncfg.Name,
 	}
 }
 
@@ -156,13 +151,9 @@ func ObjectToAddonConfig(obj client.Object) (addonv1beta1.AddOnConfig, error) {
 	gvk := obj.GetObjectKind().GroupVersionKind()
 
 	ret := addonv1beta1.AddOnConfig{
-		ConfigGroupResource: addonv1beta1.ConfigGroupResource{
-			Group: gvk.Group,
-		},
-		ConfigReferent: addonv1beta1.ConfigReferent{
-			Namespace: obj.GetNamespace(),
-			Name:      obj.GetName(),
-		},
+		Group:     gvk.Group,
+		Namespace: obj.GetNamespace(),
+		Name:      obj.GetName(),
 	}
 
 	switch gvk.Kind {

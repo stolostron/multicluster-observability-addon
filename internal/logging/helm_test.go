@@ -14,7 +14,6 @@ import (
 	"github.com/stolostron/multicluster-observability-addon/internal/logging/manifests"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog/v2"
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
@@ -102,28 +101,20 @@ func newMCAOUnmanagedScenario() *addonapiv1beta1.ManagedClusterAddOn {
 	managedClusterAddOn := addontesting.NewAddon("test", "cluster-1")
 	managedClusterAddOn.Status.ConfigReferences = []addonapiv1beta1.ConfigReference{
 		{
-			ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
-				Group:    "addon.open-cluster-management.io",
-				Resource: "addondeploymentconfigs",
-			},
+			Group:    "addon.open-cluster-management.io",
+			Resource: "addondeploymentconfigs",
 			DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
-				ConfigReferent: addonapiv1beta1.ConfigReferent{
-					Namespace: "open-cluster-management-observability",
-					Name:      "multicluster-observability-addon",
-				},
-				SpecHash: "fake-spec-hash",
+				Namespace: "open-cluster-management-observability",
+				Name:      "multicluster-observability-addon",
+				SpecHash:  "fake-spec-hash",
 			},
 		},
 		{
-			ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
-				Group:    "observability.openshift.io",
-				Resource: "clusterlogforwarders",
-			},
+			Group:    "observability.openshift.io",
+			Resource: "clusterlogforwarders",
 			DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
-				ConfigReferent: addonapiv1beta1.ConfigReferent{
-					Namespace: "open-cluster-management-observability",
-					Name:      "mcoa-instance",
-				},
+				Namespace: "open-cluster-management-observability",
+				Name:      "mcoa-instance",
 			},
 		},
 	}
@@ -133,10 +124,8 @@ func newMCAOUnmanagedScenario() *addonapiv1beta1.ManagedClusterAddOn {
 
 func newAODCUnmanagedScenario() *addonapiv1beta1.AddOnDeploymentConfig {
 	addOnDeploymentConfig := &addonapiv1beta1.AddOnDeploymentConfig{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "multicluster-observability-addon",
-			Namespace: "open-cluster-management-observability",
-		},
+		Name:      "multicluster-observability-addon",
+		Namespace: "open-cluster-management-observability",
 		Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
 			CustomizedVariables: []addonapiv1beta1.CustomizedVariable{
 				{
@@ -155,10 +144,8 @@ func newAODCUnmanagedScenario() *addonapiv1beta1.AddOnDeploymentConfig {
 
 func newCLFUnmanagedScenario() *loggingv1.ClusterLogForwarder {
 	return &loggingv1.ClusterLogForwarder{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "mcoa-instance",
-			Namespace: "open-cluster-management-observability",
-		},
+		Name:      "mcoa-instance",
+		Namespace: "open-cluster-management-observability",
 		Spec: loggingv1.ClusterLogForwarderSpec{
 			Inputs: []loggingv1.InputSpec{
 				{
@@ -209,12 +196,10 @@ func Test_Logging_Unmanaged_CLF(t *testing.T) {
 
 	// Setup configuration resources: ClusterLogForwarder, AddOnDeploymentConfig, Secrets, ConfigMaps
 	clf := &loggingv1.ClusterLogForwarder{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "mcoa-instance",
-			Namespace: "open-cluster-management-observability",
-			Annotations: map[string]string{
-				"observability.openshift.io/tech-preview-otlp-output": "true",
-			},
+		Name:      "mcoa-instance",
+		Namespace: "open-cluster-management-observability",
+		Annotations: map[string]string{
+			"observability.openshift.io/tech-preview-otlp-output": "true",
 		},
 		Spec: loggingv1.ClusterLogForwarderSpec{
 			Inputs: []loggingv1.InputSpec{
@@ -255,10 +240,8 @@ func Test_Logging_Unmanaged_CLF(t *testing.T) {
 					},
 					// Simply here to test the ConfigMap reference
 					TLS: &loggingv1.OutputTLSSpec{
-						TLSSpec: loggingv1.TLSSpec{
-							CA: &loggingv1.ValueReference{
-								ConfigMapName: "foo",
-							},
+						CA: &loggingv1.ValueReference{
+							ConfigMapName: "foo",
 						},
 					},
 				},
@@ -298,10 +281,8 @@ func Test_Logging_Unmanaged_CLF(t *testing.T) {
 	}
 
 	staticCred := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "static-authentication",
-			Namespace: "open-cluster-management-observability",
-		},
+		Name:      "static-authentication",
+		Namespace: "open-cluster-management-observability",
 		Data: map[string][]byte{
 			"key":  []byte("data"),
 			"pass": []byte("data"),
@@ -309,10 +290,8 @@ func Test_Logging_Unmanaged_CLF(t *testing.T) {
 	}
 
 	caConfigMap := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "foo",
-			Namespace: "open-cluster-management-observability",
-		},
+		Name:      "foo",
+		Namespace: "open-cluster-management-observability",
 		Data: map[string]string{
 			"foo": "bar",
 		},
@@ -326,6 +305,7 @@ func Test_Logging_Unmanaged_CLF(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, objects, 11)
 
+	var foundCAConfigMap bool
 	for _, obj := range objects {
 		switch obj := obj.(type) {
 		case *operatorsv1alpha1.Subscription:
@@ -340,6 +320,10 @@ func Test_Logging_Unmanaged_CLF(t *testing.T) {
 			require.NotNil(t, obj.Spec.Outputs[1].Cloudwatch.Authentication.AWSAccessKey)
 			require.Equal(t, "static-authentication", obj.Spec.Outputs[0].Loki.Authentication.Token.Secret.Name)
 			require.Equal(t, "static-authentication", obj.Spec.Outputs[1].Cloudwatch.Authentication.AWSAccessKey.KeySecret.SecretName)
+			// The Loki output must keep referencing the CA ConfigMap rendered below.
+			require.NotNil(t, obj.Spec.Outputs[0].TLS)
+			require.NotNil(t, obj.Spec.Outputs[0].TLS.CA)
+			require.Equal(t, "foo", obj.Spec.Outputs[0].TLS.CA.ConfigMapName)
 			// Check name and namespace to make sure that if we change the helm
 			// manifests that we don't break the addon probes
 			require.Equal(t, addoncfg.SpokeCLFName, obj.Name)
@@ -350,10 +334,12 @@ func Test_Logging_Unmanaged_CLF(t *testing.T) {
 			}
 		case *corev1.ConfigMap:
 			if obj.Name == "foo" {
+				foundCAConfigMap = true
 				require.Equal(t, caConfigMap.Data, obj.Data)
 			}
 		}
 	}
+	require.True(t, foundCAConfigMap, "expected the CA ConfigMap in rendered objects")
 }
 
 // Test_Logging_Unmanaged tests the scenarios fo the Unamanged scenario
@@ -401,10 +387,8 @@ func Test_Logging_Unmanaged(t *testing.T) {
 			clf := newCLFUnmanagedScenario()
 
 			staticCred := &corev1.Secret{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "static-authentication",
-					Namespace: "open-cluster-management-observability",
-				},
+				Name:      "static-authentication",
+				Namespace: "open-cluster-management-observability",
 				Data: map[string][]byte{
 					"key":  []byte("data"),
 					"pass": []byte("data"),
@@ -417,10 +401,8 @@ func Test_Logging_Unmanaged(t *testing.T) {
 			// Conditionally add existing subscription based on test case
 			if tc.existingSubscription {
 				existingSubscription := &operatorsv1alpha1.Subscription{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "cluster-logging",
-						Namespace: "openshift-logging",
-					},
+					Name:      "cluster-logging",
+					Namespace: "openshift-logging",
 					Spec: &operatorsv1alpha1.SubscriptionSpec{
 						Channel:                "latest-version",
 						InstallPlanApproval:    operatorsv1alpha1.ApprovalAutomatic,

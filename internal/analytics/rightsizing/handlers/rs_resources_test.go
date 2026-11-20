@@ -74,11 +74,9 @@ func newPlatformOpts(nsEnabled, virtEnabled bool) addon.Options {
 
 func createTestConfigMap(name string) *corev1.ConfigMap {
 	return &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: addoncfg.InstallNamespace,
-		},
-		Data: map[string]string{"config.yaml": "test"},
+		Name:      name,
+		Namespace: addoncfg.InstallNamespace,
+		Data:      map[string]string{"config.yaml": "test"},
 	}
 }
 
@@ -111,18 +109,18 @@ func resetIntervalState(t *testing.T) {
 func TestRSConfigMapPredicate(t *testing.T) {
 	pred := RSConfigMapPredicate()
 
-	rsNsCM := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
+	rsNsCM := &corev1.ConfigMap{
 		Name: rightsizing.NamespaceConfigMapName, Namespace: addoncfg.InstallNamespace,
-	}}
-	rsVirtCM := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
+	}
+	rsVirtCM := &corev1.ConfigMap{
 		Name: rightsizing.VirtualizationConfigMapName, Namespace: addoncfg.InstallNamespace,
-	}}
-	unrelatedCM := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
+	}
+	unrelatedCM := &corev1.ConfigMap{
 		Name: "other-config", Namespace: addoncfg.InstallNamespace,
-	}}
-	wrongNsCM := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
+	}
+	wrongNsCM := &corev1.ConfigMap{
 		Name: rightsizing.NamespaceConfigMapName, Namespace: "other-namespace",
-	}}
+	}
 
 	// Create: accepts RS ConfigMaps, rejects others
 	assert.True(t, pred.CreateFunc(event.CreateEvent{Object: rsNsCM}))
@@ -253,7 +251,7 @@ func TestReconcileRSResources_SkipsWhenNotDelegated(t *testing.T) {
 
 func TestClusterMatchesPlacement_EmptyPredicates(t *testing.T) {
 	cluster := &clusterv1.ManagedCluster{
-		ObjectMeta: metav1.ObjectMeta{Name: "cluster1"},
+		Name: "cluster1",
 	}
 	placement := rightsizing.GetDefaultRSPlacement()
 	assert.True(t, clusterMatchesPlacement(cluster, placement))
@@ -261,10 +259,8 @@ func TestClusterMatchesPlacement_EmptyPredicates(t *testing.T) {
 
 func TestClusterMatchesPlacement_LabelMatch(t *testing.T) {
 	cluster := &clusterv1.ManagedCluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   "cluster1",
-			Labels: map[string]string{"env": "prod", "region": "us-east"},
-		},
+		Name:   "cluster1",
+		Labels: map[string]string{"env": "prod", "region": "us-east"},
 	}
 
 	placement := clusterv1beta1.Placement{
@@ -283,10 +279,8 @@ func TestClusterMatchesPlacement_LabelMatch(t *testing.T) {
 
 func TestClusterMatchesPlacement_LabelNoMatch(t *testing.T) {
 	cluster := &clusterv1.ManagedCluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   "cluster1",
-			Labels: map[string]string{"env": "staging"},
-		},
+		Name:   "cluster1",
+		Labels: map[string]string{"env": "staging"},
 	}
 
 	placement := clusterv1beta1.Placement{
@@ -305,10 +299,8 @@ func TestClusterMatchesPlacement_LabelNoMatch(t *testing.T) {
 
 func TestClusterMatchesPlacement_LabelExpressions(t *testing.T) {
 	cluster := &clusterv1.ManagedCluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   "cluster1",
-			Labels: map[string]string{"env": "prod"},
-		},
+		Name:   "cluster1",
+		Labels: map[string]string{"env": "prod"},
 	}
 
 	placement := clusterv1beta1.Placement{
@@ -331,7 +323,7 @@ func TestClusterMatchesPlacement_LabelExpressions(t *testing.T) {
 
 func TestClusterMatchesPlacement_ClaimMatch(t *testing.T) {
 	cluster := &clusterv1.ManagedCluster{
-		ObjectMeta: metav1.ObjectMeta{Name: "cluster1"},
+		Name: "cluster1",
 		Status: clusterv1.ManagedClusterStatus{
 			ClusterClaims: []clusterv1.ManagedClusterClaim{
 				{Name: "platform.open-cluster-management.io", Value: "AWS"},
@@ -359,7 +351,7 @@ func TestClusterMatchesPlacement_ClaimMatch(t *testing.T) {
 
 func TestClusterMatchesPlacement_ClaimNoMatch(t *testing.T) {
 	cluster := &clusterv1.ManagedCluster{
-		ObjectMeta: metav1.ObjectMeta{Name: "cluster1"},
+		Name: "cluster1",
 		Status: clusterv1.ManagedClusterStatus{
 			ClusterClaims: []clusterv1.ManagedClusterClaim{
 				{Name: "platform.open-cluster-management.io", Value: "Azure"},
@@ -387,10 +379,8 @@ func TestClusterMatchesPlacement_ClaimNoMatch(t *testing.T) {
 
 func TestClusterMatchesPlacement_PredicatesORed(t *testing.T) {
 	cluster := &clusterv1.ManagedCluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   "cluster1",
-			Labels: map[string]string{"region": "eu-west"},
-		},
+		Name:   "cluster1",
+		Labels: map[string]string{"region": "eu-west"},
 	}
 
 	placement := clusterv1beta1.Placement{
@@ -418,7 +408,7 @@ func TestClusterMatchesPlacement_PredicatesORed(t *testing.T) {
 
 func TestClusterMatchesPlacement_ClaimDoesNotExist(t *testing.T) {
 	cluster := &clusterv1.ManagedCluster{
-		ObjectMeta: metav1.ObjectMeta{Name: "cluster1"},
+		Name: "cluster1",
 		Status: clusterv1.ManagedClusterStatus{
 			ClusterClaims: []clusterv1.ManagedClusterClaim{
 				{Name: "platform.open-cluster-management.io", Value: "AWS"},
@@ -445,10 +435,8 @@ func TestClusterMatchesPlacement_ClaimDoesNotExist(t *testing.T) {
 
 func TestClusterMatchesPlacement_CombinedLabelAndClaim(t *testing.T) {
 	cluster := &clusterv1.ManagedCluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   "cluster1",
-			Labels: map[string]string{"env": "prod"},
-		},
+		Name:   "cluster1",
+		Labels: map[string]string{"env": "prod"},
 		Status: clusterv1.ManagedClusterStatus{
 			ClusterClaims: []clusterv1.ManagedClusterClaim{
 				{Name: "platform.open-cluster-management.io", Value: "AWS"},
@@ -485,11 +473,9 @@ func TestRevertConfigMap_WritesBackValidConfig(t *testing.T) {
 	// After validation + revert, the ConfigMap must reflect the cached (valid) values.
 	invalidConfig := `{"namespaceFilterCriteria":{"exclusionCriteria":["openshift.*"]},"recommendationPercentage":110,"cpuAggregator":["Max OverAll","P99","P95"],"memoryAggregator":["Max OverAll","P99","M90"]}`
 	cm := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      rightsizing.NamespaceConfigMapName,
-			Namespace: addoncfg.InstallNamespace,
-			Labels:    rightsizing.RSLabels(),
-		},
+		Name:      rightsizing.NamespaceConfigMapName,
+		Namespace: addoncfg.InstallNamespace,
+		Labels:    rightsizing.RSLabels(),
 		Data: map[string]string{
 			"prometheusRuleConfig": invalidConfig,
 		},
@@ -533,11 +519,9 @@ func TestRevertConfigMap_WritesBackValidConfig(t *testing.T) {
 func TestRevertConfigMap_NoRevertWhenAllValid(t *testing.T) {
 	validConfig := `{"namespaceFilterCriteria":{"exclusionCriteria":["openshift.*"]},"recommendationPercentage":110,"cpuAggregator":["Max OverAll","P99","P95"],"memoryAggregator":["Max OverAll","P99"]}`
 	cm := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      rightsizing.NamespaceConfigMapName,
-			Namespace: addoncfg.InstallNamespace,
-			Labels:    rightsizing.RSLabels(),
-		},
+		Name:      rightsizing.NamespaceConfigMapName,
+		Namespace: addoncfg.InstallNamespace,
+		Labels:    rightsizing.RSLabels(),
 		Data: map[string]string{
 			"prometheusRuleConfig": validConfig,
 		},
@@ -560,11 +544,9 @@ func TestRevertConfigMap_FallsBackToDefaultsWhenNoCachedConfig(t *testing.T) {
 
 	invalidConfig := `{"recommendationPercentage":110,"cpuAggregator":["foo"],"memoryAggregator":["bar"]}`
 	cm := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      rightsizing.VirtualizationConfigMapName,
-			Namespace: addoncfg.InstallNamespace,
-			Labels:    rightsizing.RSLabels(),
-		},
+		Name:      rightsizing.VirtualizationConfigMapName,
+		Namespace: addoncfg.InstallNamespace,
+		Labels:    rightsizing.RSLabels(),
 		Data: map[string]string{
 			"prometheusRuleConfig": invalidConfig,
 		},
@@ -600,11 +582,9 @@ func TestRevertConfigMap_InvalidCpuDoesNotAffectValidMemory(t *testing.T) {
 
 	invalidConfig := `{"recommendationPercentage":110,"cpuAggregator":["P90","M80"],"memoryAggregator":["Max OverAll","P99"]}`
 	cm := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-mixed-cm",
-			Namespace: addoncfg.InstallNamespace,
-			Labels:    rightsizing.RSLabels(),
-		},
+		Name:      "test-mixed-cm",
+		Namespace: addoncfg.InstallNamespace,
+		Labels:    rightsizing.RSLabels(),
 		Data: map[string]string{
 			"prometheusRuleConfig": invalidConfig,
 		},
@@ -637,10 +617,8 @@ func TestRevertConfigMap_InvalidCpuDoesNotAffectValidMemory(t *testing.T) {
 
 func TestBackfillAggregatorKeys_AddsMissingKeys(t *testing.T) {
 	cm := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      rightsizing.NamespaceConfigMapName,
-			Namespace: addoncfg.InstallNamespace,
-		},
+		Name:      rightsizing.NamespaceConfigMapName,
+		Namespace: addoncfg.InstallNamespace,
 		Data: map[string]string{
 			"prometheusRuleConfig": `{"namespaceFilterCriteria":{"exclusionCriteria":["openshift.*"]},"recommendationPercentage":110}`,
 		},
@@ -667,10 +645,8 @@ func TestBackfillAggregatorKeys_SkipsWhenKeysExist(t *testing.T) {
 	// before they existed is left exactly as it is.
 	original := `{"recommendationPercentage":110,"cpuAggregator":["P90"],"memoryAggregator":["P99"]}`
 	cm := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      rightsizing.NamespaceConfigMapName,
-			Namespace: addoncfg.InstallNamespace,
-		},
+		Name:      rightsizing.NamespaceConfigMapName,
+		Namespace: addoncfg.InstallNamespace,
 		Data: map[string]string{
 			"prometheusRuleConfig": original,
 		},
@@ -691,10 +667,8 @@ func TestBackfillAggregatorKeys_SkipsWhenKeysExist(t *testing.T) {
 
 func TestBackfillAggregatorKeys_PreservesExistingFields(t *testing.T) {
 	cm := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      rightsizing.NamespaceConfigMapName,
-			Namespace: addoncfg.InstallNamespace,
-		},
+		Name:      rightsizing.NamespaceConfigMapName,
+		Namespace: addoncfg.InstallNamespace,
 		Data: map[string]string{
 			"prometheusRuleConfig": `{"recommendationPercentage":120,"namespaceFilterCriteria":{"exclusionCriteria":["kube-.*"]}}`,
 		},
@@ -717,10 +691,8 @@ func TestBackfillAggregatorKeys_PreservesExistingFields(t *testing.T) {
 
 func TestBackfillAggregatorKeys_OnlyOneMissing(t *testing.T) {
 	cm := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      rightsizing.NamespaceConfigMapName,
-			Namespace: addoncfg.InstallNamespace,
-		},
+		Name:      rightsizing.NamespaceConfigMapName,
+		Namespace: addoncfg.InstallNamespace,
 		Data: map[string]string{
 			"prometheusRuleConfig": `{"recommendationPercentage":110,"cpuAggregator":["P90","P75"]}`,
 		},
@@ -752,10 +724,8 @@ labelFilterCriteria: []
 recommendationPercentage: 110
 `
 	cm := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      rightsizing.NamespaceConfigMapName,
-			Namespace: addoncfg.InstallNamespace,
-		},
+		Name:      rightsizing.NamespaceConfigMapName,
+		Namespace: addoncfg.InstallNamespace,
 		Data: map[string]string{
 			"prometheusRuleConfig": yamlConfig,
 		},
@@ -791,10 +761,8 @@ memoryAggregator:
 - P99
 `
 	cm := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      rightsizing.NamespaceConfigMapName,
-			Namespace: addoncfg.InstallNamespace,
-		},
+		Name:      rightsizing.NamespaceConfigMapName,
+		Namespace: addoncfg.InstallNamespace,
 		Data: map[string]string{
 			"prometheusRuleConfig": yamlConfig,
 		},
@@ -858,8 +826,8 @@ func TestBackfillAggregatorKeys_LeavesIntervalKeysAsTheyAre(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			key := types.NamespacedName{Name: rightsizing.NamespaceConfigMapName, Namespace: addoncfg.InstallNamespace}
 			ob := newTestOptionsBuilder(t, &corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{Name: key.Name, Namespace: key.Namespace},
-				Data:       map[string]string{"prometheusRuleConfig": tc.ruleConfig},
+				Name: key.Name, Namespace: key.Namespace,
+				Data: map[string]string{"prometheusRuleConfig": tc.ruleConfig},
 			})
 			var cm corev1.ConfigMap
 			require.NoError(t, ob.Client.Get(t.Context(), key, &cm))
@@ -889,11 +857,9 @@ func TestValidateAndSanitizeConfig_InvalidEvaluationIntervalFallsBackToDefault(t
 	resetIntervalState(t)
 
 	cm := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      rightsizing.NamespaceConfigMapName,
-			Namespace: addoncfg.InstallNamespace,
-			Labels:    rightsizing.RSLabels(),
-		},
+		Name:      rightsizing.NamespaceConfigMapName,
+		Namespace: addoncfg.InstallNamespace,
+		Labels:    rightsizing.RSLabels(),
 		Data: map[string]string{
 			"prometheusRuleConfig": `{"cpuAggregator":["Max OverAll"],"memoryAggregator":["Max OverAll"],"evaluationInterval":"badvalue","evaluationInterval1d":"15m"}`,
 		},
@@ -931,11 +897,9 @@ func TestValidateAndSanitizeConfig_InvalidEvaluationIntervalRestoresCachedValue(
 	cacheValidInterval(rightsizing.NamespaceConfigMapName, "evaluationInterval", "10m")
 
 	cm := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      rightsizing.NamespaceConfigMapName,
-			Namespace: addoncfg.InstallNamespace,
-			Labels:    rightsizing.RSLabels(),
-		},
+		Name:      rightsizing.NamespaceConfigMapName,
+		Namespace: addoncfg.InstallNamespace,
+		Labels:    rightsizing.RSLabels(),
 		Data: map[string]string{
 			"prometheusRuleConfig": `{"cpuAggregator":["Max OverAll"],"memoryAggregator":["Max OverAll"],"evaluationInterval":"0m","evaluationInterval1d":"15m"}`,
 		},
@@ -957,11 +921,9 @@ func TestValidateAndSanitizeConfig_ZeroValueDurationIsInvalid(t *testing.T) {
 	resetIntervalState(t)
 
 	cm := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      rightsizing.NamespaceConfigMapName,
-			Namespace: addoncfg.InstallNamespace,
-			Labels:    rightsizing.RSLabels(),
-		},
+		Name:      rightsizing.NamespaceConfigMapName,
+		Namespace: addoncfg.InstallNamespace,
+		Labels:    rightsizing.RSLabels(),
 		Data: map[string]string{
 			"prometheusRuleConfig": `{"cpuAggregator":["Max OverAll"],"memoryAggregator":["Max OverAll"],"evaluationInterval":"0s","evaluationInterval1d":"0h"}`,
 		},
@@ -997,11 +959,9 @@ func TestValidateAndSanitizeConfig_OutOfRangeDurationsAreRejected(t *testing.T) 
 			resetIntervalState(t)
 
 			cm := &corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      rightsizing.NamespaceConfigMapName,
-					Namespace: addoncfg.InstallNamespace,
-					Labels:    rightsizing.RSLabels(),
-				},
+				Name:      rightsizing.NamespaceConfigMapName,
+				Namespace: addoncfg.InstallNamespace,
+				Labels:    rightsizing.RSLabels(),
 				Data: map[string]string{
 					"prometheusRuleConfig": fmt.Sprintf(
 						`{"cpuAggregator":["Max OverAll"],"memoryAggregator":["Max OverAll"],`+
@@ -1038,11 +998,9 @@ func TestValidateAndSanitizeConfig_IntervalCeilingsAreIndependent(t *testing.T) 
 	resetIntervalState(t)
 
 	cm := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      rightsizing.NamespaceConfigMapName,
-			Namespace: addoncfg.InstallNamespace,
-			Labels:    rightsizing.RSLabels(),
-		},
+		Name:      rightsizing.NamespaceConfigMapName,
+		Namespace: addoncfg.InstallNamespace,
+		Labels:    rightsizing.RSLabels(),
 		Data: map[string]string{
 			"prometheusRuleConfig": `{"cpuAggregator":["Max OverAll"],"memoryAggregator":["Max OverAll"],` +
 				`"evaluationInterval":"2h","evaluationInterval1d":"2h"}`,
@@ -1070,11 +1028,9 @@ func TestValidateAndSanitizeConfig_WastefulIntervalOrderingWarnsButKeepsConfig(t
 	resetIntervalState(t)
 
 	cm := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      rightsizing.NamespaceConfigMapName,
-			Namespace: addoncfg.InstallNamespace,
-			Labels:    rightsizing.RSLabels(),
-		},
+		Name:      rightsizing.NamespaceConfigMapName,
+		Namespace: addoncfg.InstallNamespace,
+		Labels:    rightsizing.RSLabels(),
 		Data: map[string]string{
 			"prometheusRuleConfig": `{"cpuAggregator":["Max OverAll"],"memoryAggregator":["Max OverAll"],` +
 				`"evaluationInterval":"30m","evaluationInterval1d":"15m"}`,
@@ -1135,11 +1091,9 @@ func TestValidateAndSanitizeConfig_ClearingIntervalDoesNotResurrectOldValue(t *t
 	// Step 3: user now makes a typo.
 	// With an empty cache the handler must use the hardcoded default, NOT resurrect "10m".
 	cm := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      cmName,
-			Namespace: addoncfg.InstallNamespace,
-			Labels:    rightsizing.RSLabels(),
-		},
+		Name:      cmName,
+		Namespace: addoncfg.InstallNamespace,
+		Labels:    rightsizing.RSLabels(),
 		Data: map[string]string{
 			"prometheusRuleConfig": `{"cpuAggregator":["Max OverAll"],"memoryAggregator":["Max OverAll"],"evaluationInterval":"badvalue","evaluationInterval1d":"15m"}`,
 		},
@@ -1171,11 +1125,9 @@ func newIntervalConfigData(evaluationInterval, evaluationInterval1d string) righ
 func newIntervalConfigMap(name, evaluationInterval, evaluationInterval1d string) *corev1.ConfigMap {
 	configData := newIntervalConfigData(evaluationInterval, evaluationInterval1d)
 	return &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: addoncfg.InstallNamespace,
-			Labels:    rightsizing.RSLabels(),
-		},
+		Name:      name,
+		Namespace: addoncfg.InstallNamespace,
+		Labels:    rightsizing.RSLabels(),
 		Data: map[string]string{
 			"prometheusRuleConfig":   rightsizing.FormatYAML(configData.PrometheusRuleConfig),
 			"placementConfiguration": rightsizing.FormatYAML(configData.PlacementConfiguration),
@@ -1470,11 +1422,9 @@ type intervalPair struct{ rolling, daily string }
 func TestBuild_EvaluationIntervals(t *testing.T) {
 	defaults := intervalPair{rightsizing.DefaultEvaluationInterval, rightsizing.DefaultEvaluationInterval1d}
 	cluster := &clusterv1.ManagedCluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "spoke-1",
-			Labels: map[string]string{
-				clusterinfov1beta1.LabelKubeVendor: string(clusterinfov1beta1.KubeVendorOpenShift),
-			},
+		Name: "spoke-1",
+		Labels: map[string]string{
+			clusterinfov1beta1.LabelKubeVendor: string(clusterinfov1beta1.KubeVendorOpenShift),
 		},
 	}
 
@@ -1575,13 +1525,13 @@ func TestBuild_EvaluationIntervals(t *testing.T) {
 		// Written before the aggregator keys existed, by MCOA as JSON and by MCO 2.17 as YAML.
 		ob := newTestOptionsBuilder(t,
 			&corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{Name: rightsizing.NamespaceConfigMapName, Namespace: addoncfg.InstallNamespace},
+				Name: rightsizing.NamespaceConfigMapName, Namespace: addoncfg.InstallNamespace,
 				Data: map[string]string{
 					"prometheusRuleConfig": `{"namespaceFilterCriteria":{"exclusionCriteria":["openshift.*"]},"recommendationPercentage":110}`,
 				},
 			},
 			&corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{Name: rightsizing.VirtualizationConfigMapName, Namespace: addoncfg.InstallNamespace},
+				Name: rightsizing.VirtualizationConfigMapName, Namespace: addoncfg.InstallNamespace,
 				Data: map[string]string{
 					"prometheusRuleConfig": "namespaceFilterCriteria:\n  exclusionCriteria:\n  - openshift.*\nrecommendationPercentage: 110\n",
 				},
@@ -1708,11 +1658,9 @@ evaluationInterval1d: 30m
 `
 	placement := `{"spec":{"predicates":[{"requiredClusterSelector":{"labelSelector":{"matchLabels":{"env":"prod"}}}}]}}`
 	cm := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      rightsizing.NamespaceConfigMapName,
-			Namespace: addoncfg.InstallNamespace,
-			Labels:    rightsizing.RSLabels(),
-		},
+		Name:      rightsizing.NamespaceConfigMapName,
+		Namespace: addoncfg.InstallNamespace,
+		Labels:    rightsizing.RSLabels(),
 		Data: map[string]string{
 			"prometheusRuleConfig":   ruleConfig,
 			"placementConfiguration": placement,
@@ -1756,11 +1704,9 @@ func TestRevertConfigMap_AggregatorRevertAddsNoIntervalKeys(t *testing.T) {
 	resetIntervalState(t)
 
 	cm := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      rightsizing.NamespaceConfigMapName,
-			Namespace: addoncfg.InstallNamespace,
-			Labels:    rightsizing.RSLabels(),
-		},
+		Name:      rightsizing.NamespaceConfigMapName,
+		Namespace: addoncfg.InstallNamespace,
+		Labels:    rightsizing.RSLabels(),
 		Data: map[string]string{
 			"prometheusRuleConfig": `{"recommendationPercentage":110,"cpuAggregator":["M80"],"memoryAggregator":["Max OverAll"]}`,
 		},
@@ -1791,11 +1737,9 @@ func TestValidateAndSanitizeConfig_YAMLNumberIntervalIsRejected(t *testing.T) {
 	resetIntervalState(t)
 
 	cm := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      rightsizing.NamespaceConfigMapName,
-			Namespace: addoncfg.InstallNamespace,
-			Labels:    rightsizing.RSLabels(),
-		},
+		Name:      rightsizing.NamespaceConfigMapName,
+		Namespace: addoncfg.InstallNamespace,
+		Labels:    rightsizing.RSLabels(),
 		Data: map[string]string{
 			"prometheusRuleConfig": "cpuAggregator:\n- Max OverAll\nmemoryAggregator:\n- Max OverAll\n" +
 				"evaluationInterval: 5\nevaluationInterval1d: 30\n",
@@ -1837,7 +1781,7 @@ func TestIndependentWorkloadPodLifecycle(t *testing.T) {
 				opts.Platform.Metrics.CollectionEnabled = true
 				opts.Platform.AnalyticsOptions.RightSizing.WorkloadEnabled = workload
 				opts.Platform.AnalyticsOptions.RightSizing.PodEnabled = pod
-				cluster := &clusterv1.ManagedCluster{ObjectMeta: metav1.ObjectMeta{Name: "cluster-1", Labels: map[string]string{"vendor": "OpenShift"}}}
+				cluster := &clusterv1.ManagedCluster{Name: "cluster-1", Labels: map[string]string{"vendor": "OpenShift"}}
 				got, err := builder.Build(t.Context(), cluster, opts)
 				require.NoError(t, err)
 				require.Equal(t, workload, got.WorkloadRightSizing.Enabled)
@@ -1899,9 +1843,9 @@ func TestIndependentWorkloadPodLifecycle(t *testing.T) {
 // reject invalid or excessive interval values.
 func TestBuildWorkloadPodEvaluationIntervals(t *testing.T) {
 	defaults := intervalPair{"5m", "15m"}
-	cluster := &clusterv1.ManagedCluster{ObjectMeta: metav1.ObjectMeta{
+	cluster := &clusterv1.ManagedCluster{
 		Name: "cluster-1", Labels: map[string]string{"vendor": "OpenShift"},
-	}}
+	}
 	opts := newPlatformOpts(false, false)
 	opts.Platform.AnalyticsOptions.RightSizing.WorkloadEnabled = true
 	opts.Platform.AnalyticsOptions.RightSizing.PodEnabled = true

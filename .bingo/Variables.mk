@@ -23,11 +23,14 @@ GOHOSTARM    ?= $(shell $(GO) env GOHOSTARM)
 #	@echo "Running golangci-lint"
 #	@$(GOLANGCI_LINT) <flags/args..>
 #
-GOLANGCI_LINT := $(GOBIN)/golangci-lint-v2.11.4
+GOLANGCI_LINT := $(GOBIN)/golangci-lint-v2.15.0
 $(GOLANGCI_LINT): $(BINGO_DIR)/golangci-lint.mod
 	@# Install binary/ries using Go 1.14+ build command. This is using bwplotka/bingo-controlled, separate go module with pinned dependencies.
-	@echo "(re)installing $(GOBIN)/golangci-lint-v2.11.4"
-	@cd $(BINGO_DIR) && GOWORK=off GOOS=$(GOHOSTOS) GOARCH=$(GOHOSTARCH) GOARM=$(GOHOSTARM) $(GO) build -mod=mod -modfile=golangci-lint.mod -o=$(GOBIN)/golangci-lint-v2.11.4 "github.com/golangci/golangci-lint/v2/cmd/golangci-lint"
+	@# NOTE: built from the repo root (not cd'ed into .bingo) so GOTOOLCHAIN
+	@# auto-switching applies from the root go.mod; the linter must be built
+	@# with a Go toolchain at least as new as the one it lints against.
+	@echo "(re)installing $(GOBIN)/golangci-lint-v2.15.0"
+	@GOWORK=off GOOS=$(GOHOSTOS) GOARCH=$(GOHOSTARCH) GOARM=$(GOHOSTARM) $(GO) build -mod=mod -modfile=$(BINGO_DIR)/golangci-lint.mod -o=$(GOBIN)/golangci-lint-v2.15.0 "github.com/golangci/golangci-lint/v2/cmd/golangci-lint"
 
 KUSTOMIZE := $(GOBIN)/kustomize-v5.8.1
 $(KUSTOMIZE): $(BINGO_DIR)/kustomize.mod

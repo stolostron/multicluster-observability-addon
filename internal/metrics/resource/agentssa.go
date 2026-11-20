@@ -20,10 +20,8 @@ import (
 // defaults that can be overridden by the user.
 func NewDefaultPrometheusAgent(ns, name string, isUWL bool) *cooprometheusv1alpha1.PrometheusAgent {
 	agent := &cooprometheusv1alpha1.PrometheusAgent{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       cooprometheusv1alpha1.PrometheusAgentsKind,
-			APIVersion: cooprometheusv1alpha1.SchemeGroupVersion.String(),
-		},
+		Kind:       cooprometheusv1alpha1.PrometheusAgentsKind,
+		APIVersion: cooprometheusv1alpha1.SchemeGroupVersion.String(),
 		ObjectMeta: metav1.ObjectMeta{},
 		Spec: cooprometheusv1alpha1.PrometheusAgentSpec{
 			CommonPrometheusFields: cooprometheusv1.CommonPrometheusFields{
@@ -107,11 +105,9 @@ type PrometheusAgentSSA struct {
 // Build generates the prometheusAgent resource containing only fields that must be enforced using server-side apply.
 func (p *PrometheusAgentSSA) Build() *cooprometheusv1alpha1.PrometheusAgent {
 	p.desiredAgent = &cooprometheusv1alpha1.PrometheusAgent{
-		TypeMeta: p.ExistingAgent.TypeMeta,
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      p.ExistingAgent.Name,
-			Namespace: p.ExistingAgent.Namespace,
-		},
+		TypeMeta:  p.ExistingAgent.TypeMeta,
+		Name:      p.ExistingAgent.Name,
+		Namespace: p.ExistingAgent.Namespace,
 		Spec: cooprometheusv1alpha1.PrometheusAgentSpec{
 			CommonPrometheusFields: cooprometheusv1.CommonPrometheusFields{
 				ArbitraryFSAccessThroughSMs: cooprometheusv1.ArbitraryFSAccessThroughSMsConfig{
@@ -189,11 +185,9 @@ func (p *PrometheusAgentSSA) setPrometheusRemoteWriteConfig() {
 		Name:          ptr.To(config.RemoteWriteCfgName),
 		RemoteTimeout: ptr.To(cooprometheusv1.Duration("30s")),
 		TLSConfig: &cooprometheusv1.TLSConfig{
-			TLSFilesConfig: cooprometheusv1.TLSFilesConfig{
-				CAFile:   p.formatSecretPath(config.HubCASecretName, config.MTLSCASecretKey),
-				CertFile: p.formatSecretPath(config.ClientCertSecretName, config.MTLSCertSecretKey),
-				KeyFile:  p.formatSecretPath(config.ClientCertSecretName, config.MTLSCertKeySecretKey),
-			},
+			CAFile:   p.formatSecretPath(config.HubCASecretName, config.MTLSCASecretKey),
+			CertFile: p.formatSecretPath(config.ClientCertSecretName, config.MTLSCertSecretKey),
+			KeyFile:  p.formatSecretPath(config.ClientCertSecretName, config.MTLSCertKeySecretKey),
 		},
 		// WriteRelabelConfigs is set individually for each managed cluster in order to enforce cluster identification labels
 	}
@@ -277,10 +271,8 @@ func (p *PrometheusAgentSSA) setKubeRBACProxySidecar() {
 	newVolumes := []corev1.Volume{
 		{
 			Name: "kube-rbac-proxy-tls",
-			VolumeSource: corev1.VolumeSource{
-				Secret: &corev1.SecretVolumeSource{
-					SecretName: tlsSecret,
-				},
+			Secret: &corev1.SecretVolumeSource{
+				SecretName: tlsSecret,
 			},
 		},
 	}

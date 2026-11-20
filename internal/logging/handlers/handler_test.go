@@ -30,12 +30,10 @@ func TestGetOutputSecretNames(t *testing.T) {
 					},
 				},
 				TLS: &loggingv1.OutputTLSSpec{
-					TLSSpec: loggingv1.TLSSpec{
-						Certificate:   &loggingv1.ValueReference{SecretName: "cert-secret"},
-						Key:           &loggingv1.SecretReference{SecretName: "key-secret"},
-						CA:            &loggingv1.ValueReference{ConfigMapName: "ca-secret"},
-						KeyPassphrase: &loggingv1.SecretReference{SecretName: "passphrase-secret"},
-					},
+					Certificate:   &loggingv1.ValueReference{SecretName: "cert-secret"},
+					Key:           &loggingv1.SecretReference{SecretName: "key-secret"},
+					CA:            &loggingv1.ValueReference{ConfigMapName: "ca-secret"},
+					KeyPassphrase: &loggingv1.SecretReference{SecretName: "passphrase-secret"},
 				},
 			},
 			extractedSecretNames:    []string{"cert-secret", "key-secret", "passphrase-secret", "token-secret"},

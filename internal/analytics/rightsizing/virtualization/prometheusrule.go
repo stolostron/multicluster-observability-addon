@@ -5,7 +5,6 @@ import (
 
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"github.com/stolostron/multicluster-observability-addon/internal/analytics/rightsizing"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // cpuUsageRateWindow is the window of the rate() that turns the VM CPU counter into
@@ -35,14 +34,10 @@ func GeneratePrometheusRule(configData rightsizing.RSConfigMapData) (monitoringv
 	intervalStr := string(evalInterval)
 
 	return monitoringv1.PrometheusRule{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      rightsizing.VirtualizationPrometheusRuleName,
-			Namespace: rightsizing.MonitoringNamespace,
-		},
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "PrometheusRule",
-			APIVersion: "monitoring.coreos.com/v1",
-		},
+		Name:       rightsizing.VirtualizationPrometheusRuleName,
+		Namespace:  rightsizing.MonitoringNamespace,
+		Kind:       "PrometheusRule",
+		APIVersion: "monitoring.coreos.com/v1",
 		Spec: monitoringv1.PrometheusRuleSpec{
 			Groups: []monitoringv1.RuleGroup{
 				{

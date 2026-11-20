@@ -72,14 +72,10 @@ func TestTranspile(t *testing.T) {
 							MaxShards: 10,
 						},
 						TLSConfig: &cooprometheusv1.TLSConfig{
-							SafeTLSConfig: cooprometheusv1.SafeTLSConfig{
-								InsecureSkipVerify: ptr.To(true),
-							},
+							InsecureSkipVerify: ptr.To(true),
 						},
 						Authorization: &cooprometheusv1.Authorization{
-							SafeAuthorization: cooprometheusv1.SafeAuthorization{
-								Type: "Bearer",
-							},
+							Type: "Bearer",
 						},
 					},
 				},
@@ -325,14 +321,10 @@ func TestSharedPointerCacheIsolation(t *testing.T) {
 							MaxShards: 10,
 						},
 						TLSConfig: &cooprometheusv1.TLSConfig{
-							SafeTLSConfig: cooprometheusv1.SafeTLSConfig{
-								InsecureSkipVerify: ptr.To(true),
-							},
+							InsecureSkipVerify: ptr.To(true),
 						},
 						Authorization: &cooprometheusv1.Authorization{
-							SafeAuthorization: cooprometheusv1.SafeAuthorization{
-								Type: "Bearer",
-							},
+							Type: "Bearer",
 						},
 						Headers: map[string]string{
 							"X-Hub": "ACM",

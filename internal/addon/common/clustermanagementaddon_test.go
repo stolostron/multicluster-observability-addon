@@ -12,7 +12,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -26,17 +25,13 @@ func TestEnsureConfigsInAddon(t *testing.T) {
 	}
 	platformConfig := addonv1beta1.AddOnConfig{
 		ConfigGroupResource: paConfigGR,
-		ConfigReferent: addonv1beta1.ConfigReferent{
-			Name:      "platform-agent",
-			Namespace: "ns",
-		},
+		Name:                "platform-agent",
+		Namespace:           "ns",
 	}
 	uwlConfig := addonv1beta1.AddOnConfig{
 		ConfigGroupResource: paConfigGR,
-		ConfigReferent: addonv1beta1.ConfigReferent{
-			Name:      "user-workload-agent",
-			Namespace: "ns",
-		},
+		Name:                "user-workload-agent",
+		Namespace:           "ns",
 	}
 
 	placementRefA := addonv1beta1.PlacementRef{
@@ -203,9 +198,7 @@ func TestEnsureConfigsInAddon(t *testing.T) {
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
 			cmao := &addonv1beta1.ClusterManagementAddOn{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: addoncfg.Name,
-				},
+				Name: addoncfg.Name,
 				Spec: addonv1beta1.ClusterManagementAddOnSpec{
 					InstallStrategy: addonv1beta1.InstallStrategy{
 						Placements: tt.initialPlacements,
@@ -235,104 +228,70 @@ func TestRemoveStaleConfigs(t *testing.T) {
 	placementRefA := addonv1beta1.PlacementRef{Namespace: "ns", Name: "a"}
 
 	scrapeConfigCfg := addonv1beta1.AddOnConfig{
-		ConfigGroupResource: addonv1beta1.ConfigGroupResource{
-			Group:    cooprometheusv1alpha1.SchemeGroupVersion.Group,
-			Resource: cooprometheusv1alpha1.ScrapeConfigName,
-		},
-		ConfigReferent: addonv1beta1.ConfigReferent{
-			Name:      "my-scrapeconfig",
-			Namespace: addoncfg.InstallNamespace,
-		},
+		Group:     cooprometheusv1alpha1.SchemeGroupVersion.Group,
+		Resource:  cooprometheusv1alpha1.ScrapeConfigName,
+		Name:      "my-scrapeconfig",
+		Namespace: addoncfg.InstallNamespace,
 	}
 
 	coreosScrapeConfigCfg := addonv1beta1.AddOnConfig{
-		ConfigGroupResource: addonv1beta1.ConfigGroupResource{
-			Group:    prometheusv1alpha1.SchemeGroupVersion.Group,
-			Resource: prometheusv1alpha1.ScrapeConfigName,
-		},
-		ConfigReferent: addonv1beta1.ConfigReferent{
-			Name:      "my-coreos-scrapeconfig",
-			Namespace: addoncfg.InstallNamespace,
-		},
+		Group:     prometheusv1alpha1.SchemeGroupVersion.Group,
+		Resource:  prometheusv1alpha1.ScrapeConfigName,
+		Name:      "my-coreos-scrapeconfig",
+		Namespace: addoncfg.InstallNamespace,
 	}
 
 	promRuleCfg := addonv1beta1.AddOnConfig{
-		ConfigGroupResource: addonv1beta1.ConfigGroupResource{
-			Group:    prometheusv1.SchemeGroupVersion.Group,
-			Resource: prometheusv1.PrometheusRuleName,
-		},
-		ConfigReferent: addonv1beta1.ConfigReferent{
-			Name:      "my-promrule",
-			Namespace: addoncfg.InstallNamespace,
-		},
+		Group:     prometheusv1.SchemeGroupVersion.Group,
+		Resource:  prometheusv1.PrometheusRuleName,
+		Name:      "my-promrule",
+		Namespace: addoncfg.InstallNamespace,
 	}
 
 	cooPromRuleCfg := addonv1beta1.AddOnConfig{
-		ConfigGroupResource: addonv1beta1.ConfigGroupResource{
-			Group:    cooprometheusv1.SchemeGroupVersion.Group,
-			Resource: cooprometheusv1.PrometheusRuleName,
-		},
-		ConfigReferent: addonv1beta1.ConfigReferent{
-			Name:      "my-coo-promrule",
-			Namespace: addoncfg.InstallNamespace,
-		},
+		Group:     cooprometheusv1.SchemeGroupVersion.Group,
+		Resource:  cooprometheusv1.PrometheusRuleName,
+		Name:      "my-coo-promrule",
+		Namespace: addoncfg.InstallNamespace,
 	}
 
 	agentCfg := addonv1beta1.AddOnConfig{
-		ConfigGroupResource: addonv1beta1.ConfigGroupResource{
-			Group:    cooprometheusv1alpha1.SchemeGroupVersion.Group,
-			Resource: cooprometheusv1alpha1.PrometheusAgentName,
-		},
-		ConfigReferent: addonv1beta1.ConfigReferent{
-			Name:      "my-agent",
-			Namespace: addoncfg.InstallNamespace,
-		},
+		Group:     cooprometheusv1alpha1.SchemeGroupVersion.Group,
+		Resource:  cooprometheusv1alpha1.PrometheusAgentName,
+		Name:      "my-agent",
+		Namespace: addoncfg.InstallNamespace,
 	}
 
 	existingScrapeConfig := &cooprometheusv1alpha1.ScrapeConfig{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "my-scrapeconfig",
-			Namespace: addoncfg.InstallNamespace,
-		},
+		Name:      "my-scrapeconfig",
+		Namespace: addoncfg.InstallNamespace,
 	}
 
 	existingCoreosScrapeConfig := &prometheusv1alpha1.ScrapeConfig{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "my-coreos-scrapeconfig",
-			Namespace: addoncfg.InstallNamespace,
-		},
+		Name:      "my-coreos-scrapeconfig",
+		Namespace: addoncfg.InstallNamespace,
 	}
 
 	existingPromRule := &prometheusv1.PrometheusRule{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "my-promrule",
-			Namespace: addoncfg.InstallNamespace,
-		},
+		Name:      "my-promrule",
+		Namespace: addoncfg.InstallNamespace,
 	}
 
 	existingCooPromRule := &cooprometheusv1.PrometheusRule{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "my-coo-promrule",
-			Namespace: addoncfg.InstallNamespace,
-		},
+		Name:      "my-coo-promrule",
+		Namespace: addoncfg.InstallNamespace,
 	}
 
 	existingAgent := &cooprometheusv1alpha1.PrometheusAgent{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "my-agent",
-			Namespace: addoncfg.InstallNamespace,
-		},
+		Name:      "my-agent",
+		Namespace: addoncfg.InstallNamespace,
 	}
 
 	otherCfg := addonv1beta1.AddOnConfig{
-		ConfigGroupResource: addonv1beta1.ConfigGroupResource{
-			Group:    "apps",
-			Resource: "deployments",
-		},
-		ConfigReferent: addonv1beta1.ConfigReferent{
-			Name:      "some-deployment",
-			Namespace: addoncfg.InstallNamespace,
-		},
+		Group:     "apps",
+		Resource:  "deployments",
+		Name:      "some-deployment",
+		Namespace: addoncfg.InstallNamespace,
 	}
 
 	testCases := []struct {
@@ -403,7 +362,7 @@ func TestRemoveStaleConfigs(t *testing.T) {
 			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(tt.existingObjects...).Build()
 
 			cmao := &addonv1beta1.ClusterManagementAddOn{
-				ObjectMeta: metav1.ObjectMeta{Name: addoncfg.Name},
+				Name: addoncfg.Name,
 				Spec: addonv1beta1.ClusterManagementAddOnSpec{
 					InstallStrategy: addonv1beta1.InstallStrategy{
 						Placements: []addonv1beta1.PlacementStrategy{
@@ -431,31 +390,23 @@ func TestDoesScrapeConfigOrPrometheusRuleOrPrometheusAgentExist(t *testing.T) {
 	scheme := newCMAOTestScheme(t)
 
 	existingScrapeConfig := &cooprometheusv1alpha1.ScrapeConfig{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "existing-sc",
-			Namespace: addoncfg.InstallNamespace,
-		},
+		Name:      "existing-sc",
+		Namespace: addoncfg.InstallNamespace,
 	}
 
 	existingCoreosScrapeConfig := &prometheusv1alpha1.ScrapeConfig{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "existing-coreos-sc",
-			Namespace: addoncfg.InstallNamespace,
-		},
+		Name:      "existing-coreos-sc",
+		Namespace: addoncfg.InstallNamespace,
 	}
 
 	existingPromRule := &prometheusv1.PrometheusRule{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "existing-rule",
-			Namespace: addoncfg.InstallNamespace,
-		},
+		Name:      "existing-rule",
+		Namespace: addoncfg.InstallNamespace,
 	}
 
 	existingAgent := &cooprometheusv1alpha1.PrometheusAgent{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "existing-agent",
-			Namespace: addoncfg.InstallNamespace,
-		},
+		Name:      "existing-agent",
+		Namespace: addoncfg.InstallNamespace,
 	}
 
 	// Same name as existingPromRule, but registered under OBO's PrometheusRule group
@@ -463,10 +414,8 @@ func TestDoesScrapeConfigOrPrometheusRuleOrPrometheusAgentExist(t *testing.T) {
 	// share the identical "prometheusrules" resource name, so this fixture is what exercises the
 	// Group+Resource disambiguation.
 	existingOboPromRule := &cooprometheusv1.PrometheusRule{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "existing-obo-rule",
-			Namespace: addoncfg.InstallNamespace,
-		},
+		Name:      "existing-obo-rule",
+		Namespace: addoncfg.InstallNamespace,
 	}
 
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(

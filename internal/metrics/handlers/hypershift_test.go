@@ -28,10 +28,8 @@ func TestHypershift_Nominal(t *testing.T) {
 	require.NoError(t, clusterv1.Install(scheme))
 
 	mc := &clusterv1.ManagedCluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Labels: map[string]string{
-				"feature.open-cluster-management.io/addon-hypershift-addon": "available",
-			},
+		Labels: map[string]string{
+			"feature.open-cluster-management.io/addon-hypershift-addon": "available",
 		},
 		Spec: clusterv1.ManagedClusterSpec{},
 	}
@@ -92,10 +90,8 @@ func TestHypershift_Nominal(t *testing.T) {
 	}
 
 	hostedCluster := &hyperv1.HostedCluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "name",
-			Namespace: "namespace",
-		},
+		Name:      "name",
+		Namespace: "namespace",
 		Spec: hyperv1.HostedClusterSpec{
 			ClusterID: "cluster-id",
 		},
@@ -103,23 +99,15 @@ func TestHypershift_Nominal(t *testing.T) {
 
 	targetPort := intstr.FromString("target")
 	hyperEtcdSM := &prometheusv1.ServiceMonitor{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      config.HypershiftEtcdServiceMonitorName,
-			Namespace: "namespace-name",
-		},
+		Name:      config.HypershiftEtcdServiceMonitorName,
+		Namespace: "namespace-name",
 		Spec: prometheusv1.ServiceMonitorSpec{
 			Endpoints: []prometheusv1.Endpoint{
 				{
 					Port:       "metrics",
 					TargetPort: &targetPort,
-					HTTPConfigWithProxyAndTLSFiles: prometheusv1.HTTPConfigWithProxyAndTLSFiles{
-						HTTPConfigWithTLSFiles: prometheusv1.HTTPConfigWithTLSFiles{
-							TLSConfig: &prometheusv1.TLSConfig{
-								TLSFilesConfig: prometheusv1.TLSFilesConfig{
-									CAFile: "cafile",
-								},
-							},
-						},
+					TLSConfig: &prometheusv1.TLSConfig{
+						CAFile: "cafile",
 					},
 				},
 			},
@@ -133,23 +121,15 @@ func TestHypershift_Nominal(t *testing.T) {
 	}
 
 	hyperApiserverSM := &prometheusv1.ServiceMonitor{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      config.HypershiftApiServerServiceMonitorName,
-			Namespace: "namespace-name",
-		},
+		Name:      config.HypershiftApiServerServiceMonitorName,
+		Namespace: "namespace-name",
 		Spec: prometheusv1.ServiceMonitorSpec{
 			Endpoints: []prometheusv1.Endpoint{
 				{
 					TargetPort: &targetPort,
 					Port:       "client",
-					HTTPConfigWithProxyAndTLSFiles: prometheusv1.HTTPConfigWithProxyAndTLSFiles{
-						HTTPConfigWithTLSFiles: prometheusv1.HTTPConfigWithTLSFiles{
-							TLSConfig: &prometheusv1.TLSConfig{
-								TLSFilesConfig: prometheusv1.TLSFilesConfig{
-									CAFile: "cafile",
-								},
-							},
-						},
+					TLSConfig: &prometheusv1.TLSConfig{
+						CAFile: "cafile",
 					},
 				},
 			},
@@ -189,7 +169,8 @@ func TestHypershift_Nominal(t *testing.T) {
 		assert.Len(t, sm.Spec.Endpoints[0].RelabelConfigs, 1)
 		assert.NotEmpty(t, sm.Spec.Endpoints[0].Port)
 		assert.NotEmpty(t, sm.Spec.Endpoints[0].TargetPort.StrVal)
-		assert.NotEmpty(t, sm.Spec.Endpoints[0].TLSConfig)
+		require.NotNil(t, sm.Spec.Endpoints[0].TLSConfig)
+		assert.Equal(t, "cafile", sm.Spec.Endpoints[0].TLSConfig.CAFile)
 		assert.NotEmpty(t, sm.Spec.Selector)
 		assert.NotEmpty(t, sm.Spec.NamespaceSelector)
 	}
@@ -225,10 +206,8 @@ func TestHypershift_NoScrapeConfigsAndRules(t *testing.T) {
 	require.NoError(t, clusterv1.Install(scheme))
 
 	hostedCluster := &hyperv1.HostedCluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "name",
-			Namespace: "namespace",
-		},
+		Name:      "name",
+		Namespace: "namespace",
 		Spec: hyperv1.HostedClusterSpec{
 			ClusterID: "cluster-id",
 		},
@@ -259,10 +238,8 @@ func TestHypershift_NoHypershiftServiceMonitors(t *testing.T) {
 	require.NoError(t, clusterv1.Install(scheme))
 
 	hostedCluster := &hyperv1.HostedCluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "name",
-			Namespace: "namespace",
-		},
+		Name:      "name",
+		Namespace: "namespace",
 		Spec: hyperv1.HostedClusterSpec{
 			ClusterID: "cluster-id",
 		},

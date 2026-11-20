@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -113,10 +112,8 @@ func TestInstallCOO(t *testing.T) {
 				},
 			},
 			subscription: &operatorv1alpha1.Subscription{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      addoncfg.CooSubscriptionName,
-					Namespace: addoncfg.CooSubscriptionNamespace,
-				},
+				Name:      addoncfg.CooSubscriptionName,
+				Namespace: addoncfg.CooSubscriptionNamespace,
 				Spec: &operatorv1alpha1.SubscriptionSpec{
 					Channel: addoncfg.CooSubscriptionChannel,
 				},
@@ -139,10 +136,8 @@ func TestInstallCOO(t *testing.T) {
 				},
 			},
 			subscription: &operatorv1alpha1.Subscription{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      addoncfg.CooSubscriptionName,
-					Namespace: "openshift-operators",
-				},
+				Name:      addoncfg.CooSubscriptionName,
+				Namespace: "openshift-operators",
 				Spec: &operatorv1alpha1.SubscriptionSpec{
 					Channel: addoncfg.CooSubscriptionChannel,
 				},
@@ -156,12 +151,10 @@ func TestInstallCOO(t *testing.T) {
 			isHub:   true,
 			options: addon.Options{},
 			subscription: &operatorv1alpha1.Subscription{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      addoncfg.CooSubscriptionName,
-					Namespace: "openshift-operators",
-					Labels: map[string]string{
-						addoncfg.ReleaseLabelKey: addoncfg.Name,
-					},
+				Name:      addoncfg.CooSubscriptionName,
+				Namespace: "openshift-operators",
+				Labels: map[string]string{
+					addoncfg.ReleaseLabelKey: addoncfg.Name,
 				},
 				Spec: &operatorv1alpha1.SubscriptionSpec{
 					Channel: addoncfg.CooSubscriptionChannel,
@@ -183,12 +176,10 @@ func TestInstallCOO(t *testing.T) {
 				},
 			},
 			subscription: &operatorv1alpha1.Subscription{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      addoncfg.CooSubscriptionName,
-					Namespace: addoncfg.CooSubscriptionNamespace,
-					Labels: map[string]string{
-						addoncfg.ReleaseLabelKey: addoncfg.Name,
-					},
+				Name:      addoncfg.CooSubscriptionName,
+				Namespace: addoncfg.CooSubscriptionNamespace,
+				Labels: map[string]string{
+					addoncfg.ReleaseLabelKey: addoncfg.Name,
 				},
 				Spec: &operatorv1alpha1.SubscriptionSpec{
 					Channel: addoncfg.CooSubscriptionChannel,
@@ -212,10 +203,8 @@ func TestInstallCOO(t *testing.T) {
 				},
 			},
 			subscription: &operatorv1alpha1.Subscription{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      addoncfg.CooSubscriptionName,
-					Namespace: addoncfg.CooSubscriptionNamespace,
-				},
+				Name:      addoncfg.CooSubscriptionName,
+				Namespace: addoncfg.CooSubscriptionNamespace,
 				Spec: &operatorv1alpha1.SubscriptionSpec{
 					Channel: "wrong-channel",
 				},
@@ -229,11 +218,9 @@ func TestInstallCOO(t *testing.T) {
 			isHub:   true,
 			options: addon.Options{},
 			subscription: &operatorv1alpha1.Subscription{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      addoncfg.CooSubscriptionName,
-					Namespace: addoncfg.CooSubscriptionNamespace,
-				},
-				Spec: nil,
+				Name:      addoncfg.CooSubscriptionName,
+				Namespace: addoncfg.CooSubscriptionNamespace,
+				Spec:      nil,
 			},
 			expectedErrMsg: addoncfg.ErrInvalidSubscriptionChannel.Error(),
 		},
@@ -326,22 +313,16 @@ func TestCardinalityRulesConfigMapPredicate(t *testing.T) {
 	pred := CardinalityRulesConfigMapPredicate()
 
 	validCM := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      thanosRulerCustomRulesName,
-			Namespace: addoncfg.InstallNamespace,
-		},
+		Name:      thanosRulerCustomRulesName,
+		Namespace: addoncfg.InstallNamespace,
 	}
 	wrongNameCM := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "other-rules",
-			Namespace: addoncfg.InstallNamespace,
-		},
+		Name:      "other-rules",
+		Namespace: addoncfg.InstallNamespace,
 	}
 	wrongNamespaceCM := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      thanosRulerCustomRulesName,
-			Namespace: "other-namespace",
-		},
+		Name:      thanosRulerCustomRulesName,
+		Namespace: "other-namespace",
 	}
 
 	assert.True(t, pred.Create(event.CreateEvent{Object: validCM}))
@@ -363,33 +344,25 @@ func TestCooSubscriptionPredicate(t *testing.T) {
 	pred := CooSubscriptionPredicate()
 
 	validSub := &operatorv1alpha1.Subscription{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:       addoncfg.CooSubscriptionName,
-			Namespace:  addoncfg.CooSubscriptionNamespace,
-			Generation: 1,
-			Labels:     map[string]string{addoncfg.ReleaseLabelKey: addoncfg.Name},
-		},
+		Name:       addoncfg.CooSubscriptionName,
+		Namespace:  addoncfg.CooSubscriptionNamespace,
+		Generation: 1,
+		Labels:     map[string]string{addoncfg.ReleaseLabelKey: addoncfg.Name},
 	}
 	wrongNameSub := &operatorv1alpha1.Subscription{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:       "other-operator",
-			Namespace:  addoncfg.CooSubscriptionNamespace,
-			Generation: 1,
-		},
+		Name:       "other-operator",
+		Namespace:  addoncfg.CooSubscriptionNamespace,
+		Generation: 1,
 	}
 	otherNamespaceSub := &operatorv1alpha1.Subscription{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:       addoncfg.CooSubscriptionName,
-			Namespace:  "openshift-operators",
-			Generation: 1,
-		},
+		Name:       addoncfg.CooSubscriptionName,
+		Namespace:  "openshift-operators",
+		Generation: 1,
 	}
 	packageMatchSub := &operatorv1alpha1.Subscription{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:       "custom-coo",
-			Namespace:  "openshift-operators",
-			Generation: 1,
-		},
+		Name:       "custom-coo",
+		Namespace:  "openshift-operators",
+		Generation: 1,
 		Spec: &operatorv1alpha1.SubscriptionSpec{
 			Package: addoncfg.CooSubscriptionName,
 		},

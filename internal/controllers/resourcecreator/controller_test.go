@@ -14,7 +14,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/workqueue"
 	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -67,74 +66,58 @@ func TestValidateAODC(t *testing.T) {
 func TestMCOAAODCPredicate(t *testing.T) {
 	t.Run("matches valid AODC create", func(t *testing.T) {
 		aodc := &addonv1beta1.AddOnDeploymentConfig{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      addoncfg.Name,
-				Namespace: addoncfg.InstallNamespace,
-			},
+			Name:      addoncfg.Name,
+			Namespace: addoncfg.InstallNamespace,
 		}
 		assert.True(t, mcoaAODCPredicate.Create(event.CreateEvent{Object: aodc}))
 	})
 
 	t.Run("rejects wrong name or namespace on create", func(t *testing.T) {
 		wrongName := &addonv1beta1.AddOnDeploymentConfig{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "other",
-				Namespace: addoncfg.InstallNamespace,
-			},
+			Name:      "other",
+			Namespace: addoncfg.InstallNamespace,
 		}
 		assert.False(t, mcoaAODCPredicate.Create(event.CreateEvent{Object: wrongName}))
 
 		wrongNs := &addonv1beta1.AddOnDeploymentConfig{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      addoncfg.Name,
-				Namespace: "other",
-			},
+			Name:      addoncfg.Name,
+			Namespace: "other",
 		}
 		assert.False(t, mcoaAODCPredicate.Create(event.CreateEvent{Object: wrongNs}))
 	})
 
 	t.Run("ignores update when generation is unchanged", func(t *testing.T) {
 		oldAODC := &addonv1beta1.AddOnDeploymentConfig{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:       addoncfg.Name,
-				Namespace:  addoncfg.InstallNamespace,
-				Generation: 1,
-			},
+			Name:       addoncfg.Name,
+			Namespace:  addoncfg.InstallNamespace,
+			Generation: 1,
 		}
 		newAODC := &addonv1beta1.AddOnDeploymentConfig{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:       addoncfg.Name,
-				Namespace:  addoncfg.InstallNamespace,
-				Generation: 1,
-			},
+			Name:       addoncfg.Name,
+			Namespace:  addoncfg.InstallNamespace,
+			Generation: 1,
 		}
 		assert.False(t, mcoaAODCPredicate.Update(event.UpdateEvent{ObjectOld: oldAODC, ObjectNew: newAODC}))
 	})
 
 	t.Run("triggers update when generation changed", func(t *testing.T) {
 		oldAODC := &addonv1beta1.AddOnDeploymentConfig{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:       addoncfg.Name,
-				Namespace:  addoncfg.InstallNamespace,
-				Generation: 1,
-			},
+			Name:       addoncfg.Name,
+			Namespace:  addoncfg.InstallNamespace,
+			Generation: 1,
 		}
 		newAODC := &addonv1beta1.AddOnDeploymentConfig{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:       addoncfg.Name,
-				Namespace:  addoncfg.InstallNamespace,
-				Generation: 2,
-			},
+			Name:       addoncfg.Name,
+			Namespace:  addoncfg.InstallNamespace,
+			Generation: 2,
 		}
 		assert.True(t, mcoaAODCPredicate.Update(event.UpdateEvent{ObjectOld: oldAODC, ObjectNew: newAODC}))
 	})
 
 	t.Run("matches valid AODC delete", func(t *testing.T) {
 		aodc := &addonv1beta1.AddOnDeploymentConfig{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      addoncfg.Name,
-				Namespace: addoncfg.InstallNamespace,
-			},
+			Name:      addoncfg.Name,
+			Namespace: addoncfg.InstallNamespace,
 		}
 		assert.True(t, mcoaAODCPredicate.Delete(event.DeleteEvent{Object: aodc}))
 	})
@@ -153,7 +136,7 @@ func TestCMAOPlacementsChanged(t *testing.T) {
 				Spec: addonv1beta1.ClusterManagementAddOnSpec{
 					InstallStrategy: addonv1beta1.InstallStrategy{
 						Placements: []addonv1beta1.PlacementStrategy{
-							{PlacementRef: addonv1beta1.PlacementRef{Name: "p1"}},
+							{Name: "p1"},
 						},
 					},
 				},
@@ -162,7 +145,7 @@ func TestCMAOPlacementsChanged(t *testing.T) {
 				Spec: addonv1beta1.ClusterManagementAddOnSpec{
 					InstallStrategy: addonv1beta1.InstallStrategy{
 						Placements: []addonv1beta1.PlacementStrategy{
-							{PlacementRef: addonv1beta1.PlacementRef{Name: "p1"}},
+							{Name: "p1"},
 						},
 					},
 				},
@@ -175,7 +158,7 @@ func TestCMAOPlacementsChanged(t *testing.T) {
 				Spec: addonv1beta1.ClusterManagementAddOnSpec{
 					InstallStrategy: addonv1beta1.InstallStrategy{
 						Placements: []addonv1beta1.PlacementStrategy{
-							{PlacementRef: addonv1beta1.PlacementRef{Name: "p1"}},
+							{Name: "p1"},
 						},
 					},
 				},
@@ -184,7 +167,7 @@ func TestCMAOPlacementsChanged(t *testing.T) {
 				Spec: addonv1beta1.ClusterManagementAddOnSpec{
 					InstallStrategy: addonv1beta1.InstallStrategy{
 						Placements: []addonv1beta1.PlacementStrategy{
-							{PlacementRef: addonv1beta1.PlacementRef{Name: "p2"}},
+							{Name: "p2"},
 						},
 					},
 				},
@@ -204,10 +187,8 @@ func TestCMAOPlacementsChanged(t *testing.T) {
 func TestMCOAAODCRequest(t *testing.T) {
 	expected := []reconcile.Request{
 		{
-			NamespacedName: types.NamespacedName{
-				Name:      addoncfg.Name,
-				Namespace: addoncfg.InstallNamespace,
-			},
+			Name:      addoncfg.Name,
+			Namespace: addoncfg.InstallNamespace,
 		},
 	}
 	assert.Equal(t, expected, mcoaAODCRequest())
@@ -245,13 +226,11 @@ func TestEnqueueFunctions(t *testing.T) {
 
 		t.Run("owned resource", func(t *testing.T) {
 			obj := &corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					OwnerReferences: []metav1.OwnerReference{
-						{
-							APIVersion: "addon.open-cluster-management.io/v1alpha1",
-							Kind:       "ClusterManagementAddOn",
-							Name:       addoncfg.Name,
-						},
+				OwnerReferences: []metav1.OwnerReference{
+					{
+						APIVersion: "addon.open-cluster-management.io/v1alpha1",
+						Kind:       "ClusterManagementAddOn",
+						Name:       addoncfg.Name,
 					},
 				},
 			}
@@ -269,10 +248,8 @@ func TestEnqueueFunctions(t *testing.T) {
 
 		t.Run("user-defined resource with part-of label", func(t *testing.T) {
 			obj := &corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						addoncfg.PartOfK8sLabelKey: addoncfg.Name,
-					},
+				Labels: map[string]string{
+					addoncfg.PartOfK8sLabelKey: addoncfg.Name,
 				},
 			}
 			q := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[reconcile.Request]())
@@ -289,12 +266,10 @@ func TestEnqueueFunctions(t *testing.T) {
 
 		t.Run("user-defined PrometheusAgent with part-of label", func(t *testing.T) {
 			agent := &cooprometheusv1alpha1.PrometheusAgent{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "user-agent",
-					Namespace: addoncfg.InstallNamespace,
-					Labels: map[string]string{
-						addoncfg.PartOfK8sLabelKey: addoncfg.Name,
-					},
+				Name:      "user-agent",
+				Namespace: addoncfg.InstallNamespace,
+				Labels: map[string]string{
+					addoncfg.PartOfK8sLabelKey: addoncfg.Name,
 				},
 			}
 			q := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[reconcile.Request]())
@@ -324,9 +299,7 @@ func TestEnqueueFunctions(t *testing.T) {
 
 		t.Run("update event: label removed triggers reconciliation", func(t *testing.T) {
 			oldObj := &corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{addoncfg.PartOfK8sLabelKey: addoncfg.Name},
-				},
+				Labels: map[string]string{addoncfg.PartOfK8sLabelKey: addoncfg.Name},
 			}
 			newObj := &corev1.ConfigMap{}
 			q := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[reconcile.Request]())
@@ -344,9 +317,7 @@ func TestEnqueueFunctions(t *testing.T) {
 		t.Run("update event: label added triggers reconciliation", func(t *testing.T) {
 			oldObj := &corev1.ConfigMap{}
 			newObj := &corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{addoncfg.PartOfK8sLabelKey: addoncfg.Name},
-				},
+				Labels: map[string]string{addoncfg.PartOfK8sLabelKey: addoncfg.Name},
 			}
 			q := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[reconcile.Request]())
 			h.Update(context.Background(), event.UpdateEvent{ObjectOld: oldObj, ObjectNew: newObj}, q)
@@ -370,9 +341,7 @@ func TestEnqueueFunctions(t *testing.T) {
 
 		t.Run("delete event: labeled resource triggers reconciliation", func(t *testing.T) {
 			obj := &corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{addoncfg.PartOfK8sLabelKey: addoncfg.Name},
-				},
+				Labels: map[string]string{addoncfg.PartOfK8sLabelKey: addoncfg.Name},
 			}
 			q := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[reconcile.Request]())
 			h.Delete(context.Background(), event.DeleteEvent{Object: obj}, q)
@@ -399,13 +368,11 @@ func TestEnqueueFunctions(t *testing.T) {
 
 		t.Run("controlled by MCO", func(t *testing.T) {
 			obj := &corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					OwnerReferences: []metav1.OwnerReference{
-						{
-							APIVersion: "observability.open-cluster-management.io/v1beta1",
-							Kind:       "MultiClusterObservability",
-							Controller: func() *bool { b := true; return &b }(),
-						},
+				OwnerReferences: []metav1.OwnerReference{
+					{
+						APIVersion: "observability.open-cluster-management.io/v1beta1",
+						Kind:       "MultiClusterObservability",
+						Controller: func() *bool { b := true; return &b }(),
 					},
 				},
 			}
@@ -423,10 +390,8 @@ func TestEnqueueFunctions(t *testing.T) {
 
 		t.Run("user-defined resource with part-of label", func(t *testing.T) {
 			obj := &corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						addoncfg.PartOfK8sLabelKey: addoncfg.Name,
-					},
+				Labels: map[string]string{
+					addoncfg.PartOfK8sLabelKey: addoncfg.Name,
 				},
 			}
 			q := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[reconcile.Request]())
@@ -443,12 +408,10 @@ func TestEnqueueFunctions(t *testing.T) {
 
 		t.Run("user-defined ScrapeConfig with part-of label", func(t *testing.T) {
 			sc := &cooprometheusv1alpha1.ScrapeConfig{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "user-sc",
-					Namespace: addoncfg.InstallNamespace,
-					Labels: map[string]string{
-						addoncfg.PartOfK8sLabelKey: addoncfg.Name,
-					},
+				Name:      "user-sc",
+				Namespace: addoncfg.InstallNamespace,
+				Labels: map[string]string{
+					addoncfg.PartOfK8sLabelKey: addoncfg.Name,
 				},
 			}
 			q := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[reconcile.Request]())
@@ -465,12 +428,10 @@ func TestEnqueueFunctions(t *testing.T) {
 
 		t.Run("user-defined PrometheusRule with part-of label", func(t *testing.T) {
 			rule := &prometheusv1.PrometheusRule{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "user-rule",
-					Namespace: addoncfg.InstallNamespace,
-					Labels: map[string]string{
-						addoncfg.PartOfK8sLabelKey: addoncfg.Name,
-					},
+				Name:      "user-rule",
+				Namespace: addoncfg.InstallNamespace,
+				Labels: map[string]string{
+					addoncfg.PartOfK8sLabelKey: addoncfg.Name,
 				},
 			}
 			q := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[reconcile.Request]())
@@ -500,9 +461,7 @@ func TestEnqueueFunctions(t *testing.T) {
 
 		t.Run("update event: label removed triggers reconciliation", func(t *testing.T) {
 			oldObj := &corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{addoncfg.PartOfK8sLabelKey: addoncfg.Name},
-				},
+				Labels: map[string]string{addoncfg.PartOfK8sLabelKey: addoncfg.Name},
 			}
 			newObj := &corev1.ConfigMap{}
 			q := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[reconcile.Request]())
@@ -520,9 +479,7 @@ func TestEnqueueFunctions(t *testing.T) {
 		t.Run("update event: label added triggers reconciliation", func(t *testing.T) {
 			oldObj := &corev1.ConfigMap{}
 			newObj := &corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{addoncfg.PartOfK8sLabelKey: addoncfg.Name},
-				},
+				Labels: map[string]string{addoncfg.PartOfK8sLabelKey: addoncfg.Name},
 			}
 			q := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[reconcile.Request]())
 			h.Update(context.Background(), event.UpdateEvent{ObjectOld: oldObj, ObjectNew: newObj}, q)
@@ -546,9 +503,7 @@ func TestEnqueueFunctions(t *testing.T) {
 
 		t.Run("delete event: labeled resource triggers reconciliation", func(t *testing.T) {
 			obj := &corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{addoncfg.PartOfK8sLabelKey: addoncfg.Name},
-				},
+				Labels: map[string]string{addoncfg.PartOfK8sLabelKey: addoncfg.Name},
 			}
 			q := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[reconcile.Request]())
 			h.Delete(context.Background(), event.DeleteEvent{Object: obj}, q)
@@ -577,10 +532,8 @@ func TestResourceCreatorReconciler_Reconcile_TerminalError(t *testing.T) {
 
 	// Create an AddOnDeploymentConfig with an invalid proxy URL (control characters or invalid format)
 	invalidAODC := &addonv1beta1.AddOnDeploymentConfig{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      addoncfg.Name,
-			Namespace: addoncfg.InstallNamespace,
-		},
+		Name:      addoncfg.Name,
+		Namespace: addoncfg.InstallNamespace,
 		Spec: addonv1beta1.AddOnDeploymentConfigSpec{
 			ProxyConfig: addonv1beta1.ProxyConfig{
 				HTTPProxy: "http://invalid proxy url with spaces",
@@ -600,10 +553,8 @@ func TestResourceCreatorReconciler_Reconcile_TerminalError(t *testing.T) {
 	}
 
 	req := reconcile.Request{
-		NamespacedName: types.NamespacedName{
-			Namespace: addoncfg.InstallNamespace,
-			Name:      addoncfg.Name,
-		},
+		Namespace: addoncfg.InstallNamespace,
+		Name:      addoncfg.Name,
 	}
 
 	_, err := r.Reconcile(t.Context(), req)
@@ -614,10 +565,8 @@ func TestResourceCreatorReconciler_Reconcile_TerminalError(t *testing.T) {
 
 func TestHostedClusterPredicate(t *testing.T) {
 	hc := &hyperv1.HostedCluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-hc",
-			Namespace: "clusters",
-		},
+		Name:      "test-hc",
+		Namespace: "clusters",
 	}
 
 	assert.True(t, hostedClusterPredicate.Create(event.CreateEvent{Object: hc}), "HostedCluster creation should trigger reconciliation")

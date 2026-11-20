@@ -26,9 +26,10 @@ func Transpile(scrapeConfig *cooprometheusv1alpha1.ScrapeConfig, agent *cooprome
 		return nil, nil
 	}
 
+	promqlParser := parser.NewParser(parser.Options{})
 	parsedSelectors := make([][]*labels.Matcher, 0, len(matchersList))
 	for _, mStr := range matchersList {
-		matchers, err := parser.ParseMetricSelector(mStr)
+		matchers, err := promqlParser.ParseMetricSelector(mStr)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse metric selector %q: %w", mStr, err)
 		}

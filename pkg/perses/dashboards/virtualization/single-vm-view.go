@@ -4,8 +4,8 @@ import (
 	"github.com/perses/community-mixins/pkg/dashboards"
 	"github.com/perses/perses/go-sdk/dashboard"
 	listVar "github.com/perses/perses/go-sdk/variable/list-variable"
-	v1variable "github.com/perses/perses/pkg/model/api/v1/variable"
 	labelValuesVar "github.com/perses/plugins/prometheus/sdk/go/variable/label-values"
+	v1variable "github.com/perses/spec/go/dashboard/variable"
 	panels "github.com/stolostron/multicluster-observability-addon/pkg/perses/panels/virtualization"
 )
 

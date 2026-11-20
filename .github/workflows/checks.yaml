@@ -16,17 +16,17 @@ jobs:
     - name: Set up Go 1.x
       uses: actions/setup-go@v6
       with:
-        go-version: '1.26'
+        go-version-file: go.mod
       id: go
     - name: Lint
       uses: golangci/golangci-lint-action@v9
       with:
-        version: v2.11.4
+        version: v2.15.0
         args: --timeout=4m --build-tags=promql
     - name: Lint pkg/perses submodule
       uses: golangci/golangci-lint-action@v9
       with:
-        version: v2.11.4
+        version: v2.15.0
         args: --timeout=4m
         working-directory: pkg/perses
     - name: Run shellcheck
@@ -42,7 +42,7 @@ jobs:
     - name: Set up Go 1.x
       uses: actions/setup-go@v6
       with:
-        go-version: '1.26'
+        go-version-file: go.mod
       id: go
     - name: Run tests
       run: go test -coverprofile=profile.cov ./internal/...
@@ -60,7 +60,7 @@ jobs:
       uses: shogo82148/actions-goveralls@v1
       with:
         path-to-profile: profile.cov
-        flag-name: Go-1.26
+        flag-name: Go-1.27
         shallow: true
 
   test-integration:
@@ -77,7 +77,7 @@ jobs:
     - name: Set up Go 1.x
       uses: actions/setup-go@v6
       with:
-        go-version: '1.26'
+        go-version-file: go.mod
       id: go
     - name: Run integration tests
       run: make test-integration

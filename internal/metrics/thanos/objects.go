@@ -62,15 +62,11 @@ func (b *ObjectBuilder) buildStore(opts addon.Options, storeImage string) *thano
 	shards := int32(config.DefaultStoreShards)
 
 	store := &thanosv1alpha1.ThanosStore{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: thanosv1alpha1.GroupVersion.String(),
-			Kind:       "ThanosStore",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "mcoa",
-			Namespace: config.HubInstallNamespace,
-			Labels:    storeLabels(),
-		},
+		APIVersion: thanosv1alpha1.GroupVersion.String(),
+		Kind:       "ThanosStore",
+		Name:       "mcoa",
+		Namespace:  config.HubInstallNamespace,
+		Labels:     storeLabels(),
 		Spec: thanosv1alpha1.ThanosStoreSpec{
 			Replicas: 1,
 			ObjectStorageConfig: thanosv1alpha1.ObjectStorageConfig{
@@ -86,8 +82,8 @@ func (b *ObjectBuilder) buildStore(opts addon.Options, storeImage string) *thano
 			},
 			IndexCacheConfig: &thanosv1alpha1.CacheConfig{
 				ExternalCacheConfig: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{Name: config.StoreCacheConfigSecretName},
-					Key:                  config.StoreCacheConfigSecretKey,
+					Name: config.StoreCacheConfigSecretName,
+					Key:  config.StoreCacheConfigSecretKey,
 				},
 			},
 		},
@@ -107,15 +103,11 @@ func (b *ObjectBuilder) buildReceive(opts addon.Options) *thanosv1alpha1.ThanosR
 	tooFarInFuture := thanosv1alpha1.Duration(config.DefaultReceiveTooFarInFuture)
 
 	receive := &thanosv1alpha1.ThanosReceive{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: thanosv1alpha1.GroupVersion.String(),
-			Kind:       "ThanosReceive",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "mcoa",
-			Namespace: config.HubInstallNamespace,
-			Labels:    receiveLabels(),
-		},
+		APIVersion: thanosv1alpha1.GroupVersion.String(),
+		Kind:       "ThanosReceive",
+		Name:       "mcoa",
+		Namespace:  config.HubInstallNamespace,
+		Labels:     receiveLabels(),
 		Spec: thanosv1alpha1.ThanosReceiveSpec{
 			Router: thanosv1alpha1.RouterSpec{
 				Replicas:          config.DefaultReceiveRouterReplicas,
@@ -156,15 +148,11 @@ func (b *ObjectBuilder) buildReceive(opts addon.Options) *thanosv1alpha1.ThanosR
 
 func (b *ObjectBuilder) buildQuery(opts addon.Options) *thanosv1alpha1.ThanosQuery {
 	query := &thanosv1alpha1.ThanosQuery{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: thanosv1alpha1.GroupVersion.String(),
-			Kind:       "ThanosQuery",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "mcoa",
-			Namespace: config.HubInstallNamespace,
-			Labels:    queryLabels(),
-		},
+		APIVersion: thanosv1alpha1.GroupVersion.String(),
+		Kind:       "ThanosQuery",
+		Name:       "mcoa",
+		Namespace:  config.HubInstallNamespace,
+		Labels:     queryLabels(),
 		Spec: thanosv1alpha1.ThanosQuerySpec{
 			Replicas:      config.DefaultQueryReplicas,
 			ReplicaLabels: []string{"replica"},
@@ -173,8 +161,8 @@ func (b *ObjectBuilder) buildQuery(opts addon.Options) *thanosv1alpha1.ThanosQue
 				CompressResponses: true,
 				QueryRangeResponseCacheConfig: &thanosv1alpha1.CacheConfig{
 					ExternalCacheConfig: &corev1.SecretKeySelector{
-						LocalObjectReference: corev1.LocalObjectReference{Name: config.QueryFECacheConfigSecretName},
-						Key:                  config.QueryFECacheConfigSecretKey,
+						Name: config.QueryFECacheConfigSecretName,
+						Key:  config.QueryFECacheConfigSecretKey,
 					},
 				},
 			},
@@ -194,15 +182,11 @@ func (b *ObjectBuilder) buildRuler(opts addon.Options) *thanosv1alpha1.ThanosRul
 	evalInterval := thanosv1alpha1.Duration(config.DefaultRulerEvalInterval)
 
 	ruler := &thanosv1alpha1.ThanosRuler{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: thanosv1alpha1.GroupVersion.String(),
-			Kind:       "ThanosRuler",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "mcoa",
-			Namespace: config.HubInstallNamespace,
-			Labels:    rulerLabels(),
-		},
+		APIVersion: thanosv1alpha1.GroupVersion.String(),
+		Kind:       "ThanosRuler",
+		Name:       "mcoa",
+		Namespace:  config.HubInstallNamespace,
+		Labels:     rulerLabels(),
 		Spec: thanosv1alpha1.ThanosRulerSpec{
 			Replicas: config.DefaultRulerReplicas,
 			RulerMode: thanosv1alpha1.RulerMode{
@@ -242,15 +226,11 @@ func (b *ObjectBuilder) buildCompact(opts addon.Options) *thanosv1alpha1.ThanosC
 	downsampleConc := config.DefaultCompactDownsampleConc
 
 	compact := &thanosv1alpha1.ThanosCompact{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: thanosv1alpha1.GroupVersion.String(),
-			Kind:       "ThanosCompact",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "mcoa",
-			Namespace: config.HubInstallNamespace,
-			Labels:    compactLabels(),
-		},
+		APIVersion: thanosv1alpha1.GroupVersion.String(),
+		Kind:       "ThanosCompact",
+		Name:       "mcoa",
+		Namespace:  config.HubInstallNamespace,
+		Labels:     compactLabels(),
 		Spec: thanosv1alpha1.ThanosCompactSpec{
 			ObjectStorageConfig: thanosv1alpha1.ObjectStorageConfig{
 				LocalObjectReference: corev1.LocalObjectReference{Name: config.ObjectStorageSecretName},

@@ -5,7 +5,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
@@ -13,19 +12,15 @@ func TestGetSecrets(t *testing.T) {
 	var (
 		defaultNamespace = "open-cluster-management"
 		clusterSecret    = &corev1.Secret{
-			ObjectMeta: v1.ObjectMeta{
-				Name:      "foo",
-				Namespace: "cluster",
-			},
+			Name:      "foo",
+			Namespace: "cluster",
 			Data: map[string][]byte{
 				"foo": []byte("bar"),
 			},
 		}
 		defaultSecret = &corev1.Secret{
-			ObjectMeta: v1.ObjectMeta{
-				Name:      "foo",
-				Namespace: defaultNamespace,
-			},
+			Name:      "foo",
+			Namespace: defaultNamespace,
 			Data: map[string][]byte{
 				"bar": []byte("baz"),
 			},

@@ -17,7 +17,6 @@ import (
 	thanosv1alpha1 "github.com/thanos-community/thanos-operator/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2"
@@ -67,32 +66,30 @@ func TestAgentConfigNamespaces(t *testing.T) {
 						{
 							ConfigGroupResource: resource,
 							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
-								ConfigReferent: addonapiv1beta1.ConfigReferent{Name: addoncfg.Name, Namespace: namespace},
-								SpecHash:       "test-hash",
+								Name: addoncfg.Name, Namespace: namespace,
+								SpecHash: "test-hash",
 							},
 						},
 					}
 				} else {
 					configRefs = []addonapiv1beta1.ConfigReference{
 						{
-							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
-								Group: "addon.open-cluster-management.io", Resource: addoncfg.AddonDeploymentConfigResource,
-							},
+							Group: "addon.open-cluster-management.io", Resource: addoncfg.AddonDeploymentConfigResource,
 							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
-								ConfigReferent: addonapiv1beta1.ConfigReferent{Name: addoncfg.Name, Namespace: addoncfg.InstallNamespace},
-								SpecHash:       "test-hash",
+								Name: addoncfg.Name, Namespace: addoncfg.InstallNamespace,
+								SpecHash: "test-hash",
 							},
 						},
 						{
 							ConfigGroupResource: resource,
 							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
-								ConfigReferent: addonapiv1beta1.ConfigReferent{Name: "instance", Namespace: namespace},
+								Name: "instance", Namespace: namespace,
 							},
 						},
 					}
 				}
 				mcAddon := &addonapiv1beta1.ManagedClusterAddOn{
-					ObjectMeta: metav1.ObjectMeta{Name: addoncfg.Name, Namespace: "cluster-a"},
+					Name: addoncfg.Name, Namespace: "cluster-a",
 					Status: addonapiv1beta1.ManagedClusterAddOnStatus{
 						ConfigReferences: configRefs,
 					},
@@ -100,12 +97,12 @@ func TestAgentConfigNamespaces(t *testing.T) {
 				//nolint:staticcheck // The generated client does not provide NewClientset.
 				client := fakeaddon.NewSimpleClientset(
 					&addonapiv1beta1.AddOnDeploymentConfig{
-						ObjectMeta: metav1.ObjectMeta{Name: addoncfg.Name, Namespace: addoncfg.InstallNamespace},
-						Spec:       addonapiv1beta1.AddOnDeploymentConfigSpec{AgentInstallNamespace: "custom-agent-namespace"},
+						Name: addoncfg.Name, Namespace: addoncfg.InstallNamespace,
+						Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{AgentInstallNamespace: "custom-agent-namespace"},
 					},
 					&addonapiv1beta1.AddOnDeploymentConfig{
-						ObjectMeta: metav1.ObjectMeta{Name: addoncfg.Name, Namespace: "cluster-a"},
-						Spec:       addonapiv1beta1.AddOnDeploymentConfigSpec{AgentInstallNamespace: "custom-agent-namespace"},
+						Name: addoncfg.Name, Namespace: "cluster-a",
+						Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{AgentInstallNamespace: "custom-agent-namespace"},
 					},
 				)
 				mock := &mockAgent{
@@ -141,32 +138,24 @@ func TestManifestsSorting(t *testing.T) {
 	// Create unsorted manifests
 	manifests := []runtime.Object{
 		&corev1.ConfigMap{
-			TypeMeta: metav1.TypeMeta{Kind: "ConfigMap", APIVersion: "v1"},
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "b-config",
-				Namespace: "ns1",
-			},
+			Kind: "ConfigMap", APIVersion: "v1",
+			Name:      "b-config",
+			Namespace: "ns1",
 		},
 		&corev1.Secret{
-			TypeMeta: metav1.TypeMeta{Kind: "Secret", APIVersion: "v1"},
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "a-secret",
-				Namespace: "ns1",
-			},
+			Kind: "Secret", APIVersion: "v1",
+			Name:      "a-secret",
+			Namespace: "ns1",
 		},
 		&corev1.ConfigMap{
-			TypeMeta: metav1.TypeMeta{Kind: "ConfigMap", APIVersion: "v1"},
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "a-config",
-				Namespace: "ns1",
-			},
+			Kind: "ConfigMap", APIVersion: "v1",
+			Name:      "a-config",
+			Namespace: "ns1",
 		},
 		&corev1.ConfigMap{
-			TypeMeta: metav1.TypeMeta{Kind: "ConfigMap", APIVersion: "v1"},
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "a-config",
-				Namespace: "ns2",
-			},
+			Kind: "ConfigMap", APIVersion: "v1",
+			Name:      "a-config",
+			Namespace: "ns2",
 		},
 	}
 
@@ -207,12 +196,10 @@ func TestManifestsSorting(t *testing.T) {
 
 func TestManifestsConvertsMonitoringStackToUnstructured(t *testing.T) {
 	ms := &monitoringv1alpha1.MonitoringStack{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "MonitoringStack",
-			APIVersion: "monitoring.rhobs/v1alpha1",
-		},
-		ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "default"},
-		Spec:       monitoringv1alpha1.MonitoringStackSpec{
+		Kind:       "MonitoringStack",
+		APIVersion: "monitoring.rhobs/v1alpha1",
+		Name:       "test", Namespace: "default",
+		Spec: monitoringv1alpha1.MonitoringStackSpec{
 			// resources and alertmanagerConfig are zero-value (empty structs)
 		},
 	}
@@ -234,11 +221,9 @@ func TestManifestsConvertsMonitoringStackToUnstructured(t *testing.T) {
 
 func TestToUnstructuredMonitoringStackPreservesNonEmptyFields(t *testing.T) {
 	ms := &monitoringv1alpha1.MonitoringStack{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "MonitoringStack",
-			APIVersion: "monitoring.rhobs/v1alpha1",
-		},
-		ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "default"},
+		Kind:       "MonitoringStack",
+		APIVersion: "monitoring.rhobs/v1alpha1",
+		Name:       "test", Namespace: "default",
 		Spec: monitoringv1alpha1.MonitoringStackSpec{
 			Resources: corev1.ResourceRequirements{
 				Requests: corev1.ResourceList{
@@ -270,37 +255,27 @@ func (m *mockAODCGetter) Get(_ context.Context, _, _ string) (*addonapiv1beta1.A
 
 func TestManifestsWithObjectBuilders(t *testing.T) {
 	hubCluster := &clusterv1.ManagedCluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   "local-cluster",
-			Labels: map[string]string{"local-cluster": "true"},
-		},
+		Name:   "local-cluster",
+		Labels: map[string]string{"local-cluster": "true"},
 	}
 
 	aodc := &addonapiv1beta1.AddOnDeploymentConfig{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:        addoncfg.Name,
-			Namespace:   addoncfg.InstallNamespace,
-			Annotations: map[string]string{"mcoa-thanos-operator": "true"},
-		},
+		Name:        addoncfg.Name,
+		Namespace:   addoncfg.InstallNamespace,
+		Annotations: map[string]string{"mcoa-thanos-operator": "true"},
 	}
 
 	mcAddon := &addonapiv1beta1.ManagedClusterAddOn{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      addoncfg.Name,
-			Namespace: "local-cluster",
-		},
+		Name:      addoncfg.Name,
+		Namespace: "local-cluster",
 		Status: addonapiv1beta1.ManagedClusterAddOnStatus{
 			ConfigReferences: []addonapiv1beta1.ConfigReference{
 				{
-					ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
-						Group:    "addon.open-cluster-management.io",
-						Resource: addoncfg.AddonDeploymentConfigResource,
-					},
+					Group:    "addon.open-cluster-management.io",
+					Resource: addoncfg.AddonDeploymentConfigResource,
 					DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
-						ConfigReferent: addonapiv1beta1.ConfigReferent{
-							Namespace: addoncfg.InstallNamespace,
-							Name:      addoncfg.Name,
-						},
+						Namespace: addoncfg.InstallNamespace,
+						Name:      addoncfg.Name,
 					},
 				},
 			},
@@ -371,34 +346,26 @@ func TestManifestsWithObjectBuilders(t *testing.T) {
 
 func TestManifestsObjectBuildersSkippedForNonHub(t *testing.T) {
 	spokeCluster := &clusterv1.ManagedCluster{
-		ObjectMeta: metav1.ObjectMeta{Name: "spoke-1"},
+		Name: "spoke-1",
 	}
 
 	aodc := &addonapiv1beta1.AddOnDeploymentConfig{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:        addoncfg.Name,
-			Namespace:   addoncfg.InstallNamespace,
-			Annotations: map[string]string{"mcoa-thanos-operator": "true"},
-		},
+		Name:        addoncfg.Name,
+		Namespace:   addoncfg.InstallNamespace,
+		Annotations: map[string]string{"mcoa-thanos-operator": "true"},
 	}
 
 	mcAddon := &addonapiv1beta1.ManagedClusterAddOn{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      addoncfg.Name,
-			Namespace: "spoke-1",
-		},
+		Name:      addoncfg.Name,
+		Namespace: "spoke-1",
 		Status: addonapiv1beta1.ManagedClusterAddOnStatus{
 			ConfigReferences: []addonapiv1beta1.ConfigReference{
 				{
-					ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
-						Group:    "addon.open-cluster-management.io",
-						Resource: addoncfg.AddonDeploymentConfigResource,
-					},
+					Group:    "addon.open-cluster-management.io",
+					Resource: addoncfg.AddonDeploymentConfigResource,
 					DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
-						ConfigReferent: addonapiv1beta1.ConfigReferent{
-							Namespace: addoncfg.InstallNamespace,
-							Name:      addoncfg.Name,
-						},
+						Namespace: addoncfg.InstallNamespace,
+						Name:      addoncfg.Name,
 					},
 				},
 			},
@@ -435,12 +402,12 @@ func (b *mockFailingBuilder) Build(_ context.Context, _ *clusterv1.ManagedCluste
 func TestManifestsMetricsTracking(t *testing.T) {
 	ctx := t.Context()
 	cluster := &clusterv1.ManagedCluster{
-		ObjectMeta: metav1.ObjectMeta{Name: "test-cluster"},
+		Name: "test-cluster",
 	}
 
 	t.Run("records duration on success", func(t *testing.T) {
 		validAddon := &addonapiv1beta1.ManagedClusterAddOn{
-			ObjectMeta: metav1.ObjectMeta{Name: addoncfg.Name, Namespace: "test-cluster"},
+			Name: addoncfg.Name, Namespace: "test-cluster",
 		}
 		wrapper := &AgentAddonWithSortedManifests{
 			agent: &mockAgent{manifests: []runtime.Object{}},
@@ -456,19 +423,15 @@ func TestManifestsMetricsTracking(t *testing.T) {
 
 	t.Run("records error on validation failure", func(t *testing.T) {
 		invalidAddon := &addonapiv1beta1.ManagedClusterAddOn{
-			ObjectMeta: metav1.ObjectMeta{Name: addoncfg.Name, Namespace: "cluster-a"},
+			Name: addoncfg.Name, Namespace: "cluster-a",
 			Status: addonapiv1beta1.ManagedClusterAddOnStatus{
 				ConfigReferences: []addonapiv1beta1.ConfigReference{
 					{
-						ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
-							Group:    "addon.open-cluster-management.io",
-							Resource: addoncfg.AddonDeploymentConfigResource,
-						},
+						Group:    "addon.open-cluster-management.io",
+						Resource: addoncfg.AddonDeploymentConfigResource,
 						DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
-							ConfigReferent: addonapiv1beta1.ConfigReferent{
-								Namespace: "cluster-b",
-								Name:      addoncfg.Name,
-							},
+							Namespace: "cluster-b",
+							Name:      addoncfg.Name,
 						},
 					},
 				},
@@ -488,7 +451,7 @@ func TestManifestsMetricsTracking(t *testing.T) {
 
 	t.Run("records error on render failure", func(t *testing.T) {
 		validAddon := &addonapiv1beta1.ManagedClusterAddOn{
-			ObjectMeta: metav1.ObjectMeta{Name: addoncfg.Name, Namespace: "test-cluster"},
+			Name: addoncfg.Name, Namespace: "test-cluster",
 		}
 		wrapper := &AgentAddonWithSortedManifests{
 			agent: &mockAgent{err: errHelmRender},
@@ -504,25 +467,19 @@ func TestManifestsMetricsTracking(t *testing.T) {
 
 	t.Run("records error on builder failure", func(t *testing.T) {
 		aodc := &addonapiv1beta1.AddOnDeploymentConfig{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      addoncfg.Name,
-				Namespace: addoncfg.InstallNamespace,
-			},
+			Name:      addoncfg.Name,
+			Namespace: addoncfg.InstallNamespace,
 		}
 		validAddon := &addonapiv1beta1.ManagedClusterAddOn{
-			ObjectMeta: metav1.ObjectMeta{Name: addoncfg.Name, Namespace: "test-cluster"},
+			Name: addoncfg.Name, Namespace: "test-cluster",
 			Status: addonapiv1beta1.ManagedClusterAddOnStatus{
 				ConfigReferences: []addonapiv1beta1.ConfigReference{
 					{
-						ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
-							Group:    "addon.open-cluster-management.io",
-							Resource: addoncfg.AddonDeploymentConfigResource,
-						},
+						Group:    "addon.open-cluster-management.io",
+						Resource: addoncfg.AddonDeploymentConfigResource,
 						DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
-							ConfigReferent: addonapiv1beta1.ConfigReferent{
-								Namespace: addoncfg.InstallNamespace,
-								Name:      addoncfg.Name,
-							},
+							Namespace: addoncfg.InstallNamespace,
+							Name:      addoncfg.Name,
 						},
 					},
 				},

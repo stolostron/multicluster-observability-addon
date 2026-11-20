@@ -6,10 +6,10 @@ import (
 
 	"github.com/perses/perses/go-sdk/dashboard"
 	panelgroup "github.com/perses/perses/go-sdk/panel-group"
-	v1 "github.com/perses/perses/pkg/model/api/v1"
-	v1Common "github.com/perses/perses/pkg/model/api/v1/common"
-	dashboardModel "github.com/perses/perses/pkg/model/api/v1/dashboard"
-	"github.com/perses/perses/pkg/model/api/v1/variable"
+	v1Common "github.com/perses/spec/go/common"
+	dashboardModel "github.com/perses/spec/go/dashboard"
+	"github.com/perses/spec/go/dashboard/variable"
+	v1Plugin "github.com/perses/spec/go/plugin"
 )
 
 type GridItem struct {
@@ -26,11 +26,9 @@ func AddTextVariable(name string, value string, displayName string, description 
 		builder.Dashboard.Spec.Variables = append(builder.Dashboard.Spec.Variables, dashboardModel.Variable{
 			Kind: variable.KindText,
 			Spec: &dashboardModel.TextVariableSpec{
-				TextSpec: variable.TextSpec{
-					Value:   value,
-					Display: display,
-				},
-				Name: name,
+				Value:   value,
+				Display: display,
+				Name:    name,
 			},
 		})
 		return nil
@@ -62,16 +60,14 @@ func AddStaticListVariable(name string, displayName string, description string, 
 		}
 
 		spec := dashboardModel.ListVariableSpec{
-			ListSpec: variable.ListSpec{
-				Display:        display,
-				AllowAllValue:  allowAll,
-				AllowMultiple:  allowMultiple,
-				CustomAllValue: customAllValue,
-				Plugin: v1Common.Plugin{
-					Kind: "StaticListVariable",
-					Spec: map[string]any{
-						"values": staticValues,
-					},
+			Display:        display,
+			AllowAllValue:  allowAll,
+			AllowMultiple:  allowMultiple,
+			CustomAllValue: customAllValue,
+			Plugin: v1Plugin.Plugin{
+				Kind: "StaticListVariable",
+				Spec: map[string]any{
+					"values": staticValues,
 				},
 			},
 			Name: name,
@@ -111,7 +107,7 @@ func addCustomPanelGroupImpl(title string, collapseOpen bool, positions []GridIt
 		}
 
 		if builder.Dashboard.Spec.Panels == nil {
-			builder.Dashboard.Spec.Panels = make(map[string]*v1.Panel)
+			builder.Dashboard.Spec.Panels = make(map[string]*dashboardModel.Panel)
 		}
 
 		layoutIdx := len(builder.Dashboard.Spec.Layouts)

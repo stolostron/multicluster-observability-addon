@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -29,11 +28,9 @@ func TestGetImageOverrides(t *testing.T) {
 	}
 
 	cm := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      ImagesConfigMapObjKey.Name,
-			Namespace: ImagesConfigMapObjKey.Namespace,
-		},
-		Data: baseImages,
+		Name:      ImagesConfigMapObjKey.Name,
+		Namespace: ImagesConfigMapObjKey.Namespace,
+		Data:      baseImages,
 	}
 
 	client := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cm).Build()

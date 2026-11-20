@@ -15,7 +15,6 @@ import (
 	"github.com/stolostron/multicluster-observability-addon/internal/coo/manifests"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog/v2"
@@ -195,25 +194,19 @@ func Test_COOHelmRendering(t *testing.T) {
 			mcao := addontesting.NewAddon("test", "cluster-1")
 			mcao.Status.ConfigReferences = []addonapiv1beta1.ConfigReference{
 				{
-					ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
-						Group:    "addon.open-cluster-management.io",
-						Resource: "addondeploymentconfigs",
-					},
+					Group:    "addon.open-cluster-management.io",
+					Resource: "addondeploymentconfigs",
 					DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
-						ConfigReferent: addonapiv1beta1.ConfigReferent{
-							Namespace: "open-cluster-management-observability",
-							Name:      "multicluster-observability-addon",
-						},
-						SpecHash: "fake-spec-hash",
+						Namespace: "open-cluster-management-observability",
+						Name:      "multicluster-observability-addon",
+						SpecHash:  "fake-spec-hash",
 					},
 				},
 			}
 
 			addc := &addonapiv1beta1.AddOnDeploymentConfig{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "multicluster-observability-addon",
-					Namespace: "open-cluster-management-observability",
-				},
+				Name:      "multicluster-observability-addon",
+				Namespace: "open-cluster-management-observability",
 				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
 					CustomizedVariables: tc.cv,
 				},
