@@ -10,13 +10,39 @@ import (
 )
 
 func TestBuildVMInventory(t *testing.T) {
-	_, err := BuildVMInventory("test-project", "test-datasource")
+	b, err := BuildVMInventory("test-project", "test-datasource")
 	require.NoError(t, err)
+
+	spec := b.Dashboard.Spec
+	// Main inventory table only; the panic device is a column in it.
+	require.Len(t, spec.Layouts, 1, "expected a single inventory group")
+
+	raw, err := json.Marshal(spec)
+	require.NoError(t, err)
+	// The panic device column covers all VMs, not only Windows ones.
+	assert.NotContains(t, string(raw), `os=~\"windows.*\"`)
+	assert.NotContains(t, string(raw), `guest_os_name=~\"(?i).*windows.*\"`)
+	// The main inventory table carries a Panic Device column (like Guest Agent).
+	assert.Contains(t, string(raw), `"header":"Panic Device"`)
+	// The column is fed by a query that carries has_panic_device for every
+	// running VMI.
+	assert.Contains(t, string(raw), `sum by (cluster, namespace, name, has_panic_device)(`)
+	// The evictable/outdated query must not carry has_panic_device anymore.
+	assert.Contains(t, string(raw), `sum by (cluster,namespace,name,outdated ,evictable) (`)
+	// The Guest Agent column detects agent-reported guest OS info, which the
+	// QEMU guest agent provides on both Linux and Windows.
+	assert.Contains(t, string(raw), `guest_os_name!=\"\"`)
 }
 
 func TestBuildVMUtilization(t *testing.T) {
-	_, err := BuildVMUtilization("test-project", "test-datasource")
+	b, err := BuildVMUtilization("test-project", "test-datasource")
 	require.NoError(t, err)
+
+	raw, err := json.Marshal(b.Dashboard.Spec)
+	require.NoError(t, err)
+	// The Guest Agent column detects agent-reported guest OS info, mirroring
+	// the inventory table.
+	assert.Contains(t, string(raw), `guest_os_name!=\"\"`)
 }
 
 func TestBuildVMServiceLevel(t *testing.T) {
@@ -45,8 +71,23 @@ func TestBuildSingleClusterView(t *testing.T) {
 }
 
 func TestBuildSingleVMView(t *testing.T) {
-	_, err := BuildSingleVMView("test-project", "test-datasource")
+	b, err := BuildSingleVMView("test-project", "test-datasource")
 	require.NoError(t, err)
+
+	raw, err := json.Marshal(b.Dashboard.Spec)
+	require.NoError(t, err)
+	assert.Contains(t, string(raw), "has_panic_device", "single VM view should surface the panic device label")
+	assert.Contains(t, string(raw), "Panic Device")
+	// The row covers all VMs, not only Windows ones.
+	assert.Contains(t, string(raw), `has_panic_device!=\"\"`)
+	assert.NotContains(t, string(raw), `os=~\"windows.*\"`)
+	assert.NotContains(t, string(raw), `guest_os_name=~\"(?i).*windows.*\"`)
+	// The Guest Agent row mirrors the inventory table's column: it reports
+	// whether the QEMU guest agent has reported guest OS info, with
+	// "Not Reporting" highlighted in red.
+	assert.Contains(t, string(raw), "Guest Agent")
+	assert.Contains(t, string(raw), "Not Reporting")
+	assert.Contains(t, string(raw), `"textColor":"#F2495C"`)
 }
 
 func TestBuildTopConsumers(t *testing.T) {

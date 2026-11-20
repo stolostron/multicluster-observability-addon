@@ -35,6 +35,20 @@ func VMInventoryTable(datasourceName, project string) panelgroup.Option {
 					},
 					map[string]any{"name": "evictable", "header": "Evictable", "enableSorting": true},
 					map[string]any{"name": "outdated", "header": "Outdated", "enableSorting": true},
+					map[string]any{
+						"name": "has_panic_device", "header": "Panic Device", "enableSorting": true,
+						"cellSettings": []any{
+							map[string]any{
+								"condition": map[string]any{"kind": "Value", "spec": map[string]any{"value": "true"}},
+								"text":      "Present",
+							},
+							map[string]any{
+								"condition": map[string]any{"kind": "Value", "spec": map[string]any{"value": "false"}},
+								"text":      "Missing",
+								"textColor": "#F2495C",
+							},
+						},
+					},
 					map[string]any{"name": "guest_os_name", "header": "OS Name", "enableSorting": true},
 					map[string]any{"name": "guest_os_version_id", "header": "OS Version", "enableSorting": true},
 					map[string]any{"name": "guest_os_arch", "header": "OS Arch", "enableSorting": true},
@@ -64,6 +78,7 @@ func VMInventoryTable(datasourceName, project string) panelgroup.Option {
 					map[string]any{"name": "value #11", "hide": true},
 					map[string]any{"name": "value #12", "hide": true},
 					map[string]any{"name": "value #13", "hide": true},
+					map[string]any{"name": "value #14", "hide": true},
 					map[string]any{"name": "__name__", "hide": true},
 					map[string]any{"name": "clusterID", "hide": true},
 					map[string]any{"name": "container", "hide": true},
@@ -90,7 +105,7 @@ func VMInventoryTable(datasourceName, project string) panelgroup.Option {
 		//   value #1  → (hidden) Query 1: VM info series value
 		//   value #2  → CPU            Query 2: inventoryCPUQuery
 		//   value #3  → Memory         Query 3: inventoryMemoryQuery
-		//   value #4  → Guest Agent    Query 4: inventoryGuestAgentQuery
+		//   value #4  → Guest Agent    Query 4: inventoryGuestAgentQuery (agent-reported guest OS info)
 		//   value #5  → Create Date    Query 5: inventoryCreateDateQuery
 		//   value #6  → Disk           Query 6: inventoryDiskQuery
 		//   value #7  → (hidden)       Query 7: inventoryFlavorQuery
@@ -100,6 +115,7 @@ func VMInventoryTable(datasourceName, project string) panelgroup.Option {
 		//   value #11 → (hidden)       Query 11: inventoryGuestOSQuery
 		//   value #12 → (hidden)       Query 12: inventoryEvictableOutdatedQuery
 		//   value #13 → (hidden)       Query 13: inventoryLiveMigratableQuery (label column: live_migratable)
+		//   value #14 → (hidden)       Query 14: inventoryPanicDeviceQuery (label column: has_panic_device)
 		// Query 1: VM info with status
 		panel.AddQuery(query.PromQL(
 			inventoryInfoQuery,
@@ -115,7 +131,7 @@ func VMInventoryTable(datasourceName, project string) panelgroup.Option {
 			inventoryMemoryQuery,
 			dashboards.AddQueryDataSource(datasourceName),
 		)),
-		// Query 4: Guest Agent indicator
+		// Query 4: Guest Agent indicator (agent-reported guest OS info)
 		panel.AddQuery(query.PromQL(
 			inventoryGuestAgentQuery,
 			dashboards.AddQueryDataSource(datasourceName),
@@ -163,6 +179,11 @@ func VMInventoryTable(datasourceName, project string) panelgroup.Option {
 		// Query 13: Live Migratable (derived from kubevirt_vmi_non_evictable)
 		panel.AddQuery(query.PromQL(
 			inventoryLiveMigratableQuery,
+			dashboards.AddQueryDataSource(datasourceName),
+		)),
+		// Query 14: Panic Device (label column: has_panic_device)
+		panel.AddQuery(query.PromQL(
+			inventoryPanicDeviceQuery,
 			dashboards.AddQueryDataSource(datasourceName),
 		)),
 	)
