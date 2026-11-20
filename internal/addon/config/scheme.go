@@ -1,6 +1,8 @@
 package config
 
 import (
+	certmanagerv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
+	lokiv1 "github.com/grafana/loki/operator/api/loki/v1"
 	otelv1alpha1 "github.com/open-telemetry/opentelemetry-operator/apis/v1alpha1"
 	otelv1beta1 "github.com/open-telemetry/opentelemetry-operator/apis/v1beta1"
 	configv1 "github.com/openshift/api/config/v1"
@@ -51,6 +53,8 @@ func AddToScheme(s *runtime.Scheme) error {
 	utilruntime.Must(addonv1beta1.Install(s))
 	utilruntime.Must(thanosv1alpha1.AddToScheme(s))
 	utilruntime.Must(configv1.AddToScheme(s))
+	utilruntime.Must(certmanagerv1.AddToScheme(s))
+	utilruntime.Must(lokiv1.AddToScheme(s))
 	// +kubebuilder:scaffold:scheme
 	return nil
 }
