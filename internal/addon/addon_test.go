@@ -726,6 +726,31 @@ func rsFieldResult(name string) agent.FieldResult {
 	}
 }
 
+func TestManifestConfigs_UIPluginServerSideApply(t *testing.T) {
+	configs := ManifestConfigs()
+
+	var found *workv1.ManifestConfigOption
+	for i := range configs {
+		id := configs[i].ResourceIdentifier
+		if id.Group == "observability.openshift.io" && id.Resource == addoncfg.UiPluginsResource {
+			found = &configs[i]
+			break
+		}
+	}
+
+	require.NotNil(t, found, "expected a ManifestConfigOption for the monitoring UIPlugin")
+	assert.Equal(t, addoncfg.MonitoringUIPluginName, found.ResourceIdentifier.Name)
+
+	// Must use Server-Side Apply so MCOA does not strip externally-set fields
+	// (e.g. clusterHealthAnalyzer) from the shared UIPlugin, and Force so it
+	// can assert its own fields over a pre-existing object.
+	require.NotNil(t, found.UpdateStrategy)
+	assert.Equal(t, workv1.UpdateStrategyTypeServerSideApply, found.UpdateStrategy.Type)
+	require.NotNil(t, found.UpdateStrategy.ServerSideApply)
+	assert.True(t, found.UpdateStrategy.ServerSideApply.Force,
+		"force must be true so MCOA asserts its owned fields over a pre-existing UIPlugin")
+}
+
 func addUserWorkloadMetricsCustomizedVariables(aodc *addonapiv1beta1.AddOnDeploymentConfig) {
 	aodc.Spec.CustomizedVariables = append(aodc.Spec.CustomizedVariables, []addonapiv1beta1.CustomizedVariable{
 		{

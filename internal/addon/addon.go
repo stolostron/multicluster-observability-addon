@@ -431,6 +431,24 @@ func ManifestConfigs() []workv1.ManifestConfigOption {
 				Type: workv1.UpdateStrategyTypeCreateOnly,
 			},
 		},
+		// The monitoring UIPlugin is shared with admins and COO. Use
+		// Server-Side Apply instead of the default full-object replace so MCOA
+		// manages only the fields it renders and leaves externally-owned
+		// fields (e.g. clusterHealthAnalyzer) untouched. Force lets MCOA
+		// assert its fields over a pre-existing UIPlugin without conflicts.
+		workv1.ManifestConfigOption{
+			ResourceIdentifier: workv1.ResourceIdentifier{
+				Group:    "observability.openshift.io",
+				Resource: addoncfg.UiPluginsResource,
+				Name:     addoncfg.MonitoringUIPluginName,
+			},
+			UpdateStrategy: &workv1.UpdateStrategy{
+				Type: workv1.UpdateStrategyTypeServerSideApply,
+				ServerSideApply: &workv1.ServerSideApplyConfig{
+					Force: true,
+				},
+			},
+		},
 	)
 
 	thanosResources := []string{
