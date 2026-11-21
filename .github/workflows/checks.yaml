@@ -21,12 +21,12 @@ jobs:
     - name: Lint
       uses: golangci/golangci-lint-action@v9
       with:
-        version: v2.11.4
+        version: v2.15.0
         args: --timeout=4m --build-tags=promql
     - name: Lint pkg/perses submodule
       uses: golangci/golangci-lint-action@v9
       with:
-        version: v2.11.4
+        version: v2.15.0
         args: --timeout=4m
         working-directory: pkg/perses
     - name: Run shellcheck
