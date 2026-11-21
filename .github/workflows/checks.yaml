@@ -50,7 +50,7 @@ jobs:
       run: go test ./...
       working-directory: pkg/perses
     - name: Cache promtool
-      uses: actions/cache@v4
+      uses: actions/cache@v6
       with:
         path: bin/promtool-*
         key: ${{ runner.os }}-${{ runner.arch }}-promtool-${{ hashFiles('Makefile', 'hack/install-promtool.sh') }}
