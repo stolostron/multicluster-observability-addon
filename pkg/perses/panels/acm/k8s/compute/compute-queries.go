@@ -16,6 +16,9 @@ var ClusterQueries = map[string]parser.Expr{
 		promqlbuilder.NewNumber(1),
 		vector.New(
 			vector.WithMetricName("node_cpu_seconds_total:mode_idle:avg_rate5m"),
+			vector.WithLabelMatchers(
+				label.New("cluster").Equal("$cluster"),
+			),
 		),
 	),
 	"CPURequestsCommitment": promqlbuilder.Div(

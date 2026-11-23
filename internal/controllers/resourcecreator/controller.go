@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/go-logr/logr"
+	hyperv1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	cooprometheusv1alpha1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1alpha1"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
@@ -63,6 +64,13 @@ var cmaoPredicate = builder.WithPredicates(predicate.Funcs{
 
 var rsConfigMapPredicate = builder.WithPredicates(rshandlers.RSConfigMapPredicate())
 
+var hostedClusterPredicate = predicate.Funcs{
+	CreateFunc:  func(e event.CreateEvent) bool { return true },
+	UpdateFunc:  func(e event.UpdateEvent) bool { return false },
+	DeleteFunc:  func(e event.DeleteEvent) bool { return true },
+	GenericFunc: func(e event.GenericEvent) bool { return false },
+}
+
 var partOfMCOALabelSelector = labels.SelectorFromSet(labels.Set{
 	addoncfg.PartOfK8sLabelKey: addoncfg.Name,
 })
@@ -83,6 +91,8 @@ func SetupWithManager(mgr ctrl.Manager, logger logr.Logger) error {
 		Watches(&addonv1beta1.ClusterManagementAddOn{}, r.enqueueAODC(), cmaoPredicate).
 		// Trigger reconciliations if the pool of ManagedClusters changes
 		Watches(&clusterv1.ManagedCluster{}, r.enqueueAODC(), builder.OnlyMetadata).
+		// Trigger reconciliations if HostedClusters are created or deleted
+		Watches(&hyperv1.HostedCluster{}, r.enqueueAODC(), builder.WithPredicates(hostedClusterPredicate)).
 		// Trigger reconciliations if the metrics configuration resources change
 		Watches(&cooprometheusv1alpha1.PrometheusAgent{}, r.enqueueForMCOAOwnedResources()).
 		Watches(&cooprometheusv1alpha1.ScrapeConfig{}, r.enqueueForMCOControlledResources()).

@@ -1,0 +1,393 @@
+// Copyright (c) Red Hat, Inc.
+// Copyright Contributors to the Open Cluster Management project
+// Licensed under the Apache License 2.0
+
+package rightsizing
+
+import (
+	"encoding/json"
+	"regexp"
+	"strings"
+	"testing"
+
+	"github.com/perses/perses/go-sdk/dashboard"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+const (
+	testProject    = "observability-analytics"
+	testDatasource = "rbac-query-proxy-datasource"
+	testClusterLbl = ""
+)
+
+// TestWorkloadAndPodQueriesDeclareAllVariables ensures every $variable used in workload/pod queries is declared.
+func TestWorkloadAndPodQueriesDeclareAllVariables(t *testing.T) {
+	for _, build := range []func(string, string, string) (dashboard.Builder, error){
+		BuildWorkloadRightSizing, BuildWorkloadDetail, BuildPodRightSizing, BuildPodDetail,
+	} {
+		db, err := build(testProject, testDatasource, testClusterLbl)
+		require.NoError(t, err)
+		t.Run(db.Dashboard.Metadata.Name, func(t *testing.T) {
+			names := extractVarNames(db.Dashboard.Spec.Variables)
+			for _, panel := range db.Dashboard.Spec.Panels {
+				for _, query := range panel.Spec.Queries {
+					raw, err := json.Marshal(query.Spec.Plugin.Spec)
+					require.NoError(t, err)
+					for _, match := range regexp.MustCompile(`\$\{?([a-zA-Z_][a-zA-Z_0-9]*)`).FindAllStringSubmatch(string(raw), -1) {
+						if !strings.HasPrefix(match[1], "__") {
+							assert.Contains(t, names, match[1], "referenced variable must be declared")
+						}
+					}
+				}
+			}
+		})
+	}
+}
+
+// --- Namespace Right-Sizing Dashboard ---
+
+func TestBuildNamespaceRightSizing(t *testing.T) {
+	db, err := BuildNamespaceRightSizing(testProject, testDatasource, testClusterLbl)
+	require.NoError(t, err)
+
+	spec := db.Dashboard.Spec
+	assert.Equal(t, "acm-rs-namespace-overview", db.Dashboard.Metadata.Name)
+	assert.Equal(t, "ACM Right-Sizing Namespace", spec.Display.Name)
+
+	t.Run("has expected variables", func(t *testing.T) {
+		require.Len(t, spec.Variables, 4, "expected cluster, cpu_profile, memory_profile, days")
+		varNames := extractVarNames(spec.Variables)
+		assert.Contains(t, varNames, "cluster")
+		assert.Contains(t, varNames, "cpu_profile")
+		assert.Contains(t, varNames, "memory_profile")
+		assert.Contains(t, varNames, "days")
+	})
+
+	t.Run("has expected panel groups", func(t *testing.T) {
+		require.Len(t, spec.Layouts, 2, "CPU section + Memory section")
+	})
+
+	t.Run("panels reference the datasource", func(t *testing.T) {
+		raw, err := json.Marshal(spec)
+		require.NoError(t, err)
+		assert.Contains(t, string(raw), testDatasource)
+	})
+
+	t.Run("panels query acm_rs namespace metrics", func(t *testing.T) {
+		raw, err := json.Marshal(spec)
+		require.NoError(t, err)
+		specStr := string(raw)
+		assert.Contains(t, specStr, "acm_rs:cluster:cpu_recommendation")
+		assert.Contains(t, specStr, "acm_rs:cluster:cpu_usage")
+		assert.Contains(t, specStr, "acm_rs:namespace:cpu_usage")
+		assert.Contains(t, specStr, "acm_rs:namespace:memory_usage")
+		assert.Contains(t, specStr, "$cpu_profile")
+		assert.Contains(t, specStr, "$memory_profile")
+		assert.NotContains(t, specStr, `profile="$profile"`)
+	})
+
+	t.Run("spec serializes to valid JSON", func(t *testing.T) {
+		data, err := json.Marshal(spec)
+		require.NoError(t, err)
+		assert.NotEmpty(t, data)
+
+		var roundTrip map[string]any
+		require.NoError(t, json.Unmarshal(data, &roundTrip))
+	})
+}
+
+func TestBuildNamespaceRightSizing_Idempotent(t *testing.T) {
+	db1, err := BuildNamespaceRightSizing(testProject, testDatasource, testClusterLbl)
+	require.NoError(t, err)
+
+	db2, err := BuildNamespaceRightSizing(testProject, testDatasource, testClusterLbl)
+	require.NoError(t, err)
+
+	data1, _ := json.Marshal(db1.Dashboard.Spec)
+	data2, _ := json.Marshal(db2.Dashboard.Spec)
+	assert.Equal(t, string(data1), string(data2), "repeated builds should produce identical specs")
+}
+
+// --- VM Overview Dashboard ---
+
+func TestBuildVMOverview(t *testing.T) {
+	db, err := BuildVMOverview(testProject, testDatasource, testClusterLbl)
+	require.NoError(t, err)
+
+	spec := db.Dashboard.Spec
+	assert.Equal(t, "acm-rightsizing-openshift-virtualization", db.Dashboard.Metadata.Name)
+	assert.Equal(t, "ACM Right-Sizing OpenShift Virtualization", spec.Display.Name)
+
+	t.Run("has expected variables", func(t *testing.T) {
+		require.Len(t, spec.Variables, 5, "expected cluster, cpu_profile, memory_profile, days, namespace")
+		varNames := extractVarNames(spec.Variables)
+		assert.Contains(t, varNames, "cluster")
+		assert.Contains(t, varNames, "cpu_profile")
+		assert.Contains(t, varNames, "memory_profile")
+		assert.Contains(t, varNames, "days")
+		assert.Contains(t, varNames, "namespace")
+	})
+
+	t.Run("has expected panel groups", func(t *testing.T) {
+		require.Len(t, spec.Layouts, 5, "stats + 4 table groups")
+	})
+
+	t.Run("panels query acm_rs_vm metrics", func(t *testing.T) {
+		raw, err := json.Marshal(spec)
+		require.NoError(t, err)
+		specStr := string(raw)
+		assert.Contains(t, specStr, "acm_rs_vm:namespace:cpu_request")
+		assert.Contains(t, specStr, "acm_rs_vm:namespace:cpu_usage")
+		assert.Contains(t, specStr, "acm_rs_vm:namespace:memory_request")
+		assert.Contains(t, specStr, "acm_rs_vm:namespace:memory_usage")
+		assert.Contains(t, specStr, "$cpu_profile")
+		assert.Contains(t, specStr, "$memory_profile")
+		assert.NotContains(t, specStr, `profile="$profile"`)
+	})
+
+	t.Run("table panels contain drill-down links", func(t *testing.T) {
+		raw, err := json.Marshal(spec)
+		require.NoError(t, err)
+		specStr := string(raw)
+		assert.Contains(t, specStr, "acm-rightsizing-vm-overestimation")
+		assert.Contains(t, specStr, "acm-rightsizing-vm-underestimation")
+		assert.Contains(t, specStr, "start=$__range", "drill-down links must pass the current time range")
+	})
+
+	// Perses runs StatChart queries as range queries (showing the last non-null point) but
+	// Table queries as instant queries at the range end. The stat queries are pinned with
+	// "@ end()" so a stopped VM disappears from the totals and the tables at the same time.
+	t.Run("stat panels are pinned to the range end, table panels stay instant", func(t *testing.T) {
+		statPanels := 0
+		for name, p := range spec.Panels {
+			for i, q := range p.Spec.Queries {
+				raw, err := json.Marshal(q.Spec.Plugin.Spec)
+				require.NoError(t, err)
+				var ps struct {
+					Query string `json:"query"`
+				}
+				require.NoError(t, json.Unmarshal(raw, &ps))
+				switch p.Spec.Plugin.Kind {
+				case "StatChart":
+					statPanels++
+					assert.Equal(t, 2, strings.Count(ps.Query, "[$days:] @ end()"), "panel %s query %d: both subqueries must be pinned to the range end", name, i)
+					assert.Contains(t, ps.Query, "} @ end() > 0) > 0)", "panel %s query %d: running VM filter must be pinned to the range end", name, i)
+				case "Table":
+					assert.NotContains(t, ps.Query, "@ end()", "panel %s query %d: table queries are already instant", name, i)
+				}
+			}
+		}
+		assert.Equal(t, 4, statPanels, "expected the four total stat panels")
+	})
+}
+
+func TestBuildVMOverview_Idempotent(t *testing.T) {
+	db1, err := BuildVMOverview(testProject, testDatasource, testClusterLbl)
+	require.NoError(t, err)
+
+	db2, err := BuildVMOverview(testProject, testDatasource, testClusterLbl)
+	require.NoError(t, err)
+
+	data1, _ := json.Marshal(db1.Dashboard.Spec)
+	data2, _ := json.Marshal(db2.Dashboard.Spec)
+	assert.Equal(t, string(data1), string(data2))
+}
+
+// --- VM Overestimation Dashboard ---
+
+func TestBuildVMOverestimation(t *testing.T) {
+	db, err := BuildVMOverestimation(testProject, testDatasource, testClusterLbl)
+	require.NoError(t, err)
+
+	spec := db.Dashboard.Spec
+	assert.Equal(t, "acm-rightsizing-vm-overestimation", db.Dashboard.Metadata.Name)
+	assert.Equal(t, "ACM Right-Sizing OpenShift Virtualization VM Overestimation", spec.Display.Name)
+
+	t.Run("has expected variables", func(t *testing.T) {
+		require.Len(t, spec.Variables, 6, "expected cluster, cpu_profile, memory_profile, days, namespace, vm")
+		varNames := extractVarNames(spec.Variables)
+		assert.Contains(t, varNames, "cluster")
+		assert.Contains(t, varNames, "cpu_profile")
+		assert.Contains(t, varNames, "memory_profile")
+		assert.Contains(t, varNames, "days")
+		assert.Contains(t, varNames, "namespace")
+		assert.Contains(t, varNames, "vm")
+	})
+
+	t.Run("has expected panel groups", func(t *testing.T) {
+		require.Len(t, spec.Layouts, 3, "back-to-main + CPU stats+chart + Mem stats+chart")
+	})
+
+	t.Run("contains back to main dashboard link", func(t *testing.T) {
+		raw, err := json.Marshal(spec)
+		require.NoError(t, err)
+		specStr := string(raw)
+		assert.Contains(t, specStr, "acm-rightsizing-openshift-virtualization")
+		assert.Contains(t, specStr, "start=$__range", "back link must pass the current time range")
+	})
+
+	t.Run("overestimation queries use acm_rs_vm metrics", func(t *testing.T) {
+		raw, err := json.Marshal(spec)
+		require.NoError(t, err)
+		specStr := string(raw)
+		assert.Contains(t, specStr, "acm_rs_vm:namespace:cpu_request")
+		assert.Contains(t, specStr, "acm_rs_vm:namespace:cpu_recommendation")
+		assert.Contains(t, specStr, "acm_rs_vm:namespace:memory_request")
+		assert.Contains(t, specStr, "acm_rs_vm:namespace:memory_recommendation")
+		assert.Contains(t, specStr, "$cpu_profile")
+		assert.Contains(t, specStr, "$memory_profile")
+	})
+}
+
+func TestBuildVMOverestimation_Idempotent(t *testing.T) {
+	db1, err := BuildVMOverestimation(testProject, testDatasource, testClusterLbl)
+	require.NoError(t, err)
+
+	db2, err := BuildVMOverestimation(testProject, testDatasource, testClusterLbl)
+	require.NoError(t, err)
+
+	data1, _ := json.Marshal(db1.Dashboard.Spec)
+	data2, _ := json.Marshal(db2.Dashboard.Spec)
+	assert.Equal(t, string(data1), string(data2))
+}
+
+// --- VM Underestimation Dashboard ---
+
+func TestBuildVMUnderestimation(t *testing.T) {
+	db, err := BuildVMUnderestimation(testProject, testDatasource, testClusterLbl)
+	require.NoError(t, err)
+
+	spec := db.Dashboard.Spec
+	assert.Equal(t, "acm-rightsizing-vm-underestimation", db.Dashboard.Metadata.Name)
+	assert.Equal(t, "ACM Right-Sizing OpenShift Virtualization VM Underestimation", spec.Display.Name)
+
+	t.Run("has expected variables", func(t *testing.T) {
+		require.Len(t, spec.Variables, 6, "expected cluster, cpu_profile, memory_profile, days, namespace, vm")
+		varNames := extractVarNames(spec.Variables)
+		assert.Contains(t, varNames, "cluster")
+		assert.Contains(t, varNames, "cpu_profile")
+		assert.Contains(t, varNames, "memory_profile")
+		assert.Contains(t, varNames, "days")
+		assert.Contains(t, varNames, "namespace")
+		assert.Contains(t, varNames, "vm")
+	})
+
+	t.Run("has expected panel groups", func(t *testing.T) {
+		require.Len(t, spec.Layouts, 3, "back-to-main + CPU stats+chart + Mem stats+chart")
+	})
+
+	t.Run("contains back to main dashboard link", func(t *testing.T) {
+		raw, err := json.Marshal(spec)
+		require.NoError(t, err)
+		specStr := string(raw)
+		assert.Contains(t, specStr, "acm-rightsizing-openshift-virtualization")
+		assert.Contains(t, specStr, "start=$__range", "back link must pass the current time range")
+	})
+
+	t.Run("underestimation queries use acm_rs_vm metrics", func(t *testing.T) {
+		raw, err := json.Marshal(spec)
+		require.NoError(t, err)
+		specStr := string(raw)
+		assert.Contains(t, specStr, "acm_rs_vm:namespace:cpu_request")
+		assert.Contains(t, specStr, "acm_rs_vm:namespace:cpu_recommendation")
+		assert.Contains(t, specStr, "acm_rs_vm:namespace:memory_request")
+		assert.Contains(t, specStr, "acm_rs_vm:namespace:memory_recommendation")
+		assert.Contains(t, specStr, "$cpu_profile")
+		assert.Contains(t, specStr, "$memory_profile")
+	})
+}
+
+func TestBuildVMUnderestimation_Idempotent(t *testing.T) {
+	db1, err := BuildVMUnderestimation(testProject, testDatasource, testClusterLbl)
+	require.NoError(t, err)
+
+	db2, err := BuildVMUnderestimation(testProject, testDatasource, testClusterLbl)
+	require.NoError(t, err)
+
+	data1, _ := json.Marshal(db1.Dashboard.Spec)
+	data2, _ := json.Marshal(db2.Dashboard.Spec)
+	assert.Equal(t, string(data1), string(data2))
+}
+
+// --- Cross-Dashboard Consistency ---
+
+func TestAllDashboards_ProjectAndDatasourceThreading(t *testing.T) {
+	customProject := "custom-project"
+	customDS := "custom-datasource"
+
+	builders := []struct {
+		name string
+		fn   func(string, string, string) (dashboard.Builder, error)
+	}{
+		{"NamespaceRightSizing", BuildNamespaceRightSizing},
+		{"VMOverview", BuildVMOverview},
+		{"VMOverestimation", BuildVMOverestimation},
+		{"VMUnderestimation", BuildVMUnderestimation},
+		{"WorkloadRightSizing", BuildWorkloadRightSizing},
+		{"PodRightSizing", BuildPodRightSizing},
+		{"WorkloadDetail", BuildWorkloadDetail},
+		{"PodDetail", BuildPodDetail},
+	}
+
+	for _, b := range builders {
+		t.Run(b.name, func(t *testing.T) {
+			db, err := b.fn(customProject, customDS, "")
+			require.NoError(t, err)
+			assert.Equal(t, customProject, db.Dashboard.Metadata.Project)
+
+			raw, err := json.Marshal(db.Dashboard.Spec)
+			require.NoError(t, err)
+			assert.Contains(t, string(raw), customDS, "all queries should reference the provided datasource")
+		})
+	}
+}
+
+func TestVMDashboards_DrillDownLinksUseCorrectProject(t *testing.T) {
+	customProject := "my-analytics-ns"
+
+	for _, tc := range []struct {
+		name   string
+		fn     func(string, string, string) (dashboard.Builder, error)
+		linkID string
+	}{
+		{"VMOverview drill-down to overestimation", BuildVMOverview, "acm-rightsizing-vm-overestimation"},
+		{"VMOverview drill-down to underestimation", BuildVMOverview, "acm-rightsizing-vm-underestimation"},
+		{"VMOverestimation back link", BuildVMOverestimation, "acm-rightsizing-openshift-virtualization"},
+		{"VMUnderestimation back link", BuildVMUnderestimation, "acm-rightsizing-openshift-virtualization"},
+		{"Workload overview drill-down to detail", BuildWorkloadRightSizing, "acm-rs-workload-detail"},
+		{"Workload detail back link", BuildWorkloadDetail, "acm-rs-workload-overview"},
+		{"Pod overview drill-down to detail", BuildPodRightSizing, "acm-rs-pod-detail"},
+		{"Pod detail back link", BuildPodDetail, "acm-rs-pod-overview"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			db, err := tc.fn(customProject, testDatasource, "")
+			require.NoError(t, err)
+
+			raw, err := json.Marshal(db.Dashboard.Spec)
+			require.NoError(t, err)
+			specStr := string(raw)
+			assert.Contains(t, specStr, tc.linkID)
+			assert.Contains(t, specStr, "project="+customProject)
+			assert.Contains(t, specStr, "start=$__range")
+		})
+	}
+}
+
+// --- helpers ---
+
+func extractVarNames(vars any) []string {
+	data, _ := json.Marshal(vars)
+	var rawVars []map[string]any
+	_ = json.Unmarshal(data, &rawVars)
+
+	var names []string
+	for _, v := range rawVars {
+		if spec, ok := v["spec"].(map[string]any); ok {
+			if name, ok := spec["name"].(string); ok {
+				names = append(names, name)
+			}
+		}
+	}
+	return names
+}

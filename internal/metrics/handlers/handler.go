@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -41,7 +42,6 @@ var (
 	errUnsupportedAppName          = errors.New("unsupported app name")
 	errMissingDesiredConfig        = errors.New("missing desiredConfig in managedClusterAddon.Status.ConfigReferences")
 	errMissingRemoteWriteConfig    = errors.New("missing expected remote write spec in the prometheusAgent")
-	errMissingCMAOOwnership        = errors.New("object is not owned by the ClusterManagementAddOn")
 	errMissingRouteHost            = errors.New("MCOA obs-api route has no host")
 	errInvalidPullSecretFormat     = errors.New("invalid pullSecret format, expected namespace.name")
 )
@@ -207,6 +207,7 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1beta1.Man
 			&ret.Secrets,
 			isOpenShiftVendor,
 			config.AlertmanagerPlatformNamespace,
+			opts.ProxyConfig.CABundle,
 		)
 		if err != nil {
 			return ret, err
@@ -230,6 +231,7 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1beta1.Man
 			&ret.Secrets,
 			isOpenShiftVendor,
 			config.AlertmanagerUWLNamespace,
+			opts.ProxyConfig.CABundle,
 		)
 		if err != nil {
 			return ret, err
@@ -334,14 +336,6 @@ func (o *OptionsBuilder) buildPrometheusAgent(ctx context.Context, opts *Options
 	}
 	agent := platformAgents[0].DeepCopy()
 
-	isOwned, err := common.HasCMAOOwnerReference(ctx, o.Client, agent)
-	if err != nil {
-		return fmt.Errorf("failed to check owner reference of the Prometheus Agent %s/%s: %w", agent.Namespace, agent.Name, err)
-	}
-	if !isOwned {
-		return fmt.Errorf("%w: kind %s %s/%s", errMissingCMAOOwnership, agent.Kind, agent.Namespace, agent.Name)
-	}
-
 	// ensure the expected remote write config exists
 	remoteWriteSpecIdx := slices.IndexFunc(agent.Spec.RemoteWrite, func(e cooprometheusv1.RemoteWriteSpec) bool {
 		return e.Name != nil && *e.Name == config.RemoteWriteCfgName
@@ -357,11 +351,10 @@ func (o *OptionsBuilder) buildPrometheusAgent(ctx context.Context, opts *Options
 	}
 
 	// Add proxy configuration to all remoteWrite configurations
-	if opts.ProxyConfig.ProxyURL != nil {
-		proxyURL := opts.ProxyConfig.ProxyURL.String()
-		for i := range agent.Spec.RemoteWrite {
-			agent.Spec.RemoteWrite[i].ProxyURL = &proxyURL
-			agent.Spec.RemoteWrite[i].NoProxy = &opts.ProxyConfig.NoProxy
+	for i := range agent.Spec.RemoteWrite {
+		if proxyURL := opts.ProxyConfig.ProxyURLForTarget(string(agent.Spec.RemoteWrite[i].URL)); proxyURL != nil {
+			agent.Spec.RemoteWrite[i].ProxyURL = new(proxyURL.String())
+			agent.Spec.RemoteWrite[i].NoProxy = new(opts.ProxyConfig.NoProxy)
 		}
 	}
 
@@ -431,7 +424,7 @@ func (o *OptionsBuilder) buildPrometheusAgent(ctx context.Context, opts *Options
 		}
 
 		// empty target namespace result in using default $.Release.Namespace in yaml
-		if err := o.addSecret(ctx, &opts.Secrets, sourceName, sourceNamespace, secretName, ""); err != nil {
+		if err := o.addSecret(ctx, &opts.Secrets, sourceName, sourceNamespace, secretName, "", opts.ProxyConfig.CABundle); err != nil {
 			return err
 		}
 	}
@@ -481,9 +474,29 @@ func (o *OptionsBuilder) buildHypershiftResources(ctx context.Context, opts *Opt
 	return nil
 }
 
-// Simplified addSecret function (unchanged)
+// mergeCABundle concatenates existing and proxyCA PEM certificate bytes, ensuring a clean newline boundary.
+func mergeCABundle(existing, proxyCA []byte) []byte {
+	if len(proxyCA) == 0 {
+		return existing
+	}
+	if len(existing) == 0 {
+		return bytes.Clone(proxyCA)
+	}
+	var merged bytes.Buffer
+	merged.Write(existing)
+	if !bytes.HasSuffix(existing, []byte("\n")) {
+		merged.WriteByte('\n')
+	}
+	merged.Write(proxyCA)
+	if !bytes.HasSuffix(proxyCA, []byte("\n")) {
+		merged.WriteByte('\n')
+	}
+	return merged.Bytes()
+}
+
+// Simplified addSecret function
 // empty target namespace result in using default $.Release.Namespace in yaml
-func (o *OptionsBuilder) addSecret(ctx context.Context, secrets *[]*corev1.Secret, secretName, secretNamespace string, targetName string, targetNamespace string) error {
+func (o *OptionsBuilder) addSecret(ctx context.Context, secrets *[]*corev1.Secret, secretName, secretNamespace string, targetName string, targetNamespace string, proxyCABundle []byte) error {
 	if slices.IndexFunc(*secrets, func(s *corev1.Secret) bool { return s.Name == targetName && s.Namespace == targetNamespace }) != -1 {
 		return nil
 	}
@@ -501,6 +514,13 @@ func (o *OptionsBuilder) addSecret(ctx context.Context, secrets *[]*corev1.Secre
 
 	secret.Namespace = targetNamespace
 	secret.Name = targetName
+
+	if secretName == config.HubCASecretName && len(proxyCABundle) > 0 {
+		if secret.Data == nil {
+			secret.Data = make(map[string][]byte)
+		}
+		secret.Data[config.MTLSCASecretKey] = mergeCABundle(secret.Data[config.MTLSCASecretKey], proxyCABundle)
+	}
 
 	*secrets = append(*secrets, secret)
 	return nil
@@ -701,19 +721,19 @@ func (o *OptionsBuilder) addAlertmanagerMtlsSecrets(ctx context.Context, secrets
 
 		// Copy HubCASecretName (observability-managed-cluster-certs) to hub-mtls-ca-<id>
 		caTargetName := config.GetHubMtlsCASecretName(trimmedClusterID)
-		if err := o.addSecret(ctx, secrets, config.HubCASecretName, config.HubInstallNamespace, caTargetName, targetNamespace); err != nil {
+		if err := o.addSecret(ctx, secrets, config.HubCASecretName, config.HubInstallNamespace, caTargetName, targetNamespace, opts.ProxyConfig.CABundle); err != nil {
 			return fmt.Errorf("failed to add platform mtls ca secret: %w", err)
 		}
 
 		// Copy ClientCertSecretName (observability-controller...) to hub-mtls-cert-<id>
 		certTargetName := config.GetHubMtlsCertSecretName(trimmedClusterID)
-		if err := o.addSecret(ctx, secrets, config.ClientCertSecretName, config.HubInstallNamespace, certTargetName, targetNamespace); err != nil {
+		if err := o.addSecret(ctx, secrets, config.ClientCertSecretName, config.HubInstallNamespace, certTargetName, targetNamespace, nil); err != nil {
 			return fmt.Errorf("failed to add platform mtls cert secret: %w", err)
 		}
 
 		// Copy AlertmanagerAccessorSecretName
 		accessorTargetName := config.GetAlertmanagerAccessorSecretName(trimmedClusterID)
-		if err := o.addSecret(ctx, secrets, config.AlertmanagerAccessorSecretName, config.HubInstallNamespace, accessorTargetName, targetNamespace); err != nil {
+		if err := o.addSecret(ctx, secrets, config.AlertmanagerAccessorSecretName, config.HubInstallNamespace, accessorTargetName, targetNamespace, nil); err != nil {
 			return fmt.Errorf("failed to add platform accessor secret: %w", err)
 		}
 	}
@@ -723,19 +743,19 @@ func (o *OptionsBuilder) addAlertmanagerMtlsSecrets(ctx context.Context, secrets
 
 		// Copy HubCASecretName (observability-managed-cluster-certs) to hub-mtls-ca-<id>
 		caTargetName := config.GetHubMtlsCASecretName(trimmedClusterID)
-		if err := o.addSecret(ctx, secrets, config.HubCASecretName, config.HubInstallNamespace, caTargetName, targetNamespace); err != nil {
+		if err := o.addSecret(ctx, secrets, config.HubCASecretName, config.HubInstallNamespace, caTargetName, targetNamespace, opts.ProxyConfig.CABundle); err != nil {
 			return fmt.Errorf("failed to add uwl mtls ca secret: %w", err)
 		}
 
 		// Copy ClientCertSecretName (observability-controller...) to hub-mtls-cert-<id>
 		certTargetName := config.GetHubMtlsCertSecretName(trimmedClusterID)
-		if err := o.addSecret(ctx, secrets, config.ClientCertSecretName, config.HubInstallNamespace, certTargetName, targetNamespace); err != nil {
+		if err := o.addSecret(ctx, secrets, config.ClientCertSecretName, config.HubInstallNamespace, certTargetName, targetNamespace, nil); err != nil {
 			return fmt.Errorf("failed to add uwl mtls cert secret: %w", err)
 		}
 
 		// Copy AlertmanagerAccessorSecretName
 		accessorTargetName := config.GetAlertmanagerAccessorSecretName(trimmedClusterID)
-		if err := o.addSecret(ctx, secrets, config.AlertmanagerAccessorSecretName, config.HubInstallNamespace, accessorTargetName, targetNamespace); err != nil {
+		if err := o.addSecret(ctx, secrets, config.AlertmanagerAccessorSecretName, config.HubInstallNamespace, accessorTargetName, targetNamespace, nil); err != nil {
 			return fmt.Errorf("failed to add uwl accessor secret: %w", err)
 		}
 	}
@@ -763,6 +783,7 @@ func (o *OptionsBuilder) processScrapeConfigs(
 	secrets *[]*corev1.Secret,
 	isOCP bool,
 	defaultNamespace string,
+	proxyCABundle []byte,
 ) ([]*cooprometheusv1alpha1.ScrapeConfig, []MonitoringStackPatch, []cooprometheusv1.RemoteWriteSpec, error) {
 	var filtered []*cooprometheusv1alpha1.ScrapeConfig
 	var serverRemoteWrites []cooprometheusv1.RemoteWriteSpec
@@ -802,12 +823,12 @@ func (o *OptionsBuilder) processScrapeConfigs(
 				// For standard platform/user-workloads on OCP, copy mTLS secrets to the standard target namespace (openshift-monitoring or openshift-user-workload-monitoring)
 				// so that the default Prometheus instances can authenticate with the hub.
 				if slices.IndexFunc(*secrets, func(s *corev1.Secret) bool { return s.Name == caTargetName && s.Namespace == defaultNamespace }) == -1 {
-					if scErr := o.addSecret(ctx, secrets, config.HubCASecretName, config.HubInstallNamespace, caTargetName, defaultNamespace); scErr != nil {
+					if scErr := o.addSecret(ctx, secrets, config.HubCASecretName, config.HubInstallNamespace, caTargetName, defaultNamespace, proxyCABundle); scErr != nil {
 						return nil, nil, nil, fmt.Errorf("failed to add standard mtls ca secret to %s: %w", defaultNamespace, scErr)
 					}
 				}
 				if slices.IndexFunc(*secrets, func(s *corev1.Secret) bool { return s.Name == certTargetName && s.Namespace == defaultNamespace }) == -1 {
-					if scErr := o.addSecret(ctx, secrets, config.ClientCertSecretName, config.HubInstallNamespace, certTargetName, defaultNamespace); scErr != nil {
+					if scErr := o.addSecret(ctx, secrets, config.ClientCertSecretName, config.HubInstallNamespace, certTargetName, defaultNamespace, nil); scErr != nil {
 						return nil, nil, nil, fmt.Errorf("failed to add standard mtls cert secret to %s: %w", defaultNamespace, scErr)
 					}
 				}
@@ -826,12 +847,12 @@ func (o *OptionsBuilder) processScrapeConfigs(
 				// Since multiple ScrapeConfigs can target the exact same COO stack/namespace, the outer guard prevents
 				// creating duplicate target secrets in secrets across multiple scrape config iterations.
 				if slices.IndexFunc(*secrets, func(s *corev1.Secret) bool { return s.Name == caTargetName && s.Namespace == targetNamespace }) == -1 {
-					if scErr := o.addSecret(ctx, secrets, config.HubCASecretName, config.HubInstallNamespace, caTargetName, targetNamespace); scErr != nil {
+					if scErr := o.addSecret(ctx, secrets, config.HubCASecretName, config.HubInstallNamespace, caTargetName, targetNamespace, proxyCABundle); scErr != nil {
 						return nil, nil, nil, fmt.Errorf("failed to add COO mtls ca secret: %w", scErr)
 					}
 				}
 				if slices.IndexFunc(*secrets, func(s *corev1.Secret) bool { return s.Name == certTargetName && s.Namespace == targetNamespace }) == -1 {
-					if scErr := o.addSecret(ctx, secrets, config.ClientCertSecretName, config.HubInstallNamespace, certTargetName, targetNamespace); scErr != nil {
+					if scErr := o.addSecret(ctx, secrets, config.ClientCertSecretName, config.HubInstallNamespace, certTargetName, targetNamespace, nil); scErr != nil {
 						return nil, nil, nil, fmt.Errorf("failed to add COO mtls cert secret: %w", scErr)
 					}
 				}
@@ -997,7 +1018,7 @@ func (o *OptionsBuilder) buildThanosComponents(ctx context.Context, opts *Option
 		return fmt.Errorf("failed to get object storage config: %w", err)
 	}
 
-	if err := o.addSecret(ctx, &opts.Secrets, objStoreSecret.Name, objStoreSecret.Namespace, objStoreSecret.Name, ""); err != nil {
+	if err := o.addSecret(ctx, &opts.Secrets, objStoreSecret.Name, objStoreSecret.Namespace, objStoreSecret.Name, "", nil); err != nil {
 		return fmt.Errorf("failed to add object storage secret: %w", err)
 	}
 
@@ -1026,6 +1047,15 @@ func (o *OptionsBuilder) overrideRemoteWriteEndpoint(ctx context.Context, opts *
 		for i := range agent.Spec.RemoteWrite {
 			if agent.Spec.RemoteWrite[i].Name != nil && *agent.Spec.RemoteWrite[i].Name == config.RemoteWriteCfgName {
 				agent.Spec.RemoteWrite[i].URL = cooprometheusv1.URL(endpoint)
+				// Re-evaluate proxy configuration for the new HTTPS endpoint: the initial proxy selection
+				// was resolved against the original URL scheme and host, which may differ (e.g. HTTP vs HTTPS proxy).
+				if proxyURL := opts.ProxyConfig.ProxyURLForTarget(endpoint); proxyURL != nil {
+					agent.Spec.RemoteWrite[i].ProxyURL = new(proxyURL.String())
+					agent.Spec.RemoteWrite[i].NoProxy = new(opts.ProxyConfig.NoProxy)
+				} else {
+					agent.Spec.RemoteWrite[i].ProxyURL = nil
+					agent.Spec.RemoteWrite[i].NoProxy = nil
+				}
 			}
 		}
 	}

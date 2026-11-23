@@ -15,6 +15,7 @@ import (
 	mconfig "github.com/stolostron/multicluster-observability-addon/internal/metrics/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
@@ -26,12 +27,11 @@ import (
 	workv1 "open-cluster-management.io/api/work/v1"
 )
 
+//nolint:staticcheck // fakeaddon.NewSimpleClientset is deprecated in client-go but open-cluster-management.io/api does not generate NewClientset
 func newTestGetter(aodc *addonapiv1beta1.AddOnDeploymentConfig) addonutils.AddOnDeploymentConfigGetter {
 	if aodc == nil {
-		//nolint:staticcheck // client.Apply is deprecated, but alternative requires ApplyConfigurations which we don't have
 		return addonutils.NewAddOnDeploymentConfigGetter(fakeaddon.NewSimpleClientset())
 	}
-	//nolint:staticcheck // client.Apply is deprecated, but alternative requires ApplyConfigurations which we don't have
 	return addonutils.NewAddOnDeploymentConfigGetter(fakeaddon.NewSimpleClientset(aodc))
 }
 
@@ -171,6 +171,7 @@ func Test_AgentHealthProber_PPA_UserWorkload(t *testing.T) {
 
 func Test_AgentHealthProber_CLF(t *testing.T) {
 	managedCluster := addontesting.NewManagedCluster("cluster-1")
+	managedCluster.Labels = map[string]string{"vendor": "OpenShift"}
 	managedClusterAddOn := addontesting.NewAddon("test", "cluster-1")
 	aodc := newAddonDeploymentConfig()
 	addLoggingCustomizedVariables(aodc)
@@ -228,6 +229,7 @@ func Test_AgentHealthProber_CLF(t *testing.T) {
 
 func Test_AgentHealthProber_OTELCol(t *testing.T) {
 	managedCluster := addontesting.NewManagedCluster("cluster-1")
+	managedCluster.Labels = map[string]string{"vendor": "OpenShift"}
 	managedClusterAddOn := addontesting.NewAddon("test", "cluster-1")
 	aodc := newAddonDeploymentConfig()
 	addTracingCustomizedVariables(aodc)
@@ -301,6 +303,8 @@ func Test_AgentHealthProber_MissingResources(t *testing.T) {
 	})
 
 	t.Run("logging enabled but missing clf", func(t *testing.T) {
+		ocpCluster := addontesting.NewManagedCluster("cluster-1")
+		ocpCluster.Labels = map[string]string{"vendor": "OpenShift"}
 		aodc := newAddonDeploymentConfig()
 		addLoggingCustomizedVariables(aodc)
 		addAODCConfigReference(managedClusterAddOn, aodc)
@@ -310,11 +314,27 @@ func Test_AgentHealthProber_MissingResources(t *testing.T) {
 			// We pass an unrelated field to bypass the initial check for empty fields
 			// in the healthChecker function.
 			[]agent.FieldResult{scrapeConfigFieldResult()}, // unrelated field to bypass empty check
-			managedCluster, managedClusterAddOn)
+			ocpCluster, managedClusterAddOn)
 		require.ErrorIs(t, err, errMissingFields)
 	})
 
+	t.Run("logging enabled on a non-OpenShift cluster", func(t *testing.T) {
+		gkeCluster := addontesting.NewManagedCluster("cluster-1")
+		gkeCluster.Labels = map[string]string{"vendor": "GKE"}
+		aodc := newAddonDeploymentConfig()
+		addLoggingCustomizedVariables(aodc)
+		addAODCConfigReference(managedClusterAddOn, aodc)
+
+		healthProber := HealthProber(newTestGetter(aodc), logr.Discard())
+		err := healthProber.WorkProber.HealthChecker(
+			[]agent.FieldResult{endpointMonitoringOperatorFieldResult(1)},
+			gkeCluster, managedClusterAddOn)
+		require.NoError(t, err)
+	})
+
 	t.Run("tracing enabled but missing otel collector", func(t *testing.T) {
+		ocpCluster := addontesting.NewManagedCluster("cluster-1")
+		ocpCluster.Labels = map[string]string{"vendor": "OpenShift"}
 		aodc := newAddonDeploymentConfig()
 		addTracingCustomizedVariables(aodc)
 		addAODCConfigReference(managedClusterAddOn, aodc)
@@ -324,22 +344,22 @@ func Test_AgentHealthProber_MissingResources(t *testing.T) {
 			// We pass an unrelated field to bypass the initial check for empty fields
 			// in the healthChecker function.
 			[]agent.FieldResult{scrapeConfigFieldResult()}, // unrelated field
-			managedCluster, managedClusterAddOn)
+			ocpCluster, managedClusterAddOn)
 		require.ErrorIs(t, err, errMissingFields)
 	})
 
-	t.Run("right-sizing enabled but missing prometheus rules", func(t *testing.T) {
-		ocpCluster := addontesting.NewManagedCluster("cluster-1")
-		ocpCluster.Labels = map[string]string{"vendor": "OpenShift"}
+	t.Run("tracing enabled on a non-OpenShift cluster", func(t *testing.T) {
+		gkeCluster := addontesting.NewManagedCluster("cluster-1")
+		gkeCluster.Labels = map[string]string{"vendor": "GKE"}
 		aodc := newAddonDeploymentConfig()
-		addRightSizingCustomizedVariables(aodc)
+		addTracingCustomizedVariables(aodc)
 		addAODCConfigReference(managedClusterAddOn, aodc)
 
 		healthProber := HealthProber(newTestGetter(aodc), logr.Discard())
 		err := healthProber.WorkProber.HealthChecker(
-			[]agent.FieldResult{scrapeConfigFieldResult()},
-			ocpCluster, managedClusterAddOn)
-		require.ErrorIs(t, err, errMissingFields)
+			[]agent.FieldResult{endpointMonitoringOperatorFieldResult(1)},
+			gkeCluster, managedClusterAddOn)
+		require.NoError(t, err)
 	})
 }
 
@@ -366,13 +386,25 @@ func Test_AgentHealthProber_RightSizing(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	t.Run("missing namespace rule", func(t *testing.T) {
+	t.Run("namespace rule not rendered for this cluster", func(t *testing.T) {
+		// The rs-namespace-config placement can leave the cluster out.
 		healthProber := HealthProber(newTestGetter(aodc), logr.Discard())
 		err := healthProber.WorkProber.HealthChecker(
 			[]agent.FieldResult{
 				rsFieldResult(virtRuleName),
 			}, managedCluster, managedClusterAddOn)
-		require.ErrorIs(t, err, errMissingFields)
+		require.NoError(t, err)
+	})
+
+	t.Run("no rule rendered for this cluster", func(t *testing.T) {
+		// Both placements can leave the cluster out. Another probe, here the endpoint
+		// operator, still returns feedback, so the checker runs.
+		healthProber := HealthProber(newTestGetter(aodc), logr.Discard())
+		err := healthProber.WorkProber.HealthChecker(
+			[]agent.FieldResult{
+				endpointMonitoringOperatorFieldResult(1),
+			}, managedCluster, managedClusterAddOn)
+		require.NoError(t, err)
 	})
 
 	t.Run("missing feedback values", func(t *testing.T) {
@@ -392,6 +424,76 @@ func Test_AgentHealthProber_RightSizing(t *testing.T) {
 			}, managedCluster, managedClusterAddOn)
 		require.ErrorIs(t, err, errMissingFeedbackValues)
 	})
+}
+
+func Test_AgentHealthProber_RightSizingNonOpenShift(t *testing.T) {
+	managedCluster := addontesting.NewManagedCluster("cluster-1")
+	managedCluster.Labels = map[string]string{"vendor": "GKE"}
+	managedClusterAddOn := addontesting.NewAddon("test", "cluster-1")
+	aodc := newAddonDeploymentConfig()
+	addRightSizingCustomizedVariables(aodc)
+	addAODCConfigReference(managedClusterAddOn, aodc)
+	healthProber := HealthProber(newTestGetter(aodc), logr.Discard())
+
+	var deploymentProbe *agent.ProbeField
+	for i := range healthProber.WorkProber.ProbeFields {
+		probe := &healthProber.WorkProber.ProbeFields[i]
+		if probe.ResourceIdentifier.Group == appsv1.GroupName &&
+			probe.ResourceIdentifier.Resource == "deployments" &&
+			probe.ResourceIdentifier.Name == addoncfg.EndpointMonitoringOperatorDeployment {
+			deploymentProbe = probe
+			break
+		}
+	}
+	require.NotNil(t, deploymentProbe, "the framework needs a deployment probe to avoid NoProbeResult")
+	require.Equal(t, "*", deploymentProbe.ResourceIdentifier.Namespace)
+	require.Equal(t, addoncfg.EndpointMonitoringOperatorProbePath, deploymentProbe.ProbeRules[0].JsonPaths[0].Path)
+
+	t.Run("unready endpoint operator", func(t *testing.T) {
+		err := healthProber.WorkProber.HealthChecker(
+			[]agent.FieldResult{endpointMonitoringOperatorFieldResult(0)}, managedCluster, managedClusterAddOn)
+		require.ErrorIs(t, err, errProbeConditionNotSatisfied)
+		assert.InDelta(t, 0.0, testutil.ToFloat64(addonmetrics.HealthCheckStatus.WithLabelValues("cluster-1", addonmetrics.SubsystemRightSizing)), 0.001)
+	})
+	t.Run("ready endpoint operator", func(t *testing.T) {
+		// After the failed check above, a passing check sets the status back to 1.
+		err := healthProber.WorkProber.HealthChecker(
+			[]agent.FieldResult{endpointMonitoringOperatorFieldResult(1)}, managedCluster, managedClusterAddOn)
+		require.NoError(t, err)
+		assert.InDelta(t, 1.0, testutil.ToFloat64(addonmetrics.HealthCheckStatus.WithLabelValues("cluster-1", addonmetrics.SubsystemRightSizing)), 0.001)
+	})
+	t.Run("missing endpoint operator feedback", func(t *testing.T) {
+		err := healthProber.WorkProber.HealthChecker(
+			[]agent.FieldResult{scrapeConfigFieldResult()}, managedCluster, managedClusterAddOn)
+		require.ErrorIs(t, err, errMissingFields)
+	})
+	t.Run("empty endpoint operator feedback", func(t *testing.T) {
+		field := endpointMonitoringOperatorFieldResult(1)
+		field.FeedbackResult.Values = nil
+		err := healthProber.WorkProber.HealthChecker(
+			[]agent.FieldResult{field}, managedCluster, managedClusterAddOn)
+		require.ErrorIs(t, err, errMissingFeedbackValues)
+	})
+}
+
+func endpointMonitoringOperatorFieldResult(availableReplicas int64) agent.FieldResult {
+	return agent.FieldResult{
+		ResourceIdentifier: workv1.ResourceIdentifier{
+			Group:     appsv1.GroupName,
+			Resource:  "deployments",
+			Name:      addoncfg.EndpointMonitoringOperatorDeployment,
+			Namespace: addoncfg.InstallNamespace,
+		},
+		FeedbackResult: workv1.StatusFeedbackResult{
+			Values: []workv1.FeedbackValue{{
+				Name: addoncfg.EndpointMonitoringOperatorProbeKey,
+				Value: workv1.FieldValue{
+					Type:    workv1.Integer,
+					Integer: &availableReplicas,
+				},
+			}},
+		},
+	}
 }
 
 func scrapeConfigFieldResult() agent.FieldResult {

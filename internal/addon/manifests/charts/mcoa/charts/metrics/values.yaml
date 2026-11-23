@@ -1,3 +1,4 @@
+isOpenShiftVendor: true
 platform:
   appName: "platform-app"
   component: platform-metrics-collector

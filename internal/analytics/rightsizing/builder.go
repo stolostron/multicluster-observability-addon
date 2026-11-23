@@ -63,6 +63,8 @@ func GetDefaultRSPrometheusRuleConfig() RSPrometheusRuleConfig {
 	ruleConfig.RecommendationPercentage = DefaultRecommendationPercentage
 	ruleConfig.CpuAggregator = DefaultCpuAggregator
 	ruleConfig.MemoryAggregator = DefaultMemoryAggregator
+	ruleConfig.EvaluationInterval = DefaultEvaluationInterval
+	ruleConfig.EvaluationInterval1d = DefaultEvaluationInterval1d
 	return ruleConfig
 }
 
@@ -163,6 +165,24 @@ func GetDefaultNamespaceConfigData() map[string]string {
 // GetDefaultVirtualizationConfigData returns default config data for virtualization right-sizing
 func GetDefaultVirtualizationConfigData() map[string]string {
 	ruleConfig := GetDefaultRSPrometheusRuleConfig()
+	placement := GetDefaultRSPlacement()
+	return map[string]string{
+		"prometheusRuleConfig":   FormatYAML(ruleConfig),
+		"placementConfiguration": FormatYAML(placement),
+	}
+}
+
+// GetDefaultWorkloadPrometheusRuleConfig includes all namespaces for workload and
+// pod right-sizing. Namespace and virtualization defaults remain unchanged.
+func GetDefaultWorkloadPrometheusRuleConfig() RSPrometheusRuleConfig {
+	ruleConfig := GetDefaultRSPrometheusRuleConfig()
+	ruleConfig.NamespaceFilterCriteria.ExclusionCriteria = nil
+	return ruleConfig
+}
+
+// GetDefaultWorkloadConfigData returns default config data for workload-pod right-sizing
+func GetDefaultWorkloadConfigData() map[string]string {
+	ruleConfig := GetDefaultWorkloadPrometheusRuleConfig()
 	placement := GetDefaultRSPlacement()
 	return map[string]string{
 		"prometheusRuleConfig":   FormatYAML(ruleConfig),

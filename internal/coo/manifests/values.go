@@ -9,13 +9,15 @@ import (
 // subscription/operatorgroup) still need. Hub-only Perses resources are
 // now reconciled directly by HubResourceReconciler.
 type COOValues struct {
-	Enabled            bool                                `json:"enabled"`
-	InstallCOO         bool                                `json:"installCOO"`
-	IsHub              bool                                `json:"isHub"`
-	MonitoringUIPlugin bool                                `json:"monitoringUIPlugin"`
-	Perses             bool                                `json:"perses"`
-	Metrics            *UIValues                           `json:"metrics,omitempty"`
-	IncidentDetection  *imanifests.IncidentDetectionValues `json:"incidentDetection,omitempty"`
+	Enabled                bool                                `json:"enabled"`
+	InstallCOO             bool                                `json:"installCOO"`
+	IsHub                  bool                                `json:"isHub"`
+	MonitoringUIPlugin     bool                                `json:"monitoringUIPlugin"`
+	Perses                 bool                                `json:"perses"`
+	Metrics                *UIValues                           `json:"metrics,omitempty"`
+	IncidentDetection      *imanifests.IncidentDetectionValues `json:"incidentDetection,omitempty"`
+	CatalogSource          string                              `json:"catalogSource"`
+	CatalogSourceNamespace string                              `json:"catalogSourceNamespace"`
 }
 
 type UIValues struct {
@@ -44,6 +46,12 @@ func BuildValues(opts addon.Options, isHubCluster bool) *COOValues {
 			rightSizingEnabled = true
 		}
 		if opts.Platform.AnalyticsOptions.RightSizing.VirtualizationEnabled {
+			rightSizingEnabled = true
+		}
+		if opts.Platform.AnalyticsOptions.RightSizing.WorkloadEnabled {
+			rightSizingEnabled = true
+		}
+		if opts.Platform.AnalyticsOptions.RightSizing.PodEnabled {
 			rightSizingEnabled = true
 		}
 	}

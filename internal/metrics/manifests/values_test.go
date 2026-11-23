@@ -1,6 +1,7 @@
 package manifests_test
 
 import (
+	"net/url"
 	"testing"
 
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
@@ -209,6 +210,29 @@ func TestBuildValues(t *testing.T) {
 			},
 			Expect: func(t *testing.T, values *manifests.MetricsValues) {
 				assert.True(t, values.DeployNonOCPStack)
+				assert.False(t, values.IsOpenShiftVendor)
+			},
+		},
+		"with is openshift vendor true": {
+			Options: handlers.Options{
+				IsOpenShiftVendor: true,
+			},
+			Expect: func(t *testing.T, values *manifests.MetricsValues) {
+				assert.True(t, values.IsOpenShiftVendor)
+				assert.False(t, values.DeployNonOCPStack)
+			},
+		},
+		"with is openshift vendor false without metrics": {
+			// Simulates a non-OCP cluster with metrics disabled (e.g., when Right-Sizing is enabled).
+			// DeployNonOCPStack must be false because no Prometheus stack is deployed,
+			// but IsOpenShiftVendor must accurately reflect false so endpoint-monitoring-operator
+			// does not inject OpenShift-only resources like kube-rbac-proxy or service-ca TLS secrets.
+			Options: handlers.Options{
+				IsOpenShiftVendor: false,
+			},
+			Expect: func(t *testing.T, values *manifests.MetricsValues) {
+				assert.False(t, values.IsOpenShiftVendor)
+				assert.False(t, values.DeployNonOCPStack)
 			},
 		},
 		"with deploy coo resources": {
@@ -260,6 +284,49 @@ func TestBuildValues(t *testing.T) {
 			Expect: func(t *testing.T, values *manifests.MetricsValues) {
 				assert.Equal(t, int32(19100), values.NodeExporter.HostPort)
 				assert.Equal(t, int32(19101), values.NodeExporter.InternalPort)
+			},
+		},
+		"with alertmanager proxy configured (https target)": {
+			Options: handlers.Options{
+				HubEndpoint: "observatorium.example.com",
+				ProxyConfig: addon.ProxyConfig{
+					HTTPSProxy: func() *url.URL {
+						u, _ := url.Parse("https://secure-proxy.example.com:8443")
+						return u
+					}(),
+					HTTPProxy: func() *url.URL {
+						u, _ := url.Parse("http://proxy.example.com:8080")
+						return u
+					}(),
+					NoProxy: "localhost,127.0.0.1",
+				},
+			},
+			Expect: func(t *testing.T, values *manifests.MetricsValues) {
+				assert.Equal(t, "https://secure-proxy.example.com:8443", values.AlertmanagerProxyURL)
+				assert.Equal(t, "localhost,127.0.0.1", values.AlertmanagerNoProxy)
+			},
+		},
+		"with alertmanager proxy fallback to http proxy": {
+			Options: handlers.Options{
+				HubEndpoint: "observatorium.example.com",
+				ProxyConfig: addon.ProxyConfig{
+					HTTPProxy: func() *url.URL {
+						u, _ := url.Parse("http://proxy.example.com:8080")
+						return u
+					}(),
+					NoProxy: "*.example.com",
+				},
+			},
+			Expect: func(t *testing.T, values *manifests.MetricsValues) {
+				assert.Equal(t, "http://proxy.example.com:8080", values.AlertmanagerProxyURL)
+				assert.Equal(t, "*.example.com", values.AlertmanagerNoProxy)
+			},
+		},
+		"without hub endpoint or proxy config": {
+			Options: handlers.Options{},
+			Expect: func(t *testing.T, values *manifests.MetricsValues) {
+				assert.Empty(t, values.AlertmanagerProxyURL)
+				assert.Empty(t, values.AlertmanagerNoProxy)
 			},
 		},
 	}

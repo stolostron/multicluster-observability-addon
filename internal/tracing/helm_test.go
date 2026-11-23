@@ -214,6 +214,7 @@ func Test_Tracing_AllConfigsTogether_AllResources(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, objects, 6)
 
+	var foundSubscription bool
 	for _, obj := range objects {
 		switch obj := obj.(type) {
 		case *otelv1beta1.OpenTelemetryCollector:
@@ -229,8 +230,13 @@ func Test_Tracing_AllConfigsTogether_AllResources(t *testing.T) {
 			if obj.Name == "tracing-otlphttp-auth" {
 				require.Equal(t, generatedSecret.Data, obj.Data)
 			}
+		case *operatorsv1alpha1.Subscription:
+			foundSubscription = true
+			require.Equal(t, addoncfg.DefaultCooCatalogSource, obj.Spec.CatalogSource)
+			require.Equal(t, addoncfg.DefaultCooCatalogSourceNamespace, obj.Spec.CatalogSourceNamespace)
 		}
 	}
+	require.True(t, foundSubscription, "expected an OTel operator Subscription in rendered objects")
 }
 
 type mockAODCGetter struct {

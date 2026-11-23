@@ -4,11 +4,14 @@ import (
 	"testing"
 
 	"github.com/go-logr/logr"
+	operatorsv1 "github.com/operator-framework/api/pkg/operators/v1"
+	operatorsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	persesv1 "github.com/perses/perses-operator/api/v1alpha1"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -194,5 +197,57 @@ func TestBuildDesiredDashboardsOmitsVirtualizationWhenMetricsUIDisabled(t *testi
 	}
 	for _, name := range virtualizationDashboardNames {
 		assert.NotContains(t, names, name)
+	}
+}
+
+func TestReconcileCOOOperatorCatalogSource(t *testing.T) {
+	scheme := runtime.NewScheme()
+	_ = persesv1.AddToScheme(scheme)
+	_ = corev1.AddToScheme(scheme)
+	_ = operatorsv1.AddToScheme(scheme)
+	_ = operatorsv1alpha1.AddToScheme(scheme)
+
+	tests := []struct {
+		name         string
+		opts         addon.Options
+		wantSource   string
+		wantSourceNS string
+	}{
+		{
+			name:         "defaults to the redhat-operators catalog",
+			opts:         addon.Options{},
+			wantSource:   addoncfg.DefaultCooCatalogSource,
+			wantSourceNS: addoncfg.DefaultCooCatalogSourceNamespace,
+		},
+		{
+			name: "uses the custom catalog from the addon options",
+			opts: addon.Options{
+				COO: addon.COOOptions{
+					CatalogSource:          "cs-redhat-operator-index-v4-20",
+					CatalogSourceNamespace: "mirrored-catalogs",
+				},
+			},
+			wantSource:   "cs-redhat-operator-index-v4-20",
+			wantSourceNS: "mirrored-catalogs",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
+			r := &HubResourceReconciler{
+				Client: fakeClient,
+				Logger: logr.Discard(),
+				Opts:   tt.opts,
+			}
+
+			require.NoError(t, r.reconcileCOOOperator(t.Context(), true))
+
+			sub := &operatorsv1alpha1.Subscription{}
+			require.NoError(t, fakeClient.Get(t.Context(),
+				client.ObjectKey{Namespace: addoncfg.CooSubscriptionNamespace, Name: addoncfg.CooSubscriptionName}, sub))
+			require.NotNil(t, sub.Spec)
+			assert.Equal(t, tt.wantSource, sub.Spec.CatalogSource)
+			assert.Equal(t, tt.wantSourceNS, sub.Spec.CatalogSourceNamespace)
+		})
 	}
 }

@@ -1,4 +1,4 @@
-{{- if not .Values.deployNonOCPStack }}
+{{- if .Values.isOpenShiftVendor }}
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:

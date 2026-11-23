@@ -1,6 +1,9 @@
 package addon
 
 import (
+	"bytes"
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"net/url"
 	"strconv"
@@ -13,7 +16,9 @@ import (
 
 const (
 	// Operator Subscription Channels
-	KeyOpenShiftLoggingChannel = "openshiftLoggingChannel"
+	KeyOpenShiftLoggingChannel   = "openshiftLoggingChannel"
+	KeyCOOCatalogSource          = "cooCatalogSource"
+	KeyCOOCatalogSourceNamespace = "cooCatalogSourceNamespace"
 
 	// Platform Observability Keys
 	KeyPlatformMetricsCollection         = "platformMetricsCollection"
@@ -21,6 +26,8 @@ const (
 	KeyPlatformIncidentDetection         = "platformIncidentDetection"
 	KeyPlatformNamespaceRightSizing      = "platformNamespaceRightSizing"
 	KeyPlatformVirtualizationRightSizing = "platformVirtualizationRightSizing"
+	KeyPlatformWorkloadRightSizing       = "platformWorkloadRightSizing"
+	KeyPlatformPodRightSizing            = "platformPodRightSizing"
 	KeyRightSizingDelegated              = "rightSizingDelegated"
 	KeyMetricsHubHostname                = "metricsHubHostname"
 	KeyNodeExporterHostPort              = "nodeExporterHostPort"
@@ -97,6 +104,8 @@ type RightSizingOptions struct {
 	Delegated             bool
 	NamespaceEnabled      bool
 	VirtualizationEnabled bool
+	WorkloadEnabled       bool
+	PodEnabled            bool
 }
 
 type AnalyticsOptions struct {
@@ -116,13 +125,89 @@ type MetricsUIOptions struct {
 }
 
 type ProxyConfig struct {
-	ProxyURL *url.URL
-	NoProxy  string
+	HTTPProxy  *url.URL
+	HTTPSProxy *url.URL
+	CABundle   []byte
+	NoProxy    string
+}
+
+// ProxyURLForTarget returns the appropriate proxy URL (*url.URL) for a given target URL string.
+// If the target URL scheme is explicitly "http" (case-insensitive), it returns p.HTTPProxy (falling back to p.HTTPSProxy).
+// Otherwise (for "https" or default/empty target scheme), it returns p.HTTPSProxy (falling back to p.HTTPProxy).
+func (p ProxyConfig) ProxyURLForTarget(targetURL string) *url.URL {
+	var scheme string
+	if targetURL != "" {
+		if u, err := url.Parse(targetURL); err == nil && u.Scheme != "" {
+			scheme = strings.ToLower(u.Scheme)
+		}
+	}
+
+	if scheme == "http" {
+		if p.HTTPProxy != nil {
+			return p.HTTPProxy
+		}
+		return p.HTTPSProxy
+	}
+
+	if p.HTTPSProxy != nil {
+		return p.HTTPSProxy
+	}
+	return p.HTTPProxy
+}
+
+func parseProxyURL(rawURL string) (*url.URL, error) {
+	if rawURL == "" {
+		return nil, nil
+	}
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %s", addoncfg.ErrInvalidProxyURL, err.Error())
+	}
+	if u.Scheme == "" || u.Host == "" {
+		return nil, fmt.Errorf("%w: missing scheme or host in proxy URL %q", addoncfg.ErrInvalidProxyURL, rawURL)
+	}
+	scheme := strings.ToLower(u.Scheme)
+	if scheme != "http" && scheme != "https" && scheme != "socks5" {
+		return nil, fmt.Errorf("%w: unsupported scheme %q in proxy URL %q (expected http, https, or socks5)", addoncfg.ErrInvalidProxyURL, u.Scheme, rawURL)
+	}
+	return u, nil
+}
+
+func validateCABundle(bundle []byte) error {
+	var certCount int
+	rest := bundle
+	for {
+		var block *pem.Block
+		block, rest = pem.Decode(rest)
+		if block == nil {
+			break
+		}
+		if block.Type != "CERTIFICATE" {
+			return fmt.Errorf("%w: expected CERTIFICATE block, got %s", addoncfg.ErrInvalidProxyCABundle, block.Type)
+		}
+		if _, err := x509.ParseCertificate(block.Bytes); err != nil {
+			return fmt.Errorf("%w: %s", addoncfg.ErrInvalidProxyCABundle, err.Error())
+		}
+		certCount++
+	}
+	if certCount == 0 {
+		return fmt.Errorf("%w: no certificates found in CA bundle", addoncfg.ErrInvalidProxyCABundle)
+	}
+	if len(bytes.TrimSpace(rest)) > 0 {
+		return fmt.Errorf("%w: trailing unparsed data in CA bundle", addoncfg.ErrInvalidProxyCABundle)
+	}
+	return nil
+}
+
+type COOOptions struct {
+	CatalogSource          string
+	CatalogSourceNamespace string
 }
 
 type Options struct {
 	Platform              PlatformOptions
 	UserWorkloads         UserWorkloadOptions
+	COO                   COOOptions
 	InstallNamespace      string
 	InstanceSize          string
 	Tolerations           []corev1.Toleration
@@ -170,12 +255,22 @@ func BuildOptions(addOnDeployment *addonapiv1beta1.AddOnDeploymentConfig) (Optio
 		opts.ResourceReqs = addOnDeployment.Spec.ResourceRequirements
 	}
 
-	if addOnDeployment.Spec.ProxyConfig.HTTPProxy != "" {
-		proxyURL, err := url.Parse(addOnDeployment.Spec.ProxyConfig.HTTPProxy)
-		if err != nil {
-			return opts, fmt.Errorf("%w: %s", addoncfg.ErrInvalidProxyURL, err.Error())
+	var err error
+	opts.ProxyConfig.HTTPProxy, err = parseProxyURL(addOnDeployment.Spec.ProxyConfig.HTTPProxy)
+	if err != nil {
+		return opts, err
+	}
+
+	opts.ProxyConfig.HTTPSProxy, err = parseProxyURL(addOnDeployment.Spec.ProxyConfig.HTTPSProxy)
+	if err != nil {
+		return opts, err
+	}
+
+	if len(addOnDeployment.Spec.ProxyConfig.CABundle) > 0 {
+		if err := validateCABundle(addOnDeployment.Spec.ProxyConfig.CABundle); err != nil {
+			return opts, err
 		}
-		opts.ProxyConfig.ProxyURL = proxyURL
+		opts.ProxyConfig.CABundle = bytes.Clone(addOnDeployment.Spec.ProxyConfig.CABundle)
 	}
 
 	opts.ProxyConfig.NoProxy = addOnDeployment.Spec.ProxyConfig.NoProxy
@@ -188,7 +283,7 @@ func BuildOptions(addOnDeployment *addonapiv1beta1.AddOnDeploymentConfig) (Optio
 
 	// Do NOT return early when CustomizedVariables is nil. The for-range
 	// loop below is a safe no-op on a nil slice, and we must always fall
-	// through to the auto-enable right-sizing logic that follows it.
+	// through to the default right-sizing logic that follows it.
 
 	// Track if right-sizing keys were explicitly set
 	nsRSExplicitlySet := false
@@ -200,6 +295,10 @@ func BuildOptions(addOnDeployment *addonapiv1beta1.AddOnDeploymentConfig) (Optio
 		case KeyOpenShiftLoggingChannel:
 			opts.Platform.Logs.SubscriptionChannel = keyvalue.Value
 			opts.UserWorkloads.Logs.SubscriptionChannel = keyvalue.Value
+		case KeyCOOCatalogSource:
+			opts.COO.CatalogSource = keyvalue.Value
+		case KeyCOOCatalogSourceNamespace:
+			opts.COO.CatalogSourceNamespace = keyvalue.Value
 		// Platform Observability Options
 		case KeyMetricsHubHostname:
 			val := keyvalue.Value
@@ -256,9 +355,7 @@ func BuildOptions(addOnDeployment *addonapiv1beta1.AddOnDeploymentConfig) (Optio
 				opts.Platform.AnalyticsOptions.IncidentDetection.Enabled = true
 			}
 		case KeyRightSizingDelegated:
-			if keyvalue.Value == "true" {
-				opts.Platform.AnalyticsOptions.RightSizing.Delegated = true
-			}
+			opts.Platform.AnalyticsOptions.RightSizing.Delegated = keyvalue.Value == "true"
 		case KeyPlatformNamespaceRightSizing:
 			nsRSExplicitlySet = true
 			// Always mark platform as enabled when RS key is present (even "disabled").
@@ -274,6 +371,12 @@ func BuildOptions(addOnDeployment *addonapiv1beta1.AddOnDeploymentConfig) (Optio
 			if keyvalue.Value == "enabled" {
 				opts.Platform.AnalyticsOptions.RightSizing.VirtualizationEnabled = true
 			}
+		case KeyPlatformWorkloadRightSizing:
+			opts.Platform.Enabled = true
+			opts.Platform.AnalyticsOptions.RightSizing.WorkloadEnabled = keyvalue.Value == "enabled"
+		case KeyPlatformPodRightSizing:
+			opts.Platform.Enabled = true
+			opts.Platform.AnalyticsOptions.RightSizing.PodEnabled = keyvalue.Value == "enabled"
 		// User Workload Observability Options
 		case KeyUserWorkloadMetricsCollection:
 			if keyvalue.Value == string(PrometheusAgentV1alpha1) {
@@ -305,18 +408,19 @@ func BuildOptions(addOnDeployment *addonapiv1beta1.AddOnDeploymentConfig) (Optio
 		}
 	}
 
-	// Auto-enable right-sizing by default when keys are not yet present in ADC.
+	// Auto-enable namespace and virtualization right-sizing when their keys are
+	// not yet present in ADC.
 	//
 	// This is a bootstrap safety net for the window between ADC creation (by MCO
 	// main controller) and first analytics controller reconcile (which calls
 	// syncRightSizingStateToADC to explicitly set the keys).
 	//
 	// Once syncRightSizingStateToADC runs, the keys are always present:
-	// - MCO mode: both keys set to "disabled" (MCO manages RS via Policy)
+	// - MCO mode: all keys set to "disabled" (MCO manages RS via Policy)
 	// - MCOA mode: keys set to "enabled"/"disabled" based on MCO CR spec
 	//
-	// The auto-enable ensures right-sizing works immediately on fresh installs
-	// before the analytics controller has had time to sync state to ADC.
+	// Workload and pod right-sizing are opt-in: they stay disabled until MCO
+	// writes their keys as "enabled".
 	if !nsRSExplicitlySet {
 		opts.Platform.Enabled = true
 		opts.Platform.AnalyticsOptions.RightSizing.NamespaceEnabled = true
@@ -325,7 +429,6 @@ func BuildOptions(addOnDeployment *addonapiv1beta1.AddOnDeploymentConfig) (Optio
 		opts.Platform.Enabled = true
 		opts.Platform.AnalyticsOptions.RightSizing.VirtualizationEnabled = true
 	}
-
 	if !opts.Platform.Metrics.CollectionEnabled {
 		opts.Platform.Metrics.UI.Enabled = false
 	}

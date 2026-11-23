@@ -1,3 +1,6 @@
 nameOverride: null
 enabled: true
 instrumentationEnabled: false
+
+catalogSource: redhat-operators
+catalogSourceNamespace: openshift-marketplace

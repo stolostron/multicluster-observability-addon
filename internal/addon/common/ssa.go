@@ -3,38 +3,119 @@ package common
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"reflect"
 	"slices"
 	"strings"
 
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
+// ErrNilObject is returned when attempting to server-side apply a nil object.
+var ErrNilObject = errors.New("cannot server-side apply a nil object")
+
+func isNil(obj client.Object) bool {
+	if obj == nil {
+		return true
+	}
+	val := reflect.ValueOf(obj)
+	return val.Kind() == reflect.Pointer && val.IsNil()
+}
+
+// ServerSideApply applies the provided object using Kubernetes Server-Side Apply (SSA).
+//
+// Background & Rationale:
+// In controller-runtime, client.Patch with client.Apply is deprecated in favor of client.Client.Apply,
+// which requires a runtime.ApplyConfiguration. Generated typed ApplyConfigurations (applyconfigurations/*)
+// are primarily available for core Kubernetes APIs (k8s.io/client-go/applyconfigurations) and are not generated
+// by the external CRD APIs used in this codebase (e.g. PrometheusAgent, Perses, ClusterManagementAddOn).
+//
+// To support arbitrary client.Object types (both typed CRDs and unstructured) without requiring dedicated
+// apply-configuration code generation across all external CRD APIs, we convert the object into an
+// *unstructured.Unstructured and wrap it with client.ApplyConfigurationFromUnstructured.
+// Once applied, the updated server state (UID, resourceVersion, generation, and populated fields) is synced
+// back into the original object.
+//
+// If owner is non-nil, a controller reference is established before applying.
 func ServerSideApply(ctx context.Context, c client.Client, obj client.Object, owner client.Object) error {
+	if isNil(obj) {
+		return ErrNilObject
+	}
+
 	// Only set controller reference if an owner is provided
-	if owner != nil {
+	if !isNil(owner) {
 		if err := controllerutil.SetControllerReference(owner, obj, c.Scheme()); err != nil {
 			return fmt.Errorf("failed to set controller reference: %w", err)
 		}
 	}
 
-	if obj.GetObjectKind().GroupVersionKind().Empty() {
-		gvk, err := apiutil.GVKForObject(obj, c.Scheme())
+	u, err := toUnstructuredApply(c, obj)
+	if err != nil {
+		return fmt.Errorf("failed to prepare object for server-side apply: %w", err)
+	}
+
+	applyConfig := client.ApplyConfigurationFromUnstructured(u)
+	if err := c.Apply(ctx, applyConfig, client.FieldOwner(addoncfg.Name), client.ForceOwnership); err != nil {
+		return fmt.Errorf("failed to apply with SSA: %w", err)
+	}
+
+	if err := syncBackToObject(u, obj); err != nil {
+		return fmt.Errorf("failed to sync server response back to object: %w", err)
+	}
+	return nil
+}
+
+// toUnstructuredApply normalizes obj into an *unstructured.Unstructured suitable for SSA:
+// 1. Unstructured objects are deep-copied directly.
+// 2. Typed objects are converted via runtime.DefaultUnstructuredConverter, preserving json tags.
+// 3. GVK is populated from the client scheme if missing on the typed struct TypeMeta.
+// 4. managedFields are stripped defensively to avoid API server rejection during apply.
+func toUnstructuredApply(c client.Client, obj client.Object) (*unstructured.Unstructured, error) {
+	var u *unstructured.Unstructured
+	if unstr, ok := obj.(*unstructured.Unstructured); ok {
+		u = unstr.DeepCopy()
+	} else {
+		unstrMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
 		if err != nil {
-			return fmt.Errorf("failed to get GVK for object: %w", err)
+			return nil, fmt.Errorf("failed to convert %T to unstructured map: %w", obj, err)
 		}
+		u = &unstructured.Unstructured{Object: unstrMap}
+	}
+
+	if u.GetAPIVersion() == "" || u.GetKind() == "" {
+		gvk, err := c.GroupVersionKindFor(obj)
+		if err != nil {
+			return nil, fmt.Errorf("failed to determine GVK for %T: %w", obj, err)
+		}
+		u.SetGroupVersionKind(gvk)
+	}
+
+	// Defensive stripping of managedFields to avoid API server rejection
+	u.SetManagedFields(nil)
+	return u, nil
+}
+
+// syncBackToObject reflects the post-apply server response from the unstructured representation
+// back into the caller's target object so in-memory pointers reflect updated metadata (UID, ResourceVersion,
+// Generation, CreationTimestamp, and GVK) as callers expect after a successful write.
+func syncBackToObject(u *unstructured.Unstructured, obj client.Object) error {
+	if unstr, ok := obj.(*unstructured.Unstructured); ok {
+		*unstr = *u
+		return nil
+	}
+
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(u.Object, obj); err != nil {
+		return fmt.Errorf("failed to sync server response to %T: %w", obj, err)
+	}
+
+	if gvk := u.GroupVersionKind(); !gvk.Empty() {
 		obj.GetObjectKind().SetGroupVersionKind(gvk)
 	}
-
-	//nolint:staticcheck // client.Apply is deprecated, but alternative requires ApplyConfigurations which we don't have
-	if err := c.Patch(ctx, obj, client.Apply, client.ForceOwnership, client.FieldOwner(addoncfg.Name)); err != nil {
-		return fmt.Errorf("failed to patch with SSA: %w", err)
-	}
-
 	return nil
 }
 
@@ -43,7 +124,7 @@ func ServerSideApply(ctx context.Context, c client.Client, obj client.Object, ow
 // automatically without a hand-maintained path list, and ignores zero-value
 // noise from typed structs (empty slices, nested structs without omitempty).
 func DeriveSSAManagedFields(obj client.Object) []string {
-	if obj == nil {
+	if isNil(obj) {
 		return nil
 	}
 
@@ -93,7 +174,7 @@ func specKeyDiff(zeroSpec, objSpec any) []string {
 		zeroMap = map[string]any{}
 	}
 
-	paths := []string{}
+	paths := make([]string, 0, len(objMap))
 	for key, val := range objMap {
 		zeroVal, exists := zeroMap[key]
 		if !exists || !reflect.DeepEqual(zeroVal, val) {
@@ -111,7 +192,7 @@ func labelKeyDiff(zeroPayload, objPayload map[string]any) []string {
 	}
 	zeroLabels := labelsFromPayload(zeroPayload)
 
-	paths := []string{}
+	paths := make([]string, 0, len(objLabels))
 	for key, val := range objLabels {
 		zeroVal, exists := zeroLabels[key]
 		if !exists || !reflect.DeepEqual(zeroVal, val) {
@@ -130,7 +211,7 @@ func labelsFromPayload(payload map[string]any) map[string]any {
 // SetSSAManagedFieldsAnnotation records the JSON paths MCOA enforces with server-side apply.
 // The annotation is sorted for a stable value so reconciles are not retriggered by field-order churn.
 func SetSSAManagedFieldsAnnotation(obj client.Object, fields []string) {
-	if obj == nil || len(fields) == 0 {
+	if isNil(obj) || len(fields) == 0 {
 		return
 	}
 
@@ -148,12 +229,15 @@ func SetSSAManagedFieldsAnnotation(obj client.Object, fields []string) {
 // SetSSAManagedFieldsAnnotationFromObject derives managed-field paths from obj and
 // writes them onto obj. obj should contain only the fields MCOA is applying.
 func SetSSAManagedFieldsAnnotationFromObject(obj client.Object) {
+	if isNil(obj) {
+		return
+	}
 	SetSSAManagedFieldsAnnotation(obj, DeriveSSAManagedFields(obj))
 }
 
 // SSAManagedFieldsAnnotation returns the SSA managed-fields annotation value, or "" if unset.
 func SSAManagedFieldsAnnotation(obj client.Object) string {
-	if obj == nil {
+	if isNil(obj) {
 		return ""
 	}
 	return obj.GetAnnotations()[addoncfg.SSAManagedFieldsAnnotationKey]

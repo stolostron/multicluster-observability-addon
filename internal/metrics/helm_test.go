@@ -51,6 +51,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	fakeclient "sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
+	"sigs.k8s.io/yaml"
 )
 
 const (
@@ -99,6 +100,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 		AgentMissing        bool
 		AlertsEnabled       bool
 		WithRawScrapeConfig bool
+		ProxyConfig         *addon.ProxyConfig
 		Expects             func(*testing.T, []client.Object)
 	}{
 		"no metrics": {
@@ -212,6 +214,55 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 					assert.Equal(t, v, job[0].Spec.Template.Labels[k],
 						"selector label %q must match the pod template labels", k)
 				}
+			},
+		},
+		"no metrics, is non ocp": {
+			// Simulates a non-OCP cluster (e.g., AKS, EKS) where metrics collection is disabled,
+			// such as when Right-Sizing is enabled.
+			// endpoint-monitoring-operator must be deployed without OpenShift-specific components:
+			// no kube-rbac-proxy sidecar, no OpenShift service-ca TLS secret volume, and no
+			// OpenShift-specific Service/ServiceMonitor/RBAC resources.
+			PlatformMetrics: false,
+			UserMetrics:     false,
+			IsOCP:           false,
+			Expects: func(t *testing.T, objects []client.Object) {
+				// 4 endpoint-monitoring-operator resources (SA, CR, CRB, Deployment)
+				// + 4 pre-delete cleanup hook resources (SA, CR, CRB, Job) = 8 total.
+				assert.Len(t, objects, 8)
+				deployments := common.FilterResourcesByLabelSelector[*appsv1.Deployment](objects, nil)
+				require.Len(t, deployments, 1)
+				emoDeployment := deployments[0]
+				assert.Equal(t, "endpoint-monitoring-operator", emoDeployment.GetName())
+
+				// endpoint-monitoring-operator container checks: non-OCP deployment must NOT have kube-rbac-proxy sidecar
+				require.Len(t, emoDeployment.Spec.Template.Spec.Containers, 1, "non-OCP deployment must NOT have kube-rbac-proxy sidecar")
+				emoContainer := emoDeployment.Spec.Template.Spec.Containers[0]
+				assert.Equal(t, "endpoint-monitoring-operator", emoContainer.Name)
+
+				// Metrics bind address must bind to 0.0.0.0:8080 directly for non-OCP
+				assert.Contains(t, emoContainer.Args, "--metrics-bind-address=0.0.0.0:8080")
+
+				// Direct metrics port must be exposed on container
+				require.Len(t, emoContainer.Ports, 1)
+				assert.Equal(t, int32(8080), emoContainer.Ports[0].ContainerPort)
+				assert.Equal(t, "metrics", emoContainer.Ports[0].Name)
+
+				// Ensure no OpenShift service-ca TLS volume is mounted or defined
+				for _, vol := range emoDeployment.Spec.Template.Spec.Volumes {
+					assert.NotEqual(t, "kube-rbac-proxy-tls", vol.Name, "kube-rbac-proxy-tls volume must not exist on non-OCP")
+				}
+
+				// No endpoint-monitoring-operator-metrics Service or ServiceMonitor on non-OCP
+				services := common.FilterResourcesByLabelSelector[*corev1.Service](objects, nil)
+				assert.Empty(t, services, "no metrics service should be deployed for endpoint-monitoring-operator on non-OCP")
+
+				serviceMonitors := common.FilterResourcesByLabelSelector[*prometheusv1.ServiceMonitor](objects, nil)
+				assert.Empty(t, serviceMonitors, "no metrics service monitor should be deployed for endpoint-monitoring-operator on non-OCP")
+
+				// Ensure pre-delete cleanup job is still present
+				job := common.FilterResourcesByLabelSelector[*batchv1.Job](objects, nil)
+				require.Len(t, job, 1)
+				assert.Equal(t, "observability-monitoring-cleanup", job[0].GetName())
 			},
 		},
 		"platform metrics enabled but agent missing": {
@@ -753,6 +804,44 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 				verifyClusterScopedResourcesPrefix(t, objects)
 			},
 		},
+		"non-ocp with proxy config renders alertmanager proxy settings": {
+			PlatformMetrics: true,
+			UserMetrics:     false,
+			COOIsInstalled:  false,
+			IsOCP:           false,
+			ProxyConfig: &addon.ProxyConfig{
+				HTTPSProxy: func() *url.URL {
+					u, _ := url.Parse("https://secure-proxy.example.com:8443")
+					return u
+				}(),
+				NoProxy: "*.example.com",
+			},
+			Expects: func(t *testing.T, objects []client.Object) {
+				secrets := common.FilterResourcesByLabelSelector[*corev1.Secret](objects, nil)
+				var alertmanagerSecret *corev1.Secret
+				for _, s := range secrets {
+					if s.GetName() == "prometheus-alertmanager" {
+						alertmanagerSecret = s
+						break
+					}
+				}
+				require.NotNil(t, alertmanagerSecret, "prometheus-alertmanager secret not found")
+				data, ok := alertmanagerSecret.Data["alertmanager.yaml"]
+				if !ok {
+					data = []byte(alertmanagerSecret.StringData["alertmanager.yaml"])
+				}
+				yamlStr := string(data)
+				assert.Contains(t, yamlStr, `proxy_url: "https://secure-proxy.example.com:8443"`)
+				assert.Contains(t, yamlStr, `no_proxy: "*.example.com"`)
+
+				// Verify the alertmanager.yaml is valid YAML and parses correctly (validating that reserved alias tokens like leading * in no_proxy are quoted)
+				var parsed []map[string]any
+				require.NoError(t, yaml.Unmarshal(data, &parsed), "failed to parse alertmanager.yaml as valid YAML")
+				require.NotEmpty(t, parsed)
+				assert.Equal(t, "https://secure-proxy.example.com:8443", parsed[0]["proxy_url"])
+				assert.Equal(t, "*.example.com", parsed[0]["no_proxy"])
+			},
+		},
 		"resource requests and limits": {
 			PlatformMetrics: true,
 			UserMetrics:     false,
@@ -1126,7 +1215,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 
 			// Wire everything together to a fake addon instance
 			agentAddon, err := addonfactory.NewAgentAddonFactory(addoncfg.Name, addon.FS, addoncfg.MetricsChartDir).
-				WithGetValuesFuncs(addonConfigValuesFn, fakeGetValues(client, tc.PlatformMetrics, tc.UserMetrics, tc.InstallNamespace, aodc.Spec.ResourceRequirements, tc.Registries, tc.NodeExporterOpts, tc.AlertsEnabled)).
+				WithGetValuesFuncs(addonConfigValuesFn, fakeGetValues(client, tc.PlatformMetrics, tc.UserMetrics, tc.InstallNamespace, aodc.Spec.ResourceRequirements, tc.Registries, tc.NodeExporterOpts, tc.AlertsEnabled, tc.ProxyConfig)).
 				WithAgentRegistrationOption(&agent.RegistrationOption{}).
 				WithAgentInstallNamespace(
 					// Set agent install namespace from addon deployment config if it exists
@@ -1425,7 +1514,7 @@ func TestHelmBuild_Metrics_HCP(t *testing.T) {
 
 	// Wire everything together to a fake addon instance
 	agentAddon, err := addonfactory.NewAgentAddonFactory(addoncfg.Name, addon.FS, addoncfg.MetricsChartDir).
-		WithGetValuesFuncs(addonConfigValuesFn, fakeGetValues(client, false, true, "", nil, nil, addon.NodeExporterOptions{}, false)).
+		WithGetValuesFuncs(addonConfigValuesFn, fakeGetValues(client, false, true, "", nil, nil, addon.NodeExporterOptions{}, false, nil)).
 		WithAgentRegistrationOption(&agent.RegistrationOption{}).
 		WithScheme(scheme).
 		BuildHelmAgentAddon()
@@ -1485,7 +1574,7 @@ func newSecret(name, ns string) *corev1.Secret {
 	}
 }
 
-func fakeGetValues(k8s client.Client, platformMetrics, userWorkloadMetrics bool, installNs string, resReqs []addonapiv1beta1.ContainerResourceRequirements, registries []addonapiv1beta1.ImageMirror, nodeExporterOpts addon.NodeExporterOptions, alertsEnabled bool) addonfactory.GetValuesFunc {
+func fakeGetValues(k8s client.Client, platformMetrics, userWorkloadMetrics bool, installNs string, resReqs []addonapiv1beta1.ContainerResourceRequirements, registries []addonapiv1beta1.ImageMirror, nodeExporterOpts addon.NodeExporterOptions, alertsEnabled bool, proxyConfig *addon.ProxyConfig) addonfactory.GetValuesFunc {
 	return func(
 		cluster *clusterv1.ManagedCluster,
 		mcAddon *addonapiv1beta1.ManagedClusterAddOn,
@@ -1512,6 +1601,10 @@ func fakeGetValues(k8s client.Client, platformMetrics, userWorkloadMetrics bool,
 				},
 			},
 			Registries: registries,
+		}
+
+		if proxyConfig != nil {
+			addonOpts.ProxyConfig = *proxyConfig
 		}
 
 		if installNs != "" {
@@ -1719,17 +1812,6 @@ func ensureGVKIsSet(scheme *runtime.Scheme) interceptor.Funcs {
 				obj.GetObjectKind().SetGroupVersionKind(gvk)
 			}
 			return nil
-		},
-		Patch: func(ctx context.Context, clientww client.WithWatch, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
-			gvk, _ := apiutil.GVKForObject(obj, scheme)
-			if !gvk.Empty() {
-				obj.GetObjectKind().SetGroupVersionKind(gvk)
-			}
-			err := clientww.Patch(ctx, obj, patch, opts...)
-			if err == nil && !gvk.Empty() {
-				obj.GetObjectKind().SetGroupVersionKind(gvk)
-			}
-			return err
 		},
 		List: func(ctx context.Context, clientww client.WithWatch, obj client.ObjectList, opts ...client.ListOption) error {
 			err := clientww.List(ctx, obj, opts...)

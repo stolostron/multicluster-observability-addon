@@ -537,6 +537,7 @@ func TestProcessScrapeConfigs(t *testing.T) {
 			secrets,
 			true, // isOCP
 			"default-ns",
+			nil,
 		)
 		require.NoError(t, err)
 
@@ -581,6 +582,7 @@ func TestProcessScrapeConfigs(t *testing.T) {
 			secrets,
 			true, // isOCP
 			"default-ns",
+			nil,
 		)
 		require.NoError(t, err)
 
@@ -595,6 +597,36 @@ func TestProcessScrapeConfigs(t *testing.T) {
 
 		// The patch should cleanly aggregate remote write specs from both raw scrape configs
 		assert.Len(t, patches[0].RemoteWriteSpecs, 2)
+	})
+
+	t.Run("OCP - Raw Metrics ScrapeConfig with proxy CA bundle merges CA into target namespace secret", func(t *testing.T) {
+		secrets := &[]*corev1.Secret{}
+		input := []*cooprometheusv1alpha1.ScrapeConfig{scRaw}
+		proxyCA := []byte("-----BEGIN CERTIFICATE-----\nproxy-ca\n-----END CERTIFICATE-----\n")
+
+		_, patches, _, err := builder.processScrapeConfigs(
+			context.Background(),
+			input,
+			agent,
+			"ca-secret",
+			"cert-secret",
+			secrets,
+			true, // isOCP
+			"default-ns",
+			proxyCA,
+		)
+		require.NoError(t, err)
+		assert.Len(t, patches, 1)
+
+		var caSec *corev1.Secret
+		for _, s := range *secrets {
+			if s.Namespace == "ns1" && s.Name == "ca-secret" {
+				caSec = s
+				break
+			}
+		}
+		require.NotNil(t, caSec, "CA secret not found in target namespace ns1")
+		assert.Equal(t, "test-ca\n-----BEGIN CERTIFICATE-----\nproxy-ca\n-----END CERTIFICATE-----\n", string(caSec.Data["ca.crt"]))
 	})
 
 	t.Run("OCP - Raw Metrics ScrapeConfig without COO stack (CMO target) should deploy secrets in default-ns and fall through as ScrapeConfig", func(t *testing.T) {
@@ -625,6 +657,7 @@ func TestProcessScrapeConfigs(t *testing.T) {
 			secrets,
 			true, // isOCP
 			"default-ns",
+			nil,
 		)
 		require.NoError(t, err)
 
@@ -666,6 +699,7 @@ func TestProcessScrapeConfigs(t *testing.T) {
 			secrets,
 			false, // isOCP
 			"default-ns",
+			nil,
 		)
 		require.NoError(t, err)
 

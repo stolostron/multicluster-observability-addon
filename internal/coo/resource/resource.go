@@ -1,6 +1,7 @@
 package resource
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	stderrors "errors"
@@ -21,13 +22,13 @@ import (
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	imanifests "github.com/stolostron/multicluster-observability-addon/internal/analytics/incident-detection/manifests"
 	cmanifests "github.com/stolostron/multicluster-observability-addon/internal/coo/manifests"
-	rsperses "github.com/stolostron/multicluster-observability-addon/internal/perses/dashboards/rightsizing"
 	"github.com/stolostron/multicluster-observability-addon/pkg/perses/dashboards/acm"
 	hcp "github.com/stolostron/multicluster-observability-addon/pkg/perses/dashboards/acm/hosted-control-plane"
 	compute "github.com/stolostron/multicluster-observability-addon/pkg/perses/dashboards/acm/k8s/compute"
 	networking "github.com/stolostron/multicluster-observability-addon/pkg/perses/dashboards/acm/k8s/networking"
 	slo "github.com/stolostron/multicluster-observability-addon/pkg/perses/dashboards/acm/k8s/slo"
 	incident_management "github.com/stolostron/multicluster-observability-addon/pkg/perses/dashboards/incident-management"
+	rsperses "github.com/stolostron/multicluster-observability-addon/pkg/perses/dashboards/rightsizing"
 	"github.com/stolostron/multicluster-observability-addon/pkg/perses/dashboards/thanos"
 	virt "github.com/stolostron/multicluster-observability-addon/pkg/perses/dashboards/virtualization"
 	corev1 "k8s.io/api/core/v1"
@@ -79,7 +80,9 @@ func EvaluateHubStackFeatures(opts addon.Options) HubStackFeatures {
 	hasAnalyticsDashboards := incidentDetectionEnabled ||
 		(opts.Platform.AnalyticsOptions.RightSizing.Delegated &&
 			(opts.Platform.AnalyticsOptions.RightSizing.NamespaceEnabled ||
-				opts.Platform.AnalyticsOptions.RightSizing.VirtualizationEnabled))
+				opts.Platform.AnalyticsOptions.RightSizing.VirtualizationEnabled ||
+				opts.Platform.AnalyticsOptions.RightSizing.WorkloadEnabled ||
+				opts.Platform.AnalyticsOptions.RightSizing.PodEnabled))
 
 	persesEnabled := hasDashboards || hasAnalyticsDashboards
 
@@ -95,9 +98,32 @@ func EvaluateHubStackFeatures(opts addon.Options) HubStackFeatures {
 // PersesDatasources, UIPlugin, analytics namespace) directly on the hub,
 // independent of the ManifestWork lifecycle.
 type HubResourceReconciler struct {
-	Client client.Client
-	Logger logr.Logger
-	Opts   addon.Options
+	Client    client.Client
+	APIReader client.Reader
+	Logger    logr.Logger
+	Opts      addon.Options
+}
+
+// reader returns APIReader when configured so reads on unwatched hub resources
+// (Namespace, OperatorGroup) bypass the informer cache. Falls back to Client
+// for unit tests that only wire a fake client.
+func (r *HubResourceReconciler) reader() client.Reader {
+	if r.APIReader != nil {
+		return r.APIReader
+	}
+	return r.Client
+}
+
+// readerFor returns APIReader for unwatched hub resource types (Namespace,
+// OperatorGroup) and the cached Client for watched types (Subscription,
+// PersesDashboard, PersesDatasource, UIPlugin).
+func (r *HubResourceReconciler) readerFor(obj client.Object) client.Reader {
+	switch obj.(type) {
+	case *corev1.Namespace, *operatorsv1.OperatorGroup:
+		return r.reader()
+	default:
+		return r.Client
+	}
 }
 
 func (r *HubResourceReconciler) Reconcile(ctx context.Context, hasCardinalityRules, canManageCOO bool) error {
@@ -226,8 +252,8 @@ func (r *HubResourceReconciler) reconcileCOOOperator(ctx context.Context, instal
 			Channel:                addoncfg.CooSubscriptionChannel,
 			InstallPlanApproval:    operatorsv1alpha1.ApprovalAutomatic,
 			Package:                addoncfg.CooSubscriptionName,
-			CatalogSource:          "redhat-operators",
-			CatalogSourceNamespace: "openshift-marketplace",
+			CatalogSource:          cmp.Or(r.Opts.COO.CatalogSource, addoncfg.DefaultCooCatalogSource),
+			CatalogSourceNamespace: cmp.Or(r.Opts.COO.CatalogSourceNamespace, addoncfg.DefaultCooCatalogSourceNamespace),
 		},
 	}
 	if err := r.applyResource(ctx, sub); err != nil {
@@ -248,7 +274,7 @@ func (r *HubResourceReconciler) ensureAnalyticsNamespace(ctx context.Context) er
 		},
 	}
 	existing := &corev1.Namespace{}
-	if err := r.Client.Get(ctx, client.ObjectKeyFromObject(ns), existing); err != nil {
+	if err := r.reader().Get(ctx, client.ObjectKeyFromObject(ns), existing); err != nil {
 		if !errors.IsNotFound(err) {
 			return fmt.Errorf("failed to get namespace %s: %w", ns.Name, err)
 		}
@@ -433,7 +459,7 @@ func (r *HubResourceReconciler) applyResource(ctx context.Context, obj client.Ob
 
 func (r *HubResourceReconciler) deleteIfManaged(ctx context.Context, obj client.Object) error {
 	existing := obj.DeepCopyObject().(client.Object)
-	if err := r.Client.Get(ctx, client.ObjectKeyFromObject(obj), existing); err != nil {
+	if err := r.readerFor(obj).Get(ctx, client.ObjectKeyFromObject(obj), existing); err != nil {
 		if errors.IsNotFound(err) || meta.IsNoMatchError(err) {
 			return nil
 		}
@@ -517,6 +543,8 @@ func allPossibleDashboardNames() map[string]struct{} {
 			buildIncidentDetectionPersesDashboards,
 			buildNamespaceRSPersesDashboards,
 			buildVMRSPersesDashboards,
+			buildWorkloadRSPersesDashboards(true),
+			buildPodRSPersesDashboards,
 			buildVirtualizationPersesDashboards,
 		}
 
@@ -558,6 +586,12 @@ func (r *HubResourceReconciler) buildDesiredDashboards(hasCardinalityRules, inci
 		}
 		if r.Opts.Platform.AnalyticsOptions.RightSizing.VirtualizationEnabled {
 			dashboards = r.appendDashboards(dashboards, "vm-rightsizing", buildVMRSPersesDashboards)
+		}
+		if r.Opts.Platform.AnalyticsOptions.RightSizing.WorkloadEnabled {
+			dashboards = r.appendDashboards(dashboards, "workload-rightsizing", buildWorkloadRSPersesDashboards(r.Opts.Platform.AnalyticsOptions.RightSizing.PodEnabled))
+		}
+		if r.Opts.Platform.AnalyticsOptions.RightSizing.PodEnabled {
+			dashboards = r.appendDashboards(dashboards, "pod-rightsizing", buildPodRSPersesDashboards)
 		}
 	}
 
@@ -732,6 +766,28 @@ func buildVMRSPersesDashboards() ([]persesv1.PersesDashboard, error) {
 		rsperses.BuildVMOverview,
 		rsperses.BuildVMOverestimation,
 		rsperses.BuildVMUnderestimation,
+	}, dsThanos, addoncfg.AnalyticsNamespace)
+}
+
+// buildWorkloadRSPersesDashboards returns a builder for the workload overview and
+// detail dashboards. When includePods is false, the detail dashboard omits pod tables.
+func buildWorkloadRSPersesDashboards(includePods bool) func() ([]persesv1.PersesDashboard, error) {
+	return func() ([]persesv1.PersesDashboard, error) {
+		detail := func(project, datasource, clusterLabel string) (dashboard.Builder, error) {
+			return rsperses.BuildWorkloadDetailForFeatures(project, datasource, clusterLabel, includePods)
+		}
+		return buildFromBuilders([]dashboardBuilderFunc{
+			rsperses.BuildWorkloadRightSizing,
+			detail,
+		}, dsThanos, addoncfg.AnalyticsNamespace)
+	}
+}
+
+// buildPodRSPersesDashboards builds the pod overview and detail right-sizing dashboards.
+func buildPodRSPersesDashboards() ([]persesv1.PersesDashboard, error) {
+	return buildFromBuilders([]dashboardBuilderFunc{
+		rsperses.BuildPodRightSizing,
+		rsperses.BuildPodDetail,
 	}, dsThanos, addoncfg.AnalyticsNamespace)
 }
 
