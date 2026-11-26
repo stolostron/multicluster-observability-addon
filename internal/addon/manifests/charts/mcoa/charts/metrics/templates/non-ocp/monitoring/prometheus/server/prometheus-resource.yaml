@@ -24,7 +24,11 @@ spec:
   secrets:
     - {{ .Values.alertmanagerRouterCASecretName }}
     - {{ .Values.clientCertSecretName }}
+    {{- if .Values.alertmanagerGatewayHost }}
+    - {{ .Values.alertmanagerGatewayTLSSecretName }}
+    {{- else }}
     - {{ .Values.alertmanagerAccessorSecretName }}
+    {{- end }}
   serviceMonitorSelector: {}
   {{- if .Values.prometheusServerRemoteWrite }}
   remoteWrite:
@@ -110,9 +114,10 @@ spec:
   additionalScrapeConfigs:
     name: prometheus-scrape-targets
     key: scrape-targets.yaml
-  {{- if .Values.hubEndpoint }}
+  {{- if or .Values.alertmanagerGatewayHost .Values.hubEndpoint }}
   additionalAlertManagerConfigs:
     name: prometheus-alertmanager
     key: alertmanager.yaml
   {{- end }}
 {{- end }}
+
