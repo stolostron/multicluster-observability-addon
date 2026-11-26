@@ -1168,7 +1168,7 @@ func TestHelmBuild_Metrics_All(t *testing.T) {
 			)
 
 			// generate default agent resources
-			images, err := config.GetImageOverrides(context.Background(), client, tc.Registries, klog.Background())
+			images, err := config.GetImageOverrides(context.Background(), client, tc.Registries, nil, klog.Background())
 			require.NoError(t, err)
 
 			addonOpts := newAddonOptions(true, true)

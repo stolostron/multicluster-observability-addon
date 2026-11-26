@@ -131,9 +131,13 @@ func (r *ResourceCreatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, fmt.Errorf("failed to get the ClusterManagementAddOn: %w", err)
 	}
 
-	// Reconcile metrics resources
+	// Reconcile metrics resources. The default agent CRs are shared across the
+	// clusters of a placement, so they carry the original images-list values:
+	// neither the AODC registries nor the per-cluster annotation overrides are
+	// applied here. All override resolution happens per cluster, at render
+	// time (see GetImageOverrides and ApplyToPrometheusAgent).
 	objs := []common.DefaultConfig{}
-	images, err := mconfig.GetImageOverrides(ctx, r.Client, opts.Registries, r.Log)
+	images, err := mconfig.GetImageOverrides(ctx, r.Client, nil, nil, r.Log)
 	if err != nil && !errors.IsNotFound(err) {
 		return ctrl.Result{}, fmt.Errorf("failed to get image overrides: %w", err)
 	}

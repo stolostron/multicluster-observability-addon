@@ -43,6 +43,7 @@ var (
 	errMissingDesiredConfig        = errors.New("missing desiredConfig in managedClusterAddon.Status.ConfigReferences")
 	errMissingRemoteWriteConfig    = errors.New("missing expected remote write spec in the prometheusAgent")
 	errMissingRouteHost            = errors.New("MCOA obs-api route has no host")
+	errInvalidPullSecretFormat     = errors.New("invalid pullSecret format, expected namespace.name")
 )
 
 type OptionsBuilder struct {
@@ -75,11 +76,23 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1beta1.Man
 		o.Logger.V(2).Info("Vendor for the managed cluster is overridden. This annotation is for testing prupose only", "managedcluster", managedCluster.Name, "newVendor", fakeVendor)
 	}
 
-	// Fetch image overrides
+	// Fetch image overrides (includes the per-cluster registry overrides from
+	// the ManagedCluster annotation)
 	var err error
-	ret.Images, err = config.GetImageOverrides(ctx, o.Client, opts.Registries, o.Logger)
+	ret.Images, err = config.GetImageOverrides(ctx, o.Client, opts.Registries, managedCluster, o.Logger)
 	if err != nil {
 		return ret, fmt.Errorf("failed to get image overrides: %w", err)
+	}
+
+	// The cluster registries are still needed for the pull secret and for
+	// rewriting images embedded in the fetched configuration resources.
+	clusterRegs := config.ParseClusterImageRegistries(managedCluster)
+	if clusterRegs != nil {
+		if clusterRegs.PullSecret != "" {
+			if psErr := o.addClusterPullSecret(ctx, &ret.Secrets, clusterRegs.PullSecret); psErr != nil {
+				o.Logger.Error(psErr, "failed to add custom pull secret from ManagedCluster annotation, using default")
+			}
+		}
 	}
 
 	// Fetch configuration references
@@ -135,6 +148,12 @@ func (o *OptionsBuilder) Build(ctx context.Context, mcAddon *addonapiv1beta1.Man
 			o.Logger.V(2).Info("No rules found for user workloads")
 		}
 	}
+
+	// The agents are copied from the hub-wide default agents, which carry the
+	// original images-list values; resolve them per cluster here (annotation
+	// first, AODC registries as the fallback), the same way as the images list.
+	clusterRegs.ApplyToPrometheusAgent(ret.Platform.PrometheusAgent, opts.Registries, o.Logger)
+	clusterRegs.ApplyToPrometheusAgent(ret.UserWorkloads.PrometheusAgent, opts.Registries, o.Logger)
 
 	if isHypershiftCluster {
 		if opts.UserWorkloads.Metrics.CollectionEnabled {
@@ -502,6 +521,33 @@ func (o *OptionsBuilder) addSecret(ctx context.Context, secrets *[]*corev1.Secre
 		}
 		secret.Data[config.MTLSCASecretKey] = mergeCABundle(secret.Data[config.MTLSCASecretKey], proxyCABundle)
 	}
+
+	*secrets = append(*secrets, secret)
+	return nil
+}
+
+const defaultImagePullSecretName = "open-cluster-management-image-pull-credentials"
+
+// addClusterPullSecret fetches the pull secret referenced in the
+// ManagedCluster's image-registries annotation (format: "namespace.name")
+// and adds it to the secrets list with the default pull secret name so it
+// replaces the one the addon framework would normally deploy.
+func (o *OptionsBuilder) addClusterPullSecret(ctx context.Context, secrets *[]*corev1.Secret, pullSecretRef string) error {
+	parts := strings.SplitN(pullSecretRef, ".", 2)
+	if len(parts) != 2 {
+		return fmt.Errorf("%w: %q", errInvalidPullSecretFormat, pullSecretRef)
+	}
+	namespace, name := parts[0], parts[1]
+
+	secret := &corev1.Secret{}
+	if err := o.Client.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, secret); err != nil {
+		return fmt.Errorf("failed to get custom pull secret %s/%s: %w", namespace, name, err)
+	}
+
+	secret = secret.DeepCopy()
+	secret.ResourceVersion = ""
+	secret.Name = defaultImagePullSecretName
+	secret.Namespace = ""
 
 	*secrets = append(*secrets, secret)
 	return nil
