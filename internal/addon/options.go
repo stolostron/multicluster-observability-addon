@@ -232,7 +232,7 @@ func (o Options) validateMetrics() error {
 	}
 
 	if o.Platform.Metrics.HubEndpoint.Host == "" {
-		return addoncfg.ErrInvalidMetricsHubHostname
+		return fmt.Errorf("%w: %w: %s is required when metrics collection is enabled", addoncfg.ErrMissingDependency, addoncfg.ErrInvalidMetricsHubHostname, KeyMetricsHubHostname)
 	}
 
 	return nil
@@ -301,6 +301,9 @@ func BuildOptions(addOnDeployment *addonapiv1beta1.AddOnDeploymentConfig) (Optio
 			opts.COO.CatalogSourceNamespace = keyvalue.Value
 		// Platform Observability Options
 		case KeyMetricsHubHostname:
+			if strings.TrimSpace(keyvalue.Value) == "" {
+				continue
+			}
 			val := keyvalue.Value
 			if !strings.HasPrefix(val, "http") {
 				val = "https://" + val
@@ -320,13 +323,17 @@ func BuildOptions(addOnDeployment *addonapiv1beta1.AddOnDeploymentConfig) (Optio
 
 			opts.Platform.Metrics.HubEndpoint = *url
 		case KeyPlatformMetricsAlerts:
-			if keyvalue.Value == "enabled" {
-				opts.Platform.Metrics.AlertsEnabled = true
+			enabled, err := parseBoolFlag(keyvalue.Name, keyvalue.Value)
+			if err != nil {
+				return opts, err
 			}
+			opts.Platform.Metrics.AlertsEnabled = enabled
 		case KeyUserWorkloadMetricsAlerts:
-			if keyvalue.Value == "enabled" {
-				opts.UserWorkloads.Metrics.AlertsEnabled = true
+			enabled, err := parseBoolFlag(keyvalue.Name, keyvalue.Value)
+			if err != nil {
+				return opts, err
 			}
+			opts.UserWorkloads.Metrics.AlertsEnabled = enabled
 		case KeyNodeExporterHostPort:
 			port, err := parsePort(keyvalue.Name, keyvalue.Value)
 			if err != nil {
@@ -340,71 +347,120 @@ func BuildOptions(addOnDeployment *addonapiv1beta1.AddOnDeploymentConfig) (Optio
 			}
 			opts.Platform.Metrics.NodeExporter.InternalPort = port
 		case KeyPlatformMetricsCollection:
-			if keyvalue.Value == string(PrometheusAgentV1alpha1) {
+			enabled, err := parseFeatureFlag(keyvalue.Name, keyvalue.Value, string(PrometheusAgentV1alpha1))
+			if err != nil {
+				return opts, err
+			}
+			opts.Platform.Metrics.CollectionEnabled = enabled
+			if enabled {
 				opts.Platform.Enabled = true
-				opts.Platform.Metrics.CollectionEnabled = true
 			}
 		case KeyPlatformLogsCollection:
-			if keyvalue.Value == string(ClusterLogForwarderV1) {
+			enabled, err := parseFeatureFlag(keyvalue.Name, keyvalue.Value, string(ClusterLogForwarderV1))
+			if err != nil {
+				return opts, err
+			}
+			opts.Platform.Logs.CollectionEnabled = enabled
+			if enabled {
 				opts.Platform.Enabled = true
-				opts.Platform.Logs.CollectionEnabled = true
 			}
 		case KeyPlatformIncidentDetection:
-			if keyvalue.Value == string(UIPluginV1alpha1) {
+			enabled, err := parseFeatureFlag(keyvalue.Name, keyvalue.Value, string(UIPluginV1alpha1))
+			if err != nil {
+				return opts, err
+			}
+			opts.Platform.AnalyticsOptions.IncidentDetection.Enabled = enabled
+			if enabled {
 				opts.Platform.Enabled = true
-				opts.Platform.AnalyticsOptions.IncidentDetection.Enabled = true
 			}
 		case KeyRightSizingDelegated:
-			opts.Platform.AnalyticsOptions.RightSizing.Delegated = keyvalue.Value == "true"
+			enabled, err := parseBoolFlag(keyvalue.Name, keyvalue.Value)
+			if err != nil {
+				return opts, err
+			}
+			opts.Platform.AnalyticsOptions.RightSizing.Delegated = enabled
 		case KeyPlatformNamespaceRightSizing:
 			nsRSExplicitlySet = true
 			// Always mark platform as enabled when RS key is present (even "disabled").
 			// This ensures the rendering pipeline runs so the addon framework can prune
 			// stale ManifestWork content when both RS features are disabled.
 			opts.Platform.Enabled = true
-			if keyvalue.Value == "enabled" {
-				opts.Platform.AnalyticsOptions.RightSizing.NamespaceEnabled = true
+			enabled, err := parseBoolFlag(keyvalue.Name, keyvalue.Value)
+			if err != nil {
+				return opts, err
 			}
+			opts.Platform.AnalyticsOptions.RightSizing.NamespaceEnabled = enabled
 		case KeyPlatformVirtualizationRightSizing:
 			virtRSExplicitlySet = true
 			opts.Platform.Enabled = true
-			if keyvalue.Value == "enabled" {
-				opts.Platform.AnalyticsOptions.RightSizing.VirtualizationEnabled = true
+			enabled, err := parseBoolFlag(keyvalue.Name, keyvalue.Value)
+			if err != nil {
+				return opts, err
 			}
+			opts.Platform.AnalyticsOptions.RightSizing.VirtualizationEnabled = enabled
 		case KeyPlatformWorkloadRightSizing:
 			opts.Platform.Enabled = true
-			opts.Platform.AnalyticsOptions.RightSizing.WorkloadEnabled = keyvalue.Value == "enabled"
+			enabled, err := parseBoolFlag(keyvalue.Name, keyvalue.Value)
+			if err != nil {
+				return opts, err
+			}
+			opts.Platform.AnalyticsOptions.RightSizing.WorkloadEnabled = enabled
 		case KeyPlatformPodRightSizing:
 			opts.Platform.Enabled = true
-			opts.Platform.AnalyticsOptions.RightSizing.PodEnabled = keyvalue.Value == "enabled"
+			enabled, err := parseBoolFlag(keyvalue.Name, keyvalue.Value)
+			if err != nil {
+				return opts, err
+			}
+			opts.Platform.AnalyticsOptions.RightSizing.PodEnabled = enabled
 		// User Workload Observability Options
 		case KeyUserWorkloadMetricsCollection:
-			if keyvalue.Value == string(PrometheusAgentV1alpha1) {
+			enabled, err := parseFeatureFlag(keyvalue.Name, keyvalue.Value, string(PrometheusAgentV1alpha1))
+			if err != nil {
+				return opts, err
+			}
+			opts.UserWorkloads.Metrics.CollectionEnabled = enabled
+			if enabled {
 				opts.UserWorkloads.Enabled = true
-				opts.UserWorkloads.Metrics.CollectionEnabled = true
 			}
 		case KeyUserWorkloadLogsCollection:
-			if keyvalue.Value == string(ClusterLogForwarderV1) {
+			enabled, err := parseFeatureFlag(keyvalue.Name, keyvalue.Value, string(ClusterLogForwarderV1))
+			if err != nil {
+				return opts, err
+			}
+			opts.UserWorkloads.Logs.CollectionEnabled = enabled
+			if enabled {
 				opts.UserWorkloads.Enabled = true
-				opts.UserWorkloads.Logs.CollectionEnabled = true
 			}
 		case KeyUserWorkloadTracesCollection:
-			if keyvalue.Value == string(OpenTelemetryCollectorV1beta1) {
+			enabled, err := parseFeatureFlag(keyvalue.Name, keyvalue.Value, string(OpenTelemetryCollectorV1beta1))
+			if err != nil {
+				return opts, err
+			}
+			opts.UserWorkloads.Traces.CollectionEnabled = enabled
+			if enabled {
 				opts.UserWorkloads.Enabled = true
-				opts.UserWorkloads.Traces.CollectionEnabled = true
 			}
 		case KeyUserWorkloadInstrumentation:
-			if keyvalue.Value == string(InstrumentationV1alpha1) {
+			enabled, err := parseFeatureFlag(keyvalue.Name, keyvalue.Value, string(InstrumentationV1alpha1))
+			if err != nil {
+				return opts, err
+			}
+			opts.UserWorkloads.Traces.InstrumentationEnabled = enabled
+			if enabled {
 				opts.UserWorkloads.Enabled = true
-				opts.UserWorkloads.Traces.InstrumentationEnabled = true
 			}
-			// Observability UI Options
+		// Observability UI Options
 		case KeyPlatformMetricsUI:
-			if keyvalue.Value == string(UIPluginV1alpha1) {
-				opts.Platform.Metrics.UI.Enabled = true
+			enabled, err := parseFeatureFlag(keyvalue.Name, keyvalue.Value, string(UIPluginV1alpha1))
+			if err != nil {
+				return opts, err
 			}
+			opts.Platform.Metrics.UI.Enabled = enabled
 		case KeyMetricsStorageInstanceSize:
 			opts.InstanceSize = keyvalue.Value
+			// Note on unknown keys:
+			// Unknown customized variables are intentionally ignored (no default error in this switch)
+			// to preserve forward compatibility with newer MCO versions writing keys unrecognized by this MCOA build.
 		}
 	}
 
@@ -445,4 +501,32 @@ func parsePort(name, value string) (int32, error) {
 		return 0, fmt.Errorf("%w: %d for %s must be between 1 and 65535", addoncfg.ErrInvalidPort, port, name)
 	}
 	return int32(port), nil
+}
+
+// parseBoolFlag evaluates boolean/status strings for keys that do not have a legacy Kubernetes API string.
+func parseBoolFlag(key, value string) (bool, error) {
+	return parseFeatureFlag(key, value, "")
+}
+
+// parseFeatureFlag evaluates boolean/status strings for AddOnDeploymentConfig variables.
+// To ensure backward compatibility with earlier MCOA releases, it accepts legacy Kubernetes
+// API resource strings (e.g. "prometheusagents.v1alpha1.monitoring.rhobs") as enabled values,
+// alongside intuitive truth values ("true", "enabled") and false values ("false", "disabled").
+// An empty value ("" or whitespace only) is treated as false to prevent fatal errors when
+// variables are defined without an explicit value in the AddOnDeploymentConfig.
+// Unrecognized non-empty values return ErrInvalidConfigurationValue to avoid silent misconfiguration.
+func parseFeatureFlag(key, value, legacyValue string) (bool, error) {
+	val := strings.TrimSpace(value)
+	if legacyValue != "" && (val == legacyValue || strings.EqualFold(val, legacyValue)) {
+		return true, nil
+	}
+
+	switch strings.ToLower(val) {
+	case "true", "enabled":
+		return true, nil
+	case "false", "disabled", "":
+		return false, nil
+	default:
+		return false, fmt.Errorf("%w: unrecognized value %q for %s", addoncfg.ErrInvalidConfigurationValue, value, key)
+	}
 }

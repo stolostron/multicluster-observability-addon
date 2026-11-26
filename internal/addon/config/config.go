@@ -111,6 +111,8 @@ const (
 )
 
 var (
+	ErrInvalidConfigurationValue  = errors.New("invalid configuration value")
+	ErrMissingDependency          = errors.New("missing configuration dependency")
 	ErrInvalidMetricsHubHostname  = errors.New("invalid metrics hub hostname")
 	ErrInvalidProxyURL            = errors.New("invalid proxy URL")
 	ErrInvalidProxyCABundle       = errors.New("invalid proxy CA bundle")
