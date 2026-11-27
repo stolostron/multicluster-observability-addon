@@ -32,12 +32,8 @@ require (
 	github.com/grafana/loki/operator/api/loki v0.0.0-20260618161557-5b6cddfaab00
 	github.com/openshift/controller-runtime-common v0.0.0-20260428152732-64ee174f5e2e
 	github.com/openshift/library-go v0.0.0-20260713143403-795ac1a480b5
-	github.com/perses/community-mixins v0.0.0-20251209094652-b91692c6ac00
 	github.com/perses/perses v0.53.1
 	github.com/perses/perses-operator v0.2.0
-	github.com/perses/plugins/prometheus v0.57.1
-	github.com/perses/plugins/statchart v0.12.1
-	github.com/perses/plugins/timeserieschart v0.12.1
 	github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring v0.90.1-rhobs1
 	github.com/rhobs/observability-operator/pkg/apis v0.0.0-20250902133632-f98bd8a20a80
 	github.com/thanos-community/thanos-operator v0.0.0-20261029071342-1a9a0ab18a9f
@@ -59,12 +55,16 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.3.1 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus v1.1.0 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.3.3 // indirect
+	github.com/perses/community-mixins v0.0.0-20251209094652-b91692c6ac00 // indirect
 	github.com/perses/plugins/barchart v0.11.1 // indirect
 	github.com/perses/plugins/logstable v0.2.1 // indirect
 	github.com/perses/plugins/loki v0.5.1 // indirect
 	github.com/perses/plugins/piechart v0.13.2-0.20260326134814-37e86f6b1c58 // indirect
+	github.com/perses/plugins/prometheus v0.57.1 // indirect
+	github.com/perses/plugins/statchart v0.12.1 // indirect
 	github.com/perses/plugins/staticlistvariable v0.8.1 // indirect
 	github.com/perses/plugins/table v0.11.3-0.20260416092358-50d24073dacc // indirect
+	github.com/perses/plugins/timeserieschart v0.12.1 // indirect
 	github.com/prometheus/otlptranslator v1.0.0 // indirect
 	golang.org/x/text v0.41.0 // indirect
 	k8s.io/streaming v0.36.2 // indirect
@@ -133,7 +133,7 @@ require (
 	github.com/perses/common v0.30.2 // indirect
 	github.com/perses/plugins/gaugechart v0.12.1 // indirect
 	github.com/perses/plugins/markdown v0.11.1 // indirect
-	github.com/perses/promql-builder v0.2.1-0.20260106092606-e4909fea9c57
+	github.com/perses/promql-builder v0.2.1-0.20260106092606-e4909fea9c57 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/prometheus/client_golang v1.23.2
