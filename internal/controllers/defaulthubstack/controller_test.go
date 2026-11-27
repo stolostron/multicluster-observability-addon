@@ -1,10 +1,13 @@
 package defaulthubstack
 
 import (
+	"context"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/go-logr/logr"
+	"github.com/go-logr/logr/funcr"
 	operatorsv1 "github.com/operator-framework/api/pkg/operators/v1"
 	operatorsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	persesv1 "github.com/perses/perses-operator/api/v1alpha1"
@@ -18,12 +21,14 @@ import (
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
@@ -57,6 +62,28 @@ func persesDashboardCRD() *apiextensionsv1.CustomResourceDefinition {
 			},
 		},
 	}
+}
+
+// persesDashboardCRDWithoutWebhook returns the dashboard CRD as OLM leaves it after
+// the COO CSV is removed: v1alpha2 is the storage version and conversion is None.
+func persesDashboardCRDWithoutWebhook() *apiextensionsv1.CustomResourceDefinition {
+	crd := persesDashboardCRD()
+	crd.Spec.Versions[0].Storage = false
+	crd.Spec.Versions = append(crd.Spec.Versions,
+		apiextensionsv1.CustomResourceDefinitionVersion{Name: "v1alpha2", Served: true, Storage: true})
+	crd.Spec.Conversion = &apiextensionsv1.CustomResourceConversion{Strategy: apiextensionsv1.NoneConverter}
+	return crd
+}
+
+// countLogs counts the log lines with message msg.
+func countLogs(logs []string, msg string) int {
+	n := 0
+	for _, line := range logs {
+		if strings.Contains(line, `"msg"="`+msg+`"`) {
+			n++
+		}
+	}
+	return n
 }
 
 func TestManagedByPredicate(t *testing.T) {
@@ -274,11 +301,7 @@ func TestReconcile_RightSizingInstallsCOOOnHub(t *testing.T) {
 			},
 		},
 	}
-	dashboardCRD := persesDashboardCRD()
-	dashboardCRD.Spec.Versions[0].Storage = false
-	dashboardCRD.Spec.Versions = append(dashboardCRD.Spec.Versions,
-		apiextensionsv1.CustomResourceDefinitionVersion{Name: "v1alpha2", Served: true, Storage: true})
-	dashboardCRD.Spec.Conversion = &apiextensionsv1.CustomResourceConversion{Strategy: apiextensionsv1.NoneConverter}
+	dashboardCRD := persesDashboardCRDWithoutWebhook()
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).
 		WithObjects(aodc, dashboardCRD).Build()
 
@@ -293,7 +316,7 @@ func TestReconcile_RightSizingInstallsCOOOnHub(t *testing.T) {
 	require.NoError(t, err)
 	require.Positive(t, result.RequeueAfter)
 
-	// Perses must be enabled before waiting for its conversion webhook.
+	// The UIPlugin enables Perses even while dashboards wait for the conversion webhook.
 	uip := &uiplugin.UIPlugin{}
 	require.NoError(t, fakeClient.Get(t.Context(), client.ObjectKey{Name: "monitoring"}, uip))
 	require.NotNil(t, uip.Spec.Monitoring)
@@ -350,6 +373,168 @@ func TestReconcile_RightSizingInstallsCOOOnHub(t *testing.T) {
 		Namespace: addoncfg.AnalyticsNamespace,
 	}, ds)
 	require.NoError(t, err, "analytics datasource should exist when right-sizing is enabled")
+}
+
+// TestReconcile_PrunedDashboardApplyWaitsForPersesAPI covers each way an apply
+// response can lose dashboard content. Some dashboards have no variables, so lost
+// panels alone must also count.
+func TestReconcile_PrunedDashboardApplyWaitsForPersesAPI(t *testing.T) {
+	tests := []struct {
+		name   string
+		fields []string
+	}{
+		{name: "variables and panels lost", fields: []string{"variables", "panels"}},
+		{name: "variables lost", fields: []string{"variables"}},
+		{name: "panels lost", fields: []string{"panels"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			testPrunedDashboardApply(t, tt.fields)
+		})
+	}
+}
+
+// testPrunedDashboardApply reconciles while each dashboard apply response comes back
+// without the given spec fields, then once the API server keeps the full dashboard.
+func testPrunedDashboardApply(t *testing.T, fields []string) {
+	scheme := newTestScheme()
+	aodc := &addonv1beta1.AddOnDeploymentConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      addoncfg.Name,
+			Namespace: addoncfg.InstallNamespace,
+		},
+		Spec: addonv1beta1.AddOnDeploymentConfigSpec{
+			// Namespace right-sizing builds a single dashboard. Virtualization adds more,
+			// so the test can tell whether a reconcile stops at the first pruned one.
+			CustomizedVariables: []addonv1beta1.CustomizedVariable{
+				{Name: addon.KeyRightSizingDelegated, Value: "true"},
+				{Name: addon.KeyPlatformNamespaceRightSizing, Value: "enabled"},
+				{Name: addon.KeyPlatformVirtualizationRightSizing, Value: "enabled"},
+			},
+		},
+	}
+	prune := true
+	pruned := 0
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).
+		WithObjects(aodc, persesDashboardCRD()).
+		WithInterceptorFuncs(interceptor.Funcs{
+			// The fake client cannot prune. Answer like an API server that has yet to
+			// observe the CRD update: the dashboard comes back without those fields.
+			Apply: func(ctx context.Context, c client.WithWatch, obj runtime.ApplyConfiguration, opts ...client.ApplyOption) error {
+				u, ok := obj.(interface {
+					GetKind() string
+					UnstructuredContent() map[string]any
+				})
+				if !prune || !ok || u.GetKind() != "PersesDashboard" {
+					return c.Apply(ctx, obj, opts...)
+				}
+				for _, field := range fields {
+					unstructured.RemoveNestedField(u.UnstructuredContent(), "spec", field)
+				}
+				pruned++
+				return nil
+			},
+		}).Build()
+
+	var logs []string
+	r := &DefaultHubStackReconciler{
+		Client:      fakeClient,
+		Log:         funcr.New(func(_, args string) { logs = append(logs, args) }, funcr.Options{}),
+		Scheme:      scheme,
+		watchedGVKs: allGVKsRegistered(),
+	}
+
+	for range 2 {
+		result, err := r.Reconcile(t.Context(), reconcile.Request{})
+		require.NoError(t, err)
+		assert.Equal(t, 10*time.Second, result.RequeueAfter)
+	}
+	assert.Equal(t, 2, pruned, "each reconcile must stop at the first pruned dashboard")
+	assert.Equal(t, 1, countLogs(logs, "waiting for Perses API"), "only the first wait logs at the default verbosity")
+
+	prune = false
+	result, err := r.Reconcile(t.Context(), reconcile.Request{})
+	require.NoError(t, err)
+	assert.Zero(t, result.RequeueAfter)
+	assert.Equal(t, 1, countLogs(logs, "finished waiting for Perses API"))
+
+	dashboard := &persesv1.PersesDashboard{}
+	require.NoError(t, fakeClient.Get(t.Context(), client.ObjectKey{Name: "acm-rs-namespace-overview", Namespace: addoncfg.AnalyticsNamespace}, dashboard))
+	assert.NotEmpty(t, dashboard.Spec.Variables)
+	assert.NotEmpty(t, dashboard.Spec.Panels)
+}
+
+func TestReconcile_PersesWaitStopsWhenNoFeatureUsesPerses(t *testing.T) {
+	scheme := newTestScheme()
+	aodc := &addonv1beta1.AddOnDeploymentConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      addoncfg.Name,
+			Namespace: addoncfg.InstallNamespace,
+		},
+		Spec: addonv1beta1.AddOnDeploymentConfigSpec{
+			CustomizedVariables: []addonv1beta1.CustomizedVariable{
+				{Name: addon.KeyRightSizingDelegated, Value: "true"},
+				{Name: addon.KeyPlatformNamespaceRightSizing, Value: "enabled"},
+			},
+		},
+	}
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).
+		WithObjects(aodc, persesDashboardCRDWithoutWebhook()).Build()
+
+	var logs []string
+	r := &DefaultHubStackReconciler{
+		Client:      fakeClient,
+		Log:         funcr.New(func(_, args string) { logs = append(logs, args) }, funcr.Options{}),
+		Scheme:      scheme,
+		watchedGVKs: allGVKsRegistered(),
+	}
+
+	result, err := r.Reconcile(t.Context(), reconcile.Request{})
+	require.NoError(t, err)
+	assert.Equal(t, 10*time.Second, result.RequeueAfter)
+	assert.Equal(t, 1, countLogs(logs, "waiting for Perses API"))
+	assert.Contains(t, logs, `"level"=0 "msg"="waiting for Perses API" "reason"="perses API not ready: `+
+		`waiting for persesdashboards.perses.dev to configure webhook conversion for v1alpha1 writes"`)
+
+	// Right-sizing is turned off before COO configures the conversion webhook.
+	require.NoError(t, fakeClient.Get(t.Context(), client.ObjectKeyFromObject(aodc), aodc))
+	aodc.Spec.CustomizedVariables = []addonv1beta1.CustomizedVariable{
+		{Name: addon.KeyRightSizingDelegated, Value: "true"},
+		{Name: addon.KeyPlatformNamespaceRightSizing, Value: "disabled"},
+		{Name: addon.KeyPlatformVirtualizationRightSizing, Value: "disabled"},
+	}
+	require.NoError(t, fakeClient.Update(t.Context(), aodc))
+
+	result, err = r.Reconcile(t.Context(), reconcile.Request{})
+	require.NoError(t, err)
+	assert.Zero(t, result.RequeueAfter)
+	assert.Equal(t, 1, countLogs(logs, "stopped waiting for Perses API"))
+	assert.Zero(t, countLogs(logs, "finished waiting for Perses API"), "the Perses API never became ready")
+}
+
+func TestPersesWaitLogging(t *testing.T) {
+	var logs []string
+	r := &DefaultHubStackReconciler{
+		Log: funcr.New(func(_, args string) { logs = append(logs, args) }, funcr.Options{Verbosity: 1}),
+	}
+
+	r.endPersesWait(true)  // no wait yet: silent
+	r.logPersesWait("a")   // the wait starts
+	r.logPersesWait("a")   // same reason: V(1)
+	r.logPersesWait("b")   // the reason changes
+	r.endPersesWait(true)  // the API is ready
+	r.endPersesWait(true)  // already ended: silent
+	r.logPersesWait("b")   // a new wait starts
+	r.endPersesWait(false) // no enabled feature uses Perses any more
+
+	assert.Equal(t, []string{
+		`"level"=0 "msg"="waiting for Perses API" "reason"="a"`,
+		`"level"=1 "msg"="waiting for Perses API" "reason"="a"`,
+		`"level"=0 "msg"="waiting for Perses API" "reason"="b"`,
+		`"level"=0 "msg"="finished waiting for Perses API"`,
+		`"level"=0 "msg"="waiting for Perses API" "reason"="b"`,
+		`"level"=0 "msg"="stopped waiting for Perses API" "reason"="no enabled feature uses Perses"`,
+	}, logs)
 }
 
 func TestReconcile_IncidentDetectionInstallsCOOOnHub(t *testing.T) {

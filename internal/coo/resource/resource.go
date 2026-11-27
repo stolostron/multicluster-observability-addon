@@ -150,7 +150,8 @@ func (r *HubResourceReconciler) Reconcile(ctx context.Context, hasCardinalityRul
 	}
 
 	if features.PersesEnabled {
-		// COO starts the Perses operator when the monitoring UIPlugin enables Perses.
+		// Enable the UIPlugin before the dashboard readiness check so a wait for
+		// the conversion webhook does not also hold back the console plugin.
 		if err := r.reconcileUIPlugin(ctx, true, features.IncidentDetectionEnabled); err != nil {
 			return fmt.Errorf("failed to reconcile UIPlugin: %w", err)
 		}
@@ -200,7 +201,7 @@ func (r *HubResourceReconciler) checkDashboardWriteReadiness(ctx context.Context
 		if errors.IsNotFound(err) {
 			return fmt.Errorf("%w: waiting for %s", ErrPersesAPINotReady, name)
 		}
-		return fmt.Errorf("get %s CRD: %w", name, err)
+		return fmt.Errorf("failed to get %s CRD: %w", name, err)
 	}
 	if crd.DeletionTimestamp != nil {
 		return fmt.Errorf("%w: %s is being deleted", ErrPersesAPINotReady, name)
