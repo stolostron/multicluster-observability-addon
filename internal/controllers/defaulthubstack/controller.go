@@ -63,6 +63,8 @@ type DefaultHubStackReconciler struct {
 	mapper      meta.RESTMapper
 	mu          sync.RWMutex
 	watchedGVKs map[schema.GroupVersionKind]bool
+	// persesWait holds the reason of the current wait for the Perses API.
+	persesWait string
 }
 
 func (r *DefaultHubStackReconciler) enqueueAODC() handler.EventHandler {
@@ -144,8 +146,14 @@ func (r *DefaultHubStackReconciler) Reconcile(ctx context.Context, _ ctrl.Reques
 		Opts:      opts,
 	}
 	if err := hubReconciler.Reconcile(ctx, hasCardinalityRules, canManageCOO); err != nil {
+		if stderrors.Is(err, cooresource.ErrPersesAPINotReady) {
+			r.logPersesWait(err.Error())
+			return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+		}
 		return ctrl.Result{}, fmt.Errorf("failed to reconcile COO hub resources: %w", err)
 	}
+	// The hub reconciler checks the Perses API only while a feature uses Perses.
+	r.endPersesWait(features.PersesEnabled)
 
 	allWatchesBound := r.registerDynamicWatches(ctx, features)
 	if !allWatchesBound {
@@ -153,6 +161,40 @@ func (r *DefaultHubStackReconciler) Reconcile(ctx context.Context, _ ctrl.Reques
 	}
 
 	return ctrl.Result{}, nil
+}
+
+// logPersesWait logs a wait for the Perses API at the default verbosity when it
+// starts or its reason changes, and at V(1) while the reason stays the same.
+func (r *DefaultHubStackReconciler) logPersesWait(reason string) {
+	r.mu.Lock()
+	changed := r.persesWait != reason
+	r.persesWait = reason
+	r.mu.Unlock()
+
+	if changed {
+		r.Log.Info("waiting for Perses API", "reason", reason)
+		return
+	}
+	r.Log.V(1).Info("waiting for Perses API", "reason", reason)
+}
+
+// endPersesWait logs once when the hub stack stops waiting for the Perses API:
+// either the API is ready, or no enabled feature uses Perses any more. Reconcile
+// calls it only after a successful pass, so a reconcile error keeps the wait open.
+func (r *DefaultHubStackReconciler) endPersesWait(apiReady bool) {
+	r.mu.Lock()
+	waited := r.persesWait != ""
+	r.persesWait = ""
+	r.mu.Unlock()
+
+	if !waited {
+		return
+	}
+	if apiReady {
+		r.Log.Info("finished waiting for Perses API")
+		return
+	}
+	r.Log.Info("stopped waiting for Perses API", "reason", "no enabled feature uses Perses")
 }
 
 func (r *DefaultHubStackReconciler) registerDynamicWatches(ctx context.Context, features cooresource.HubStackFeatures) bool {

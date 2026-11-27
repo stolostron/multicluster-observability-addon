@@ -1,7 +1,9 @@
 package resource
 
 import (
+	"context"
 	"testing"
+	"time"
 
 	"github.com/go-logr/logr"
 	operatorsv1 "github.com/operator-framework/api/pkg/operators/v1"
@@ -12,10 +14,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 )
 
 func newTestScheme() *runtime.Scheme {
@@ -248,6 +253,85 @@ func TestReconcileCOOOperatorCatalogSource(t *testing.T) {
 			require.NotNil(t, sub.Spec)
 			assert.Equal(t, tt.wantSource, sub.Spec.CatalogSource)
 			assert.Equal(t, tt.wantSourceNS, sub.Spec.CatalogSourceNamespace)
+		})
+	}
+}
+
+func TestCheckDashboardWriteReadiness(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, apiextensionsv1.AddToScheme(scheme))
+
+	dashboardCRD := func(conversion *apiextensionsv1.CustomResourceConversion, versions ...apiextensionsv1.CustomResourceDefinitionVersion) *apiextensionsv1.CustomResourceDefinition {
+		return &apiextensionsv1.CustomResourceDefinition{
+			ObjectMeta: metav1.ObjectMeta{Name: "persesdashboards.perses.dev"},
+			Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+				Versions:   versions,
+				Conversion: conversion,
+			},
+		}
+	}
+	v1alpha1 := apiextensionsv1.CustomResourceDefinitionVersion{Name: "v1alpha1", Served: true}
+	v1alpha1Storage := apiextensionsv1.CustomResourceDefinitionVersion{Name: "v1alpha1", Served: true, Storage: true}
+	v1alpha1Unserved := apiextensionsv1.CustomResourceDefinitionVersion{Name: "v1alpha1"}
+	v1alpha2Storage := apiextensionsv1.CustomResourceDefinitionVersion{Name: "v1alpha2", Served: true, Storage: true}
+	webhook := &apiextensionsv1.CustomResourceConversion{Strategy: apiextensionsv1.WebhookConverter}
+	none := &apiextensionsv1.CustomResourceConversion{Strategy: apiextensionsv1.NoneConverter}
+
+	deleting := dashboardCRD(webhook, v1alpha1, v1alpha2Storage)
+	deleting.DeletionTimestamp = &metav1.Time{Time: time.Now()}
+	deleting.Finalizers = []string{"test.perses.dev/keep"}
+
+	tests := []struct {
+		name    string
+		crd     *apiextensionsv1.CustomResourceDefinition
+		readErr error // the API reader returns this error instead of the CRD
+		ready   bool  // dashboard writes may start
+		wait    bool  // the caller retries after a delay
+	}{
+		{name: "CRD missing", wait: true},
+		{name: "CRD read forbidden", readErr: errors.NewForbidden(apiextensionsv1.Resource("customresourcedefinitions"), "persesdashboards.perses.dev", assert.AnError)},
+		{name: "CRD being deleted", crd: deleting, wait: true},
+		{name: "v1alpha1 not served", crd: dashboardCRD(webhook, v1alpha1Unserved, v1alpha2Storage)},
+		{name: "v1alpha1 removed", crd: dashboardCRD(webhook, v1alpha2Storage)},
+		{name: "v1alpha1 is the storage version", crd: dashboardCRD(nil, v1alpha1Storage), ready: true},
+		{name: "v1alpha2 storage without conversion", crd: dashboardCRD(nil, v1alpha1, v1alpha2Storage), wait: true},
+		{name: "v1alpha2 storage with None conversion", crd: dashboardCRD(none, v1alpha1, v1alpha2Storage), wait: true},
+		{name: "v1alpha2 storage with webhook conversion", crd: dashboardCRD(webhook, v1alpha1, v1alpha2Storage), ready: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			apiReader := fake.NewClientBuilder().WithScheme(scheme)
+			if tt.crd != nil {
+				apiReader = apiReader.WithObjects(tt.crd)
+			}
+			if tt.readErr != nil {
+				apiReader = apiReader.WithInterceptorFuncs(interceptor.Funcs{
+					Get: func(context.Context, client.WithWatch, client.ObjectKey, client.Object, ...client.GetOption) error {
+						return tt.readErr
+					},
+				})
+			}
+			r := &HubResourceReconciler{
+				// The CRD is only in the API reader: the check must not read it from the cache.
+				Client:    fake.NewClientBuilder().WithScheme(scheme).Build(),
+				APIReader: apiReader.Build(),
+				Logger:    logr.Discard(),
+			}
+
+			err := r.checkDashboardWriteReadiness(t.Context())
+			switch {
+			case tt.ready:
+				require.NoError(t, err)
+			case tt.wait:
+				require.ErrorIs(t, err, ErrPersesAPINotReady)
+			case tt.readErr != nil:
+				// A read error other than NotFound is a reconcile error, not a wait.
+				require.ErrorIs(t, err, tt.readErr)
+				require.NotErrorIs(t, err, ErrPersesAPINotReady)
+			default:
+				require.ErrorIs(t, err, errPersesWriteVersionNotServed)
+				require.NotErrorIs(t, err, ErrPersesAPINotReady)
+			}
 		})
 	}
 }
