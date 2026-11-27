@@ -2,7 +2,7 @@ package config
 
 import (
 	certmanagerv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
-	lokiv1 "github.com/grafana/loki/operator/api/loki/v1"
+	lokiv1 "github.com/grafana-community/loki-operator/api/loki/v1"
 	otelv1alpha1 "github.com/open-telemetry/opentelemetry-operator/apis/v1alpha1"
 	otelv1beta1 "github.com/open-telemetry/opentelemetry-operator/apis/v1beta1"
 	configv1 "github.com/openshift/api/config/v1"

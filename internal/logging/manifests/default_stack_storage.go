@@ -1,7 +1,7 @@
 package manifests
 
 import (
-	lokiv1 "github.com/grafana/loki/operator/api/loki/v1"
+	lokiv1 "github.com/grafana-community/loki-operator/api/loki/v1"
 	addoncfg "github.com/stolostron/multicluster-observability-addon/internal/addon/config"
 	mcoagateway "github.com/stolostron/multicluster-observability-addon/internal/mcoagateway"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

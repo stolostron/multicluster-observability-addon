@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"testing"
 
-	lokiv1 "github.com/grafana/loki/operator/api/loki/v1"
+	lokiv1 "github.com/grafana-community/loki-operator/api/loki/v1"
 	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon"
 	"github.com/stolostron/multicluster-observability-addon/internal/addon/common"

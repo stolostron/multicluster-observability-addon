@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"github.com/go-logr/logr"
-	lokiv1 "github.com/grafana/loki/operator/api/loki/v1"
+	lokiv1 "github.com/grafana-community/loki-operator/api/loki/v1"
 	routev1 "github.com/openshift/api/route/v1"
 	loggingv1 "github.com/openshift/cluster-logging-operator/api/observability/v1"
 	hyperv1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
