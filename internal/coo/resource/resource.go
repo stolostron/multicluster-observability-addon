@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	stderrors "errors"
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 
@@ -32,6 +33,7 @@ import (
 	"github.com/stolostron/multicluster-observability-addon/pkg/perses/dashboards/thanos"
 	virt "github.com/stolostron/multicluster-observability-addon/pkg/perses/dashboards/virtualization"
 	corev1 "k8s.io/api/core/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -50,6 +52,11 @@ const (
 )
 
 var errUnexpectedObjectType = stderrors.New("unexpected object type, expected *PersesDashboard")
+
+var errPersesWriteVersionNotServed = stderrors.New("write version is not served")
+
+// ErrPersesAPINotReady indicates that Perses dashboard publication must be retried.
+var ErrPersesAPINotReady = stderrors.New("perses API not ready")
 
 var managedResourceLabels = map[string]string{
 	addoncfg.ManagedByK8sLabelKey: ManagedByLabelValue,
@@ -105,8 +112,8 @@ type HubResourceReconciler struct {
 }
 
 // reader returns APIReader when configured so reads on unwatched hub resources
-// (Namespace, OperatorGroup) bypass the informer cache. Falls back to Client
-// for unit tests that only wire a fake client.
+// bypass the informer cache. Falls back to Client for unit tests that only
+// wire a fake client.
 func (r *HubResourceReconciler) reader() client.Reader {
 	if r.APIReader != nil {
 		return r.APIReader
@@ -130,8 +137,6 @@ func (r *HubResourceReconciler) Reconcile(ctx context.Context, hasCardinalityRul
 	features := EvaluateHubStackFeatures(r.Opts)
 	cooNeeded := features.PersesEnabled && canManageCOO
 
-	// Install COO first — Perses CRD conversion webhooks must be available
-	// before we can create/update dashboards and datasources.
 	if cooNeeded {
 		if err := r.reconcileCOOOperator(ctx, true); err != nil {
 			return fmt.Errorf("failed to reconcile COO operator: %w", err)
@@ -144,6 +149,16 @@ func (r *HubResourceReconciler) Reconcile(ctx context.Context, hasCardinalityRul
 		}
 	}
 
+	if features.PersesEnabled {
+		// COO starts the Perses operator when the monitoring UIPlugin enables Perses.
+		if err := r.reconcileUIPlugin(ctx, true, features.IncidentDetectionEnabled); err != nil {
+			return fmt.Errorf("failed to reconcile UIPlugin: %w", err)
+		}
+		if err := r.checkDashboardWriteReadiness(ctx); err != nil {
+			return err
+		}
+	}
+
 	if err := r.reconcileDashboards(ctx, hasCardinalityRules, features.IncidentDetectionEnabled); err != nil {
 		return fmt.Errorf("failed to reconcile dashboards: %w", err)
 	}
@@ -152,8 +167,10 @@ func (r *HubResourceReconciler) Reconcile(ctx context.Context, hasCardinalityRul
 		return fmt.Errorf("failed to reconcile datasources: %w", err)
 	}
 
-	if err := r.reconcileUIPlugin(ctx, features.PersesEnabled, features.IncidentDetectionEnabled); err != nil {
-		return fmt.Errorf("failed to reconcile UIPlugin: %w", err)
+	if !features.PersesEnabled {
+		if err := r.reconcileUIPlugin(ctx, false, features.IncidentDetectionEnabled); err != nil {
+			return fmt.Errorf("failed to reconcile UIPlugin: %w", err)
+		}
 	}
 
 	if !features.HasAnalyticsDashboards {
@@ -172,6 +189,38 @@ func (r *HubResourceReconciler) Reconcile(ctx context.Context, hasCardinalityRul
 		}
 	}
 
+	return nil
+}
+
+func (r *HubResourceReconciler) checkDashboardWriteReadiness(ctx context.Context) error {
+	const name = "persesdashboards.perses.dev"
+	writeVersion := persesv1.GroupVersion.Version
+	crd := &apiextensionsv1.CustomResourceDefinition{}
+	if err := r.reader().Get(ctx, client.ObjectKey{Name: name}, crd); err != nil {
+		if errors.IsNotFound(err) {
+			return fmt.Errorf("%w: waiting for %s", ErrPersesAPINotReady, name)
+		}
+		return fmt.Errorf("get %s CRD: %w", name, err)
+	}
+	if crd.DeletionTimestamp != nil {
+		return fmt.Errorf("%w: %s is being deleted", ErrPersesAPINotReady, name)
+	}
+	if !slices.ContainsFunc(crd.Spec.Versions, func(version apiextensionsv1.CustomResourceDefinitionVersion) bool {
+		return version.Name == writeVersion && version.Served
+	}) {
+		return fmt.Errorf("%s version %s: %w", name, writeVersion, errPersesWriteVersionNotServed)
+	}
+	if slices.ContainsFunc(crd.Spec.Versions, func(version apiextensionsv1.CustomResourceDefinitionVersion) bool {
+		return version.Name == writeVersion && version.Storage
+	}) {
+		return nil
+	}
+
+	// With conversion disabled, the API server can accept writes and prune
+	// dashboard content that lives at different paths in the storage version.
+	if crd.Spec.Conversion == nil || crd.Spec.Conversion.Strategy != apiextensionsv1.WebhookConverter {
+		return fmt.Errorf("%w: waiting for %s to configure webhook conversion for %s writes", ErrPersesAPINotReady, name, writeVersion)
+	}
 	return nil
 }
 
@@ -489,8 +538,15 @@ func (r *HubResourceReconciler) reconcileDashboards(ctx context.Context, hasCard
 		db := &desired[i]
 		desiredNames[db.Namespace+"/"+db.Name] = struct{}{}
 
+		variables, panels := len(db.Spec.Variables), len(db.Spec.Panels)
 		if err := r.applyResource(ctx, db); err != nil {
 			return fmt.Errorf("failed to apply dashboard %s/%s: %w", db.Namespace, db.Name, err)
+		}
+		// The write can reach an API server that has yet to observe the CRD update.
+		// Keep retrying if the apply response lost dashboard content.
+		if len(db.Spec.Variables) < variables || len(db.Spec.Panels) < panels {
+			return fmt.Errorf("%w: apply for dashboard %s/%s returned %d of %d variables and %d of %d panels",
+				ErrPersesAPINotReady, db.Namespace, db.Name, len(db.Spec.Variables), variables, len(db.Spec.Panels), panels)
 		}
 	}
 

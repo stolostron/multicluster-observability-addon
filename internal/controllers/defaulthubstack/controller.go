@@ -144,6 +144,10 @@ func (r *DefaultHubStackReconciler) Reconcile(ctx context.Context, _ ctrl.Reques
 		Opts:      opts,
 	}
 	if err := hubReconciler.Reconcile(ctx, hasCardinalityRules, canManageCOO); err != nil {
+		if stderrors.Is(err, cooresource.ErrPersesAPINotReady) {
+			r.Log.V(1).Info("waiting for Perses API", "reason", err.Error())
+			return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+		}
 		return ctrl.Result{}, fmt.Errorf("failed to reconcile COO hub resources: %w", err)
 	}
 

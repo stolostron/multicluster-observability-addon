@@ -13,8 +13,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog/v2"
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -50,8 +50,17 @@ func buildOpts(t *testing.T, cv []addonapiv1beta1.CustomizedVariable) addon.Opti
 func reconcileHubResources(t *testing.T, cv []addonapiv1beta1.CustomizedVariable) client.Client {
 	t.Helper()
 
+	crd := &apiextensionsv1.CustomResourceDefinition{
+		ObjectMeta: metav1.ObjectMeta{Name: "persesdashboards.perses.dev"},
+		Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+			Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
+				{Name: persesv1.GroupVersion.Version, Served: true, Storage: true},
+			},
+		},
+	}
 	k8s := fake.NewClientBuilder().
-		WithScheme(scheme.Scheme).
+		WithScheme(addoncfg.NewScheme()).
+		WithObjects(crd).
 		Build()
 
 	reconciler := &cooresource.HubResourceReconciler{

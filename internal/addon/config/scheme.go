@@ -17,6 +17,7 @@ import (
 	monitoringv1alpha1 "github.com/rhobs/observability-operator/pkg/apis/monitoring/v1alpha1"
 	uiplugin "github.com/rhobs/observability-operator/pkg/apis/uiplugin/v1alpha1"
 	thanosv1alpha1 "github.com/thanos-community/thanos-operator/api/v1alpha1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -30,6 +31,7 @@ import (
 // AddToScheme adds all types needed by MCOA to the provided scheme.
 func AddToScheme(s *runtime.Scheme) error {
 	utilruntime.Must(clientgoscheme.AddToScheme(s))
+	utilruntime.Must(apiextensionsv1.AddToScheme(s))
 	utilruntime.Must(workv1.Install(s))
 	utilruntime.Must(loggingv1.AddToScheme(s))
 	utilruntime.Must(otelv1beta1.AddToScheme(s))

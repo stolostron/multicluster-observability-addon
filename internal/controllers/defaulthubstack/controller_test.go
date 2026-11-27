@@ -15,6 +15,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -37,12 +39,24 @@ func allGVKsRegistered() map[schema.GroupVersionKind]bool {
 func newTestScheme() *runtime.Scheme {
 	scheme := runtime.NewScheme()
 	_ = corev1.AddToScheme(scheme)
+	_ = apiextensionsv1.AddToScheme(scheme)
 	_ = addonv1beta1.Install(scheme)
 	_ = operatorsv1.AddToScheme(scheme)
 	_ = operatorsv1alpha1.AddToScheme(scheme)
 	_ = persesv1.AddToScheme(scheme)
 	_ = uiplugin.AddToScheme(scheme)
 	return scheme
+}
+
+func persesDashboardCRD() *apiextensionsv1.CustomResourceDefinition {
+	return &apiextensionsv1.CustomResourceDefinition{
+		ObjectMeta: metav1.ObjectMeta{Name: "persesdashboards.perses.dev"},
+		Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+			Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
+				{Name: persesv1.GroupVersion.Version, Served: true, Storage: true},
+			},
+		},
+	}
 }
 
 func TestManagedByPredicate(t *testing.T) {
@@ -169,7 +183,8 @@ func TestReconcile_DynamicWatchesPendingRequeues(t *testing.T) {
 			},
 		},
 	}
-	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(aodc).Build()
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).
+		WithObjects(aodc, persesDashboardCRD()).Build()
 
 	r := &DefaultHubStackReconciler{
 		Client: fakeClient,
@@ -259,7 +274,13 @@ func TestReconcile_RightSizingInstallsCOOOnHub(t *testing.T) {
 			},
 		},
 	}
-	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(aodc).Build()
+	dashboardCRD := persesDashboardCRD()
+	dashboardCRD.Spec.Versions[0].Storage = false
+	dashboardCRD.Spec.Versions = append(dashboardCRD.Spec.Versions,
+		apiextensionsv1.CustomResourceDefinitionVersion{Name: "v1alpha2", Served: true, Storage: true})
+	dashboardCRD.Spec.Conversion = &apiextensionsv1.CustomResourceConversion{Strategy: apiextensionsv1.NoneConverter}
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).
+		WithObjects(aodc, dashboardCRD).Build()
 
 	r := &DefaultHubStackReconciler{
 		Client:      fakeClient,
@@ -270,7 +291,34 @@ func TestReconcile_RightSizingInstallsCOOOnHub(t *testing.T) {
 
 	result, err := r.Reconcile(t.Context(), reconcile.Request{})
 	require.NoError(t, err)
+	require.Positive(t, result.RequeueAfter)
+
+	// Perses must be enabled before waiting for its conversion webhook.
+	uip := &uiplugin.UIPlugin{}
+	require.NoError(t, fakeClient.Get(t.Context(), client.ObjectKey{Name: "monitoring"}, uip))
+	require.NotNil(t, uip.Spec.Monitoring)
+	require.NotNil(t, uip.Spec.Monitoring.Perses)
+	assert.True(t, uip.Spec.Monitoring.Perses.Enabled)
+
+	dashboard := &persesv1.PersesDashboard{}
+	err = fakeClient.Get(t.Context(), client.ObjectKey{Name: "acm-rs-namespace-overview", Namespace: addoncfg.AnalyticsNamespace}, dashboard)
+	require.True(t, errors.IsNotFound(err), "dashboard must wait for conversion: %v", err)
+
+	require.NoError(t, fakeClient.Get(t.Context(), client.ObjectKeyFromObject(dashboardCRD), dashboardCRD))
+	dashboardCRD.Spec.Conversion = &apiextensionsv1.CustomResourceConversion{
+		Strategy: apiextensionsv1.WebhookConverter,
+		Webhook: &apiextensionsv1.WebhookConversion{
+			ClientConfig: &apiextensionsv1.WebhookClientConfig{
+				Service: &apiextensionsv1.ServiceReference{Name: "perses-operator-service", Namespace: addoncfg.CooSubscriptionNamespace},
+			},
+			ConversionReviewVersions: []string{"v1"},
+		},
+	}
+	require.NoError(t, fakeClient.Update(t.Context(), dashboardCRD))
+	result, err = r.Reconcile(t.Context(), reconcile.Request{})
+	require.NoError(t, err)
 	assert.Zero(t, result.RequeueAfter)
+	require.NoError(t, fakeClient.Get(t.Context(), client.ObjectKey{Name: "acm-rs-namespace-overview", Namespace: addoncfg.AnalyticsNamespace}, dashboard))
 
 	// COO Subscription should be created on hub for right-sizing dashboards
 	sub := &operatorsv1alpha1.Subscription{}
@@ -317,7 +365,8 @@ func TestReconcile_IncidentDetectionInstallsCOOOnHub(t *testing.T) {
 			},
 		},
 	}
-	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(aodc).Build()
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).
+		WithObjects(aodc, persesDashboardCRD()).Build()
 
 	r := &DefaultHubStackReconciler{
 		Client:      fakeClient,
